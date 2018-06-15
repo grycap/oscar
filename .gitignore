@@ -1,0 +1,6 @@
+work/
+test/*.zip
+.p*
+*.pyc
+*.zip*
+*.log
