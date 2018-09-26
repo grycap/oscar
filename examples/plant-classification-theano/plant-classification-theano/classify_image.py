@@ -69,22 +69,22 @@ parser.add_argument("FILE")
 parser.add_argument("-o", "--output", help="Save the result to a local file.")
 args = parser.parse_args()
 
-metadata = np.genfromtxt(os.path.join('data', 'data_splits', 'synsets.txt'), dtype='str', delimiter='/n')
-metadata_binomial = np.genfromtxt(os.path.join('data', 'data_splits', 'synsets_binomial.txt'), dtype='str', delimiter='/n')
+homedir = (os.path.dirname(os.path.realpath(__file__)))
+
+metadata_binomial = np.genfromtxt(os.path.join(homedir, 'data', 'data_splits', 'synsets_binomial.txt'), dtype='str', delimiter='/n')
 modelname = 'resnet50_6182classes_100epochs'
 
 # Load training info
-info_file = os.path.join('plant_classification', 'training_info', modelname + '.json')
+info_file = os.path.join(homedir, 'plant_classification', 'training_info', modelname + '.json')
 with open(info_file) as datafile:
     train_info = json.load(datafile)
 mean_RGB = train_info['augmentation_params']['mean_RGB']
 output_dim = train_info['training_params']['output_dim']
 
 # Load net weights
-test_func = load_model(os.path.join('plant_classification', 'training_weights', modelname + '.npz'), output_dim=output_dim)
+test_func = load_model(os.path.join(homedir, 'plant_classification', 'training_weights', modelname + '.npz'), output_dim=output_dim)
 
 # Predict single local image
 im_path = [args.FILE]
 pred_lab, pred_prob = single_prediction(test_func, im_list=im_path, aug_params={'mean_RGB': mean_RGB})
 plot_image(im_path[0], metadata_binomial[pred_lab], pred_prob, output=args.output)
-
