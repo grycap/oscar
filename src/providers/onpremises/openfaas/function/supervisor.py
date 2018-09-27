@@ -7,7 +7,7 @@ import tempfile
 import subprocess
 from urllib.parse import unquote_plus
 
-os_tmp_folder = tempfile.gettempdir() + "/" + get_temp_folder()
+os_tmp_folder = tempfile.gettempdir() + "/" + str(uuid.uuid4().hex)
 output_folder = os_tmp_folder + "/output"
 
 def is_s3_event(event):
@@ -68,9 +68,6 @@ def upload_file(bucket_name, file_path, file_key):
     # print("Changing ACLs for public-read for object in bucket {0} with key {1}".format(bucket_name, file_key))
     # obj = boto3.resource('s3').Object(bucket_name, file_key)
     # obj.Acl().put(ACL='public-read')
-
-def get_temp_folder():
-    return str(uuid.uuid4().hex)
 
 def is_key_and_value_in_dictionary(key, dictionary):
     return (key in dictionary) and dictionary[key] and dictionary[key] != ""    
