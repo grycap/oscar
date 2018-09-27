@@ -1,0 +1,15 @@
+provider:
+  name: faas 
+  gateway: http://127.0.0.1:31112
+
+functions:
+  plants:
+    lang: dockerfile
+    handler: ./plant-classification-theano
+    image: plants
+    environment:
+      AWS_ACCESS_KEY_ID: xxx
+      AWS_SECRET_ACCESS_KEY: xxx
+      OUTPUT_BUCKET: xxx
+      read_timeout: 90
+      write_timeout: 90 

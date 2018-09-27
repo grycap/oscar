@@ -18,6 +18,10 @@ import sys
 import json
 import argparse
 
+# Set matplotlib non-interactive backend to work in a container
+import matplotlib
+matplotlib.use('agg')
+
 import numpy as np
 import matplotlib.pylab as plt
 from PIL import Image
