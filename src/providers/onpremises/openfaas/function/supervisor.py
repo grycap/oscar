@@ -7,7 +7,7 @@ import tempfile
 import subprocess
 from urllib.parse import unquote_plus
 
-os_tmp_folder = tempfile.gettempdir()
+os_tmp_folder = tempfile.gettempdir() + "/" + get_temp_folder()
 output_folder = os_tmp_folder + "/output"
 
 def is_s3_event(event):
@@ -68,7 +68,10 @@ def upload_file(bucket_name, file_path, file_key):
     # print("Changing ACLs for public-read for object in bucket {0} with key {1}".format(bucket_name, file_key))
     # obj = boto3.resource('s3').Object(bucket_name, file_key)
     # obj.Acl().put(ACL='public-read')
-    
+
+def get_temp_folder():
+    return str(uuid.uuid4().hex)
+
 def is_key_and_value_in_dictionary(key, dictionary):
     return (key in dictionary) and dictionary[key] and dictionary[key] != ""    
 
@@ -87,6 +90,7 @@ if(__name__ == "__main__"):
     print("Received input: {0}".format(f_input))
     if is_s3_event(f_input):
         os.environ['SCAR_INPUT_FILE'] = download_s3_file(f_input)
+        os.environ['SCAR_OUTPUT_FOLDER'] = output_folder
         print('SCAR_INPUT_FILE: {0}'.format(os.environ['SCAR_INPUT_FILE']))
         if is_key_and_value_in_dictionary('sprocess', os.environ):
             os.makedirs(output_folder, exist_ok=True)
