@@ -6,11 +6,10 @@ functions:
   imagemagick:
     lang: dockerfile
     handler: ./imagemagick
-    image: imagemagick
+    image: registry.docker-registry/imagemagick
     environment:
       AWS_ACCESS_KEY_ID: xxx
       AWS_SECRET_ACCESS_KEY: xxx
       OUTPUT_BUCKET: xxx
-      OUTPUT_FOLDER: xxx
       read_timeout: 90
       write_timeout: 90 
