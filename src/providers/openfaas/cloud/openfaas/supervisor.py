@@ -93,5 +93,3 @@ if(__name__ == "__main__"):
             os.makedirs(output_folder, exist_ok=True)
             launch_user_script()
             upload_output()
-        
-    
