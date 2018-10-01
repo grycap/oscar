@@ -3,10 +3,10 @@ provider:
   gateway: http://127.0.0.1:31112
 
 functions:
-  imagemagick:
+  plants:
     lang: dockerfile
-    handler: ./imagemagick
-    image: registry.docker-registry/imagemagick
+    handler: ./plant-classification-theano
+    image: registry.docker-registry/plants
     environment:
       AWS_ACCESS_KEY_ID: xxx
       AWS_SECRET_ACCESS_KEY: xxx
