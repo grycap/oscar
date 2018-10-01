@@ -1,0 +1,22 @@
+description ubuntu16 (
+    kind = 'images' and
+    short = 'Ubuntu 16.04 amn64 on Ramses.' and
+    content = 'Ubuntu 16.04 amd64 on Ramses.'
+)
+
+# It uses Ubuntu 16
+system front (
+    disk.0.os.name = 'linux' and
+    disk.0.image.url = 'one://ramses.i3m.upv.es/576' and
+    disk.0.os.credentials.username = 'ubuntu' and
+    disk.0.os.credentials.password = 'yoyoyo'
+)
+
+# It uses Ubuntu 16
+system wn (
+    ec3_max_instances = 5 and # maximum number of working nodes in the cluster
+    disk.0.os.name = 'linux' and
+    disk.0.image.url = 'one://ramses.i3m.upv.es/576' and
+    disk.0.os.credentials.username = 'ubuntu' and
+    disk.0.os.credentials.password = 'yoyoyo'
+)
