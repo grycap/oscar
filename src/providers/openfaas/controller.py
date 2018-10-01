@@ -38,7 +38,6 @@ class OpenFaas(Commands):
     system_info = '/system/info'
     
     def __init__(self):
-#         utils.set_environment_variable("ENDPOINT", "http://158.42.105.19:31112")
         self.endpoint = utils.get_environment_variable("OPENFAAS_URL")
         
     @flask_response        
