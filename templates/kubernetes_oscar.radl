@@ -30,6 +30,7 @@ system front (
   disk.0.applications contains (name = 'ansible.modules.grycap.kubeminio') and
   disk.0.applications contains (name = 'ansible.modules.grycap.kubeventgateway') and
   disk.0.applications contains (name = 'ansible.modules.grycap.kuberegistry') and
+  disk.0.applications contains (name = 'ansible.modules.grycap.kubeoscar') and
   disk.1.size=20GB and
   disk.1.fstype='ext4' and
   disk.1.mount_path='/pv/minio' and
@@ -87,6 +88,8 @@ configure front (
       public_access: false
       type_of_node: "front"
       svc_name: "registry.docker-registry"
+      
+    - role: 'grycap.kubeoscar'    
 
 @end
 )
