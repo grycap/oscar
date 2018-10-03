@@ -18,7 +18,7 @@ from src.cmdtemplate import Commands
 import src.utils as utils 
 import requests
 from flask import Response
-from . import faascli 
+from . import dockercli 
 
 def flask_response(func):
     '''
@@ -48,20 +48,19 @@ class OpenFaas(Commands):
             path = self.function_info + function_name
         return requests.get(self.endpoint + path)
     
-    @flask_response    
-    def init(self, **kwargs):
-        print(kwargs)
+    #@flask_response    
+    def init(self, **oscar_args):
+        print("OSCAR ARGS: ", oscar_args)
         path = self.functions_path
-        
-        func_name = kwargs['name']
-        func_folder = faascli.create_function(**kwargs)
-        func_yml = utils.join_paths(func_folder, '{0}.yml'.format(func_name))
-        print(faascli.build_function(func_yml))
-        print(faascli.push_function(func_yml))
-        print(faascli.deploy_function(func_yml))
-          
-#         r = requests.post(self.endpoint + path, json=kwargs)
-#         return r
+        registry_image_id = dockercli.create_docker_image(**oscar_args)
+        dockercli.push_docker_image(registry_image_id)
+        openfaas_args = {"service" : oscar_args['name'],
+                         "image" : registry_image_id,
+                         "envProcess" : "supervisor",
+                         "envVars" : { "sprocess" : "/tmp/user_script.sh" } }
+        print("OPENFAAS ARGS: ", openfaas_args)        
+        r = requests.post(self.endpoint + path, json=openfaas_args)
+        return r
 
     @flask_response
     def invoke(self, function_name, body, asynch=False):

@@ -6,7 +6,6 @@ from datetime import date, datetime  # noqa: F401
 from typing import List, Dict  # noqa: F401
 
 from swagger_server.models.base_model_ import Model
-from swagger_server.models.function_definition_limits import FunctionDefinitionLimits  # noqa: F401,E501
 from swagger_server import util
 
 
@@ -16,76 +15,31 @@ class FunctionDefinition(Model):
     Do not edit the class manually.
     """
 
-    def __init__(self, service: str=None, network: str=None, image: str=None, env_process: str=None, env_vars: Dict[str, str]=None, constraints: List[str]=None, labels: List[str]=None, annotations: List[str]=None, secrets: List[str]=None, registry_auth: str=None, limits: FunctionDefinitionLimits=None, requests: FunctionDefinitionLimits=None):  # noqa: E501
+    def __init__(self, name: str=None, image: str=None, script: str=None):  # noqa: E501
         """FunctionDefinition - a model defined in Swagger
 
-        :param service: The service of this FunctionDefinition.  # noqa: E501
-        :type service: str
-        :param network: The network of this FunctionDefinition.  # noqa: E501
-        :type network: str
+        :param name: The name of this FunctionDefinition.  # noqa: E501
+        :type name: str
         :param image: The image of this FunctionDefinition.  # noqa: E501
         :type image: str
-        :param env_process: The env_process of this FunctionDefinition.  # noqa: E501
-        :type env_process: str
-        :param env_vars: The env_vars of this FunctionDefinition.  # noqa: E501
-        :type env_vars: Dict[str, str]
-        :param constraints: The constraints of this FunctionDefinition.  # noqa: E501
-        :type constraints: List[str]
-        :param labels: The labels of this FunctionDefinition.  # noqa: E501
-        :type labels: List[str]
-        :param annotations: The annotations of this FunctionDefinition.  # noqa: E501
-        :type annotations: List[str]
-        :param secrets: The secrets of this FunctionDefinition.  # noqa: E501
-        :type secrets: List[str]
-        :param registry_auth: The registry_auth of this FunctionDefinition.  # noqa: E501
-        :type registry_auth: str
-        :param limits: The limits of this FunctionDefinition.  # noqa: E501
-        :type limits: FunctionDefinitionLimits
-        :param requests: The requests of this FunctionDefinition.  # noqa: E501
-        :type requests: FunctionDefinitionLimits
+        :param script: The script of this FunctionDefinition.  # noqa: E501
+        :type script: str
         """
         self.swagger_types = {
-            'service': str,
-            'network': str,
+            'name': str,
             'image': str,
-            'env_process': str,
-            'env_vars': Dict[str, str],
-            'constraints': List[str],
-            'labels': List[str],
-            'annotations': List[str],
-            'secrets': List[str],
-            'registry_auth': str,
-            'limits': FunctionDefinitionLimits,
-            'requests': FunctionDefinitionLimits
+            'script': str
         }
 
         self.attribute_map = {
-            'service': 'service',
-            'network': 'network',
+            'name': 'name',
             'image': 'image',
-            'env_process': 'envProcess',
-            'env_vars': 'envVars',
-            'constraints': 'constraints',
-            'labels': 'labels',
-            'annotations': 'annotations',
-            'secrets': 'secrets',
-            'registry_auth': 'registryAuth',
-            'limits': 'limits',
-            'requests': 'requests'
+            'script': 'script'
         }
 
-        self._service = service
-        self._network = network
+        self._name = name
         self._image = image
-        self._env_process = env_process
-        self._env_vars = env_vars
-        self._constraints = constraints
-        self._labels = labels
-        self._annotations = annotations
-        self._secrets = secrets
-        self._registry_auth = registry_auth
-        self._limits = limits
-        self._requests = requests
+        self._script = script
 
     @classmethod
     def from_dict(cls, dikt) -> 'FunctionDefinition':
@@ -99,52 +53,29 @@ class FunctionDefinition(Model):
         return util.deserialize_model(dikt, cls)
 
     @property
-    def service(self) -> str:
-        """Gets the service of this FunctionDefinition.
+    def name(self) -> str:
+        """Gets the name of this FunctionDefinition.
 
         Name of deployed function  # noqa: E501
 
-        :return: The service of this FunctionDefinition.
+        :return: The name of this FunctionDefinition.
         :rtype: str
         """
-        return self._service
+        return self._name
 
-    @service.setter
-    def service(self, service: str):
-        """Sets the service of this FunctionDefinition.
+    @name.setter
+    def name(self, name: str):
+        """Sets the name of this FunctionDefinition.
 
         Name of deployed function  # noqa: E501
 
-        :param service: The service of this FunctionDefinition.
-        :type service: str
+        :param name: The name of this FunctionDefinition.
+        :type name: str
         """
-        if service is None:
-            raise ValueError("Invalid value for `service`, must not be `None`")  # noqa: E501
+        if name is None:
+            raise ValueError("Invalid value for `name`, must not be `None`")  # noqa: E501
 
-        self._service = service
-
-    @property
-    def network(self) -> str:
-        """Gets the network of this FunctionDefinition.
-
-        Docker swarm network, usually func_functions  # noqa: E501
-
-        :return: The network of this FunctionDefinition.
-        :rtype: str
-        """
-        return self._network
-
-    @network.setter
-    def network(self, network: str):
-        """Sets the network of this FunctionDefinition.
-
-        Docker swarm network, usually func_functions  # noqa: E501
-
-        :param network: The network of this FunctionDefinition.
-        :type network: str
-        """
-
-        self._network = network
+        self._name = name
 
     @property
     def image(self) -> str:
@@ -172,202 +103,26 @@ class FunctionDefinition(Model):
         self._image = image
 
     @property
-    def env_process(self) -> str:
-        """Gets the env_process of this FunctionDefinition.
+    def script(self) -> str:
+        """Gets the script of this FunctionDefinition.
 
-        Process for watchdog to fork  # noqa: E501
+        Script to be executed inside the function coded in base64  # noqa: E501
 
-        :return: The env_process of this FunctionDefinition.
+        :return: The script of this FunctionDefinition.
         :rtype: str
         """
-        return self._env_process
+        return self._script
 
-    @env_process.setter
-    def env_process(self, env_process: str):
-        """Sets the env_process of this FunctionDefinition.
+    @script.setter
+    def script(self, script: str):
+        """Sets the script of this FunctionDefinition.
 
-        Process for watchdog to fork  # noqa: E501
+        Script to be executed inside the function coded in base64  # noqa: E501
 
-        :param env_process: The env_process of this FunctionDefinition.
-        :type env_process: str
+        :param script: The script of this FunctionDefinition.
+        :type script: str
         """
-        if env_process is None:
-            raise ValueError("Invalid value for `env_process`, must not be `None`")  # noqa: E501
+        if script is None:
+            raise ValueError("Invalid value for `script`, must not be `None`")  # noqa: E501
 
-        self._env_process = env_process
-
-    @property
-    def env_vars(self) -> Dict[str, str]:
-        """Gets the env_vars of this FunctionDefinition.
-
-        Overrides to environmental variables  # noqa: E501
-
-        :return: The env_vars of this FunctionDefinition.
-        :rtype: Dict[str, str]
-        """
-        return self._env_vars
-
-    @env_vars.setter
-    def env_vars(self, env_vars: Dict[str, str]):
-        """Sets the env_vars of this FunctionDefinition.
-
-        Overrides to environmental variables  # noqa: E501
-
-        :param env_vars: The env_vars of this FunctionDefinition.
-        :type env_vars: Dict[str, str]
-        """
-
-        self._env_vars = env_vars
-
-    @property
-    def constraints(self) -> List[str]:
-        """Gets the constraints of this FunctionDefinition.
-
-
-        :return: The constraints of this FunctionDefinition.
-        :rtype: List[str]
-        """
-        return self._constraints
-
-    @constraints.setter
-    def constraints(self, constraints: List[str]):
-        """Sets the constraints of this FunctionDefinition.
-
-
-        :param constraints: The constraints of this FunctionDefinition.
-        :type constraints: List[str]
-        """
-
-        self._constraints = constraints
-
-    @property
-    def labels(self) -> List[str]:
-        """Gets the labels of this FunctionDefinition.
-
-        An array of labels used by the back-end for making scheduling or routing decisions  # noqa: E501
-
-        :return: The labels of this FunctionDefinition.
-        :rtype: List[str]
-        """
-        return self._labels
-
-    @labels.setter
-    def labels(self, labels: List[str]):
-        """Sets the labels of this FunctionDefinition.
-
-        An array of labels used by the back-end for making scheduling or routing decisions  # noqa: E501
-
-        :param labels: The labels of this FunctionDefinition.
-        :type labels: List[str]
-        """
-
-        self._labels = labels
-
-    @property
-    def annotations(self) -> List[str]:
-        """Gets the annotations of this FunctionDefinition.
-
-        An array of annotations used by the back-end for management, orchestration, events and build tasks  # noqa: E501
-
-        :return: The annotations of this FunctionDefinition.
-        :rtype: List[str]
-        """
-        return self._annotations
-
-    @annotations.setter
-    def annotations(self, annotations: List[str]):
-        """Sets the annotations of this FunctionDefinition.
-
-        An array of annotations used by the back-end for management, orchestration, events and build tasks  # noqa: E501
-
-        :param annotations: The annotations of this FunctionDefinition.
-        :type annotations: List[str]
-        """
-
-        self._annotations = annotations
-
-    @property
-    def secrets(self) -> List[str]:
-        """Gets the secrets of this FunctionDefinition.
-
-
-        :return: The secrets of this FunctionDefinition.
-        :rtype: List[str]
-        """
-        return self._secrets
-
-    @secrets.setter
-    def secrets(self, secrets: List[str]):
-        """Sets the secrets of this FunctionDefinition.
-
-
-        :param secrets: The secrets of this FunctionDefinition.
-        :type secrets: List[str]
-        """
-
-        self._secrets = secrets
-
-    @property
-    def registry_auth(self) -> str:
-        """Gets the registry_auth of this FunctionDefinition.
-
-        Private registry base64-encoded basic auth (as present in ~/.docker/config.json)  # noqa: E501
-
-        :return: The registry_auth of this FunctionDefinition.
-        :rtype: str
-        """
-        return self._registry_auth
-
-    @registry_auth.setter
-    def registry_auth(self, registry_auth: str):
-        """Sets the registry_auth of this FunctionDefinition.
-
-        Private registry base64-encoded basic auth (as present in ~/.docker/config.json)  # noqa: E501
-
-        :param registry_auth: The registry_auth of this FunctionDefinition.
-        :type registry_auth: str
-        """
-
-        self._registry_auth = registry_auth
-
-    @property
-    def limits(self) -> FunctionDefinitionLimits:
-        """Gets the limits of this FunctionDefinition.
-
-
-        :return: The limits of this FunctionDefinition.
-        :rtype: FunctionDefinitionLimits
-        """
-        return self._limits
-
-    @limits.setter
-    def limits(self, limits: FunctionDefinitionLimits):
-        """Sets the limits of this FunctionDefinition.
-
-
-        :param limits: The limits of this FunctionDefinition.
-        :type limits: FunctionDefinitionLimits
-        """
-
-        self._limits = limits
-
-    @property
-    def requests(self) -> FunctionDefinitionLimits:
-        """Gets the requests of this FunctionDefinition.
-
-
-        :return: The requests of this FunctionDefinition.
-        :rtype: FunctionDefinitionLimits
-        """
-        return self._requests
-
-    @requests.setter
-    def requests(self, requests: FunctionDefinitionLimits):
-        """Sets the requests of this FunctionDefinition.
-
-
-        :param requests: The requests of this FunctionDefinition.
-        :type requests: FunctionDefinitionLimits
-        """
-
-        self._requests = requests
+        self._script = script

@@ -5,7 +5,7 @@ from swagger_server.models.function_definition import FunctionDefinition
 from src.providers.openfaas.controller import OpenFaas
 
 
-def function_async_function_name_post(functionName, input=None):
+def function_async_function_name_post(functionName, data=None):
     """Invoke a function asynchronously
 
     :param functionName: Function name
@@ -29,7 +29,7 @@ def function_function_name_get(functionName):
     return OpenFaas().ls(functionName)
 
 
-def function_function_name_post(functionName, input=None):
+def function_function_name_post(functionName, data=None):
     """Invoke a function defined in OpenFaaS
 
     :param functionName: Function name
