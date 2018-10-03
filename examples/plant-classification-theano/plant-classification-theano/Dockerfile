@@ -45,7 +45,7 @@ RUN echo "Pulling watchdog binary from Github." \
 RUN echo "Installing Oscar supervisors and dependencies." \
     && apt install -y python3 python3-pip \
     && pip3 install boto3 \
-    && curl -sSL https://raw.githubusercontent.com/grycap/oscar/master/src/providers/onpremises/openfaas/function/supervisor.py > supervisor.py
+    && curl -sSL https://raw.githubusercontent.com/grycap/oscar/master/src/providers/openfaas/cloud/supervisor.py > supervisor.py
 
 COPY script.sh /tmp/user_script.sh
 RUN chmod +x /tmp/user_script.sh
