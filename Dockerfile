@@ -10,7 +10,7 @@ RUN apk add --no-cache git && pip3 install --no-cache-dir -r requirements.txt
 COPY . /usr/src/app
 
 RUN ln -s /usr/src/app/bin/docker-linux-amd64 /usr/bin/docker \
- && ln -s /usr/src/app/bin/faas-cli /usr/bin/faas-cli
+ && ln -s /usr/src/app/bin/faas-cli-0.7.5 /usr/bin/faas-cli
 
 EXPOSE 8080
 

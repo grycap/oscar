@@ -22,6 +22,10 @@ import subprocess
 import tarfile
 import tempfile
 import uuid
+import shutil
+
+def copy_file(src, dst):
+    shutil.copy(src, dst)
 
 def join_paths(*paths):
     return os.path.join(*paths)

@@ -18,6 +18,7 @@ from src.cmdtemplate import Commands
 import src.utils as utils 
 import requests
 from flask import Response
+from . import faascli 
 
 def flask_response(func):
     '''
@@ -50,9 +51,17 @@ class OpenFaas(Commands):
     @flask_response    
     def init(self, **kwargs):
         print(kwargs)
-        path = self.functions_path        
-        r = requests.post(self.endpoint + path, json=kwargs)
-        return r
+        path = self.functions_path
+        
+        func_name = kwargs['name']
+        func_folder = faascli.create_function(**kwargs)
+        func_yml = utils.join_paths(func_folder, '{0}.yml'.format(func_name))
+        print(faascli.build_function(func_yml))
+        print(faascli.push_function(func_yml))
+        print(faascli.deploy_function(func_yml))
+          
+#         r = requests.post(self.endpoint + path, json=kwargs)
+#         return r
 
     @flask_response
     def invoke(self, function_name, body, asynch=False):
