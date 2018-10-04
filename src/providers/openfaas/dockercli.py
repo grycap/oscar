@@ -42,7 +42,7 @@ def create_docker_image(**oscar_args):
     build_command = ['docker', 'build']
     registry_image_id = "registry.docker-registry/{0}".format(oscar_args['name'])
     build_command.extend(["-t", registry_image_id])
-    build_command.extend(["func_folder"])
+    build_command.extend([func_folder])
     utils.execute_command_and_return_output(build_command)
     return registry_image_id
     
