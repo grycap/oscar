@@ -146,6 +146,9 @@ def execute_command(command):
 def execute_command_and_return_output(command):
     return subprocess.check_output(command).decode("utf-8")
 
+def execute_command_with_input_and_return_output(command, cmd_input):
+    return subprocess.check_output(command, input=cmd_input).decode("utf-8")
+
 def is_variable_in_environment(variable):
     return is_value_in_dict(os.environ, variable)
 

@@ -18,7 +18,9 @@ from src.cmdtemplate import Commands
 import src.utils as utils 
 import requests
 from flask import Response
-from . import dockercli 
+from src.providers.openfaas import dockercli
+from src.providers.openfaas import eventgateway
+from src.providers.openfaas import miniocli 
 
 def flask_response(func):
     '''
@@ -39,7 +41,7 @@ class OpenFaas(Commands):
     system_info = '/system/info'
     
     def __init__(self):
-        self.endpoint = utils.get_environment_variable("OPENFAAS_URL")
+        self.endpoint = utils.get_environment_variable("OPENFAAS_ENDPOINT")
         
     @flask_response        
     def ls(self, function_name=None):
@@ -54,12 +56,26 @@ class OpenFaas(Commands):
         path = self.functions_path
         registry_image_id = dockercli.create_docker_image(**oscar_args)
         dockercli.push_docker_image(registry_image_id)
-        openfaas_args = {"service" : oscar_args['name'],
+        
+        function_name = oscar_args['name']
+        
+        event_gateway = eventgateway.EventGatewayClient()
+        event_gateway.register_function(function_name)
+        subscription_id = event_gateway.subscribe_event(function_name)
+
+        openfaas_args = {"service" : function_name,
                          "image" : registry_image_id,
                          "envProcess" : "supervisor",
-                         "envVars" : { "sprocess" : "/tmp/user_script.sh" } }
+                         "envVars" : { "sprocess" : "/tmp/user_script.sh",
+                                       "eventgateway_sub_id" : subscription_id } }
         print("OPENFAAS ARGS: ", openfaas_args)        
         r = requests.post(self.endpoint + path, json=openfaas_args)
+        
+        miniocli = miniocli.MinioClient()
+        miniocli.add_function_endpoint(function_name)
+        miniocli.create_input_bucket(function_name)
+        miniocli.create_output_bucket(function_name)        
+        
         return r
 
     @flask_response
