@@ -48,7 +48,7 @@ class OpenFaas(Commands):
             path = self.function_info + function_name
         return requests.get(self.endpoint + path)
     
-    #@flask_response    
+    @flask_response    
     def init(self, **oscar_args):
         print("OSCAR ARGS: ", oscar_args)
         path = self.functions_path
