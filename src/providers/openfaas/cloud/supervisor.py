@@ -11,7 +11,9 @@ os_tmp_folder = tempfile.gettempdir() + "/" + str(uuid.uuid4().hex)
 output_folder = os_tmp_folder + "/output"
 
 def is_s3_event(event):
-    if is_key_and_value_in_dictionary('Records', event['data']['body']):
+    if is_key_and_value_in_dictionary('data', event) \
+    and is_key_and_value_in_dictionary('body', event['data']) \
+    and is_key_and_value_in_dictionary('Records', event['data']['body']):
         record = event['data']['body']['Records'][0]
         if is_key_and_value_in_dictionary('s3', record):
             print("Is S3 event")
@@ -89,7 +91,8 @@ if(__name__ == "__main__"):
         os.environ['SCAR_INPUT_FILE'] = download_s3_file(f_input)
         os.environ['SCAR_OUTPUT_FOLDER'] = output_folder
         print('SCAR_INPUT_FILE: {0}'.format(os.environ['SCAR_INPUT_FILE']))
-        if is_key_and_value_in_dictionary('sprocess', os.environ):
-            os.makedirs(output_folder, exist_ok=True)
-            launch_user_script()
-            upload_output()
+    if is_key_and_value_in_dictionary('sprocess', os.environ):
+        os.makedirs(output_folder, exist_ok=True)
+        launch_user_script()
+    if is_s3_event(f_input):        
+        upload_output()
