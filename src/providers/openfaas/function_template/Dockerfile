@@ -2,7 +2,6 @@ FROM ubuntu
 
 COPY fwatchdog /usr/bin/fwatchdog
 COPY supervisor /usr/bin/supervisor
-COPY mc /usr/bin/mc
 
 COPY user_script.sh /tmp/user_script.sh
 RUN chmod +x /tmp/user_script.sh
