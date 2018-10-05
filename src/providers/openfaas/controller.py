@@ -72,8 +72,8 @@ class OpenFaas(Commands):
         r = requests.post(self.endpoint + path, json=openfaas_args)
         
         minio = miniocli.MinioClient()
-        minio.add_function_endpoint(function_name)
-        minio.create_input_bucket(function_name)
+        webhook_id = minio.add_function_endpoint(function_name)
+        minio.create_input_bucket(function_name, webhook_id)
         minio.create_output_bucket(function_name)        
         
         return r

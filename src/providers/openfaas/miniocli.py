@@ -45,10 +45,15 @@ class MinioClient():
         while utils.execute_command_and_discard_output(self.get_config_command) != 0:
             print('Waiting for minio configuration')
         
-    def create_input_bucket(self, function_name):
+        return webhook_id
+        
+    def create_input_bucket(self, function_name, webhook_id):
         create_bucket_command = ['mc', 'mb', 'myminio/{0}-in'.format(function_name)]
         print(utils.execute_command_and_return_output(create_bucket_command))
-        enable_webhook_command = ['mc', 'events', 'add', 'myminio/{0}-in'.format(function_name), 'arn:minio:sqs::1:webhook', '--events', 'put']
+        enable_webhook_command = ['mc', 'events', 'add',
+                                  'myminio/{0}-in'.format(function_name), 
+                                  'arn:minio:sqs::{0}:webhook'.format(webhook_id),
+                                  '--events', 'put']
         print(utils.execute_command_and_return_output(enable_webhook_command))
     
     def create_output_bucket(self, function_name):
