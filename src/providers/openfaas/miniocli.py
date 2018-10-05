@@ -26,7 +26,7 @@ class MinioClient():
         self.mcuser = utils.get_environment_variable("MINIO_USER")
         self.mcpass = utils.get_environment_variable("MINIO_PASS")
         config_command = ['mc', 'config', 'host', 'add', 'myminio']
-        config_command.extend([self.endpoint, self.muser, self.mcpass])
+        config_command.extend([self.endpoint, self.mcuser, self.mcpass])
         print(utils.execute_command_and_return_output(config_command))
     
     def get_minio_config(self):
