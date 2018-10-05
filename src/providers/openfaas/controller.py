@@ -63,11 +63,15 @@ class OpenFaas(Commands):
         event_gateway.register_function(function_name)
         subscription_id = event_gateway.subscribe_event(function_name)
 
+        mcuser = utils.get_environment_variable("MINIO_USER")
+        mcpass = utils.get_environment_variable("MINIO_PASS")
         openfaas_args = {"service" : function_name,
                          "image" : registry_image_id,
                          "envProcess" : "supervisor",
                          "envVars" : { "sprocess" : "/tmp/user_script.sh",
-                                       "eventgateway_sub_id" : subscription_id } }
+                                       "eventgateway_sub_id" : subscription_id,
+                                       "AWS_ACCESS_KEY_ID" : mcuser,
+                                       "AWS_SECRET_ACCESS_KEY" : mcpass } }
         print("OPENFAAS ARGS: ", openfaas_args)        
         r = requests.post(self.endpoint + path, json=openfaas_args)
         
