@@ -71,10 +71,10 @@ class OpenFaas(Commands):
         print("OPENFAAS ARGS: ", openfaas_args)        
         r = requests.post(self.endpoint + path, json=openfaas_args)
         
-        miniocli = miniocli.MinioClient()
-        miniocli.add_function_endpoint(function_name)
-        miniocli.create_input_bucket(function_name)
-        miniocli.create_output_bucket(function_name)        
+        minio = miniocli.MinioClient()
+        minio.add_function_endpoint(function_name)
+        minio.create_input_bucket(function_name)
+        minio.create_output_bucket(function_name)        
         
         return r
 

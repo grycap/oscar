@@ -15,10 +15,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import src.utils as utils
 import json
-from time import sleep
 
 # MISSING DELETE FUNCTIONS
-
 class MinioClient():
     
     get_config_command = ['mc', 'admin', 'config', 'get', 'myminio']
