@@ -39,7 +39,6 @@ system front (
   disk.2.mount_path='/pv/registry'
 )
 
-
 configure front (
 @begin
 ---
