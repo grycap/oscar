@@ -71,7 +71,10 @@ class OpenFaas(Commands):
                          "envVars" : { "sprocess" : "/tmp/user_script.sh",
                                        "eventgateway_sub_id" : subscription_id,
                                        "AWS_ACCESS_KEY_ID" : mcuser,
-                                       "AWS_SECRET_ACCESS_KEY" : mcpass } }
+                                       "AWS_SECRET_ACCESS_KEY" : mcpass,
+                                       "OUTPUT_BUCKET" : "{0}-out".format(function_name),
+                                       "read_timeout": 90,
+                                       "write_timeout": 90  } }
         print("OPENFAAS ARGS: ", openfaas_args)        
         r = requests.post(self.endpoint + path, json=openfaas_args)
         
