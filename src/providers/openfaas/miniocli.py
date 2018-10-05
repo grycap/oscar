@@ -42,7 +42,7 @@ class MinioClient():
         set_config_command = ['mc', 'admin', 'config', 'set', 'myminio']
         print(utils.execute_command_with_input_and_return_output(set_config_command, json.dumps(config).encode('utf-8')))
         
-        while utils.execute_command(self.get_config_command) != 0:
+        while utils.execute_command_and_discard_output(self.get_config_command) != 0:
             print('Waiting for minio configuration')
         
     def create_input_bucket(self, function_name):

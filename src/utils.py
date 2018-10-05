@@ -143,6 +143,9 @@ def kill_process(self, process):
 def execute_command(command):
     subprocess.call(command)
     
+def execute_command_and_discard_output(command):
+    subprocess.call(command, stdout=subprocess.DEVNULL)    
+    
 def execute_command_and_return_output(command):
     return subprocess.check_output(command).decode("utf-8")
 
