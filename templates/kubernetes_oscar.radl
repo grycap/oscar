@@ -74,13 +74,6 @@ configure front (
       faas_framework: 'openfaas'
 
     - role: 'grycap.kubeminio'
-      enable_notifications: true
-      webhook_endpoints:
-      - {id: "1", endpoint: "http://event-gateway.event-gateway:4000/function1"}
-      - {id: "2", endpoint: "http://event-gateway.event-gateway:4000/function2"}
-      - {id: "3", endpoint: "http://event-gateway.event-gateway:4000/function3"}
-      - {id: "4", endpoint: "http://event-gateway.event-gateway:4000/function4"}
-      - {id: "5", endpoint: "http://event-gateway.event-gateway:4000/function5"}
 
     - role: 'grycap.kubeventgateway'
 
