@@ -65,7 +65,7 @@ configure front (
     - role: 'grycap.kubernetes'
       kube_server: 'kubeserver'
       kube_apiserver_options: [{option: "--insecure-port", value: "8080"}]
-      kube_deploy_dashboard: true
+      kube_install_metrics_server: true
       kube_persistent_volumes:
       - {namespace : "minio", name : "pvnfsminio", label : "minio", capacity_storage : "20Gi", nfs_path : "/pv/minio"}
       - {namespace : "docker-registry", name : "pvnfsregistry", label : "registry", capacity_storage : "20Gi", nfs_path : "/pv/registry"}
@@ -75,13 +75,6 @@ configure front (
       faas_framework: 'openfaas'
 
     - role: 'grycap.kubeminio'
-      enable_notifications: true
-      webhook_endpoints:
-      - {id: "1", endpoint: "http://event-gateway.event-gateway:4000/function1"}
-      - {id: "2", endpoint: "http://event-gateway.event-gateway:4000/function2"}
-      - {id: "3", endpoint: "http://event-gateway.event-gateway:4000/function3"}
-      - {id: "4", endpoint: "http://event-gateway.event-gateway:4000/function4"}
-      - {id: "5", endpoint: "http://event-gateway.event-gateway:4000/function5"}
 
     - role: 'grycap.kubeventgateway'
 
