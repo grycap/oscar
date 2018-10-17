@@ -31,6 +31,7 @@ system front (
   disk.0.applications contains (name = 'ansible.modules.grycap.kubeventgateway') and
   disk.0.applications contains (name = 'ansible.modules.grycap.kuberegistry') and
   disk.0.applications contains (name = 'ansible.modules.grycap.kubeoscar') and
+  disk.0.applications contains (name = 'ansible.modules.grycap.oscarui') and
   disk.1.size=20GB and
   disk.1.fstype='ext4' and
   disk.1.mount_path='/pv/minio' and
@@ -90,6 +91,9 @@ configure front (
       svc_name: "registry.docker-registry"
       
     - role: 'grycap.kubeoscar'    
+
+    - role: 'grycap.oscarui'
+      vue_app_backend_host: '{{ hostvars[groups["front"][0]]["IM_NODE_PUBLIC_IP"] }}'
 
 @end
 )
