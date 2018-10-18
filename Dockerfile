@@ -9,8 +9,8 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY . /usr/src/app
 
-RUN ln -s /usr/src/app/bin/docker-linux-amd64 /usr/bin/docker \
- && ln -s /usr/src/app/bin/faas-cli /usr/bin/faas-cli
+RUN ln -s /usr/src/app/bin/docker-linux-amd64 /usr/bin/docker
+RUN ln -s /usr/src/app/bin/mc /usr/bin/mc
 
 EXPOSE 8080
 
