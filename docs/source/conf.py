@@ -20,8 +20,8 @@
 # -- Project information -----------------------------------------------------
 
 project = 'oscar'
-copyright = '2018, Alfonso Pérez, Sebas Risco, Germán Moltó'
-author = 'Alfonso Pérez, Sebas Risco, Germán Moltó'
+copyright = '2018, Alfonso Perez, Sebas Risco, German Molto'
+author = 'Alfonso Perez, Sebas Risco, German Molto'
 
 # The short X.Y version
 version = ''
@@ -130,7 +130,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'oscar.tex', 'oscar Documentation',
-     'Alfonso Pérez, Sebas Risco, Germán Moltó', 'manual'),
+     'Alfonso Perez, Sebas Risco, German Molto', 'manual'),
 ]
 
 
