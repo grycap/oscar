@@ -18,6 +18,9 @@ from src.cmdtemplate import Commands
 import src.utils as utils 
 import requests
 from flask import Response
+from src.providers.openfaas import dockercli
+from src.providers.openfaas import eventgateway
+from src.providers.openfaas import miniocli 
 
 def flask_response(func):
     '''
@@ -38,7 +41,7 @@ class OpenFaas(Commands):
     system_info = '/system/info'
     
     def __init__(self):
-        self.endpoint = utils.get_environment_variable("OPENFAAS_URL")
+        self.endpoint = utils.get_environment_variable("OPENFAAS_ENDPOINT")
         
     @flask_response        
     def ls(self, function_name=None):
@@ -48,10 +51,38 @@ class OpenFaas(Commands):
         return requests.get(self.endpoint + path)
     
     @flask_response    
-    def init(self, **kwargs):
-        print(kwargs)
-        path = self.functions_path        
-        r = requests.post(self.endpoint + path, json=kwargs)
+    def init(self, **oscar_args):
+        print("OSCAR ARGS: ", oscar_args)
+        path = self.functions_path
+        registry_image_id = dockercli.create_docker_image(**oscar_args)
+        dockercli.push_docker_image(registry_image_id)
+        
+        function_name = oscar_args['name']
+        
+        event_gateway = eventgateway.EventGatewayClient()
+        event_gateway.register_function(function_name)
+        subscription_id = event_gateway.subscribe_event(function_name)
+
+        mcuser = utils.get_environment_variable("MINIO_USER")
+        mcpass = utils.get_environment_variable("MINIO_PASS")
+        openfaas_args = {"service" : function_name,
+                         "image" : registry_image_id,
+                         "envProcess" : "supervisor",
+                         "envVars" : { "sprocess" : "/tmp/user_script.sh",
+                                       "eventgateway_sub_id" : subscription_id,
+                                       "AWS_ACCESS_KEY_ID" : mcuser,
+                                       "AWS_SECRET_ACCESS_KEY" : mcpass,
+                                       "OUTPUT_BUCKET" : "{0}-out".format(function_name),
+                                       "read_timeout": "90",
+                                       "write_timeout": "90"  } }
+        print("OPENFAAS ARGS: ", openfaas_args)        
+        r = requests.post(self.endpoint + path, json=openfaas_args)
+        
+        minio = miniocli.MinioClient()
+        webhook_id = minio.add_function_endpoint(function_name)
+        minio.create_input_bucket(function_name, webhook_id)
+        minio.create_output_bucket(function_name)        
+        
         return r
 
     @flask_response

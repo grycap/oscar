@@ -5,17 +5,17 @@ from swagger_server.models.function_definition import FunctionDefinition
 from src.providers.openfaas.controller import OpenFaas
 
 
-def function_async_function_name_post(functionName, input=None):
+def function_async_function_name_post(functionName, data=None):
     """Invoke a function asynchronously
 
     :param functionName: Function name
     :type functionName: str
-    :param input: (Optional) data to pass to function
-    :type input: str
+    :param data: (Optional) data to pass to function
+    :type data: str
 
     :rtype: None
     """
-    return OpenFaas().invoke(functionName, input, asynch=True)
+    return OpenFaas().invoke(functionName, data, asynch=True)
 
 
 def function_function_name_get(functionName):
@@ -29,17 +29,17 @@ def function_function_name_get(functionName):
     return OpenFaas().ls(functionName)
 
 
-def function_function_name_post(functionName, input=None):
+def function_function_name_post(functionName, data=None):
     """Invoke a function defined in OpenFaaS
 
     :param functionName: Function name
     :type functionName: str
-    :param body: (Optional) data to pass to function
-    :type body: str
+    :param data: (Optional) data to pass to function
+    :type data: str
 
     :rtype: None
     """
-    return OpenFaas().invoke(functionName, input)
+    return OpenFaas().invoke(functionName, data)
 
 
 def functions_delete(body):
