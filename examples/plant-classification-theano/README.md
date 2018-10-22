@@ -7,12 +7,12 @@ To run this example you need:
 1. An elastic cluster running OSCAR
 
 2. The container to deploy available in docker hub:
-    * You can create your own with:
+  * You can create your own with:
       ```
       docker build -t {docker-hub-user}/{docker-hub-image} .
       docker push {docker-hub-user}/{docker-hub-image}
       ```
-    * Or use the container already available in docker hub: 
+  * Or use the container already available in docker hub: 
       ```
       grycap/oscar-theano-plants
       ```
@@ -23,7 +23,7 @@ python ../tobase64.py < script.sh
 ```
   
 4. Then, to create the function you have two options:
-    * Use the OSCAR interface available at the IP where you deployed your cluster in the port `32112`
+  * Use the OSCAR interface available at the IP where you deployed your cluster in the port `32112`
   ```
   {
   "image": "grycap/oscar-theano-plants",
@@ -32,8 +32,7 @@ python ../tobase64.py < script.sh
   }
   ```
   ![post.png](img/POST.png)
-
-    * Use curl to do a POST request:
+  * Use curl to do a POST request:
   ```
   curl -X POST --header 'Content-Type: application/json' --header 'Accept: text/plain' -d '{ \ 
   "image": "grycap/oscar-theano-plants", \ 
