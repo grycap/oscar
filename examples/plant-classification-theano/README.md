@@ -5,6 +5,7 @@ Example cloned from: https://github.com/indigo-dc/plant-classification-theano
 To run this example you need:
 
 1. An elastic cluster running OSCAR
+
 2. The container to deploy available in docker hub:
     * You can create your own with:
       ```
@@ -30,6 +31,8 @@ python ../tobase64.py < script.sh
   "script": "IyEvYmluL2Jhc2gKCmVjaG8gIlNDUklQVDogSW52b2tlZCBjbGFzc2lmeV9pbWFnZS5weS4gRmlsZSBhdmFpbGFibGUgaW4gJFNDQVJfSU5QVVRfRklMRSIKRklMRV9OQU1FPWBiYXNlbmFtZSAkU0NBUl9JTlBVVF9GSUxFYApPVVRQVVRfRklMRT0kU0NBUl9PVVRQVVRfRk9MREVSLyRGSUxFX05BTUUKCnB5dGhvbjIgL29wdC9wbGFudC1jbGFzc2lmaWNhdGlvbi10aGVhbm8vY2xhc3NpZnlfaW1hZ2UucHkgJFNDQVJfSU5QVVRfRklMRSAtbyAkT1VUUFVUX0ZJTEU="
   }
   ```
+  ![post.png](img/POST.png)
+
     * Use curl to do a POST request:
   ```
   curl -X POST --header 'Content-Type: application/json' --header 'Accept: text/plain' -d '{ \ 
@@ -38,6 +41,11 @@ python ../tobase64.py < script.sh
   "script": "IyEvYmluL2Jhc2gKCmVjaG8gIlNDUklQVDogSW52b2tlZCBjbGFzc2lmeV9pbWFnZS5weS4gRmlsZSBhdmFpbGFibGUgaW4gJFNDQVJfSU5QVVRfRklMRSIKRklMRV9OQU1FPWBiYXNlbmFtZSAkU0NBUl9JTlBVVF9GSUxFYApPVVRQVVRfRklMRT0kU0NBUl9PVVRQVVRfRk9MREVSLyRGSUxFX05BTUUKCnB5dGhvbjIgL29wdC9wbGFudC1jbGFzc2lmaWNhdGlvbi10aGVhbm8vY2xhc3NpZnlfaW1hZ2UucHkgJFNDQVJfSU5QVVRfRklMRSAtbyAkT1VUUFVUX0ZJTEU=" \ 
   }' 'http://${OSCAR_ENDPOINT}:32112/functions'
   ```
-  Once OSCAR finishes the creation of the function, the corresponding buckets in minio are also created.
+  Once OSCAR finishes the creation of the function (it will take some minutes), the corresponding buckets in minio are also created.
+  ![minio-buckets.png](img/Minio-Buckets.png)
 
-5. To execute the function that will process the image you need to upload the image to process to the corresponding `plant-classifier-in`
+5. To execute the function that will process the image you need to upload the image to process to the corresponding input bucket, in this case `plant-classifier-in`.
+  ![minio-in.png](img/Minio-IN.png)
+
+6. Once the function is executed, the output is automatically copied to the output bucket in minio, in this case `plant-classifier-out`. You can download the ouput from here for further processing.  
+  ![minio-out.png](img/Minio-OUT.png)
