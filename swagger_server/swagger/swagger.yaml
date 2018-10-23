@@ -208,10 +208,74 @@ definitions:
         type: "string"
         example: "ZWNobyAiaXQgd29ya3MhIg=="
         description: "Script to be executed inside the function coded in base64"
+      envVars:
+        type: "object"
+        description: "Overrides to environmental variables"
+        additionalProperties:
+          type: "string"
+      constraints:
+        type: "array"
+        items:
+          type: "string"
+          example: "node.platform.os == linux"
+          description: "Constraints are specific to the OpenFaaS Provider"
+      labels:
+        type: "array"
+        description: "An array of labels used by the back-end for making scheduling\
+          \ or routing decisions"
+        items:
+          type: "string"
+      annotations:
+        type: "array"
+        description: "An array of annotations used by the back-end for management,\
+          \ orchestration, events and build tasks"
+        items:
+          type: "string"
+      network:
+        type: "string"
+        example: "func_functions"
+        description: "Docker swarm network, usually func_functions"
+      secrets:
+        type: "array"
+        items:
+          type: "string"
+          example: "secret-name-1"
+          description: "An array of names of secrets that are required to be loaded\
+            \ from the Docker Swarm."
+      registryAuth:
+        type: "string"
+        example: "dXNlcjpwYXNzd29yZA=="
+        description: "Private registry base64-encoded basic auth (as present in ~/.docker/config.json)"
+      limits:
+        $ref: "#/definitions/FunctionDefinition_limits"
+      requests:
+        $ref: "#/definitions/FunctionDefinition_limits"
     example:
       image: "functions/nodeinfo:latest"
       name: "nodeinfo"
+      envVars:
+        key: "envVars"
+      annotations:
+      - "annotations"
+      - "annotations"
+      registryAuth: "dXNlcjpwYXNzd29yZA=="
+      requests:
+        memory: "128M"
+        cpu: "0.01"
+      constraints:
+      - "node.platform.os == linux"
+      - "node.platform.os == linux"
+      secrets:
+      - "secret-name-1"
+      - "secret-name-1"
       script: "ZWNobyAiaXQgd29ya3MhIg=="
+      limits:
+        memory: "128M"
+        cpu: "0.01"
+      labels:
+      - "labels"
+      - "labels"
+      network: "func_functions"
   FunctionListEntry:
     type: "object"
     required:
@@ -269,6 +333,17 @@ definitions:
       availableReplicas: 2
       labels:
         key: "labels"
+  FunctionDefinition_limits:
+    properties:
+      memory:
+        type: "string"
+        example: "128M"
+      cpu:
+        type: "string"
+        example: "0.01"
+    example:
+      memory: "128M"
+      cpu: "0.01"
 externalDocs:
   description: "More documentation available on Github"
   url: "https://github.com/grycap/oscar"
