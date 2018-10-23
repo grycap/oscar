@@ -66,16 +66,18 @@ class OpenFaas(Commands):
         mcuser = utils.get_environment_variable("MINIO_USER")
         mcpass = utils.get_environment_variable("MINIO_PASS")
         openfaas_args = {"service" : function_name,
-                         "image" : registry_image_id,
-                         "envProcess" : "supervisor",
-                         "envVars" : { "sprocess" : "/tmp/user_script.sh",
-                                       "eventgateway_sub_id" : subscription_id,
-                                       "AWS_ACCESS_KEY_ID" : mcuser,
-                                       "AWS_SECRET_ACCESS_KEY" : mcpass,
-                                       "OUTPUT_BUCKET" : "{0}-out".format(function_name),
-                                       "read_timeout": "90",
-                                       "write_timeout": "90"  } }
-        print("OPENFAAS ARGS: ", openfaas_args)        
+                              "image" : registry_image_id,
+                              "envProcess" : "supervisor",
+                              "envVars" : { "sprocess" : "/tmp/user_script.sh",
+                                            "eventgateway_sub_id" : subscription_id,
+                                            "AWS_ACCESS_KEY_ID" : mcuser,
+                                            "AWS_SECRET_ACCESS_KEY" : mcpass,
+                                            "OUTPUT_BUCKET" : "{0}-out".format(function_name),
+                                            "read_timeout": "90",
+                                            "write_timeout": "90"  }}
+        openfaas_args = self. merge_dicts(openfaas_args, oscar_args)
+        print("OPENFAAS ARGS: ", openfaas_args)  
+              
         r = requests.post(self.endpoint + path, json=openfaas_args)
         
         minio = miniocli.MinioClient()
@@ -114,4 +116,19 @@ class OpenFaas(Commands):
     
     def parse_arguments(self, args):
         pass
+    
+    def merge_dicts(self, d1, d2):
+        '''
+        Merge 'd1' and 'd2' dicts into 'd1'.
+        'd1' has precedence over 'd2'
+        '''
+        for k,v in d2.items():
+            if v:
+                if k not in d1:
+                    d1[k] = v
+                elif type(v) is dict:
+                    d1[k] = self.merge_dicts(d1[k], v)
+                elif type(v) is list:
+                    d1[k] += v
+        return d1    
     
