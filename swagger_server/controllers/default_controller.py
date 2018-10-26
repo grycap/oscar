@@ -3,7 +3,20 @@ import connexion
 from swagger_server.models.delete_function_request import DeleteFunctionRequest
 from swagger_server.models.function_definition import FunctionDefinition
 from src.providers.openfaas.controller import OpenFaas
+from swagger_server.models.in_body import InBody  # noqa: E501
 
+
+def events_post(body):  # noqa: E501
+    """Process Minio events
+
+     # noqa: E501
+
+    :param body: Minio webhook endpoint
+    :type body: dict | bytes
+
+    :rtype: None
+    """
+    return OpenFaas().process_minio_event(body)
 
 def function_async_function_name_post(functionName, data=None):
     """Invoke a function asynchronously

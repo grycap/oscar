@@ -10,6 +10,30 @@ basePath: "/"
 schemes:
 - "http"
 paths:
+  /events:
+    post:
+      summary: "Process Minio events"
+      description: ""
+      operationId: "events_post"
+      consumes:
+      - "application/json"
+      produces:
+      - "application/json"
+      parameters:
+      - in: "body"
+        name: "body"
+        description: "Minio webhook endpoint"
+        required: true
+        schema:
+          $ref: "#/definitions/InBody"
+      responses:
+        202:
+          description: "Accepted"
+        400:
+          description: "Bad Request"
+        500:
+          description: "Internal Server Error"
+      x-swagger-router-controller: "swagger_server.controllers.default_controller"
   /functions:
     get:
       summary: "Get a list of deployed functions with: stats and image digest"
@@ -298,17 +322,17 @@ definitions:
       invocationCount:
         type: "number"
         format: "integer"
-        example: 1337
+        example: 1337.0
         description: "The amount of invocations for the specified function"
       replicas:
         type: "number"
         format: "integer"
-        example: 2
+        example: 2.0
         description: "The current minimal ammount of replicas"
       availableReplicas:
         type: "number"
         format: "integer"
-        example: 2
+        example: 2.0
         description: "The current available amount of replicas"
       envProcess:
         type: "string"
@@ -333,6 +357,8 @@ definitions:
       availableReplicas: 2
       labels:
         key: "labels"
+  InBody:
+    type: "object"
   FunctionDefinition_limits:
     properties:
       memory:
