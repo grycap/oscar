@@ -74,6 +74,7 @@ configure front (
       faas_framework: 'openfaas'
 
     - role: 'grycap.kubeminio'
+      enable_notifications: true
       webhook_endpoints: [{ id: "1", endpoint: "http://oscar.oscar:8080/events"}]
 
     - role: 'grycap.kubeventgateway'
