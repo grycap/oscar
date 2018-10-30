@@ -6,5 +6,6 @@ Welcome to OSCAR's documentation!
    :caption: Contents:
 
    intro
+   deploy
    license
    help
