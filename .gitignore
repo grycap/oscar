@@ -1,4 +1,6 @@
 docs/build
+docs/.vscode
+docs/source/_build
 work/
 test/*.zip
 .p*
