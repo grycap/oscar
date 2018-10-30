@@ -36,4 +36,15 @@ As an example, to deploy on an OpenNebula-based Cloud site the contents of the f
   ./ec3 launch oscar-cluster kubernetes_oscar ubuntu-opennebula -a auth.txt 
 
 This will take several minutes until the Kubernetes cluster and all the required services have been deployed.
-You will obtain the IP of the front-end of the cluster.
+You will obtain the IP of the front-end of the cluster and a confirmation message that the front-end is ready.
+Notice that it will still take few minutes before the services in the Kubernetes cluster are up & running.
+
+6. Check the cluster state.
+
+The cluster will be fully configured when all the Kubernetes pods are in the `Running`.
+:: 
+
+ ./ec3 ssh oscar-cluster
+ sudo kubectl get pods --all-namespaces 
+
+
