@@ -21,7 +21,7 @@ def create_docker_image(**oscar_args):
     makedirs(func_folder , exist_ok=True)
     root_path = path.dirname(path.dirname(path.dirname(path.dirname(path.abspath(__file__)))))
     # Get function Dockerfile paths
-    func_dockerfile_path = utils.join_paths(root_path, "src", "providers", "openfaas", "function_template", "Dockerfile")
+    func_dockerfile_path = utils.join_paths(root_path, "src", "providers", "onpremises", "function_template", "Dockerfile")
     func_dockerfile_dest_path = utils.join_paths(func_folder, "Dockerfile")
 
     # Modify Dockerfile
@@ -34,7 +34,6 @@ def create_docker_image(**oscar_args):
     bin_path = utils.join_paths(root_path, "bin")
     utils.copy_file(utils.join_paths(bin_path, "fwatchdog-0.9.6"), utils.join_paths(func_folder, "fwatchdog"))
     utils.copy_file(utils.join_paths(bin_path, "supervisor"), utils.join_paths(func_folder, "supervisor"))
-    utils.copy_file(utils.join_paths(bin_path, "mc"), utils.join_paths(func_folder, "mc"))
     # Create user script
     utils.create_file_with_content(utils.join_paths(func_folder, "user_script.sh"),
                                    utils.base64_to_utf8_string(oscar_args['script']))    

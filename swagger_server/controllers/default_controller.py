@@ -2,9 +2,7 @@ import connexion
 
 from swagger_server.models.delete_function_request import DeleteFunctionRequest
 from swagger_server.models.function_definition import FunctionDefinition
-from src.providers.openfaas.controller import OpenFaas
-from swagger_server.models.in_body import InBody  # noqa: E501
-
+from src.providers.onpremises.controller import OpenFaas
 
 def events_post(body):  # noqa: E501
     """Process Minio events

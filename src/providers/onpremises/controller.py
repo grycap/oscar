@@ -19,8 +19,8 @@ import src.utils as utils
 import requests
 from flask import Response
 from src.providers.onpremises import dockercli
-from src.providers.onpremises import eventgateway
-from src.providers.onpremises import miniocli 
+from src.providers.onpremises.eventgateway import EventGatewayClient
+from src.providers.onpremises.miniocli import MinioClient 
 
 def flask_response(func):
     '''
@@ -53,11 +53,11 @@ class OpenFaas(Commands):
     @flask_response    
     def init(self, **oscar_args):
         print("OSCAR ARGS: ", oscar_args)
-        self.create_docker_image(oscar_args)
-        function_name = oscar_args['name']
-        openfaas_args = self.get_openfaas_args()
-        openfaas_args = self.manage_event_gateway(function_name, openfaas_args)
-        openfaas_args = self.manage_minio(function_name, openfaas_args)
+        function_name = oscar_args['name']        
+        registry_image_id = self.create_docker_image(oscar_args)
+        openfaas_args = self.get_openfaas_args(registry_image_id, oscar_args)
+        self.manage_event_gateway(function_name, openfaas_args)
+        self.manage_minio(function_name, openfaas_args)
         print("OPENFAAS ARGS: ", openfaas_args)
         r = requests.post(self.endpoint + self.functions_path, json=openfaas_args)
         return r
@@ -65,6 +65,7 @@ class OpenFaas(Commands):
     def create_docker_image(self, oscar_args):
         registry_image_id = dockercli.create_docker_image(**oscar_args)
         dockercli.push_docker_image(registry_image_id)
+        return registry_image_id
     
     def get_openfaas_args(self, registry_image_id, oscar_args):
         func_args = {"service" : oscar_args['name'],
@@ -74,28 +75,27 @@ class OpenFaas(Commands):
                                   "read_timeout": "90",
                                   "write_timeout": "90" }
                      }
-        return self. merge_dicts(func_args, oscar_args)
+        return self.merge_dicts(func_args, oscar_args)
     
     def manage_event_gateway(self, function_name, func_args):
-        event_gateway = eventgateway.EventGatewayClient()
+        event_gateway = EventGatewayClient()
         event_gateway.register_function(function_name)
         subscription_id = event_gateway.subscribe_event(function_name)
         func_args["envVars"]["eventgateway_sub_id"] = subscription_id
     
     def manage_minio(self, function_name, func_args):
-        minio = miniocli.MinioClient(function_name)
+        minio = MinioClient(function_name)
         minio.create_input_bucket()
         minio.create_output_bucket()
         func_args["envVars"]["AWS_ACCESS_KEY_ID"] = minio.get_access_key()
         func_args["envVars"]["AWS_SECRET_ACCESS_KEY"] = minio.get_secret_key()
         func_args["envVars"]["OUTPUT_BUCKET"] = minio.get_output_bucket_name()
-        return func_args        
 
     @flask_response
     def process_minio_event(self, minio_event):
         # Remove the bucketname'-in' part
-        function_name = minio_event["Records"]["s3"]["bucket"]["name"][:-3]
-        return eventgateway.EventGatewayClient().send_event(function_name, minio_event)
+        function_name = minio_event["Records"][0]["s3"]["bucket"]["name"][:-3]
+        return EventGatewayClient().send_event(function_name, minio_event)
 
     @flask_response
     def invoke(self, function_name, body, asynch=False):

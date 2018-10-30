@@ -24,8 +24,9 @@ class MinioClient():
         self.access_key = utils.get_environment_variable("MINIO_USER")
         self.secret_key = utils.get_environment_variable("MINIO_PASS")
         self.client = minio.Minio(utils.get_environment_variable("MINIO_ENDPOINT"),
-                            access_key=utils.get_environment_variable("MINIO_USER"),
-                            secret_key=utils.get_environment_variable("MINIO_PASS"))
+                            access_key=self.access_key,
+                            secret_key=self.secret_key,
+                            secure=False)
              
     def create_input_bucket(self):
         self.create_bucket('{0}-in'.format(self.function_name))
