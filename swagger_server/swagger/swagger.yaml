@@ -204,15 +204,18 @@ securityDefinitions:
 definitions:
   DeleteFunctionRequest:
     type: "object"
-    required:
-    - "functionName"
     properties:
-      functionName:
+      name:
         type: "string"
         example: "nodeinfo"
         description: "Name of deployed function"
+      deleteBuckets:
+        type: "boolean"
+        example: false
+        description: "Delete linked buckets"
     example:
-      functionName: "nodeinfo"
+      name: "nodeinfo"
+      deleteBuckets: false
   FunctionDefinition:
     type: "object"
     required:
@@ -237,24 +240,24 @@ definitions:
         description: "Overrides to environmental variables"
         additionalProperties:
           type: "string"
+      labels:
+        type: "object"
+        description: "An dictionary of labels used by the back-end for making scheduling\
+          \ or routing decisions"
+        additionalProperties:
+          type: "string"
+      annotations:
+        type: "object"
+        description: "An dictionary of annotations used by the back-end for management,\
+          \ orchestration, events and build tasks"
+        additionalProperties:
+          type: "string"
       constraints:
         type: "array"
         items:
           type: "string"
           example: "node.platform.os == linux"
           description: "Constraints are specific to the OpenFaaS Provider"
-      labels:
-        type: "array"
-        description: "An array of labels used by the back-end for making scheduling\
-          \ or routing decisions"
-        items:
-          type: "string"
-      annotations:
-        type: "array"
-        description: "An array of annotations used by the back-end for management,\
-          \ orchestration, events and build tasks"
-        items:
-          type: "string"
       network:
         type: "string"
         example: "func_functions"
@@ -280,8 +283,8 @@ definitions:
       envVars:
         key: "envVars"
       annotations:
-      - "annotations"
-      - "annotations"
+        key1: "annotation1"
+        key2: "annotation2"
       registryAuth: "dXNlcjpwYXNzd29yZA=="
       requests:
         memory: "128M"
@@ -297,8 +300,8 @@ definitions:
         memory: "128M"
         cpu: "0.01"
       labels:
-      - "labels"
-      - "labels"
+        key1: "label1"
+        key2: "label2"
       network: "func_functions"
   FunctionListEntry:
     type: "object"

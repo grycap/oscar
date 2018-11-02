@@ -59,7 +59,7 @@ def utf8_to_base64_string(value):
     return base64.b64encode(value).decode('utf-8')
 
 def dict_to_base64_string(value):
-    return base64.b64encode(json.dumps(value)).decode("utf-8")
+    return utf8_to_base64_string(json.dumps(value))
 
 def divide_list_in_chunks(elements, chunk_size):
     """Yield successive n-sized chunks from th elements list."""
@@ -74,7 +74,7 @@ def get_random_uuid4_str():
 def merge_dicts(d1, d2):
     '''
     Merge 'd1' and 'd2' dicts into 'd1'.
-    'd2' has precedence over 'd1'
+    'd1' has precedence over 'd2'
     '''
     for k,v in d2.items():
         if v:
@@ -125,6 +125,9 @@ def read_file(file_path, mode="r"):
 def delete_file(path):
     if os.path.isfile(path):
         os.remove(path)
+        
+def delete_folder(folder_path):
+    shutil.rmtree(folder_path)       
     
 def create_tar_gz(files_to_archive, destination_tar_path):
     with tarfile.open(destination_tar_path, "w:gz") as tar:

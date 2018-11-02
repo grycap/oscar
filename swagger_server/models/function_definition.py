@@ -16,7 +16,7 @@ class FunctionDefinition(Model):
     Do not edit the class manually.
     """
 
-    def __init__(self, name: str=None, image: str=None, script: str=None, env_vars: Dict[str, str]=None, constraints: List[str]=None, labels: List[str]=None, annotations: List[str]=None, network: str=None, secrets: List[str]=None, registry_auth: str=None, limits: FunctionDefinitionLimits=None, requests: FunctionDefinitionLimits=None):  # noqa: E501
+    def __init__(self, name: str=None, image: str=None, script: str=None, env_vars: Dict[str, str]=None, labels: Dict[str, str]=None, annotations: Dict[str, str]=None, constraints: List[str]=None, network: str=None, secrets: List[str]=None, registry_auth: str=None, limits: FunctionDefinitionLimits=None, requests: FunctionDefinitionLimits=None):  # noqa: E501
         """FunctionDefinition - a model defined in Swagger
 
         :param name: The name of this FunctionDefinition.  # noqa: E501
@@ -27,12 +27,12 @@ class FunctionDefinition(Model):
         :type script: str
         :param env_vars: The env_vars of this FunctionDefinition.  # noqa: E501
         :type env_vars: Dict[str, str]
+        :param labels: The labels of this FunctionDefinition.  # noqa: E501
+        :type labels: Dict[str, str]
+        :param annotations: The annotations of this FunctionDefinition.  # noqa: E501
+        :type annotations: Dict[str, str]
         :param constraints: The constraints of this FunctionDefinition.  # noqa: E501
         :type constraints: List[str]
-        :param labels: The labels of this FunctionDefinition.  # noqa: E501
-        :type labels: List[str]
-        :param annotations: The annotations of this FunctionDefinition.  # noqa: E501
-        :type annotations: List[str]
         :param network: The network of this FunctionDefinition.  # noqa: E501
         :type network: str
         :param secrets: The secrets of this FunctionDefinition.  # noqa: E501
@@ -49,9 +49,9 @@ class FunctionDefinition(Model):
             'image': str,
             'script': str,
             'env_vars': Dict[str, str],
+            'labels': Dict[str, str],
+            'annotations': Dict[str, str],
             'constraints': List[str],
-            'labels': List[str],
-            'annotations': List[str],
             'network': str,
             'secrets': List[str],
             'registry_auth': str,
@@ -64,9 +64,9 @@ class FunctionDefinition(Model):
             'image': 'image',
             'script': 'script',
             'env_vars': 'envVars',
-            'constraints': 'constraints',
             'labels': 'labels',
             'annotations': 'annotations',
+            'constraints': 'constraints',
             'network': 'network',
             'secrets': 'secrets',
             'registry_auth': 'registryAuth',
@@ -78,9 +78,9 @@ class FunctionDefinition(Model):
         self._image = image
         self._script = script
         self._env_vars = env_vars
-        self._constraints = constraints
         self._labels = labels
         self._annotations = annotations
+        self._constraints = constraints
         self._network = network
         self._secrets = secrets
         self._registry_auth = registry_auth
@@ -197,6 +197,52 @@ class FunctionDefinition(Model):
         self._env_vars = env_vars
 
     @property
+    def labels(self) -> Dict[str, str]:
+        """Gets the labels of this FunctionDefinition.
+
+        An dictionary of labels used by the back-end for making scheduling or routing decisions  # noqa: E501
+
+        :return: The labels of this FunctionDefinition.
+        :rtype: Dict[str, str]
+        """
+        return self._labels
+
+    @labels.setter
+    def labels(self, labels: Dict[str, str]):
+        """Sets the labels of this FunctionDefinition.
+
+        An dictionary of labels used by the back-end for making scheduling or routing decisions  # noqa: E501
+
+        :param labels: The labels of this FunctionDefinition.
+        :type labels: Dict[str, str]
+        """
+
+        self._labels = labels
+
+    @property
+    def annotations(self) -> Dict[str, str]:
+        """Gets the annotations of this FunctionDefinition.
+
+        An dictionary of annotations used by the back-end for management, orchestration, events and build tasks  # noqa: E501
+
+        :return: The annotations of this FunctionDefinition.
+        :rtype: Dict[str, str]
+        """
+        return self._annotations
+
+    @annotations.setter
+    def annotations(self, annotations: Dict[str, str]):
+        """Sets the annotations of this FunctionDefinition.
+
+        An dictionary of annotations used by the back-end for management, orchestration, events and build tasks  # noqa: E501
+
+        :param annotations: The annotations of this FunctionDefinition.
+        :type annotations: Dict[str, str]
+        """
+
+        self._annotations = annotations
+
+    @property
     def constraints(self) -> List[str]:
         """Gets the constraints of this FunctionDefinition.
 
@@ -216,52 +262,6 @@ class FunctionDefinition(Model):
         """
 
         self._constraints = constraints
-
-    @property
-    def labels(self) -> List[str]:
-        """Gets the labels of this FunctionDefinition.
-
-        An array of labels used by the back-end for making scheduling or routing decisions  # noqa: E501
-
-        :return: The labels of this FunctionDefinition.
-        :rtype: List[str]
-        """
-        return self._labels
-
-    @labels.setter
-    def labels(self, labels: List[str]):
-        """Sets the labels of this FunctionDefinition.
-
-        An array of labels used by the back-end for making scheduling or routing decisions  # noqa: E501
-
-        :param labels: The labels of this FunctionDefinition.
-        :type labels: List[str]
-        """
-
-        self._labels = labels
-
-    @property
-    def annotations(self) -> List[str]:
-        """Gets the annotations of this FunctionDefinition.
-
-        An array of annotations used by the back-end for management, orchestration, events and build tasks  # noqa: E501
-
-        :return: The annotations of this FunctionDefinition.
-        :rtype: List[str]
-        """
-        return self._annotations
-
-    @annotations.setter
-    def annotations(self, annotations: List[str]):
-        """Sets the annotations of this FunctionDefinition.
-
-        An array of annotations used by the back-end for management, orchestration, events and build tasks  # noqa: E501
-
-        :param annotations: The annotations of this FunctionDefinition.
-        :type annotations: List[str]
-        """
-
-        self._annotations = annotations
 
     @property
     def network(self) -> str:
