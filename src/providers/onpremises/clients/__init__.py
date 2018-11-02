@@ -15,4 +15,4 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-__all__ = ['cmdtemplate','utils']
+__all__ = ['dockercli','eventgateway','minio','openfaas']
