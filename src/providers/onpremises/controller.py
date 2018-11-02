@@ -16,104 +16,90 @@
 
 from src.cmdtemplate import Commands
 import src.utils as utils 
-import requests
 from flask import Response
-from src.providers.onpremises import dockercli
-from src.providers.onpremises.eventgateway import EventGatewayClient
-from src.providers.onpremises.miniocli import MinioClient 
+from src.providers.onpremises.clients.dockercli import DockerClient
+from src.providers.onpremises.clients.eventgateway import EventGatewayClient
+from src.providers.onpremises.clients.minio import MinioClient
+from src.providers.onpremises.clients.openfaas import OpenFaasClient
 
 def flask_response(func):
-    '''
-    Decorator used to create a flask Response
-    '''
+    ''' Decorator used to create a flask Response '''
     def wrapper(*args, **kwargs):
         r = func(*args, **kwargs)
         kwargs = {'response' : r.content, 'status' : str(r.status_code), 'headers' : r.headers.items()}
         return Response(**kwargs)
     return wrapper
 
-class OpenFaas(Commands):
+class OnPremises(Commands):
     
-    functions_path = '/system/functions'
-    function_info = '/system/function/'
-    invoke_req_response_function = '/function/'
-    invoke_async_function = '/async-function/'
-    system_info = '/system/info'
+    @utils.lazy_property
+    def openfaas(self):
+        openfaas = OpenFaasClient(self.function_args)
+        return openfaas
     
-    def __init__(self):
-        self.endpoint = utils.get_environment_variable("OPENFAAS_ENDPOINT")
-        
-    @flask_response        
-    def ls(self, function_name=None):
-        path = self.functions_path
-        if function_name:
-            path = self.function_info + function_name
-        return requests.get(self.endpoint + path)
+    @utils.lazy_property
+    def event_gateway(self):
+        event_gateway = EventGatewayClient(self.function_args)
+        return event_gateway
+    
+    @utils.lazy_property
+    def minio(self):
+        minio = MinioClient(self.function_args)
+        return minio    
+    
+    @utils.lazy_property
+    def docker(self):
+        docker = DockerClient(self.function_args)
+        return docker
+    
+    def __init__(self, function_args=None):
+        self.function_args = function_args if function_args else {}
     
     @flask_response    
-    def init(self, **oscar_args):
-        print("OSCAR ARGS: ", oscar_args)
-        function_name = oscar_args['name']        
-        registry_image_id = self.create_docker_image(oscar_args)
-        openfaas_args = self.get_openfaas_args(registry_image_id, oscar_args)
-        self.manage_event_gateway(function_name, openfaas_args)
-        self.manage_minio(function_name, openfaas_args)
-        print("OPENFAAS ARGS: ", openfaas_args)
-        r = requests.post(self.endpoint + self.functions_path, json=openfaas_args)
-        return r
-    
-    def create_docker_image(self, oscar_args):
-        registry_image_id = dockercli.create_docker_image(**oscar_args)
-        dockercli.push_docker_image(registry_image_id)
-        return registry_image_id
-    
-    def get_openfaas_args(self, registry_image_id, oscar_args):
-        func_args = {"service" : oscar_args['name'],
-                     "image" : registry_image_id,
-                     "envProcess" : "supervisor",
-                     "envVars" : {"sprocess" : "/tmp/user_script.sh",
-                                  "read_timeout": "90",
-                                  "write_timeout": "90" }
-                     }
-        return self.merge_dicts(func_args, oscar_args)
-    
-    def manage_event_gateway(self, function_name, func_args):
-        event_gateway = EventGatewayClient()
-        event_gateway.register_function(function_name)
-        subscription_id = event_gateway.subscribe_event(function_name)
-        func_args["envVars"]["eventgateway_sub_id"] = subscription_id
-    
-    def manage_minio(self, function_name, func_args):
-        minio = MinioClient(function_name)
-        minio.create_input_bucket()
-        minio.create_output_bucket()
-        func_args["envVars"]["AWS_ACCESS_KEY_ID"] = minio.get_access_key()
-        func_args["envVars"]["AWS_SECRET_ACCESS_KEY"] = minio.get_secret_key()
-        func_args["envVars"]["OUTPUT_BUCKET"] = minio.get_output_bucket_name()
+    def init(self):
+        # Create docker image
+        self.create_docker_image()
+        self.set_docker_variables()        
+        # Create eventgateway connections
+        self.manage_event_gateway()
+        self.set_eventgateway_variables()
+        # Create minio buckets
+        self.create_minio_buckets()
+        self.set_minio_variables()
+        print("FUNCTION ARGS: ", self.function_args)
+        # Create openfaas function
+        return self.openfaas.create_function()
 
     @flask_response
     def process_minio_event(self, minio_event):
         # Remove the bucketname'-in' part
-        function_name = minio_event["Records"][0]["s3"]["bucket"]["name"][:-3]
-        return EventGatewayClient().send_event(function_name, minio_event)
+        self.function_args['name'] = minio_event["Records"][0]["s3"]["bucket"]["name"][:-3]
+        return self.event_gateway.send_event(minio_event)
+
+    @flask_response        
+    def ls(self):
+        return self.openfaas.get_functions_info()
 
     @flask_response
-    def invoke(self, function_name, body, asynch=False):
-        path = self.invoke_req_response_function
-        if asynch:
-            path = self.invoke_async_function
-        return requests.post(self.endpoint + path + function_name, data=body)
+    def invoke(self, body, asynch=False):
+        return self.openfaas.invoke_function(body, asynch)
     
     def run(self):
         pass
     
     def update(self):
-        pass    
+        pass   
     
     @flask_response    
-    def rm(self, function_name):
-        payload = { 'functionName' : function_name }
-        return requests.delete(self.endpoint + self.functions_path, json=payload)
+    def rm(self):
+        # Delete minio buckets (if selected)
+        if 'deleteBuckets' in self.function_args and self.function_args['deleteBuckets']:
+            self.minio.delete_input_bucket()
+            self.minio.delete_output_bucket()
+        # Delete event gateway registers
+        self.event_gateway.deregister_function()
+        self.event_gateway.unsubscribe_event(self.get_function_subscription_id())
+        return self.openfaas.delete_function()
 
     def log(self):
         pass
@@ -127,18 +113,42 @@ class OpenFaas(Commands):
     def parse_arguments(self, args):
         pass
     
-    def merge_dicts(self, d1, d2):
-        '''
-        Merge 'd1' and 'd2' dicts into 'd1'.
-        'd1' has precedence over 'd2'
-        '''
-        for k,v in d2.items():
-            if v:
-                if k not in d1:
-                    d1[k] = v
-                elif type(v) is dict:
-                    d1[k] = self.merge_dicts(d1[k], v)
-                elif type(v) is list:
-                    d1[k] += v
-        return d1    
+    def add_function_environment_variable(self, key, value):
+        if "envVars" in self.function_args:
+            self.function_args["envVars"][key] = value
+        else:
+            self.function_args["envVars"] = { key: value }
     
+    def add_function_annotation(self, key, value):
+        if "annotations" in self.function_args:
+            self.function_args["annotations"][key] = value
+        else:
+            self.function_args["annotations"] = { key: value }        
+    
+    def create_docker_image(self):
+        self.docker.create_docker_image()
+        self.docker.push_docker_image()
+
+    def set_docker_variables(self):  
+        # Override the function image name
+        self.function_args["image"] = self.docker.registry_image_id    
+    
+    def manage_event_gateway(self):
+        self.event_gateway.register_function()
+        self.event_gateway.subscribe_event()
+        
+    def set_eventgateway_variables(self):  
+        self.add_function_annotation("eventgateway.subscription.id", self.event_gateway.subscription_id)      
+    
+    def create_minio_buckets(self):
+        self.minio.create_input_bucket()
+        self.minio.create_output_bucket()
+        
+    def set_minio_variables(self):
+        self.add_function_environment_variable("AWS_ACCESS_KEY_ID", self.minio.get_access_key())
+        self.add_function_environment_variable("AWS_SECRET_ACCESS_KEY", self.minio.get_secret_key())
+        self.add_function_environment_variable("OUTPUT_BUCKET", self.minio.get_output_bucket_name())
+        
+    def get_function_subscription_id(self):
+        function_info = self.openfaas.get_functions_info(json_response=True)
+        return function_info["annotations"]["eventgateway.subscription.id"]     

@@ -1,10 +1,5 @@
-# coding: utf-8
 
 from __future__ import absolute_import
-from datetime import date, datetime  # noqa: F401
-
-from typing import List, Dict  # noqa: F401
-
 from swagger_server.models.base_model_ import Model
 from swagger_server import util
 
@@ -15,21 +10,26 @@ class DeleteFunctionRequest(Model):
     Do not edit the class manually.
     """
 
-    def __init__(self, function_name: str=None):  # noqa: E501
+    def __init__(self, name: str=None, delete_buckets: bool=None):  # noqa: E501
         """DeleteFunctionRequest - a model defined in Swagger
 
-        :param function_name: The function_name of this DeleteFunctionRequest.  # noqa: E501
-        :type function_name: str
+        :param name: The name of this DeleteFunctionRequest.  # noqa: E501
+        :type name: str
+        :param delete_buckets: The delete_buckets of this DeleteFunctionRequest.  # noqa: E501
+        :type delete_buckets: bool
         """
         self.swagger_types = {
-            'function_name': str
+            'name': str,
+            'delete_buckets': bool
         }
 
         self.attribute_map = {
-            'function_name': 'functionName'
+            'name': 'name',
+            'delete_buckets': 'deleteBuckets'
         }
 
-        self._function_name = function_name
+        self._name = name
+        self._delete_buckets = delete_buckets
 
     @classmethod
     def from_dict(cls, dikt) -> 'DeleteFunctionRequest':
@@ -43,26 +43,47 @@ class DeleteFunctionRequest(Model):
         return util.deserialize_model(dikt, cls)
 
     @property
-    def function_name(self) -> str:
-        """Gets the function_name of this DeleteFunctionRequest.
+    def name(self) -> str:
+        """Gets the name of this DeleteFunctionRequest.
 
         Name of deployed function  # noqa: E501
 
-        :return: The function_name of this DeleteFunctionRequest.
+        :return: The name of this DeleteFunctionRequest.
         :rtype: str
         """
-        return self._function_name
+        return self._name
 
-    @function_name.setter
-    def function_name(self, function_name: str):
-        """Sets the function_name of this DeleteFunctionRequest.
+    @name.setter
+    def name(self, name: str):
+        """Sets the name of this DeleteFunctionRequest.
 
         Name of deployed function  # noqa: E501
 
-        :param function_name: The function_name of this DeleteFunctionRequest.
-        :type function_name: str
+        :param name: The name of this DeleteFunctionRequest.
+        :type name: str
         """
-        if function_name is None:
-            raise ValueError("Invalid value for `function_name`, must not be `None`")  # noqa: E501
 
-        self._function_name = function_name
+        self._name = name
+
+    @property
+    def delete_buckets(self) -> bool:
+        """Gets the delete_buckets of this DeleteFunctionRequest.
+
+        Delete linked buckets  # noqa: E501
+
+        :return: The delete_buckets of this DeleteFunctionRequest.
+        :rtype: bool
+        """
+        return self._delete_buckets
+
+    @delete_buckets.setter
+    def delete_buckets(self, delete_buckets: bool):
+        """Sets the delete_buckets of this DeleteFunctionRequest.
+
+        Delete linked buckets  # noqa: E501
+
+        :param delete_buckets: The delete_buckets of this DeleteFunctionRequest.
+        :type delete_buckets: bool
+        """
+
+        self._delete_buckets = delete_buckets
