@@ -1,5 +1,5 @@
-Welcome to OSCAR's documentation!
-=================================
+OSCAR Documentation
+===================
 
 .. toctree::
    :maxdepth: 2
@@ -7,5 +7,6 @@ Welcome to OSCAR's documentation!
 
    intro
    deploy
+   usage
    license
    help

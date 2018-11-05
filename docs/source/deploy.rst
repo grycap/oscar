@@ -1,18 +1,50 @@
 Deploy
 ======
 
-In order to deploy the Kubernetes cluster with all OSCAR components you have to use `ec3 <https://github.com/grycap/ec3>`_ (Installation details can be found `here <https://ec3.readthedocs.io/en/latest/intro.html#installation>`_).
+In order to deploy the Kubernetes cluster with all the OSCAR components use `EC3 <https://github.com/grycap/ec3>`_, a tool that deploys elastic virtual clusters. EC3 uses the `Infrastructure Manager (IM) <https://www.grycap.upv.es/im>`_ to deploy such clusters on multiple Cloud back-ends.
+The installation details can be found `here <https://ec3.readthedocs.io/en/latest/intro.html#installation>`_), though this section includes the relevant information to get you started:
+
+
+
+1. Clone the EC3 repository:
+::
 
   git clone https://github.com/grycap/ec3
 
-Download the template into the ec3/templates folder:
+2. Download the OSCAR template into the ``ec3/templates`` folder:
+::
 
-  cd ec3/
+  cd ec3
   wget -P templates https://raw.githubusercontent.com/grycap/oscar/master/templates/kubernetes_oscar.radl
 
-Make an `auth.txt <https://ec3.readthedocs.io/en/devel/ec3.html#authorization-file>`_ file with the credentials of your cloud provider.
+3. Create an ``auth.txt`` `authorization file <https://ec3.readthedocs.io/en/devel/ec3.html#authorization-file>`_ with valid credentials to access your Cloud provider.  
+As an example, to deploy on an OpenNebula-based Cloud site the contents of the file would be:
+::
 
-Deploy the cluster! Example with Amazon EC2:
+  type = OpenNebula; host = opennebula-host:2633; username = your-user; password = you-password
 
-  ./ec3 launch mycluster kubernetes_oscar ubuntu-ec2 -a auth.txt 
+4. Modify the corresponding `RADL <https://imdocs.readthedocs.io/en/latest/radl.html#resource-and-application-description-language-radl>`_ template in order to determine the appropriate configuration for your deployment:
+
+  * Virtual Machine Image identifiers 
+  * Hardware Configuration
+
+ As an example, to deploy in OpenNebula, one would modify the `ubuntu-opennebula.radl` (or create a new one).
+
+5. Deploy the cluster:
+::
+
+  ./ec3 launch oscar-cluster kubernetes_oscar ubuntu-opennebula -a auth.txt 
+
+This will take several minutes until the Kubernetes cluster and all the required services have been deployed.
+You will obtain the IP of the front-end of the cluster and a confirmation message that the front-end is ready.
+Notice that it will still take few minutes before the services in the Kubernetes cluster are up & running.
+
+6. Check the cluster state.
+
+The cluster will be fully configured when all the Kubernetes pods are in the `Running`.
+:: 
+
+ ./ec3 ssh oscar-cluster
+ sudo kubectl get pods --all-namespaces 
+
 
