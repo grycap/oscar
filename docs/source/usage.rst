@@ -18,6 +18,8 @@ Once the OSCAR framework is running on the Kubernetes cluster, the following end
 +-----------------+-----------------------+----------------------+ 
 | Kubernetes API  | https://{KUBE}:6443   |                      | 
 +-----------------+-----------------------+----------------------+ 
+| Prometheus      | http://{KUBE}:31119   |                      | 
++-----------------+-----------------------+----------------------+ 
 
 Note that `{KUBE}` refers to the public IP of the front-end of the Kubernetes cluster.
 
