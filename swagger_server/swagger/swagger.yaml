@@ -10,6 +10,30 @@ basePath: "/"
 schemes:
 - "http"
 paths:
+  /events:
+    post:
+      summary: "Process Minio events"
+      description: ""
+      operationId: "events_post"
+      consumes:
+      - "application/json"
+      produces:
+      - "application/json"
+      parameters:
+      - in: "body"
+        name: "body"
+        description: "Minio webhook endpoint"
+        required: true
+        schema:
+          $ref: "#/definitions/InBody"
+      responses:
+        202:
+          description: "Accepted"
+        400:
+          description: "Bad Request"
+        500:
+          description: "Internal Server Error"
+      x-swagger-router-controller: "swagger_server.controllers.default_controller"
   /functions:
     get:
       summary: "Get a list of deployed functions with: stats and image digest"
@@ -111,7 +135,7 @@ paths:
         required: true
         type: "string"
       - in: "body"
-        name: "input"
+        name: "data"
         description: "(Optional) data to pass to function"
         required: false
         schema:
@@ -159,7 +183,7 @@ paths:
         required: true
         type: "string"
       - in: "body"
-        name: "input"
+        name: "data"
         description: "(Optional) data to pass to function"
         required: false
         schema:
@@ -180,40 +204,52 @@ securityDefinitions:
 definitions:
   DeleteFunctionRequest:
     type: "object"
-    required:
-    - "functionName"
     properties:
-      functionName:
+      name:
         type: "string"
         example: "nodeinfo"
         description: "Name of deployed function"
+      deleteBuckets:
+        type: "boolean"
+        example: false
+        description: "Delete linked buckets"
     example:
-      functionName: "nodeinfo"
+      name: "nodeinfo"
+      deleteBuckets: false
   FunctionDefinition:
     type: "object"
     required:
     - "image"
-    - "service"
+    - "name"
+    - "script"
     properties:
-      service:
+      name:
         type: "string"
         example: "nodeinfo"
         description: "Name of deployed function"
-      network:
-        type: "string"
-        example: "func_functions"
-        description: "Docker swarm network, usually func_functions"
       image:
         type: "string"
         example: "functions/nodeinfo:latest"
         description: "Docker image in accessible registry"
-      envProcess:
+      script:
         type: "string"
-        example: "node main.js"
-        description: "Process for watchdog to fork"
+        example: "ZWNobyAiaXQgd29ya3MhIg=="
+        description: "Script to be executed inside the function coded in base64"
       envVars:
         type: "object"
         description: "Overrides to environmental variables"
+        additionalProperties:
+          type: "string"
+      labels:
+        type: "object"
+        description: "An dictionary of labels used by the back-end for making scheduling\
+          \ or routing decisions"
+        additionalProperties:
+          type: "string"
+      annotations:
+        type: "object"
+        description: "An dictionary of annotations used by the back-end for management,\
+          \ orchestration, events and build tasks"
         additionalProperties:
           type: "string"
       constraints:
@@ -221,19 +257,11 @@ definitions:
         items:
           type: "string"
           example: "node.platform.os == linux"
-          description: "Constraints are specific to OpenFaaS Provider"
-      labels:
-        type: "array"
-        description: "An array of labels used by the back-end for making scheduling\
-          \ or routing decisions"
-        items:
-          type: "string"
-      annotations:
-        type: "array"
-        description: "An array of annotations used by the back-end for management,\
-          \ orchestration, events and build tasks"
-        items:
-          type: "string"
+          description: "Constraints are specific to the OpenFaaS Provider"
+      network:
+        type: "string"
+        example: "func_functions"
+        description: "Docker swarm network, usually func_functions"
       secrets:
         type: "array"
         items:
@@ -251,13 +279,12 @@ definitions:
         $ref: "#/definitions/FunctionDefinition_limits"
     example:
       image: "functions/nodeinfo:latest"
-      envProcess: "node main.js"
-      service: "nodeinfo"
+      name: "nodeinfo"
       envVars:
         key: "envVars"
       annotations:
-      - "annotations"
-      - "annotations"
+        key1: "annotation1"
+        key2: "annotation2"
       registryAuth: "dXNlcjpwYXNzd29yZA=="
       requests:
         memory: "128M"
@@ -268,13 +295,14 @@ definitions:
       secrets:
       - "secret-name-1"
       - "secret-name-1"
+      script: "ZWNobyAiaXQgd29ya3MhIg=="
       limits:
         memory: "128M"
         cpu: "0.01"
-      network: "func_functions"
       labels:
-      - "labels"
-      - "labels"
+        key1: "label1"
+        key2: "label2"
+      network: "func_functions"
   FunctionListEntry:
     type: "object"
     required:
@@ -297,17 +325,17 @@ definitions:
       invocationCount:
         type: "number"
         format: "integer"
-        example: 1337
+        example: 1337.0
         description: "The amount of invocations for the specified function"
       replicas:
         type: "number"
         format: "integer"
-        example: 2
+        example: 2.0
         description: "The current minimal ammount of replicas"
       availableReplicas:
         type: "number"
         format: "integer"
-        example: 2
+        example: 2.0
         description: "The current available amount of replicas"
       envProcess:
         type: "string"
@@ -332,6 +360,8 @@ definitions:
       availableReplicas: 2
       labels:
         key: "labels"
+  InBody:
+    type: "object"
   FunctionDefinition_limits:
     properties:
       memory:

@@ -22,6 +22,10 @@ import subprocess
 import tarfile
 import tempfile
 import uuid
+import shutil
+
+def copy_file(src, dst):
+    shutil.copy(src, dst)
 
 def join_paths(*paths):
     return os.path.join(*paths)
@@ -55,7 +59,7 @@ def utf8_to_base64_string(value):
     return base64.b64encode(value).decode('utf-8')
 
 def dict_to_base64_string(value):
-    return base64.b64encode(json.dumps(value)).decode("utf-8")
+    return utf8_to_base64_string(json.dumps(value))
 
 def divide_list_in_chunks(elements, chunk_size):
     """Yield successive n-sized chunks from th elements list."""
@@ -70,7 +74,7 @@ def get_random_uuid4_str():
 def merge_dicts(d1, d2):
     '''
     Merge 'd1' and 'd2' dicts into 'd1'.
-    'd2' has precedence over 'd1'
+    'd1' has precedence over 'd2'
     '''
     for k,v in d2.items():
         if v:
@@ -121,6 +125,9 @@ def read_file(file_path, mode="r"):
 def delete_file(path):
     if os.path.isfile(path):
         os.remove(path)
+        
+def delete_folder(folder_path):
+    shutil.rmtree(folder_path)       
     
 def create_tar_gz(files_to_archive, destination_tar_path):
     with tarfile.open(destination_tar_path, "w:gz") as tar:
@@ -139,8 +146,14 @@ def kill_process(self, process):
 def execute_command(command):
     subprocess.call(command)
     
+def execute_command_and_discard_output(command):
+    return subprocess.call(command, stdout=subprocess.DEVNULL)    
+    
 def execute_command_and_return_output(command):
     return subprocess.check_output(command).decode("utf-8")
+
+def execute_command_with_input_and_return_output(command, cmd_input):
+    return subprocess.check_output(command, input=cmd_input).decode("utf-8")
 
 def is_variable_in_environment(variable):
     return is_value_in_dict(os.environ, variable)

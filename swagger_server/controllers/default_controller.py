@@ -1,22 +1,19 @@
 import connexion
 
-from swagger_server.models.delete_function_request import DeleteFunctionRequest
 from swagger_server.models.function_definition import FunctionDefinition
-from src.providers.openfaas.controller import OpenFaas
+from src.providers.onpremises.controller import OnPremises
 
+def events_post(body):
+    """Process Minio events
 
-def function_async_function_name_post(functionName, input=None):
-    """Invoke a function asynchronously
+     # noqa: E501
 
-    :param functionName: Function name
-    :type functionName: str
-    :param input: (Optional) data to pass to function
-    :type input: str
+    :param body: Minio webhook endpoint
+    :type body: dict | bytes
 
     :rtype: None
     """
-    return OpenFaas().invoke(functionName, input, asynch=True)
-
+    return OnPremises().process_minio_event(body)
 
 def function_function_name_get(functionName):
     """Get a summary of an OpenFaaS function
@@ -26,21 +23,41 @@ def function_function_name_get(functionName):
 
     :rtype: FunctionListEntry
     """
-    return OpenFaas().ls(functionName)
+    params = {'name' : functionName}
+    return OnPremises(params).ls()
 
+def functions_get():
+    """Get a list of deployed functions with: stats and image digest
 
-def function_function_name_post(functionName, input=None):
+    :rtype: List[FunctionListEntry]
+    """
+    return OnPremises().ls()
+
+def function_function_name_post(functionName, data=None):
     """Invoke a function defined in OpenFaaS
 
     :param functionName: Function name
     :type functionName: str
-    :param body: (Optional) data to pass to function
-    :type body: str
+    :param data: (Optional) data to pass to function
+    :type data: str
 
     :rtype: None
     """
-    return OpenFaas().invoke(functionName, input)
+    params = {'name' : functionName}    
+    return OnPremises(params).invoke(data)
 
+def function_async_function_name_post(functionName, data=None):
+    """Invoke a function asynchronously
+
+    :param functionName: Function name
+    :type functionName: str
+    :param data: (Optional) data to pass to function
+    :type data: str
+
+    :rtype: None
+    """
+    params = {'name' : functionName}      
+    return OnPremises(params).invoke(data, asynch=True)
 
 def functions_delete(body):
     """Remove a deployed function.
@@ -51,17 +68,8 @@ def functions_delete(body):
     :rtype: None
     """
     if connexion.request.is_json:
-        body = DeleteFunctionRequest.from_dict(connexion.request.get_json())
-    return OpenFaas().rm(body.function_name)
-
-
-def functions_get():
-    """Get a list of deployed functions with: stats and image digest
-
-    :rtype: List[FunctionListEntry]
-    """
-    return OpenFaas().ls()
-
+        params = connexion.request.get_json()
+    return OnPremises(params).rm()
 
 def functions_post(body):
     """Deploy a new function.
@@ -73,7 +81,7 @@ def functions_post(body):
     """
     if connexion.request.is_json:
         params = connexion.request.get_json()
-    return OpenFaas().init(**params)
+    return OnPremises(params).init()
 
 
 def functions_put(body):
