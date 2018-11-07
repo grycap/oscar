@@ -41,10 +41,30 @@ Notice that it will still take few minutes before the services in the Kubernetes
 
 6. Check the cluster state.
 
-The cluster will be fully configured when all the Kubernetes pods are in the `Running`.
+The cluster will be fully configured when all the Kubernetes pods are in the `Running` state.
 :: 
 
  ./ec3 ssh oscar-cluster
  sudo kubectl get pods --all-namespaces 
 
+Notice that initially only the front-end node of the cluster is deployed. 
+As soon as the OSCAR framework is deployed, together with its services, the CLUES elasticity manager powers on a new (working) node on which these services will be run.
 
+You can see the status of the provisioned node(s) by issuing:
+::
+
+ clues status
+
+
+which obtains:
+::
+
+  node                          state    enabled   time stable   (cpu,mem) used   (cpu,mem) total
+  -----------------------------------------------------------------------------------------------
+  wn1.localdomain                used    enabled     00h00'49"    0.0,825229312      1,1992404992
+  wn2.localdomain                 off    enabled     00h06'43"      0,0              1,1073741824
+  wn3.localdomain                 off    enabled     00h06'43"      0,0              1,1073741824
+  wn4.localdomain                 off    enabled     00h06'43"      0,0              1,1073741824
+  wn5.localdomain                 off    enabled     00h06'43"      0,0              1,1073741824
+
+The working nodes transition from `off` to `pwon` and, finally, to the `used` status. 
