@@ -16,8 +16,6 @@ network public (
 network private ()
 
 system front (
-  cpu.count>=2 and
-  memory.size>=2048m and
   net_interface.0.connection = 'private' and
   net_interface.0.dns_name = 'kubeserver' and
   net_interface.1.connection = 'public' and
@@ -44,14 +42,12 @@ configure front (
 @begin
 ---
   - pre_tasks:
-    # - name: Create dir for the NFS PV Top dir
-    #   file: path=/pv state=directory mode=755
-    # - name: Create dir for the minio NFS PV Top dir
-    #   file: path=/pv/minio state=directory mode=755
-    # - name: Create dir for the docker registry NFS PV Top dir
-    #   file: path=/pv/minio state=directory mode=755
     - name: Create dir for the etcd NFS PV Top dir
       file: path=/pv/etcd-event-gateway state=directory mode=755
+    - name: Create auth file dir
+      file: path=/etc/kubernetes/pki state=directory mode=755 recurse=yes
+    - name: Create auth data file with an admin user
+      copy: content='{{ lookup('password', '/var/tmp/dashboard_token chars=ascii_lowercase,digits length=16') }},kubeuser,100,"users,system:masters"' dest=/etc/kubernetes/pki/auth mode=600
 
     roles:
     - role: 'grycap.nfs'
@@ -63,7 +59,10 @@ configure front (
 
     - role: 'grycap.kubernetes'
       kube_server: 'kubeserver'
-      kube_apiserver_options: [{option: "--insecure-port", value: "8080"}]
+      kube_apiserver_options:
+      - {option: "--insecure-port", value: "8080"}
+      - {option: "--token-auth-file", value: "/etc/kubernetes/pki/auth"}
+      kube_deploy_dashboard: true
       kube_install_metrics_server: true
       kube_persistent_volumes:
       - {namespace : "minio", name : "pvnfsminio", label : "minio", capacity_storage : "20Gi", nfs_path : "/pv/minio"}
@@ -94,7 +93,6 @@ configure front (
 )
 
 system wn (
-  memory.size>=2048m and
   net_interface.0.connection='private'
 )
 
