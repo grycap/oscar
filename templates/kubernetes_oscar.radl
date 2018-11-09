@@ -48,6 +48,9 @@ configure front (
       file: path=/etc/kubernetes/pki state=directory mode=755 recurse=yes
     - name: Create auth data file with an admin user
       copy: content='{{ lookup('password', '/var/tmp/dashboard_token chars=ascii_lowercase,digits length=16') }},kubeuser,100,"users,system:masters"' dest=/etc/kubernetes/pki/auth mode=600
+    - name: Generate minio secret key
+      set_fact:
+        minio_secret: "{{ lookup('password', '/var/tmp/minio_secret_key chars=ascii_letters,digits') }}"
 
     roles:
     - role: 'grycap.nfs'
@@ -75,6 +78,7 @@ configure front (
     - role: 'grycap.kubeminio'
       enable_notifications: true
       webhook_endpoints: [{ id: "1", endpoint: "http://oscar.oscar:8080/events"}]
+      minio_secretkey: '{{ minio_secret }}'
 
     - role: 'grycap.kubeventgateway'
 
@@ -84,10 +88,12 @@ configure front (
       svc_name: "registry.docker-registry"
       delete_enabled: true
 
-    - role: 'grycap.kubeoscar'    
+    - role: 'grycap.kubeoscar'
+      minio_pass: '{{ minio_secret }}' 
 
     - role: 'grycap.kubeoscarui'
       vue_app_backend_host: '{{ hostvars[groups["front"][0]]["IM_NODE_PUBLIC_IP"] }}'
+      minio_pass: '{{ minio_secret }}' 
 
 @end
 )
