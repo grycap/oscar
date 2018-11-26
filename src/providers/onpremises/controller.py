@@ -81,7 +81,7 @@ class OnPremises(Commands):
         return self.openfaas.get_functions_info()
 
     @flask_response
-    def invoke(self, body, asynch=False):
+    def invoke(self, body, asynch=True):
         return self.openfaas.invoke_function(body, asynch)
     
     def run(self):
