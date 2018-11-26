@@ -57,18 +57,21 @@ class OnPremises(Commands):
     
     @flask_response    
     def init(self):
-        # Create docker image
-        self.create_docker_image()
-        self.set_docker_variables()        
-        # Create eventgateway connections
-        self.manage_event_gateway()
-        self.set_eventgateway_variables()
-        # Create minio buckets
-        self.create_minio_buckets()
-        self.set_minio_variables()
-        print("FUNCTION ARGS: ", self.function_args)
-        # Create openfaas function
-        return self.openfaas.create_function()
+        function_exists, response = self.openfaas().is_function_created()
+        if function_exists:
+            return response
+        else:
+            # Create docker image
+            self.create_docker_image()
+            self.set_docker_variables()
+            # Create eventgateway connections
+            self.manage_event_gateway()
+            self.set_eventgateway_variables()
+            # Create minio buckets
+            self.create_minio_buckets()
+            self.set_minio_variables()
+            # Create openfaas function
+            return self.openfaas.create_function(self.function_args)
 
     @flask_response
     def process_minio_event(self, minio_event):
