@@ -83,6 +83,5 @@ class EventGatewayClient():
                                                   subscription_id))
         
     def send_event(self, json_body):
-        return requests.post("{0}/{1}".format(self.events_endpoint,
-                                              self.function_name), json=json_body)
+        return requests.post("{0}/{1}".format(self.events_endpoint, self.function_name), json=json_body)
 

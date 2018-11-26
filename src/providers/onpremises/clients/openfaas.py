@@ -56,7 +56,7 @@ class OpenFaasClient():
     def update_function(self):
         pass
     
-    def invoke_function(self, body, asynch=False):
+    def invoke_function(self, body, asynch=True):
         function_path = self.invoke_async_function if asynch else self.invoke_req_response_function
         url = "{0}/{1}/{2}".format(self.endpoint, function_path, self.function_args['name'])
         return requests.post(url, data=body)
