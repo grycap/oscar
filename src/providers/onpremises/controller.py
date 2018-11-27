@@ -67,8 +67,8 @@ class OnPremises(Commands):
         if function_exists:
             return response
         else:
+            # Return response received
             yield CustomResponse(status_code=200)
-            
             # Create docker image
             self.create_docker_image()
             self.set_docker_variables()
@@ -79,7 +79,7 @@ class OnPremises(Commands):
             self.create_minio_buckets()
             self.set_minio_variables()
             # Create openfaas function
-            return self.openfaas.create_function(self.function_args)
+            self.openfaas.create_function(self.function_args)
 
     @flask_response
     def process_minio_event(self, minio_event):
