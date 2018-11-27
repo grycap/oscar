@@ -22,6 +22,12 @@ from src.providers.onpremises.clients.eventgateway import EventGatewayClient
 from src.providers.onpremises.clients.minio import MinioClient
 from src.providers.onpremises.clients.openfaas import OpenFaasClient
 
+class CustomResponse():
+    def __init__(self, content=None, status_code=None, headers=None):
+        self.content = content if content else ''
+        self.status_code = status_code if status_code else 500
+        self.headers = headers if headers else {}
+
 def flask_response(func):
     ''' Decorator used to create a flask Response '''
     def wrapper(*args, **kwargs):
@@ -61,6 +67,8 @@ class OnPremises(Commands):
         if function_exists:
             return response
         else:
+            yield CustomResponse(status_code=200)
+            
             # Create docker image
             self.create_docker_image()
             self.set_docker_variables()
