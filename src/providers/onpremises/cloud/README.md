@@ -2,7 +2,7 @@
 
 To create the supervisor binary you will need the supervisor library dependencies (python3 and boto3) and the pyinstaller binary.
 
-To ease the process you can use a docker container with all the reuqired packages:
+To ease the process you can use a docker container with all the required packages:
 
 You only have to execute:
 
