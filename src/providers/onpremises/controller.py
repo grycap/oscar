@@ -21,6 +21,7 @@ from src.providers.onpremises.clients.dockercli import DockerClient
 from src.providers.onpremises.clients.eventgateway import EventGatewayClient
 from src.providers.onpremises.clients.minio import MinioClient
 from src.providers.onpremises.clients.openfaas import OpenFaasClient
+from threading import Thread
 
 class CustomResponse():
     def __init__(self, content=None, status_code=None, headers=None):
@@ -61,25 +62,33 @@ class OnPremises(Commands):
     def __init__(self, function_args=None):
         self.function_args = function_args if function_args else {}
     
-    @flask_response    
     def init(self):
-        function_exists, response = self.openfaas().is_function_created()
+        function_exists, response = self.openfaas.is_function_created()
         if function_exists:
-            return response
+            kwargs = {'response' : response.content,
+                      'status' : str(response.status_code),
+                      'headers' : response.headers.items()}
+            return Response(**kwargs)
         else:
+            # Start initializing the function
+            init_t = Thread(target=self.asynch_init)
+            init_t.start()
             # Return response received
-            yield CustomResponse(status_code=200)
-            # Create docker image
-            self.create_docker_image()
-            self.set_docker_variables()
-            # Create eventgateway connections
-            self.manage_event_gateway()
-            self.set_eventgateway_variables()
-            # Create minio buckets
-            self.create_minio_buckets()
-            self.set_minio_variables()
-            # Create openfaas function
-            self.openfaas.create_function(self.function_args)
+            kwargs = {'response' : 'Initializing function', 'status' : '200'}
+            return Response(**kwargs)
+
+    def asynch_init(self):
+        # Create docker image
+        self.create_docker_image()
+        self.set_docker_variables()
+        # Create eventgateway connections
+        self.manage_event_gateway()
+        self.set_eventgateway_variables()
+        # Create minio buckets
+        self.create_minio_buckets()
+        self.set_minio_variables()
+        # Create openfaas function
+        self.openfaas.create_function(self.function_args)        
 
     @flask_response
     def process_minio_event(self, minio_event):

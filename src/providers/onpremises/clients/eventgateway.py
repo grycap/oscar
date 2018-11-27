@@ -48,7 +48,7 @@ class EventGatewayClient():
     def get_register_function_json(self):
         return {"functionId": self.function_name,
                 "type": "http",
-                "provider": { "url": "{0}/function/async/{1}".format(self.openfaas_endpoint, self.function_name) }
+                "provider": { "url": "{0}/async-function/{1}".format(self.openfaas_endpoint, self.function_name) }
                 }        
 
     def register_function(self):
