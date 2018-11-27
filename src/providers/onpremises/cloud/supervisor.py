@@ -100,7 +100,10 @@ def launch_user_script():
     print(subprocess.call(os.environ['sprocess'], stderr=subprocess.STDOUT))
 
 if(__name__ == "__main__"):
-    f_input = json.loads(get_stdin())
+    if 'OSCAR_EVENT' in os.environ:
+        f_input = json.loads(os.environ['OSCAR_EVENT'])
+    else:
+        f_input = json.loads(get_stdin())
     print("Received input: {0}".format(f_input))
     if is_s3_event(f_input):
         os.environ['SCAR_INPUT_FILE'] = download_s3_file(f_input)
