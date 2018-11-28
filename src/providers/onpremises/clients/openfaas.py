@@ -1,5 +1,5 @@
 # SCAR - Serverless Container-aware ARchitectures
-# Copyright (C) 2011 - GRyCAP - Universitat Politecnica de Valencia
+# Copyright (C) 2018 - GRyCAP - Universitat Politecnica de Valencia
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,6 +30,9 @@ class OpenFaasClient():
         self.openfaas_envvars = {"sprocess": "/tmp/user_script.sh",
                                  "read_timeout": "90",
                                  "write_timeout": "90"}
+        self.set_function_args(function_args)
+        
+    def set_function_args(self, function_args):
         self.function_args = function_args
         if 'name' in self.function_args:
             self.function_args["service"] = self.function_args['name']
@@ -37,7 +40,7 @@ class OpenFaasClient():
         if "envVars" not in self.function_args:    
             self.function_args["envVars"] = self.openfaas_envvars
         else:
-            self.function_args["envVars"].update(self.openfaas_envvars)         
+            self.function_args["envVars"].update(self.openfaas_envvars)             
     
     def get_functions_info(self, json_response=False):
         url = "{0}/{1}".format(self.endpoint, self.functions_path)
@@ -46,7 +49,8 @@ class OpenFaasClient():
         response = requests.get(url)
         return json.loads(response.text) if json_response else response
     
-    def create_function(self):
+    def create_function(self, function_args):
+        self.set_function_args(function_args)
         return requests.post("{0}/{1}".format(self.endpoint, self.functions_path), json=self.function_args)
     
     def delete_function(self):
@@ -60,4 +64,10 @@ class OpenFaasClient():
         function_path = self.invoke_async_function if asynch else self.invoke_req_response_function
         url = "{0}/{1}/{2}".format(self.endpoint, function_path, self.function_args['name'])
         return requests.post(url, data=body)
+    
+    def is_function_created(self):
+        function_path = self.invoke_req_response_function
+        url = "{0}/{1}/{2}".format(self.endpoint, function_path, self.function_args['name'])
+        response = requests.get(url)
+        return (True, response) if response.status_code == 200 else (False, response)
     

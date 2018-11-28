@@ -1,5 +1,5 @@
 # SCAR - Serverless Container-aware ARchitectures
-# Copyright (C) 2011 - GRyCAP - Universitat Politecnica de Valencia
+# Copyright (C) 2018 - GRyCAP - Universitat Politecnica de Valencia
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,6 +21,13 @@ from src.providers.onpremises.clients.dockercli import DockerClient
 from src.providers.onpremises.clients.eventgateway import EventGatewayClient
 from src.providers.onpremises.clients.minio import MinioClient
 from src.providers.onpremises.clients.openfaas import OpenFaasClient
+from threading import Thread
+
+class CustomResponse():
+    def __init__(self, content=None, status_code=None, headers=None):
+        self.content = content if content else ''
+        self.status_code = status_code if status_code else 500
+        self.headers = headers if headers else {}
 
 def flask_response(func):
     ''' Decorator used to create a flask Response '''
@@ -55,20 +62,33 @@ class OnPremises(Commands):
     def __init__(self, function_args=None):
         self.function_args = function_args if function_args else {}
     
-    @flask_response    
     def init(self):
+        function_exists, response = self.openfaas.is_function_created()
+        if function_exists:
+            kwargs = {'response' : response.content,
+                      'status' : str(response.status_code),
+                      'headers' : response.headers.items()}
+            return Response(**kwargs)
+        else:
+            # Start initializing the function
+            init_t = Thread(target=self.asynch_init)
+            init_t.start()
+            # Return response received
+            kwargs = {'response' : 'Initializing function', 'status' : '200'}
+            return Response(**kwargs)
+
+    def asynch_init(self):
         # Create docker image
         self.create_docker_image()
-        self.set_docker_variables()        
+        self.set_docker_variables()
         # Create eventgateway connections
         self.manage_event_gateway()
         self.set_eventgateway_variables()
         # Create minio buckets
         self.create_minio_buckets()
         self.set_minio_variables()
-        print("FUNCTION ARGS: ", self.function_args)
         # Create openfaas function
-        return self.openfaas.create_function()
+        self.openfaas.create_function(self.function_args)        
 
     @flask_response
     def process_minio_event(self, minio_event):
@@ -97,8 +117,8 @@ class OnPremises(Commands):
             self.minio.delete_input_bucket()
             self.minio.delete_output_bucket()
         # Delete event gateway registers
-        self.event_gateway.deregister_function()
         self.event_gateway.unsubscribe_event(self.get_function_subscription_id())
+        self.event_gateway.deregister_function()
         return self.openfaas.delete_function()
 
     def log(self):
@@ -134,8 +154,9 @@ class OnPremises(Commands):
         self.function_args["image"] = self.docker.registry_image_id    
     
     def manage_event_gateway(self):
-        self.event_gateway.register_function()
-        self.event_gateway.subscribe_event()
+        if not self.event_gateway.is_function_registered():
+            self.event_gateway.register_function()
+            self.event_gateway.subscribe_event()
         
     def set_eventgateway_variables(self):  
         self.add_function_annotation("eventgateway.subscription.id", self.event_gateway.subscription_id)      

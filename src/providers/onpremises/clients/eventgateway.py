@@ -1,5 +1,5 @@
 # SCAR - Serverless Container-aware ARchitectures
-# Copyright (C) 2011 - GRyCAP - Universitat Politecnica de Valencia
+# Copyright (C) 2018 - GRyCAP - Universitat Politecnica de Valencia
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@ import requests
 import json
 
 class EventGatewayClient():
+    '''https://github.com/serverless/event-gateway/blob/master/docs/api.md'''
     
     space_name = 'oscar'
     event_type_path = 'v1/spaces/{0}/eventtypes'.format(space_name)
@@ -40,6 +41,15 @@ class EventGatewayClient():
                     return True
         return False
     
+    def is_function_registered(self):
+        r = requests.get("{0}/{1}".format(self.config_endpoint, self.func_reg_path))
+        j = json.loads(r.text)
+        if 'functions' in j:
+            for function in j['functions']:
+                if 'functionId' in function and function['functionId'] == self.function_name:
+                    return True
+        return False        
+    
     def create_http_eventype(self):
         event_def = { "name": "http" }
         return requests.post("{0}/{1}".format(self.config_endpoint, self.event_type_path),
@@ -48,7 +58,7 @@ class EventGatewayClient():
     def get_register_function_json(self):
         return {"functionId": self.function_name,
                 "type": "http",
-                "provider": { "url": "{0}/function/{1}".format(self.openfaas_endpoint, self.function_name) }
+                "provider": { "url": "{0}/async-function/{1}".format(self.openfaas_endpoint, self.function_name) }
                 }        
 
     def register_function(self):
