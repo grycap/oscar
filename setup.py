@@ -1,6 +1,5 @@
 # coding: utf-8
 
-import sys
 from setuptools import setup, find_packages
 
 NAME = "swagger_server"
@@ -21,7 +20,7 @@ setup(
     description="On-premises Serverless Container-aware ARchitectures API Gateway",
     author_email="",
     url="",
-    keywords=["Swagger", "On-premises Serverless Container-aware ARchitectures API Gateway"],
+    keywords=["On-premises", "Serverless", "Containers", "FaaS"],
     install_requires=REQUIRES,
     packages=find_packages(),
     package_data={'': ['swagger/swagger.yaml']},
