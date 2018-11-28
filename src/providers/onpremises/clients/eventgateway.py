@@ -18,6 +18,7 @@ import requests
 import json
 
 class EventGatewayClient():
+    '''https://github.com/serverless/event-gateway/blob/master/docs/api.md'''
     
     space_name = 'oscar'
     event_type_path = 'v1/spaces/{0}/eventtypes'.format(space_name)
@@ -39,6 +40,15 @@ class EventGatewayClient():
                 if 'name' in event_type and event_type['name'] == 'http':
                     return True
         return False
+    
+    def is_function_registered(self):
+        r = requests.get("{0}/{1}".format(self.config_endpoint, self.func_reg_path))
+        j = json.loads(r.text)
+        if 'functions' in j:
+            for function in j['functions']:
+                if 'functionId' in function and function['functionId'] == self.function_name:
+                    return True
+        return False        
     
     def create_http_eventype(self):
         event_def = { "name": "http" }

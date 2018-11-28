@@ -117,8 +117,8 @@ class OnPremises(Commands):
             self.minio.delete_input_bucket()
             self.minio.delete_output_bucket()
         # Delete event gateway registers
-        self.event_gateway.deregister_function()
         self.event_gateway.unsubscribe_event(self.get_function_subscription_id())
+        self.event_gateway.deregister_function()
         return self.openfaas.delete_function()
 
     def log(self):
@@ -154,8 +154,9 @@ class OnPremises(Commands):
         self.function_args["image"] = self.docker.registry_image_id    
     
     def manage_event_gateway(self):
-        self.event_gateway.register_function()
-        self.event_gateway.subscribe_event()
+        if not self.event_gateway.is_function_registered():
+            self.event_gateway.register_function()
+            self.event_gateway.subscribe_event()
         
     def set_eventgateway_variables(self):  
         self.add_function_annotation("eventgateway.subscription.id", self.event_gateway.subscription_id)      
