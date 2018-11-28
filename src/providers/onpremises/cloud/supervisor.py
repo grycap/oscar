@@ -101,7 +101,7 @@ def launch_user_script():
 
 if(__name__ == "__main__"):
     if 'OSCAR_EVENT' in os.environ:
-        f_input = json.loads(os.environ['OSCAR_EVENT'])
+        f_input = json.loads(str(os.environ['OSCAR_EVENT']))
     else:
         f_input = json.loads(get_stdin())
     print("Received input: {0}".format(f_input))
