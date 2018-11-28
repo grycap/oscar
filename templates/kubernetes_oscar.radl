@@ -90,7 +90,6 @@ configure front (
 
     - role: 'grycap.kubeoscar'
       minio_pass: '{{ minio_secret }}'
-      oscar_version: "fixes"
 
     - role: 'grycap.kubeoscarui'
       vue_app_backend_host: '{{ hostvars[groups["front"][0]]["IM_NODE_PUBLIC_IP"] }}'
