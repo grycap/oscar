@@ -30,6 +30,7 @@ class OpenFaasClient():
         self.openfaas_envvars = {"sprocess": "/tmp/user_script.sh",
                                  "read_timeout": "90",
                                  "write_timeout": "90"}
+        self.openfaas_labels = {"com.openfaas.scale.zero": "true"}
         self.set_function_args(function_args)
         self.basic_auth = None
         if (os.path.isfile('/var/secrets/basic-auth-user') and
@@ -45,8 +46,13 @@ class OpenFaasClient():
         if "envVars" not in self.function_args:    
             self.function_args["envVars"] = self.openfaas_envvars
         else:
-            self.function_args["envVars"].update(self.openfaas_envvars)             
-    
+            self.function_args["envVars"].update(self.openfaas_envvars)
+        # Set 'com.openfaas.scale.zero=true' label to enable zero-scale
+        if "labels" not in self.function_args:
+            self.function_args["labels"] = self.openfaas_labels
+        else:
+            self.function_args["labels"].update(self.openfaas_labels)
+
     def get_functions_info(self, json_response=False):
         url = "{0}/{1}".format(self.endpoint, self.functions_path)
         if 'name' in self.function_args:
