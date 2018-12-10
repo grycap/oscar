@@ -15,7 +15,7 @@ Most of the passwords/tokens are dynamically generated at deployment time and ma
 +-----------------+-----------------------+--------------+------------------+ 
 | Minio UI        |  http://{KUBE}:31852  |    minio     | minio_secret_key | 
 +-----------------+-----------------------+--------------+------------------+ 
-| OpenFaaS UI     | http://{KUBE}:31112   |              |                  | 
+| OpenFaaS UI     | http://{KUBE}:31112   |    admin     |  gw_password     | 
 +-----------------+-----------------------+--------------+------------------+ 
 | Kubernetes API  | https://{KUBE}:6443   |              |  tokenpass       | 
 +-----------------+-----------------------+--------------+------------------+ 
