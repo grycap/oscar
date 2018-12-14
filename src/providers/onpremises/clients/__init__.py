@@ -14,4 +14,4 @@
 # limitations under the License.
 
 
-__all__ = ['dockercli','eventgateway','minio','openfaas']
+__all__ = ['kaniko','eventgateway','minio','openfaas']
