@@ -26,7 +26,7 @@ class KanikoClient():
     def __init__(self, function_args):
         self.registry_name = utils.get_environment_variable("DOCKER_REGISTRY")
         self.function_args = function_args
-        self.function_image_folder = utils.join_paths("/kaniko-builds", utils.get_random_uuid4_str())
+        self.function_image_folder = utils.join_paths("/pv/kaniko-builds", utils.get_random_uuid4_str())
         self.root_path = path.dirname(path.dirname(path.dirname(path.dirname(path.dirname(path.abspath(__file__))))))
         self.job_name = "{0}-build-job".format(function_args['name'])
         # Get k8s api host and port
@@ -136,7 +136,8 @@ class KanikoClient():
                             {
                                 'name': 'build-context',
                                 'hostPath': {
-                                    'path': self.function_image_folder
+                                    'path': self.function_image_folder,
+                                    'type': 'Directory'
                                 }
                             }
                         ]
