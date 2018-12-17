@@ -85,18 +85,20 @@ class KanikoClient():
 
     def wait_until_build_finishes(self):
         while True:
-            r = requests.get("{0}/{1}".format(self.jobs_url, self.job_name), verify=self.cert_verify, headers=self.token)
+            r = requests.get("{0}/{1}".format(self.jobs_url, self.job_name), verify=self.cert_verify, headers=self.auth_header)
             if r.status_code != 200:
                 logging.error("Error obtaining {0} info - {1}\n{2}".format(self.job_name, str(r.status_code), str(r.content)))
                 break
             job = r.json()
-            if job['status']['succeeded'] >= job['spec']['completions']:
-                # Delete succeeded job
-                self.delete_job()
-                break
-            if job['status']['failed'] >= job['spec']['backoffLimit']:
-                logging.error("{0} failed! See pod logs for details.".format(self.job_name))
-                break
+            if utils.is_value_in_dict(job['status'], 'succeeded') and utils.is_value_in_dict(job['spec'], 'completions'):
+                if job['status']['succeeded'] >= job['spec']['completions']:
+                    # Delete succeeded job
+                    self.delete_job()
+                    break
+            if utils.is_value_in_dict(job['status'], 'failed') and utils.is_value_in_dict(job['spec'], 'backoffLimit'):
+                if job['status']['failed'] >= job['spec']['backoffLimit']:
+                    logging.error("{0} failed! See pod logs for details.".format(self.job_name))
+                    break
             time.sleep(5)
 
 
@@ -148,7 +150,7 @@ class KanikoClient():
         return job
 
     def delete_job(self):
-        r = requests.delete("{0}/{1}".format(self.jobs_url, self.job_name), verify=self.cert_verify, headers=self.token)
+        r = requests.delete("{0}/{1}".format(self.jobs_url, self.job_name), verify=self.cert_verify, headers=self.auth_header)
         if r.status_code not in [200, 202]:
             logging.error("Error deleting {0} - {1}\n{2}".format(self.job_name, str(r.status_code), str(r.content)))
 
