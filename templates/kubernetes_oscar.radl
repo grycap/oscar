@@ -116,7 +116,7 @@ configure wn (
       - {local: "/pv/minio", remote: "/pv/minio", server_host: "kubeserver.localdomain"}
       - {local: "/pv/registry", remote: "/pv/registry", server_host: "kubeserver.localdomain"}
       - {local: "/pv/etcd-event-gateway", remote: "/pv/etcd-event-gateway", server_host: "kubeserver.localdomain"}
-      - {local: "/pv/kaniko-builds", remote: "/kaniko-builds", server_host: "kubeserver.localdomain"}
+      - {local: "/pv/kaniko-builds", remote: "/pv/kaniko-builds", server_host: "kubeserver.localdomain"}
 
     - role: 'grycap.kubernetes'
       kube_type_of_node: 'wn'
