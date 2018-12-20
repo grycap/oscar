@@ -150,7 +150,10 @@ class KanikoClient():
         return job
 
     def delete_job(self):
-        r = requests.delete("{0}/{1}".format(self.jobs_url, self.job_name), verify=self.cert_verify, headers=self.auth_header)
+        r = requests.delete("{0}/{1}".format(self.jobs_url, self.job_name), 
+                            verify=self.cert_verify, 
+                            headers=self.auth_header,
+                            params={'propagationPolicy': 'Background'})
         if r.status_code not in [200, 202]:
             logging.error("Error deleting {0} - {1}\n{2}".format(self.job_name, str(r.status_code), str(r.content)))
 
