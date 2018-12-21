@@ -44,6 +44,8 @@ configure front (
   - pre_tasks:
     - name: Create dir for the etcd NFS PV Top dir
       file: path=/pv/etcd-event-gateway state=directory mode=755
+    - name: Create dir for kaniko builds
+      file: path=/pv/kaniko-builds state=directory mode=755
     - name: Create auth file dir
       file: path=/etc/kubernetes/pki state=directory mode=755 recurse=yes
     - name: Create auth data file with an admin user
@@ -59,6 +61,7 @@ configure front (
       - {path: "/pv/minio", export: "wn*.localdomain(rw,async,no_root_squash,no_subtree_check,insecure)"}
       - {path: "/pv/registry", export: "wn*.localdomain(rw,async,no_root_squash,no_subtree_check,insecure)"}
       - {path: "/pv/etcd-event-gateway", export: "wn*.localdomain(rw,async,no_root_squash,no_subtree_check,insecure)"}
+      - {path: "/pv/kaniko-builds", export: "wn*.localdomain(rw,async,no_root_squash,no_subtree_check,insecure)"}
 
     - role: 'grycap.kubernetes'
       kube_server: 'kubeserver'
@@ -71,6 +74,7 @@ configure front (
       - {namespace : "minio", name : "pvnfsminio", label : "minio", capacity_storage : "20Gi", nfs_path : "/pv/minio"}
       - {namespace : "docker-registry", name : "pvnfsregistry", label : "registry", capacity_storage : "20Gi", nfs_path : "/pv/registry"}
       - {namespace : "event-gateway", name : "pvnfsetcdeg", label : "event-gateway", capacity_storage : "2Gi", nfs_path : "/pv/etcd-event-gateway"}
+      - {namespace : "oscar", name : "pvnfskanikobuilds", label : "oscar-manager", capacity_storage : "2Gi", nfs_path : "/pv/kaniko-builds"}
 
     - role: 'grycap.kubefaas'
       faas_framework: 'openfaas'
@@ -112,6 +116,7 @@ configure wn (
       - {local: "/pv/minio", remote: "/pv/minio", server_host: "kubeserver.localdomain"}
       - {local: "/pv/registry", remote: "/pv/registry", server_host: "kubeserver.localdomain"}
       - {local: "/pv/etcd-event-gateway", remote: "/pv/etcd-event-gateway", server_host: "kubeserver.localdomain"}
+      - {local: "/pv/kaniko-builds", remote: "/pv/kaniko-builds", server_host: "kubeserver.localdomain"}
 
     - role: 'grycap.kubernetes'
       kube_type_of_node: 'wn'

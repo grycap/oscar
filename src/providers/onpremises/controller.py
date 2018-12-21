@@ -16,7 +16,7 @@
 from src.cmdtemplate import Commands
 import src.utils as utils 
 from flask import Response
-from src.providers.onpremises.clients.dockercli import DockerClient
+from src.providers.onpremises.clients.kaniko import KanikoClient
 from src.providers.onpremises.clients.eventgateway import EventGatewayClient
 from src.providers.onpremises.clients.minio import MinioClient
 from src.providers.onpremises.clients.openfaas import OpenFaasClient
@@ -54,9 +54,9 @@ class OnPremises(Commands):
         return minio    
     
     @utils.lazy_property
-    def docker(self):
-        docker = DockerClient(self.function_args)
-        return docker
+    def kaniko(self):
+        kaniko = KanikoClient(self.function_args)
+        return kaniko
     
     def __init__(self, function_args=None):
         self.function_args = function_args if function_args else {}
@@ -78,7 +78,7 @@ class OnPremises(Commands):
 
     def asynch_init(self):
         # Create docker image
-        self.create_docker_image()
+        self.kaniko.create_and_push_docker_image()
         self.set_docker_variables()
         # Create eventgateway connections
         self.manage_event_gateway()
@@ -143,14 +143,10 @@ class OnPremises(Commands):
             self.function_args["annotations"][key] = value
         else:
             self.function_args["annotations"] = { key: value }        
-    
-    def create_docker_image(self):
-        self.docker.create_docker_image()
-        self.docker.push_docker_image()
 
     def set_docker_variables(self):  
         # Override the function image name
-        self.function_args["image"] = self.docker.registry_image_id    
+        self.function_args["image"] = self.kaniko.registry_image_id    
     
     def manage_event_gateway(self):
         if not self.event_gateway.is_function_registered():

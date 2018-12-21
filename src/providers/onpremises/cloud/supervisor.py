@@ -97,7 +97,7 @@ def get_stdin():
 
 def launch_user_script():
     print("Executing user_script.sh")
-    print(subprocess.call(os.environ['sprocess'], stderr=subprocess.STDOUT))
+    print(subprocess.call(['/bin/sh', os.environ['sprocess']], stderr=subprocess.STDOUT))
 
 if(__name__ == "__main__"):
     if 'OSCAR_EVENT' in os.environ:
