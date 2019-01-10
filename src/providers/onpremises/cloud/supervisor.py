@@ -130,7 +130,7 @@ def get_input():
         f_input = json.loads(utils.get_stdin())
     return f_input
 
-if __name__ == "__main__":
+def function_handler():
     f_input = get_input()
     print("Received input: {0}".format(f_input))    
     supervisor = Supervisor('openfaas', f_input)
@@ -141,7 +141,10 @@ if __name__ == "__main__":
 
     except Exception as ex:
         exception_msg = "Exception launched:\n {0}".format(ex)
-        logger.error(exception_msg)
+        print(exception_msg)
         return supervisor.create_error_response(exception_msg, 500)
     
     return supervisor.create_response()
+
+if __name__ == "__main__":
+    function_handler()
