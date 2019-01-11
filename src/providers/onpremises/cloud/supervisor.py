@@ -27,7 +27,7 @@ def get_input():
 def function_handler():
     f_input = get_input()
     print("Received input: {0}".format(f_input))    
-    supervisor = Supervisor('openfaas', f_input)
+    supervisor = Supervisor('openfaas', event=f_input)
     try:
         supervisor.parse_input()
         supervisor.execute_function()                                      
