@@ -33,8 +33,7 @@ def function_handler():
         supervisor.execute_function()                                      
         supervisor.parse_output()
     except Exception as ex:
-        exception_msg = "Exception launched:\n {0}".format(ex)
-        print(exception_msg)
+        print(ex)
 
 if __name__ == "__main__":
     function_handler()
