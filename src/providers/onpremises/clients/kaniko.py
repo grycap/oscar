@@ -61,7 +61,7 @@ class KanikoClient():
                     
     def copy_binaries(self):
         bin_path = utils.join_paths(self.root_path, "bin")
-        utils.copy_file(utils.join_paths(bin_path, "fwatchdog-0.9.6"),
+        utils.copy_file(utils.join_paths(bin_path, "fwatchdog"),
                         utils.join_paths(self.function_image_folder, "fwatchdog"))
         utils.copy_file(utils.join_paths(bin_path, "supervisor"),
                         utils.join_paths(self.function_image_folder, "supervisor"))
