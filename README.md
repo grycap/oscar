@@ -1,6 +1,6 @@
 # OSCAR - On-Premises Serverless Container-aware ARchitectures
 
-[![License](https://img.shields.io/badge/license-Apache%202-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Docker Build Status](https://img.shields.io/docker/build/grycap/oscar-manager.svg)](https://hub.docker.com/r/grycap/oscar-manager/) [![License](https://img.shields.io/badge/license-Apache%202-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 ## Introduction
 
