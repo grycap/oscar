@@ -101,7 +101,7 @@ configure front (
       minio_pass: '{{ minio_secret }}'
 
     - role: 'grycap.kubeoscarui'
-      vue_app_backend_host: '{{ hostvars[groups["front"][0]]["IM_NODE_PUBLIC_IP"] }}'
+      vue_app_backend_host: '{{ hostvars[groups["front"][0]]["IM_NODE_PUBLIC_IP"] }}:{{ oscar_ui_nodeport }}'
       minio_pass: '{{ minio_secret }}' 
 
 @end
