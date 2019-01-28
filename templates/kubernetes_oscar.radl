@@ -83,26 +83,32 @@ configure front (
 
     - role: 'grycap.kubefaas'
       faas_framework: 'openfaas'
+      master_deploy: true
 
     - role: 'grycap.kubeminio'
       enable_notifications: true
       webhook_endpoints: [{ id: "1", endpoint: "http://oscar-manager.oscar:8080/events"}]
       minio_secretkey: '{{ minio_secret }}'
+      master_deploy: true
 
     - role: 'grycap.kubeventgateway'
+      master_deploy: true
 
     - role: 'grycap.kuberegistry'
       public_access: false
       type_of_node: "front"
       svc_name: "registry.docker-registry"
       delete_enabled: true
+      master_deploy: true
 
     - role: 'grycap.kubeoscar'
       minio_pass: '{{ minio_secret }}'
+      master_deploy: true
 
     - role: 'grycap.kubeoscarui'
       vue_app_backend_host: '{{ hostvars[groups["front"][0]]["IM_NODE_PUBLIC_IP"] }}:{{ oscar_ui_nodeport }}'
       minio_pass: '{{ minio_secret }}' 
+      master_deploy: true
 
 @end
 )
