@@ -20,19 +20,22 @@ class MinioClient():
     
     def __init__(self, function_args):
         self.function_name = function_args['name']
+        if 'envVars' in function_args and 'OUTPUT_BUCKET' in function_args['envVars']:    
+            self.output_bucket = function_args['envVars']['OUTPUT_BUCKET']
         self.access_key = utils.get_environment_variable("MINIO_USER")
         self.secret_key = utils.get_environment_variable("MINIO_PASS")
         self.client = minio.Minio(utils.get_environment_variable("MINIO_ENDPOINT"),
-                            access_key=self.access_key,
-                            secret_key=self.secret_key,
-                            secure=False)
+                                  access_key=self.access_key,
+                                  secret_key=self.secret_key,
+                                  secure=False)
              
     def create_input_bucket(self):
         self.create_bucket('{0}-in'.format(self.function_name))
         self.set_bucket_event_notification('{0}-in'.format(self.function_name))
 
     def create_output_bucket(self):
-        self.create_bucket('{0}-out'.format(self.function_name))        
+        if not hasattr(self, 'output_bucket'):
+            self.create_bucket('{0}-out'.format(self.function_name))
 
     def create_bucket(self, bucket_name):
         try:
@@ -72,7 +75,7 @@ class MinioClient():
             self.delete_bucket_files(bucket_name)
             self.client.remove_bucket(bucket_name)
         except minio.error.ResponseError as err:
-            print(err)             
+            print(err)
             
     def delete_bucket_event_notification(self, bucket_name):
         try:
@@ -82,7 +85,7 @@ class MinioClient():
             print(err)            
     
     def get_output_bucket_name(self):
-        return '{0}-out'.format(self.function_name)
+        return self.output_bucket if hasattr(self, 'output_bucket') else '{0}-out'.format(self.function_name)
     
     def get_access_key(self):
         return self.access_key

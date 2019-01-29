@@ -93,5 +93,5 @@ def functions_put(body):
     :rtype: None
     """
     if connexion.request.is_json:
-        body = FunctionDefinition.from_dict(connexion.request.get_json())
-    return 'do some magic!'
+        params = connexion.request.get_json()
+    return OnPremises(params).update()
