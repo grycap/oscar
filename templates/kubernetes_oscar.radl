@@ -30,7 +30,7 @@ system front (
   disk.0.applications contains (name = 'ansible.modules.grycap.kuberegistry') and
   disk.0.applications contains (name = 'ansible.modules.grycap.kubeoscar') and
   disk.0.applications contains (name = 'ansible.modules.grycap.kubeoscarui') and
-  disk.0.applications contains (name = 'ansible.modules.grycap.clues,configure_options') and
+  disk.0.applications contains (name = 'ansible.modules.grycap.clues') and
   disk.0.applications contains (name = 'ansible.modules.grycap.im') and
   disk.1.type='standard' and
   disk.1.size=15GB and
