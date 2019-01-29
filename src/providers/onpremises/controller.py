@@ -23,8 +23,9 @@ from src.providers.onpremises.clients.openfaas import OpenFaasClient
 from threading import Thread
 import logging
 
-logger = logging.getLogger('OSCAR_LOGGER')
-logger.setLevel(logging.DEBUG)
+loglevel = logging.DEBUG
+FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+logging.basicConfig(format=FORMAT, level=loglevel)
 
 class CustomResponse():
     def __init__(self, content=None, status_code=None, headers=None):
@@ -44,43 +45,43 @@ class OnPremises(Commands):
     
     @utils.lazy_property
     def openfaas(self):
-        logger.debug("Initializing OpenFaas client")
+        logging.debug("Initializing OpenFaas client")
         openfaas = OpenFaasClient(self.function_args)
         return openfaas
     
     @utils.lazy_property
     def event_gateway(self):
-        logger.debug("Initializing EventGateway client")
+        logging.debug("Initializing EventGateway client")
         event_gateway = EventGatewayClient(self.function_args)
         return event_gateway
     
     @utils.lazy_property
     def minio(self):
-        logger.debug("Initializing Minio client")
+        logging.debug("Initializing Minio client")
         minio = MinioClient(self.function_args)
         return minio    
     
     @utils.lazy_property
     def kaniko(self):
-        logger.debug("Initializing Kaniko client")
+        logging.debug("Initializing Kaniko client")
         kaniko = KanikoClient(self.function_args)
         return kaniko
     
     def __init__(self, function_args=None):
         if function_args:
-            logger.debug("Function creation arguments received: {}".format(function_args))
+            logging.debug("Function creation arguments received: {}".format(function_args))
         self.function_args = function_args if function_args else {}
     
     def init(self):
         function_exists, response = self.openfaas.is_function_created()
         if function_exists:
-            logger.info("Function with name '{}' found".format(self.function_args['name']))
+            logging.info("Function with name '{}' found".format(self.function_args['name']))
             kwargs = {'response' : response.content,
                       'status' : str(response.status_code),
                       'headers' : response.headers.items()}
             return Response(**kwargs)
         else:
-            logger.info("Initialize asynchronous function creation")
+            logging.info("Initialize asynchronous function creation")
             # Start initializing the function
             init_t = Thread(target=self.asynch_init)
             init_t.start()
@@ -90,19 +91,19 @@ class OnPremises(Commands):
 
     def asynch_init(self):
         # Create docker image
-        logger.info("Creating docker image with kaniko")
+        logging.info("Creating docker image with kaniko")
         self.kaniko.create_and_push_docker_image()
         self.set_docker_variables()
         # Create eventgateway connections
-        logger.info("Creating event gateway connections")
+        logging.info("Creating event gateway connections")
         self.manage_event_gateway()
         self.set_eventgateway_variables()
         # Create minio buckets
-        logger.info("Creating minio buckets")
+        logging.info("Creating minio buckets")
         self.create_minio_buckets()
         self.set_minio_variables()
         # Create openfaas function
-        logger.info("Creating OpenFaas function")
+        logging.info("Creating OpenFaas function")
         self.openfaas.create_function(self.function_args)        
 
     @flask_response
@@ -113,12 +114,12 @@ class OnPremises(Commands):
 
     @flask_response        
     def ls(self):
-        logger.info("Retrieving functions information")
+        logging.info("Retrieving functions information")
         return self.openfaas.get_functions_info()
 
     @flask_response
     def invoke(self, body, asynch=True):
-        logger.info("Invoking '{}' function".format(self.function_args['name']))
+        logging.info("Invoking '{}' function".format(self.function_args['name']))
         return self.openfaas.invoke_function(body, asynch)
     
     def run(self):
@@ -126,7 +127,7 @@ class OnPremises(Commands):
     
     @flask_response
     def update(self):
-        logger.info("Update functionality not implemented yet")
+        logging.info("Update functionality not implemented yet")
         # Service not implemented (yet)
         return CustomResponse(content='Update functionality not implemented', status_code=501)
     
@@ -134,14 +135,14 @@ class OnPremises(Commands):
     def rm(self):
         # Delete minio buckets (if selected)
         if 'deleteBuckets' in self.function_args and self.function_args['deleteBuckets']:
-            logger.info("Deleting Minio buckets")
+            logging.info("Deleting Minio buckets")
             self.minio.delete_input_bucket()
             self.minio.delete_output_bucket()
         # Delete event gateway registers
-        logger.info("Deleting EventGateway subscriptions and registers")
+        logging.info("Deleting EventGateway subscriptions and registers")
         self.event_gateway.unsubscribe_event(self.get_function_subscription_id())
         self.event_gateway.deregister_function()
-        logger.info("Deleting OpenFaas function")
+        logging.info("Deleting OpenFaas function")
         return self.openfaas.delete_function()
 
     def log(self):
