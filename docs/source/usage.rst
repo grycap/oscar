@@ -9,11 +9,12 @@ Most of the passwords/tokens are dynamically generated at deployment time and ma
 +-----------------+-----------------------+--------------+------------------+
 | Service         | Endpoint              | Default User |  Password File   |
 +=================+=======================+==============+==================+ 
-| OSCAR UI        | https://{KUBE}:31114  | admin / admin|                  |
+| OSCAR UI        | https://{KUBE}        | admin / admin|                  |
 +-----------------+-----------------------+--------------+------------------+ 
 | OSCAR Manager   | http://{KUBE}:32112   |              |                  |
+| (Swagger UI)    | http://{KUBE}:32112/ui|              |                  |
 +-----------------+-----------------------+--------------+------------------+ 
-| Minio UI        |  http://{KUBE}:31852  |    minio     | minio_secret_key | 
+| Minio UI        | http://{KUBE}:31852   |    minio     | minio_secret_key | 
 +-----------------+-----------------------+--------------+------------------+ 
 | OpenFaaS UI     | http://{KUBE}:31112   |    admin     |  gw_password     | 
 +-----------------+-----------------------+--------------+------------------+ 
