@@ -142,6 +142,7 @@ configure front (
 )
 
 system wn (
+  ec3_node_type = 'wn' and
   net_interface.0.connection='private'
 )
 
