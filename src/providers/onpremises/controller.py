@@ -104,7 +104,7 @@ class OnPremises(Commands):
         self.set_minio_variables()
         # Create openfaas function
         logging.info("Creating OpenFaas function")
-        self.openfaas.create_function(self.function_args)        
+        self._parse_output(self.openfaas.create_function(self.function_args))
 
     @flask_response
     def process_minio_event(self, minio_event):
@@ -192,4 +192,11 @@ class OnPremises(Commands):
         
     def get_function_subscription_id(self):
         function_info = self.openfaas.get_functions_info(json_response=True)
-        return function_info["annotations"]["eventgateway.subscription.id"]     
+        return function_info["annotations"]["eventgateway.subscription.id"]
+    
+    def _parse_output(self, response):
+        if response:
+            if response.status_code == 200:
+                logging.info("Request petition successful")
+            else:
+                logging.info("Request call returned code '{0}': {1}".format(response.status_code, response.text))

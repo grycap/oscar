@@ -17,6 +17,7 @@ import src.utils as utils
 import requests
 import os.path
 import json
+import logging
 
 class OpenFaasClient():
     
@@ -62,6 +63,7 @@ class OpenFaasClient():
     
     def create_function(self, function_args):
         self.set_function_args(function_args)
+        logging.debug("Function creation arguments: {}".format(function_args))
         return requests.post("{0}/{1}".format(self.endpoint, self.functions_path), json=self.function_args, auth=self.basic_auth)
     
     def delete_function(self):
