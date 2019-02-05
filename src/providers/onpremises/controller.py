@@ -198,5 +198,5 @@ class OnPremises(Commands):
         if response:
             if response.status_code != 200:
                 logging.error("Request call failed with code '{0}': {1}".format(response.status_code, response.text))
-        else:
-            logging.info("Request petition successful")
+            else:
+                logging.info("Request petition successful")
