@@ -6,24 +6,24 @@ Default Service Endpoints
 Once the OSCAR framework is running on the Kubernetes cluster, the endpoints described in the following table should be available.
 Most of the passwords/tokens are dynamically generated at deployment time and made available in the `/var/tmp` folder of the front-end node of the cluster.
 
-+-----------------+-----------------------+--------------+------------------+
-| Service         | Endpoint              | Default User |  Password File   |
-+=================+=======================+==============+==================+ 
-| OSCAR UI        | https://{KUBE}        | admin / admin|                  |
-+-----------------+-----------------------+--------------+------------------+ 
-| OSCAR Manager   | http://{KUBE}:32112   |              |                  |
-| (Swagger UI)    | http://{KUBE}:32112/ui|              |                  |
-+-----------------+-----------------------+--------------+------------------+ 
-| Minio UI        | http://{KUBE}:31852   |    minio     | minio_secret_key | 
-+-----------------+-----------------------+--------------+------------------+ 
-| OpenFaaS UI     | http://{KUBE}:31112   |    admin     |  gw_password     | 
-+-----------------+-----------------------+--------------+------------------+ 
-| Kubernetes API  | https://{KUBE}:6443   |              |  tokenpass       | 
-+-----------------+-----------------------+--------------+------------------+ 
-| Kube. Dashboard | https://{KUBE}:30443  |              | dashboard_token  |
-+-----------------+-----------------------+--------------+------------------+
-| Prometheus      | http://{KUBE}:31119   |              |                  |
-+-----------------+-----------------------+--------------+------------------+ 
++-----------------+------------------------+--------------+------------------+
+| Service         | Endpoint               | Default User |  Password File   |
++=================+========================+==============+==================+ 
+| OSCAR UI        | https://{KUBE}         | admin / admin|                  |
++-----------------+------------------------+--------------+------------------+ 
+| OSCAR Manager   | http://{KUBE}/oscar/   |              |                  |
+| (Swagger UI)    | http://{KUBE}/oscar/ui/|              |                  |
++-----------------+------------------------+--------------+------------------+ 
+| Minio UI        | http://{KUBE}/minio/   |    minio     | minio_secret_key | 
++-----------------+------------------------+--------------+------------------+ 
+| OpenFaaS UI     | http://{KUBE}/openfaas/|    admin     |  gw_password     | 
++-----------------+------------------------+--------------+------------------+ 
+| Kubernetes API  | https://{KUBE}:6443    |              |  tokenpass       | 
++-----------------+------------------------+--------------+------------------+ 
+| Kube. Dashboard | https://{KUBE}:30443   |              | dashboard_token  |
++-----------------+------------------------+--------------+------------------+
+| Prometheus      | http://{KUBE}:31119    |              |                  |
++-----------------+------------------------+--------------+------------------+ 
 
 Note that `{KUBE}` refers to the public IP of the front-end of the Kubernetes cluster. 
 
