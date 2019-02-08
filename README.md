@@ -1,5 +1,5 @@
 <h1 align="center">
-    <img src="docs/source/images/oscar-logo.png" alt="OSCAR" width="320">
+    <img src="docs/source/images/oscar-logo.png" alt="OSCAR" width="220">
   <br>
   OSCAR - Open Source Serverless Computing for Data-Processing Applications
 </h1>
