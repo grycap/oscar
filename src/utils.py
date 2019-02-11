@@ -22,6 +22,7 @@ import tarfile
 import tempfile
 import uuid
 import shutil
+import requests
 
 def copy_file(src, dst):
     shutil.copy(src, dst)
@@ -175,3 +176,23 @@ def parse_arg_list(arg_keys, cmd_args):
             if key in cmd_args and cmd_args[key]:
                 result[key] = cmd_args[key]
     return result
+
+def get_latest_github_tag(user, project):
+    url = 'https://api.github.com/repos/{0}/{1}/releases/latest'.format(user, project)
+    req = requests.get(url)
+    if req.status_code == 200:
+        response = req.json()
+        if is_value_in_dict(response, 'tag_name'):
+            return response['tag_name']
+    return None
+
+def download_github_asset(user, project, asset, download_path, release='latest'):
+    if release == 'latest':
+        tag = get_latest_github_tag(user, project)
+    else:
+        tag = release
+    url = 'https://github.com/{0}/{1}/releases/download/{2}/{3}'.format(user, project, tag, asset)
+    req = requests.get(url)
+    if req.status_code == 200:
+        with open(os.path.join(download_path, asset), 'wb') as f:
+            f.write(req.content)
