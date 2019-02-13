@@ -14,7 +14,8 @@
 # limitations under the License.
 
 import src.utils as utils
-from os import makedirs, path
+import os
+import stat
 import requests
 import logging
 import time
@@ -27,7 +28,7 @@ class KanikoClient():
         self.registry_name = utils.get_environment_variable("DOCKER_REGISTRY")
         self.function_args = function_args
         self.function_image_folder = utils.join_paths("/pv/kaniko-builds", utils.get_random_uuid4_str())
-        self.root_path = path.dirname(path.dirname(path.dirname(path.dirname(path.dirname(path.abspath(__file__))))))
+        self.root_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
         self.job_name = "{0}-build-job".format(function_args['name'])
         # Get k8s api host and port
         self.kubernetes_service_host = utils.get_environment_variable("KUBERNETES_SERVICE_HOST")
@@ -39,7 +40,7 @@ class KanikoClient():
         # Get k8s api token
         self.token = utils.read_file("/var/run/secrets/kubernetes.io/serviceaccount/token")
         # Get k8s api certs 
-        if path.isfile("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"):
+        if os.path.isfile("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"):
             self.cert_verify = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
         else:
             self.cert_verify = False
@@ -59,23 +60,28 @@ class KanikoClient():
                 for line in f_in:
                     f_out.write(line.replace("FROM ubuntu", "FROM {0}".format(self.function_args['image'])))
                     
-    def copy_binaries(self):
-        bin_path = utils.join_paths(self.root_path, "bin")
-        utils.copy_file(utils.join_paths(bin_path, "fwatchdog"),
-                        utils.join_paths(self.function_image_folder, "fwatchdog"))
-        utils.copy_file(utils.join_paths(bin_path, "supervisor"),
-                        utils.join_paths(self.function_image_folder, "supervisor"))
+    def download_binaries(self):
+        # Download latest fwatchdog binary and set exec permissions
+        utils.download_github_asset('openfaas', 'faas', 'fwatchdog', self.function_image_folder)
+        fwatchdog_path = os.path.join(self.function_image_folder, 'fwatchdog')
+        fwatchdog_st = os.stat(fwatchdog_path)
+        os.chmod(fwatchdog_path, fwatchdog_st.st_mode | stat.S_IEXEC)
+        # Download latest faas-supervisor binary and set exec permissions
+        utils.download_github_asset('grycap', 'faas-supervisor', 'supervisor', self.function_image_folder)
+        supervisor_path = os.path.join(self.function_image_folder, 'supervisor')
+        supervisor_st = os.stat(supervisor_path)
+        os.chmod(supervisor_path, supervisor_st.st_mode | stat.S_IEXEC)
         
     def copy_user_script(self):
         utils.create_file_with_content(utils.join_paths(self.function_image_folder, "user_script.sh"),
                                        utils.base64_to_utf8_string(self.function_args['script']))       
 
     def copy_required_files(self):
-        makedirs(self.function_image_folder , exist_ok=True)
+        os.makedirs(self.function_image_folder , exist_ok=True)
         # Get function Dockerfile paths
         self.copy_dockerfile()   
-        # Copy required binaries
-        self.copy_binaries()
+        # Download required binaries
+        self.download_binaries()
         # Create user script
         self.copy_user_script()
     
