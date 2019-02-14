@@ -186,8 +186,8 @@ def get_latest_github_tag(user, project):
             return response['tag_name']
     return None
 
-def download_github_asset(user, project, asset, download_path, release='latest'):
-    if release == 'latest':
+def download_github_asset(user, project, asset, download_path, release=None):
+    if release == 'latest' or release == None:
         tag = get_latest_github_tag(user, project)
     else:
         tag = release

@@ -66,8 +66,9 @@ class KanikoClient():
         fwatchdog_path = os.path.join(self.function_image_folder, 'fwatchdog')
         fwatchdog_st = os.stat(fwatchdog_path)
         os.chmod(fwatchdog_path, fwatchdog_st.st_mode | stat.S_IEXEC)
-        # Download latest faas-supervisor binary and set exec permissions
-        utils.download_github_asset('grycap', 'faas-supervisor', 'supervisor', self.function_image_folder)
+        # Download faas-supervisor binary and set exec permissions
+        release = utils.get_environment_variable('SUPERVISOR_VERSION')
+        utils.download_github_asset('grycap', 'faas-supervisor', 'supervisor', self.function_image_folder, release=release)
         supervisor_path = os.path.join(self.function_image_folder, 'supervisor')
         supervisor_st = os.stat(supervisor_path)
         os.chmod(supervisor_path, supervisor_st.st_mode | stat.S_IEXEC)
