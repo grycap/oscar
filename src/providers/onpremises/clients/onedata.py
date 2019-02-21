@@ -46,7 +46,7 @@ class OnedataClient():
             self.cert_verify = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
         else:
             self.cert_verify = False
-        self.jobs_url = "https://{0}:{1}{2}".format(self.kubernetes_service_host, self.kubernetes_service_port, self.deployments_path)
+        self.deployments_url = "https://{0}:{1}{2}".format(self.kubernetes_service_host, self.kubernetes_service_port, self.deployments_path)
 
     @utils.lazy_property
     def kube_auth_header(self):
@@ -161,11 +161,8 @@ class OnedataClient():
                 }
             }
         }
-        url = '{0}:{1}{2}'.format(self.kubernetes_service_host,
-                                  self.kubernetes_service_port,
-                                  self.deployments_path)
         try:
-            r = requests.post(url, json=deploy, headers=self.kube_auth_header, verify=self.cert_verify)
+            r = requests.post(self.deployments_url, json=deploy, headers=self.kube_auth_header, verify=self.cert_verify)
             if r.status_code in [200, 201, 202]:
                 logging.info('Deployment "{0}" created successfully'.format(deploy['metadata']['name']))
             else:
@@ -174,10 +171,7 @@ class OnedataClient():
             logging.error('Unable to deploy OneTrigger. Error: {0}'.format(e))
 
     def delete_onetrigger_deploy(self):
-        url = '{0}:{1}{2}/{3}-onetrigger'.format(self.kubernetes_service_host,
-                                  self.kubernetes_service_port,
-                                  self.deployments_path,
-                                  self.function_name)
+        url = '{0}/{1}-onetrigger'.format(self.deployments_url, self.function_name)
         try:
             r = requests.delete(url, headers=self.kube_auth_header, verify=self.cert_verify)
             if r.status_code in [200, 202]:
