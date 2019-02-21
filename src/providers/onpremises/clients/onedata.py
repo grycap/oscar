@@ -126,11 +126,24 @@ class OnedataClient():
             'kind': 'Deployment',
             'metadata': {
                 'name': '{0}-onetrigger'.format(self.function_name),
-                'namespace': 'oscar'
+                'namespace': 'oscar',
+                'labels': {
+                    'app': '{0}-onetrigger'.format(self.function_name)
+                }
             },
             'spec': {
+                'selector': {
+                    'matchLabels': {
+                        'app': '{0}-onetrigger'.format(self.function_name)
+                    }
+                },
                 'replicas': 1,
                 'template': {
+                    'metadata': {
+                        'labels': {
+                            'app': '{0}-onetrigger'.format(self.function_name)
+                        }
+                    },
                     'spec': {
                         'containers': [
                             {
