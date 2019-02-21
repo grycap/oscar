@@ -16,9 +16,11 @@
 from src.cmdtemplate import Commands
 import src.utils as utils 
 from flask import Response
+import requests
 from src.providers.onpremises.clients.kaniko import KanikoClient
 from src.providers.onpremises.clients.eventgateway import EventGatewayClient
 from src.providers.onpremises.clients.minio import MinioClient
+from src.providers.onpremises.clients.onedata import OnedataClient
 from src.providers.onpremises.clients.openfaas import OpenFaasClient
 from threading import Thread
 import logging
@@ -59,7 +61,13 @@ class OnPremises(Commands):
     def minio(self):
         logging.debug("Initializing Minio client")
         minio = MinioClient(self.function_args)
-        return minio    
+        return minio
+
+    @utils.lazy_property
+    def onedata(self):
+        logging.debug("Initializing Onedata client")
+        onedata = OnedataClient(self.function_args)
+        return onedata 
     
     @utils.lazy_property
     def kaniko(self):
@@ -101,6 +109,11 @@ class OnPremises(Commands):
         # Create minio buckets
         logging.info("Creating minio buckets")
         self.create_minio_buckets()
+        if self.check_onedata():
+            logging.info('Creating Onedata folders')
+            self.create_onedata_folders()
+            logging.info('Creating OneTrigger deployment')
+            self.onedata.deploy_onetrigger()
         self.set_minio_variables()
         # Create openfaas function
         logging.info("Creating OpenFaas function")
@@ -141,6 +154,14 @@ class OnPremises(Commands):
         # Delete event gateway registers
         logging.info("Deleting EventGateway subscriptions and registers")
         self.event_gateway.unsubscribe_event(self.get_function_subscription_id())
+        # Delete Onetrigger deployment and Onedata folders (if selected)
+        if self.check_onedata():
+            logging.info("Deleting OneTrigger deployment")
+            self.onedata.delete_onetrigger_deploy()
+            if 'deleteBuckets' in self.function_args and self.function_args['deleteBuckets']:
+                logging.info("Deleting Onedata folders")
+                self.onedata.delete_input_folder()
+                self.onedata.delete_output_folder()
         self.event_gateway.deregister_function()
         logging.info("Deleting OpenFaas function")
         return self.openfaas.delete_function()
@@ -184,6 +205,42 @@ class OnPremises(Commands):
     def create_minio_buckets(self):
         self.minio.create_input_bucket()
         self.minio.create_output_bucket()
+
+    def check_onedata(self):
+        if 'envVars' in self.function_args:
+            if 'ONEPROVIDER_HOST' in self.function_args['envVars'] and \
+               'ONEDATA_ACCESS_TOKEN' in self.function_args['envVars'] and \
+               'ONEDATA_SPACE' in self.function_args['envVars']:
+                settings = {
+                    'oneprovider_host': self.function_args['envVars']['ONEPROVIDER_HOST'].strip('/ '),
+                    'onedata_access_token': self.function_args['envVars']['ONEDATA_ACCESS_TOKEN'].strip('/ '),
+                    'onedata_space': self.function_args['envVars']['ONEDATA_SPACE'].strip('/ ')
+                }
+                for value in settings.values():
+                    # Check settings
+                    if value in [None, '']:
+                        return False
+                # Check connection
+                url = 'https://{0}/api/v3/oneprovider/spaces'.format(settings['oneprovider_host'])
+                try:
+                    r = requests.get(url, headers={'X-Auth-Token': settings['onedata_access_token']})
+                    if r.status_code == 200:
+                        for space in r.json():
+                            if settings['onedata_space'] == space['name']:
+                                return True
+                    elif r.status_code == 401:
+                        logging.error('The provided Onedata access token is not valid. Skipping Onedata configuration.')
+                        return False
+                    else:
+                        raise Exception('Error: {0} - {1}'.format(r.text, r.status_code))
+                except Exception as e:
+                    logging.error(e)
+                    return False
+        return False
+
+    def create_onedata_folders(self):
+        self.onedata.create_input_folder()
+        self.onedata.create_output_folder()
         
     def set_minio_variables(self):
         self.add_function_environment_variable("AWS_ACCESS_KEY_ID", self.minio.get_access_key())
