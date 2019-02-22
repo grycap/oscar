@@ -165,7 +165,7 @@ class OnedataClient():
                                     },
                                     {
                                         'name': 'ONEDATA_SPACE_FOLDER',
-                                        'value': self.get_output_bucket_name()
+                                        'value': '{0}-in'.format(self.function_name)
                                     },
                                     {
                                         'name': 'ONETRIGGER_WEBHOOK',
