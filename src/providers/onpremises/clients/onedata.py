@@ -166,6 +166,10 @@ class OnedataClient():
                                     {
                                         'name': 'ONEDATA_SPACE_FOLDER',
                                         'value': self.get_output_bucket_name()
+                                    },
+                                    {
+                                        'name': 'ONETRIGGER_WEBHOOK',
+                                        'value': 'http://event-gateway:4000/{0}'.format(self.function_name)
                                     }
                                 ]
                             }
