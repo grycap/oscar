@@ -184,4 +184,4 @@ class OnedataClient():
         kubernetes_client.create_deployment(deploy, self.function_name, self.namespace)
 
     def delete_onetrigger_deploy(self, kubernetes_client):
-        kubernetes_client.delete_deployment(self.function_name, self.namespace)
+        kubernetes_client.delete_deployment('{0}-onetrigger'.format(self.function_name), self.namespace)
