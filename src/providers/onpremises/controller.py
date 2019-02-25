@@ -16,7 +16,6 @@
 from src.cmdtemplate import Commands
 import src.utils as utils 
 from flask import Response
-import requests
 from src.providers.onpremises.clients.kaniko import KanikoClient
 from src.providers.onpremises.clients.eventgateway import EventGatewayClient
 from src.providers.onpremises.clients.minio import MinioClient
