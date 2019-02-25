@@ -16,10 +16,13 @@
 from src.cmdtemplate import Commands
 import src.utils as utils 
 from flask import Response
+import requests
 from src.providers.onpremises.clients.kaniko import KanikoClient
 from src.providers.onpremises.clients.eventgateway import EventGatewayClient
 from src.providers.onpremises.clients.minio import MinioClient
+from src.providers.onpremises.clients.onedata import OnedataClient
 from src.providers.onpremises.clients.openfaas import OpenFaasClient
+from src.providers.onpremises.clients.kubernetes import KubernetesClient
 from threading import Thread
 import logging
 
@@ -59,18 +62,31 @@ class OnPremises(Commands):
     def minio(self):
         logging.debug("Initializing Minio client")
         minio = MinioClient(self.function_args)
-        return minio    
+        return minio
+
+    @utils.lazy_property
+    def onedata(self):
+        logging.debug("Initializing Onedata client")
+        onedata = OnedataClient(self.function_args)
+        return onedata 
     
     @utils.lazy_property
     def kaniko(self):
         logging.debug("Initializing Kaniko client")
         kaniko = KanikoClient(self.function_args)
         return kaniko
-    
+
+    @utils.lazy_property
+    def kubernetes(self):
+        logging.debug("Initializing Kubernetes client")
+        kubernetes = KubernetesClient()
+        return kubernetes
+
     def __init__(self, function_args=None):
         if function_args:
             logging.debug("Function creation arguments received: {}".format(function_args))
         self.function_args = function_args if function_args else {}
+        self.get_function_environment_variables()
     
     def init(self):
         function_exists, response = self.openfaas.is_function_created()
@@ -92,7 +108,7 @@ class OnPremises(Commands):
     def asynch_init(self):
         # Create docker image
         logging.info("Creating docker image with kaniko")
-        self.kaniko.create_and_push_docker_image()
+        self.kaniko.create_and_push_docker_image(self.kubernetes)
         self.set_docker_variables()
         # Create eventgateway connections
         logging.info("Creating event gateway connections")
@@ -101,6 +117,11 @@ class OnPremises(Commands):
         # Create minio buckets
         logging.info("Creating minio buckets")
         self.create_minio_buckets()
+        if self.is_onedata_defined():
+            logging.info('Creating Onedata folders')
+            self.create_onedata_folders()
+            logging.info('Creating OneTrigger deployment')
+            self.onedata.deploy_onetrigger(self.kubernetes)
         self.set_minio_variables()
         # Create openfaas function
         logging.info("Creating OpenFaas function")
@@ -121,10 +142,10 @@ class OnPremises(Commands):
     def invoke(self, body, asynch=True):
         logging.info("Invoking '{}' function".format(self.function_args['name']))
         return self.openfaas.invoke_function(body, asynch)
-    
+
     def run(self):
         pass
-    
+
     @flask_response
     def update(self):
         logging.info("Update functionality not implemented yet")
@@ -141,6 +162,14 @@ class OnPremises(Commands):
         # Delete event gateway registers
         logging.info("Deleting EventGateway subscriptions and registers")
         self.event_gateway.unsubscribe_event(self.get_function_subscription_id())
+        # Delete Onetrigger deployment and Onedata folders (if selected)
+        if self.is_onedata_defined():
+            logging.info("Deleting OneTrigger deployment")
+            self.onedata.delete_onetrigger_deploy(self.kubernetes)
+            if 'deleteBuckets' in self.function_args and self.function_args['deleteBuckets']:
+                logging.info("Deleting Onedata folders")
+                self.onedata.delete_input_folder()
+                self.onedata.delete_output_folder()
         self.event_gateway.deregister_function()
         logging.info("Deleting OpenFaas function")
         return self.openfaas.delete_function()
@@ -162,7 +191,14 @@ class OnPremises(Commands):
             self.function_args["envVars"][key] = value
         else:
             self.function_args["envVars"] = { key: value }
-    
+
+    def get_function_environment_variables(self):
+        if 'envVars' not in self.function_args or len(self.function_args['envVars']) == 0:
+            if 'name' in self.function_args:
+                deploy_envvars = self.kubernetes.get_deployment_envvars(self.function_args['name'], 'openfaas-fn')
+                for envvar in deploy_envvars:
+                    self.add_function_environment_variable(envvar['name'], envvar['value'])
+
     def add_function_annotation(self, key, value):
         if "annotations" in self.function_args:
             self.function_args["annotations"][key] = value
@@ -184,6 +220,18 @@ class OnPremises(Commands):
     def create_minio_buckets(self):
         self.minio.create_input_bucket()
         self.minio.create_output_bucket()
+
+    def is_onedata_defined(self):
+        if 'envVars' in self.function_args:
+            if 'ONEPROVIDER_HOST' in self.function_args['envVars'] and \
+               'ONEDATA_ACCESS_TOKEN' in self.function_args['envVars'] and \
+               'ONEDATA_SPACE' in self.function_args['envVars']:
+                return self.onedata.check_connection()
+        return False
+
+    def create_onedata_folders(self):
+        self.onedata.create_input_folder()
+        self.onedata.create_output_folder()
         
     def set_minio_variables(self):
         self.add_function_environment_variable("AWS_ACCESS_KEY_ID", self.minio.get_access_key())
