@@ -20,7 +20,7 @@ import requests
 
 class OnedataClient():
 
-    deployments_path = "/apis/apps/v1/namespaces/oscar/deployments"
+    namespace = 'oscar'
     cdmi_path = '/cdmi/'
     cdmi_version_header = {'X-CDMI-Specification-Version': '1.1.1'}
     cdmi_container_header = {'Content-Type': 'application/cdmi-container'}
@@ -32,29 +32,32 @@ class OnedataClient():
         self.oneprovider_host = function_args['envVars']['ONEPROVIDER_HOST']
         self.onedata_access_token = function_args['envVars']['ONEDATA_ACCESS_TOKEN']
         self.onedata_space = function_args['envVars']['ONEDATA_SPACE'].strip('/ ')
-        # Get k8s api host and port
-        self.kubernetes_service_host = utils.get_environment_variable("KUBERNETES_SERVICE_HOST")
-        if not self.kubernetes_service_host:
-            self.kubernetes_service_host = "kubernetes.default"
-        self.kubernetes_service_port = utils.get_environment_variable("KUBERNETES_SERVICE_PORT")
-        if not self.kubernetes_service_port:
-            self.kubernetes_service_port = "443"
-        # Get k8s api token
-        self.kube_token = utils.read_file("/var/run/secrets/kubernetes.io/serviceaccount/token")
-        # Get k8s api certs 
-        if os.path.isfile("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"):
-            self.cert_verify = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-        else:
-            self.cert_verify = False
-        self.deployments_url = "https://{0}:{1}{2}".format(self.kubernetes_service_host, self.kubernetes_service_port, self.deployments_path)
-
-    @utils.lazy_property
-    def kube_auth_header(self):
-        return {'Authorization': 'Bearer ' + self.kube_token}
 
     @utils.lazy_property
     def onedata_auth_header(self):
         return {'X-Auth-Token': self.onedata_access_token}
+
+    def check_connection(self):
+        if self.oneprovider_host in [None, ''] or \
+           self.onedata_access_token in [None, ''] or \
+           self.onedata_space in [None, '']:
+            return False
+        else:
+            url = 'https://{0}/api/v3/oneprovider/spaces'.format(self.oneprovider_host)
+            try:
+                r = requests.get(url, headers=self.onedata_auth_header)
+                if r.status_code == 200:
+                    for space in r.json():
+                        if self.onedata_space == space['name']:
+                            return True
+                    return False
+                elif r.status_code == 401:
+                    raise Exception('The provided Onedata access token is not valid. Skipping Onedata configuration.')
+                else:
+                    raise Exception('Error: {0} - {1}'.format(r.text, r.status_code))
+            except Exception as e:
+                logging.error(e)
+                return False
 
     def folder_exists(self, folder_name):
         folder_name = '{0}/'.format(folder_name.strip('/ '))
@@ -119,14 +122,14 @@ class OnedataClient():
     def get_onedata_space(self):
         return self.onedata_space
 
-    def deploy_onetrigger(self):
+    def deploy_onetrigger(self, kubernetes_client):
         # K8s deployment object
         deploy = {
             'apiVersion': 'apps/v1',
             'kind': 'Deployment',
             'metadata': {
                 'name': '{0}-onetrigger'.format(self.function_name),
-                'namespace': 'oscar',
+                'namespace': self.namespace,
                 'labels': {
                     'app': '{0}-onetrigger'.format(self.function_name)
                 }
@@ -178,22 +181,7 @@ class OnedataClient():
                 }
             }
         }
-        try:
-            r = requests.post(self.deployments_url, json=deploy, headers=self.kube_auth_header, verify=self.cert_verify)
-            if r.status_code in [200, 201, 202]:
-                logging.info('Deployment "{0}" created successfully'.format(deploy['metadata']['name']))
-            else:
-                raise Exception(r.status_code)
-        except Exception as e:
-            logging.error('Unable to deploy OneTrigger. Error: {0}'.format(e))
+        kubernetes_client.create_deployment(deploy, self.function_name, self.namespace)
 
-    def delete_onetrigger_deploy(self):
-        url = '{0}/{1}-onetrigger'.format(self.deployments_url, self.function_name)
-        try:
-            r = requests.delete(url, headers=self.kube_auth_header, verify=self.cert_verify)
-            if r.status_code in [200, 202]:
-                logging.info('Deployment "{0}-onetrigger" deleted successfully'.format(self.function_name))
-            else:
-                raise Exception(r.status_code)
-        except Exception as e:
-            logging.error('Unable to delete deployment "{0}-onetrigger". Error: {1}'.format(self.function_name, e))
+    def delete_onetrigger_deploy(self, kubernetes_client):
+        kubernetes_client.delete_deployment(self.function_name, self.namespace)

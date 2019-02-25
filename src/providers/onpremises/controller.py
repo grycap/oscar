@@ -22,6 +22,7 @@ from src.providers.onpremises.clients.eventgateway import EventGatewayClient
 from src.providers.onpremises.clients.minio import MinioClient
 from src.providers.onpremises.clients.onedata import OnedataClient
 from src.providers.onpremises.clients.openfaas import OpenFaasClient
+from src.providers.onpremises.clients.kubernetes import KubernetesClient
 from threading import Thread
 import logging
 
@@ -74,11 +75,18 @@ class OnPremises(Commands):
         logging.debug("Initializing Kaniko client")
         kaniko = KanikoClient(self.function_args)
         return kaniko
-    
+
+    @utils.lazy_property
+    def kubernetes(self):
+        logging.debug("Initializing Kubernetes client")
+        kubernetes = KubernetesClient()
+        return kubernetes
+
     def __init__(self, function_args=None):
         if function_args:
             logging.debug("Function creation arguments received: {}".format(function_args))
         self.function_args = function_args if function_args else {}
+        self.get_function_environment_variables()
     
     def init(self):
         function_exists, response = self.openfaas.is_function_created()
@@ -100,7 +108,7 @@ class OnPremises(Commands):
     def asynch_init(self):
         # Create docker image
         logging.info("Creating docker image with kaniko")
-        self.kaniko.create_and_push_docker_image()
+        self.kaniko.create_and_push_docker_image(self.kubernetes)
         self.set_docker_variables()
         # Create eventgateway connections
         logging.info("Creating event gateway connections")
@@ -109,11 +117,11 @@ class OnPremises(Commands):
         # Create minio buckets
         logging.info("Creating minio buckets")
         self.create_minio_buckets()
-        if self.check_onedata():
+        if self.is_onedata_defined():
             logging.info('Creating Onedata folders')
             self.create_onedata_folders()
             logging.info('Creating OneTrigger deployment')
-            self.onedata.deploy_onetrigger()
+            self.onedata.deploy_onetrigger(self.kubernetes)
         self.set_minio_variables()
         # Create openfaas function
         logging.info("Creating OpenFaas function")
@@ -134,10 +142,10 @@ class OnPremises(Commands):
     def invoke(self, body, asynch=True):
         logging.info("Invoking '{}' function".format(self.function_args['name']))
         return self.openfaas.invoke_function(body, asynch)
-    
+
     def run(self):
         pass
-    
+
     @flask_response
     def update(self):
         logging.info("Update functionality not implemented yet")
@@ -155,9 +163,9 @@ class OnPremises(Commands):
         logging.info("Deleting EventGateway subscriptions and registers")
         self.event_gateway.unsubscribe_event(self.get_function_subscription_id())
         # Delete Onetrigger deployment and Onedata folders (if selected)
-        if self.check_onedata():
+        if self.is_onedata_defined():
             logging.info("Deleting OneTrigger deployment")
-            self.onedata.delete_onetrigger_deploy()
+            self.onedata.delete_onetrigger_deploy(self.kubernetes)
             if 'deleteBuckets' in self.function_args and self.function_args['deleteBuckets']:
                 logging.info("Deleting Onedata folders")
                 self.onedata.delete_input_folder()
@@ -183,7 +191,14 @@ class OnPremises(Commands):
             self.function_args["envVars"][key] = value
         else:
             self.function_args["envVars"] = { key: value }
-    
+
+    def get_function_environment_variables(self):
+        if 'envVars' not in self.function_args or len(self.function_args['envVars']) == 0:
+            if 'name' in self.function_args:
+                deploy_envvars = self.kubernetes.get_deployment_envvars(self.function_args['name'], 'openfaas-fn')
+                for envvar in deploy_envvars:
+                    self.add_function_environment_variable(envvar['name'], envvar['value'])
+
     def add_function_annotation(self, key, value):
         if "annotations" in self.function_args:
             self.function_args["annotations"][key] = value
@@ -206,36 +221,12 @@ class OnPremises(Commands):
         self.minio.create_input_bucket()
         self.minio.create_output_bucket()
 
-    def check_onedata(self):
+    def is_onedata_defined(self):
         if 'envVars' in self.function_args:
             if 'ONEPROVIDER_HOST' in self.function_args['envVars'] and \
                'ONEDATA_ACCESS_TOKEN' in self.function_args['envVars'] and \
                'ONEDATA_SPACE' in self.function_args['envVars']:
-                settings = {
-                    'oneprovider_host': self.function_args['envVars']['ONEPROVIDER_HOST'].strip('/ '),
-                    'onedata_access_token': self.function_args['envVars']['ONEDATA_ACCESS_TOKEN'].strip('/ '),
-                    'onedata_space': self.function_args['envVars']['ONEDATA_SPACE'].strip('/ ')
-                }
-                for value in settings.values():
-                    # Check settings
-                    if value in [None, '']:
-                        return False
-                # Check connection
-                url = 'https://{0}/api/v3/oneprovider/spaces'.format(settings['oneprovider_host'])
-                try:
-                    r = requests.get(url, headers={'X-Auth-Token': settings['onedata_access_token']})
-                    if r.status_code == 200:
-                        for space in r.json():
-                            if settings['onedata_space'] == space['name']:
-                                return True
-                    elif r.status_code == 401:
-                        logging.error('The provided Onedata access token is not valid. Skipping Onedata configuration.')
-                        return False
-                    else:
-                        raise Exception('Error: {0} - {1}'.format(r.text, r.status_code))
-                except Exception as e:
-                    logging.error(e)
-                    return False
+                return self.onedata.check_connection()
         return False
 
     def create_onedata_folders(self):
