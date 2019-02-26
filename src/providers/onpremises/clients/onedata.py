@@ -27,6 +27,7 @@ class OnedataClient():
     
     def __init__(self, function_args):
         self.function_name = function_args['name']
+        self.endpoint = utils.get_environment_variable("OPENFAAS_ENDPOINT")
         if 'envVars' in function_args and 'OUTPUT_BUCKET' in function_args['envVars']:    
             self.output_bucket = function_args['envVars']['OUTPUT_BUCKET'].strip('/ ')
         self.oneprovider_host = function_args['envVars']['ONEPROVIDER_HOST']
@@ -172,7 +173,7 @@ class OnedataClient():
                                     },
                                     {
                                         'name': 'ONETRIGGER_WEBHOOK',
-                                        'value': 'http://event-gateway:4000/{0}'.format(self.function_name)
+                                        'value': '{0}/async-function/{1}'.format(self.endpoint, self.function_name)
                                     }
                                 ]
                             }
