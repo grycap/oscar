@@ -17,7 +17,6 @@ from src.cmdtemplate import Commands
 import src.utils as utils 
 from flask import Response
 from src.providers.onpremises.clients.kaniko import KanikoClient
-from src.providers.onpremises.clients.eventgateway import EventGatewayClient
 from src.providers.onpremises.clients.minio import MinioClient
 from src.providers.onpremises.clients.onedata import OnedataClient
 from src.providers.onpremises.clients.openfaas import OpenFaasClient
@@ -50,13 +49,7 @@ class OnPremises(Commands):
         logging.debug("Initializing OpenFaas client")
         openfaas = OpenFaasClient(self.function_args)
         return openfaas
-    
-    @utils.lazy_property
-    def event_gateway(self):
-        logging.debug("Initializing EventGateway client")
-        event_gateway = EventGatewayClient(self.function_args)
-        return event_gateway
-    
+
     @utils.lazy_property
     def minio(self):
         logging.debug("Initializing Minio client")
@@ -109,10 +102,6 @@ class OnPremises(Commands):
         logging.info("Creating docker image with kaniko")
         self.kaniko.create_and_push_docker_image(self.kubernetes)
         self.set_docker_variables()
-        # Create eventgateway connections
-        logging.info("Creating event gateway connections")
-        self.manage_event_gateway()
-        self.set_eventgateway_variables()
         # Create minio buckets
         logging.info("Creating minio buckets")
         self.create_minio_buckets()
@@ -130,7 +119,7 @@ class OnPremises(Commands):
     def process_minio_event(self, minio_event):
         # Remove the bucketname'-in' part
         self.function_args['name'] = minio_event["Records"][0]["s3"]["bucket"]["name"][:-3]
-        return self.event_gateway.send_event(minio_event)
+        return self.openfaas.invoke_function(minio_event)
 
     @flask_response        
     def ls(self):
@@ -158,9 +147,6 @@ class OnPremises(Commands):
             logging.info("Deleting Minio buckets")
             self.minio.delete_input_bucket()
             self.minio.delete_output_bucket()
-        # Delete event gateway registers
-        logging.info("Deleting EventGateway subscriptions and registers")
-        self.event_gateway.unsubscribe_event(self.get_function_subscription_id())
         # Delete Onetrigger deployment and Onedata folders (if selected)
         if self.is_onedata_defined():
             logging.info("Deleting OneTrigger deployment")
@@ -169,7 +155,6 @@ class OnPremises(Commands):
                 logging.info("Deleting Onedata folders")
                 self.onedata.delete_input_folder()
                 self.onedata.delete_output_folder()
-        self.event_gateway.deregister_function()
         logging.info("Deleting OpenFaas function")
         return self.openfaas.delete_function()
 
@@ -207,15 +192,7 @@ class OnPremises(Commands):
     def set_docker_variables(self):  
         # Override the function image name
         self.function_args["image"] = self.kaniko.registry_image_id    
-    
-    def manage_event_gateway(self):
-        if not self.event_gateway.is_function_registered():
-            self.event_gateway.register_function()
-            self.event_gateway.subscribe_event()
-        
-    def set_eventgateway_variables(self):  
-        self.add_function_annotation("eventgateway.subscription.id", self.event_gateway.subscription_id)      
-    
+
     def create_minio_buckets(self):
         self.minio.create_input_bucket()
         self.minio.create_output_bucket()
@@ -236,11 +213,7 @@ class OnPremises(Commands):
         self.add_function_environment_variable("AWS_ACCESS_KEY_ID", self.minio.get_access_key())
         self.add_function_environment_variable("AWS_SECRET_ACCESS_KEY", self.minio.get_secret_key())
         self.add_function_environment_variable("OUTPUT_BUCKET", self.minio.get_output_bucket_name())
-        
-    def get_function_subscription_id(self):
-        function_info = self.openfaas.get_functions_info(json_response=True)
-        return function_info["annotations"]["eventgateway.subscription.id"]
-    
+
     def _parse_output(self, response):
         if response:
             if response.status_code == 200:
