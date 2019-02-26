@@ -80,8 +80,8 @@ configure front (
       kube_deploy_dashboard: true
       kube_install_metrics: true
       kube_persistent_volumes:
-      - {namespace : "minio", name : "pvnfsminio", label : "minio", capacity_storage : "15Gi", nfs_path : "/pv/minio"}
-      - {namespace : "docker-registry", name : "pvnfsregistry", label : "registry", capacity_storage : "15Gi", nfs_path : "/pv/registry"}
+      - {namespace : "minio", name : "pvnfsminio", label : "minio", capacity_storage : "20Gi", nfs_path : "/pv/minio"}
+      - {namespace : "docker-registry", name : "pvnfsregistry", label : "registry", capacity_storage : "20Gi", nfs_path : "/pv/registry"}
       - {namespace : "oscar", name : "pvnfskanikobuilds", label : "oscar-manager", capacity_storage : "2Gi", nfs_path : "/pv/kaniko-builds"}
 
     - role: 'grycap.kubefaas'
