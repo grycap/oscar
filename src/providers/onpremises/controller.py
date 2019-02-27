@@ -22,6 +22,7 @@ from src.providers.onpremises.clients.onedata import OnedataClient
 from src.providers.onpremises.clients.openfaas import OpenFaasClient
 from src.providers.onpremises.clients.kubernetes import KubernetesClient
 from threading import Thread
+import json
 import logging
 
 loglevel = logging.DEBUG
@@ -119,7 +120,7 @@ class OnPremises(Commands):
     def process_minio_event(self, minio_event):
         # Remove the bucketname'-in' part
         self.function_args['name'] = minio_event["Records"][0]["s3"]["bucket"]["name"][:-3]
-        return self.openfaas.invoke_function(minio_event)
+        return self.openfaas.invoke_function(json.dumps(minio_event))
 
     @flask_response        
     def ls(self):
