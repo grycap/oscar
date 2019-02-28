@@ -182,7 +182,8 @@ class OnPremises(Commands):
             if 'name' in self.function_args:
                 deploy_envvars = self.kubernetes.get_deployment_envvars(self.function_args['name'], 'openfaas-fn')
                 for envvar in deploy_envvars:
-                    self.add_function_environment_variable(envvar['name'], envvar['value'])
+                    if 'name' in envvar and 'value' in envvar:
+                        self.add_function_environment_variable(envvar['name'], envvar['value'])
 
     def add_function_annotation(self, key, value):
         if "annotations" in self.function_args:
