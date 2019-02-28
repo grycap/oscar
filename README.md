@@ -39,7 +39,6 @@ The following services are deployed inside the Kubernetes cluster in order to su
 
 * [Minio](http://minio.io), a high performance distributed object storage server that provides an API compatible with S3. 
 * [OpenFaaS](https://www.openfaas.com/), a FaaS platform that allows creating functions executed via HTTP requests.
-* [Event Gateway](https://serverless.com/event-gateway/), an event router that facilitates wiring functions to HTTP endpoints.
 * [OSCAR UI](https://github.com/grycap/oscar-ui), a web-based GUI aimed at end users to facilitate interaction with the OSCAR platform.
 
 Further information is available in the [documentation](https://o-scar.readthedocs.io).

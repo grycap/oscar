@@ -32,7 +32,6 @@ The services that currently comprise the OSCAR stack:
 
 - `Minio <http://minio.io>`_, a high performance distributed object storage server that provides an API compatible with S3.
 - `OpenFaaS <https://www.openfaas.com/>`_, a FaaS platform that allows creating functions executed via HTTP requests.
-- `Event Gateway <https://serverless.com/event-gateway/>`_, an event router that facilitates wiring functions to HTTP endpoints.
 - `OSCAR UI <https://github.com/grycap/oscar-ui>`_, a web-based GUI aimed at end users to facilitate interaction with OSCAR.
 
 Architecture
