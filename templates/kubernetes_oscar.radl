@@ -16,6 +16,8 @@ network public (
 network private ()
 
 system front (
+  cpu.count>=2 and
+  memory.size>=4096m and
   net_interface.0.connection = 'private' and
   net_interface.0.dns_name = 'kubeserver' and
   net_interface.1.connection = 'public' and
@@ -129,6 +131,8 @@ configure front (
 )
 
 system wn (
+  cpu.count>=2 and
+  memory.size>=4096m and
   ec3_node_type = 'wn' and
   net_interface.0.connection='private'
 )
