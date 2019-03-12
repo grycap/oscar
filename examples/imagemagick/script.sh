@@ -1,7 +1,7 @@
 #!/bin/bash
 
-echo "SCRIPT: Invoked Image Grayifier. File available in $SCAR_INPUT_FILE"
-FILE_NAME=`basename $SCAR_INPUT_FILE`
-OUTPUT_FILE=$SCAR_OUTPUT_FOLDER/$FILE_NAME
-echo "SCRIPT: Converting input image file $SCAR_INPUT_FILE to grayscale to output file $OUTPUT_FILE"
-convert $SCAR_INPUT_FILE -type Grayscale $OUTPUT_FILE
+echo "SCRIPT: Invoked Image Grayifier. File available in $INPUT_FILE_PATH"
+FILE_NAME=`basename $INPUT_FILE_PATH`
+OUTPUT_FILE=$STORAGE_OUTPUT_DIR/$FILE_NAME
+echo "SCRIPT: Converting input image file $INPUT_FILE_PATH to grayscale to output file $OUTPUT_FILE"
+convert $INPUT_FILE_PATH -type Grayscale $OUTPUT_FILE

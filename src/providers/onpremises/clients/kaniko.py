@@ -16,7 +16,6 @@
 import src.utils as utils
 import os
 import stat
-import logging
 
 class KanikoClient():
 

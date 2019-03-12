@@ -84,6 +84,9 @@ class MinioClient():
         except minio.error.ResponseError as err:
             print(err)            
     
+    def get_input_bucket_name(self):
+        return self.output_bucket if hasattr(self, 'input_bucket') else '{0}-in'.format(self.function_name)    
+    
     def get_output_bucket_name(self):
         return self.output_bucket if hasattr(self, 'output_bucket') else '{0}-out'.format(self.function_name)
     

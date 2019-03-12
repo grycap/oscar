@@ -13,21 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from src.cmdtemplate import Commands
-import src.utils as utils 
 from flask import Response
+from src.cmdtemplate import Commands
 from src.providers.onpremises.clients.kaniko import KanikoClient
+from src.providers.onpremises.clients.kubernetes import KubernetesClient
 from src.providers.onpremises.clients.minio import MinioClient
 from src.providers.onpremises.clients.onedata import OnedataClient
 from src.providers.onpremises.clients.openfaas import OpenFaasClient
-from src.providers.onpremises.clients.kubernetes import KubernetesClient
 from threading import Thread
 import json
-import logging
-
-loglevel = logging.DEBUG
-FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-logging.basicConfig(format=FORMAT, level=loglevel)
+import random
+import src.logger as logger
+import src.utils as utils
 
 class CustomResponse():
     def __init__(self, content=None, status_code=None, headers=None):
@@ -47,50 +44,50 @@ class OnPremises(Commands):
     
     @utils.lazy_property
     def openfaas(self):
-        logging.debug("Initializing OpenFaas client")
+        logger.debug("Initializing OpenFaas client")
         openfaas = OpenFaasClient(self.function_args)
         return openfaas
 
     @utils.lazy_property
     def minio(self):
-        logging.debug("Initializing Minio client")
+        logger.debug("Initializing Minio client")
         minio = MinioClient(self.function_args)
         return minio
 
     @utils.lazy_property
     def onedata(self):
-        logging.debug("Initializing Onedata client")
+        logger.debug("Initializing Onedata client")
         onedata = OnedataClient(self.function_args)
         return onedata 
     
     @utils.lazy_property
     def kaniko(self):
-        logging.debug("Initializing Kaniko client")
+        logger.debug("Initializing Kaniko client")
         kaniko = KanikoClient(self.function_args)
         return kaniko
 
     @utils.lazy_property
     def kubernetes(self):
-        logging.debug("Initializing Kubernetes client")
+        logger.debug("Initializing Kubernetes client")
         kubernetes = KubernetesClient()
         return kubernetes
 
     def __init__(self, function_args=None):
         if function_args:
-            logging.debug("Function creation arguments received: {}".format(function_args))
+            logger.debug("Function creation arguments received: {}".format(function_args))
         self.function_args = function_args if function_args else {}
         self.get_function_environment_variables()
     
     def init(self):
         function_exists, response = self.openfaas.is_function_created()
         if function_exists:
-            logging.info("Function with name '{}' found".format(self.function_args['name']))
+            logger.info("Function with name '{}' found".format(self.function_args['name']))
             kwargs = {'response' : response.content,
                       'status' : str(response.status_code),
                       'headers' : response.headers.items()}
             return Response(**kwargs)
         else:
-            logging.info("Initialize asynchronous function creation")
+            logger.info("Initialize asynchronous function creation")
             # Start initializing the function
             init_t = Thread(target=self.asynch_init)
             init_t.start()
@@ -100,20 +97,20 @@ class OnPremises(Commands):
 
     def asynch_init(self):
         # Create docker image
-        logging.info("Creating docker image with kaniko")
+        logger.info("Creating docker image with kaniko")
         self.kaniko.create_and_push_docker_image(self.kubernetes)
         self.set_docker_variables()
         # Create minio buckets
-        logging.info("Creating minio buckets")
+        logger.info("Creating minio buckets")
         self.create_minio_buckets()
         if self.is_onedata_defined():
-            logging.info('Creating Onedata folders')
+            logger.info('Creating Onedata folders')
             self.create_onedata_folders()
-            logging.info('Creating OneTrigger deployment')
+            logger.info('Creating OneTrigger deployment')
             self.onedata.deploy_onetrigger(self.kubernetes)
         self.set_minio_variables()
         # Create openfaas function
-        logging.info("Creating OpenFaas function")
+        logger.info("Creating OpenFaas function")
         self._parse_output(self.openfaas.create_function(self.function_args))
 
     @flask_response
@@ -124,12 +121,12 @@ class OnPremises(Commands):
 
     @flask_response        
     def ls(self):
-        logging.info("Retrieving functions information")
+        logger.info("Retrieving functions information")
         return self.openfaas.get_functions_info()
 
     @flask_response
     def invoke(self, body, asynch=True):
-        logging.info("Invoking '{}' function".format(self.function_args['name']))
+        logger.info("Invoking '{}' function".format(self.function_args['name']))
         return self.openfaas.invoke_function(body, asynch)
 
     def run(self):
@@ -137,7 +134,7 @@ class OnPremises(Commands):
 
     @flask_response
     def update(self):
-        logging.info("Update functionality not implemented yet")
+        logger.info("Update functionality not implemented yet")
         # Service not implemented (yet)
         return CustomResponse(content='Update functionality not implemented', status_code=501)
     
@@ -145,18 +142,18 @@ class OnPremises(Commands):
     def rm(self):
         # Delete minio buckets (if selected)
         if 'deleteBuckets' in self.function_args and self.function_args['deleteBuckets']:
-            logging.info("Deleting Minio buckets")
+            logger.info("Deleting Minio buckets")
             self.minio.delete_input_bucket()
             self.minio.delete_output_bucket()
         # Delete Onetrigger deployment and Onedata folders (if selected)
         if self.is_onedata_defined():
-            logging.info("Deleting OneTrigger deployment")
+            logger.info("Deleting OneTrigger deployment")
             self.onedata.delete_onetrigger_deploy(self.kubernetes)
             if 'deleteBuckets' in self.function_args and self.function_args['deleteBuckets']:
-                logging.info("Deleting Onedata folders")
+                logger.info("Deleting Onedata folders")
                 self.onedata.delete_input_folder()
                 self.onedata.delete_output_folder()
-        logging.info("Deleting OpenFaas function")
+        logger.info("Deleting OpenFaas function")
         return self.openfaas.delete_function()
 
     def log(self):
@@ -212,13 +209,15 @@ class OnPremises(Commands):
         self.onedata.create_output_folder()
         
     def set_minio_variables(self):
-        self.add_function_environment_variable("AWS_ACCESS_KEY_ID", self.minio.get_access_key())
-        self.add_function_environment_variable("AWS_SECRET_ACCESS_KEY", self.minio.get_secret_key())
-        self.add_function_environment_variable("OUTPUT_BUCKET", self.minio.get_output_bucket_name())
+        provider_id = random.randint(1,1001)
+        self.add_function_environment_variable("STORAGE_AUTH_MINIO_{}_USER".format(provider_id), self.minio.get_access_key())
+        self.add_function_environment_variable("STORAGE_AUTH_MINIO_{}_PASS".format(provider_id), self.minio.get_secret_key())
+        self.add_function_environment_variable("STORAGE_PATH_INPUT_{}".format(provider_id), self.minio.get_input_bucket_name())
+        self.add_function_environment_variable("STORAGE_PATH_OUTPUT_{}".format(provider_id), self.minio.get_output_bucket_name())
 
     def _parse_output(self, response):
         if response:
             if response.status_code == 200:
-                logging.info("Request petition successful")
+                logger.info("Request petition successful")
             else:
-                logging.info("Request call returned code '{0}': {1}".format(response.status_code, response.text))
+                logger.info("Request call returned code '{0}': {1}".format(response.status_code, response.text))
