@@ -84,7 +84,7 @@ class KanikoClient():
                             {
                                 'name': 'build',
                                 'image': 'gcr.io/kaniko-project/executor:latest',
-                                'args': ["-c", "/workspace/", "-d", self.registry_image_id, "--skip-tls-verify"],
+                                'args': ["-c", "/workspace/", "-d", self.registry_image_id, "--skip-tls-verify", "--skip-tls-verify-pull"],
                                 'resources': {
                                     'requests': {
                                         'memory': '256Mi',
