@@ -28,7 +28,7 @@ class KanikoClient():
         self.root_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
         self.job_name = "{0}-build-job".format(function_args['name'])
 
-    def copy_dockerfile(self):
+    def _copy_dockerfile(self):
         # Get function Dockerfile paths
         func_dockerfile_path = utils.join_paths(self.root_path, "src", "providers", "onpremises", "function_template", "Dockerfile")
         func_dockerfile_dest_path = utils.join_paths(self.function_image_folder, "Dockerfile")
@@ -38,7 +38,7 @@ class KanikoClient():
                 for line in f_in:
                     f_out.write(line.replace("FROM ubuntu", "FROM {0}".format(self.function_args['image'])))
 
-    def download_binaries(self):
+    def _download_binaries(self):
         # Download latest fwatchdog binary and set exec permissions
         utils.download_github_asset('openfaas', 'faas', 'fwatchdog', self.function_image_folder)
         fwatchdog_path = os.path.join(self.function_image_folder, 'fwatchdog')
@@ -51,24 +51,24 @@ class KanikoClient():
         supervisor_st = os.stat(supervisor_path)
         os.chmod(supervisor_path, supervisor_st.st_mode | stat.S_IEXEC)
 
-    def copy_user_script(self):
+    def _copy_user_script(self):
         utils.create_file_with_content(utils.join_paths(self.function_image_folder, "user_script.sh"),
                                        utils.base64_to_utf8_string(self.function_args['script']))       
 
-    def copy_required_files(self):
+    def _copy_required_files(self):
         os.makedirs(self.function_image_folder , exist_ok=True)
         # Get function Dockerfile paths
-        self.copy_dockerfile()   
+        self._copy_dockerfile()   
         # Download required binaries
-        self.download_binaries()
+        self._download_binaries()
         # Create user script
-        self.copy_user_script()
+        self._copy_user_script()
     
-    def delete_image_files(self):
+    def _delete_image_files(self):
         # Delete all the temporal files created for the image creation
         utils.delete_folder(self.function_image_folder)
 
-    def create_job_definition(self):
+    def _create_job_definition(self):
         self.registry_image_id = "{0}/{1}".format(self.registry_name, self.function_args['name'])
         job = {
             'apiVersion': 'batch/v1',
@@ -117,12 +117,12 @@ class KanikoClient():
 
     def create_and_push_docker_image(self, kubernetes_client):
         # Copy/create function required files
-        self.copy_required_files()    
+        self._copy_required_files()    
         # Build the docker image       
-        job = self.create_job_definition()
+        job = self._create_job_definition()
         # Send request to the k8s api
         kubernetes_client.create_job(job, self.job_name, self.namespace)
         # Wait until build finishes
         kubernetes_client.wait_job(self.job_name, self.namespace, delete=True)
         # Avoid storing unnecessary files
-        self.delete_image_files()
+        self._delete_image_files()

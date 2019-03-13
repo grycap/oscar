@@ -18,10 +18,10 @@ import minio
 
 class MinioClient():
     
-    def __init__(self, function_args):
+    def __init__(self, function_args, minio_id):
         self.function_name = function_args['name']
-        if 'envVars' in function_args and 'OUTPUT_BUCKET' in function_args['envVars']:    
-            self.output_bucket = function_args['envVars']['OUTPUT_BUCKET']
+        if minio_id and 'envVars' in function_args and 'STORAGE_PATH_OUTPUT_'.format(minio_id) in function_args['envVars']:    
+            self.output_bucket = function_args['envVars']['STORAGE_PATH_OUTPUT_'.format(minio_id)]
         self.access_key = utils.get_environment_variable("MINIO_USER")
         self.secret_key = utils.get_environment_variable("MINIO_PASS")
         self.client = minio.Minio(utils.get_environment_variable("MINIO_ENDPOINT"),
@@ -30,14 +30,14 @@ class MinioClient():
                                   secure=False)
              
     def create_input_bucket(self):
-        self.create_bucket('{0}-in'.format(self.function_name))
-        self.set_bucket_event_notification('{0}-in'.format(self.function_name))
+        self._create_bucket('{0}-in'.format(self.function_name))
+        self._set_bucket_event_notification('{0}-in'.format(self.function_name))
 
     def create_output_bucket(self):
         if not hasattr(self, 'output_bucket'):
-            self.create_bucket('{0}-out'.format(self.function_name))
+            self._create_bucket('{0}-out'.format(self.function_name))
 
-    def create_bucket(self, bucket_name):
+    def _create_bucket(self, bucket_name):
         try:
             self.client.make_bucket(bucket_name)
         except minio.error.BucketAlreadyOwnedByYou as err:
@@ -45,39 +45,38 @@ class MinioClient():
         except minio.error.ResponseError as err:
             print(err)        
 
-    def set_bucket_event_notification(self, bucket_name):
+    def _set_bucket_event_notification(self, bucket_name):
         try:
             notification = {'QueueConfigurations': [
                                 {'Arn': 'arn:minio:sqs::1:webhook', 
-                                 'Events': ['s3:ObjectCreated:*']
-                                 }
+                                 'Events': ['s3:ObjectCreated:*']}
                             ]}
             self.client.set_bucket_notification(bucket_name, notification)
         except minio.error.ResponseError as err:
             print(err)
             
     def delete_input_bucket(self):
-        self.delete_bucket_event_notification('{0}-in'.format(self.function_name))
-        self.delete_bucket('{0}-in'.format(self.function_name))
+        self._delete_bucket_event_notification('{0}-in'.format(self.function_name))
+        self._delete_bucket('{0}-in'.format(self.function_name))
         
     def delete_output_bucket(self):
-        self.delete_bucket('{0}-out'.format(self.function_name))                    
+        self._delete_bucket('{0}-out'.format(self.function_name))                    
      
-    def delete_bucket_files(self, bucket_name):
+    def _delete_bucket_files(self, bucket_name):
         try:
             for file in self.client.list_objects_v2(bucket_name):
                 self.client.remove_object(bucket_name, file.object_name)
         except minio.error.ResponseError as err:
             print(err)     
            
-    def delete_bucket(self, bucket_name):
+    def _delete_bucket(self, bucket_name):
         try:
-            self.delete_bucket_files(bucket_name)
+            self._delete_bucket_files(bucket_name)
             self.client.remove_bucket(bucket_name)
         except minio.error.ResponseError as err:
             print(err)
             
-    def delete_bucket_event_notification(self, bucket_name):
+    def _delete_bucket_event_notification(self, bucket_name):
         try:
             notification = {'QueueConfigurations': []}
             self.client.set_bucket_notification(bucket_name, notification)

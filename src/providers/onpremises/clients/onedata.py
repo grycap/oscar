@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import src.utils as utils
-import os
 import logging
 import requests
 
@@ -25,14 +24,15 @@ class OnedataClient():
     cdmi_version_header = {'X-CDMI-Specification-Version': '1.1.1'}
     cdmi_container_header = {'Content-Type': 'application/cdmi-container'}
     
-    def __init__(self, function_args):
+    def __init__(self, function_args, onedata_id):
         self.function_name = function_args['name']
+        self.onedata_id = onedata_id
         self.endpoint = utils.get_environment_variable("OPENFAAS_ENDPOINT")
-        if 'envVars' in function_args and 'OUTPUT_BUCKET' in function_args['envVars']:    
-            self.output_bucket = function_args['envVars']['OUTPUT_BUCKET'].strip('/ ')
-        self.oneprovider_host = function_args['envVars']['ONEPROVIDER_HOST']
-        self.onedata_access_token = function_args['envVars']['ONEDATA_ACCESS_TOKEN']
-        self.onedata_space = function_args['envVars']['ONEDATA_SPACE'].strip('/ ')
+        if 'envVars' in function_args and 'STORAGE_PATH_OUTPUT_'.format(onedata_id) in function_args['envVars']:    
+            self.output_bucket = function_args['envVars']['STORAGE_PATH_OUTPUT_'.format(onedata_id)].strip('/ ')
+        self.oneprovider_host = function_args['envVars']['STORAGE_AUTH_ONEDATA_{}_HOST'.format(onedata_id)]
+        self.onedata_access_token = function_args['envVars']['STORAGE_AUTH_ONEDATA_{}_TOKEN'.format(onedata_id)]
+        self.onedata_space = function_args['envVars']['STORAGE_AUTH_ONEDATA_{}_SPACE'.format(onedata_id)].strip('/ ')
 
     @utils.lazy_property
     def onedata_auth_header(self):

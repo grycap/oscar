@@ -51,13 +51,13 @@ class OnPremises(Commands):
     @utils.lazy_property
     def minio(self):
         logger.debug("Initializing Minio client")
-        minio = MinioClient(self.function_args)
+        minio = MinioClient(self.function_args, self.minio_id)
         return minio
 
     @utils.lazy_property
     def onedata(self):
         logger.debug("Initializing Onedata client")
-        onedata = OnedataClient(self.function_args)
+        onedata = OnedataClient(self.function_args, self.onedata_id)
         return onedata 
     
     @utils.lazy_property
@@ -99,16 +99,18 @@ class OnPremises(Commands):
         # Create docker image
         logger.info("Creating docker image with kaniko")
         self.kaniko.create_and_push_docker_image(self.kubernetes)
-        self.set_docker_variables()
+        # Override the function image name with the new image_id
+        self.function_args["image"] = self.kaniko.registry_image_id 
         # Create minio buckets
         logger.info("Creating minio buckets")
-        self.create_minio_buckets()
-        if self.is_onedata_defined():
+        self.minio_id = self._get_storage_provider_id('MINIO')
+        self._create_minio_buckets()
+        if self._is_onedata_defined():
             logger.info('Creating Onedata folders')
-            self.create_onedata_folders()
+            self._create_onedata_folders()
             logger.info('Creating OneTrigger deployment')
             self.onedata.deploy_onetrigger(self.kubernetes)
-        self.set_minio_variables()
+        self._set_minio_variables()
         # Create openfaas function
         logger.info("Creating OpenFaas function")
         self._parse_output(self.openfaas.create_function(self.function_args))
@@ -188,27 +190,44 @@ class OnPremises(Commands):
         else:
             self.function_args["annotations"] = { key: value }        
 
-    def set_docker_variables(self):  
-        # Override the function image name
-        self.function_args["image"] = self.kaniko.registry_image_id    
-
-    def create_minio_buckets(self):
+    def _create_minio_buckets(self):
         self.minio.create_input_bucket()
         self.minio.create_output_bucket()
 
-    def is_onedata_defined(self):
+    def _is_onedata_defined(self):
         if 'envVars' in self.function_args:
-            if 'ONEPROVIDER_HOST' in self.function_args['envVars'] and \
-               'ONEDATA_ACCESS_TOKEN' in self.function_args['envVars'] and \
-               'ONEDATA_SPACE' in self.function_args['envVars']:
+            self.onedata_id = self._get_storage_provider_id('ONEDATA')
+            if self.onedata_id and 'STORAGE_AUTH_ONEDATA_{}_HOST'.format(self.onedata_id) in self.function_args['envVars'] and \
+               'STORAGE_AUTH_ONEDATA_{}_TOKEN'.format(self.onedata_id) in self.function_args['envVars'] and \
+               'STORAGE_AUTH_ONEDATA_{}_SPACE'.format(self.onedata_id) in self.function_args['envVars']:
                 return self.onedata.check_connection()
         return False
 
-    def create_onedata_folders(self):
+    def _get_storage_provider_id(self, storage_provider):
+        '''
+        Reads the global variables to get the provider's id.
+        Variable schema:  STORAGE_AUTH_$1_$2_$3
+        $1: MINIO | S3 | ONEDATA
+        $2: STORAGE_ID (Specified in the function definition file, is unique for each storage defined)
+        $3: USER | PASS | TOKEN | SPACE | HOST
+        
+        e.g.: STORAGE_AUTH_MINIO_12345_USER
+        '''
+        for envvar in self.function_args['envVars']:
+            if envvar.startswith('STORAGE_AUTH_{}_'.format(storage_provider)):
+                '''
+                The provider_id can be composed by several fields but it's always between the position [3:-1]
+                e.g.:
+                  - "STORAGE_AUTH_MINIO_123_456_USER" -> ['STORAGE', 'AUTH', 'MINIO', '123', '456', 'USER']
+                  - "STORAGE_AUTH_MINIO_123-456_USER" -> ['STORAGE', 'AUTH', 'MINIO', '123-456', 'USER']
+                '''
+                return "_".join(envvar.split("_")[3:-1])        
+
+    def _create_onedata_folders(self):
         self.onedata.create_input_folder()
         self.onedata.create_output_folder()
         
-    def set_minio_variables(self):
+    def _set_minio_variables(self):
         provider_id = random.randint(1,1001)
         self.add_function_environment_variable("STORAGE_AUTH_MINIO_{}_USER".format(provider_id), self.minio.get_access_key())
         self.add_function_environment_variable("STORAGE_AUTH_MINIO_{}_PASS".format(provider_id), self.minio.get_secret_key())
