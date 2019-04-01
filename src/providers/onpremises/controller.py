@@ -148,7 +148,7 @@ class OnPremises(Commands):
             self.minio.delete_input_bucket()
             self.minio.delete_output_bucket()
         # Delete Onetrigger deployment and Onedata folders (if selected)
-        if self.is_onedata_defined():
+        if self._is_onedata_defined():
             logger.info("Deleting OneTrigger deployment")
             self.onedata.delete_onetrigger_deploy(self.kubernetes)
             if 'deleteBuckets' in self.function_args and self.function_args['deleteBuckets']:
@@ -226,13 +226,17 @@ class OnPremises(Commands):
     def _create_onedata_folders(self):
         self.onedata.create_input_folder()
         self.onedata.create_output_folder()
+        self._set_io_folder_variables(self._get_storage_provider_id('ONEDATA'))
         
     def _set_minio_variables(self):
-        provider_id = random.randint(1,1001)
+        provider_id = random.randint(1,1000001)
         self.add_function_environment_variable("STORAGE_AUTH_MINIO_{}_USER".format(provider_id), self.minio.get_access_key())
         self.add_function_environment_variable("STORAGE_AUTH_MINIO_{}_PASS".format(provider_id), self.minio.get_secret_key())
+        self._set_io_folder_variables(provider_id)
+        
+    def _set_io_folder_variables(self, provider_id):
         self.add_function_environment_variable("STORAGE_PATH_INPUT_{}".format(provider_id), self.minio.get_input_bucket_name())
-        self.add_function_environment_variable("STORAGE_PATH_OUTPUT_{}".format(provider_id), self.minio.get_output_bucket_name())
+        self.add_function_environment_variable("STORAGE_PATH_OUTPUT_{}".format(provider_id), self.minio.get_output_bucket_name())        
 
     def _parse_output(self, response):
         if response:

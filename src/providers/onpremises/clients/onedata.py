@@ -75,13 +75,13 @@ class OnedataClient():
         return False
 
     def create_input_folder(self):
-        self.create_folder('{0}-in'.format(self.function_name))
+        self._create_folder('{0}-in'.format(self.function_name))
 
     def create_output_folder(self):
         if not hasattr(self, 'output_bucket'):
-            self.create_folder('{0}-out'.format(self.function_name))
+            self._create_folder('{0}-out'.format(self.function_name))
 
-    def create_folder(self, folder_name):
+    def _create_folder(self, folder_name):
         url = 'https://{0}{1}{2}/{3}/'.format(self.oneprovider_host, self.cdmi_path, self.onedata_space, folder_name)
         headers = {**self.cdmi_version_header, **self.cdmi_container_header, **self.onedata_auth_header}
         try:
