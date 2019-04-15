@@ -2,7 +2,7 @@ Deploy
 ======
 
 In order to deploy the Kubernetes cluster with the OSCAR platform, you must use `EC3 <https://github.com/grycap/ec3>`_, a tool that deploys elastic virtual clusters. EC3 uses the `Infrastructure Manager (IM) <https://www.grycap.upv.es/im>`_ to deploy such clusters on multiple Cloud back-ends.
-The installation details can be found `here <https://ec3.readthedocs.io/en/latest/intro.html#installation>`_), though this section includes the relevant information to get you started:
+The installation details can be found `here <https://ec3.readthedocs.io/en/latest/intro.html#installation>`_, though this section includes the relevant information to get you started:
 
 1. Clone the EC3 repository:
 ::
