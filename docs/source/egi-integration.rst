@@ -41,3 +41,12 @@ This will trigger the following:
 
 This means that scientists can upload input files to their Onedata space in the EGI DataHub in order to automatically trigger the execution of a function in order to process this file.
 Multiple file uploads results in multiple function invocations that run as Kubernetes job in the elastic Kubernetes cluster dynamically provisioned from the EGI Federated Cloud.
+
+Video Demo
+-----------
+This video demo will get you up & running deploying an OSCAR cluster, through the EGI Applications on Demand portal, in the EGI Federated Cloud and using EGI DataHub as the source of events to perform the automated parallel classification of `plants using deep learning techniques <https://github.com/deephdc/DEEP-OC-plant-classification-theano>`_, a use case from the `DEEP Hybrid-DataCloud <http://www.deep-hybrid-datacloud.eu>`_ project.
+You will only need a valid user account in EGI to follow the steps.
+
+.. raw:: html
+
+    <iframe width="560" height="315" src="https://www.youtube.com/embed/ZtAlVc1uLwc" frameborder="0" allowfullscreen></iframe>
