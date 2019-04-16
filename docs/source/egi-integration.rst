@@ -1,6 +1,10 @@
 Integration with the EGI Federated Cloud
 ========================================
 
+`EGI <https://www.egi.eu/>`_ is a federation of many cloud providers and hundreds of data centres, spread across Europe and worldwide that delivers advanced computing services to support scientists, multinational projects and research infrastructures.
+
+The `EGI Federated Cloud <https://www.egi.eu/federation/egi-federated-cloud/>`_ is an IaaS-type cloud, made of academic private clouds and virtualised resources and built around open standards. Its development is driven by requirements of the scientific communities.
+
 EGI Applications on Demand: EC3 Portal
 --------------------------------------
 
