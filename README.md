@@ -41,6 +41,8 @@ The following services are deployed inside the Kubernetes cluster in order to su
 * [OpenFaaS](https://www.openfaas.com/), a FaaS platform that allows creating functions executed via HTTP requests.
 * [OSCAR UI](https://github.com/grycap/oscar-ui), a web-based GUI aimed at end users to facilitate interaction with the OSCAR platform.
 
+OSCAR has also been integrated with the following [EGI](https://www.egi.eu) services: EGI Applications on Demand, to provision the OSCAR cluster from the EGI Federated Cloud and EGI DataHub as the storage back-end and sources of events.
+
 Further information is available in the [documentation](https://o-scar.readthedocs.io).
 
 ## Licensing

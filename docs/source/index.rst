@@ -8,5 +8,6 @@ OSCAR Documentation
    intro
    deploy
    usage
+   egi-integration
    license
    help

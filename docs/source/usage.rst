@@ -31,4 +31,4 @@ Getting Started
 ---------------
 
 You can follow one of the `examples <https://github.com/grycap/oscar/tree/master/examples>`_ in order to use the OSCAR framework for specific applications. 
-We recommend you start with the [Event-Driven Image Conversion via ImageMagick](https://github.com/grycap/oscar/tree/master/examples/imagemagick) example.
+We recommend you start with the `Event-Driven Image Conversion via ImageMagick <https://github.com/grycap/oscar/tree/master/examples/imagemagick>`_ example.
