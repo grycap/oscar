@@ -103,14 +103,15 @@ class OnPremises(Commands):
         self.function_args["image"] = self.kaniko.registry_image_id 
         # Create minio buckets
         logger.info("Creating minio buckets")
-        self.minio_id = self._get_storage_provider_id('MINIO')
+        self._set_minio_variables()
         self._create_minio_buckets()
+        # Onedata stuff
         if self._is_onedata_defined():
             logger.info('Creating Onedata folders')
             self._create_onedata_folders()
             logger.info('Creating OneTrigger deployment')
             self.onedata.deploy_onetrigger(self.kubernetes)
-        self._set_minio_variables()
+
         # Create openfaas function
         logger.info("Creating OpenFaas function")
         self._parse_output(self.openfaas.create_function(self.function_args))
@@ -195,6 +196,10 @@ class OnPremises(Commands):
         self.minio.create_output_bucket()
 
     def _is_onedata_defined(self):
+        # Check if variables are defined in the function creation (without storage id...)
+        # or in the remove function process.
+        # In the first case would be needed to generate a new storage id and update 
+        # variable names and values with the new definition before 'check_connection()'
         if 'envVars' in self.function_args:
             self.onedata_id = self._get_storage_provider_id('ONEDATA')
             if self.onedata_id and 'STORAGE_AUTH_ONEDATA_{}_HOST'.format(self.onedata_id) in self.function_args['envVars'] and \
@@ -229,10 +234,10 @@ class OnPremises(Commands):
         self._set_io_folder_variables(self._get_storage_provider_id('ONEDATA'))
         
     def _set_minio_variables(self):
-        provider_id = random.randint(1,1000001)
-        self.add_function_environment_variable("STORAGE_AUTH_MINIO_{}_USER".format(provider_id), self.minio.get_access_key())
-        self.add_function_environment_variable("STORAGE_AUTH_MINIO_{}_PASS".format(provider_id), self.minio.get_secret_key())
-        self._set_io_folder_variables(provider_id)
+        self.minio_id = random.randint(1,1000001)
+        self.add_function_environment_variable("STORAGE_AUTH_MINIO_{}_USER".format(self.minio_id), self.minio.get_access_key())
+        self.add_function_environment_variable("STORAGE_AUTH_MINIO_{}_PASS".format(self.minio_id), self.minio.get_secret_key())
+        self._set_io_folder_variables(self.minio_id)
         
     def _set_io_folder_variables(self, provider_id):
         self.add_function_environment_variable("STORAGE_PATH_INPUT_{}".format(provider_id), self.minio.get_input_bucket_name())
