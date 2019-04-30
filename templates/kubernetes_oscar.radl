@@ -34,12 +34,12 @@ system front (
   disk.0.applications contains (name = 'ansible.modules.grycap.im') and
   disk.1.type='standard' and
   disk.1.size=20GB and
-  disk.1.device='sdf' and
+  disk.1.device='vdf' and
   disk.1.fstype='ext4' and
   disk.1.mount_path='/pv/minio' and
   disk.2.type='standard' and
   disk.2.size=20GB and
-  disk.2.device='sdg' and
+  disk.2.device='vdg' and
   disk.2.fstype='ext4' and
   disk.2.mount_path='/pv/registry'
 )
