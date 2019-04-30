@@ -51,6 +51,8 @@ class OnPremises(Commands):
     @utils.lazy_property
     def minio(self):
         logger.debug("Initializing Minio client")
+        if not hasattr(self, 'minio_id'):
+            self.minio_id = self._get_storage_provider_id('MINIO')
         minio = MinioClient(self.function_args, self.minio_id)
         return minio
 
