@@ -59,6 +59,8 @@ class OnPremises(Commands):
     @utils.lazy_property
     def onedata(self):
         logger.debug("Initializing Onedata client")
+        if not hasattr(self, 'onedata_id'):
+            self.onedata_id = self._get_storage_provider_id('ONEDATA')
         onedata = OnedataClient(self.function_args, self.onedata_id)
         return onedata 
     
@@ -78,7 +80,7 @@ class OnPremises(Commands):
         if function_args:
             logger.debug("Function creation arguments received: {}".format(function_args))
         self.function_args = function_args if function_args else {}
-        self.get_function_environment_variables()
+        self._get_function_environment_variables()
     
     def init(self):
         function_exists, response = self.openfaas.is_function_created()
@@ -110,6 +112,7 @@ class OnPremises(Commands):
         # Onedata stuff
         if self._is_onedata_defined():
             logger.info('Creating Onedata folders')
+            self._set_onedata_variables()
             self._create_onedata_folders()
             logger.info('Creating OneTrigger deployment')
             self.onedata.deploy_onetrigger(self.kubernetes)
@@ -179,7 +182,7 @@ class OnPremises(Commands):
         else:
             self.function_args["envVars"] = { key: value }
 
-    def get_function_environment_variables(self):
+    def _get_function_environment_variables(self):
         if 'envVars' not in self.function_args or len(self.function_args['envVars']) == 0:
             if 'name' in self.function_args:
                 deploy_envvars = self.kubernetes.get_deployment_envvars(self.function_args['name'], 'openfaas-fn')
@@ -198,15 +201,10 @@ class OnPremises(Commands):
         self.minio.create_output_bucket()
 
     def _is_onedata_defined(self):
-        # Check if variables are defined in the function creation (without storage id...)
-        # or in the remove function process.
-        # In the first case would be needed to generate a new storage id and update 
-        # variable names and values with the new definition before 'check_connection()'
         if 'envVars' in self.function_args:
-            self.onedata_id = self._get_storage_provider_id('ONEDATA')
-            if self.onedata_id and 'STORAGE_AUTH_ONEDATA_{}_HOST'.format(self.onedata_id) in self.function_args['envVars'] and \
-               'STORAGE_AUTH_ONEDATA_{}_TOKEN'.format(self.onedata_id) in self.function_args['envVars'] and \
-               'STORAGE_AUTH_ONEDATA_{}_SPACE'.format(self.onedata_id) in self.function_args['envVars']:
+            if 'ONEPROVIDER_HOST' in self.function_args['envVars'] and \
+               'ONEDATA_ACCESS_TOKEN' in self.function_args['envVars'] and \
+               'ONEDATA_SPACE' in self.function_args['envVars']:
                 return self.onedata.check_connection()
         return False
 
@@ -240,7 +238,14 @@ class OnPremises(Commands):
         self.add_function_environment_variable("STORAGE_AUTH_MINIO_{}_USER".format(self.minio_id), self.minio.get_access_key())
         self.add_function_environment_variable("STORAGE_AUTH_MINIO_{}_PASS".format(self.minio_id), self.minio.get_secret_key())
         self._set_io_folder_variables(self.minio_id)
-        
+
+    def _set_onedata_variables(self):
+        self.onedata_id = random.randint(1,1000001)
+        self.add_function_environment_variable("STORAGE_AUTH_ONEDATA_{}_HOST".format(self.onedata_id), self.onedata.get_oneprovider_host())
+        self.add_function_environment_variable("STORAGE_AUTH_ONEDATA_{}_TOKEN".format(self.onedata_id), self.onedata.get_onedata_access_token())
+        self.add_function_environment_variable("STORAGE_AUTH_ONEDATA_{}_SPACE".format(self.onedata_id), self.onedata.get_onedata_space())
+        self._set_io_folder_variables(self.onedata_id)
+
     def _set_io_folder_variables(self, provider_id):
         self.add_function_environment_variable("STORAGE_PATH_INPUT_{}".format(provider_id), self.minio.get_input_bucket_name())
         self.add_function_environment_variable("STORAGE_PATH_OUTPUT_{}".format(provider_id), self.minio.get_output_bucket_name())        
