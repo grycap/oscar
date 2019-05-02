@@ -20,8 +20,11 @@ class MinioClient():
     
     def __init__(self, function_args, minio_id):
         self.function_name = function_args['name']
-        if minio_id and 'envVars' in function_args and 'STORAGE_PATH_OUTPUT_'.format(minio_id) in function_args['envVars']:    
-            self.output_bucket = function_args['envVars']['STORAGE_PATH_OUTPUT_'.format(minio_id)]
+        if minio_id and 'envVars' in function_args:
+            if 'STORAGE_PATH_OUTPUT_{}'.format(minio_id) in function_args['envVars']:    
+                self.output_bucket = function_args['envVars']['STORAGE_PATH_OUTPUT_{}'.format(minio_id)]
+            elif 'OUTPUT_BUCKET' in function_args['envVars']:
+                self.output_bucket = function_args['envVars']['OUTPUT_BUCKET']
         self.access_key = utils.get_environment_variable("MINIO_USER")
         self.secret_key = utils.get_environment_variable("MINIO_PASS")
         self.client = minio.Minio(utils.get_environment_variable("MINIO_ENDPOINT"),
