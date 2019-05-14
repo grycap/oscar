@@ -28,7 +28,9 @@ class OnedataClient():
         self.function_name = function_args['name']
         self.onedata_id = onedata_id
         self.endpoint = utils.get_environment_variable("OPENFAAS_ENDPOINT")
-        if 'envVars' in function_args and 'OUTPUT_BUCKET' in function_args['envVars']:    
+        onetrigger_version = utils.get_environment_variable("ONETRIGGER_VERSION")
+        self.onetrigger_version = 'latest' if not onetrigger_version else onetrigger_version
+        if 'envVars' in function_args and 'OUTPUT_BUCKET' in function_args['envVars']:
             self.output_bucket = function_args['envVars']['OUTPUT_BUCKET'].strip('/ ')
         self.oneprovider_host = function_args['envVars']['ONEPROVIDER_HOST']
         self.onedata_access_token = function_args['envVars']['ONEDATA_ACCESS_TOKEN']
@@ -152,7 +154,7 @@ class OnedataClient():
                         'containers': [
                             {
                                 'name': 'onetrigger',
-                                'image': 'grycap/onetrigger:latest',
+                                'image': 'grycap/onetrigger:{0}'.format(self.onetrigger_version),
                                 'imagePullPolicy': 'Always',
                                 'env': [
                                     {
