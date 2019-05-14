@@ -92,6 +92,7 @@ configure front (
       master_deploy: true
       faas_chart_version: 3.3.0
       cli_version: 0.8.11
+      oscar_worker_version: 1.2.0
 
     - role: 'grycap.kubeminio'
       enable_notifications: true
