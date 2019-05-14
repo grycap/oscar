@@ -110,9 +110,10 @@ configure front (
       minio_pass: '{{ minio_secret }}'
       vue_app_backend_host: '{{ hostvars[groups["front"][0]]["IM_NODE_PUBLIC_IP"] }}:{{ nginx_https_nodeport }}'
       master_deploy: true
-      oscar_version: 1.1.0
+      oscar_version: 1.1.1
       oscar_ui_version: 1.0.0
       supervisor_version: 1.0.5
+      onetrigger_version: 1.0.3
 
     - role: 'grycap.im'
 
