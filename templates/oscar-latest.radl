@@ -85,6 +85,7 @@ configure front (
       - {namespace : "minio", name : "pvnfsminio", label : "minio", capacity_storage : "20Gi", nfs_path : "/pv/minio"}
       - {namespace : "docker-registry", name : "pvnfsregistry", label : "registry", capacity_storage : "20Gi", nfs_path : "/pv/registry"}
       - {namespace : "oscar", name : "pvnfskanikobuilds", label : "oscar-manager", capacity_storage : "2Gi", nfs_path : "/pv/kaniko-builds"}
+      kube_version: 'latest'
 
     - role: 'grycap.kubefaas'
       faas_framework: 'openfaas'
@@ -151,6 +152,7 @@ configure wn (
     - role: 'grycap.kubernetes'
       kube_type_of_node: 'wn'
       kube_server: 'kubeserver'
+      kube_version: 'latest'
 
     - role: 'grycap.kuberegistry'
       public_access: false

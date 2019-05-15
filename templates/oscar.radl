@@ -1,0 +1,175 @@
+
+description kubernetes (
+    kind = 'main' and
+    short = 'Install and configure a cluster using the grycap.kubernetes ansible role and install all needed services to run OSCAR.' and
+    content = 'The template installs the grycap.kubernetes ansible role. Initially the template creates as many working node hostnames as the sum of the values of feature "ec3_max_instances_max" in every system.
+
+Webpage: https://kubernetes.io/'
+)
+
+network public (
+  # kubernetes ports
+  outbound = 'yes' and
+  outports contains '443/tcp,22/tcp,6443/tcp,31112/tcp,32112/tcp,31852/tcp,8800/tcp'
+)
+
+network private ()
+
+system front (
+  cpu.count>=2 and
+  memory.size>=4096m and
+  net_interface.0.connection = 'private' and
+  net_interface.0.dns_name = 'kubeserver' and
+  net_interface.1.connection = 'public' and
+  net_interface.1.dns_name = 'kubeserverpublic' and
+  queue_system = 'kubernetes' and
+  ec3_templates contains 'kubernetes_oscar' and
+  disk.0.applications contains (name = 'ansible.modules.grycap.kubernetes') and
+  disk.0.applications contains (name = 'ansible.modules.grycap.nfs') and
+  disk.0.applications contains (name = 'ansible.modules.grycap.kubefaas') and
+  disk.0.applications contains (name = 'ansible.modules.grycap.kubeminio') and
+  disk.0.applications contains (name = 'ansible.modules.grycap.kuberegistry') and
+  disk.0.applications contains (name = 'ansible.modules.grycap.kubeoscar') and
+  disk.0.applications contains (name = 'ansible.modules.grycap.clues') and
+  disk.0.applications contains (name = 'ansible.modules.grycap.im') and
+  disk.1.type='standard' and
+  disk.1.size=20GB and
+  disk.1.device='vdf' and
+  disk.1.fstype='ext4' and
+  disk.1.mount_path='/pv/minio' and
+  disk.2.type='standard' and
+  disk.2.size=20GB and
+  disk.2.device='vdg' and
+  disk.2.fstype='ext4' and
+  disk.2.mount_path='/pv/registry'
+)
+
+configure front (
+@begin
+---
+  - vars:
+      AUTH:
+        ec3_xpath: /system/front/auth
+      SYSTEMS:
+        ec3_jpath: /system/*
+      NNODES: '{{ SYSTEMS | selectattr("ec3_max_instances_max", "defined") | sum(attribute="ec3_max_instances_max") }}'
+
+    pre_tasks:
+    - name: Create dir for kaniko builds
+      file: path=/pv/kaniko-builds state=directory mode=755
+    - name: Create auth file dir
+      file: path=/etc/kubernetes/pki state=directory mode=755 recurse=yes
+    - name: Create auth data file with an admin user
+      copy: content='{{ lookup('password', '/var/tmp/dashboard_token chars=ascii_lowercase,digits length=16') }},kubeuser,100,"users,system:masters"' dest=/etc/kubernetes/pki/auth mode=600
+    - name: Generate minio secret key
+      set_fact:
+        minio_secret: "{{ lookup('password', '/var/tmp/minio_secret_key chars=ascii_letters,digits') }}"
+
+    roles:
+    - role: 'grycap.nfs'
+      nfs_mode: 'front'
+      nfs_exports:
+      - {path: "/pv/minio", export: "*.localdomain(rw,async,no_root_squash,no_subtree_check,insecure)"}
+      - {path: "/pv/registry", export: "*.localdomain(rw,async,no_root_squash,no_subtree_check,insecure)"}
+      - {path: "/pv/kaniko-builds", export: "*.localdomain(rw,async,no_root_squash,no_subtree_check,insecure)"}
+
+    - role: 'grycap.kubernetes'
+      kube_server: 'kubeserver'
+      kube_apiserver_options:
+      - {option: "--insecure-port", value: "8080"}
+      - {option: "--token-auth-file", value: "/etc/kubernetes/pki/auth"}
+      - {option: "--service-node-port-range", value: "80-32767"}
+      kube_deploy_dashboard: true
+      kube_install_metrics: true
+      kube_persistent_volumes:
+      - {namespace : "minio", name : "pvnfsminio", label : "minio", capacity_storage : "20Gi", nfs_path : "/pv/minio"}
+      - {namespace : "docker-registry", name : "pvnfsregistry", label : "registry", capacity_storage : "20Gi", nfs_path : "/pv/registry"}
+      - {namespace : "oscar", name : "pvnfskanikobuilds", label : "oscar-manager", capacity_storage : "2Gi", nfs_path : "/pv/kaniko-builds"}
+      kube_version: 1.13.6
+
+    - role: 'grycap.kubefaas'
+      faas_framework: 'openfaas'
+      master_deploy: true
+      faas_chart_version: 3.3.0
+      cli_version: 0.8.11
+      oscar_worker_version: 1.2.0
+
+    - role: 'grycap.kubeminio'
+      enable_notifications: true
+      webhook_endpoints: [{ id: "1", endpoint: "http://oscar-manager.oscar:8080/events"}]
+      minio_secretkey: '{{ minio_secret }}'
+      master_deploy: true
+
+    - role: 'grycap.kuberegistry'
+      public_access: false
+      type_of_node: "front"
+      svc_name: "registry.docker-registry"
+      delete_enabled: true
+      master_deploy: true
+
+    - role: 'grycap.kubeoscar'
+      minio_pass: '{{ minio_secret }}'
+      vue_app_backend_host: '{{ hostvars[groups["front"][0]]["IM_NODE_PUBLIC_IP"] }}:{{ nginx_https_nodeport }}'
+      master_deploy: true
+      oscar_version: 1.1.1
+      oscar_ui_version: 1.0.0
+      supervisor_version: 1.0.5
+      onetrigger_version: 1.0.3
+
+    - role: 'grycap.im'
+
+    - role: 'grycap.clues'
+      auth: '{{AUTH}}'
+      clues_queue_system: kubernetes
+      max_number_of_nodes: '{{ NNODES }}'
+      vnode_prefix: 'wn'
+      clues_config_options:
+          - { section: 'scheduling', option: 'IDLE_TIME', value: '300' }
+          - { section: 'scheduling', option: 'RECONSIDER_JOB_TIME', value: '60' }
+          - { section: 'monitoring', option: 'MAX_WAIT_POWERON', value: '3000' }
+          - { section: 'monitoring', option: 'MAX_WAIT_POWEROFF', value: '600' }
+          - { section: 'monitoring', option: 'PERIOD_LIFECYCLE', value: '10' }
+          - { section: 'monitoring', option: 'PERIOD_MONITORING_NODES', value: '2' }
+          - { section: 'client', option: 'CLUES_REQUEST_WAIT_TIMEOUT', value: '3000' }
+          # These options enable to have always one slot free
+          - { section: 'scheduling', option: 'SCHEDULER_CLASSES', value: 'clueslib.schedulers.CLUES_Scheduler_PowOn_Requests, clueslib.schedulers.CLUES_Scheduler_Reconsider_Jobs, clueslib.schedulers.CLUES_Scheduler_PowOff_IDLE, clueslib.schedulers.CLUES_Scheduler_PowOn_Free' }
+          - { section: 'scheduling', option: 'EXTRA_SLOTS_FREE', value: '1' }
+
+@end
+)
+
+system wn (
+  cpu.count>=2 and
+  memory.size>=4096m and
+  ec3_node_type = 'wn' and
+  net_interface.0.connection='private'
+)
+
+configure wn (
+@begin
+---
+  - roles:
+    - role: 'grycap.nfs'
+      nfs_mode: 'wn'
+      nfs_client_imports:
+      - {local: "/pv/minio", remote: "/pv/minio", server_host: "kubeserver.localdomain"}
+      - {local: "/pv/registry", remote: "/pv/registry", server_host: "kubeserver.localdomain"}
+      - {local: "/pv/kaniko-builds", remote: "/pv/kaniko-builds", server_host: "kubeserver.localdomain"}
+
+    - role: 'grycap.kubernetes'
+      kube_type_of_node: 'wn'
+      kube_server: 'kubeserver'
+      kube_version: 1.13.6
+
+    - role: 'grycap.kuberegistry'
+      public_access: false
+      type_of_node: "wn"
+      svc_name: "registry.docker-registry"
+@end
+)
+
+include kube_misc (
+  template = 'openports'
+)
+
+deploy front 1
