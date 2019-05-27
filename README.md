@@ -53,4 +53,9 @@ license text.
 
 ## Acknowledgements
 
-This development is partially funded by the [EGI Strategic and Innovation Fund](https://www.egi.eu/about/egi-council/egi-strategic-and-innovation-fund/).
+This development is partially funded by the [EGI Strategic and Innovation Fund](https://www.egi.eu/about/egi-council/egi-strategic-and-innovation-fund/). 
+
+Please acknowledge the use of OSCAR by citing the following scientific publication ([preprint available](https://www.grycap.upv.es/gmolto/publications/preprints/Perez2019osc.pdf)):
+```
+A. Pérez, S. Risco, D. M. Naranjo, M. Caballer, and G. Moltó, “Serverless Computing for Event-Driven Data Processing Applications,” in 2019 IEEE International Conference on Cloud Computing (CLOUD 2019), 2019.
+```
