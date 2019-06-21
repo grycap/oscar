@@ -13,7 +13,7 @@ The installation details can be found `here <https://ec3.readthedocs.io/en/lates
 ::
 
   cd ec3
-  wget -P templates https://raw.githubusercontent.com/grycap/oscar/master/templates/kubernetes_oscar.radl
+  wget -P templates https://raw.githubusercontent.com/grycap/oscar/master/templates/oscar.radl
 
 3. Create an ``auth.txt`` `authorization file <https://ec3.readthedocs.io/en/devel/ec3.html#authorization-file>`_ with valid credentials to access your Cloud provider.  
 As an example, to deploy on an OpenNebula-based Cloud site the contents of the file would be:
