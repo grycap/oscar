@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import src.utils as utils
 import os
 import time
-import logging
 import requests
+import src.logger as logger
+import src.utils as utils
+
 
 class KubernetesClient():
 
@@ -46,81 +47,115 @@ class KubernetesClient():
 
     def create_job(self, definition, name, namespace):
         jobs_path = self.jobs_path.format(namespace)
-        url = 'https://{0}:{1}{2}'.format(self.kubernetes_service_host, self.kubernetes_service_port, jobs_path)
+        url = 'https://{0}:{1}{2}'.format(self.kubernetes_service_host,
+                                          self.kubernetes_service_port,
+                                          jobs_path)
         try:
-            r = requests.post(url, json=definition, verify=self.cert_verify, headers=self.auth_header)
+            r = requests.post(url,
+                              json=definition,
+                              verify=self.cert_verify,
+                              headers=self.auth_header)
             if r.status_code not in [200, 201, 202]:
-                raise Exception("Error creating job {0} - {1}\n{2}".format(name, str(r.status_code), str(r.content)))
+                raise Exception(f'Error creating job {name} - {str(r.status_code)}\n{str(r.content)}')
         except Exception as e:
-            logging.error(e)
+            logger.error(e)
 
     def delete_job(self, name, namespace):
         jobs_path = self.jobs_path.format(namespace)
-        url = 'https://{0}:{1}{2}/{3}'.format(self.kubernetes_service_host, self.kubernetes_service_port, jobs_path, name)
+        url = 'https://{0}:{1}{2}/{3}'.format(self.kubernetes_service_host,
+                                              self.kubernetes_service_port,
+                                              jobs_path,
+                                              name)
         params = {'propagationPolicy': 'Background'}
         try:
-            r = requests.delete(url, verify=self.cert_verify, headers=self.auth_header, params=params)
+            r = requests.delete(url,
+                                verify=self.cert_verify,
+                                headers=self.auth_header,
+                                params=params)
             if r.status_code not in [200, 202]:
-                raise Exception("Error deleting {0} - {1}\n{2}".format(name, str(r.status_code), str(r.content)))
+                raise Exception(f'Error deleting {name} - {str(r.status_code)}\n{str(r.content)}')
         except Exception as e:
-            logging.error(e)
+            logger.error(e)
 
     def wait_job(self, name, namespace, delete=False, sleep=5):
         jobs_path = self.jobs_path.format(namespace)
-        url = 'https://{0}:{1}{2}/{3}'.format(self.kubernetes_service_host, self.kubernetes_service_port, jobs_path, name)
+        url = 'https://{0}:{1}{2}/{3}'.format(self.kubernetes_service_host,
+                                              self.kubernetes_service_port,
+                                              jobs_path,
+                                              name)
         while True:
             try:
-                r = requests.get(url, verify=self.cert_verify, headers=self.auth_header)
+                r = requests.get(url,
+                                 verify=self.cert_verify,
+                                 headers=self.auth_header)
                 if r.status_code != 200:
-                    raise Exception('Error obtaining {0} info - {1}\n{2}'.format(name, str(r.status_code), str(r.content)))
+                    raise Exception(f'Error obtaining {name} info - {str(r.status_code)}\n{str(r.content)}')
                 job = r.json()
-                if utils.is_value_in_dict(job['status'], 'succeeded') and utils.is_value_in_dict(job['spec'], 'completions'):
+                if (utils.is_value_in_dict(job['status'], 'succeeded') and
+                        utils.is_value_in_dict(job['spec'], 'completions')):
                     if job['status']['succeeded'] >= job['spec']['completions']:
                         # Delete succeeded jobs if delete=True
-                        if delete: self.delete_job(name, namespace)
+                        if delete:
+                            self.delete_job(name, namespace)
                         break
-                if utils.is_value_in_dict(job['status'], 'failed') and utils.is_value_in_dict(job['spec'], 'backoffLimit'):
+                if (utils.is_value_in_dict(job['status'], 'failed') and
+                        utils.is_value_in_dict(job['spec'], 'backoffLimit')):
                     if job['status']['failed'] >= job['spec']['backoffLimit']:
-                        logging.error('{0} failed! See pod logs for details'.format(name))
+                        logger.error(f'{name} failed! See pod logs for details')
                         break
                 time.sleep(sleep)
             except Exception as e:
-                logging.error(e)
+                logger.error(e)
                 break
 
     def create_deployment(self, definition, name, namespace):
         deployments_path = self.deployments_path.format(namespace)
-        url = 'https://{0}:{1}{2}'.format(self.kubernetes_service_host, self.kubernetes_service_port, deployments_path)
+        url = 'https://{0}:{1}{2}'.format(self.kubernetes_service_host,
+                                          self.kubernetes_service_port,
+                                          deployments_path)
         try:
-            r = requests.post(url, json=definition, verify=self.cert_verify, headers=self.auth_header)
+            r = requests.post(url,
+                              json=definition,
+                              verify=self.cert_verify,
+                              headers=self.auth_header)
             if r.status_code not in [200, 201, 202]:
-                raise Exception('Error creating deployment {0} - {1}\n{2}'.format(name, str(r.status_code), str(r.content)))
+                raise Exception(f'Error creating deployment {name} - {str(r.status_code)}\n{str(r.content)}')
         except Exception as e:
-            logging.error(e)
+            logger.error(e)
 
     def delete_deployment(self, name, namespace):
         deployments_path = self.deployments_path.format(namespace)
-        url = 'https://{0}:{1}{2}/{3}'.format(self.kubernetes_service_host, self.kubernetes_service_port, deployments_path, name)
+        url = 'https://{0}:{1}{2}/{3}'.format(self.kubernetes_service_host,
+                                              self.kubernetes_service_port,
+                                              deployments_path,
+                                              name)
         try:
-            r = requests.delete(url, verify=self.cert_verify, headers=self.auth_header)
+            r = requests.delete(url,
+                                verify=self.cert_verify,
+                                headers=self.auth_header)
             if r.status_code not in [200, 202]:
-                raise Exception("Error deleting {0} - {1}\n{2}".format(name, str(r.status_code), str(r.content)))
+                raise Exception(f'Error deleting {name} - {str(r.status_code)}\n{str(r.content)}')
         except Exception as e:
-            logging.error(e)
+            logger.error(e)
 
     def get_deployment_envvars(self, name, namespace):
         deployments_path = self.deployments_path.format(namespace)
-        url = 'https://{0}:{1}{2}/{3}'.format(self.kubernetes_service_host, self.kubernetes_service_port, deployments_path, name)
+        url = 'https://{0}:{1}{2}/{3}'.format(self.kubernetes_service_host,
+                                              self.kubernetes_service_port,
+                                              deployments_path,
+                                              name)
         try:
-            r = requests.get(url, verify=self.cert_verify, headers=self.auth_header)
+            r = requests.get(url,
+                             verify=self.cert_verify,
+                             headers=self.auth_header)
             if r.status_code != 200:
-                raise Exception('Error reading deployment {0} - {1}\n{2}'.format(name, str(r.status_code), str(r.content)))
+                raise Exception(f'Error reading deployment {name} - {str(r.status_code)}\n{str(r.content)}')
             deploy = r.json()
             if len(deploy['spec']['template']['spec']['containers']) > 1:
-                logging.warning('The function have more than one container. Getting environment variables from the first one')
+                logger.warning('The function have more than one container. Getting environment variables from container 0')
             container_info = deploy['spec']['template']['spec']['containers'][0]
             envvars = container_info['env'] if 'env' in container_info else []
             return envvars
         except Exception as e:
-            logging.error(e)
+            logger.error(e)
             return []

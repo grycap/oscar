@@ -14,4 +14,4 @@
 # limitations under the License.
 
 
-__all__ = ['kaniko', 'minio','openfaas', 'onedata', 'kubernetes']
+__all__ = ['kaniko', 'minio', 'openfaas', 'onedata', 'kubernetes']
