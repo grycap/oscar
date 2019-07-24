@@ -1,6 +1,6 @@
 # Radiomics with Keras and TF
 
-Use-case about the handling of RHD through image computing and Artificial Intelligence (AI).
+Use-case about the handling of Rheumatic Heart Disease (RHD) through image computing and Artificial Intelligence (AI).
 
 Example from the [ATMOSPHERE Project](https://www.atmosphere-eubrazil.eu/). Cloned from: https://github.com/eubr-atmosphere/radiomics.
 
@@ -19,8 +19,9 @@ Log in into the OSCAR UI using the [Default Service Endpoints](https://o-scar.re
 ## STEP 3: Create the Function
 
 You will use the following information:
- * Docker image: [grycap/oscar-radiomics](https://hub.docker.com/r/grycap/oscar-radiomics)
- * Script: The `user-script.sh` file in this directory in charge of processing the image.
+
+* Docker image: [grycap/oscar-radiomics](https://hub.docker.com/r/grycap/oscar-radiomics)
+* Script: The `user-script.sh` file in this directory in charge of processing the image.
 
 Create a new function and specify the aforementioned details:
 
@@ -50,7 +51,7 @@ Upload videos to the input bucket created. You have to select the video first an
 
 ## STEP 6: Download results
 
-The processed file will be automatically uploaded to the output bucket. When the execution is finished you can download all the generated files as a zip file. First you have to select all the generated files by clicking in '*Rows per page: All*' and then you can select all the files by clicking on the checkbox of the header row and then clicking in the button *DOWNLOAD ALL AS A ZIP* like in the following image:
+The processed file will be automatically uploaded to the output bucket. When the execution is finished you can download all the generated files as a zip. First you have to select all the generated files by clicking in '*Rows per page: All*' and then you can select all the files by clicking on the checkbox of the header row and then clicking in the button *DOWNLOAD ALL AS A ZIP* like in the following image:
 
 ![oscar-output-bucket.png](img/oscar-output-bucket.png)
 
@@ -60,7 +61,7 @@ Now you can visualize the result of each video opening the *.txt* output file. M
 
 ## STEP 7: Remove the Function
 
-Once you have finished you have to delete the function:
+Once you have finished you can delete the function:
 
 ![oscar-delete-function.png](img/oscar-delete-function.png)
 
