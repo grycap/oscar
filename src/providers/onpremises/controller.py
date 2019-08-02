@@ -228,21 +228,19 @@ class OnPremises(Commands):
         """Reads the global variables to get the provider's id.
         Variable schema:  STORAGE_AUTH_$1_$2_$3
         $1: MINIO | S3 | ONEDATA
-        $2: STORAGE_ID (Specified in the function definition file, is unique
+        $2: USER | PASS | TOKEN | SPACE | HOST
+        $3: STORAGE_ID (Specified in the function definition file, is unique
             for each storage defined)
-        $3: USER | PASS | TOKEN | SPACE | HOST
 
-        e.g.: STORAGE_AUTH_MINIO_12345_USER"""
+        e.g.: STORAGE_AUTH_MINIO_USER_12345"""
         for envvar in self.function_args['envVars']:
             if envvar.startswith(f'STORAGE_AUTH_{storage_provider}_'):
                 """The provider_id can be composed by several fields but it's
-                always between the position [3:-1]
+                always between the position [4]
                 e.g.:
-                  - 'STORAGE_AUTH_MINIO_123_456_USER' ->
-                        ['STORAGE', 'AUTH', 'MINIO', '123', '456', 'USER']
                   - 'STORAGE_AUTH_MINIO_123-456_USER' ->
-                        ['STORAGE', 'AUTH', 'MINIO', '123-456', 'USER']"""
-                return '_'.join(envvar.split('_')[3:-1])
+                        ['STORAGE', 'AUTH', 'MINIO', 'USER', '123-456']"""
+                return envvar.split('_', 4)[4]
 
     def _create_onedata_folders(self):
         self.onedata.create_input_folder()
@@ -252,23 +250,23 @@ class OnPremises(Commands):
     def _set_minio_variables(self):
         self.minio_id = random.randint(1, 1000001)
         self.add_function_environment_variable(
-            f'STORAGE_AUTH_MINIO_{self.minio_id}_USER',
+            f'STORAGE_AUTH_MINIO_USER_{self.minio_id}',
             self.minio.get_access_key())
         self.add_function_environment_variable(
-            f'STORAGE_AUTH_MINIO_{self.minio_id}_PASS',
+            f'STORAGE_AUTH_MINIO_PASS_{self.minio_id}',
             self.minio.get_secret_key())
         self._set_io_folder_variables(self.minio_id)
 
     def _set_onedata_variables(self):
         self.onedata_id = random.randint(1, 1000001)
         self.add_function_environment_variable(
-            f'STORAGE_AUTH_ONEDATA_{self.onedata_id}_HOST',
+            f'STORAGE_AUTH_ONEDATA_HOST_{self.onedata_id}',
             self.onedata.get_oneprovider_host())
         self.add_function_environment_variable(
-            f'STORAGE_AUTH_ONEDATA_{self.onedata_id}_TOKEN',
+            f'STORAGE_AUTH_ONEDATA_TOKEN_{self.onedata_id}',
             self.onedata.get_onedata_access_token())
         self.add_function_environment_variable(
-            f'STORAGE_AUTH_ONEDATA_{self.onedata_id}_SPACE',
+            f'STORAGE_AUTH_ONEDATA_SPACE_{self.onedata_id}',
             self.onedata.get_onedata_space())
         self._set_io_folder_variables(self.onedata_id)
 
