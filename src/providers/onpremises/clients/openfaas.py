@@ -29,9 +29,8 @@ class OpenFaasClient():
 
     def __init__(self, function_args):
         self.endpoint = utils.get_environment_variable('OPENFAAS_ENDPOINT')
-        self.openfaas_envvars = {'SCRIPT': function_args['script'],
+        self.openfaas_envvars = {'read_timeout': '90',
                                 #{'sprocess': '/tmp/user_script.sh',
-                                 'read_timeout': '90',
                                  'write_timeout': '90'}
         self.openfaas_labels = {'com.openfaas.scale.zero': 'true'}
         self.set_function_args(function_args)
@@ -55,6 +54,9 @@ class OpenFaasClient():
             self.function_args['labels'] = self.openfaas_labels
         else:
             self.function_args['labels'].update(self.openfaas_labels)
+        # Set SCRIPT environment variable
+        if 'script' in self.function_args:
+            self.function_args['envVars']['SCRIPT'] = self.function_args['script']
 
     def get_functions_info(self, json_response=False):
         url = f'{self.endpoint}/{self.functions_path}'
