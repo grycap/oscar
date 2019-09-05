@@ -55,8 +55,8 @@ class OpenFaasClient():
         else:
             self.function_args['labels'].update(self.openfaas_labels)
         # Set SCRIPT environment variable
-        if 'script' in self.function_args:
-            self.function_args['envVars']['SCRIPT'] = self.function_args['script']
+        if 'script' in function_args:
+            self.function_args['envVars']['SCRIPT'] = function_args['script']
 
     def get_functions_info(self, json_response=False):
         url = f'{self.endpoint}/{self.functions_path}'
