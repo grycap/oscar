@@ -29,7 +29,8 @@ class OpenFaasClient():
 
     def __init__(self, function_args):
         self.endpoint = utils.get_environment_variable('OPENFAAS_ENDPOINT')
-        self.openfaas_envvars = {'sprocess': '/tmp/user_script.sh',
+        self.openfaas_envvars = {'SCRIPT': function_args['script'],
+                                #{'sprocess': '/tmp/user_script.sh',
                                  'read_timeout': '90',
                                  'write_timeout': '90'}
         self.openfaas_labels = {'com.openfaas.scale.zero': 'true'}
