@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import src.utils as utils
-import logging
 import requests
+import src.logger as logger
+import src.utils as utils
+
 
 class OnedataClient():
 
@@ -23,14 +24,16 @@ class OnedataClient():
     cdmi_path = '/cdmi/'
     cdmi_version_header = {'X-CDMI-Specification-Version': '1.1.1'}
     cdmi_container_header = {'Content-Type': 'application/cdmi-container'}
-    
+
     def __init__(self, function_args, onedata_id):
         self.function_name = function_args['name']
         self.onedata_id = onedata_id
-        self.endpoint = utils.get_environment_variable("OPENFAAS_ENDPOINT")
-        onetrigger_version = utils.get_environment_variable("ONETRIGGER_VERSION")
-        self.onetrigger_version = 'latest' if not onetrigger_version else onetrigger_version
-        if 'envVars' in function_args and 'OUTPUT_BUCKET' in function_args['envVars']:
+        self.endpoint = utils.get_environment_variable('OPENFAAS_ENDPOINT')
+        self.onetrigger_version = utils.get_environment_variable('ONETRIGGER_VERSION')
+        if not self.onetrigger_version:
+            self.onetrigger_version = 'latest'
+        if ('envVars' in function_args and
+                'OUTPUT_BUCKET' in function_args['envVars']):
             self.output_bucket = function_args['envVars']['OUTPUT_BUCKET'].strip('/ ')
         self.oneprovider_host = function_args['envVars']['ONEPROVIDER_HOST']
         self.onedata_access_token = function_args['envVars']['ONEDATA_ACCESS_TOKEN']
@@ -41,12 +44,12 @@ class OnedataClient():
         return {'X-Auth-Token': self.onedata_access_token}
 
     def check_connection(self):
-        if self.oneprovider_host in [None, ''] or \
-           self.onedata_access_token in [None, ''] or \
-           self.onedata_space in [None, '']:
+        if (self.oneprovider_host in [None, ''] or
+                self.onedata_access_token in [None, ''] or
+                self.onedata_space in [None, '']):
             return False
         else:
-            url = 'https://{0}/api/v3/oneprovider/spaces'.format(self.oneprovider_host)
+            url = f'https://{self.oneprovider_host}/api/v3/oneprovider/spaces'
             try:
                 r = requests.get(url, headers=self.onedata_auth_header)
                 if r.status_code == 200:
@@ -57,14 +60,16 @@ class OnedataClient():
                 elif r.status_code == 401:
                     raise Exception('The provided Onedata access token is not valid. Skipping Onedata configuration.')
                 else:
-                    raise Exception('Error: {0} - {1}'.format(r.text, r.status_code))
+                    raise Exception(f'Error: {r.text} - {r.status_code}')
             except Exception as e:
-                logging.error(e)
+                logger.error(e)
                 return False
 
     def folder_exists(self, folder_name):
         folder_name = '{0}/'.format(folder_name.strip('/ '))
-        url = 'https://{0}{1}{2}?children'.format(self.oneprovider_host, self.cdmi_path, self.onedata_space)
+        url = 'https://{0}{1}{2}?children'.format(self.oneprovider_host,
+                                                  self.cdmi_path,
+                                                  self.onedata_space)
         headers = {**self.cdmi_version_header, **self.onedata_auth_header}
         try:
             r = requests.get(url, headers=headers)
@@ -72,56 +77,68 @@ class OnedataClient():
                 if folder_name in r.json()['children']:
                     return True
         except Exception as e:
-            logging.warning('Cannot check if folder "{0}" exists. Error: {1}'.format(folder_name, e))
+            logger.warning(f'Cannot check if folder "{folder_name}" exists. Error: {e}')
             return False
         return False
 
     def create_input_folder(self):
-        self._create_folder('{0}-in'.format(self.function_name))
+        self._create_folder(f'{self.function_name}-in')
 
     def create_output_folder(self):
         if not hasattr(self, 'output_bucket'):
-            self._create_folder('{0}-out'.format(self.function_name))
+            self._create_folder(f'{self.function_name}-out')
 
     def _create_folder(self, folder_name):
-        url = 'https://{0}{1}{2}/{3}/'.format(self.oneprovider_host, self.cdmi_path, self.onedata_space, folder_name)
-        headers = {**self.cdmi_version_header, **self.cdmi_container_header, **self.onedata_auth_header}
+        url = 'https://{0}{1}{2}/{3}/'.format(self.oneprovider_host,
+                                              self.cdmi_path,
+                                              self.onedata_space,
+                                              folder_name)
+        headers = {
+            **self.cdmi_version_header,
+            **self.cdmi_container_header,
+            **self.onedata_auth_header
+        }
         try:
             r = requests.put(url, headers=headers)
             if r.status_code in [201, 202]:
-                logging.info('Folder "{0}" created successfully in space "{1}"'.format(folder_name, self.onedata_space))
+                logger.info(f'Folder "{folder_name}" created successfully in space "{self.onedata_space}"')
             else:
                 raise Exception(r.status_code)
         except Exception as e:
-            logging.warning('Unable to create folder "{0}". Error: {1}'.format(folder_name, e))
+            logger.warning(f'Unable to create folder "{folder_name}". Error: {e}')
 
     def delete_input_folder(self):
-        self.delete_folder('{0}-in'.format(self.function_name))
+        self.delete_folder(f'{self.function_name}-in')
 
     def delete_output_folder(self):
-        self.delete_folder('{0}-out'.format(self.function_name))                    
+        self.delete_folder(f'{self.function_name}-out')
 
     def delete_folder(self, folder_name):
-        url = 'https://{0}{1}{2}/{3}/'.format(self.oneprovider_host, self.cdmi_path, self.onedata_space, folder_name)
+        url = 'https://{0}{1}{2}/{3}/'.format(self.oneprovider_host,
+                                              self.cdmi_path,
+                                              self.onedata_space,
+                                              folder_name)
         headers = {**self.cdmi_version_header, **self.onedata_auth_header}
         try:
             r = requests.delete(url, headers=headers)
             if r.status_code == 204:
-                logging.info('Folder "{0}" deleted successfully in space "{1}"'.format(folder_name, self.onedata_space))
+                logger.info(f'Folder "{folder_name}" deleted successfully in space "{self.onedata_space}"')
             else:
                 raise Exception(r.status_code)
         except Exception as e:
-            logging.warning('Unable to delete folder "{0}". Error: {1}'.format(folder_name, e))
+            logger.warning(f'Unable to delete folder "{folder_name}". Error: {e}')
 
     def get_output_bucket_name(self):
-        return self.output_bucket if hasattr(self, 'output_bucket') else '{0}-out'.format(self.function_name)
-    
+        if hasattr(self, 'output_bucket'):
+            return self.output_bucket
+        return f'{self.function_name}-out'
+
     def get_oneprovider_host(self):
         return self.oneprovider_host
 
     def get_onedata_access_token(self):
         return self.onedata_access_token
-    
+
     def get_onedata_space(self):
         return self.onedata_space
 
@@ -131,30 +148,30 @@ class OnedataClient():
             'apiVersion': 'apps/v1',
             'kind': 'Deployment',
             'metadata': {
-                'name': '{0}-onetrigger'.format(self.function_name),
+                'name': f'{self.function_name}-onetrigger',
                 'namespace': self.namespace,
                 'labels': {
-                    'app': '{0}-onetrigger'.format(self.function_name)
+                    'app': f'{self.function_name}-onetrigger'
                 }
             },
             'spec': {
                 'selector': {
                     'matchLabels': {
-                        'app': '{0}-onetrigger'.format(self.function_name)
+                        'app': f'{self.function_name}-onetrigger'
                     }
                 },
                 'replicas': 1,
                 'template': {
                     'metadata': {
                         'labels': {
-                            'app': '{0}-onetrigger'.format(self.function_name)
+                            'app': f'{self.function_name}-onetrigger'
                         }
                     },
                     'spec': {
                         'containers': [
                             {
                                 'name': 'onetrigger',
-                                'image': 'grycap/onetrigger:{0}'.format(self.onetrigger_version),
+                                'image': f'grycap/onetrigger:{self.onetrigger_version}',
                                 'imagePullPolicy': 'Always',
                                 'env': [
                                     {
@@ -171,11 +188,11 @@ class OnedataClient():
                                     },
                                     {
                                         'name': 'ONEDATA_SPACE_FOLDER',
-                                        'value': '{0}-in'.format(self.function_name)
+                                        'value': f'{self.function_name}-in'
                                     },
                                     {
                                         'name': 'ONETRIGGER_WEBHOOK',
-                                        'value': '{0}/async-function/{1}'.format(self.endpoint, self.function_name)
+                                        'value': f'{self.endpoint}/async-function/{self.function_name}'
                                     }
                                 ]
                             }
@@ -184,7 +201,11 @@ class OnedataClient():
                 }
             }
         }
-        kubernetes_client.create_deployment(deploy, self.function_name, self.namespace)
+        kubernetes_client.create_deployment(deploy,
+                                            self.function_name,
+                                            self.namespace)
 
     def delete_onetrigger_deploy(self, kubernetes_client):
-        kubernetes_client.delete_deployment('{0}-onetrigger'.format(self.function_name), self.namespace)
+        kubernetes_client.delete_deployment(
+            f'{self.function_name}-onetrigger',
+            self.namespace)
