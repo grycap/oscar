@@ -20,8 +20,8 @@
 # -- Project information -----------------------------------------------------
 
 project = 'oscar'
-copyright = '2018, Alfonso Perez, Sebas Risco, German Molto'
-author = 'Alfonso Perez, Sebas Risco, German Molto'
+copyright = '2018, Sebas Risco, Alfonso Perez, Diana M. Naranjo, German Molto'
+author = 'Sebas Risco, Alfonso Perez, Diana M. Naranjo, German Molto'
 
 # The short X.Y version
 version = ''
@@ -129,8 +129,8 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'oscar.tex', 'oscar Documentation',
-     'Alfonso Perez, Sebas Risco, German Molto', 'manual'),
+    (master_doc, 'oscar.tex', 'OSCAR Documentation',
+     'Sebas Risco, Alfonso Perez, Diana M. Naranjo, German Molto', 'manual'),
 ]
 
 
@@ -139,7 +139,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'oscar', 'oscar Documentation',
+    (master_doc, 'oscar', 'OSCAR Documentation',
      [author], 1)
 ]
 
@@ -150,7 +150,7 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'oscar', 'oscar Documentation',
+    (master_doc, 'oscar', 'OSCAR Documentation',
      author, 'oscar', 'One line description of project.',
      'Miscellaneous'),
 ]
