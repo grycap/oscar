@@ -20,16 +20,19 @@ import src.utils as utils
 
 class KanikoClient():
 
-    namespace = 'kaniko-builds'
+    namespace = 'oscar'
 
     def __init__(self, function_args):
         self.registry_name = utils.get_environment_variable("DOCKER_REGISTRY")
         self.function_args = function_args
-        self.function_image_folder = utils.join_paths(
+        self.function_image_folder = utils.get_random_uuid4_str()
+        self.function_image_path = utils.join_paths(
             '/pv/kaniko-builds',
-            utils.get_random_uuid4_str())
+            self.function_image_folder)
         self.root_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
-        self.job_name = '{0}-build-job'.format(function_args['name'])
+        self.job_name = '{0}-build'.format(function_args['name'])
+        self.registry_image_id = '{0}/{1}'.format(self.registry_name,
+                                                  self.function_args['name'])
 
     def _copy_dockerfile(self):
         # Get function Dockerfile paths
@@ -40,7 +43,7 @@ class KanikoClient():
                                                 'function_template',
                                                 'Dockerfile')
         func_dockerfile_dest_path = utils.join_paths(
-            self.function_image_folder,
+            self.function_image_path,
             'Dockerfile')
         # Modify Dockerfile
         with open(func_dockerfile_path, 'r') as f_in:
@@ -55,28 +58,28 @@ class KanikoClient():
         utils.download_github_asset('openfaas',
                                     'faas',
                                     'fwatchdog',
-                                    self.function_image_folder)
-        fwatchdog_path = os.path.join(self.function_image_folder, 'fwatchdog')
+                                    self.function_image_path)
+        fwatchdog_path = os.path.join(self.function_image_path, 'fwatchdog')
         fwatchdog_st = os.stat(fwatchdog_path)
         os.chmod(fwatchdog_path, fwatchdog_st.st_mode | stat.S_IEXEC)
         # Download faas-supervisor binary and set exec permissions
         release = utils.get_environment_variable('SUPERVISOR_VERSION')
-        utils.download_github_asset('grycap', 
+        utils.download_github_asset('grycap',
                                     'faas-supervisor',
                                     'supervisor',
-                                    self.function_image_folder,
+                                    self.function_image_path,
                                     release=release)
-        supervisor_path = os.path.join(self.function_image_folder, 'supervisor')
+        supervisor_path = os.path.join(self.function_image_path, 'supervisor')
         supervisor_st = os.stat(supervisor_path)
         os.chmod(supervisor_path, supervisor_st.st_mode | stat.S_IEXEC)
 
     def _copy_user_script(self):
         utils.create_file_with_content(
-            utils.join_paths(self.function_image_folder, 'user_script.sh'),
+            utils.join_paths(self.function_image_path, 'user_script.sh'),
             utils.base64_to_utf8_string(self.function_args['script']))
 
     def _copy_required_files(self):
-        os.makedirs(self.function_image_folder, exist_ok=True)
+        os.makedirs(self.function_image_path, exist_ok=True)
         # Get function Dockerfile paths
         self._copy_dockerfile()
         # Download required binaries
@@ -86,12 +89,10 @@ class KanikoClient():
 
     def _delete_image_files(self):
         # Delete all the temporal files created for the image creation
-        utils.delete_folder(self.function_image_folder)
+        utils.delete_folder(self.function_image_path)
 
     def _create_kaniko_job_definition(self):
-        self.registry_image_id = '{0}/{1}'.format(self.registry_name,
-                                                  self.function_args['name'])
-        job = {
+        return {
             'apiVersion': 'batch/v1',
             'kind': 'Job',
             'metadata': {
@@ -122,7 +123,8 @@ class KanikoClient():
                                 'volumeMounts': [
                                     {
                                         'name': 'build-context',
-                                        'mountPath': '/workspace'
+                                        'mountPath': '/workspace',
+                                        'subPath': self.function_image_folder
                                     }
                                 ]
                             }
@@ -131,9 +133,8 @@ class KanikoClient():
                         'volumes': [
                             {
                                 'name': 'build-context',
-                                'hostPath': {
-                                    'path': self.function_image_folder,
-                                    'type': 'Directory'
+                                'persistentVolumeClaim': {
+                                    'claimName': 'oscar-pv-claim'
                                 }
                             }
                         ]
@@ -141,7 +142,6 @@ class KanikoClient():
                 }
             }
         }
-        return job
 
     def create_and_push_docker_image(self, kubernetes_client):
         # Copy/create function required files
