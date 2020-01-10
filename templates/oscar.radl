@@ -1,5 +1,4 @@
-
-description kubernetes (
+description oscar (
     kind = 'main' and
     short = 'Install and configure a cluster using the grycap.kubernetes ansible role and install all needed services to run OSCAR.' and
     content = 'The template installs the grycap.kubernetes ansible role. Initially the template creates as many working node hostnames as the sum of the values of feature "ec3_max_instances_max" in every system.
@@ -10,7 +9,7 @@ Webpage: https://kubernetes.io/'
 network public (
   # kubernetes ports
   outbound = 'yes' and
-  outports contains '443/tcp,22/tcp,6443/tcp,31112/tcp,32112/tcp,31852/tcp,8800/tcp'
+  outports contains '80/tcp,443/tcp,22/tcp,6443/tcp,31112/tcp,32112/tcp,31852/tcp,8800/tcp'
 )
 
 network private ()
@@ -33,15 +32,10 @@ system front (
   disk.0.applications contains (name = 'ansible.modules.grycap.clues') and
   disk.0.applications contains (name = 'ansible.modules.grycap.im') and
   disk.1.type='standard' and
-  disk.1.size=20GB and
+  disk.1.size=50GB and
   disk.1.device='vdf' and
   disk.1.fstype='ext4' and
-  disk.1.mount_path='/pv/minio' and
-  disk.2.type='standard' and
-  disk.2.size=20GB and
-  disk.2.device='vdg' and
-  disk.2.fstype='ext4' and
-  disk.2.mount_path='/pv/registry'
+  disk.1.mount_path='/pv'
 )
 
 configure front (
@@ -55,8 +49,6 @@ configure front (
       NNODES: '{{ SYSTEMS | selectattr("ec3_max_instances_max", "defined") | sum(attribute="ec3_max_instances_max") }}'
 
     pre_tasks:
-    - name: Create dir for kaniko builds
-      file: path=/pv/kaniko-builds state=directory mode=755
     - name: Create auth file dir
       file: path=/etc/kubernetes/pki state=directory mode=755 recurse=yes
     - name: Create auth data file with an admin user
@@ -69,9 +61,7 @@ configure front (
     - role: 'grycap.nfs'
       nfs_mode: 'front'
       nfs_exports:
-      - {path: "/pv/minio", export: "*.localdomain(rw,async,no_root_squash,no_subtree_check,insecure)"}
-      - {path: "/pv/registry", export: "*.localdomain(rw,async,no_root_squash,no_subtree_check,insecure)"}
-      - {path: "/pv/kaniko-builds", export: "*.localdomain(rw,async,no_root_squash,no_subtree_check,insecure)"}
+      - {path: "/pv", export: "*.localdomain(rw,async,no_root_squash,no_subtree_check,insecure)"}
 
     - role: 'grycap.kubernetes'
       kube_server: 'kubeserver'
@@ -81,18 +71,15 @@ configure front (
       - {option: "--service-node-port-range", value: "80-32767"}
       kube_deploy_dashboard: true
       kube_install_metrics: true
-      kube_persistent_volumes:
-      - {namespace : "minio", name : "pvnfsminio", label : "minio", capacity_storage : "20Gi", nfs_path : "/pv/minio"}
-      - {namespace : "docker-registry", name : "pvnfsregistry", label : "registry", capacity_storage : "20Gi", nfs_path : "/pv/registry"}
-      - {namespace : "oscar", name : "pvnfskanikobuilds", label : "oscar-manager", capacity_storage : "2Gi", nfs_path : "/pv/kaniko-builds"}
-      kube_version: 1.13.6
+      kube_install_nfs_client: true
+      kube_version: 1.16.4
 
     - role: 'grycap.kubefaas'
       faas_framework: 'openfaas'
       master_deploy: true
-      faas_chart_version: 3.3.0
-      cli_version: 0.8.11
-      oscar_worker_version: 1.2.0
+      faas_chart_version: 5.4.0
+      cli_version: 0.11.3
+      oscar_worker_version: 1.2.1
 
     - role: 'grycap.kubeminio'
       enable_notifications: true
@@ -103,7 +90,6 @@ configure front (
     - role: 'grycap.kuberegistry'
       public_access: false
       type_of_node: "front"
-      svc_name: "registry.docker-registry"
       delete_enabled: true
       master_deploy: true
 
@@ -111,10 +97,10 @@ configure front (
       minio_pass: '{{ minio_secret }}'
       vue_app_backend_host: '{{ hostvars[groups["front"][0]]["IM_NODE_PUBLIC_IP"] }}:{{ nginx_https_nodeport }}'
       master_deploy: true
-      oscar_version: 1.1.1
-      oscar_ui_version: 1.0.0
-      supervisor_version: 1.0.5
-      onetrigger_version: 1.0.3
+      oscar_version: 1.2.0
+      oscar_ui_version: 1.0.1
+      supervisor_version: 1.1.2
+      onetrigger_version: 1.0.4
 
     - role: 'grycap.im'
 
@@ -131,7 +117,7 @@ configure front (
           - { section: 'monitoring', option: 'PERIOD_LIFECYCLE', value: '10' }
           - { section: 'monitoring', option: 'PERIOD_MONITORING_NODES', value: '2' }
           - { section: 'client', option: 'CLUES_REQUEST_WAIT_TIMEOUT', value: '3000' }
-          # These options enable to have always one slot free
+          # These options enable to have always one slot and 1GB of memory free
           - { section: 'scheduling', option: 'SCHEDULER_CLASSES', value: 'clueslib.schedulers.CLUES_Scheduler_PowOn_Requests, clueslib.schedulers.CLUES_Scheduler_Reconsider_Jobs, clueslib.schedulers.CLUES_Scheduler_PowOff_IDLE, clueslib.schedulers.CLUES_Scheduler_PowOn_Free' }
           - { section: 'scheduling', option: 'EXTRA_SLOTS_FREE', value: '1' }
 
@@ -152,19 +138,17 @@ configure wn (
     - role: 'grycap.nfs'
       nfs_mode: 'wn'
       nfs_client_imports:
-      - {local: "/pv/minio", remote: "/pv/minio", server_host: "kubeserver.localdomain"}
-      - {local: "/pv/registry", remote: "/pv/registry", server_host: "kubeserver.localdomain"}
-      - {local: "/pv/kaniko-builds", remote: "/pv/kaniko-builds", server_host: "kubeserver.localdomain"}
+      - {local: "/pv", remote: "/pv", server_host: "kubeserver.localdomain"}
 
     - role: 'grycap.kubernetes'
       kube_type_of_node: 'wn'
       kube_server: 'kubeserver'
-      kube_version: 1.13.6
+      kube_version: 1.16.4
 
     - role: 'grycap.kuberegistry'
       public_access: false
       type_of_node: "wn"
-      svc_name: "registry.docker-registry"
+
 @end
 )
 
