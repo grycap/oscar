@@ -107,10 +107,8 @@ class KanikoClient():
                                 'name': 'build',
                                 'image': 'gcr.io/kaniko-project/executor:latest',
                                 'args': [
-                                    '-c',
-                                    '/workspace/',
-                                    '-d',
-                                    self.registry_image_id,
+                                    '--context=dir:///workspace',
+                                    f'--destination={self.registry_image_id}',
                                     '--skip-tls-verify',
                                     '--skip-tls-verify-pull'
                                 ],
