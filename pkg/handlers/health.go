@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package handlers
 
-// Info represents the system information to be exposed
-type Info struct {
-	Version           string `json:"version"`
-	Arch              string `json:"arch"`
-	KubeVersion       string `json:"kubernetes_version"`
-	ServerlessBackend struct {
-		Name    string `json:"name"`
-		Version string `json:"version"`
-	} `json:"serverless_backend"`
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+// HealthHandler health handler for kubernetes deployment
+func HealthHandler(c *gin.Context) {
+	c.String(http.StatusOK, "Ok")
 }

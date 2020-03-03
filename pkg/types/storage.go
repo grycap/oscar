@@ -40,16 +40,16 @@ type S3Provider struct {
 
 // MinIOProvider stores the credentials of the MinIO storage provider
 type MinIOProvider struct {
-	Endpoint  url.URL `json:"endpoint"`
-	Verify    bool    `json:"verify"`
-	AccessKey string  `json:"access_key"`
-	SecretKey string  `json:"secret_key"`
-	Region    string  `json:"region"`
+	Endpoint  *url.URL `json:"endpoint"`
+	Verify    bool     `json:"verify"`
+	AccessKey string   `json:"access_key"`
+	SecretKey string   `json:"secret_key"`
+	Region    string   `json:"region"`
 }
 
 // OnedataProvider stores the credentials of the Onedata storage provider
 type OnedataProvider struct {
-	OneproviderHost url.URL `json:"oneprovider_host"`
-	Token           string  `json:"token"`
-	Space           string  `json:"space"`
+	OneproviderHost *url.URL `json:"oneprovider_host"`
+	Token           string   `json:"token"`
+	Space           string   `json:"space"`
 }
