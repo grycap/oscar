@@ -44,6 +44,12 @@ type Config struct {
 	// MinIO server endpoint (default: https://minio-service.minio:9000)
 	MinIOEndpoint *url.URL
 
+	// OpenFaaS gateway basic auth user
+	OpenfaasGatewayUsername string
+
+	// OpenFaaS gateway basic auth password
+	OpenfaasGatewayPassword string
+
 	// OpenFaaS gateway endpoint (default: http://gateway.openfaas:8080)
 	OpenfaasGatewayEndpoint *url.URL
 
@@ -55,6 +61,9 @@ type Config struct {
 
 	// Kubernetes namespace for services and jobs (default: oscar)
 	Namespace string
+
+	// Use a Serverless framework to support sync invocations (default: false)
+	EnableServerlessBackend bool
 
 	// Serverless framework used to deploy services (Openfaas | Knative)
 	ServerlessBackend string
@@ -87,6 +96,7 @@ func parseSeconds(s string) (time.Duration, error) {
 
 // ReadConfig reads environment variables to create the OSCAR server configuration
 func ReadConfig() (*Config, error) {
+	// TODO: check if serverless backend is enabled.. if it is check ServerlessBackend names
 	var config Config
 	var err error
 
