@@ -15,11 +15,34 @@
 package types
 
 import (
+	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-const containerName = "oscar-container"
+const (
+	// ContainerName name of the service container
+	ContainerName = "oscar-container"
+
+	// VolumeName name of the volume for mounting the OSCAR PVC
+	VolumeName = "oscar-volume"
+
+	// VolumePath path to mount the OSCAR PVC
+	VolumePath = "/oscar-bin"
+
+	// PVCName name of the OSCAR PVC
+	PVCName = "oscar-pvc"
+
+	// WatchdogName name of the OpenFaaS watchdog binary
+	WatchdogName = "fwatchdog"
+
+	// WatchdogProcess name of the environment variable used by the watchdog to handle requests
+	WatchdogProcess = "fprocess"
+
+	// SupervisorName name of the FaaS Supervisor binary
+	SupervisorName = "supervisor"
+)
 
 // Service represents an OSCAR service following the SCAR Function Definition Language
 type Service struct {
@@ -54,7 +77,6 @@ type Service struct {
 }
 
 // ToPodSpec returns a k8s podSpec from the Service
-// TODO
 func (service *Service) ToPodSpec() (*v1.PodSpec, error) {
 	resources, err := createResources(service)
 	if err != nil {
@@ -64,13 +86,35 @@ func (service *Service) ToPodSpec() (*v1.PodSpec, error) {
 	podSpec := &v1.PodSpec{
 		Containers: []v1.Container{
 			v1.Container{
-				Name:      containerName,
-				Image:     service.Image,
-				Env:       convertEnvVars(service.Environment.Vars),
+				Name:  ContainerName,
+				Image: service.Image,
+				Env:   convertEnvVars(service.Environment.Vars),
+				VolumeMounts: []v1.VolumeMount{
+					v1.VolumeMount{
+						Name:      VolumeName,
+						ReadOnly:  true,
+						MountPath: VolumePath,
+					},
+				},
+				Command:   []string{"/bin/sh", "-c"},
+				Args:      []string{fmt.Sprintf("%s/%s", VolumePath, WatchdogName)},
 				Resources: resources,
 			},
 		},
+		Volumes: []v1.Volume{
+			v1.Volume{
+				Name: VolumeName,
+				VolumeSource: v1.VolumeSource{
+					PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+						ClaimName: PVCName,
+					},
+				},
+			},
+		},
 	}
+
+	// Add the required environment variables for the watchdog
+	addWatchdogEnvVars(podSpec)
 
 	return podSpec, nil
 }
@@ -108,4 +152,35 @@ func createResources(service *Service) (v1.ResourceRequirements, error) {
 	}
 
 	return resources, nil
+}
+
+func addWatchdogEnvVars(p *v1.PodSpec) {
+	requiredEnvVars := []v1.EnvVar{
+		// Use FaaS Supervisor to handle requests
+		v1.EnvVar{
+			Name:  WatchdogProcess,
+			Value: fmt.Sprintf("%s/%s", VolumePath, SupervisorName),
+		},
+		// Other OpenFaaS Watchdog options
+		// https://github.com/openfaas/faas/tree/master/watchdog
+		// TODO: This should be configurable
+		v1.EnvVar{
+			Name:  "max_inflight",
+			Value: "1",
+		},
+		v1.EnvVar{
+			Name:  "write_debug",
+			Value: "true",
+		},
+		v1.EnvVar{
+			Name:  "exec_timeout",
+			Value: "0",
+		},
+	}
+
+	for _, cont := range p.Containers {
+		if cont.Name == ContainerName {
+			cont.Env = append(cont.Env, requiredEnvVars...)
+		}
+	}
 }

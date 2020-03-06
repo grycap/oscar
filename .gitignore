@@ -13,3 +13,12 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+# Other files and folders
+.vscode
+docs/build
+docs/.vscode
+docs/source/_build
+work/
+test/*.zip
+.settings/
