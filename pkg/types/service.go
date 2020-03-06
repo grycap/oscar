@@ -29,7 +29,13 @@ const (
 	VolumeName = "oscar-volume"
 
 	// VolumePath path to mount the OSCAR PVC
-	VolumePath = "/oscar-bin"
+	VolumePath = "/oscar/bin"
+
+	// ConfigVolumeName name of the volume for mounting the service configMap
+	ConfigVolumeName = "oscar-config"
+
+	// ConfigPath path to mount the service configMap
+	ConfigPath = "/oscar/config"
 
 	// PVCName name of the OSCAR PVC
 	PVCName = "oscar-pvc"
@@ -95,6 +101,11 @@ func (service *Service) ToPodSpec() (*v1.PodSpec, error) {
 						ReadOnly:  true,
 						MountPath: VolumePath,
 					},
+					v1.VolumeMount{
+						Name:      ConfigVolumeName,
+						ReadOnly:  true,
+						MountPath: ConfigPath,
+					},
 				},
 				Command:   []string{"/bin/sh", "-c"},
 				Args:      []string{fmt.Sprintf("%s/%s", VolumePath, WatchdogName)},
@@ -107,6 +118,16 @@ func (service *Service) ToPodSpec() (*v1.PodSpec, error) {
 				VolumeSource: v1.VolumeSource{
 					PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
 						ClaimName: PVCName,
+					},
+				},
+			},
+			v1.Volume{
+				Name: ConfigVolumeName,
+				VolumeSource: v1.VolumeSource{
+					ConfigMap: &v1.ConfigMapVolumeSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: service.Name,
+						},
 					},
 				},
 			},
