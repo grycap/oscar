@@ -15,9 +15,7 @@
 package types
 
 import (
-	"github.com/grycap/oscar/pkg/backends"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 // ServerlessBackend define an interface for different serverless backends
@@ -29,20 +27,4 @@ type ServerlessBackend interface {
 	ReadService(name, namespace string) (*Service, error)
 	UpdateService(service Service) error
 	DeleteService(name, namespace string) error
-}
-
-// MakeServerlessBackend creates a new ServerlessBackend based on the configuration
-func MakeServerlessBackend(c *Config, kubeClientset *kubernetes.Clientset) ServerlessBackend {
-	// TODO
-	if c.EnableServerlessBackend {
-		switch c.ServerlessBackend {
-		case "openfaas":
-			//return backends.MakeOpenfaasBackend()
-		case "knative":
-			//return backends.MakeKnativeBackend()
-		}
-	}
-
-	// KubeBackend is the default ServerlessBackend
-	return backends.MakeKubeBackend(kubeClientset)
 }

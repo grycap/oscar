@@ -17,6 +17,7 @@ package types
 import (
 	"fmt"
 
+	"github.com/goccy/go-yaml"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -53,32 +54,41 @@ const (
 // Service represents an OSCAR service following the SCAR Function Definition Language
 type Service struct {
 	// The name of the service
-	Name string `json:"name"`
+	Name string `json:"name" binding:"required"`
 
 	// Memory limit for the service following the kubernetes format
 	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
+	// Optional. (default: 256Mi)
 	Memory string `json:"memory"`
 
 	// CPU limit for the service following the kubernetes format
 	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
+	// Optional. (default: 0.2)
 	CPU string `json:"cpu"`
 
+	// Log level for the FaaS Supervisor
+	// Optional. (default: INFO)
+	LogLevel string `json:"log_level"`
+
 	// Docker image for the service
-	Image string `json:"image"`
+	Image string `json:"image" binding:"required"`
 
 	// StorageIOConfig slices with the input and ouput service configuration
+	// Optional
 	Input  []StorageIOConfig `json:"input"`
 	Output []StorageIOConfig `json:"output"`
 
 	// The user script to execute when the service is invoked
-	Script string `json:"script"`
+	Script string `json:"script" binding:"required"`
 
 	// The user-defined environment variables assigned to the service
+	// Optional
 	Environment struct {
 		Vars map[string]string `json:"Variables"`
 	} `json:"environment"`
 
 	// Configuration for the storage providers used by the service
+	// Optional. (default: MinIOProvider with the server's config credentials)
 	StorageProviders *StorageProviders `json:"storage_providers"`
 }
 
@@ -138,6 +148,15 @@ func (service *Service) ToPodSpec() (*v1.PodSpec, error) {
 	addWatchdogEnvVars(podSpec)
 
 	return podSpec, nil
+}
+
+// ToYAML returns the service as a Function Definition Language YAML
+func (service *Service) ToYAML() (string, error) {
+	bytes, err := yaml.Marshal(service)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
 }
 
 func convertEnvVars(vars map[string]string) []v1.EnvVar {
