@@ -28,6 +28,9 @@ const (
 	defaultMinIOEndpoint           = "https://minio-service.minio:9000"
 	defaultOpenfaasGatewayEndpoint = "http://gateway.openfaas:8080"
 	defaultTimeout                 = time.Duration(300) * time.Second
+	defaultServiceName             = "oscar"
+	defaultServicePort             = 8080
+	defaultNamespace               = "oscar"
 )
 
 // Config stores the configuration for the OSCAR server
@@ -59,8 +62,14 @@ type Config struct {
 	// Basic auth password
 	Password string
 
+	// Kubernetes name for the deployment and service (default: oscar)
+	Name string
+
 	// Kubernetes namespace for services and jobs (default: oscar)
 	Namespace string
+
+	// Port used for the ClusterIP k8s service
+	ServicePort int
 
 	// Use a Serverless framework to support sync invocations (default: false)
 	EnableServerlessBackend bool
