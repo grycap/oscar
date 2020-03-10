@@ -13,3 +13,47 @@
 // limitations under the License.
 
 package main
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/pkg/handlers"
+)
+
+func main() {
+	r := gin.Default()
+
+	// Define system group with basic auth middleware
+	system := r.Group("/system", gin.BasicAuth(gin.Accounts{
+		"admin": "admin",
+	}))
+
+	//system.POST("/service", handlers.MakeCreateHandler())
+
+	// Test Basic auth...
+	system.GET("/info", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "valid user"})
+	})
+
+	r.GET("/health", handlers.HealthHandler)
+
+	r.Run(":8080")
+}
+
+// use something similar on main
+// MakeServerlessBackend creates a new ServerlessBackend based on the configuration
+// func MakeServerlessBackend(c *Config, kubeClientset *kubernetes.Clientset) ServerlessBackend {
+// 	// TODO
+// 	if c.EnableServerlessBackend {
+// 		switch c.ServerlessBackend {
+// 		case "openfaas":
+// 			//return backends.MakeOpenfaasBackend()
+// 		case "knative":
+// 			//return backends.MakeKnativeBackend()
+// 		}
+// 	}
+
+// 	// KubeBackend is the default ServerlessBackend
+// 	return backends.MakeKubeBackend(kubeClientset)
+// }

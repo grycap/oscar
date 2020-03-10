@@ -77,8 +77,8 @@ func MakeMinIOAdminClient(provider *types.MinIOProvider, cfg *types.Config) (*Mi
 	return minIOAdminClient, nil
 }
 
-// RegisterMinIOWebhook registers a new webhook in the MinIO configuration
-func (minIOAdminClient *MinIOAdminClient) RegisterMinIOWebhook(name string) error {
+// RegisterWebhook registers a new webhook in the MinIO configuration
+func (minIOAdminClient *MinIOAdminClient) RegisterWebhook(name string) error {
 	err := minIOAdminClient.adminClient.SetConfigKV(fmt.Sprintf("notify_webhook:%s endpoint=%s/job/%s", name, minIOAdminClient.oscarEndpoint.String(), name))
 	if err != nil {
 		return err
@@ -86,8 +86,8 @@ func (minIOAdminClient *MinIOAdminClient) RegisterMinIOWebhook(name string) erro
 	return nil
 }
 
-// RemoveMinIOWebhook removes an existent webhook in the MinIO configuration
-func (minIOAdminClient *MinIOAdminClient) RemoveMinIOWebhook(name string) error {
+// RemoveWebhook removes an existent webhook in the MinIO configuration
+func (minIOAdminClient *MinIOAdminClient) RemoveWebhook(name string) error {
 	err := minIOAdminClient.adminClient.DelConfigKV(fmt.Sprintf("notify_webhook:%s", name))
 	if err != nil {
 		return err
@@ -95,8 +95,8 @@ func (minIOAdminClient *MinIOAdminClient) RemoveMinIOWebhook(name string) error 
 	return nil
 }
 
-// RestartMinIOServer restarts a MinIO server to apply the configuration changes
-func (minIOAdminClient *MinIOAdminClient) RestartMinIOServer() error {
+// RestartServer restarts a MinIO server to apply the configuration changes
+func (minIOAdminClient *MinIOAdminClient) RestartServer() error {
 	err := minIOAdminClient.adminClient.ServiceRestart()
 	if err != nil {
 		return err

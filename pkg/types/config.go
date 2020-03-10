@@ -26,6 +26,7 @@ import (
 const (
 	defaultMinioTLSVerify          = true
 	defaultMinIOEndpoint           = "https://minio-service.minio:9000"
+	defaultMinIORegion             = "us-east-1"
 	defaultOpenfaasGatewayEndpoint = "http://gateway.openfaas:8080"
 	defaultTimeout                 = time.Duration(300) * time.Second
 	defaultServiceName             = "oscar"

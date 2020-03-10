@@ -13,3 +13,7 @@
 // limitations under the License.
 
 package backends
+
+// KnativeBackend struct to represent a Knative client
+// TODO
+type KnativeBackend struct{}

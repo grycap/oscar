@@ -13,3 +13,17 @@
 // limitations under the License.
 
 package backends
+
+import v1 "k8s.io/api/core/v1"
+
+// TODO
+
+// OpenfaasBackend struct to represent an Openfaas client
+type OpenfaasBackend struct {
+	client string
+}
+
+// GetServicePodSpec returns the podSpec from a OpenFaaS function
+func (*OpenfaasBackend) GetServicePodSpec(name, namespace string) (*v1.PodSpec, error) {
+	return &v1.PodSpec{}, nil
+}

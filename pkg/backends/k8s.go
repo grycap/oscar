@@ -50,7 +50,7 @@ func (k *KubeBackend) GetInfo() *types.ServerlessBackendInfo {
 	return nil
 }
 
-// ListServices returns a slice with all the services registered in the provided namespace
+// ListServices returns a slice with all services registered in the provided namespace
 func (k *KubeBackend) ListServices(namespace string) ([]types.Service, error) {
 	podTemplates, err := k.kubeClientset.CoreV1().PodTemplates(namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -67,7 +67,7 @@ func (k *KubeBackend) ListServices(namespace string) ([]types.Service, error) {
 	return services, nil
 }
 
-// CreateService create a new service as a k8s podTemplate
+// CreateService creates a new service as a k8s podTemplate
 func (k *KubeBackend) CreateService(service types.Service) error {
 
 }
@@ -88,3 +88,8 @@ func (k *KubeBackend) DeleteService(name, namespace string) error {
 }
 
 //func podSpecToService
+
+// ConfigToService embeds the FDL and user-script variables stored in a k8s configMap to the specified service
+func configToService(service *types.Service, kubeClientset *kubernetes.Clientset) error {
+	// TODO
+}
