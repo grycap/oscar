@@ -15,6 +15,10 @@
 package backends
 
 import (
+	"fmt"
+	"log"
+
+	"github.com/goccy/go-yaml"
 	"github.com/grycap/oscar/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,23 +28,25 @@ import (
 // KubeBackend struct to represent a Kubernetes client to store services as podTemplates
 type KubeBackend struct {
 	kubeClientset *kubernetes.Clientset
+	namespace     string
 }
 
 // MakeKubeBackend makes a KubeBackend with the provided k8s clientset
-func MakeKubeBackend(kubeClientset *kubernetes.Clientset) *KubeBackend {
+func MakeKubeBackend(kubeClientset *kubernetes.Clientset, cfg *types.Config) *KubeBackend {
 	return &KubeBackend{
 		kubeClientset: kubeClientset,
+		namespace:     cfg.Namespace,
 	}
 }
 
 // GetServicePodSpec returns a k8s podSpec for the service from the serverless backend
-func (k *KubeBackend) GetServicePodSpec(name, namespace string) (*v1.PodSpec, error) {
-	podTemplate, err := k.kubeClientset.CoreV1().PodTemplates(namespace).Get(name, metav1.GetOptions{})
+func (k *KubeBackend) GetServicePodSpec(name string) (*v1.PodSpec, error) {
+	podTemplate, err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
-	return &podTemplate.Template.Spec, nil
 
+	return &podTemplate.Template.Spec, nil
 }
 
 // GetInfo returns the ServerlessBackendInfo with the name and version
@@ -51,17 +57,22 @@ func (k *KubeBackend) GetInfo() *types.ServerlessBackendInfo {
 }
 
 // ListServices returns a slice with all services registered in the provided namespace
-func (k *KubeBackend) ListServices(namespace string) ([]types.Service, error) {
-	podTemplates, err := k.kubeClientset.CoreV1().PodTemplates(namespace).List(metav1.ListOptions{})
+func (k *KubeBackend) ListServices() ([]*types.Service, error) {
+	// Get the list with all podTemplates
+	podTemplates, err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	services := []types.Service{}
+	services := []*types.Service{}
 	for _, podTemplate := range podTemplates.Items {
-		services = append(services, types.Service{
-			Name: podTemplate.Name,
-		})
+		// Get service from configMap's FDL
+		svc, err := getServiceFromFDL(podTemplate.Name, k.namespace, k.kubeClientset)
+		if err != nil {
+			log.Printf("WARNING: %v/n", err)
+		} else {
+			services = append(services, svc)
+		}
 	}
 
 	return services, nil
@@ -69,27 +80,127 @@ func (k *KubeBackend) ListServices(namespace string) ([]types.Service, error) {
 
 // CreateService creates a new service as a k8s podTemplate
 func (k *KubeBackend) CreateService(service types.Service) error {
+	// Create the configMap with FDL and user-script
+	err := createServiceConfigMap(&service, k.namespace, k.kubeClientset)
+	if err != nil {
+		return err
+	}
 
+	// Create podSpec from the service
+	podSpec, err := service.ToPodSpec()
+	if err != nil {
+		// Delete the previously created configMap
+		if delErr := deleteServiceConfigMap(service.Name, k.namespace, k.kubeClientset); delErr != nil {
+			log.Println(delErr.Error())
+		}
+		return err
+	}
+
+	// Create the podTemplate spec
+	podTemplate := &v1.PodTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      service.Name,
+			Namespace: k.namespace,
+		},
+		Template: v1.PodTemplateSpec{
+			Spec: *podSpec,
+		},
+	}
+	_, err = k.kubeClientset.CoreV1().PodTemplates(k.namespace).Create(podTemplate)
+	if err != nil {
+		// Delete the previously created configMap
+		if delErr := deleteServiceConfigMap(service.Name, k.namespace, k.kubeClientset); delErr != nil {
+			log.Println(delErr.Error())
+		}
+		return err
+	}
+
+	return nil
 }
 
-//
-func (k *KubeBackend) ReadService(name, namespace string) (*types.Service, error) {
+// ReadService returns a Service
+func (k *KubeBackend) ReadService(name string) (*types.Service, error) {
+	// Check if service exists
+	if _, err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).Get(name, metav1.GetOptions{}); err != nil {
+		return nil, err
+	}
 
+	// Get service from configMap's FDL
+	svc, err := getServiceFromFDL(name, k.namespace, k.kubeClientset)
+	if err != nil {
+		return nil, err
+	}
+
+	return svc, nil
 }
 
-//
+// UpdateService updates an existent service
 func (k *KubeBackend) UpdateService(service types.Service) error {
-
-}
-
-//
-func (k *KubeBackend) DeleteService(name, namespace string) error {
-
-}
-
-//func podSpecToService
-
-// ConfigToService embeds the FDL and user-script variables stored in a k8s configMap to the specified service
-func configToService(service *types.Service, kubeClientset *kubernetes.Clientset) error {
 	// TODO
+	return nil
+}
+
+// DeleteService deletes a service
+func (k *KubeBackend) DeleteService(name string) error {
+	if err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).Delete(name, &metav1.DeleteOptions{}); err != nil {
+		return err
+	}
+
+	// Delete the service's configMap
+	if delErr := deleteServiceConfigMap(name, k.namespace, k.kubeClientset); delErr != nil {
+		log.Println(delErr.Error())
+	}
+
+	return nil
+}
+
+func getServiceFromFDL(name string, namespace string, kubeClientset *kubernetes.Clientset) (*types.Service, error) {
+	// Get the configMap of the Service
+	cm, err := kubeClientset.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("The Service \"%s\" does not have a registered ConfigMap", name)
+	}
+	service := &types.Service{}
+
+	// Unmarshal the FDL stored in the configMap
+	if err = yaml.Unmarshal([]byte(cm.Data["function_config.yaml"]), service); err != nil {
+		return nil, fmt.Errorf("The FDL of the Service \"%s\" cannot be read", name)
+	}
+
+	return service, nil
+}
+
+func createServiceConfigMap(service *types.Service, namespace string, kubeClientset *kubernetes.Clientset) error {
+	// Create FDL YAML
+	fdl, err := service.ToYAML()
+	if err != nil {
+		return err
+	}
+
+	// Create ConfigMap
+	cm := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      service.Name,
+			Namespace: namespace,
+		},
+		Data: map[string]string{
+			"script.sh":            service.Script,
+			"function_config.yaml": fdl,
+		},
+	}
+	_, err = kubeClientset.CoreV1().ConfigMaps(namespace).Create(cm)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func deleteServiceConfigMap(name string, namespace string, kubeClientset *kubernetes.Clientset) error {
+	err := kubeClientset.CoreV1().ConfigMaps(namespace).Delete(name, &metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

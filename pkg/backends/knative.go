@@ -14,6 +14,11 @@
 
 package backends
 
-// KnativeBackend struct to represent a Knative client
 // TODO
+
+// TODO: add annotation "serving.knative.dev/visibility=cluster-local"
+// to make all services only cluster-local, the Kn serving component can be configured to use the default domain "svc.cluster.local"
+// https://knative.dev/docs/serving/cluster-local-route/
+
+// KnativeBackend struct to represent a Knative client
 type KnativeBackend struct{}

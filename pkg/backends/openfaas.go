@@ -18,6 +18,8 @@ import v1 "k8s.io/api/core/v1"
 
 // TODO
 
+// TODO: add annotation "com.openfaas.scale.zero=true" for scaling to zero
+
 // OpenfaasBackend struct to represent an Openfaas client
 type OpenfaasBackend struct {
 	client string

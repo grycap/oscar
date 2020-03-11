@@ -20,11 +20,11 @@ import (
 
 // ServerlessBackend define an interface for different serverless backends
 type ServerlessBackend interface {
-	GetServicePodSpec(name, namespace string) (*v1.PodSpec, error)
+	GetServicePodSpec(name string) (*v1.PodSpec, error)
 	GetInfo() *ServerlessBackendInfo
-	ListServices(namespace string) ([]Service, error)
+	ListServices() ([]*Service, error)
 	CreateService(service Service) error
-	ReadService(name, namespace string) (*Service, error)
+	ReadService(name string) (*Service, error)
 	UpdateService(service Service) error
-	DeleteService(name, namespace string) error
+	DeleteService(name string) error
 }

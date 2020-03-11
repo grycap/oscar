@@ -25,9 +25,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/pkg/types"
-	"github.com/grycap/oscar/pkg/utils"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -47,79 +44,41 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, b
 		}
 		addDefaultValues(&service, cfg)
 
-		// Create the configMap with FDL and user-script
-		cm, err := createConfigMapSpec(service, cfg.Namespace)
-		if err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service's configMap spec: %v", err))
-			return
-		}
-		_, err = kubeClientset.CoreV1().ConfigMaps(cfg.Namespace).Create(cm)
-		if err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service's configMap: %v", err))
-			return
-		}
-
 		// Create the service
-		if err = back.CreateService(service); err != nil {
-			kubeClientset.CoreV1().ConfigMaps(cfg.Namespace).Delete(service.Name, &metav1.DeleteOptions{})
+		if err := back.CreateService(service); err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 			return
 		}
 
-		// Register minio webhook and restart the server
-		minIOAdminClient, err := utils.MakeMinIOAdminClient(service.StorageProviders.MinIO, cfg)
-		if err != nil {
-			// TODO: refactor this to a func
-			back.DeleteService(service.Name, cfg.Namespace)
-			kubeClientset.CoreV1().ConfigMaps(cfg.Namespace).Delete(service.Name, &metav1.DeleteOptions{})
-			c.String(http.StatusInternalServerError, fmt.Sprintf("The provided MinIO configuration is not valid: %v", err))
-			return
-		}
-		if err = minIOAdminClient.RegisterWebhook(service.Name); err != nil {
-			back.DeleteService(service.Name, cfg.Namespace)
-			kubeClientset.CoreV1().ConfigMaps(cfg.Namespace).Delete(service.Name, &metav1.DeleteOptions{})
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error registering the service's webhook: %v", err))
-			return
-		}
-		if err = minIOAdminClient.RestartServer(); err != nil {
-			back.DeleteService(service.Name, cfg.Namespace)
-			kubeClientset.CoreV1().ConfigMaps(cfg.Namespace).Delete(service.Name, &metav1.DeleteOptions{})
-			c.String(http.StatusInternalServerError, err.Error())
-			return
-		}
+		// // Register minio webhook and restart the server
+		// minIOAdminClient, err := utils.MakeMinIOAdminClient(service.StorageProviders.MinIO, cfg)
+		// if err != nil {
+		// 	back.DeleteService(service.Name)
+		// 	c.String(http.StatusInternalServerError, fmt.Sprintf("The provided MinIO configuration is not valid: %v", err))
+		// 	return
+		// }
+		// if err := minIOAdminClient.RegisterWebhook(service.Name); err != nil {
+		// 	back.DeleteService(service.Name)
+		// 	c.String(http.StatusInternalServerError, fmt.Sprintf("Error registering the service's webhook: %v", err))
+		// 	return
+		// }
+		// if err := minIOAdminClient.RestartServer(); err != nil {
+		// 	back.DeleteService(service.Name)
+		// 	c.String(http.StatusInternalServerError, err.Error())
+		// 	return
+		// }
 
-		// Create buckets/folders based on the Input []StorageIOConfig
-		if err := createBuckets(service.Input, service.StorageProviders); err != nil {
-			back.DeleteService(service.Name, cfg.Namespace)
-			kubeClientset.CoreV1().ConfigMaps(cfg.Namespace).Delete(service.Name, &metav1.DeleteOptions{})
-			c.String(http.StatusInternalServerError, err.Error())
-			return
-		}
+		// // Create buckets/folders based on the Input []StorageIOConfig
+		// if err := createBuckets(service.Input, service.StorageProviders); err != nil {
+		// 	back.DeleteService(service.Name)
+		// 	c.String(http.StatusInternalServerError, err.Error())
+		// 	return
+		// }
 
 		// TODO: Register S3/Minio notifications based on the Input []StorageIOConfig
 
 		c.Status(http.StatusCreated)
 	}
-}
-
-func createConfigMapSpec(service types.Service, namespace string) (*v1.ConfigMap, error) {
-	fdl, err := service.ToYAML()
-	if err != nil {
-		return nil, err
-	}
-
-	cm := &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      service.Name,
-			Namespace: namespace,
-		},
-		Data: map[string]string{
-			"script.sh":            service.Script,
-			"function_config.yaml": fdl,
-		},
-	}
-
-	return cm, nil
 }
 
 func addDefaultValues(service *types.Service, cfg *types.Config) {
