@@ -48,6 +48,9 @@ type Config struct {
 	// MinIO server endpoint (default: https://minio-service.minio:9000)
 	MinIOEndpoint *url.URL
 
+	// MinIO region
+	MinIORegion string
+
 	// OpenFaaS gateway basic auth user
 	OpenfaasGatewayUsername string
 

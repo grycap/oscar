@@ -34,10 +34,8 @@ type MinIOAdminClient struct {
 // MakeMinIOAdminClient creates a new MinIO Admin client to configure webhook notifications
 func MakeMinIOAdminClient(provider *types.MinIOProvider, cfg *types.Config) (*MinIOAdminClient, error) {
 	// Check if both MinIOProvider and Config minIO endpoints are the same
-	// TODO: allow registering webhooks on external minIO servers
-	// Functionality to retrieve the oscar service/loadbalancer external IP and port/nodeport is required to support it
 	if provider.Endpoint.String() != cfg.MinIOEndpoint.String() {
-		return nil, fmt.Errorf("The provided MinIO server \"%s\" is not the same as the one configured", provider.Endpoint.String())
+		return nil, fmt.Errorf("The provided MinIO server \"%s\" is not the configured in OSCAR", provider.Endpoint.String())
 	}
 
 	// Check URL Scheme for using TLS or not

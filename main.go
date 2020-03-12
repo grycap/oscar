@@ -79,11 +79,11 @@ func main() {
 	}))
 
 	// CRUD Services
-	system.POST("/services", handlers.MakeCreateHandler(cfg, kubeClientset, back))
-	//system.GET("/services", handlers.MakeListHandler(cfg, kubeClientset, back))
-	//system.GET("/services/:serviceName", handlers.MakeReadHandler(cfg, kubeClientset, back))
-	//system.PUT("/services", handlers.MakeUpdateHandler(cfg, kubeClientset, back))
-	//system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, kubeClientset, back))
+	system.POST("/services", handlers.MakeCreateHandler(cfg, back))
+	system.GET("/services", handlers.MakeListHandler(back))
+	//system.GET("/services/:serviceName", handlers.MakeReadHandler(cfg, back))
+	//system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
+	//system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
 
 	// Job path for async invocations
 	//r.POST("/job/:serviceName", handlers.MakeJobHandler(cfg, kubeClientset, back))
