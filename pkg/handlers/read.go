@@ -14,4 +14,23 @@
 
 package handlers
 
-// TODO
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/pkg/types"
+)
+
+// MakeReadHandler makes a handler to read a service
+func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Retrieve services from the back
+		service, err := back.ReadService(c.Param("serviceName"))
+		if err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		c.JSON(http.StatusOK, service)
+	}
+}

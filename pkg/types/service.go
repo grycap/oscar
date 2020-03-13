@@ -49,6 +49,9 @@ const (
 
 	// SupervisorName name of the FaaS Supervisor binary
 	SupervisorName = "supervisor"
+
+	// ServiceLabel label for deploying services in all backs
+	ServiceLabel = "oscar_service"
 )
 
 // Service represents an OSCAR service following the SCAR Function Definition Language

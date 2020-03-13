@@ -81,7 +81,7 @@ func main() {
 	// CRUD Services
 	system.POST("/services", handlers.MakeCreateHandler(cfg, back))
 	system.GET("/services", handlers.MakeListHandler(back))
-	//system.GET("/services/:serviceName", handlers.MakeReadHandler(cfg, back))
+	system.GET("/services/:serviceName", handlers.MakeReadHandler(cfg, back))
 	//system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
 	//system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
 

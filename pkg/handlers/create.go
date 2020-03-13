@@ -16,16 +16,18 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/pkg/types"
-	"k8s.io/client-go/kubernetes"
+	"github.com/grycap/oscar/pkg/utils"
 )
 
 const (
@@ -35,7 +37,7 @@ const (
 )
 
 // MakeCreateHandler makes a handler to create services
-func MakeCreateHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back types.ServerlessBackend) gin.HandlerFunc {
+func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var service types.Service
 		if err := c.ShouldBindJSON(&service); err != nil {
@@ -50,30 +52,19 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, b
 			return
 		}
 
-		// // Register minio webhook and restart the server
-		// minIOAdminClient, err := utils.MakeMinIOAdminClient(service.StorageProviders.MinIO, cfg)
-		// if err != nil {
-		// 	back.DeleteService(service.Name)
-		// 	c.String(http.StatusInternalServerError, fmt.Sprintf("The provided MinIO configuration is not valid: %v", err))
-		// 	return
-		// }
-		// if err := minIOAdminClient.RegisterWebhook(service.Name); err != nil {
-		// 	back.DeleteService(service.Name)
-		// 	c.String(http.StatusInternalServerError, fmt.Sprintf("Error registering the service's webhook: %v", err))
-		// 	return
-		// }
-		// if err := minIOAdminClient.RestartServer(); err != nil {
-		// 	back.DeleteService(service.Name)
-		// 	c.String(http.StatusInternalServerError, err.Error())
-		// 	return
-		// }
+		// Register minio webhook and restart the server
+		if err := configureMinIO(service.Name, service.StorageProviders.MinIO, cfg); err != nil {
+			back.DeleteService(service.Name)
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
 
-		// // Create buckets/folders based on the Input []StorageIOConfig
-		// if err := createBuckets(service.Input, service.StorageProviders); err != nil {
-		// 	back.DeleteService(service.Name)
-		// 	c.String(http.StatusInternalServerError, err.Error())
-		// 	return
-		// }
+		// Create buckets/folders based on the Input and Output
+		if err := createBuckets(service.Input, service.Output, service.StorageProviders); err != nil {
+			back.DeleteService(service.Name)
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
 
 		// TODO: Register S3/Minio notifications based on the Input []StorageIOConfig
 
@@ -107,6 +98,7 @@ func addDefaultValues(service *types.Service, cfg *types.Config) {
 				Verify:    cfg.MinIOTLSVerify,
 				AccessKey: cfg.MinIOAccessKey,
 				SecretKey: cfg.MinIOSecretKey,
+				Region:    cfg.MinIORegion,
 			},
 		}
 	}
@@ -116,14 +108,15 @@ func addDefaultValues(service *types.Service, cfg *types.Config) {
 			Verify:    cfg.MinIOTLSVerify,
 			AccessKey: cfg.MinIOAccessKey,
 			SecretKey: cfg.MinIOSecretKey,
+			Region:    cfg.MinIORegion,
 		}
 	}
 }
 
-func createBuckets(input []types.StorageIOConfig, providers *types.StorageProviders) error {
-	// MinIO
+func createBuckets(input []types.StorageIOConfig, output []types.StorageIOConfig, providers *types.StorageProviders) error {
+	// Create S3 client for MinIO
+	var minIOClient *s3.S3
 	if providers.MinIO != nil {
-		// Create s3 (for MinIO) client
 		s3MinIOConfig := &aws.Config{
 			Credentials:      credentials.NewStaticCredentials(providers.MinIO.AccessKey, providers.MinIO.SecretKey, ""),
 			Endpoint:         aws.String(providers.MinIO.Endpoint.String()),
@@ -132,12 +125,98 @@ func createBuckets(input []types.StorageIOConfig, providers *types.StorageProvid
 			S3ForcePathStyle: aws.Bool(true),
 		}
 		minIOSession := session.New(s3MinIOConfig)
-		minIOClient := s3.New(minIOSession)
-		// TODO: finish
+		minIOClient = s3.New(minIOSession)
 	}
-	// TODO: S3 Support
-	// TODO: Onedata Support (define a CDMI client)
-	// Functionality to retrieve the oscar service/loadbalancer external IP
-	// and port/nodeport is required to support external storage providers
+
+	// Create S3 client for Amazon S3
+	var s3Client *s3.S3
+	if providers.S3 != nil {
+		s3Config := &aws.Config{
+			Credentials: credentials.NewStaticCredentials(providers.S3.AccessKey, providers.S3.SecretKey, ""),
+			Region:      aws.String(providers.S3.Region),
+		}
+		s3Session := session.New(s3Config)
+		s3Client = s3.New(s3Session)
+	}
+
+	// TODO: Onedata support
+
+	// Create input buckets
+	// TODO: finish...
+	for _, in := range input {
+		// Only allow input from MinIO
+		if strings.ToLower(in.Provider) != "minio" {
+			return fmt.Errorf("Only MinIO input allowed")
+		}
+		path := strings.Trim(in.Path, " /")
+		// Split buckets and folders from path
+		splitPath := strings.SplitN(path, "/", 2)
+		// Create bucket
+		_, err := minIOClient.CreateBucket(&s3.CreateBucketInput{
+			Bucket: aws.String(splitPath[0]),
+		})
+		if err != nil {
+			if aerr, ok := err.(awserr.Error); ok {
+				// Check if the error is caused because the bucket already exists
+				if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
+					log.Printf("The bucket \"%s\" already exists\n", splitPath[0])
+				}
+			} else {
+				return err
+			}
+		}
+	}
+
+	// Create output buckets
+	for _, out := range output {
+		path := strings.Trim(out.Path, " /")
+		// Split buckets and folders from path
+		splitPath := strings.SplitN(path, "/", 2)
+
+		switch strings.ToLower(out.Provider) {
+		case "minio":
+			// Create bucket
+			_, err := minIOClient.CreateBucket(&s3.CreateBucketInput{
+				Bucket: aws.String(splitPath[0]),
+			})
+			if err != nil {
+				if aerr, ok := err.(awserr.Error); ok {
+					// Check if the error is caused because the bucket already exists
+					if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
+						log.Printf("The bucket \"%s\" already exists\n", splitPath[0])
+						continue
+					}
+				}
+				return err
+			}
+		case "s3":
+
+		}
+	}
+
+	return nil
+}
+
+func configureMinIO(name string, minIO *types.MinIOProvider, cfg *types.Config) error {
+	minIOAdminClient, err := utils.MakeMinIOAdminClient(minIO, cfg)
+	if err != nil {
+		return fmt.Errorf("The provided MinIO configuration is not valid: %v", err)
+	}
+
+	if err := minIOAdminClient.RegisterWebhook(name); err != nil {
+		return fmt.Errorf("Error registering the service's webhook: %v", err)
+	}
+
+	if err := minIOAdminClient.RestartServer(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Only allow input from MinIO
+func configureInputNotifications(input []types.StorageIOConfig, minIO *types.MinIOProvider) error {
+	// TODO
+
 	return nil
 }

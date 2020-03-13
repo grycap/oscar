@@ -101,6 +101,9 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      service.Name,
 			Namespace: k.namespace,
+			Labels: map[string]string{
+				types.ServiceLabel: service.Name,
+			},
 		},
 		Template: v1.PodTemplateSpec{
 			Spec: *podSpec,
