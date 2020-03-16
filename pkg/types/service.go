@@ -57,7 +57,7 @@ const (
 // Service represents an OSCAR service following the SCAR Function Definition Language
 type Service struct {
 	// The name of the service
-	Name string `json:"name" binding:"required"`
+	Name string `json:"name" binding:"required,max=39,min=1"`
 
 	// Memory limit for the service following the kubernetes format
 	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory

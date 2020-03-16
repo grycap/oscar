@@ -14,4 +14,28 @@
 
 package handlers
 
-// TODO
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/pkg/types"
+	"k8s.io/apimachinery/pkg/api/errors"
+)
+
+// MakeDeleteHandler makes a handler to delete a service
+func MakeDeleteHandler(back types.ServerlessBackend) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		err := back.DeleteService(c.Param("serviceName"))
+		if err != nil {
+			// Check if error is caused because the service is not found
+			if errors.IsNotFound(err) || errors.IsGone(err) {
+				c.Status(http.StatusNotFound)
+			} else {
+				c.String(http.StatusInternalServerError, err.Error())
+			}
+			return
+		}
+
+		c.Status(http.StatusNoContent)
+	}
+}

@@ -24,7 +24,6 @@ import (
 // MakeListHandler makes a handler to list services
 func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Retrieve services from the back
 		services, err := back.ListServices()
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())

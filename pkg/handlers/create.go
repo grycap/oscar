@@ -15,6 +15,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -28,6 +29,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/pkg/types"
 	"github.com/grycap/oscar/pkg/utils"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 const (
@@ -35,6 +37,8 @@ const (
 	defaultCPU      = "0.2"
 	defaultLogLevel = "INFO"
 )
+
+var errNoMinIOInput = errors.New("Only MinIO input allowed")
 
 // MakeCreateHandler makes a handler to create services
 func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
@@ -48,7 +52,12 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Create the service
 		if err := back.CreateService(service); err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+			// Check if error is caused because the service name provided already exists
+			if k8sErrors.IsAlreadyExists(err) {
+				c.String(http.StatusConflict, "A service with the provided name already exists")
+			} else {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+			}
 			return
 		}
 
@@ -61,12 +70,14 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Create buckets/folders based on the Input and Output
 		if err := createBuckets(service.Input, service.Output, service.StorageProviders); err != nil {
+			if err == errNoMinIOInput {
+				c.String(http.StatusBadRequest, err.Error())
+			} else {
+				c.String(http.StatusInternalServerError, err.Error())
+			}
 			back.DeleteService(service.Name)
-			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
-
-		// TODO: Register S3/Minio notifications based on the Input []StorageIOConfig
 
 		c.Status(http.StatusCreated)
 	}
@@ -146,7 +157,7 @@ func createBuckets(input []types.StorageIOConfig, output []types.StorageIOConfig
 	for _, in := range input {
 		// Only allow input from MinIO
 		if strings.ToLower(in.Provider) != "minio" {
-			return fmt.Errorf("Only MinIO input allowed")
+			return errNoMinIOInput
 		}
 		path := strings.Trim(in.Path, " /")
 		// Split buckets and folders from path
@@ -165,6 +176,8 @@ func createBuckets(input []types.StorageIOConfig, output []types.StorageIOConfig
 				return err
 			}
 		}
+		// TODO: Create folder(s)
+		// TODO: Register MinIO notifications based on the Input []StorageIOConfig
 	}
 
 	// Create output buckets
@@ -189,7 +202,20 @@ func createBuckets(input []types.StorageIOConfig, output []types.StorageIOConfig
 				}
 				return err
 			}
+			// TODO: Create folder(s)
+			if len(splitPath) == 2 {
+				// Add "/" to the end of the key in order to create a folder
+				folderKey := fmt.Sprint("%s/", splitPath[1])
+				_, err := minIOClient.PutObject(&s3.PutObjectInput{
+					Bucket: aws.String(splitPath[0]),
+					Key:    aws.String(folderKey),
+				})
+				// TODO: finish...
+			}
 		case "s3":
+			// TODO: Use the same code as for minIO, only change the client...
+			// TODO: Create bucket
+			// TODO: Create folder(s)
 
 		}
 	}
@@ -210,13 +236,6 @@ func configureMinIO(name string, minIO *types.MinIOProvider, cfg *types.Config) 
 	if err := minIOAdminClient.RestartServer(); err != nil {
 		return err
 	}
-
-	return nil
-}
-
-// Only allow input from MinIO
-func configureInputNotifications(input []types.StorageIOConfig, minIO *types.MinIOProvider) error {
-	// TODO
 
 	return nil
 }

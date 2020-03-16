@@ -19,15 +19,20 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/pkg/types"
+	"k8s.io/apimachinery/pkg/api/errors"
 )
 
 // MakeReadHandler makes a handler to read a service
 func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Retrieve services from the back
 		service, err := back.ReadService(c.Param("serviceName"))
 		if err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
+			// Check if error is caused because the service is not found
+			if errors.IsNotFound(err) || errors.IsGone(err) {
+				c.Status(http.StatusNotFound)
+			} else {
+				c.String(http.StatusInternalServerError, err.Error())
+			}
 			return
 		}
 
