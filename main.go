@@ -1,16 +1,18 @@
-// Copyright (C) GRyCAP - I3M - UPV
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+Copyright (C) GRyCAP - I3M - UPV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package main
 
@@ -83,7 +85,13 @@ func main() {
 	system.GET("/services", handlers.MakeListHandler(back))
 	system.GET("/services/:serviceName", handlers.MakeReadHandler(back))
 	//system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
-	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(back))
+	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
+
+	// Logs paths
+	system.GET("/logs/:serviceName", handlers.MakeJobsInfoHandler(kubeClientset, cfg.Namespace))
+	//system.DELETE("/logs/:serviceName", handlers.MakeDeleteJobsHandler(kubeClientset, cfg.Namespace))
+	//system.GET("/logs/:serviceName/:jobName", handlers.MakeGetLogsHandler(kubeClientset, cfg.Namespace))
+	//system.DELETE("/logs/:serviceName/:jobName", handlers.MakeDeleteJobHandler(kubeClientset, cfg.Namespace))
 
 	// Job path for async invocations
 	//r.POST("/job/:serviceName", handlers.MakeJobHandler(cfg, kubeClientset, back))

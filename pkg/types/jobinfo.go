@@ -14,24 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package handlers
+package types
 
-import (
-	"net/http"
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/pkg/types"
-)
-
-// MakeListHandler makes a handler to list services
-func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		services, err := back.ListServices()
-		if err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
-			return
-		}
-
-		c.JSON(http.StatusOK, services)
-	}
+// JobInfo details the current status of a service's job
+type JobInfo struct {
+	Status       string      `json:"status"`
+	CreationTime metav1.Time `json:"creation_time,omitempty"`
+	StartTime    metav1.Time `json:"start_time,omitempty"`
+	FinishTime   metav1.Time `json:"finish_time,omitempty"`
 }

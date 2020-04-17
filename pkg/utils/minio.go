@@ -1,20 +1,23 @@
-// Copyright (C) GRyCAP - I3M - UPV
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+Copyright (C) GRyCAP - I3M - UPV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package utils
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -77,7 +80,7 @@ func MakeMinIOAdminClient(provider *types.MinIOProvider, cfg *types.Config) (*Mi
 
 // RegisterWebhook registers a new webhook in the MinIO configuration
 func (minIOAdminClient *MinIOAdminClient) RegisterWebhook(name string) error {
-	err := minIOAdminClient.adminClient.SetConfigKV(fmt.Sprintf("notify_webhook:%s endpoint=%s/job/%s", name, minIOAdminClient.oscarEndpoint.String(), name))
+	err := minIOAdminClient.adminClient.SetConfigKV(context.TODO(), fmt.Sprintf("notify_webhook:%s endpoint=%s/job/%s", name, minIOAdminClient.oscarEndpoint.String(), name))
 	if err != nil {
 		return err
 	}
@@ -86,7 +89,7 @@ func (minIOAdminClient *MinIOAdminClient) RegisterWebhook(name string) error {
 
 // RemoveWebhook removes an existent webhook in the MinIO configuration
 func (minIOAdminClient *MinIOAdminClient) RemoveWebhook(name string) error {
-	err := minIOAdminClient.adminClient.DelConfigKV(fmt.Sprintf("notify_webhook:%s", name))
+	err := minIOAdminClient.adminClient.DelConfigKV(context.TODO(), fmt.Sprintf("notify_webhook:%s", name))
 	if err != nil {
 		return err
 	}
@@ -95,7 +98,7 @@ func (minIOAdminClient *MinIOAdminClient) RemoveWebhook(name string) error {
 
 // RestartServer restarts a MinIO server to apply the configuration changes
 func (minIOAdminClient *MinIOAdminClient) RestartServer() error {
-	err := minIOAdminClient.adminClient.ServiceRestart()
+	err := minIOAdminClient.adminClient.ServiceRestart(context.TODO())
 	if err != nil {
 		return err
 	}
@@ -105,10 +108,16 @@ func (minIOAdminClient *MinIOAdminClient) RestartServer() error {
 	// receives a restart command.
 	// Sleep for 6 seconds and then check if the server is online.
 	time.Sleep(6 * time.Second)
-	_, err = minIOAdminClient.adminClient.ServerInfo()
+	_, err = minIOAdminClient.adminClient.ServerInfo(context.TODO())
 	if err != nil {
 		return fmt.Errorf("Error restarting the MinIO server: %v", err)
 	}
 
 	return nil
+}
+
+// TODO: add this as a method for an apropiate type (Service?)
+// GetWebhookARN returns the MinIO's notify_webhook ARN for the specified function
+func GetWebhookARN(functionName string, provider *types.MinIOProvider) string {
+	return fmt.Sprintf("arn:minio:sqs:%s:%s:webhook", provider.Region, functionName)
 }

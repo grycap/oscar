@@ -1,16 +1,18 @@
-// Copyright (C) GRyCAP - I3M - UPV
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+Copyright (C) GRyCAP - I3M - UPV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package handlers
 
@@ -50,6 +52,8 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 		addDefaultValues(&service, cfg)
 
+		// TODO: check if storage providers are valid
+
 		// Create the service
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
@@ -62,7 +66,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Register minio webhook and restart the server
-		if err := configureMinIO(service.Name, service.StorageProviders.MinIO, cfg); err != nil {
+		if err := registerMinIOWebhook(service.Name, service.StorageProviders.MinIO, cfg); err != nil {
 			back.DeleteService(service.Name)
 			c.String(http.StatusInternalServerError, err.Error())
 			return
@@ -153,7 +157,6 @@ func createBuckets(input []types.StorageIOConfig, output []types.StorageIOConfig
 	// TODO: Onedata support
 
 	// Create input buckets
-	// TODO: finish...
 	for _, in := range input {
 		// Only allow input from MinIO
 		if strings.ToLower(in.Provider) != "minio" {
@@ -173,10 +176,21 @@ func createBuckets(input []types.StorageIOConfig, output []types.StorageIOConfig
 					log.Printf("The bucket \"%s\" already exists\n", splitPath[0])
 				}
 			} else {
-				return err
+				return fmt.Errorf("Error creating bucket %s: %v", splitPath[0], err)
 			}
 		}
-		// TODO: Create folder(s)
+		// Create folder(s)
+		if len(splitPath) == 2 {
+			// Add "/" to the end of the key in order to create a folder
+			folderKey := fmt.Sprintf("%s/", splitPath[1])
+			_, err := minIOClient.PutObject(&s3.PutObjectInput{
+				Bucket: aws.String(splitPath[0]),
+				Key:    aws.String(folderKey),
+			})
+			if err != nil {
+				return fmt.Errorf("Error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
+			}
+		}
 		// TODO: Register MinIO notifications based on the Input []StorageIOConfig
 	}
 
@@ -186,10 +200,19 @@ func createBuckets(input []types.StorageIOConfig, output []types.StorageIOConfig
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
 
-		switch strings.ToLower(out.Provider) {
-		case "minio":
+		provName := strings.ToLower(out.Provider)
+		switch provName {
+		case "minio", "s3":
+			// Use the appropiate client
+			// TODO: check if the client is not nil too...
+			var client *s3.S3
+			if provName == "minio" {
+				client = minIOClient
+			} else {
+				client = s3Client
+			}
 			// Create bucket
-			_, err := minIOClient.CreateBucket(&s3.CreateBucketInput{
+			_, err := client.CreateBucket(&s3.CreateBucketInput{
 				Bucket: aws.String(splitPath[0]),
 			})
 			if err != nil {
@@ -200,22 +223,23 @@ func createBuckets(input []types.StorageIOConfig, output []types.StorageIOConfig
 						continue
 					}
 				}
-				return err
+				return fmt.Errorf("Error creating bucket %s: %v", splitPath[0], err)
 			}
-			// TODO: Create folder(s)
+			// Create folder(s)
 			if len(splitPath) == 2 {
 				// Add "/" to the end of the key in order to create a folder
-				folderKey := fmt.Sprint("%s/", splitPath[1])
-				_, err := minIOClient.PutObject(&s3.PutObjectInput{
+				folderKey := fmt.Sprintf("%s/", splitPath[1])
+				_, err := client.PutObject(&s3.PutObjectInput{
 					Bucket: aws.String(splitPath[0]),
 					Key:    aws.String(folderKey),
 				})
-				// TODO: finish...
+				if err != nil {
+					return fmt.Errorf("Error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
+				}
 			}
-		case "s3":
-			// TODO: Use the same code as for minIO, only change the client...
-			// TODO: Create bucket
-			// TODO: Create folder(s)
+		// TODO: Onedata support
+		case "onedata":
+			log.Printf("Onedata is not supported yet. Folder \"%s\" has to be created manually", path)
 
 		}
 	}
@@ -223,7 +247,7 @@ func createBuckets(input []types.StorageIOConfig, output []types.StorageIOConfig
 	return nil
 }
 
-func configureMinIO(name string, minIO *types.MinIOProvider, cfg *types.Config) error {
+func registerMinIOWebhook(name string, minIO *types.MinIOProvider, cfg *types.Config) error {
 	minIOAdminClient, err := utils.MakeMinIOAdminClient(minIO, cfg)
 	if err != nil {
 		return fmt.Errorf("The provided MinIO configuration is not valid: %v", err)

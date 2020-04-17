@@ -1,16 +1,18 @@
-// Copyright (C) GRyCAP - I3M - UPV
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+Copyright (C) GRyCAP - I3M - UPV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package types
 
@@ -104,17 +106,17 @@ func (service *Service) ToPodSpec() (*v1.PodSpec, error) {
 
 	podSpec := &v1.PodSpec{
 		Containers: []v1.Container{
-			v1.Container{
+			{
 				Name:  ContainerName,
 				Image: service.Image,
 				Env:   convertEnvVars(service.Environment.Vars),
 				VolumeMounts: []v1.VolumeMount{
-					v1.VolumeMount{
+					{
 						Name:      VolumeName,
 						ReadOnly:  true,
 						MountPath: VolumePath,
 					},
-					v1.VolumeMount{
+					{
 						Name:      ConfigVolumeName,
 						ReadOnly:  true,
 						MountPath: ConfigPath,
@@ -126,7 +128,7 @@ func (service *Service) ToPodSpec() (*v1.PodSpec, error) {
 			},
 		},
 		Volumes: []v1.Volume{
-			v1.Volume{
+			{
 				Name: VolumeName,
 				VolumeSource: v1.VolumeSource{
 					PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
@@ -134,7 +136,7 @@ func (service *Service) ToPodSpec() (*v1.PodSpec, error) {
 					},
 				},
 			},
-			v1.Volume{
+			{
 				Name: ConfigVolumeName,
 				VolumeSource: v1.VolumeSource{
 					ConfigMap: &v1.ConfigMapVolumeSource{
@@ -200,22 +202,22 @@ func createResources(service *Service) (v1.ResourceRequirements, error) {
 func addWatchdogEnvVars(p *v1.PodSpec) {
 	requiredEnvVars := []v1.EnvVar{
 		// Use FaaS Supervisor to handle requests
-		v1.EnvVar{
+		{
 			Name:  WatchdogProcess,
 			Value: fmt.Sprintf("%s/%s", VolumePath, SupervisorName),
 		},
 		// Other OpenFaaS Watchdog options
 		// https://github.com/openfaas/faas/tree/master/watchdog
 		// TODO: This should be configurable
-		v1.EnvVar{
+		{
 			Name:  "max_inflight",
 			Value: "1",
 		},
-		v1.EnvVar{
+		{
 			Name:  "write_debug",
 			Value: "true",
 		},
-		v1.EnvVar{
+		{
 			Name:  "exec_timeout",
 			Value: "0",
 		},
