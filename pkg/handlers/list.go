@@ -23,7 +23,7 @@ import (
 	"github.com/grycap/oscar/pkg/types"
 )
 
-// MakeListHandler makes a handler to list services
+// MakeListHandler makes a handler for listing services
 func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		services, err := back.ListServices()

@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
-// MakeReadHandler makes a handler to read a service
+// MakeReadHandler makes a handler for reading a service
 func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		service, err := back.ReadService(c.Param("serviceName"))

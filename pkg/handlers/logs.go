@@ -20,15 +20,17 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/pkg/types"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
-// MakeJobsInfoHandler list all existing jobs from a service and show their JobInfo
+// MakeJobsInfoHandler makes a handler for listing all existing jobs from a service and show their JobInfo
 func MakeJobsInfoHandler(kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		jobsInfo := make(map[string]*types.JobInfo)
@@ -103,12 +105,55 @@ func MakeDeleteJobsHandler(kubeClientset *kubernetes.Clientset, namespace string
 	}
 }
 
-// MakeGetLogsHandler
-// TODO: get logs for the 'oscar-container' from the specified job's pod
+// MakeGetLogsHandler makes a hander for getting logs from the 'oscar-container' inside the pod created by the specified job
 func MakeGetLogsHandler(kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		//
+		// Get serviceName and jobName
+		serviceName := c.Param("serviceName")
+		jobName := c.Param("jobName")
+		// Get timestamps querystring (default to false)
+		timestamps, err := strconv.ParseBool(c.DefaultQuery("timestamps", "false"))
+		if err != nil {
+			timestamps = false
+		}
 
+		// Get job's pod (assuming there's only one pod per job)
+		listOpts := metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s job-name=%s", types.ServiceLabel, serviceName, jobName),
+		}
+		pods, err := kubeClientset.CoreV1().Pods("oscar-fn").List(context.TODO(), listOpts)
+		if err != nil || len(pods.Items) < 1 {
+			// Check if error is caused because the service is not found
+			if !errors.IsNotFound(err) || !errors.IsGone(err) {
+				c.String(http.StatusInternalServerError, err.Error())
+			} else {
+				c.Status(http.StatusNotFound)
+			}
+			return
+		}
+
+		// Get logs
+		podLogOpts := &v1.PodLogOptions{
+			Timestamps: timestamps,
+			Container:  types.ContainerName,
+		}
+		req := kubeClientset.CoreV1().Pods(namespace).GetLogs(pods.Items[0].Name, podLogOpts)
+		result := req.Do(context.TODO())
+
+		// Check result status code
+		statusCode := new(int)
+		if result.StatusCode(statusCode); *statusCode != 200 {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		logs, err := result.Raw()
+		if err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		c.String(http.StatusOK, string(logs))
 	}
 }
 

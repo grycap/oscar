@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
-// MakeDeleteHandler makes a handler to delete a service
+// MakeDeleteHandler makes a handler for deleting services
 func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// First get the Service

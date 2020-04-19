@@ -42,7 +42,7 @@ const (
 
 var errNoMinIOInput = errors.New("Only MinIO input allowed")
 
-// MakeCreateHandler makes a handler to create services
+// MakeCreateHandler makes a handler for creating services
 func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var service types.Service

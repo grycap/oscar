@@ -115,9 +115,3 @@ func (minIOAdminClient *MinIOAdminClient) RestartServer() error {
 
 	return nil
 }
-
-// TODO: add this as a method for an apropiate type (Service?)
-// GetWebhookARN returns the MinIO's notify_webhook ARN for the specified function
-func GetWebhookARN(functionName string, provider *types.MinIOProvider) string {
-	return fmt.Sprintf("arn:minio:sqs:%s:%s:webhook", provider.Region, functionName)
-}

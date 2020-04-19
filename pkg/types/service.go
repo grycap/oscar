@@ -164,6 +164,11 @@ func (service *Service) ToYAML() (string, error) {
 	return string(bytes), nil
 }
 
+// GetMinIOWebhookARN returns the MinIO's notify_webhook ARN for the specified function
+func (service *Service) GetMinIOWebhookARN() string {
+	return fmt.Sprintf("arn:minio:sqs:%s:%s:webhook", service.StorageProviders.MinIO.Region, service.Name)
+}
+
 func convertEnvVars(vars map[string]string) []v1.EnvVar {
 	envVars := []v1.EnvVar{}
 	for k, v := range vars {

@@ -17,6 +17,7 @@ limitations under the License.
 package backends
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -43,7 +44,7 @@ func MakeKubeBackend(kubeClientset *kubernetes.Clientset, cfg *types.Config) *Ku
 
 // GetServicePodSpec returns a k8s podSpec for the service from the serverless backend
 func (k *KubeBackend) GetServicePodSpec(name string) (*v1.PodSpec, error) {
-	podTemplate, err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).Get(name, metav1.GetOptions{})
+	podTemplate, err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +62,7 @@ func (k *KubeBackend) GetInfo() *types.ServerlessBackendInfo {
 // ListServices returns a slice with all services registered in the provided namespace
 func (k *KubeBackend) ListServices() ([]*types.Service, error) {
 	// Get the list with all podTemplates
-	podTemplates, err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).List(metav1.ListOptions{})
+	podTemplates, err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +112,7 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 			Spec: *podSpec,
 		},
 	}
-	_, err = k.kubeClientset.CoreV1().PodTemplates(k.namespace).Create(podTemplate)
+	_, err = k.kubeClientset.CoreV1().PodTemplates(k.namespace).Create(context.TODO(), podTemplate, metav1.CreateOptions{})
 	if err != nil {
 		// Delete the previously created configMap
 		if delErr := deleteServiceConfigMap(service.Name, k.namespace, k.kubeClientset); delErr != nil {
@@ -126,7 +127,7 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 // ReadService returns a Service
 func (k *KubeBackend) ReadService(name string) (*types.Service, error) {
 	// Check if service exists
-	if _, err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).Get(name, metav1.GetOptions{}); err != nil {
+	if _, err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
 		return nil, err
 	}
 
@@ -147,7 +148,7 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 
 // DeleteService deletes a service
 func (k *KubeBackend) DeleteService(name string) error {
-	if err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).Delete(name, &metav1.DeleteOptions{}); err != nil {
+	if err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		return err
 	}
 
@@ -161,7 +162,7 @@ func (k *KubeBackend) DeleteService(name string) error {
 
 func getServiceFromFDL(name string, namespace string, kubeClientset *kubernetes.Clientset) (*types.Service, error) {
 	// Get the configMap of the Service
-	cm, err := kubeClientset.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+	cm, err := kubeClientset.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("The Service \"%s\" does not have a registered ConfigMap", name)
 	}
@@ -193,7 +194,7 @@ func createServiceConfigMap(service *types.Service, namespace string, kubeClient
 			"function_config.yaml": fdl,
 		},
 	}
-	_, err = kubeClientset.CoreV1().ConfigMaps(namespace).Create(cm)
+	_, err = kubeClientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), cm, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -202,7 +203,7 @@ func createServiceConfigMap(service *types.Service, namespace string, kubeClient
 }
 
 func deleteServiceConfigMap(name string, namespace string, kubeClientset *kubernetes.Clientset) error {
-	err := kubeClientset.CoreV1().ConfigMaps(namespace).Delete(name, &metav1.DeleteOptions{})
+	err := kubeClientset.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		return err
 	}
