@@ -89,9 +89,9 @@ func main() {
 
 	// Logs paths
 	system.GET("/logs/:serviceName", handlers.MakeJobsInfoHandler(kubeClientset, cfg.Namespace))
-	//system.DELETE("/logs/:serviceName", handlers.MakeDeleteJobsHandler(kubeClientset, cfg.Namespace))
+	system.DELETE("/logs/:serviceName", handlers.MakeDeleteJobsHandler(kubeClientset, cfg.Namespace))
 	system.GET("/logs/:serviceName/:jobName", handlers.MakeGetLogsHandler(kubeClientset, cfg.Namespace))
-	//system.DELETE("/logs/:serviceName/:jobName", handlers.MakeDeleteJobHandler(kubeClientset, cfg.Namespace))
+	system.DELETE("/logs/:serviceName/:jobName", handlers.MakeDeleteJobHandler(kubeClientset, cfg.Namespace))
 
 	// Job path for async invocations
 	//r.POST("/job/:serviceName", handlers.MakeJobHandler(cfg, kubeClientset, back))

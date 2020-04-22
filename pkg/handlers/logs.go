@@ -39,11 +39,11 @@ func MakeJobsInfoHandler(kubeClientset *kubernetes.Clientset, namespace string) 
 		serviceName := c.Param("serviceName")
 
 		// List jobs
-		listOpt := metav1.ListOptions{
+		listOpts := metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("%s=%s", types.ServiceLabel, serviceName),
 		}
 
-		jobs, err := kubeClientset.BatchV1().Jobs(namespace).List(context.TODO(), listOpt)
+		jobs, err := kubeClientset.BatchV1().Jobs(namespace).List(context.TODO(), listOpts)
 		if err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {
@@ -64,7 +64,7 @@ func MakeJobsInfoHandler(kubeClientset *kubernetes.Clientset, namespace string) 
 		}
 
 		// List jobs' pods
-		pods, err := kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), listOpt)
+		pods, err := kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), listOpts)
 		if err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {
@@ -97,15 +97,44 @@ func MakeJobsInfoHandler(kubeClientset *kubernetes.Clientset, namespace string) 
 	}
 }
 
-// MakeDeleteJobsHandler
-// TODO: delete all COMPLETED jobs for the provided service name
+// MakeDeleteJobsHandler makes a handler for deleting all jobs created by the provided service.
+// If 'all' querystring is set to 'true' pending, running and failed jobs will also be deleted
 func MakeDeleteJobsHandler(kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Get serviceName and jobName
+		serviceName := c.Param("serviceName")
+		// Get timestamps querystring (default to false)
+		all, err := strconv.ParseBool(c.DefaultQuery("all", "false"))
+		if err != nil {
+			all = false
+		}
 
+		// Delete jobs
+		listOpts := metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s", types.ServiceLabel, serviceName),
+		}
+
+		if !all {
+			// Only delete completed jobs
+			listOpts.FieldSelector = "status.successful!=0"
+		}
+
+		err = kubeClientset.BatchV1().Jobs(namespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, listOpts)
+		if err != nil {
+			// Check if error is caused because the service is not found
+			if !errors.IsNotFound(err) || !errors.IsGone(err) {
+				c.String(http.StatusInternalServerError, err.Error())
+			} else {
+				c.Status(http.StatusNotFound)
+			}
+			return
+		}
+
+		c.Status(http.StatusNoContent)
 	}
 }
 
-// MakeGetLogsHandler makes a hander for getting logs from the 'oscar-container' inside the pod created by the specified job
+// MakeGetLogsHandler makes a handler for getting logs from the 'oscar-container' inside the pod created by the specified job
 func MakeGetLogsHandler(kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get serviceName and jobName
@@ -157,10 +186,43 @@ func MakeGetLogsHandler(kubeClientset *kubernetes.Clientset, namespace string) g
 	}
 }
 
-// MakeDeleteJobHandler
-// TODO: remove the specified Job
+// MakeDeleteJobHandler makes a handler for removing a job
 func MakeDeleteJobHandler(kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Get serviceName and jobName
+		serviceName := c.Param("serviceName")
+		jobName := c.Param("jobName")
 
+		// Get job in order to check if it is associated with the provided serviceName
+		job, err := kubeClientset.BatchV1().Jobs(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
+		if err != nil {
+			// Check if error is caused because the service is not found
+			if !errors.IsNotFound(err) || !errors.IsGone(err) {
+				c.String(http.StatusInternalServerError, err.Error())
+			} else {
+				c.Status(http.StatusNotFound)
+			}
+			return
+		}
+
+		// Return StatusNotFound if job exists but is not associated with the provided serviceName
+		if job.Labels[types.ServiceLabel] != serviceName {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		// Delete the job
+		err = kubeClientset.BatchV1().Jobs(namespace).Delete(context.TODO(), jobName, metav1.DeleteOptions{})
+		if err != nil {
+			// Check if error is caused because the service is not found
+			if !errors.IsNotFound(err) || !errors.IsGone(err) {
+				c.String(http.StatusInternalServerError, err.Error())
+			} else {
+				c.Status(http.StatusNotFound)
+			}
+			return
+		}
+
+		c.Status(http.StatusNoContent)
 	}
 }
