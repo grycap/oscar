@@ -188,6 +188,9 @@ func createServiceConfigMap(service *types.Service, namespace string, kubeClient
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      service.Name,
 			Namespace: namespace,
+			Labels: map[string]string{
+				types.ServiceLabel: service.Name,
+			},
 		},
 		Data: map[string]string{
 			"script.sh":            service.Script,

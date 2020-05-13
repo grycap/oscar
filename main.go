@@ -18,6 +18,8 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"net/http"
 	"os"
 	"path"
 
@@ -57,17 +59,14 @@ func main() {
 
 	// Create the ServerlessBackend based on the configuration
 	var back types.ServerlessBackend
-	if cfg.EnableServerlessBackend {
-		switch cfg.ServerlessBackend {
-		// TODO: Uncomment when backends are implemented
-		// case "openfaas":
-		// 	back = backends.MakeOpenfaasBackend()
-		// case "knative":
-		// 	back = backends.MakeKnativeBackend()
-		default:
-			back = backends.MakeKubeBackend(kubeClientset, cfg)
-		}
-	} else {
+
+	switch cfg.ServerlessBackend {
+	// TODO: Uncomment when backends are implemented
+	// case "openfaas":
+	// 	back = backends.MakeOpenfaasBackend()
+	// case "knative":
+	// 	back = backends.MakeKnativeBackend()
+	default:
 		back = backends.MakeKubeBackend(kubeClientset, cfg)
 	}
 
@@ -94,18 +93,26 @@ func main() {
 	system.DELETE("/logs/:serviceName/:jobName", handlers.MakeDeleteJobHandler(kubeClientset, cfg.Namespace))
 
 	// Job path for async invocations
-	//r.POST("/job/:serviceName", handlers.MakeJobHandler(cfg, kubeClientset, back))
+	r.POST("/job/:serviceName", handlers.MakeJobHandler(cfg, kubeClientset, back))
 
 	// Service path for sync invocations (only if ServerlessBackend is enabled)
-	// if cfg.EnableServerlessBackend {
-	// 	r.GET("/service/:serviceName", handlers.MakeServiceHandler(cfg, kubeClientset, back))
+	// if cfg.ServerlessBackend != "" {
+	// 	r.GET("/service/:serviceName", handlers.MakeServiceHandler(cfg, back))
 	// }
 
 	// System info path
-	//system.GET("/info", handlers.MakeInfoHandler(...))
+	system.GET("/info", handlers.MakeInfoHandler(kubeClientset, back))
 
 	// Health path for k8s health checks
 	r.GET("/health", handlers.HealthHandler)
 
-	r.Run(":8080")
+	// Define and start HTTP server
+	s := &http.Server{
+		Addr:         fmt.Sprintf(":%d", cfg.ServicePort),
+		Handler:      r,
+		WriteTimeout: cfg.WriteTimeout,
+		ReadTimeout:  cfg.ReadTimeout,
+	}
+
+	s.ListenAndServe()
 }

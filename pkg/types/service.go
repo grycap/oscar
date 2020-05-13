@@ -54,6 +54,9 @@ const (
 
 	// ServiceLabel label for deploying services in all backs
 	ServiceLabel = "oscar_service"
+
+	// EventVariable name used by the environment variable where events are stored
+	EventVariable = "EVENT"
 )
 
 // Service represents an OSCAR service following the SCAR Function Definition Language
@@ -122,8 +125,8 @@ func (service *Service) ToPodSpec() (*v1.PodSpec, error) {
 						MountPath: ConfigPath,
 					},
 				},
-				Command:   []string{"/bin/sh", "-c"},
-				Args:      []string{fmt.Sprintf("%s/%s", VolumePath, WatchdogName)},
+				Command:   []string{"/bin/sh"},
+				Args:      []string{"-c", fmt.Sprintf("%s/%s", VolumePath, WatchdogName)},
 				Resources: resources,
 			},
 		},

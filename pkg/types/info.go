@@ -18,10 +18,11 @@ package types
 
 // Info represents the system information to be exposed
 type Info struct {
-	Version           string                `json:"version"`
-	Arch              string                `json:"arch"`
-	KubeVersion       string                `json:"kubernetes_version"`
-	ServerlessBackend ServerlessBackendInfo `json:"serverless_backend,omitempty"`
+	Version               string                 `json:"version"`
+	GitCommit             string                 `json:"git_commit"`
+	Platform              string                 `json:"platform"`
+	KubeVersion           string                 `json:"kubernetes_version"`
+	ServerlessBackendInfo *ServerlessBackendInfo `json:"serverless_backend,omitempty"`
 }
 
 // ServerlessBackendInfo shows the name and version of the underlying serverless backend

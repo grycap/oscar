@@ -36,23 +36,24 @@ type MinIOAdminClient struct {
 
 // MakeMinIOAdminClient creates a new MinIO Admin client to configure webhook notifications
 func MakeMinIOAdminClient(provider *types.MinIOProvider, cfg *types.Config) (*MinIOAdminClient, error) {
-	// Check if both MinIOProvider and Config minIO endpoints are the same
-	if provider.Endpoint.String() != cfg.MinIOEndpoint.String() {
-		return nil, fmt.Errorf("The provided MinIO server \"%s\" is not the configured in OSCAR", provider.Endpoint.String())
+	// Parse minIO endpoint
+	endpointURL, err := url.Parse(provider.Endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("The provided MinIO endpoint \"%s\" is not valid", provider.Endpoint)
 	}
 
 	// Check URL Scheme for using TLS or not
 	var enableTLS bool
-	switch provider.Endpoint.Scheme {
+	switch endpointURL.Scheme {
 	case "http":
 		enableTLS = false
 	case "https":
 		enableTLS = true
 	default:
-		return nil, fmt.Errorf("Invalid MinIO Endpoint: %s", provider.Endpoint.String())
+		return nil, fmt.Errorf("Invalid MinIO Endpoint: %s. Must start with \"http://\" or \"https://\"", provider.Endpoint)
 	}
 
-	adminClient, err := madmin.New(provider.Endpoint.Host, provider.AccessKey, provider.SecretKey, enableTLS)
+	adminClient, err := madmin.New(endpointURL.Host, provider.AccessKey, provider.SecretKey, enableTLS)
 	if err != nil {
 		return nil, err
 	}

@@ -26,41 +26,19 @@ import (
 )
 
 const (
-	defaultMinioTLSVerify          = true
-	defaultMinIOEndpoint           = "https://minio-service.minio:9000"
-	defaultMinIORegion             = "us-east-1"
-	defaultOpenfaasGatewayEndpoint = "http://gateway.openfaas:8080"
-	defaultTimeout                 = time.Duration(300) * time.Second
-	defaultServiceName             = "oscar"
-	defaultServicePort             = 8080
-	defaultNamespace               = "oscar"
+	defaultMinioTLSVerify = true
+	defaultMinIOEndpoint  = "https://minio-service.minio:9000"
+	defaultMinIORegion    = "us-east-1"
+	defaultTimeout        = time.Duration(300) * time.Second
+	defaultServiceName    = "oscar"
+	defaultServicePort    = 8080
+	defaultNamespace      = "oscar"
 )
 
 // Config stores the configuration for the OSCAR server
 type Config struct {
-	// MinIO access key
-	MinIOAccessKey string
-
-	// MinIO secret key
-	MinIOSecretKey string
-
-	// Enable TLS verification for MinIO server (default: true)
-	MinIOTLSVerify bool
-
-	// MinIO server endpoint (default: https://minio-service.minio:9000)
-	MinIOEndpoint *url.URL
-
-	// MinIO region
-	MinIORegion string
-
-	// OpenFaaS gateway basic auth user
-	OpenfaasGatewayUsername string
-
-	// OpenFaaS gateway basic auth password
-	OpenfaasGatewayPassword string
-
-	// OpenFaaS gateway endpoint (default: http://gateway.openfaas:8080)
-	OpenfaasGatewayEndpoint *url.URL
+	// MinIOProvider access info
+	MinIOProvider *MinIOProvider
 
 	// Basic auth username
 	Username string
@@ -74,13 +52,11 @@ type Config struct {
 	// Kubernetes namespace for services and jobs (default: oscar)
 	Namespace string
 
-	// Port used for the ClusterIP k8s service
+	// Port used for the ClusterIP k8s service (default: 8080)
 	ServicePort int
 
-	// Use a Serverless framework to support sync invocations (default: false)
-	EnableServerlessBackend bool
-
 	// Serverless framework used to deploy services (Openfaas | Knative)
+	// If not defined only async invokations allowed (Using KubeBackend)
 	ServerlessBackend string
 
 	// HTTP timeout for reading the payload (default: 300)
@@ -88,15 +64,6 @@ type Config struct {
 
 	// HTTP timeout for writing the response (default: 300)
 	WriteTimeout time.Duration
-}
-
-func parseBool(s string) (bool, error) {
-	if strings.ToLower(s) == "true" {
-		return true, nil
-	} else if strings.ToLower(s) == "false" {
-		return false, nil
-	}
-	return false, fmt.Errorf("The value must be a boolean")
 }
 
 func parseSeconds(s string) (time.Duration, error) {
@@ -111,65 +78,46 @@ func parseSeconds(s string) (time.Duration, error) {
 
 // ReadConfig reads environment variables to create the OSCAR server configuration
 func ReadConfig() (*Config, error) {
-	// TODO: check if serverless backend is enabled.. if it is check ServerlessBackend names
-	var config Config
+	config := &Config{
+		Name: defaultServiceName,
+	}
+	config.MinIOProvider = &MinIOProvider{}
 	var err error
 
 	if len(os.Getenv("MINIO_ACCESS_KEY")) > 0 {
-		config.MinIOAccessKey = os.Getenv("MINIO_ACCESS_KEY")
+		config.MinIOProvider.AccessKey = os.Getenv("MINIO_ACCESS_KEY")
 	} else {
 		return nil, fmt.Errorf("A MINIO_ACCESS_KEY must be provided")
 	}
 
 	if len(os.Getenv("MINIO_SECRET_KEY")) > 0 {
-		config.MinIOSecretKey = os.Getenv("MINIO_SECRET_KEY")
+		config.MinIOProvider.SecretKey = os.Getenv("MINIO_SECRET_KEY")
 	} else {
 		return nil, fmt.Errorf("A MINIO_SECRET_KEY must be provided")
 	}
 
 	if len(os.Getenv("MINIO_TLS_VERIFY")) > 0 {
-		config.MinIOTLSVerify, err = parseBool(os.Getenv("MINIO_SECRET_KEY"))
+		config.MinIOProvider.Verify, err = strconv.ParseBool(os.Getenv("MINIO_TLS_VERIFY"))
 		if err != nil {
 			return nil, fmt.Errorf("The MINIO_TLS_VERIFY value must be a boolean")
 		}
 	} else {
-		config.MinIOTLSVerify = defaultMinioTLSVerify
+		config.MinIOProvider.Verify = defaultMinioTLSVerify
 	}
 
 	if len(os.Getenv("MINIO_ENDPOINT")) > 0 {
-		config.MinIOEndpoint, err = url.Parse(os.Getenv("MINIO_ENDPOINT"))
-		if err != nil {
-			return nil, fmt.Errorf("The MINIO_ENDPOINT \"%s\" is not valid. Error: %s", os.Getenv("MINIO_ENDPOINT"), err)
+		config.MinIOProvider.Endpoint = os.Getenv("MINIO_ENDPOINT")
+		if _, err = url.Parse(config.MinIOProvider.Endpoint); err != nil {
+			return nil, fmt.Errorf("The MINIO_ENDPOINT value is not valid. Error: %s", err)
 		}
 	} else {
-		config.MinIOEndpoint, _ = url.Parse(defaultMinIOEndpoint)
-	}
-
-	if len(os.Getenv("OPENFAAS_GATEWAY_ENDPOINT")) > 0 {
-		config.OpenfaasGatewayEndpoint, err = url.Parse(os.Getenv("OPENFAAS_GATEWAY_ENDPOINT"))
-		if err != nil {
-			return nil, fmt.Errorf("The OPENFAAS_GATEWAY_ENDPOINT \"%s\" is not valid. Error: %s", os.Getenv("OPENFAAS_GATEWAY_ENDPOINT"), err)
-		}
-	} else {
-		config.OpenfaasGatewayEndpoint, _ = url.Parse(defaultOpenfaasGatewayEndpoint)
-	}
-
-	if len(os.Getenv("OSCAR_USERNAME")) > 0 {
-		config.Username = os.Getenv("OSCAR_USERNAME")
-	} else {
-		return nil, fmt.Errorf("An OSCAR_USERNAME must be provided")
-	}
-
-	if len(os.Getenv("OSCAR_PASSWORD")) > 0 {
-		config.Password = os.Getenv("OSCAR_PASSWORD")
-	} else {
-		return nil, fmt.Errorf("An OSCAR_PASSWORD must be provided")
+		config.MinIOProvider.Endpoint = defaultMinIOEndpoint
 	}
 
 	if len(os.Getenv("OSCAR_NAMESPACE")) > 0 {
 		config.Namespace = os.Getenv("OSCAR_NAMESPACE")
 	} else {
-		return nil, fmt.Errorf("An OSCAR_NAMESPACE must be provided")
+		config.Namespace = defaultNamespace
 	}
 
 	if len(os.Getenv("SERVERLESS_BACKEND")) > 0 {
@@ -177,8 +125,6 @@ func ReadConfig() (*Config, error) {
 		if config.ServerlessBackend != "openfaas" && config.ServerlessBackend != "knative" {
 			return nil, fmt.Errorf("The SERVERLESS_BACKEND is not valid. Must be \"Openfaas\" or \"Knative\"")
 		}
-	} else {
-		return nil, fmt.Errorf("A SERVERLESS_BACKEND (Openfaas or Knative) must be provided")
 	}
 
 	if len(os.Getenv("READ_TIMEOUT")) > 0 {
@@ -199,5 +145,14 @@ func ReadConfig() (*Config, error) {
 		config.WriteTimeout = defaultTimeout
 	}
 
-	return &config, nil
+	if len(os.Getenv("OSCAR_PORT")) > 0 {
+		config.ServicePort, err = strconv.Atoi(os.Getenv("OSCAR_PORT"))
+		if err != nil {
+			return nil, fmt.Errorf("The OSCAR_PORT value is not valid. Error: %s", err)
+		}
+	} else {
+		config.ServicePort = defaultServicePort
+	}
+
+	return config, nil
 }

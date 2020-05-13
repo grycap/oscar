@@ -21,14 +21,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"reflect"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
+	"github.com/grycap/cdmi-client-go"
 	"github.com/grycap/oscar/pkg/types"
 	"github.com/grycap/oscar/pkg/utils"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -50,9 +50,12 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
-		addDefaultValues(&service, cfg)
 
-		// TODO: check if storage providers are valid
+		// Check service values and set defaults
+		if err := checkValues(&service, cfg); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+			return
+		}
 
 		// Create the service
 		if err := back.CreateService(service); err != nil {
@@ -73,7 +76,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Create buckets/folders based on the Input and Output
-		if err := createBuckets(service.Input, service.Output, service.StorageProviders); err != nil {
+		if err := createBuckets(&service); err != nil {
 			if err == errNoMinIOInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {
@@ -87,7 +90,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 	}
 }
 
-func addDefaultValues(service *types.Service, cfg *types.Config) {
+func checkValues(service *types.Service, cfg *types.Config) error {
 	// Add default values for Memory and CPU if they are not set
 	// Do not validate, Kubernetes client throws an error if they are not correct
 	if service.Memory == "" {
@@ -105,59 +108,40 @@ func addDefaultValues(service *types.Service, cfg *types.Config) {
 		service.LogLevel = defaultLogLevel
 	}
 
-	// Add MinIO storage provider if not set
-	if service.StorageProviders == nil {
-		service.StorageProviders = &types.StorageProviders{
-			MinIO: &types.MinIOProvider{
-				Endpoint:  cfg.MinIOEndpoint,
-				Verify:    cfg.MinIOTLSVerify,
-				AccessKey: cfg.MinIOAccessKey,
-				SecretKey: cfg.MinIOSecretKey,
-				Region:    cfg.MinIORegion,
-			},
+	// Check if MinIO provider is defined and valid
+	if service.StorageProviders != nil {
+		if service.StorageProviders.MinIO != nil {
+			if !reflect.DeepEqual(*cfg.MinIOProvider, *service.StorageProviders.MinIO) {
+				return fmt.Errorf("The provided MinIO server \"%s\" is not the configured in OSCAR", service.StorageProviders.MinIO.Endpoint)
+			}
+		} else {
+			service.StorageProviders.MinIO = cfg.MinIOProvider
 		}
+	} else {
+		service.StorageProviders = &types.StorageProviders{MinIO: cfg.MinIOProvider}
 	}
-	if service.StorageProviders.MinIO == nil {
-		service.StorageProviders.MinIO = &types.MinIOProvider{
-			Endpoint:  cfg.MinIOEndpoint,
-			Verify:    cfg.MinIOTLSVerify,
-			AccessKey: cfg.MinIOAccessKey,
-			SecretKey: cfg.MinIOSecretKey,
-			Region:    cfg.MinIORegion,
-		}
-	}
+
+	return nil
 }
 
-func createBuckets(input []types.StorageIOConfig, output []types.StorageIOConfig, providers *types.StorageProviders) error {
+func createBuckets(service *types.Service) error {
 	// Create S3 client for MinIO
-	var minIOClient *s3.S3
-	if providers.MinIO != nil {
-		s3MinIOConfig := &aws.Config{
-			Credentials:      credentials.NewStaticCredentials(providers.MinIO.AccessKey, providers.MinIO.SecretKey, ""),
-			Endpoint:         aws.String(providers.MinIO.Endpoint.String()),
-			Region:           aws.String(providers.MinIO.Region),
-			DisableSSL:       aws.Bool(!providers.MinIO.Verify),
-			S3ForcePathStyle: aws.Bool(true),
-		}
-		minIOSession := session.New(s3MinIOConfig)
-		minIOClient = s3.New(minIOSession)
-	}
+	minIOClient := service.StorageProviders.MinIO.GetS3Client()
 
 	// Create S3 client for Amazon S3
 	var s3Client *s3.S3
-	if providers.S3 != nil {
-		s3Config := &aws.Config{
-			Credentials: credentials.NewStaticCredentials(providers.S3.AccessKey, providers.S3.SecretKey, ""),
-			Region:      aws.String(providers.S3.Region),
-		}
-		s3Session := session.New(s3Config)
-		s3Client = s3.New(s3Session)
+	if service.StorageProviders.S3 != nil {
+		s3Client = service.StorageProviders.S3.GetS3Client()
 	}
 
-	// TODO: Onedata support
+	// Create Onedata CDMI client
+	var cdmiClient *cdmi.Client
+	if service.StorageProviders.Onedata != nil {
+		cdmiClient = service.StorageProviders.Onedata.GetCDMIClient()
+	}
 
 	// Create input buckets
-	for _, in := range input {
+	for _, in := range service.Input {
 		// Only allow input from MinIO
 		if strings.ToLower(in.Provider) != "minio" {
 			return errNoMinIOInput
@@ -191,11 +175,16 @@ func createBuckets(input []types.StorageIOConfig, output []types.StorageIOConfig
 				return fmt.Errorf("Error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
 			}
 		}
-		// TODO: Register MinIO notifications based on the Input []StorageIOConfig
+
+		// Enable MinIO notifications based on the Input []StorageIOConfig
+		if err := enableInputNotification(minIOClient, service.GetMinIOWebhookARN(), in); err != nil {
+			return err
+		}
+
 	}
 
 	// Create output buckets
-	for _, out := range output {
+	for _, out := range service.Output {
 		path := strings.Trim(out.Path, " /")
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
@@ -204,12 +193,15 @@ func createBuckets(input []types.StorageIOConfig, output []types.StorageIOConfig
 		switch provName {
 		case "minio", "s3":
 			// Use the appropiate client
-			// TODO: check if the client is not nil too...
 			var client *s3.S3
 			if provName == "minio" {
 				client = minIOClient
 			} else {
-				client = s3Client
+				if s3Client != nil {
+					client = s3Client
+				} else {
+					return fmt.Errorf("Output \"%s\" cannot be created. S3 provider not defined", path)
+				}
 			}
 			// Create bucket
 			_, err := client.CreateBucket(&s3.CreateBucketInput{
@@ -237,9 +229,17 @@ func createBuckets(input []types.StorageIOConfig, output []types.StorageIOConfig
 					return fmt.Errorf("Error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
 				}
 			}
-		// TODO: Onedata support
 		case "onedata":
-			log.Printf("Onedata is not supported yet. Folder \"%s\" has to be created manually", path)
+			if cdmiClient != nil {
+				err := cdmiClient.CreateContainer(fmt.Sprintf("%s/%s", service.StorageProviders.Onedata.Space, path), true)
+				if err != nil {
+					if err != cdmi.ErrBadRequest {
+						log.Printf("Error creating \"%s\" folder in Onedata. Error: %v", path, err)
+					}
+				}
+			} else {
+				return fmt.Errorf("Output \"%s\" cannot be created. Onedata provider not defined", path)
+			}
 
 		}
 	}
@@ -259,6 +259,54 @@ func registerMinIOWebhook(name string, minIO *types.MinIOProvider, cfg *types.Co
 
 	if err := minIOAdminClient.RestartServer(); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func enableInputNotification(minIOClient *s3.S3, arn string, input types.StorageIOConfig) error {
+	path := strings.Trim(input.Path, " /")
+	// Split buckets and folders from path
+	splitPath := strings.SplitN(path, "/", 2)
+
+	// Get current BucketNotificationConfiguration
+	gbncRequest := &s3.GetBucketNotificationConfigurationRequest{
+		Bucket: aws.String(splitPath[0]),
+	}
+	nCfg, err := minIOClient.GetBucketNotificationConfiguration(gbncRequest)
+	if err != nil {
+		return fmt.Errorf("Error enabling bucket notification: %v", err)
+	}
+	queueConfiguration := s3.QueueConfiguration{
+		QueueArn: aws.String(arn),
+		Events:   []*string{aws.String(s3.EventS3ObjectCreated)},
+	}
+
+	// Add folder filter if required
+	if len(splitPath) == 2 {
+		queueConfiguration.Filter = &s3.NotificationConfigurationFilter{
+			Key: &s3.KeyFilter{
+				FilterRules: []*s3.FilterRule{
+					{
+						Name:  aws.String(s3.FilterRuleNamePrefix),
+						Value: aws.String(fmt.Sprintf("%s/", splitPath[1])),
+					},
+				},
+			},
+		}
+	}
+
+	// Append the new queueConfiguration
+	nCfg.QueueConfigurations = append(nCfg.QueueConfigurations, &queueConfiguration)
+	pbncInput := &s3.PutBucketNotificationConfigurationInput{
+		Bucket:                    aws.String(splitPath[0]),
+		NotificationConfiguration: nCfg,
+	}
+
+	// Enable the notification
+	_, err = minIOClient.PutBucketNotificationConfiguration(pbncInput)
+	if err != nil {
+		return fmt.Errorf("Error enabling bucket notification: %v", err)
 	}
 
 	return nil
