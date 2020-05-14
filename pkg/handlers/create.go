@@ -264,7 +264,7 @@ func registerMinIOWebhook(name string, minIO *types.MinIOProvider, cfg *types.Co
 	return nil
 }
 
-func enableInputNotification(minIOClient *s3.S3, arn string, input types.StorageIOConfig) error {
+func enableInputNotification(minIOClient *s3.S3, arnStr string, input types.StorageIOConfig) error {
 	path := strings.Trim(input.Path, " /")
 	// Split buckets and folders from path
 	splitPath := strings.SplitN(path, "/", 2)
@@ -275,10 +275,10 @@ func enableInputNotification(minIOClient *s3.S3, arn string, input types.Storage
 	}
 	nCfg, err := minIOClient.GetBucketNotificationConfiguration(gbncRequest)
 	if err != nil {
-		return fmt.Errorf("Error enabling bucket notification: %v", err)
+		return fmt.Errorf("Error getting bucket \"%s\" notifications: %v", splitPath[0], err)
 	}
 	queueConfiguration := s3.QueueConfiguration{
-		QueueArn: aws.String(arn),
+		QueueArn: aws.String(arnStr),
 		Events:   []*string{aws.String(s3.EventS3ObjectCreated)},
 	}
 

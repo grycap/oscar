@@ -20,7 +20,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/arn"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/pkg/types"
 	"github.com/grycap/oscar/pkg/utils"
@@ -31,7 +35,7 @@ import (
 func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// First get the Service
-		svc, _ := back.ReadService(c.Param("serviceName"))
+		service, _ := back.ReadService(c.Param("serviceName"))
 
 		if err := back.DeleteService(c.Param("serviceName")); err != nil {
 			// Check if error is caused because the service is not found
@@ -43,11 +47,14 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
-		// TODO: remove bucket notifications
+		// Disable input notifications
+		if err := disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, service.StorageProviders.MinIO); err != nil {
+			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v", service.Name, err)
+		}
 
 		// Remove the service's webhook in MinIO config and restart the server
-		if err := removeMinIOWebhook(svc.Name, svc.StorageProviders.MinIO, cfg); err != nil {
-			log.Printf("Error removing MinIO webhook for service \"%s\": %v", svc.Name, err)
+		if err := removeMinIOWebhook(service.Name, service.StorageProviders.MinIO, cfg); err != nil {
+			log.Printf("Error removing MinIO webhook for service \"%s\": %v", service.Name, err)
 		}
 
 		c.Status(http.StatusNoContent)
@@ -71,7 +78,45 @@ func removeMinIOWebhook(name string, minIO *types.MinIOProvider, cfg *types.Conf
 	return nil
 }
 
-// TODO
-func deleteNotifications(input []types.StorageIOConfig, cfg *types.Config) error {
+func disableInputNotifications(arnStr string, input []types.StorageIOConfig, minIO *types.MinIOProvider) error {
+	parsedARN, _ := arn.Parse(arnStr)
+
+	// Create S3 client for MinIO
+	minIOClient := minIO.GetS3Client()
+
+	for _, in := range input {
+		path := strings.Trim(in.Path, " /")
+		// Split buckets and folders from path
+		splitPath := strings.SplitN(path, "/", 2)
+
+		updatedQueueConfigurations := []*s3.QueueConfiguration{}
+		// Get bucket notification
+		nCfg, err := minIOClient.GetBucketNotificationConfiguration(&s3.GetBucketNotificationConfigurationRequest{Bucket: aws.String(splitPath[0])})
+		if err != nil {
+			return fmt.Errorf("Error getting bucket \"%s\" notifications: %v", splitPath[0], err)
+		}
+
+		// Filter elements that doesn't match with service's ARN
+		for _, q := range nCfg.QueueConfigurations {
+			queueARN, _ := arn.Parse(*q.QueueArn)
+			if queueARN.Resource == parsedARN.Resource &&
+				queueARN.AccountID != parsedARN.AccountID {
+				updatedQueueConfigurations = append(updatedQueueConfigurations, q)
+			}
+		}
+
+		// Put the updated bucket configuration
+		nCfg.QueueConfigurations = updatedQueueConfigurations
+		pbncInput := &s3.PutBucketNotificationConfigurationInput{
+			Bucket:                    aws.String(splitPath[0]),
+			NotificationConfiguration: nCfg,
+		}
+		_, err = minIOClient.PutBucketNotificationConfiguration(pbncInput)
+		if err != nil {
+			return fmt.Errorf("Error disabling bucket notification: %v", err)
+		}
+
+	}
+
 	return nil
 }
