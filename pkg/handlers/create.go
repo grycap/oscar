@@ -75,7 +75,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
-		// Create buckets/folders based on the Input and Output
+		// Create buckets/folders based on the Input and Output and enable notifications
 		if err := createBuckets(&service); err != nil {
 			if err == errNoMinIOInput {
 				c.String(http.StatusBadRequest, err.Error())

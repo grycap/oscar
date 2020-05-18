@@ -26,13 +26,14 @@ import (
 )
 
 const (
-	defaultMinioTLSVerify = true
-	defaultMinIOEndpoint  = "https://minio-service.minio:9000"
-	defaultMinIORegion    = "us-east-1"
-	defaultTimeout        = time.Duration(300) * time.Second
-	defaultServiceName    = "oscar"
-	defaultServicePort    = 8080
-	defaultNamespace      = "oscar"
+	defaultMinioTLSVerify    = true
+	defaultMinIOEndpoint     = "https://minio-service.minio:9000"
+	defaultMinIORegion       = "us-east-1"
+	defaultTimeout           = time.Duration(300) * time.Second
+	defaultServiceName       = "oscar"
+	defaultServicePort       = 8080
+	defaultNamespace         = "oscar"
+	defaultServicesNamespace = "oscar-svc"
 )
 
 // Config stores the configuration for the OSCAR server
@@ -49,8 +50,11 @@ type Config struct {
 	// Kubernetes name for the deployment and service (default: oscar)
 	Name string
 
-	// Kubernetes namespace for services and jobs (default: oscar)
+	// Kubernetes namespace for the deployment and service (default: oscar)
 	Namespace string
+
+	// Kubernetes namespace for services and jobs (default: oscar-svc)
+	ServicesNamespace string
 
 	// Port used for the ClusterIP k8s service (default: 8080)
 	ServicePort int
@@ -78,11 +82,21 @@ func parseSeconds(s string) (time.Duration, error) {
 
 // ReadConfig reads environment variables to create the OSCAR server configuration
 func ReadConfig() (*Config, error) {
-	config := &Config{
-		Name: defaultServiceName,
-	}
+	config := &Config{}
 	config.MinIOProvider = &MinIOProvider{}
 	var err error
+
+	if len(os.Getenv("OSCAR_USERNAME")) > 0 {
+		config.Username = os.Getenv("OSCAR_USERNAME")
+	} else {
+		return nil, fmt.Errorf("An OSCAR_USERNAME must be provided")
+	}
+
+	if len(os.Getenv("OSCAR_PASSWORD")) > 0 {
+		config.Password = os.Getenv("OSCAR_PASSWORD")
+	} else {
+		return nil, fmt.Errorf("An OSCAR_PASSWORD must be provided")
+	}
 
 	if len(os.Getenv("MINIO_ACCESS_KEY")) > 0 {
 		config.MinIOProvider.AccessKey = os.Getenv("MINIO_ACCESS_KEY")
@@ -94,6 +108,12 @@ func ReadConfig() (*Config, error) {
 		config.MinIOProvider.SecretKey = os.Getenv("MINIO_SECRET_KEY")
 	} else {
 		return nil, fmt.Errorf("A MINIO_SECRET_KEY must be provided")
+	}
+
+	if len(os.Getenv("MINIO_REGION")) > 0 {
+		config.MinIOProvider.Region = os.Getenv("MINIO_REGION")
+	} else {
+		config.MinIOProvider.Region = defaultMinIORegion
 	}
 
 	if len(os.Getenv("MINIO_TLS_VERIFY")) > 0 {
@@ -114,10 +134,22 @@ func ReadConfig() (*Config, error) {
 		config.MinIOProvider.Endpoint = defaultMinIOEndpoint
 	}
 
+	if len(os.Getenv("OSCAR_NAME")) > 0 {
+		config.Name = os.Getenv("OSCAR_NAME")
+	} else {
+		config.Name = defaultServiceName
+	}
+
 	if len(os.Getenv("OSCAR_NAMESPACE")) > 0 {
 		config.Namespace = os.Getenv("OSCAR_NAMESPACE")
 	} else {
 		config.Namespace = defaultNamespace
+	}
+
+	if len(os.Getenv("OSCAR_SERVICES_NAMESPACE")) > 0 {
+		config.ServicesNamespace = os.Getenv("OSCAR_SERVICES_NAMESPACE")
+	} else {
+		config.ServicesNamespace = defaultServicesNamespace
 	}
 
 	if len(os.Getenv("SERVERLESS_BACKEND")) > 0 {

@@ -38,18 +38,8 @@ type KubeBackend struct {
 func MakeKubeBackend(kubeClientset *kubernetes.Clientset, cfg *types.Config) *KubeBackend {
 	return &KubeBackend{
 		kubeClientset: kubeClientset,
-		namespace:     cfg.Namespace,
+		namespace:     cfg.ServicesNamespace,
 	}
-}
-
-// GetServicePodSpec returns a k8s podSpec for the service from the serverless backend
-func (k *KubeBackend) GetServicePodSpec(name string) (*v1.PodSpec, error) {
-	podTemplate, err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	return &podTemplate.Template.Spec, nil
 }
 
 // GetInfo returns the ServerlessBackendInfo with the name and version
@@ -142,7 +132,51 @@ func (k *KubeBackend) ReadService(name string) (*types.Service, error) {
 
 // UpdateService updates an existent service
 func (k *KubeBackend) UpdateService(service types.Service) error {
-	// TODO
+	// Get the old service's configMap
+	oldCm, err := k.kubeClientset.CoreV1().ConfigMaps(k.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("The service \"%s\" does not have a registered ConfigMap", service.Name)
+	}
+
+	// Update the configMap with FDL and user-script
+	if err := updateServiceConfigMap(&service, k.namespace, k.kubeClientset); err != nil {
+		return err
+	}
+
+	// Create podSpec from the service
+	podSpec, err := service.ToPodSpec()
+	if err != nil {
+		// Restore the old configMap
+		_, resErr := k.kubeClientset.CoreV1().ConfigMaps(k.namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
+		if resErr != nil {
+			log.Println(resErr.Error())
+		}
+		return err
+	}
+
+	// Create the podTemplate spec
+	podTemplate := &v1.PodTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      service.Name,
+			Namespace: k.namespace,
+			Labels: map[string]string{
+				types.ServiceLabel: service.Name,
+			},
+		},
+		Template: v1.PodTemplateSpec{
+			Spec: *podSpec,
+		},
+	}
+	_, err = k.kubeClientset.CoreV1().PodTemplates(k.namespace).Update(context.TODO(), podTemplate, metav1.UpdateOptions{})
+	if err != nil {
+		// Restore the old configMap
+		_, resErr := k.kubeClientset.CoreV1().ConfigMaps(k.namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
+		if resErr != nil {
+			log.Println(resErr.Error())
+		}
+		return err
+	}
+
 	return nil
 }
 
@@ -164,13 +198,13 @@ func getServiceFromFDL(name string, namespace string, kubeClientset *kubernetes.
 	// Get the configMap of the Service
 	cm, err := kubeClientset.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("The Service \"%s\" does not have a registered ConfigMap", name)
+		return nil, fmt.Errorf("The service \"%s\" does not have a registered ConfigMap", name)
 	}
 	service := &types.Service{}
 
 	// Unmarshal the FDL stored in the configMap
 	if err = yaml.Unmarshal([]byte(cm.Data["function_config.yaml"]), service); err != nil {
-		return nil, fmt.Errorf("The FDL of the Service \"%s\" cannot be read", name)
+		return nil, fmt.Errorf("The FDL of the service \"%s\" cannot be read", name)
 	}
 
 	return service, nil
@@ -198,6 +232,35 @@ func createServiceConfigMap(service *types.Service, namespace string, kubeClient
 		},
 	}
 	_, err = kubeClientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), cm, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func updateServiceConfigMap(service *types.Service, namespace string, kubeClientset *kubernetes.Clientset) error {
+	// Create FDL YAML
+	fdl, err := service.ToYAML()
+	if err != nil {
+		return err
+	}
+
+	// Create ConfigMap
+	cm := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      service.Name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				types.ServiceLabel: service.Name,
+			},
+		},
+		Data: map[string]string{
+			"script.sh":            service.Script,
+			"function_config.yaml": fdl,
+		},
+	}
+	_, err = kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}

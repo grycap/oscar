@@ -17,44 +17,35 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"fmt"
+	"log"
 	"net/http"
-	"os"
-	"path"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/pkg/backends"
 	"github.com/grycap/oscar/pkg/handlers"
 	"github.com/grycap/oscar/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
 func main() {
 	// Read configuration from the environment
 	cfg, err := types.ReadConfig()
 	if err != nil {
-		panic(err.Error())
+		log.Fatal(err)
+	}
+
+	// Creates the k8s in-cluster config
+	kubeConfig, err := rest.InClusterConfig()
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	// Create the k8s clientset
-	// Creates the k8s in-cluster config
-	// kubeConfig, err := rest.InClusterConfig()
-	// if err != nil {
-	// 	panic(err.Error())
-	// }
-
-	// Read kubeconfig file in $HOME FOR TESTING
-	homeDir, _ := os.UserHomeDir()
-	kubeconfigPath := flag.String("kubeconfig", path.Join(homeDir, "kubeconfig"), "absolute path")
-	kubeConfig, err := clientcmd.BuildConfigFromFlags("", *kubeconfigPath)
-	if err != nil {
-		panic(err.Error())
-	}
 	kubeClientset, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
-		panic(err.Error())
+		log.Fatal(err)
 	}
 
 	// Create the ServerlessBackend based on the configuration
@@ -83,18 +74,19 @@ func main() {
 	system.POST("/services", handlers.MakeCreateHandler(cfg, back))
 	system.GET("/services", handlers.MakeListHandler(back))
 	system.GET("/services/:serviceName", handlers.MakeReadHandler(back))
-	//system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
+	system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
 	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
 
 	// Logs paths
-	system.GET("/logs/:serviceName", handlers.MakeJobsInfoHandler(kubeClientset, cfg.Namespace))
-	system.DELETE("/logs/:serviceName", handlers.MakeDeleteJobsHandler(kubeClientset, cfg.Namespace))
-	system.GET("/logs/:serviceName/:jobName", handlers.MakeGetLogsHandler(kubeClientset, cfg.Namespace))
-	system.DELETE("/logs/:serviceName/:jobName", handlers.MakeDeleteJobHandler(kubeClientset, cfg.Namespace))
+	system.GET("/logs/:serviceName", handlers.MakeJobsInfoHandler(kubeClientset, cfg.ServicesNamespace))
+	system.DELETE("/logs/:serviceName", handlers.MakeDeleteJobsHandler(kubeClientset, cfg.ServicesNamespace))
+	system.GET("/logs/:serviceName/:jobName", handlers.MakeGetLogsHandler(kubeClientset, cfg.ServicesNamespace))
+	system.DELETE("/logs/:serviceName/:jobName", handlers.MakeDeleteJobHandler(kubeClientset, cfg.ServicesNamespace))
 
 	// Job path for async invocations
 	r.POST("/job/:serviceName", handlers.MakeJobHandler(cfg, kubeClientset, back))
 
+	// TODO: Uncomment when backends are implemented
 	// Service path for sync invocations (only if ServerlessBackend is enabled)
 	// if cfg.ServerlessBackend != "" {
 	// 	r.GET("/service/:serviceName", handlers.MakeServiceHandler(cfg, back))
@@ -114,5 +106,5 @@ func main() {
 		ReadTimeout:  cfg.ReadTimeout,
 	}
 
-	s.ListenAndServe()
+	log.Fatal(s.ListenAndServe())
 }

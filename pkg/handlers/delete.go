@@ -115,7 +115,6 @@ func disableInputNotifications(arnStr string, input []types.StorageIOConfig, min
 		if err != nil {
 			return fmt.Errorf("Error disabling bucket notification: %v", err)
 		}
-
 	}
 
 	return nil

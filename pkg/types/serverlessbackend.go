@@ -16,13 +16,8 @@ limitations under the License.
 
 package types
 
-import (
-	v1 "k8s.io/api/core/v1"
-)
-
 // ServerlessBackend define an interface for different serverless backends
 type ServerlessBackend interface {
-	GetServicePodSpec(name string) (*v1.PodSpec, error)
 	GetInfo() *ServerlessBackendInfo
 	ListServices() ([]*Service, error)
 	CreateService(service Service) error

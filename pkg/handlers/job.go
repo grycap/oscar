@@ -91,7 +91,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 				// UUID used as a name for jobs
 				// To filter jobs by service name use the label "oscar_service"
 				Name:      uuid.New().String(),
-				Namespace: cfg.Namespace,
+				Namespace: cfg.ServicesNamespace,
 				Labels: map[string]string{
 					types.ServiceLabel: service.Name,
 				},
@@ -110,7 +110,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 		}
 
 		// Create job
-		_, err = kubeClientset.BatchV1().Jobs(cfg.Namespace).Create(context.TODO(), job, metav1.CreateOptions{})
+		_, err = kubeClientset.BatchV1().Jobs(cfg.ServicesNamespace).Create(context.TODO(), job, metav1.CreateOptions{})
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
