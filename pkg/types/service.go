@@ -40,6 +40,12 @@ const (
 	// ConfigPath path to mount the service configMap
 	ConfigPath = "/oscar/config"
 
+	// FDLFileName name of the FDL file to be stored in the service's configMap
+	FDLFileName = "function_config.yaml"
+
+	// ScriptFileName name of the user script file to be stored in the service's configMap
+	ScriptFileName = "script.sh"
+
 	// PVCName name of the OSCAR PVC
 	PVCName = "oscar-pvc"
 

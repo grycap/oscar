@@ -203,7 +203,7 @@ func getServiceFromFDL(name string, namespace string, kubeClientset *kubernetes.
 	service := &types.Service{}
 
 	// Unmarshal the FDL stored in the configMap
-	if err = yaml.Unmarshal([]byte(cm.Data["function_config.yaml"]), service); err != nil {
+	if err = yaml.Unmarshal([]byte(cm.Data[types.FDLFileName]), service); err != nil {
 		return nil, fmt.Errorf("The FDL of the service \"%s\" cannot be read", name)
 	}
 
@@ -227,8 +227,8 @@ func createServiceConfigMap(service *types.Service, namespace string, kubeClient
 			},
 		},
 		Data: map[string]string{
-			"script.sh":            service.Script,
-			"function_config.yaml": fdl,
+			types.ScriptFileName: service.Script,
+			types.FDLFileName:    fdl,
 		},
 	}
 	_, err = kubeClientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), cm, metav1.CreateOptions{})
@@ -259,8 +259,8 @@ func updateServiceConfigMap(service *types.Service, namespace string, kubeClient
 			},
 		},
 		Data: map[string]string{
-			"script.sh":            service.Script,
-			"function_config.yaml": fdl,
+			types.ScriptFileName: service.Script,
+			types.FDLFileName:    fdl,
 		},
 	}
 	_, err = kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
