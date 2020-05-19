@@ -87,7 +87,7 @@ type Service struct {
 	Output []StorageIOConfig `json:"output"`
 
 	// The user script to execute when the service is invoked
-	Script string `json:"script" binding:"required"`
+	Script string `json:"script,omitempty" binding:"required"`
 
 	// The user-defined environment variables assigned to the service
 	// Optional
@@ -159,7 +159,7 @@ func (service *Service) ToPodSpec() (*v1.PodSpec, error) {
 }
 
 // ToYAML returns the service as a Function Definition Language YAML
-func (service *Service) ToYAML() (string, error) {
+func (service Service) ToYAML() (string, error) {
 	bytes, err := yaml.Marshal(service)
 	if err != nil {
 		return "", err

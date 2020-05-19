@@ -13,13 +13,12 @@ COPY go.sum .
 COPY main.go .
 COPY pkg pkg
 
-RUN go mod download
-
 RUN GOOS=${GOOS} CGO_ENABLED=0 go build --ldflags "-s -w \
 -X \"github.com/grycap/oscar/pkg/version.Version=${VERSION}\" \
 -X \"github.com/grycap/oscar/pkg/version.GitCommit=${GIT_COMMIT}\" \
 -X \"github.com/grycap/oscar/pkg/version.Platform=${PLATFORM}\"" \
 -a -installsuffix cgo -o oscar .
+
 
 FROM alpine:3.11
 

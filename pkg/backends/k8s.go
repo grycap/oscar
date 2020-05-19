@@ -240,6 +240,9 @@ func createServiceConfigMap(service *types.Service, namespace string, kubeClient
 }
 
 func updateServiceConfigMap(service *types.Service, namespace string, kubeClientset *kubernetes.Clientset) error {
+	// Clear script from YAML
+	service.Script = ""
+
 	// Create FDL YAML
 	fdl, err := service.ToYAML()
 	if err != nil {
