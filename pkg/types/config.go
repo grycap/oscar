@@ -177,10 +177,10 @@ func ReadConfig() (*Config, error) {
 		config.WriteTimeout = defaultTimeout
 	}
 
-	if len(os.Getenv("OSCAR_PORT")) > 0 {
-		config.ServicePort, err = strconv.Atoi(os.Getenv("OSCAR_PORT"))
+	if len(os.Getenv("OSCAR_SERVICE_PORT")) > 0 {
+		config.ServicePort, err = strconv.Atoi(os.Getenv("OSCAR_SERVICE_PORT"))
 		if err != nil {
-			return nil, fmt.Errorf("The OSCAR_PORT value is not valid. Error: %s", err)
+			return nil, fmt.Errorf("The OSCAR_SERVICE_PORT value is not valid. Error: %s", err)
 		}
 	} else {
 		config.ServicePort = defaultServicePort
