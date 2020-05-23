@@ -62,7 +62,7 @@ func (k *KubeBackend) ListServices() ([]*types.Service, error) {
 		// Get service from configMap's FDL
 		svc, err := getServiceFromFDL(podTemplate.Name, k.namespace, k.kubeClientset)
 		if err != nil {
-			log.Printf("WARNING: %v/n", err)
+			log.Printf("WARNING: %v\n", err)
 		} else {
 			services = append(services, svc)
 		}

@@ -49,12 +49,12 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Disable input notifications
 		if err := disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, service.StorageProviders.MinIO); err != nil {
-			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v", service.Name, err)
+			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 		}
 
 		// Remove the service's webhook in MinIO config and restart the server
 		if err := removeMinIOWebhook(service.Name, service.StorageProviders.MinIO, cfg); err != nil {
-			log.Printf("Error removing MinIO webhook for service \"%s\": %v", service.Name, err)
+			log.Printf("Error removing MinIO webhook for service \"%s\": %v\n", service.Name, err)
 		}
 
 		c.Status(http.StatusNoContent)

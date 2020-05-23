@@ -158,6 +158,8 @@ func createBuckets(service *types.Service) error {
 				// Check if the error is caused because the bucket already exists
 				if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
 					log.Printf("The bucket \"%s\" already exists\n", splitPath[0])
+				} else {
+					return fmt.Errorf("Error creating bucket %s: %v", splitPath[0], err)
 				}
 			} else {
 				return fmt.Errorf("Error creating bucket %s: %v", splitPath[0], err)
@@ -212,10 +214,12 @@ func createBuckets(service *types.Service) error {
 					// Check if the error is caused because the bucket already exists
 					if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
 						log.Printf("The bucket \"%s\" already exists\n", splitPath[0])
-						continue
+					} else {
+						return fmt.Errorf("Error creating bucket %s: %v", splitPath[0], err)
 					}
+				} else {
+					return fmt.Errorf("Error creating bucket %s: %v", splitPath[0], err)
 				}
-				return fmt.Errorf("Error creating bucket %s: %v", splitPath[0], err)
 			}
 			// Create folder(s)
 			if len(splitPath) == 2 {
@@ -234,7 +238,7 @@ func createBuckets(service *types.Service) error {
 				err := cdmiClient.CreateContainer(fmt.Sprintf("%s/%s", service.StorageProviders.Onedata.Space, path), true)
 				if err != nil {
 					if err != cdmi.ErrBadRequest {
-						log.Printf("Error creating \"%s\" folder in Onedata. Error: %v", path, err)
+						log.Printf("Error creating \"%s\" folder in Onedata. Error: %v\n", path, err)
 					}
 				}
 			} else {
