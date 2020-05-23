@@ -150,7 +150,7 @@ func MakeGetLogsHandler(kubeClientset *kubernetes.Clientset, namespace string) g
 		listOpts := metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("%s=%s job-name=%s", types.ServiceLabel, serviceName, jobName),
 		}
-		pods, err := kubeClientset.CoreV1().Pods("oscar-fn").List(context.TODO(), listOpts)
+		pods, err := kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), listOpts)
 		if err != nil || len(pods.Items) < 1 {
 			// Check if error is caused because the service is not found
 			if !errors.IsNotFound(err) || !errors.IsGone(err) {
