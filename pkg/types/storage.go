@@ -40,9 +40,9 @@ type StorageIOConfig struct {
 
 // StorageProviders stores the credentials of all supported storage providers
 type StorageProviders struct {
-	S3      *S3Provider      `json:"s3"`
-	MinIO   *MinIOProvider   `json:"minio"`
-	Onedata *OnedataProvider `json:"onedata"`
+	S3      *S3Provider      `json:"s3,omitempty"`
+	MinIO   *MinIOProvider   `json:"minio,omitempty"`
+	Onedata *OnedataProvider `json:"onedata,omitempty"`
 }
 
 // S3Provider stores the credentials of the AWS S3 storage provider

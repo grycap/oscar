@@ -58,7 +58,7 @@ func MakeJobsInfoHandler(kubeClientset *kubernetes.Clientset, namespace string) 
 		for _, job := range jobs.Items {
 			if job.Status.StartTime != nil {
 				jobsInfo[job.Name] = &types.JobInfo{
-					CreationTime: *job.Status.StartTime,
+					CreationTime: job.Status.StartTime,
 				}
 			}
 		}
@@ -83,10 +83,10 @@ func MakeJobsInfoHandler(kubeClientset *kubernetes.Clientset, namespace string) 
 				for _, contStatus := range pod.Status.ContainerStatuses {
 					if contStatus.Name == types.ContainerName {
 						if contStatus.State.Running != nil {
-							jobsInfo[jobName].StartTime = contStatus.State.Running.StartedAt
+							jobsInfo[jobName].StartTime = &contStatus.State.Running.StartedAt
 						} else if contStatus.State.Terminated != nil {
-							jobsInfo[jobName].StartTime = contStatus.State.Terminated.StartedAt
-							jobsInfo[jobName].StartTime = contStatus.State.Terminated.FinishedAt
+							jobsInfo[jobName].StartTime = &contStatus.State.Terminated.StartedAt
+							jobsInfo[jobName].FinishTime = &contStatus.State.Terminated.FinishedAt
 						}
 					}
 				}
@@ -119,10 +119,16 @@ func MakeDeleteJobsHandler(kubeClientset *kubernetes.Clientset, namespace string
 			listOpts.FieldSelector = "status.successful!=0"
 		}
 
-		err = kubeClientset.BatchV1().Jobs(namespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, listOpts)
+		// Create DeleteOptions and configure PropagationPolicy for deleting associated pods in background
+		background := metav1.DeletePropagationBackground
+		delOpts := metav1.DeleteOptions{
+			PropagationPolicy: &background,
+		}
+
+		err = kubeClientset.BatchV1().Jobs(namespace).DeleteCollection(context.TODO(), delOpts, listOpts)
 		if err != nil {
 			// Check if error is caused because the service is not found
-			if !errors.IsNotFound(err) || !errors.IsGone(err) {
+			if !errors.IsNotFound(err) && !errors.IsGone(err) {
 				c.String(http.StatusInternalServerError, err.Error())
 			} else {
 				c.Status(http.StatusNotFound)
@@ -148,12 +154,12 @@ func MakeGetLogsHandler(kubeClientset *kubernetes.Clientset, namespace string) g
 
 		// Get job's pod (assuming there's only one pod per job)
 		listOpts := metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s job-name=%s", types.ServiceLabel, serviceName, jobName),
+			LabelSelector: fmt.Sprintf("%s=%s,job-name=%s", types.ServiceLabel, serviceName, jobName),
 		}
 		pods, err := kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), listOpts)
 		if err != nil || len(pods.Items) < 1 {
 			// Check if error is caused because the service is not found
-			if !errors.IsNotFound(err) || !errors.IsGone(err) {
+			if !errors.IsNotFound(err) && !errors.IsGone(err) {
 				c.String(http.StatusInternalServerError, err.Error())
 			} else {
 				c.Status(http.StatusNotFound)
@@ -194,10 +200,10 @@ func MakeDeleteJobHandler(kubeClientset *kubernetes.Clientset, namespace string)
 		jobName := c.Param("jobName")
 
 		// Get job in order to check if it is associated with the provided serviceName
-		job, err := kubeClientset.BatchV1().Jobs(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
+		job, err := kubeClientset.BatchV1().Jobs(namespace).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if err != nil {
 			// Check if error is caused because the service is not found
-			if !errors.IsNotFound(err) || !errors.IsGone(err) {
+			if !errors.IsNotFound(err) && !errors.IsGone(err) {
 				c.String(http.StatusInternalServerError, err.Error())
 			} else {
 				c.Status(http.StatusNotFound)
@@ -211,11 +217,17 @@ func MakeDeleteJobHandler(kubeClientset *kubernetes.Clientset, namespace string)
 			return
 		}
 
+		// Create DeleteOptions and configure PropagationPolicy for deleting associated pods in background
+		background := metav1.DeletePropagationBackground
+		delOpts := metav1.DeleteOptions{
+			PropagationPolicy: &background,
+		}
+
 		// Delete the job
-		err = kubeClientset.BatchV1().Jobs(namespace).Delete(context.TODO(), jobName, metav1.DeleteOptions{})
+		err = kubeClientset.BatchV1().Jobs(namespace).Delete(context.TODO(), jobName, delOpts)
 		if err != nil {
 			// Check if error is caused because the service is not found
-			if !errors.IsNotFound(err) || !errors.IsGone(err) {
+			if !errors.IsNotFound(err) && !errors.IsGone(err) {
 				c.String(http.StatusInternalServerError, err.Error())
 			} else {
 				c.Status(http.StatusNotFound)

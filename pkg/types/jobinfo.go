@@ -20,8 +20,8 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // JobInfo details the current status of a service's job
 type JobInfo struct {
-	Status       string      `json:"status"`
-	CreationTime metav1.Time `json:"creation_time,omitempty"`
-	StartTime    metav1.Time `json:"start_time,omitempty"`
-	FinishTime   metav1.Time `json:"finish_time,omitempty"`
+	Status       string       `json:"status"`
+	CreationTime *metav1.Time `json:"creation_time,omitempty"`
+	StartTime    *metav1.Time `json:"start_time,omitempty"`
+	FinishTime   *metav1.Time `json:"finish_time,omitempty"`
 }

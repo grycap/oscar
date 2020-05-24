@@ -103,7 +103,7 @@ type Service struct {
 
 	// Configuration for the storage providers used by the service
 	// Optional. (default: MinIOProvider with the server's config credentials)
-	StorageProviders *StorageProviders `json:"storage_providers"`
+	StorageProviders *StorageProviders `json:"storage_providers,omitempty"`
 }
 
 // ToPodSpec returns a k8s podSpec from the Service
