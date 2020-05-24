@@ -207,39 +207,16 @@ func getServiceFromFDL(name string, namespace string, kubeClientset *kubernetes.
 		return nil, fmt.Errorf("The FDL of the service \"%s\" cannot be read", name)
 	}
 
+	// Add the script to the service from configmap's script value
+	service.Script = cm.Data[types.ScriptFileName]
+
 	return service, nil
 }
 
 func createServiceConfigMap(service *types.Service, namespace string, kubeClientset *kubernetes.Clientset) error {
-	// Create FDL YAML
-	fdl, err := service.ToYAML()
-	if err != nil {
-		return err
-	}
+	// Copy script from service
+	script := service.Script
 
-	// Create ConfigMap
-	cm := &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      service.Name,
-			Namespace: namespace,
-			Labels: map[string]string{
-				types.ServiceLabel: service.Name,
-			},
-		},
-		Data: map[string]string{
-			types.ScriptFileName: service.Script,
-			types.FDLFileName:    fdl,
-		},
-	}
-	_, err = kubeClientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), cm, metav1.CreateOptions{})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func updateServiceConfigMap(service *types.Service, namespace string, kubeClientset *kubernetes.Clientset) error {
 	// Clear script from YAML
 	service.Script = ""
 
@@ -259,7 +236,42 @@ func updateServiceConfigMap(service *types.Service, namespace string, kubeClient
 			},
 		},
 		Data: map[string]string{
-			types.ScriptFileName: service.Script,
+			types.ScriptFileName: script,
+			types.FDLFileName:    fdl,
+		},
+	}
+	_, err = kubeClientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), cm, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func updateServiceConfigMap(service *types.Service, namespace string, kubeClientset *kubernetes.Clientset) error {
+	// Copy script from service
+	script := service.Script
+
+	// Clear script from YAML
+	service.Script = ""
+
+	// Create FDL YAML
+	fdl, err := service.ToYAML()
+	if err != nil {
+		return err
+	}
+
+	// Create ConfigMap
+	cm := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      service.Name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				types.ServiceLabel: service.Name,
+			},
+		},
+		Data: map[string]string{
+			types.ScriptFileName: script,
 			types.FDLFileName:    fdl,
 		},
 	}
