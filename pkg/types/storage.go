@@ -106,7 +106,7 @@ func (minIOProvider MinIOProvider) GetS3Client() *s3.S3 {
 func (onedataProvider OnedataProvider) GetCDMIClient() *cdmi.Client {
 	opHost := strings.TrimRight(onedataProvider.OneproviderHost, "/ ")
 	// OneproviderHost must contain the "/cdmi" path for creating the CDMI client
-	opHostCDMI, _ := url.Parse(fmt.Sprintf("%s/cdmi", opHost))
+	opHostCDMI, _ := url.Parse(fmt.Sprintf("https://%s/cdmi", opHost))
 
 	return cdmi.New(opHostCDMI, onedataProvider.Token, true)
 }
