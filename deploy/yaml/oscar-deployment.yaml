@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oscar
+  namespace: oscar
+  labels:
+    app: oscar
+spec:
+  selector:
+    matchLabels:
+      app: oscar
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: oscar
+    spec:
+      serviceAccountName: oscar-sa
+      containers:
+      - name: oscar
+        image: "srisco/oscar:2.0.0-preview"
+        imagePullPolicy: Always
+        securityContext:
+          readOnlyRootFilesystem: true
+          runAsUser: 10001
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          timeoutSeconds: 5
+        env:
+        - name: OSCAR_USERNAME
+          value: admin
+        - name: OSCAR_PASSWORD
+          value: password
+        - name: MINIO_ACCESS_KEY
+          value: minio
+        - name: MINIO_SECRET_KEY
+          value: 
+        - name: MINIO_TLS_VERIFY
+          value: "false"
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      nodeSelector:
+        node-role.kubernetes.io/master: ''
