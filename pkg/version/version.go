@@ -17,6 +17,8 @@ limitations under the License.
 package version
 
 import (
+	"runtime"
+
 	"github.com/grycap/oscar/pkg/types"
 	"k8s.io/client-go/kubernetes"
 )
@@ -27,9 +29,6 @@ var (
 
 	// GitCommit SHA of last git commit
 	GitCommit string
-
-	// Platform architecture of the compiled binary
-	Platform string
 )
 
 // GetInfo returns version info
@@ -43,7 +42,7 @@ func GetInfo(kubeClientset *kubernetes.Clientset, back types.ServerlessBackend) 
 	return types.Info{
 		Version:               version,
 		GitCommit:             GitCommit,
-		Platform:              Platform,
+		Architecture:          runtime.GOARCH,
 		KubeVersion:           getKubeVersion(kubeClientset),
 		ServerlessBackendInfo: back.GetInfo(),
 	}

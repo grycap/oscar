@@ -20,7 +20,7 @@ package types
 type Info struct {
 	Version               string                 `json:"version"`
 	GitCommit             string                 `json:"git_commit"`
-	Platform              string                 `json:"platform"`
+	Architecture          string                 `json:"architecture"`
 	KubeVersion           string                 `json:"kubernetes_version"`
 	ServerlessBackendInfo *ServerlessBackendInfo `json:"serverless_backend,omitempty"`
 }

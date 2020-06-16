@@ -2,7 +2,6 @@ FROM golang:1.14 as build
 
 ARG VERSION
 ARG GIT_COMMIT
-ARG PLATFORM="x86_64"
 ARG GOOS=linux
 
 RUN mkdir /oscar
@@ -15,8 +14,7 @@ COPY pkg pkg
 
 RUN GOOS=${GOOS} CGO_ENABLED=0 go build --ldflags "-s -w \
 -X \"github.com/grycap/oscar/pkg/version.Version=${VERSION}\" \
--X \"github.com/grycap/oscar/pkg/version.GitCommit=${GIT_COMMIT}\" \
--X \"github.com/grycap/oscar/pkg/version.Platform=${PLATFORM}\"" \
+-X \"github.com/grycap/oscar/pkg/version.GitCommit=${GIT_COMMIT}\"" \
 -a -installsuffix cgo -o oscar .
 
 
