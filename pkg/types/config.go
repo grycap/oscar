@@ -39,35 +39,35 @@ const (
 // Config stores the configuration for the OSCAR server
 type Config struct {
 	// MinIOProvider access info
-	MinIOProvider *MinIOProvider
+	MinIOProvider *MinIOProvider `json:"minio_provider"`
 
 	// Basic auth username
-	Username string
+	Username string `json:"-"`
 
 	// Basic auth password
-	Password string
+	Password string `json:"-"`
 
 	// Kubernetes name for the deployment and service (default: oscar)
-	Name string
+	Name string `json:"name"`
 
 	// Kubernetes namespace for the deployment and service (default: oscar)
-	Namespace string
+	Namespace string `json:"namespace"`
 
 	// Kubernetes namespace for services and jobs (default: oscar-svc)
-	ServicesNamespace string
+	ServicesNamespace string `json:"services_namespace"`
 
 	// Port used for the ClusterIP k8s service (default: 8080)
-	ServicePort int
+	ServicePort int `json:"-"`
 
 	// Serverless framework used to deploy services (Openfaas | Knative)
 	// If not defined only async invokations allowed (Using KubeBackend)
-	ServerlessBackend string
+	ServerlessBackend string `json:"serverless_backend,omitempty"`
 
 	// HTTP timeout for reading the payload (default: 300)
-	ReadTimeout time.Duration
+	ReadTimeout time.Duration `json:"-"`
 
 	// HTTP timeout for writing the response (default: 300)
-	WriteTimeout time.Duration
+	WriteTimeout time.Duration `json:"-"`
 }
 
 func parseSeconds(s string) (time.Duration, error) {

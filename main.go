@@ -70,6 +70,9 @@ func main() {
 		cfg.Username: cfg.Password,
 	}))
 
+	// Config path
+	system.GET("/config", handlers.MakeConfigHandler(cfg))
+
 	// CRUD Services
 	system.POST("/services", handlers.MakeCreateHandler(cfg, back))
 	system.GET("/services", handlers.MakeListHandler(back))
