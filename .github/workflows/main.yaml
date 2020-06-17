@@ -4,6 +4,7 @@ on:
   push:
     branches: [master]
   release:
+    types: [created]
 
 jobs:
   buildx:
@@ -23,7 +24,7 @@ jobs:
         fi
 
         TAGS="--tag ${DOCKER_IMAGE}:latest"
-        if [[ -z $VERSION ]]; then
+        if [[ ! -v $VERSION ]]; then
           TAGS="$TAGS --tag ${DOCKER_IMAGE}:${VERSION}"
         fi
 
@@ -32,7 +33,7 @@ jobs:
         echo ::set-output name=buildx_args::--platform ${DOCKER_PLATFORMS} \
           --build-arg VERSION=${VERSION} \
           --build-arg GIT_COMMIT=${GITHUB_SHA::8} \
-          ${TAGS} .
+          ${TAGS} --file Dockerfile .
 
     - name: Set up Docker Buildx
       uses: crazy-max/ghaction-docker-buildx@v3.1.0
