@@ -1,8 +1,6 @@
-name: build
+name: bin-downloader
 
 on:
-  push:
-    branches: [master]
   release:
     types: [created]
 
@@ -16,7 +14,7 @@ jobs:
     - name: Prepare
       id: prepare
       run: |
-        DOCKER_IMAGE=grycap/oscar
+        DOCKER_IMAGE=grycap/oscar-bin-downloader
         DOCKER_PLATFORMS=linux/amd64,linux/arm64
 
         if [[ $GITHUB_REF == refs/tags/* ]]; then
@@ -29,9 +27,7 @@ jobs:
         fi
 
         echo ::set-output name=buildx_args::--platform ${DOCKER_PLATFORMS} \
-          --build-arg VERSION=${VERSION} \
-          --build-arg GIT_COMMIT=${GITHUB_SHA::8} \
-          ${TAGS} --file Dockerfile .
+          ${TAGS} --file tools/oscar-bin-downloader/Dockerfile tools/oscar-bin-downloader
 
     - name: Set up Docker Buildx
       uses: crazy-max/ghaction-docker-buildx@v3.1.0
