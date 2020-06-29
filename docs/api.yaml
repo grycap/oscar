@@ -11,7 +11,7 @@ info:
     email: serisgal@i3m.upv.es
 externalDocs:
   description: More documentation available on GitHub
-  url: https://github.com/grycap/oscar
+  url: 'https://github.com/grycap/oscar'
 paths:
   /system/services:
     get:
@@ -294,6 +294,21 @@ paths:
               format: binary
             examples: {}
         description: Event
+  /system/config:
+    get:
+      summary: Your GET endpoint
+      tags: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: ''
+        '500':
+          description: Internal Server Error
+      operationId: GetConfig
+      description: Get system configuration
+      security:
+        - basicAuth: []
 components:
   schemas:
     Service:
@@ -367,18 +382,7 @@ components:
             region:
               type: string
         minio:
-          type: object
-          properties:
-            endpoint:
-              type: string
-            region:
-              type: string
-            secret_key:
-              type: string
-            access_key:
-              type: string
-            verify:
-              type: boolean
+          $ref: '#/components/schemas/MinIOProvider'
         onedata:
           type: object
           properties:
@@ -417,6 +421,32 @@ components:
               type: string
             version:
               type: string
+    Config:
+      title: Config
+      type: object
+      properties:
+        minio_provider:
+          $ref: '#/components/schemas/MinIOProvider'
+        name:
+          type: string
+        namespace:
+          type: string
+        serverless_backend:
+          type: string
+    MinIOProvider:
+      title: MinIOProvider
+      type: object
+      properties:
+        endpoint:
+          type: string
+        region:
+          type: string
+        secret_key:
+          type: string
+        access_key:
+          type: string
+        verify:
+          type: boolean
   securitySchemes:
     basicAuth:
       type: http
