@@ -1,8 +1,11 @@
-<h1 align="center">
-    <img src="docs/source/images/oscar-logo.png" alt="OSCAR" width="220">
-  <br>
-  OSCAR - Open Source Serverless Computing for Data-Processing Applications
-</h1>
+# OSCAR - Open Source Serverless Computing for Data-Processing Applications
+
+[![Docker Image Version (latest semver)](https://img.shields.io/docker/v/grycap/oscar)](https://hub.docker.com/r/grycap/oscar)
+[![build](https://github.com/grycap/oscar/workflows/build/badge.svg)](https://github.com/grycap/oscar/actions?query=workflow%3Abuild)
+[![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat)](https://pkg.go.dev/github.com/grycap/oscar)
+[![GitHub](https://img.shields.io/github/license/grycap/oscar)](https://github.com/grycap/oscar/blob/master/LICENSE)
+
+![OSCAR-logo](docs/source/images/oscar3.png)
 
 ## Introduction
 
