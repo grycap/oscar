@@ -297,10 +297,15 @@ paths:
   /system/config:
     get:
       summary: Your GET endpoint
-      tags: []
+      tags:
+        - config
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Config'
         '401':
           description: ''
         '500':
