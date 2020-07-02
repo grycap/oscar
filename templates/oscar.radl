@@ -69,10 +69,11 @@ configure front (
       - {option: "--insecure-port", value: "8080"}
       - {option: "--token-auth-file", value: "/etc/kubernetes/pki/auth"}
       - {option: "--service-node-port-range", value: "80-32767"}
+      kube_install_ingress: true
       kube_deploy_dashboard: true
       kube_install_metrics: true
       kube_install_nfs_client: true
-      kube_version: 1.16.4
+      kube_version: 1.18.3
 
     - role: 'grycap.kubefaas'
       faas_framework: 'openfaas'
@@ -85,6 +86,7 @@ configure front (
       enable_notifications: true
       webhook_endpoints: [{ id: "1", endpoint: "http://oscar-manager.oscar:8080/events"}]
       minio_secretkey: '{{ minio_secret }}'
+      enable_tls: false
       master_deploy: true
 
     - role: 'grycap.kuberegistry'
@@ -95,7 +97,7 @@ configure front (
 
     - role: 'grycap.kubeoscar'
       minio_pass: '{{ minio_secret }}'
-      vue_app_backend_host: '{{ hostvars[groups["front"][0]]["IM_NODE_PUBLIC_IP"] }}:{{ nginx_https_nodeport }}'
+      vue_app_backend_host: '{{ hostvars[groups["front"][0]]["IM_NODE_PUBLIC_IP"] }}'
       master_deploy: true
       oscar_version: 1.2.0
       oscar_ui_version: 1.0.1
@@ -143,7 +145,7 @@ configure wn (
     - role: 'grycap.kubernetes'
       kube_type_of_node: 'wn'
       kube_server: 'kubeserver'
-      kube_version: 1.16.4
+      kube_version: 1.18.3
 
     - role: 'grycap.kuberegistry'
       public_access: false

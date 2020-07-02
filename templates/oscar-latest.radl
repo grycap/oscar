@@ -70,6 +70,7 @@ configure front (
       - {option: "--token-auth-file", value: "/etc/kubernetes/pki/auth"}
       - {option: "--service-node-port-range", value: "80-32767"}
       kube_deploy_dashboard: true
+      kube_install_ingress: true
       kube_install_metrics: true
       kube_install_nfs_client: true
       kube_version: 'latest'
@@ -83,6 +84,7 @@ configure front (
       webhook_endpoints: [{ id: "1", endpoint: "http://oscar-manager.oscar:8080/events"}]
       minio_secretkey: '{{ minio_secret }}'
       master_deploy: true
+      enable_tls: false
 
     - role: 'grycap.kuberegistry'
       public_access: false
@@ -92,7 +94,7 @@ configure front (
 
     - role: 'grycap.kubeoscar'
       minio_pass: '{{ minio_secret }}'
-      vue_app_backend_host: '{{ hostvars[groups["front"][0]]["IM_NODE_PUBLIC_IP"] }}:{{ nginx_https_nodeport }}'
+      vue_app_backend_host: '{{ hostvars[groups["front"][0]]["IM_NODE_PUBLIC_IP"] }}'
       master_deploy: true
       # Last supervisor version until FDL. Not implemented in OSCAR yet.
       supervisor_version: 1.1.2
