@@ -34,6 +34,8 @@ const (
 	defaultServicePort       = 8080
 	defaultNamespace         = "oscar"
 	defaultServicesNamespace = "oscar-svc"
+	defaultOpenfaasNamespace = "openfaas"
+	defaultOpenfaasPort      = 8080
 )
 
 // Config stores the configuration for the OSCAR server
@@ -62,6 +64,12 @@ type Config struct {
 	// Serverless framework used to deploy services (Openfaas | Knative)
 	// If not defined only async invokations allowed (Using KubeBackend)
 	ServerlessBackend string `json:"serverless_backend,omitempty"`
+
+	// OpenfaasNamespace namespace where the OpenFaaS gateway is deployed
+	OpenfaasNamespace string `json:"-"`
+
+	// OpenfaasPort service port where the OpenFaaS gateway is exposed
+	OpenfaasPort int `json:"-"`
 
 	// HTTP timeout for reading the payload (default: 300)
 	ReadTimeout time.Duration `json:"-"`
@@ -156,6 +164,23 @@ func ReadConfig() (*Config, error) {
 		config.ServerlessBackend = strings.ToLower(os.Getenv("SERVERLESS_BACKEND"))
 		if config.ServerlessBackend != "openfaas" && config.ServerlessBackend != "knative" {
 			return nil, fmt.Errorf("The SERVERLESS_BACKEND is not valid. Must be \"Openfaas\" or \"Knative\"")
+		}
+	}
+
+	if config.ServerlessBackend == "openfaas" {
+		if len(os.Getenv("OPENFAAS_NAMESPACE")) > 0 {
+			config.OpenfaasNamespace = strings.ToLower(os.Getenv("OPENFAAS_NAMESPACE"))
+		} else {
+			config.OpenfaasNamespace = defaultOpenfaasNamespace
+		}
+
+		if len(os.Getenv("OPENFAAS_PORT")) > 0 {
+			config.OpenfaasPort, err = strconv.Atoi(os.Getenv("OPENFAAS_PORT"))
+			if err != nil {
+				return nil, fmt.Errorf("The OPENFAAS_PORT value is not valid. Error: %s", err)
+			}
+		} else {
+			config.OpenfaasPort = defaultOpenfaasPort
 		}
 	}
 

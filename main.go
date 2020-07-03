@@ -53,8 +53,8 @@ func main() {
 
 	switch cfg.ServerlessBackend {
 	// TODO: Uncomment when backends are implemented
-	// case "openfaas":
-	// 	back = backends.MakeOpenfaasBackend()
+	case "openfaas":
+		back = backends.MakeOpenfaasBackend(kubeClientset, kubeConfig, cfg)
 	// case "knative":
 	// 	back = backends.MakeKnativeBackend()
 	default:
