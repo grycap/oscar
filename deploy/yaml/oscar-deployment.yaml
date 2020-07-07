@@ -50,7 +50,7 @@ spec:
           protocol: TCP
         resources:
           requests:
-            cpu: 200m
+            cpu: 250m
             memory: 256Mi
       tolerations:
       - key: node-role.kubernetes.io/master

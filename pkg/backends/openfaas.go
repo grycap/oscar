@@ -17,10 +17,13 @@ limitations under the License.
 package backends
 
 import (
+	"context"
 	"fmt"
+	"log"
 
 	"github.com/grycap/oscar/pkg/types"
 	ofclientset "github.com/openfaas/faas-netes/pkg/client/clientset/versioned"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -35,7 +38,10 @@ type OpenfaasBackend struct {
 
 // MakeOpenfaasBackend makes a OpenfaasBackend from the provided k8S clientset and config
 func MakeOpenfaasBackend(kubeClientset *kubernetes.Clientset, kubeConfig *rest.Config, cfg *types.Config) *OpenfaasBackend {
-	ofClientset, _ := ofclientset.NewForConfig(kubeConfig)
+	ofClientset, err := ofclientset.NewForConfig(kubeConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	return &OpenfaasBackend{
 		kubeClientset:   kubeClientset,
@@ -51,26 +57,53 @@ func (of *OpenfaasBackend) GetInfo() *types.ServerlessBackendInfo {
 	return nil
 }
 
-// ListServices
-// TODO: implement
+// ListServices returns a slice with all services registered in the provided namespace
 func (of *OpenfaasBackend) ListServices() ([]*types.Service, error) {
-	// TODO: list deployments directly (with kubeClientset)
+	// Get the list with all deployments
+	deployments, err := of.kubeClientset.AppsV1().Deployments(of.namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	services := []*types.Service{}
+	for _, deployment := range deployments.Items {
+		// Get service from configMap's FDL
+		svc, err := getServiceFromFDL(deployment.Name, of.namespace, of.kubeClientset)
+		if err != nil {
+			log.Printf("WARNING: %v\n", err)
+		} else {
+			services = append(services, svc)
+		}
+	}
+
+	return services, nil
 
 }
 
 // CreateService
 // TODO: implement
 func (of *OpenfaasBackend) CreateService(service types.Service) error {
+	// TODO: create function and watch (list) the deployment until it is created
 	// TODO: update deployment after creation... add volume
 	// TODO: add label "com.openfaas.scale.zero=true" for scaling to zero
 	// TODO: use ofClientset
 	return nil
 }
 
-// ReadService
-// TODO: implement
+// ReadService returns a Service
 func (of *OpenfaasBackend) ReadService(name string) (*types.Service, error) {
-	// TODO: read deployment directly (with kubeClientset)
+	// Check if service exists
+	if _, err := of.kubeClientset.AppsV1().Deployments(of.namespace).Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
+		return nil, err
+	}
+
+	// Get service from configMap's FDL
+	svc, err := getServiceFromFDL(name, of.namespace, of.kubeClientset)
+	if err != nil {
+		return nil, err
+	}
+
+	return svc, nil
 
 }
 
