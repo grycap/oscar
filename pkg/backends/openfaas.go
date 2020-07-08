@@ -18,15 +18,23 @@ package backends
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/grycap/oscar/pkg/types"
+	ofv1 "github.com/openfaas/faas-netes/pkg/apis/openfaas/v1"
 	ofclientset "github.com/openfaas/faas-netes/pkg/client/clientset/versioned"
+
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
+
+var errOpenfaasOperator = errors.New("The OpenFaaS Operator is not creating the service deployment")
 
 // OpenfaasBackend struct to represent an Openfaas client
 type OpenfaasBackend struct {
@@ -47,11 +55,11 @@ func MakeOpenfaasBackend(kubeClientset *kubernetes.Clientset, kubeConfig *rest.C
 		kubeClientset:   kubeClientset,
 		ofClientset:     ofClientset,
 		namespace:       cfg.ServicesNamespace,
-		gatewayEndpoint: fmt.Sprintf("http://gateway.%s:%d", cfg.OpenfaasNamespace, cfg.OpenfaasPort),
+		gatewayEndpoint: fmt.Sprintf("gateway.%s:%d", cfg.OpenfaasNamespace, cfg.OpenfaasPort),
 	}
 }
 
-// GetInfo
+// GetInfo returns the ServerlessBackendInfo with the name and version
 // TODO: implement
 func (of *OpenfaasBackend) GetInfo() *types.ServerlessBackendInfo {
 	return nil
@@ -77,16 +85,103 @@ func (of *OpenfaasBackend) ListServices() ([]*types.Service, error) {
 	}
 
 	return services, nil
-
 }
 
-// CreateService
-// TODO: implement
+// CreateService creates a new service as a OpenFaaS function
 func (of *OpenfaasBackend) CreateService(service types.Service) error {
-	// TODO: create function and watch (list) the deployment until it is created
-	// TODO: update deployment after creation... add volume
-	// TODO: add label "com.openfaas.scale.zero=true" for scaling to zero
-	// TODO: use ofClientset
+	// Create the configMap with FDL and user-script
+	err := createServiceConfigMap(&service, of.namespace, of.kubeClientset)
+	if err != nil {
+		return err
+	}
+
+	// Check if a deployment of the function was already created to get its ResourceVersion
+	var resourceVersion string
+	oldDeploy, err := of.kubeClientset.AppsV1().Deployments(of.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
+	if err == nil {
+		resourceVersion = oldDeploy.ResourceVersion
+	}
+
+	// Create the Function through the OpenFaaS operator
+	function := of.createOFFunctionDefinition(&service)
+	_, err = of.ofClientset.OpenfaasV1().Functions(of.namespace).Create(context.TODO(), function, metav1.CreateOptions{})
+	if err != nil {
+		// Delete the previously created configMap
+		if delErr := deleteServiceConfigMap(service.Name, of.namespace, of.kubeClientset); delErr != nil {
+			log.Println(delErr.Error())
+		}
+		return err
+	}
+
+	// Watch for deployment changes in services namespace
+	var timeoutSeconds int64 = 120
+	var deploymentCreated = false
+	listOpts := metav1.ListOptions{
+		TimeoutSeconds:  &timeoutSeconds,
+		Watch:           true,
+		ResourceVersion: resourceVersion,
+	}
+	watcher, err := of.kubeClientset.AppsV1().Deployments(of.namespace).Watch(context.TODO(), listOpts)
+	if err != nil {
+		// Delete the previously created configMap
+		if delErr := deleteServiceConfigMap(service.Name, of.namespace, of.kubeClientset); delErr != nil {
+			log.Println(delErr.Error())
+		}
+		return err
+	}
+	ch := watcher.ResultChan()
+	for event := range ch {
+		deploy, ok := event.Object.(*appsv1.Deployment)
+		if ok {
+			if event.Type == watch.Added && deploy.Name == service.Name {
+				deploymentCreated = true
+				break
+			}
+		}
+	}
+	watcher.Stop()
+	// Return an error if the OpenFaaS Operator doesn't create the deployment
+	if !deploymentCreated {
+		// Delete the previously created configMap
+		if delErr := deleteServiceConfigMap(service.Name, of.namespace, of.kubeClientset); delErr != nil {
+			log.Println(delErr.Error())
+		}
+		return errOpenfaasOperator
+	}
+
+	// Get the service's deployment to update mounting the volume
+	deployment, err := of.kubeClientset.AppsV1().Deployments(of.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
+	if err != nil {
+		// Delete the previously created configMap
+		if delErr := deleteServiceConfigMap(service.Name, of.namespace, of.kubeClientset); delErr != nil {
+			log.Println(delErr.Error())
+		}
+		return errOpenfaasOperator
+	}
+
+	// Create podSpec from the service
+	podSpec, err := service.ToPodSpec()
+	if err != nil {
+		// Delete the previously created configMap
+		if delErr := deleteServiceConfigMap(service.Name, of.namespace, of.kubeClientset); delErr != nil {
+			log.Println(delErr.Error())
+		}
+		return err
+	}
+
+	// Update podSpec in the deployment
+	deployment.Spec.Template.Spec = *podSpec
+
+	// Update the deployment
+	_, err = of.kubeClientset.AppsV1().Deployments(of.namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
+	if err != nil {
+		// Delete the previously created configMap
+		if delErr := deleteServiceConfigMap(service.Name, of.namespace, of.kubeClientset); delErr != nil {
+			log.Println(delErr.Error())
+		}
+		return err
+	}
+
 	return nil
 }
 
@@ -107,15 +202,97 @@ func (of *OpenfaasBackend) ReadService(name string) (*types.Service, error) {
 
 }
 
-// UpdateService
-// TODO: implement
+// UpdateService updates an existent service
 func (of *OpenfaasBackend) UpdateService(service types.Service) error {
-	// TODO: update the deployment directly (with kubeClientset)
+	// Get the old service's configMap
+	oldCm, err := of.kubeClientset.CoreV1().ConfigMaps(of.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("The service \"%s\" does not have a registered ConfigMap", service.Name)
+	}
+
+	// Update the configMap with FDL and user-script
+	if err := updateServiceConfigMap(&service, of.namespace, of.kubeClientset); err != nil {
+		return err
+	}
+
+	// Create podSpec from the service
+	podSpec, err := service.ToPodSpec()
+	if err != nil {
+		// Restore the old configMap
+		_, resErr := of.kubeClientset.CoreV1().ConfigMaps(of.namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
+		if resErr != nil {
+			log.Println(resErr.Error())
+		}
+		return err
+	}
+
+	// Get the service's deployment to update its podSpec
+	deployment, err := of.kubeClientset.AppsV1().Deployments(of.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
+	if err != nil {
+		// Restore the old configMap
+		_, resErr := of.kubeClientset.CoreV1().ConfigMaps(of.namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
+		if resErr != nil {
+			log.Println(resErr.Error())
+		}
+		return err
+	}
+
+	// Update podSpec in the deployment
+	deployment.Spec.Template.Spec = *podSpec
+
+	// Update the deployment
+	_, err = of.kubeClientset.AppsV1().Deployments(of.namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
+	if err != nil {
+		// Restore the old configMap
+		_, resErr := of.kubeClientset.CoreV1().ConfigMaps(of.namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
+		if resErr != nil {
+			log.Println(resErr.Error())
+		}
+		return err
+	}
+
 	return nil
 }
 
-// DeleteService
-// TODO: implement
+// DeleteService deletes a service
 func (of *OpenfaasBackend) DeleteService(name string) error {
+	if err := of.ofClientset.OpenfaasV1().Functions(of.namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
+		return err
+	}
+
+	// Delete the service's configMap
+	if delErr := deleteServiceConfigMap(name, of.namespace, of.kubeClientset); delErr != nil {
+		log.Println(delErr.Error())
+	}
+
 	return nil
+}
+
+// GetProxyDirector returns a director function to use in a httputil.ReverseProxy
+func (of *OpenfaasBackend) GetProxyDirector(serviceName string) func(req *http.Request) {
+	return func(req *http.Request) {
+		req.URL.Scheme = "http"
+		req.URL.Host = of.gatewayEndpoint
+		req.URL.Path = fmt.Sprintf("/function/%s", serviceName)
+	}
+}
+
+func (of *OpenfaasBackend) createOFFunctionDefinition(service *types.Service) *ofv1.Function {
+	labels := map[string]string{
+		// Add label "com.openfaas.scale.zero=true" for scaling to zero
+		types.OpenfaasZeroScalingLabel: "true",
+		types.ServiceLabel:             service.Name,
+	}
+
+	return &ofv1.Function{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      service.Name,
+			Namespace: of.namespace,
+		},
+		Spec: ofv1.FunctionSpec{
+			Image:  service.Image,
+			Name:   service.Name,
+			Labels: &labels,
+		},
+	}
 }

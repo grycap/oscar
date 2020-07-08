@@ -319,7 +319,6 @@ components:
     Service:
       title: Service
       type: object
-      x-examples: {}
       properties:
         name:
           type: string

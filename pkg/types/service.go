@@ -63,6 +63,9 @@ const (
 
 	// EventVariable name used by the environment variable where events are stored
 	EventVariable = "EVENT"
+
+	// OpenfaasZeroScalingLabel label to enable zero scaling in OpenFaaS functions
+	OpenfaasZeroScalingLabel = "com.openfaas.scale.zero"
 )
 
 // Service represents an OSCAR service following the SCAR Function Definition Language
