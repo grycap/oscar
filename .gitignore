@@ -22,3 +22,13 @@ docs/source/_build
 work/
 test/*.zip
 .settings/
+
+#Files from ui
+ui/node_modules
+ui/dist
+ui/package-lock.json
+
+# Log files
+ui/npm-debug.log*
+ui/yarn-debug.log*
+ui/yarn-error.log*
