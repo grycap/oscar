@@ -16,7 +16,9 @@ limitations under the License.
 
 package types
 
-// ServerlessBackend define an interface for different serverless backends
+import "net/http"
+
+// ServerlessBackend define an interface for OSCAR's backends
 type ServerlessBackend interface {
 	GetInfo() *ServerlessBackendInfo
 	ListServices() ([]*Service, error)
@@ -24,4 +26,10 @@ type ServerlessBackend interface {
 	ReadService(name string) (*Service, error)
 	UpdateService(service Service) error
 	DeleteService(name string) error
+}
+
+// SyncBackend define an interface for serverless backends that allow sync invocations
+type SyncBackend interface {
+	ServerlessBackend
+	GetProxyDirector(serviceName string) func(req *http.Request)
 }

@@ -89,11 +89,11 @@ func main() {
 	// Job path for async invocations
 	r.POST("/job/:serviceName", handlers.MakeJobHandler(cfg, kubeClientset, back))
 
-	// TODO: Uncomment when backends are implemented
 	// Service path for sync invocations (only if ServerlessBackend is enabled)
-	// if cfg.ServerlessBackend != "" {
-	// 	r.GET("/service/:serviceName", handlers.MakeServiceHandler(cfg, back))
-	// }
+	syncBack, ok := back.(types.SyncBackend)
+	if cfg.ServerlessBackend != "" && ok {
+		r.GET("/service/:serviceName", handlers.MakeRunHandler(cfg, syncBack))
+	}
 
 	// System info path
 	system.GET("/info", handlers.MakeInfoHandler(kubeClientset, back))
