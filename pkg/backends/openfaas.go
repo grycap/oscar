@@ -18,6 +18,7 @@ package backends
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -28,7 +29,9 @@ import (
 	ofclientset "github.com/openfaas/faas-netes/pkg/client/clientset/versioned"
 
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -60,9 +63,11 @@ func MakeOpenfaasBackend(kubeClientset *kubernetes.Clientset, kubeConfig *rest.C
 }
 
 // GetInfo returns the ServerlessBackendInfo with the name and version
-// TODO: implement
 func (of *OpenfaasBackend) GetInfo() *types.ServerlessBackendInfo {
-	return nil
+	return &types.ServerlessBackendInfo{
+		Name: "OpenFaaS",
+		// TODO: Get version
+	}
 }
 
 // ListServices returns a slice with all services registered in the provided namespace
@@ -114,7 +119,7 @@ func (of *OpenfaasBackend) CreateService(service types.Service) error {
 	}
 
 	// Watch for deployment changes in services namespace
-	var timeoutSeconds int64 = 120
+	var timeoutSeconds int64 = 130
 	var deploymentCreated = false
 	listOpts := metav1.ListOptions{
 		TimeoutSeconds:  &timeoutSeconds,
@@ -123,6 +128,11 @@ func (of *OpenfaasBackend) CreateService(service types.Service) error {
 	}
 	watcher, err := of.kubeClientset.AppsV1().Deployments(of.namespace).Watch(context.TODO(), listOpts)
 	if err != nil {
+		// Delete the function
+		delErr := of.ofClientset.OpenfaasV1().Functions(of.namespace).Delete(context.TODO(), service.Name, metav1.DeleteOptions{})
+		if delErr != nil {
+			log.Println(delErr.Error())
+		}
 		// Delete the previously created configMap
 		if delErr := deleteServiceConfigMap(service.Name, of.namespace, of.kubeClientset); delErr != nil {
 			log.Println(delErr.Error())
@@ -142,16 +152,11 @@ func (of *OpenfaasBackend) CreateService(service types.Service) error {
 	watcher.Stop()
 	// Return an error if the OpenFaaS Operator doesn't create the deployment
 	if !deploymentCreated {
-		// Delete the previously created configMap
-		if delErr := deleteServiceConfigMap(service.Name, of.namespace, of.kubeClientset); delErr != nil {
+		// Delete the function
+		delErr := of.ofClientset.OpenfaasV1().Functions(of.namespace).Delete(context.TODO(), service.Name, metav1.DeleteOptions{})
+		if delErr != nil {
 			log.Println(delErr.Error())
 		}
-		return errOpenfaasOperator
-	}
-
-	// Get the service's deployment to update mounting the volume
-	deployment, err := of.kubeClientset.AppsV1().Deployments(of.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
-	if err != nil {
 		// Delete the previously created configMap
 		if delErr := deleteServiceConfigMap(service.Name, of.namespace, of.kubeClientset); delErr != nil {
 			log.Println(delErr.Error())
@@ -162,6 +167,11 @@ func (of *OpenfaasBackend) CreateService(service types.Service) error {
 	// Create podSpec from the service
 	podSpec, err := service.ToPodSpec()
 	if err != nil {
+		// Delete the function
+		delErr := of.ofClientset.OpenfaasV1().Functions(of.namespace).Delete(context.TODO(), service.Name, metav1.DeleteOptions{})
+		if delErr != nil {
+			log.Println(delErr.Error())
+		}
 		// Delete the previously created configMap
 		if delErr := deleteServiceConfigMap(service.Name, of.namespace, of.kubeClientset); delErr != nil {
 			log.Println(delErr.Error())
@@ -169,12 +179,29 @@ func (of *OpenfaasBackend) CreateService(service types.Service) error {
 		return err
 	}
 
-	// Update podSpec in the deployment
-	deployment.Spec.Template.Spec = *podSpec
+	// Create JSON Patch
+	// https://tools.ietf.org/html/rfc6902
+	patch := []struct {
+		Op    string      `json:"op"`
+		Path  string      `json:"path"`
+		Value *v1.PodSpec `json:"value"`
+	}{
+		{
+			Op:    "replace",
+			Path:  "/spec/template/spec",
+			Value: podSpec,
+		},
+	}
+	jsonPatch, _ := json.Marshal(patch)
 
 	// Update the deployment
-	_, err = of.kubeClientset.AppsV1().Deployments(of.namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
+	_, err = of.kubeClientset.AppsV1().Deployments(of.namespace).Patch(context.TODO(), service.Name, k8stypes.JSONPatchType, jsonPatch, metav1.PatchOptions{})
 	if err != nil {
+		// Delete the function
+		delErr := of.ofClientset.OpenfaasV1().Functions(of.namespace).Delete(context.TODO(), service.Name, metav1.DeleteOptions{})
+		if delErr != nil {
+			log.Println(delErr.Error())
+		}
 		// Delete the previously created configMap
 		if delErr := deleteServiceConfigMap(service.Name, of.namespace, of.kubeClientset); delErr != nil {
 			log.Println(delErr.Error())
