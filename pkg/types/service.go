@@ -240,9 +240,9 @@ func addWatchdogEnvVars(p *v1.PodSpec) {
 		},
 	}
 
-	for _, cont := range p.Containers {
+	for i, cont := range p.Containers {
 		if cont.Name == ContainerName {
-			cont.Env = append(cont.Env, requiredEnvVars...)
+			p.Containers[i].Env = append(p.Containers[i].Env, requiredEnvVars...)
 		}
 	}
 }

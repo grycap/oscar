@@ -119,7 +119,7 @@ func (of *OpenfaasBackend) CreateService(service types.Service) error {
 	}
 
 	// Watch for deployment changes in services namespace
-	var timeoutSeconds int64 = 130
+	var timeoutSeconds int64 = 30
 	var deploymentCreated = false
 	listOpts := metav1.ListOptions{
 		TimeoutSeconds:  &timeoutSeconds,
@@ -226,7 +226,6 @@ func (of *OpenfaasBackend) ReadService(name string) (*types.Service, error) {
 	}
 
 	return svc, nil
-
 }
 
 // UpdateService updates an existent service
