@@ -18,6 +18,15 @@ RUN GOOS=${GOOS} CGO_ENABLED=0 go build --ldflags "-s -w \
 -a -installsuffix cgo -o oscar .
 
 
+FROM node:14.5-alpine as ui-build
+
+COPY ui /ui
+WORKDIR /ui
+
+RUN npm install && \
+    npm run build
+
+
 FROM alpine:3.11
 
 LABEL org.label-schema.license="Apache 2.0" \
@@ -36,6 +45,8 @@ WORKDIR /home/app
 EXPOSE 8080
 
 COPY --from=build /oscar/oscar .
+
+COPY --from=ui-build /ui/dist assets
 
 RUN chown -R app:app ./
 

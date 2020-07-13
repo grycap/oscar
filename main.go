@@ -52,7 +52,6 @@ func main() {
 	var back types.ServerlessBackend
 
 	switch cfg.ServerlessBackend {
-	// TODO: Uncomment when backends are implemented
 	case "openfaas":
 		back = backends.MakeOpenfaasBackend(kubeClientset, kubeConfig, cfg)
 	// case "knative":
@@ -92,11 +91,19 @@ func main() {
 	// Service path for sync invocations (only if ServerlessBackend is enabled)
 	syncBack, ok := back.(types.SyncBackend)
 	if cfg.ServerlessBackend != "" && ok {
-		r.GET("/service/:serviceName", handlers.MakeRunHandler(cfg, syncBack))
+		r.GET("/run/:serviceName", handlers.MakeRunHandler(cfg, syncBack))
 	}
 
 	// System info path
 	system.GET("/info", handlers.MakeInfoHandler(kubeClientset, back))
+
+	// Serve OSCAR User Interface
+	r.Static("/ui", "./assets")
+	// Redirect root to /ui
+	r.GET("/", func(c *gin.Context) {
+		c.Request.URL.Path = "/ui"
+		r.HandleContext(c)
+	})
 
 	// Health path for k8s health checks
 	r.GET("/health", handlers.HealthHandler)
