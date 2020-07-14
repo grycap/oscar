@@ -7,13 +7,22 @@ on:
     types: [created]
 
 jobs:
-  buildx:
+  build:
     runs-on: ubuntu-18.04
     steps:
     - name: Checkout
       uses: actions/checkout@v2.2.0
 
-    - name: Prepare
+    - name: Setup node
+      uses: actions/setup-node@v1
+      with:
+        node-version: '14'
+
+    - name: Build OSCAR-UI
+      run: npm install && npm run build
+      working-directory: ./ui
+
+    - name: Prepare docker buildx
       id: prepare
       run: |
         DOCKER_IMAGE=grycap/oscar
