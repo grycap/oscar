@@ -91,7 +91,7 @@ func main() {
 	// Service path for sync invocations (only if ServerlessBackend is enabled)
 	syncBack, ok := back.(types.SyncBackend)
 	if cfg.ServerlessBackend != "" && ok {
-		r.GET("/run/:serviceName", handlers.MakeRunHandler(cfg, syncBack))
+		r.POST("/run/:serviceName", handlers.MakeRunHandler(cfg, syncBack))
 	}
 
 	// System info path
