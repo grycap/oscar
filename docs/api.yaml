@@ -314,6 +314,33 @@ paths:
       description: Get system configuration
       security:
         - basicAuth: []
+  '/run/{serviceName}':
+    parameters:
+      - schema:
+          type: string
+        name: serviceName
+        in: path
+        required: true
+    post:
+      summary: Invoke service (sync)
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      operationId: InvokeSync
+      tags:
+        - sync
+      description: Invoke a service synchronously (a Serverless backend is required)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+              format: binary
+        description: Event
 components:
   schemas:
     Service:
@@ -459,6 +486,7 @@ components:
 tags:
   - name: services
   - name: logs
+  - name: sync
   - name: async
   - name: info
   - name: health
