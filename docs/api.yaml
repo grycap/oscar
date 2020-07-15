@@ -441,7 +441,9 @@ components:
       properties:
         version:
           type: string
-        arch:
+        git_commit:
+          type: string
+        architecture:
           type: string
         kubernetes_version:
           type: string
