@@ -16,6 +16,7 @@
             <v-btn flat icon color="blue" @click="handleUpdate()">
                 <v-icon>autorenew</v-icon>
             </v-btn>
+             <v-btn color="green lighten-2" dark @click="deleteSuccessJobs()">DELETE SUCCESS JOBS</v-btn>          
              <v-btn color="error" dark @click="deleteAllJobs()">DELETE ALL JOBS</v-btn>          
         </v-card-title>
         <v-data-table
@@ -105,6 +106,7 @@ export default {
         pagination: {
             descending: true,
             sortBy: 'create_time',
+            rowsPerPage: 10
 		},
         jobs: [],
         index:'',
@@ -148,28 +150,54 @@ export default {
         deleteJob(job,job_name){
             this.index = this.jobs.indexOf(job)
             this.params_delete = {serviceName: this.serviceName, jobName: job_name}
-            if (confirm('Are you sure you want to delete this function?')) {
+            if (confirm('Are you sure you want to delete this job?')) {
                 this.deleteJobCall(this.params_delete, this.deleteJobCallback);
 			}
         },
         deleteJobCallback(response){
-            if (response.status ==200 ) {   //check response
-				this.jobs.splice(this.index, 1)
+            if (response.status==204 ) {   //check response
+                this.jobs.splice(this.index, 1)
 				window.getApp.$emit('APP_SHOW_SNACKBAR', { text: `Job ${this.params_delete.jobName} was deleted`, color: 'success' })           
 			}else{
 				window.getApp.$emit('APP_SHOW_SNACKBAR', { text: response, color: 'error' })
-			}
+            }
         },
         deleteAllJobs(){
-            if (confirm('Are you sure you want to delete this function?')) {
-                this.deleteAllJobCall(this.serviceName, this.deleteAllJobCallback);
+            var params = {
+                serviceName: this.serviceName,
+                all:true
+            }
+            if (confirm('Are you sure you want to delete this jobs?')) {
+                this.deleteAllJobCall(params, this.deleteAllJobCallback);
 			}
 
         },
         deleteAllJobCallback(response){
-            if (response.status=204) {   //check response
-                this.listJobsCall(this.serviceName, this.listJobsCallback);				
-				window.getApp.$emit('APP_SHOW_SNACKBAR', { text: `All Jobs had been deleted`, color: 'success' })           
+            if (response.status==204) {   //check response
+                window.getApp.$emit('APP_SHOW_SNACKBAR', { text: `All Jobs had been deleted`, color: 'success' })    
+                this.jobs = []
+			}else{
+				window.getApp.$emit('APP_SHOW_SNACKBAR', { text: response, color: 'error' })
+			}
+            
+        },
+        deleteSuccessJobs(){
+            var params = {
+                serviceName: this.serviceName,
+                all:false
+            }
+            if (confirm('Are you sure you want to delete the successful jobs?')) {
+                this.deleteAllJobCall(params, this.deleteSuccessJobCallback);
+			}
+
+        },
+        deleteSuccessJobCallback(response){
+            var _this = this
+            if (response.status==204) {   //check response
+                setTimeout(function(){
+                    _this.handleUpdate()
+                },3000)
+                window.getApp.$emit('APP_SHOW_SNACKBAR', { text: `Successful Jobs had been deleted`, color: 'success' })    
 			}else{
 				window.getApp.$emit('APP_SHOW_SNACKBAR', { text: response, color: 'error' })
 			}
