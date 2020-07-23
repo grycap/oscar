@@ -406,23 +406,32 @@ components:
         s3:
           type: object
           properties:
-            access_key:
-              type: string
-            secret_key:
-              type: string
-            region:
-              type: string
+            id:
+              type: object
+              properties:
+                access_key:
+                  type: string
+                secret_key:
+                  type: string
+                region:
+                  type: string
         minio:
-          $ref: '#/components/schemas/MinIOProvider'
+          type: object
+          properties:
+            id:
+              $ref: '#/components/schemas/MinIOProvider'
         onedata:
           type: object
           properties:
-            oneprovider_host:
-              type: string
-            token:
-              type: string
-            space:
-              type: string
+            id:
+              type: object
+              properties:
+                oneprovider_host:
+                  type: string
+                token:
+                  type: string
+                space:
+                  type: string
     JobInfo:
       title: JobInfo
       type: object
