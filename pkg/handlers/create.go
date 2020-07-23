@@ -69,14 +69,14 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Register minio webhook and restart the server
-		if err := registerMinIOWebhook(service.Name, service.StorageProviders.MinIO, cfg); err != nil {
+		if err := registerMinIOWebhook(service.Name, service.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
 			back.DeleteService(service.Name)
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
 
 		// Create buckets/folders based on the Input and Output and enable notifications
-		if err := createBuckets(&service); err != nil {
+		if err := createBuckets(&service, cfg); err != nil {
 			if err == errNoMinIOInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {
@@ -108,49 +108,70 @@ func checkValues(service *types.Service, cfg *types.Config) error {
 		service.LogLevel = defaultLogLevel
 	}
 
-	// Check if MinIO provider is defined and valid
+	// Add the default MinIO provider
 	if service.StorageProviders != nil {
 		if service.StorageProviders.MinIO != nil {
-			if !reflect.DeepEqual(*cfg.MinIOProvider, *service.StorageProviders.MinIO) {
-				return fmt.Errorf("The provided MinIO server \"%s\" is not the configured in OSCAR", service.StorageProviders.MinIO.Endpoint)
-			}
+			service.StorageProviders.MinIO[types.DefaultProvider] = cfg.MinIOProvider
 		} else {
-			service.StorageProviders.MinIO = cfg.MinIOProvider
+			service.StorageProviders.MinIO = map[string]*types.MinIOProvider{
+				types.DefaultProvider: cfg.MinIOProvider,
+			}
+
 		}
 	} else {
-		service.StorageProviders = &types.StorageProviders{MinIO: cfg.MinIOProvider}
+		service.StorageProviders = &types.StorageProviders{
+			MinIO: map[string]*types.MinIOProvider{
+				types.DefaultProvider: cfg.MinIOProvider,
+			},
+		}
 	}
 
 	return nil
 }
 
-func createBuckets(service *types.Service) error {
-	// Create S3 client for MinIO
-	minIOClient := service.StorageProviders.MinIO.GetS3Client()
-
-	// Create S3 client for Amazon S3
+func createBuckets(service *types.Service, cfg *types.Config) error {
 	var s3Client *s3.S3
-	if service.StorageProviders.S3 != nil {
-		s3Client = service.StorageProviders.S3.GetS3Client()
-	}
-
-	// Create Onedata CDMI client
 	var cdmiClient *cdmi.Client
-	if service.StorageProviders.Onedata != nil {
-		cdmiClient = service.StorageProviders.Onedata.GetCDMIClient()
-	}
+	var provName, provID string
 
 	// Create input buckets
 	for _, in := range service.Input {
+		// Split input provider
+		provSlice := strings.SplitN(strings.TrimSpace(in.Provider), types.ProviderSeparator, 2)
+		if len(provSlice) == 1 {
+			provName = strings.ToLower(provSlice[0])
+			// Set "default" provider ID
+			provID = types.DefaultProvider
+		} else {
+			provName = strings.ToLower(provSlice[0])
+			provID = provSlice[1]
+		}
+
 		// Only allow input from MinIO
-		if strings.ToLower(in.Provider) != "minio" {
+		if provName != types.MinIOName {
 			return errNoMinIOInput
 		}
+
+		// Check if the provider identifier is defined in StorageProviders
+		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
+			return fmt.Errorf("The StorageProvider \"%s.%s\" is not defined", provName, provID)
+		}
+
+		// Check if the input provider is the defined in the server config
+		if provID != types.DefaultProvider {
+			if reflect.DeepEqual(*cfg.MinIOProvider, *service.StorageProviders.MinIO[provID]) {
+				return fmt.Errorf("The provided MinIO server \"%s\" is not the configured in OSCAR", service.StorageProviders.MinIO[provID].Endpoint)
+			}
+		}
+
+		// Get client for the provider
+		s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
+
 		path := strings.Trim(in.Path, " /")
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
 		// Create bucket
-		_, err := minIOClient.CreateBucket(&s3.CreateBucketInput{
+		_, err := s3Client.CreateBucket(&s3.CreateBucketInput{
 			Bucket: aws.String(splitPath[0]),
 		})
 		if err != nil {
@@ -169,7 +190,7 @@ func createBuckets(service *types.Service) error {
 		if len(splitPath) == 2 {
 			// Add "/" to the end of the key in order to create a folder
 			folderKey := fmt.Sprintf("%s/", splitPath[1])
-			_, err := minIOClient.PutObject(&s3.PutObjectInput{
+			_, err := s3Client.PutObject(&s3.PutObjectInput{
 				Bucket: aws.String(splitPath[0]),
 				Key:    aws.String(folderKey),
 			})
@@ -179,7 +200,7 @@ func createBuckets(service *types.Service) error {
 		}
 
 		// Enable MinIO notifications based on the Input []StorageIOConfig
-		if err := enableInputNotification(minIOClient, service.GetMinIOWebhookARN(), in); err != nil {
+		if err := enableInputNotification(s3Client, service.GetMinIOWebhookARN(), in); err != nil {
 			return err
 		}
 
@@ -187,26 +208,36 @@ func createBuckets(service *types.Service) error {
 
 	// Create output buckets
 	for _, out := range service.Output {
+		// Split input provider
+		provSlice := strings.SplitN(strings.TrimSpace(out.Provider), types.ProviderSeparator, 2)
+		if len(provSlice) == 1 {
+			provName = strings.ToLower(provSlice[0])
+			// Set "default" provider ID
+			provID = types.DefaultProvider
+		} else {
+			provName = strings.ToLower(provSlice[0])
+			provID = provSlice[1]
+		}
+
+		// Check if the provider identifier is defined in StorageProviders
+		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
+			return fmt.Errorf("The StorageProvider \"%s.%s\" is not defined", provName, provID)
+		}
+
 		path := strings.Trim(out.Path, " /")
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
 
-		provName := strings.ToLower(out.Provider)
 		switch provName {
-		case "minio", "s3":
+		case types.MinIOName, types.S3Name:
 			// Use the appropiate client
-			var client *s3.S3
-			if provName == "minio" {
-				client = minIOClient
+			if provName == types.MinIOName {
+				s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
 			} else {
-				if s3Client != nil {
-					client = s3Client
-				} else {
-					return fmt.Errorf("Output \"%s\" cannot be created. S3 provider not defined", path)
-				}
+				s3Client = service.StorageProviders.S3[provID].GetS3Client()
 			}
 			// Create bucket
-			_, err := client.CreateBucket(&s3.CreateBucketInput{
+			_, err := s3Client.CreateBucket(&s3.CreateBucketInput{
 				Bucket: aws.String(splitPath[0]),
 			})
 			if err != nil {
@@ -225,7 +256,7 @@ func createBuckets(service *types.Service) error {
 			if len(splitPath) == 2 {
 				// Add "/" to the end of the key in order to create a folder
 				folderKey := fmt.Sprintf("%s/", splitPath[1])
-				_, err := client.PutObject(&s3.PutObjectInput{
+				_, err := s3Client.PutObject(&s3.PutObjectInput{
 					Bucket: aws.String(splitPath[0]),
 					Key:    aws.String(folderKey),
 				})
@@ -233,26 +264,35 @@ func createBuckets(service *types.Service) error {
 					return fmt.Errorf("Error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
 				}
 			}
-		case "onedata":
-			if cdmiClient != nil {
-				err := cdmiClient.CreateContainer(fmt.Sprintf("%s/%s", service.StorageProviders.Onedata.Space, path), true)
-				if err != nil {
-					if err != cdmi.ErrBadRequest {
-						log.Printf("Error creating \"%s\" folder in Onedata. Error: %v\n", path, err)
-					}
+		case types.OnedataName:
+			cdmiClient = service.StorageProviders.Onedata[provID].GetCDMIClient()
+			err := cdmiClient.CreateContainer(fmt.Sprintf("%s/%s", service.StorageProviders.Onedata[provID].Space, path), true)
+			if err != nil {
+				if err != cdmi.ErrBadRequest {
+					log.Printf("Error creating \"%s\" folder in Onedata. Error: %v\n", path, err)
 				}
-			} else {
-				return fmt.Errorf("Output \"%s\" cannot be created. Onedata provider not defined", path)
 			}
-
 		}
 	}
 
 	return nil
 }
 
+func isStorageProviderDefined(storageName string, storageID string, providers *types.StorageProviders) bool {
+	var ok = false
+	switch storageName {
+	case types.MinIOName:
+		_, ok = providers.MinIO[storageID]
+	case types.S3Name:
+		_, ok = providers.S3[storageID]
+	case types.OnedataName:
+		_, ok = providers.Onedata[storageID]
+	}
+	return ok
+}
+
 func registerMinIOWebhook(name string, minIO *types.MinIOProvider, cfg *types.Config) error {
-	minIOAdminClient, err := utils.MakeMinIOAdminClient(minIO, cfg)
+	minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
 	if err != nil {
 		return fmt.Errorf("The provided MinIO configuration is not valid: %v", err)
 	}

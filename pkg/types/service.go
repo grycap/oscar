@@ -105,7 +105,7 @@ type Service struct {
 	} `json:"environment"`
 
 	// Configuration for the storage providers used by the service
-	// Optional. (default: MinIOProvider with the server's config credentials)
+	// Optional. (default: MinIOProvider["default"] with the server's config credentials)
 	StorageProviders *StorageProviders `json:"storage_providers,omitempty"`
 }
 
@@ -178,7 +178,7 @@ func (service Service) ToYAML() (string, error) {
 
 // GetMinIOWebhookARN returns the MinIO's notify_webhook ARN for the specified function
 func (service *Service) GetMinIOWebhookARN() string {
-	return fmt.Sprintf("arn:minio:sqs:%s:%s:webhook", service.StorageProviders.MinIO.Region, service.Name)
+	return fmt.Sprintf("arn:minio:sqs:%s:%s:webhook", service.StorageProviders.MinIO[DefaultProvider].Region, service.Name)
 }
 
 func convertEnvVars(vars map[string]string) []v1.EnvVar {

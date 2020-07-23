@@ -35,11 +35,11 @@ type MinIOAdminClient struct {
 }
 
 // MakeMinIOAdminClient creates a new MinIO Admin client to configure webhook notifications
-func MakeMinIOAdminClient(provider *types.MinIOProvider, cfg *types.Config) (*MinIOAdminClient, error) {
+func MakeMinIOAdminClient(cfg *types.Config) (*MinIOAdminClient, error) {
 	// Parse minIO endpoint
-	endpointURL, err := url.Parse(provider.Endpoint)
+	endpointURL, err := url.Parse(cfg.MinIOProvider.Endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("The provided MinIO endpoint \"%s\" is not valid", provider.Endpoint)
+		return nil, fmt.Errorf("The provided MinIO endpoint \"%s\" is not valid", cfg.MinIOProvider.Endpoint)
 	}
 
 	// Check URL Scheme for using TLS or not
@@ -50,16 +50,16 @@ func MakeMinIOAdminClient(provider *types.MinIOProvider, cfg *types.Config) (*Mi
 	case "https":
 		enableTLS = true
 	default:
-		return nil, fmt.Errorf("Invalid MinIO Endpoint: %s. Must start with \"http://\" or \"https://\"", provider.Endpoint)
+		return nil, fmt.Errorf("Invalid MinIO Endpoint: %s. Must start with \"http://\" or \"https://\"", cfg.MinIOProvider.Endpoint)
 	}
 
-	adminClient, err := madmin.New(endpointURL.Host, provider.AccessKey, provider.SecretKey, enableTLS)
+	adminClient, err := madmin.New(endpointURL.Host, cfg.MinIOProvider.AccessKey, cfg.MinIOProvider.SecretKey, enableTLS)
 	if err != nil {
 		return nil, err
 	}
 
 	// Disable tls verification in client transport if verify == false
-	if !provider.Verify {
+	if !cfg.MinIOProvider.Verify {
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}

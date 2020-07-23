@@ -59,7 +59,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Update buckets
-		if err := updateBuckets(&newService, oldService); err != nil {
+		if err := updateBuckets(&newService, oldService, cfg); err != nil {
 			if err == errNoMinIOInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {
@@ -74,14 +74,14 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 	}
 }
 
-func updateBuckets(newService, oldService *types.Service) error {
+func updateBuckets(newService, oldService *types.Service, cfg *types.Config) error {
 	// Disable notifications from oldService.Input
-	if err := disableInputNotifications(oldService.GetMinIOWebhookARN(), oldService.Input, oldService.StorageProviders.MinIO); err != nil {
+	if err := disableInputNotifications(oldService.GetMinIOWebhookARN(), oldService.Input, oldService.StorageProviders.MinIO[types.DefaultProvider]); err != nil {
 		return fmt.Errorf("Error disabling MinIO input notifications: %v", err)
 	}
 
 	// Create the input and output buckets/folders from newService
-	if err := createBuckets(newService); err != nil {
+	if err := createBuckets(newService, cfg); err != nil {
 		return err
 	}
 

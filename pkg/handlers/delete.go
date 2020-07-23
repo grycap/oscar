@@ -48,12 +48,12 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Disable input notifications
-		if err := disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, service.StorageProviders.MinIO); err != nil {
+		if err := disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, service.StorageProviders.MinIO[types.DefaultProvider]); err != nil {
 			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 		}
 
 		// Remove the service's webhook in MinIO config and restart the server
-		if err := removeMinIOWebhook(service.Name, service.StorageProviders.MinIO, cfg); err != nil {
+		if err := removeMinIOWebhook(service.Name, cfg); err != nil {
 			log.Printf("Error removing MinIO webhook for service \"%s\": %v\n", service.Name, err)
 		}
 
@@ -61,8 +61,8 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 	}
 }
 
-func removeMinIOWebhook(name string, minIO *types.MinIOProvider, cfg *types.Config) error {
-	minIOAdminClient, err := utils.MakeMinIOAdminClient(minIO, cfg)
+func removeMinIOWebhook(name string, cfg *types.Config) error {
+	minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
 	if err != nil {
 		return fmt.Errorf("The provided MinIO configuration is not valid: %v", err)
 	}

@@ -30,8 +30,27 @@ import (
 	"github.com/grycap/cdmi-client-go"
 )
 
+const (
+	// DefaultProvider string identifier for the default StorageProvider
+	DefaultProvider = "default"
+
+	// MinIOName string representing the MinIO provider name
+	MinIOName = "minio"
+
+	// S3Name string representing the S3 provider name
+	S3Name = "s3"
+
+	// OnedataName string representing the Onedata provider name
+	OnedataName = "onedata"
+
+	// ProviderSeparator separator character used for split provider's name and identifier
+	ProviderSeparator = "."
+)
+
 // StorageIOConfig provides the storage input/output configuration for services
 type StorageIOConfig struct {
+	// Provider reference to the provider's name and identifier specified in StorageProviders
+	// The provider's name is separated from the ID by a point (e.g. "minio.myidentifier")
 	Provider string   `json:"storage_provider"`
 	Path     string   `json:"path"`
 	Suffix   []string `json:"suffix,omitempty"`
@@ -40,9 +59,9 @@ type StorageIOConfig struct {
 
 // StorageProviders stores the credentials of all supported storage providers
 type StorageProviders struct {
-	S3      *S3Provider      `json:"s3,omitempty"`
-	MinIO   *MinIOProvider   `json:"minio,omitempty"`
-	Onedata *OnedataProvider `json:"onedata,omitempty"`
+	S3      map[string]*S3Provider      `json:"s3,omitempty"`
+	MinIO   map[string]*MinIOProvider   `json:"minio,omitempty"`
+	Onedata map[string]*OnedataProvider `json:"onedata,omitempty"`
 }
 
 // S3Provider stores the credentials of the AWS S3 storage provider
