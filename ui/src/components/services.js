@@ -125,7 +125,7 @@ export default {
         deleteAllJobCall(params,callBackHandler) {
             axios({
                 method: 'delete',
-                url: '/system/logs/'+params,
+                url: '/system/logs/'+params.serviceName+'?all='+params.all,
                 auth: {
                     username: this.username_auth,
                     password: this.password_auth

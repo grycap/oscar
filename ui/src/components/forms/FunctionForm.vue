@@ -79,6 +79,7 @@
 											<v-flex xs12 text-xs-center>
 												<span v-show="filerequire" style="color: #cc3300; font-size: 12px;"><b>Select a file or enter a URL</b></span>                   									
 											</v-flex>
+
 											
 											<v-flex xs12 sm8 offset-sm2 v-show="showSelectedFiles"  id="selectedList" class="text-xs-center">
 													<input type="file" id="files" ref="files" hidden=true  v-on:change="handleFilesUpload()"/>								                  									
@@ -108,8 +109,58 @@
 																</v-list-tile-action>
 														</v-list-tile>
 													</v-list>
-											</v-flex>					
-									
+													<v-card flat>
+														<v-card-actions >
+														<v-btn
+															outline color="indigo"
+															round
+															small
+															@click.native="editSummernote()"
+														>
+															Edit															
+														</v-btn>
+														<v-btn
+															outline color="indigo"
+															round
+															small
+															@click.native="saveSummernote()"
+														>
+															Save															
+														</v-btn>
+														</v-card-actions>
+														<v-card-actions>
+														
+														</v-card-actions>
+													</v-card>
+											</v-flex>	
+											<v-flex xs-12 text-center v-show="editionMode==true && showSelectedFiles == false">
+												<span>Note: To edit the script sending in the creation of the service press the Edit button.</span>
+												<v-card flat>
+														<v-card-actions style="justify-content: center;">
+														<v-btn
+															outline color="indigo"
+															round
+															small
+															@click.native="editSummernote()"
+														>
+															Edit															
+														</v-btn>
+														<v-btn
+															outline color="indigo"
+															round
+															small
+															@click.native="saveSummernote()"
+														>
+															Save															
+														</v-btn>
+														</v-card-actions>
+													</v-card>
+											</v-flex>
+											<v-flex xs12>
+                                            	<!-- <div  v-show="editScript==true" style="white-space: pre-wrap;" class="click2edit text-left"></div>				 -->
+												<div class="summernote" style="white-space: pre-wrap;"></div>
+                                            	<!-- <div v-show="editScript==true" style="white-space: pre-wrap;" class="click2edit text-left"></div>				 -->
+											</v-flex>
 									
 											<v-flex xs12>
 													<v-btn
@@ -219,7 +270,7 @@
 									</v-layout>
 							</v-card-text>
 							<v-card-actions >
-								<v-btn @click="closeWithoutSave" flat color="grey">Cancel</v-btn>
+								<v-btn @click="closeWithoutSave()" flat color="grey">Cancel</v-btn>
 								<v-btn @click="clear" flat color="red">Clear</v-btn>
 								<v-spacer></v-spacer>
 								<v-btn @click="show('input_output')" flat color="success">NEXT</v-btn>
@@ -535,7 +586,7 @@
 									</v-card-actions>
 								</div>
 								<v-card-actions >
-									<v-btn @click="closeWithoutSave" flat color="grey">Cancel</v-btn>
+									<v-btn @click="closeWithoutSave()" flat color="grey">Cancel</v-btn>
 									<v-btn @click="cleanfieldInput();cleanfieldOutput()" flat color="red">Clear</v-btn>
 									<v-spacer></v-spacer>
 									<v-btn @click="show('home')" flat color="blue">BACK</v-btn>
@@ -744,7 +795,7 @@
 								</v-card>
 							</div>
 							<v-card-actions >
-								<v-btn @click="closeWithoutSave" flat color="grey">Cancel</v-btn>
+								<v-btn @click="closeWithoutSave()" flat color="grey">Cancel</v-btn>
 								<v-btn @click="clear" flat color="red">Clear</v-btn>
 								<v-spacer></v-spacer>
 								<v-btn  @click="show('input_output')" flat color="primary">BACK</v-btn>
@@ -876,11 +927,60 @@ export default {
 			showinput: true,
 			memory: '',
 			varsEnv: '',
+			editScript: false
 
 
 		}
 	},
 	methods: {
+		editSummernote(){
+			var _this = this
+            $('.summernote').summernote(
+                {
+					callbacks:{
+						onInit: function() {
+							 $('.summernote').summernote('codeview.activate');
+						},		
+					},
+					codeviewFilter: true,
+  					codeviewIframeFilter: true,
+					focus: true,
+					height: 200,                 // set editor height
+					minHeight: null,             // set minimum height of editor
+					maxHeight: null,             // set maximum height of editor
+                    toolbar: [
+                        // [groupName, [list of button]]
+                        ['style', ['bold', 'italic', 'underline', 'clear']],
+                        ['font', ['strikethrough', 'superscript', 'subscript']],
+                        ['fontsize', ['fontsize']],
+                        ['color', ['color']],
+                        ['para', ['ul', 'ol', 'paragraph']],
+						['height', ['height']],
+						['view', ['codeview']]
+					],
+					codemirror: { // codemirror options
+						theme: 'monokai',
+						lineNumbers: true,
+						lineWrapping: true,
+    					tabMode: 'indent'
+					},
+					
+                })
+                .on("summernote.enter", function(we, e) {
+                    $(this).summernote("pasteHTML", "<br><br>");
+                    e.preventDefault();
+				});
+				 $('.summernote').summernote('code',_this.base64String)
+        },
+        saveSummernote(){
+			this.base64String = $('.summernote').summernote('code')
+			$('.summernote').summernote('destroy');
+			setTimeout(function(){
+				$('.summernote').css('display','none');
+			},100)
+            this.editScript = false
+        },
+
 		show(id){
 			$("#myTabContent .tab-pane-content").removeClass("show active")
 			$("#myTab .nav-link").removeClass("show active")
@@ -1056,6 +1156,11 @@ export default {
 		removeFile (key) {     
 			this.files.splice(key, 1)
 			this.$refs.files.value = null
+			// this.base64String = ''
+			$('.summernote').summernote('destroy');
+			setTimeout(function(){
+				$('.summernote').css('display','none');
+			},100)
 		},		
 		handleFilesUpload () {
 			this.files = []      
@@ -1112,7 +1217,7 @@ export default {
 			});
 			this.cleanfield()
 		},
-		closeWithoutSave () {      
+		closeWithoutSave() {      
 			this.progress.active = false
 			this.dialog = false            
 			this.clear()      
@@ -1124,20 +1229,25 @@ export default {
 				return obj;
 		},
 		submit () {	
-			if (this.$refs.form.validate() && this.files.length != 0) {
+
+			if(this.$refs.form.validate() && this.editionMode == true && this.base64String != ''){
+					this.editFunction()
+			}else if (this.$refs.form.validate() && this.files.length != 0) {
 				this.progress.active = true
 				this.editionMode ? this.editFunction() : this.newFunction()				
 				this.envrequirehost = false
 				this.envrequiretoken = false
 				this.envrequirespace = false
-			}else if (this.editionMode == false){
+			}else {
+				if (this.files.length == 0){
+					this.filerequire = true
+				}else{
+					this.filerequire = false
+				}	
 				this.show('home')
-			}			
-			if (this.files.length == 0){
-				this.filerequire = true
-			}else{
-				this.filerequire = false
-			}			
+			}
+						
+					
 						
 		},
 		clear () {
@@ -1184,6 +1294,13 @@ export default {
 			this.showselectInput = false
 			this.showselectOutput = false
 			this.select_logLevel = 'INFO'
+			this.editScript = false
+			this.base64String = ''
+			$('.summernote').summernote('destroy');
+			setTimeout(function(){
+				$('.summernote').css('display','none');
+			},100)
+			
 		},
 		newFunction () {
 			if (this.minio.endpoint != "") {
@@ -1272,7 +1389,7 @@ export default {
 				},
 				'input': this.inputs,
 				'output': this.outputs,
-				'script': script,
+				'script': this.base64String,
 				'storage_providers':this.form.storage_provider
 
 			}	
@@ -1356,11 +1473,7 @@ export default {
 			}else{
 				this.showselectOutput = true
 			}
-			this.script = data.script
-			if(this.script != ""){
-				this.files.length = 1
-			}
-			
+			this.base64String = data.script
 		})
 	}
 }
