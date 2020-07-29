@@ -159,7 +159,7 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 
 		// Check if the input provider is the defined in the server config
 		if provID != types.DefaultProvider {
-			if reflect.DeepEqual(*cfg.MinIOProvider, *service.StorageProviders.MinIO[provID]) {
+			if !reflect.DeepEqual(*cfg.MinIOProvider, *service.StorageProviders.MinIO[provID]) {
 				return fmt.Errorf("The provided MinIO server \"%s\" is not the configured in OSCAR", service.StorageProviders.MinIO[provID].Endpoint)
 			}
 		}
