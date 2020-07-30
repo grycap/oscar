@@ -221,6 +221,7 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 
 		// Check if the provider identifier is defined in StorageProviders
 		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
+			disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
 			return fmt.Errorf("The StorageProvider \"%s.%s\" is not defined", provName, provID)
 		}
 
@@ -246,9 +247,11 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 					if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
 						log.Printf("The bucket \"%s\" already exists\n", splitPath[0])
 					} else {
+						disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
 						return fmt.Errorf("Error creating bucket %s: %v", splitPath[0], err)
 					}
 				} else {
+					disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
 					return fmt.Errorf("Error creating bucket %s: %v", splitPath[0], err)
 				}
 			}
@@ -261,6 +264,7 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 					Key:    aws.String(folderKey),
 				})
 				if err != nil {
+					disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
 					return fmt.Errorf("Error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
 				}
 			}
@@ -268,8 +272,11 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 			cdmiClient = service.StorageProviders.Onedata[provID].GetCDMIClient()
 			err := cdmiClient.CreateContainer(fmt.Sprintf("%s/%s", service.StorageProviders.Onedata[provID].Space, path), true)
 			if err != nil {
-				if err != cdmi.ErrBadRequest {
+				if err == cdmi.ErrBadRequest {
 					log.Printf("Error creating \"%s\" folder in Onedata. Error: %v\n", path, err)
+				} else {
+					disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
+					return fmt.Errorf("Error connecting to Onedata's Oneprovider \"%s\". Error: %v", service.StorageProviders.Onedata[provID].OneproviderHost, err)
 				}
 			}
 		}

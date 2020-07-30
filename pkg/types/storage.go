@@ -43,7 +43,7 @@ const (
 	// OnedataName string representing the Onedata provider name
 	OnedataName = "onedata"
 
-	// ProviderSeparator separator character used for split provider's name and identifier
+	// ProviderSeparator separator character used to split provider's name and identifier
 	ProviderSeparator = "."
 )
 
