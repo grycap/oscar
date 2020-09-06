@@ -295,7 +295,7 @@
 												<v-container>
 													<div class="form-group" style="width:100%">                     
 														<div class="input-group">
-															<v-flex>
+															<v-flex class="col-12">
 																<v-select
 																	v-model="form.storage_provider_in"
 																	:items="storages_all"
@@ -443,7 +443,7 @@
 											<v-container>
 												<div class="form-group" style="width:100%">                     
 													<div class="input-group">
-														<v-flex>
+														<v-flex class="col-12">
 															<v-select
 																v-model="form.storage_provider_out"
 																:items="storages_all"
