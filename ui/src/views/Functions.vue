@@ -316,10 +316,11 @@ export default {
 			}
 		},
 		listServicesCallback(response) {
-			if(response.length > 0){
+			console.log(response)
+			if(response.status == 200){
 				this.show_spinner = false;
-				this.services = Object.assign(this.services, response); 
-				this.services = response.map((serv) => {
+				this.services = Object.assign(this.services, response.data); 
+				this.services = response.data.map((serv) => {
 					return {
 						service: serv.name,
 						container: serv.image,

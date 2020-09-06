@@ -101,7 +101,7 @@ export default {
         var _this = this
           axios({
                 method: 'get',
-                url: '/system/config',
+                url: 'https://158.42.105.207/system/config',
                 auth: {
                     username: this.model.username,
                     password: this.model.password

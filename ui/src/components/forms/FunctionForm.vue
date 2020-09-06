@@ -19,11 +19,11 @@
 							<a class="nav-link active" id="home-tab" @click="show('home')" role="tab" aria-controls="home" aria-selected="true">New Function</a>
 						</li>
 						<li class="nav-item" style="margin-rigth:10px;margin-left:10px;">
-							<a class="nav-link " id="input_output-tab" @click="show('input_output')" role="tab" aria-controls="input_output" aria-selected="false">Input/Output</a>
-						</li>
-						<li class="nav-item" style="margin-rigth:10px;margin-left:10px;">
 							<a class="nav-link" id="profile-tab" @click="show('profile')" role="tab" aria-controls="profile" aria-selected="false">Storage</a>
 						</li>  
+						<li class="nav-item" style="margin-rigth:10px;margin-left:10px;">
+							<a class="nav-link " id="input_output-tab" @click="show('input_output')" role="tab" aria-controls="input_output" aria-selected="false">Input/Output</a>
+						</li>
 					</ul>
 					 
 					<v-progress-linear :active="progress.active" :indeterminate="true"></v-progress-linear>
@@ -271,9 +271,9 @@
 							</v-card-text>
 							<v-card-actions >
 								<v-btn @click="closeWithoutSave()" flat color="grey">Cancel</v-btn>
-								<v-btn @click="clear" flat color="red">Clear</v-btn>
+								<v-btn @click="clearHome()" flat color="red">Clear</v-btn>
 								<v-spacer></v-spacer>
-								<v-btn @click="show('input_output')" flat color="success">NEXT</v-btn>
+								<v-btn @click="show('profile')" flat color="success">NEXT</v-btn>
 							</v-card-actions>
 						</div>
 
@@ -296,21 +296,21 @@
 													<div class="form-group" style="width:100%">                     
 														<div class="input-group">
 															<v-flex>
+																<v-select
+																	v-model="form.storage_provider_in"
+																	:items="storages_all"
+																	label="Storage Provider"
+																	outline
+																></v-select>																
+															</v-flex>
+															<v-flex>
 																<v-text-field
 																	v-model="form.path_in"
 																	:counter="200"
 																	label="Path"		
 																	style="padding-right: 5px;"									
 																></v-text-field>
-															</v-flex>	
-															<v-flex>
-																<v-text-field
-																	v-model="form.storage_provider_in"
-																	:counter="200"
-																	label="Storage Provider"		
-																	style="padding-right: 5px;"									
-																></v-text-field>
-															</v-flex>
+															</v-flex>															
 														</div>            
 													</div> 
 
@@ -444,6 +444,14 @@
 												<div class="form-group" style="width:100%">                     
 													<div class="input-group">
 														<v-flex>
+															<v-select
+																v-model="form.storage_provider_out"
+																:items="storages_all"
+																label="Storage Provider"
+																outline
+															></v-select>																
+														</v-flex>
+														<v-flex>
 															<v-text-field
 																v-model="form.path_out"
 																:counter="200"
@@ -451,14 +459,7 @@
 																style="padding-right: 5px;"									
 															></v-text-field>
 														</v-flex>	
-														<v-flex>
-															<v-text-field
-																v-model="form.storage_provider_out"
-																:counter="200"
-																label="Storage Provider"		
-																style="padding-right: 5px;"									
-															></v-text-field>
-														</v-flex>
+														
 													</div>            
 												</div> 
 
@@ -589,8 +590,10 @@
 									<v-btn @click="closeWithoutSave()" flat color="grey">Cancel</v-btn>
 									<v-btn @click="cleanfieldInput();cleanfieldOutput()" flat color="red">Clear</v-btn>
 									<v-spacer></v-spacer>
-									<v-btn @click="show('home')" flat color="blue">BACK</v-btn>
-									<v-btn @click="show('profile')" flat color="success">NEXT</v-btn>
+									<v-btn @click="show('profile')" flat color="blue">BACK</v-btn>
+									<v-btn :disabled="!form.valid" @click="submit" flat color="success">submit</v-btn>
+									<!-- <v-btn @click="show('input_output')" flat color="success">NEXT</v-btn> -->
+									
 								</v-card-actions>
 							</div>		
 									
@@ -636,6 +639,16 @@
 												<v-layout row style="padding:0px,10px;" >										
 													<v-flex xs12 sm8 offset-sm2>
 														<v-text-field
+															v-model="onedata.id"
+															:counter="200"		
+															label="ID"																
+														></v-text-field>
+													</v-flex>									
+												</v-layout>
+
+												<v-layout row style="padding:0px,10px;" >										
+													<v-flex xs12 sm8 offset-sm2>
+														<v-text-field
 															v-model="onedata.oneprovider_host"
 															:counter="200"		
 															label="ONEPROVIDER HOST:"																
@@ -673,6 +686,44 @@
 														></v-text-field>
 													</v-flex>										
 												</v-layout>
+
+												<v-flex xs12 sm6 offset-sm3 v-show="showOneData">
+													<input type="file" id="onedata" hidden="true" multiple />
+													<v-list subheader dense>
+														<v-subheader inset>ONEDATA</v-subheader>
+														<v-list-tile
+														v-for="(id,key) in ONEDATA_DICT"
+														:key="key"
+														avatar
+														@click.stop=""
+														style="margin-bottom:40px;"
+														>                                    
+																
+
+																<v-list-tile-content style="height:80px;">
+																	<v-list-tile-title style="padding-bottom:20px;">ID: {{key}}</v-list-tile-title>
+																	<v-list-tile-title style="padding-bottom:20px;">ONEPROVIDER HOST: {{id.oneprovider_host}}</v-list-tile-title>
+																	<v-list-tile-title style="padding-bottom:20px;">ACCES TOKEN: {{id.token}}</v-list-tile-title>
+																	<v-list-tile-title style="padding-bottom:20px;">SPACE: {{id.space}}</v-list-tile-title>
+																	<!-- <v-list-tile-title>{{key}}</v-list-tile-title> -->
+																</v-list-tile-content>
+
+																<v-list-tile-action>
+																	<v-btn icon ripple @click="removeOneData(key)">
+																	<v-icon color="red lighten-1">remove_circle_outline</v-icon>
+																	</v-btn>
+																</v-list-tile-action>
+														</v-list-tile>
+													</v-list>
+												</v-flex>
+
+												<v-card-actions class="text-md-center" >
+													<v-spacer></v-spacer>
+													<v-btn @click="includeOneData()"  color="info">ADD</v-btn>
+													
+												</v-card-actions>
+
+
 											</v-container>	
 										</v-tab-item>
 
@@ -684,6 +735,16 @@
 												</v-layout>
 												<br>
 												<br>
+
+												<v-layout row style="padding:0px,10px;">
+													<v-flex xs12 sm8 offset-sm2>
+														<v-text-field 
+															v-model="minio.id"
+															:counter="200"
+															label="ID"
+														></v-text-field>
+													</v-flex>
+												</v-layout>
 
 												<v-layout row style="padding:0px,10px;">
 													<v-flex xs12 sm8 offset-sm2>
@@ -738,6 +799,45 @@
 															></v-switch>
 													</v-flex>										
 												</v-layout>
+
+												<v-flex xs12 sm6 offset-sm3 v-show="showMinio">
+													<input type="file" id="minio" hidden="true" multiple />
+													<v-list subheader dense>
+														<v-subheader inset>MINIO</v-subheader>
+														<v-list-tile
+														v-for="(id,key) in MINIO_DICT"
+														:key="key"
+														avatar
+														@click.stop=""
+														style="margin-bottom:80px;"
+														>                                    
+																
+
+																<v-list-tile-content style="height:120px;margin-top:40px;">
+																	<v-list-tile-title style="padding-bottom:20px;">ID: {{key}}</v-list-tile-title>
+																	<v-list-tile-title style="padding-bottom:20px;">ENDPOINT: {{id.endpoint}}</v-list-tile-title>
+																	<v-list-tile-title style="padding-bottom:20px;">REGION: {{id.region}}</v-list-tile-title>
+																	<v-list-tile-title style="padding-bottom:20px;">SECRET KEY: {{id.secret_key}}</v-list-tile-title>
+																	<v-list-tile-title style="padding-bottom:20px;">ACCESS KEY: {{id.access_key}}</v-list-tile-title>
+																	<v-list-tile-title style="padding-bottom:20px;">VERIFY: {{id.verify}}</v-list-tile-title>
+																	<!-- <v-list-tile-title>{{key}}</v-list-tile-title> -->
+																</v-list-tile-content>
+
+																<v-list-tile-action>
+																	<v-btn icon ripple @click="removeMinio(key)">
+																	<v-icon color="red lighten-1">remove_circle_outline</v-icon>
+																	</v-btn>
+																</v-list-tile-action>
+														</v-list-tile>
+													</v-list>
+												</v-flex>
+
+												<v-card-actions class="text-md-center" >
+													<v-spacer></v-spacer>
+													<v-btn @click="includeMinio()"  color="info">ADD</v-btn>
+													
+												</v-card-actions>
+
 											</v-container>
 										</v-tab-item>
 
@@ -749,6 +849,16 @@
 												</v-layout>
 												<br>
 												<br>
+
+												<v-layout row style="padding:0px,10px;">
+													<v-flex xs12 sm8 offset-sm2>
+														<v-text-field 
+															v-model="s3.id"
+															:counter="200"
+															label="ID"
+														></v-text-field>
+													</v-flex>										
+												</v-layout>
 
 												<v-layout row style="padding:0px,10px;">
 													<v-flex xs12 sm8 offset-sm2>
@@ -789,6 +899,44 @@
 														></v-text-field>
 													</v-flex>										
 												</v-layout>
+
+												<v-flex xs12 sm6 offset-sm3 v-show="showS3">
+													<input type="file" id="s3" hidden="true" multiple />
+													<v-list subheader dense>
+														<v-subheader inset>S3</v-subheader>
+														<v-list-tile
+														v-for="(id,key) in S3_DICT"
+														:key="key"
+														avatar
+														@click.stop=""
+														style="margin-bottom:40px;"
+														>                                    
+																
+
+																<v-list-tile-content style="height:80px;">
+																	<v-list-tile-title style="padding-bottom:20px;">ID: {{key}}</v-list-tile-title>
+																	<v-list-tile-title style="padding-bottom:20px;">ACCESS KEY: {{id.access_key}}</v-list-tile-title>
+																	<v-list-tile-title style="padding-bottom:20px;">SECRET TOKEN: {{id.secret_key}}</v-list-tile-title>
+																	<v-list-tile-title style="padding-bottom:20px;">REGION: {{id.region}}</v-list-tile-title>
+																	<!-- <v-list-tile-title>{{key}}</v-list-tile-title> -->
+																</v-list-tile-content>
+
+																<v-list-tile-action>
+																	<v-btn icon ripple @click="removeS3(key)">
+																	<v-icon color="red lighten-1">remove_circle_outline</v-icon>
+																	</v-btn>
+																</v-list-tile-action>
+														</v-list-tile>
+													</v-list>
+												</v-flex>
+
+												<v-card-actions class="text-md-center" >
+													<v-spacer></v-spacer>
+													<v-btn @click="includeS3()"  color="info">ADD</v-btn>
+													
+												</v-card-actions>
+
+
 											</v-container>
 										</v-tab-item>
 									</v-tabs-items>	
@@ -796,10 +944,11 @@
 							</div>
 							<v-card-actions >
 								<v-btn @click="closeWithoutSave()" flat color="grey">Cancel</v-btn>
-								<v-btn @click="clear" flat color="red">Clear</v-btn>
+								<v-btn @click="cleanfieldMinio();cleanfieldOneData();cleanfieldS3()" flat color="red">Clear</v-btn>
 								<v-spacer></v-spacer>
-								<v-btn  @click="show('input_output')" flat color="primary">BACK</v-btn>
-								<v-btn :disabled="!form.valid" @click="submit" flat color="success">submit</v-btn>
+								<v-btn  @click="show('home')" flat color="primary">BACK</v-btn>								
+								<v-btn @click="show('input_output')" flat color="success">NEXT</v-btn>
+								
 							</v-card-actions>						
 						</div>  
 					</div>									
@@ -847,6 +996,9 @@ export default {
 			showS3SecretKey: false,
 			showMinioAccessKey: false,
 			showMinioSecretKey: false,
+			showOneData: false,
+			showMinio: false,
+			showS3: false,
 			filerequire : false,
 			envrequirehost: false,
 			envrequiretoken : false,
@@ -856,7 +1008,11 @@ export default {
 			limits_mem: '',
 			request_mem: '',
 			select_logLevel: 'INFO',
+			ONEDATA_DICT:{},
+			S3_DICT:{},
+			MINIO_DICT:{},
 			 minio:{
+				id:'',
 				endpoint: '' ,
 				region: '',
 				secret_key: '',
@@ -864,11 +1020,13 @@ export default {
 				verify: true
 			},
 			s3:{
+				id:'',
 				access_key: '',
 				secret_key: '',
 				region: ''
 			},
 			onedata:{
+				id:'',
 				oneprovider_host: '',		
 				token: '',		
 				space: ''
@@ -927,8 +1085,18 @@ export default {
 			showinput: true,
 			memory: '',
 			varsEnv: '',
-			editScript: false
+			editScript: false,
+			storages_all:[],
+			select_tab:''
 
+
+		}
+	},
+	watch:{
+		"select_tab"(val){
+			if(val == 'input_output'){				
+					this.storages_all.push("minio")				
+			}
 
 		}
 	},
@@ -986,6 +1154,7 @@ export default {
 			$("#myTab .nav-link").removeClass("show active")
 			$("#"+id).addClass("show active")
 			$("#"+id+"-tab").addClass("show active")
+			this.select_tab = id
 		},
 		show_input(id){
 			$("#myTabContentInOut .tab-pane-inout").removeClass("show active")
@@ -1102,6 +1271,98 @@ export default {
 			this.envVars[key]=value
 			this.cleanfieldenv()						
 		},		
+		includeOneData(){
+			this.showOneData = true;
+			var value_onedata = {
+				"oneprovider_host": this.onedata.oneprovider_host,
+				"token": this.onedata.token,
+				"space": this.onedata.space
+			}
+			this.ONEDATA_DICT[this.onedata.id]=value_onedata;
+			if (this.isEmpty(this.ONEDATA_DICT)) {
+				this.showOneData = false
+			}
+			this.storages_all.push('onedata.'+this.onedata.id)
+			value_onedata = ''
+			this.cleanfieldOneData()
+			
+		},
+		cleanfieldOneData(){
+			this.onedata.id=''
+			this.onedata.oneprovider_host = ''
+			this.onedata.space = ''
+			this.onedata.token = ''
+		},
+		removeOneData(item){
+			this.$delete(this.ONEDATA_DICT,item)			
+			if (this.isEmpty(this.ONEDATA_DICT)) {
+				this.showOneData = false
+			}	
+
+		},
+		includeMinio(){
+			this.showMinio = true;
+			var value_minio = {
+				"endpoint": this.minio.endpoint,
+				"region": this.minio.region,
+				"secret_key": this.minio.secret_key,
+				"access_key": this.minio.access_key,
+				"verify": this.minio.verify
+			}
+			this.MINIO_DICT[this.minio.id]=value_minio;
+			if (this.isEmpty(this.MINIO_DICT)) {
+				this.showMinio = false
+			}
+			
+			this.storages_all.push("minio."+this.minio.id)
+			value_minio = ''
+			this.cleanfieldMinio()
+			
+		},
+		cleanfieldMinio(){
+			this.minio.id=''
+			this.minio.endpoint = ''
+			this.minio.region = ''
+			this.minio.secret_key = ''
+			this.minio.access_key = ''
+			this.minio.verify = true
+		},
+		removeMinio(item){
+			this.$delete(this.MINIO_DICT,item)			
+			if (this.isEmpty(this.MINIO_DICT)) {
+				this.showMinio = false
+			}	
+
+		},
+		includeS3(){
+			this.showS3 = true;
+			var value_s3 = {
+				"access_key": this.s3.access_key,
+				"secret_key": this.s3.secret_key,
+				"region": this.s3.region
+			}
+			this.S3_DICT[this.s3.id]=value_s3;
+			if (this.isEmpty(this.S3_DICT)) {
+				this.showS3 = false
+			}
+			this.storages_all.push("s3."+this.s3.id)
+			value_s3 = ''
+			this.cleanfieldS3()
+			
+		},
+		cleanfieldS3(){
+			this.s3.id=''
+			this.s3.access_key = ''
+			this.s3.secret_key = ''
+			this.s3.region = ''
+		},
+		removeS3(item){
+			this.$delete(this.S3_DICT,item)			
+			if (this.isEmpty(this.S3_DICT)) {
+				this.showS3 = false
+			}	
+
+		},
 		isEmpty(obj) {
 			for(var key in obj) {
 				if(obj.hasOwnProperty(key))
@@ -1250,6 +1511,28 @@ export default {
 					
 						
 		},
+		clearHome(){
+			this.files = []
+			this.url = ""
+			this.$refs.files.value = null
+			this.showUploading = false
+			this.showselectEnv = false
+			this.envVars = {}
+			this.expand = "expand_more"
+			$("#panel").slideUp("slow");
+			$("#home-tab").addClass("show active")
+			$("#home").addClass("show active")
+			$("#input_output-tab").removeClass("show active")
+			$("#input_output").removeClass("show active")
+			$("#profile-tab").removeClass("show active")
+			$("#profile").removeClass("show active")
+			this.select_logLevel = 'INFO'
+			this.editScript = false
+			this.form.limits_cpu=''
+			this.form.limits_memory=''
+			this.form.image=''
+			this.form.name=''
+		},
 		clear () {
 			this.files = []
 			this.url = ""
@@ -1287,6 +1570,9 @@ export default {
 			this.suffixs_out = []
 			this.outputs = []
 			this.cleanfieldOutput()
+			this.cleanfieldOneData()
+			this.cleanfieldMinio()
+			this.cleanfieldS3()
 			this.showselectPrefixIn = false
 			this.showselectSuffixIn = false
 			this.showselectPrefixOut = false
@@ -1295,6 +1581,13 @@ export default {
 			this.showselectOutput = false
 			this.select_logLevel = 'INFO'
 			this.editScript = false
+			this.storages_all = []
+			this.ONEDATA_DICT={}
+			this.MINIO_DICT={}
+			this.S3_DICT={}
+			this.showOneData=false
+			this.showMinio=false
+			this.showS3=false
 			this.base64String = ''
 			$('.summernote').summernote('destroy');
 			setTimeout(function(){
@@ -1303,14 +1596,14 @@ export default {
 			
 		},
 		newFunction () {
-			if (this.minio.endpoint != "") {
-				this.form.storage_provider["minio"]=this.minio
+			if (this.isEmpty(this.MINIO_DICT)==false) {
+				this.form.storage_provider["minio"]=this.MINIO_DICT
 			}
-			if (this.s3.access_key != ""){
-				this.form.storage_provider["s3"]=this.s3
+			if (this.isEmpty(this.S3_DICT)==false){
+				this.form.storage_provider["s3"]=this.S3_DICT
 			}
-			if (this.onedata.oneprovider_host != ""){
-				this.form.storage_provider["onedata"]=this.onedata
+			if (this.isEmpty(this.ONEDATA_DICT)==false){
+				this.form.storage_provider["onedata"]=this.ONEDATA_DICT
 			}
 			
 			var value = $("#classmemory option:selected").text();			
@@ -1338,6 +1631,7 @@ export default {
 				'storage_providers':this.form.storage_provider
 
 			}
+			console.log(params)
 			this.createServiceCall(params,this.createServiceCallBack)	
 			
 		},
@@ -1355,14 +1649,14 @@ export default {
 
 		},
 		editFunction () {
-			if (this.minio.endpoint != "") {
-				this.form.storage_provider["minio"]=this.minio
+			if (this.isEmpty(this.MINIO_DICT)==false) {
+				this.form.storage_provider["minio"]=this.MINIO_DICT
 			}
-			if (this.s3.access_key != ""){
-				this.form.storage_provider["s3"]=this.s3
+			if (this.isEmpty(this.S3_DICT)==false){
+				this.form.storage_provider["s3"]=this.S3_DICT
 			}
-			if (this.onedata.oneprovider_host != ""){
-				this.form.storage_provider["onedata"]=this.onedata
+			if (this.isEmpty(this.ONEDATA_DICT)==false){
+				this.form.storage_provider["onedata"]=this.ONEDATA_DICT
 			}
 			
 			var value = $("#classmemory option:selected").text();
