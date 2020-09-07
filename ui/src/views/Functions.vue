@@ -330,7 +330,7 @@ export default {
 						memory: serv.memory,
 						inputs: serv.input,
 						outputs: serv.output,
-						storage: serv.storage_provider,
+						storage: serv.storage_providers,
 						script: serv.script
 					}
 				})				
