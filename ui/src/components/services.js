@@ -157,7 +157,7 @@ export default {
         editServiceCall(params, callBackHandler){
             axios({
                 method: 'put',
-                url: this.api+'/system/services',
+                url: '/system/services',
                 auth: {
                     username: this.username_auth,
                     password: this.password_auth
