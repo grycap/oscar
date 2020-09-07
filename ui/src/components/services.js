@@ -3,7 +3,7 @@ import JSZipUtils from "jszip-utils"
 export default {
     data: () => {
 		return {
-            api: 'https://158.42.105.207',
+            api: '',
             minioClient: '',  
             username_auth:'',
             password_auth:''        
