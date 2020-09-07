@@ -269,6 +269,8 @@ import moment from 'moment'
 import filesize from 'filesize'
 import { IntersectingCirclesSpinner } from 'epic-spinners'
 import { saveAs } from 'file-saver'
+import JSZip from "jszip";
+import JSZipUtils from "jszip-utils"
 import Services from '../components/services'
 export default {
 	mixins:[Services],
@@ -700,7 +702,7 @@ export default {
 		},
 		downloadFileCallBack(response){
 			var _this = this;
-			if (this.selected == 1){
+			if (this.selected.length == 1){
 				const url = window.URL.createObjectURL(new Blob([response.data]))
 				const link = document.createElement('a')
 				link.href = url
