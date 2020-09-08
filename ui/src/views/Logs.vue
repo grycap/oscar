@@ -39,7 +39,7 @@
                 <td class="text-xs-center">{{ moment(props.item.start).format("YYYY-MM-DD HH:mm:ss") }}</td>
                 <td class="text-xs-center">{{ moment(props.item.finish).format("YYYY-MM-DD HH:mm:ss") }}</td>
                 <td class="text-xs-center">
-                    <v-icon small class="mr-2" @click="moreLogs(props.item.name)">autorenew</v-icon>
+                    <v-icon small class="mr-2" @click="moreLogs(props.item.name);handleUpdate()">autorenew</v-icon>
                     <v-icon small class="mr-2" @click="deleteJob(props.item,props.item.name)">delete</v-icon>
                 </td>
                 <td class="justify-center layout px-0">
