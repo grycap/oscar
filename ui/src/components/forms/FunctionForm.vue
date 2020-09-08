@@ -703,7 +703,7 @@
 																<v-list-tile-content style="height:80px;">
 																	<v-list-tile-title style="padding-bottom:20px;">ID: {{key}}</v-list-tile-title>
 																	<v-list-tile-title style="padding-bottom:20px;">ONEPROVIDER HOST: {{id.oneprovider_host}}</v-list-tile-title>
-																	<v-list-tile-title style="padding-bottom:20px;">ACCES TOKEN: <span class="hide_text">{{id.token}}</span> </v-list-tile-title>
+																	<v-list-tile-title style="padding-bottom:20px;">ACCES TOKEN: <span class="hide_text">*********</span> </v-list-tile-title>
 																	<v-list-tile-title style="padding-bottom:20px;">SPACE: {{id.space}}</v-list-tile-title>
 																	<!-- <v-list-tile-title>{{key}}</v-list-tile-title> -->
 																</v-list-tile-content>
@@ -817,8 +817,8 @@
 																	<v-list-tile-title style="padding-bottom:20px;">ID: {{key}}</v-list-tile-title>
 																	<v-list-tile-title style="padding-bottom:20px;">ENDPOINT: {{id.endpoint}}</v-list-tile-title>
 																	<v-list-tile-title style="padding-bottom:20px;">REGION: {{id.region}}</v-list-tile-title>
-																	<v-list-tile-title style="padding-bottom:20px;">SECRET KEY: <span class="hide_text">{{id.secret_key}}</span></v-list-tile-title>
-																	<v-list-tile-title style="padding-bottom:20px;">ACCESS KEY: <span class="hide_text">{{id.access_key}}</span></v-list-tile-title>
+																	<v-list-tile-title style="padding-bottom:20px;">SECRET KEY: <span class="hide_text">*********</span></v-list-tile-title>
+																	<v-list-tile-title style="padding-bottom:20px;">ACCESS KEY: <span class="hide_text">*********</span></v-list-tile-title>
 																	<v-list-tile-title style="padding-bottom:20px;">VERIFY: {{id.verify}}</v-list-tile-title>
 																	<!-- <v-list-tile-title>{{key}}</v-list-tile-title> -->
 																</v-list-tile-content>
@@ -915,8 +915,8 @@
 
 																<v-list-tile-content style="height:80px;">
 																	<v-list-tile-title style="padding-bottom:20px;">ID: {{key}}</v-list-tile-title>
-																	<v-list-tile-title style="padding-bottom:20px;">ACCESS KEY: <span class="hide_text">{{id.access_key}}</span></v-list-tile-title>
-																	<v-list-tile-title style="padding-bottom:20px;">SECRET TOKEN: <span class="hide_text">{{id.secret_key}}</span></v-list-tile-title>
+																	<v-list-tile-title style="padding-bottom:20px;">ACCESS KEY: <span class="hide_text">*********</span></v-list-tile-title>
+																	<v-list-tile-title style="padding-bottom:20px;">SECRET TOKEN: <span class="hide_text">*********</span></v-list-tile-title>
 																	<v-list-tile-title style="padding-bottom:20px;">REGION: {{id.region}}</v-list-tile-title>
 																	<!-- <v-list-tile-title>{{key}}</v-list-tile-title> -->
 																</v-list-tile-content>
@@ -1794,8 +1794,9 @@ export default {
 <style scoped>
 
 .hide_text{
-	-webkit-text-security: disc;
-	-moz-text-security: disc;
+	/* content:'*************'!important; */
+	-webkit-text-security: disc!important;
+	-moz-text-security: disc!important;
 	/* text-security: disc; */
 }
 

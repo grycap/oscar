@@ -1,9 +1,9 @@
 <template>
     <div class="mb-1">		
         <v-toolbar flat color="white">
-            <v-toolbar-title>LOGS: Service {{serviceName}} </v-toolbar-title>
+            <v-btn color="primary" icon  @click="goBack()"><v-icon>arrow_back</v-icon> </v-btn>
             <v-spacer></v-spacer>
-            <v-btn color="primary" dark @click="goBack()">BACK</v-btn>
+            <v-toolbar-title>LOGS: Service {{serviceName}} </v-toolbar-title>
         </v-toolbar>
         <v-card-title>
             <v-text-field
@@ -16,7 +16,7 @@
             <v-btn flat icon color="blue" @click="handleUpdate()">
                 <v-icon>autorenew</v-icon>
             </v-btn>
-             <v-btn color="green lighten-2" dark @click="deleteSuccessJobs()">DELETE SUCCESS JOBS</v-btn>          
+             <v-btn color="green lighten-2" dark @click="deleteSuccessJobs()">DELETE SUCCEEDED JOBS</v-btn>          
              <v-btn color="error" dark @click="deleteAllJobs()">DELETE ALL JOBS</v-btn>          
         </v-card-title>
         <v-data-table
@@ -35,9 +35,9 @@
             <tr >
                 <td>{{ props.item.name }}</td>
                 <td class="text-xs-center">{{ props.item.status }}</td>
-                <td class="text-xs-center">{{ moment(props.item.creation).format("YYYY-MM-DD HH:mm") }}</td>
-                <td class="text-xs-center">{{ moment(props.item.start).format("YYYY-MM-DD HH:mm") }}</td>
-                <td class="text-xs-center">{{ moment(props.item.finish).format("YYYY-MM-DD HH:mm") }}</td>
+                <td class="text-xs-center">{{ moment(props.item.creation).format("YYYY-MM-DD HH:mm:ss") }}</td>
+                <td class="text-xs-center">{{ moment(props.item.start).format("YYYY-MM-DD HH:mm:ss") }}</td>
+                <td class="text-xs-center">{{ moment(props.item.finish).format("YYYY-MM-DD HH:mm:ss") }}</td>
                 <td class="text-xs-center">
                     <v-icon small class="mr-2" @click="moreLogs(props.item.name)">autorenew</v-icon>
                     <v-icon small class="mr-2" @click="deleteJob(props.item,props.item.name)">delete</v-icon>
