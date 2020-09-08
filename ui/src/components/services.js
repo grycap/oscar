@@ -3,7 +3,7 @@ import JSZipUtils from "jszip-utils"
 export default {
     data: () => {
 		return {
-            api: '',
+            api: 'https://158.42.105.207',
             minioClient: '',  
             username_auth:'',
             password_auth:''        
@@ -37,7 +37,7 @@ export default {
             var _this = this
             axios({
                 method: 'get',
-                url: '/system/info',
+                url: this.api+'/system/info',
                 auth: {
                     username: params.user,
                     password: params.password
@@ -54,7 +54,7 @@ export default {
         listServicesCall(callBackHandler) {
             axios({
                 method: 'get',
-                url: '/system/services',
+                url: this.api+'/system/services',
                 auth: {
                     username: this.username_auth,
                     password: this.password_auth
@@ -68,7 +68,7 @@ export default {
         deleteServiceCall(params, callBackHandler) {
             axios({
                 method: 'delete',
-                url: '/system/services/'+params,
+                url: this.api+'/system/services/'+params,
                 auth: {
                     username: this.username_auth,
                     password: this.password_auth
@@ -83,7 +83,7 @@ export default {
         listJobsCall(serviceName,callBackHandler) {
             axios({
                 method: 'get',
-                url: '/system/logs/'+serviceName,
+                url: this.api+'/system/logs/'+serviceName,
                 auth: {
                     username: this.username_auth,
                     password: this.password_auth
@@ -97,7 +97,7 @@ export default {
         deleteJobCall(params, callBackHandler) {
             axios({
                 method: 'delete',
-                url:  '/system/logs/'+params.serviceName+'/'+params.jobName,
+                url:  this.api+'/system/logs/'+params.serviceName+'/'+params.jobName,
                 auth: {
                     username: this.username_auth,
                     password: this.password_auth
@@ -112,7 +112,7 @@ export default {
         listJobNameCall(params,callBackHandler) {
             axios({
                 method: 'get',
-                url: '/system/logs/'+params.serviceName+'/'+params.jobName,
+                url: this.api+'/system/logs/'+params.serviceName+'/'+params.jobName,
                 auth: {
                     username: this.username_auth,
                     password: this.password_auth
@@ -126,7 +126,7 @@ export default {
         deleteAllJobCall(params,callBackHandler) {
             axios({
                 method: 'delete',
-                url: '/system/logs/'+params.serviceName+'?all='+params.all,
+                url: this.api+'/system/logs/'+params.serviceName+'?all='+params.all,
                 auth: {
                     username: this.username_auth,
                     password: this.password_auth
@@ -141,7 +141,7 @@ export default {
         createServiceCall(params, callBackHandler){
             axios({
                 method: 'post',
-                url: '/system/services',
+                url: this.api+'/system/services',
                 auth: {
                     username: this.username_auth,
                     password: this.password_auth
@@ -157,7 +157,7 @@ export default {
         editServiceCall(params, callBackHandler){
             axios({
                 method: 'put',
-                url: '/system/services',
+                url: this.api+'/system/services',
                 auth: {
                     username: this.username_auth,
                     password: this.password_auth

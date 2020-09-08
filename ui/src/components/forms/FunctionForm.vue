@@ -293,6 +293,9 @@
 										<v-layout row wrap>
 											<v-flex xs12>  								
 												<v-container>
+													<v-flex xs12 text-xs-center>
+														<span v-show="showErrorInput" style="color: #cc3300; font-size: 12px;"><b>The Storage Provider and Path fields are required.</b></span>                   									
+													</v-flex>
 													<div class="form-group" style="width:100%">                     
 														<div class="input-group">
 															<v-flex class="col-12">
@@ -441,6 +444,9 @@
 									<v-layout row wrap>
 										<v-flex xs12>  								
 											<v-container>
+												<v-flex xs12 text-xs-center>
+													<span v-show="showErrorOutput" style="color: #cc3300; font-size: 12px;"><b>The Storage Provider and Path fields are required.</b></span>                   									
+												</v-flex>
 												<div class="form-group" style="width:100%">                     
 													<div class="input-group">
 														<v-flex class="col-12">
@@ -629,11 +635,15 @@
 									<v-tabs-items v-model="model_create" >
 										<v-tab-item  :value="`tab-onedata`">
 											<v-container>
+												
 									
 												<v-layout row style="padding:0px,10px;justify-content: center;">										
 													<img src="../../img/logo_one_data.jpg" alt=""> 
 												</v-layout>
 												<br>
+												<v-flex xs12 text-xs-center>
+													<span v-show="showErrorOneData" style="color: #cc3300; font-size: 12px;"><b>You must fill in all the information.</b></span>                   									
+												</v-flex>
 												<br>
 
 												<v-layout row style="padding:0px,10px;" >										
@@ -729,11 +739,15 @@
 
 										<v-tab-item  :value="`tab-minio`">
 											<v-container>
+												
 									
 												<v-layout row style="padding:0px,10px;justify-content: center;">										
 													<img src="../../img/minio-storage.png" height="110px" alt=""> 
 												</v-layout>
 												<br>
+												<v-flex xs12 text-xs-center>
+													<span v-show="showErrorMinio" style="color: #cc3300; font-size: 12px;"><b>You must fill in all the information.</b></span>                   									
+												</v-flex>
 												<br>
 
 												<v-layout row style="padding:0px,10px;">
@@ -843,13 +857,16 @@
 
 										<v-tab-item  :value="`tab-s3`">
 											<v-container>
+												
 									
 												<v-layout row style="padding:0px,10px;justify-content: center;">										
 													<img src="../../img/amazon-s3.png" height="110px" alt=""> 
 												</v-layout>
 												<br>
+												<v-flex xs12 text-xs-center>
+													<span v-show="showErrorS3" style="color: #cc3300; font-size: 12px;"><b>You must fill in all the information.</b></span>                   									
+												</v-flex>
 												<br>
-
 												<v-layout row style="padding:0px,10px;">
 													<v-flex xs12 sm8 offset-sm2>
 														<v-text-field 
@@ -999,6 +1016,11 @@ export default {
 			showOneData: false,
 			showMinio: false,
 			showS3: false,
+			showErrorMinio:false,
+			showErrorOneData:false,
+			showErrorS3:false,
+			showErrorInput:false,
+			showErrorOutput:false,
 			filerequire : false,
 			envrequirehost: false,
 			envrequiretoken : false,
@@ -1095,7 +1117,7 @@ export default {
 	watch:{
 		"select_tab"(val){
 			if(val == 'input_output'){				
-					this.storages_all.push("minio")				
+					this.storages_all.push("minio.default")				
 			}
 
 		}
@@ -1189,36 +1211,45 @@ export default {
 			this.form.suffix_in=""		
 		},
 		includePrefixIn(){
-			this.showselectPrefixIn = true
-			this.prefixs_in.push(this.form.prefix_in)
-			this.cleanfieldPrefixIn()
+			if(this.form.prefix_in != null && this.form.prefix_in != ''){
+				this.showselectPrefixIn = true
+				this.prefixs_in.push(this.form.prefix_in)
+				this.cleanfieldPrefixIn()
+			}
 		},
 		includeSuffixIn(){
-			this.showselectSuffixIn = true
-			this.suffixs_in.push(this.form.suffix_in)
-			this.cleanfieldSuffixIn()
+			if(this.form.suffix_in != null && this.form.suffix_in != ''){
+				this.showselectSuffixIn = true
+				this.suffixs_in.push(this.form.suffix_in)
+				this.cleanfieldSuffixIn()
+			}
 		},
 		includeInput(){
-			this.showselectInput=true
-			var input = {
-				"path":this.form.path_in,
-				"storage_provider":this.form.storage_provider_in,
-				"prefix":this.prefixs_in,
-				"suffix":this.suffixs_in
+			if(this.form.storage_provider_in=='' || this.form.path_in==''){
+				this.showErrorInput = true
+			}else{
+				this.showErrorInput = false
+				this.showselectInput=true
+				var input = {
+					"path":this.form.path_in,
+					"storage_provider":this.form.storage_provider_in,
+					"prefix":this.prefixs_in,
+					"suffix":this.suffixs_in
+				}
+				this.inputs.push(input)
+				input = {}
+				this.prefixs_in=[]
+				this.suffixs_in=[]
+				this.cleanfieldInput()						
+				this.cleanfieldPrefixIn()						
+				this.cleanfieldSuffixIn()	
+				if (this.isEmpty(this.prefixs_in)) {
+					this.showselectPrefixIn = false
+				}
+				if (this.isEmpty(this.suffixs_in)) {
+					this.showselectSuffixIn = false
+				}					
 			}
-			this.inputs.push(input)
-			input = {}
-			this.prefixs_in=[]
-			this.suffixs_in=[]
-			this.cleanfieldInput()						
-			this.cleanfieldPrefixIn()						
-			this.cleanfieldSuffixIn()	
-			if (this.isEmpty(this.prefixs_in)) {
-				this.showselectPrefixIn = false
-			}
-			if (this.isEmpty(this.suffixs_in)) {
-				this.showselectSuffixIn = false
-			}					
 		},
 		cleanfieldOutput(){
 			this.form.path_out=""		
@@ -1233,58 +1264,74 @@ export default {
 			this.form.suffix_out=""		
 		},
 		includePrefixOut(){
-			this.showselectPrefixOut = true
-			this.prefixs_out.push(this.form.prefix_out)
-			this.cleanfieldPrefixOut()
+			if(this.form.prefix_out != null && this.form.prefix_out != ''){
+				this.showselectPrefixOut = true
+				this.prefixs_out.push(this.form.prefix_out)
+				this.cleanfieldPrefixOut()
+			}
 		},
 		includeSuffixOut(){
-			this.showselectSuffixOut = true
-			this.suffixs_out.push(this.form.suffix_out)
-			this.cleanfieldSuffixOut()
+			if(this.form.suffix_out != null && this.form.suffix_out != ''){
+				this.showselectSuffixOut = true
+				this.suffixs_out.push(this.form.suffix_out)
+				this.cleanfieldSuffixOut()
+			}
 		},
 		includeOutput(){
-			this.showselectOutput=true
-			var output = {
-				"path":this.form.path_out,
-				"storage_provider":this.form.storage_provider_out,
-				"prefix":this.prefixs_out,
-				"suffix":this.suffixs_out
-			}
-			this.outputs.push(output)
-			output = {}
-			this.prefixs_out=[]
-			this.suffixs_out=[]
-			this.cleanfieldOutput()						
-			this.cleanfieldPrefixOut()						
-			this.cleanfieldSuffixOut()	
-			if (this.isEmpty(this.prefixs_out)) {
-				this.showselectPrefixOut = false
-			}
-			if (this.isEmpty(this.suffixs_out)) {
-				this.showselectSuffixOut = false
-			}					
+			if(this.form.storage_provider_out=='' || this.form.path_out==''){
+				this.showErrorOutput = true
+			}else{
+				this.showErrorOutput = false
+				this.showselectOutput=true
+				var output = {
+					"path":this.form.path_out,
+					"storage_provider":this.form.storage_provider_out,
+					"prefix":this.prefixs_out,
+					"suffix":this.suffixs_out
+				}
+				this.outputs.push(output)
+				output = {}
+				this.prefixs_out=[]
+				this.suffixs_out=[]
+				this.cleanfieldOutput()						
+				this.cleanfieldPrefixOut()						
+				this.cleanfieldSuffixOut()	
+				if (this.isEmpty(this.prefixs_out)) {
+					this.showselectPrefixOut = false
+				}
+				if (this.isEmpty(this.suffixs_out)) {
+					this.showselectSuffixOut = false
+				}	
+			}				
 		},
 		includeEnv(){
-			this.showselectEnv=true
-			var key= this.form.envVarskey.replace(" ", "")
-			var value = this.form.envVarsValue.replace(" ", "")
-			this.envVars[key]=value
-			this.cleanfieldenv()						
+			if(this.form.envVarskey != null && this.form.envVarskey != '' && this.form.envVarsValue != null && this.form.envVarsValue != ''){
+				this.showselectEnv=true
+				var key= this.form.envVarskey.replace(" ", "")
+				var value = this.form.envVarsValue.replace(" ", "")
+				this.envVars[key]=value
+				this.cleanfieldenv()						
+			}
 		},		
 		includeOneData(){
-			this.showOneData = true;
-			var value_onedata = {
-				"oneprovider_host": this.onedata.oneprovider_host,
-				"token": this.onedata.token,
-				"space": this.onedata.space
+			if(this.onedata.id=='' || this.onedata.oneprovider_host=='' || this.onedata.token=='' || this.onedata.space==''){
+				this.showErrorOneData = true
+				}else{
+				this.showErrorOneData = false
+				this.showOneData = true;
+				var value_onedata = {
+					"oneprovider_host": this.onedata.oneprovider_host,
+					"token": this.onedata.token,
+					"space": this.onedata.space
+				}
+				this.ONEDATA_DICT[this.onedata.id]=value_onedata;
+				if (this.isEmpty(this.ONEDATA_DICT)) {
+					this.showOneData = false
+				}
+				this.storages_all.push('onedata.'+this.onedata.id)
+				value_onedata = ''
+				this.cleanfieldOneData()
 			}
-			this.ONEDATA_DICT[this.onedata.id]=value_onedata;
-			if (this.isEmpty(this.ONEDATA_DICT)) {
-				this.showOneData = false
-			}
-			this.storages_all.push('onedata.'+this.onedata.id)
-			value_onedata = ''
-			this.cleanfieldOneData()
 			
 		},
 		cleanfieldOneData(){
@@ -1301,22 +1348,27 @@ export default {
 
 		},
 		includeMinio(){
-			this.showMinio = true;
-			var value_minio = {
-				"endpoint": this.minio.endpoint,
-				"region": this.minio.region,
-				"secret_key": this.minio.secret_key,
-				"access_key": this.minio.access_key,
-				"verify": this.minio.verify
+			if(this.minio.id=='' || this.minio.endpoint=='' || this.minio.region=='' || this.minio.secret_key=='' || this.minio.access_key==''){
+				this.showErrorMinio = true
+			}else{
+				this.showErrorMinio = false
+				this.showMinio = true;
+				var value_minio = {
+					"endpoint": this.minio.endpoint,
+					"region": this.minio.region,
+					"secret_key": this.minio.secret_key,
+					"access_key": this.minio.access_key,
+					"verify": this.minio.verify
+				}
+				this.MINIO_DICT[this.minio.id]=value_minio;
+				if (this.isEmpty(this.MINIO_DICT)) {
+					this.showMinio = false
+				}
+				
+				this.storages_all.push("minio."+this.minio.id)
+				value_minio = ''
+				this.cleanfieldMinio()
 			}
-			this.MINIO_DICT[this.minio.id]=value_minio;
-			if (this.isEmpty(this.MINIO_DICT)) {
-				this.showMinio = false
-			}
-			
-			this.storages_all.push("minio."+this.minio.id)
-			value_minio = ''
-			this.cleanfieldMinio()
 			
 		},
 		cleanfieldMinio(){
@@ -1335,19 +1387,24 @@ export default {
 
 		},
 		includeS3(){
-			this.showS3 = true;
-			var value_s3 = {
-				"access_key": this.s3.access_key,
-				"secret_key": this.s3.secret_key,
-				"region": this.s3.region
+			if(this.s3.id=='' || this.s3.region=='' || this.s3.secret_key=='' || this.s3.access_key==''){
+				this.showErrorS3 = true
+			}else{
+				this.showErrorS3 = false
+				this.showS3 = true;
+				var value_s3 = {
+					"access_key": this.s3.access_key,
+					"secret_key": this.s3.secret_key,
+					"region": this.s3.region
+				}
+				this.S3_DICT[this.s3.id]=value_s3;
+				if (this.isEmpty(this.S3_DICT)) {
+					this.showS3 = false
+				}
+				this.storages_all.push("s3."+this.s3.id)
+				value_s3 = ''
+				this.cleanfieldS3()
 			}
-			this.S3_DICT[this.s3.id]=value_s3;
-			if (this.isEmpty(this.S3_DICT)) {
-				this.showS3 = false
-			}
-			this.storages_all.push("s3."+this.s3.id)
-			value_s3 = ''
-			this.cleanfieldS3()
 			
 		},
 		cleanfieldS3(){
@@ -1394,10 +1451,22 @@ export default {
 				this.showselectPrefixIn = false
 			}		
 		},
+		removePrefixOut (key) {     
+			this.$delete(this.suffixs_out,key)			
+			if (this.isEmpty(this.suffixs_in)) {
+				this.showselectPrefixOut = false
+			}		
+		},
 		removeSuffixIn (key) {     
 			this.$delete(this.suffixs_in,key)			
 			if (this.isEmpty(this.suffixs_in)) {
 				this.showselectSuffixIn = false
+			}		
+		},	
+		removeSuffixOut (key) {     
+			this.$delete(this.suffixs_out,key)			
+			if (this.isEmpty(this.suffixs_out)) {
+				this.showselectSuffixOut = false
 			}		
 		},	
 		collapse(){			
@@ -1461,22 +1530,24 @@ export default {
 		
 		},
 		readurl(){     
-			this.files = [] 		
-			let uploadedFiles = this.url						
-			this.showUploading = false
-			this.filename = this.url
-			this.files.push(uploadedFiles)
-			var _this = this
-			fetch(this.url).then(r => r.blob()).then(blob => {
-				var reader = new FileReader();
-				reader.onload = function() {
-					_this.base64String = reader.result.replace(/^data:.+;base64,/, '');
-					// Convert to string because new OSCAR version doesn't need base64
-					_this.base64String = atob(_this.base64String)
-				};
-				reader.readAsDataURL(blob);
-			});
-			this.cleanfield()
+			if(this.url != '' && this.url!=null){
+				this.files = [] 		
+				let uploadedFiles = this.url						
+				this.showUploading = false
+				this.filename = this.url
+				this.files.push(uploadedFiles)
+				var _this = this
+				fetch(this.url).then(r => r.blob()).then(blob => {
+					var reader = new FileReader();
+					reader.onload = function() {
+						_this.base64String = reader.result.replace(/^data:.+;base64,/, '');
+						// Convert to string because new OSCAR version doesn't need base64
+						_this.base64String = atob(_this.base64String)
+					};
+					reader.readAsDataURL(blob);
+				});
+				this.cleanfield()
+			}
 		},
 		closeWithoutSave() {      
 			this.progress.active = false
@@ -1631,7 +1702,6 @@ export default {
 				'storage_providers':this.form.storage_provider
 
 			}
-			console.log(params)
 			this.createServiceCall(params,this.createServiceCallBack)	
 			
 		},
@@ -1641,6 +1711,7 @@ export default {
 				this.dialog = false;
 				this.clear()
 				this.updateFunctionsGrid()
+				window.getApp.$emit('REFRESH_BUCKETS_LIST')
 
 			}else {
 				window.getApp.$emit('APP_SHOW_SNACKBAR', { text: response, color: 'error' })
@@ -1696,7 +1767,7 @@ export default {
 				this.dialog = false;
 				this.clear()
 				this.updateFunctionsGrid()
-				window.getApp.$emit('REFRESH_BUCKETS_LIST')
+				
 			}else {
 				window.getApp.$emit('APP_SHOW_SNACKBAR', { text: response, color: 'error' })
 			}
@@ -1705,6 +1776,7 @@ export default {
 		},
 		updateFunctionsGrid () {
 			window.getApp.$emit('FUNC_GET_FUNCTIONS_LIST')
+			window.getApp.$emit('REFRESH_BUCKETS_LIST')
 		}
 	},
 	computed: {
@@ -1756,7 +1828,6 @@ export default {
 			setTimeout(function(){
 				this.select_logLevel = data.log_Level
 			},100)
-		
 			if (this.isEmpty(this.inputs)) {
 				this.showselectInput = false
 			}else{
@@ -1771,20 +1842,25 @@ export default {
 			this.MINIO_DICT=data.storage_provider.minio
 			this.ONEDATA_DICT=data.storage_provider.onedata
 			this.S3_DICT=data.storage_provider.s3
+			this.storages_all=[]
 			if (this.isEmpty(this.MINIO_DICT)) {
 				this.showMinio = false
 			}else{
 				this.showMinio = true
+				this.storages_all.push('minio.'+Object.keys(this.MINIO_DICT))
 			}
 			if (this.isEmpty(this.ONEDATA_DICT)) {
 				this.showOneData = false
 			}else{
 				this.showOneData = true
+				this.storages_all.push('onedata.'+Object.keys(this.ONEDATA_DICT))
 			}
 			if (this.isEmpty(this.S3_DICT)) {
 				this.S3_DICT = false
 			}else{
 				this.S3_DICT = true
+				this.storages_all.push('s3.'+Object.keys(this.S3_DICT))
+
 			}
 		})
 	}
