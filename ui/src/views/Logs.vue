@@ -2,7 +2,6 @@
     <div class="mb-1">		
         <v-toolbar flat color="white">
             <v-btn color="primary" icon  @click="goBack()"><v-icon>arrow_back</v-icon> </v-btn>
-            <v-spacer></v-spacer>
             <v-toolbar-title>LOGS: Service {{serviceName}} </v-toolbar-title>
         </v-toolbar>
         <v-card-title>
@@ -43,8 +42,8 @@
                     <v-icon small class="mr-2" @click="deleteJob(props.item,props.item.name)">delete</v-icon>
                 </td>
                 <td class="justify-center layout px-0">
-                        <v-icon  medium v-show="props.expanded" @click="props.expanded = !props.expanded">expand_less</v-icon>
-                        <v-icon  medium v-show="!props.expanded" @click="props.expanded = !props.expanded;moreLogs(props.item.name)">expand_more</v-icon>
+                        <v-icon  medium v-show="props.expanded && props.item.status!='Pending'" @click="props.expanded = !props.expanded">expand_less</v-icon>
+                        <v-icon  medium v-show="!props.expanded && props.item.status!='Pending'" @click="props.expanded = !props.expanded;moreLogs(props.item.name)">expand_more</v-icon>
                 </td>
 
             </tr>
@@ -97,10 +96,10 @@ export default {
             
             value: 'name',
             },
-            { text: 'Status',align: 'center', value: 'status' },
-            { text: 'Creation Time', align: 'center', value: 'create_time' },
-            { text: 'Start time',align: 'center', value: 'start_time' },
-            { text: 'Finish Time',align: 'center', value: 'finish_time' },       
+            { text: 'STATUS',align: 'center', value: 'status' },
+            { text: 'CREATION TIME', align: 'center', value: 'create_time' },
+            { text: 'START TIME',align: 'center', value: 'start_time' },
+            { text: 'FINISH TIME',align: 'center', value: 'finish_time' },       
             { text: '',align: 'center', value: 'actions' },
             { text: '',align: 'center', value: 'expand' },
         ],
@@ -143,7 +142,12 @@ export default {
             this.listJobNameCall(params_logs, this.listJobNameCallback);
         },
         listJobNameCallback(response){
-                this.job_logs = response  //remember to handle error
+                this.job_logs = ''
+                if(response.status==200){
+                    this.job_logs = response.data  //remember to handle error
+                }else {
+                    this.job_logs = "There are no logs available yet."
+                }
         },
         goBack(){
             this.$router.push({name: "Functions"})

@@ -16,7 +16,7 @@
 					
 					<ul class="nav nav-pills nav-fill" id="myTab" role="tablist" style="padding-right:5px; padding-left:5px;">
 						<li class="nav-item" style="margin-rigth:10px;margin-left:10px;">
-							<a class="nav-link active" id="home-tab" @click="show('home')" role="tab" aria-controls="home" aria-selected="true">New Function</a>
+							<a class="nav-link active" id="home-tab" @click="show('home')" role="tab" aria-controls="home" aria-selected="true">New Service</a>
 						</li>
 						<li class="nav-item" style="margin-rigth:10px;margin-left:10px;">
 							<a class="nav-link" id="profile-tab" @click="show('profile')" role="tab" aria-controls="profile" aria-selected="false">Storage</a>
@@ -66,7 +66,7 @@
 											<v-flex xs12  md5>
 												<div style="margin:10px" class="form-group">                     
 												<div class="input-group">
-													<input type="text" class="form-control" id="bucketname" v-model="url"   placeholder="URL" autofocus  style="border-right: none; border-left:none; border-top:none; hover: "/>                     
+													<input type="text" class="form-control" id="bucketname" autocomplete="off" v-model="url"   placeholder="URL" autofocus  style="border-right: none; border-left:none; border-top:none; hover: "/>                     
 													
 													<div class="input-group-append mr-2">                        
 													<button class="" @click="readurl()" type="button"><v-icon left color="green">check_circle</v-icon></button>
@@ -642,7 +642,7 @@
 												</v-layout>
 												<br>
 												<v-flex xs12 text-xs-center>
-													<span v-show="showErrorOneData" style="color: #cc3300; font-size: 12px;"><b>You must fill in all the information.</b></span>                   									
+													<span v-show="showErrorOneData" style="color: #cc3300; font-size: 12px;"><b>To add a storage option you must complete all the information.</b></span>                   									
 												</v-flex>
 												<br>
 
@@ -746,7 +746,7 @@
 												</v-layout>
 												<br>
 												<v-flex xs12 text-xs-center>
-													<span v-show="showErrorMinio" style="color: #cc3300; font-size: 12px;"><b>You must fill in all the information.</b></span>                   									
+													<span v-show="showErrorMinio" style="color: #cc3300; font-size: 12px;"><b>To add a storage option you must complete all the information.</b></span>                   									
 												</v-flex>
 												<br>
 
@@ -864,7 +864,7 @@
 												</v-layout>
 												<br>
 												<v-flex xs12 text-xs-center>
-													<span v-show="showErrorS3" style="color: #cc3300; font-size: 12px;"><b>You must fill in all the information.</b></span>                   									
+													<span v-show="showErrorS3" style="color: #cc3300; font-size: 12px;"><b>To add a storage option you must complete all the information.</b></span>                   									
 												</v-flex>
 												<br>
 												<v-layout row style="padding:0px,10px;">
@@ -1664,6 +1664,7 @@ export default {
 			setTimeout(function(){
 				$('.summernote').css('display','none');
 			},100)
+			this.show_input('input')
 			
 		},
 		newFunction () {
