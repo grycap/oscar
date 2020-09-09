@@ -104,7 +104,7 @@ export default {
                 },
                 data:params,
             }).then(function (response) {
-                callBackHandler("success");
+                callBackHandler(response);
             }.bind(this)).catch(function (error) {
                 callBackHandler(error);
             })
