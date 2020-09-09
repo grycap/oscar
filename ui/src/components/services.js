@@ -118,7 +118,7 @@ export default {
                     password: this.password_auth
                 }
             }).then(function (response) {
-                callBackHandler(response.data);
+                callBackHandler(response);
             }.bind(this)).catch(function (error) {
                 callBackHandler(error);
             })
