@@ -291,6 +291,11 @@ func (of *OpenfaasBackend) DeleteService(name string) error {
 		log.Println(delErr.Error())
 	}
 
+	// Delete all the service's jobs
+	if err := deleteServiceJobs(name, of.namespace, of.kubeClientset); err != nil {
+		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
+	}
+
 	return nil
 }
 

@@ -191,6 +191,11 @@ func (k *KubeBackend) DeleteService(name string) error {
 		log.Println(delErr.Error())
 	}
 
+	// Delete all the service's jobs
+	if err := deleteServiceJobs(name, k.namespace, k.kubeClientset); err != nil {
+		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
+	}
+
 	return nil
 }
 
@@ -285,6 +290,27 @@ func updateServiceConfigMap(service *types.Service, namespace string, kubeClient
 
 func deleteServiceConfigMap(name string, namespace string, kubeClientset *kubernetes.Clientset) error {
 	err := kubeClientset.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func deleteServiceJobs(name string, namespace string, kubeClientset *kubernetes.Clientset) error {
+	// ListOptions to select all the associated jobs with the specified service
+	listOpts := metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", types.ServiceLabel, name),
+	}
+
+	// Create DeleteOptions and configure PropagationPolicy for deleting associated pods in background
+	background := metav1.DeletePropagationBackground
+	delOpts := metav1.DeleteOptions{
+		PropagationPolicy: &background,
+	}
+
+	// Delete jobs
+	err := kubeClientset.BatchV1().Jobs(namespace).DeleteCollection(context.TODO(), delOpts, listOpts)
 	if err != nil {
 		return err
 	}
