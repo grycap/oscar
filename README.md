@@ -14,8 +14,6 @@ OSCAR is an open-source platform to support the Functions as a Service (FaaS) co
 [**Deploy**](docs/source/deploy.rst) &nbsp; |
 &nbsp; [**Documentation**](https://o-scar.readthedocs.io) &nbsp;
 
-<BR><center><img src="docs/source/images/oscar-components.png" alt="OSCAR Components" width="700"></center>
-
 ## Overview
 
 - [**About OSCAR**](#why-oscar)
@@ -28,9 +26,11 @@ FaaS platforms are typically oriented to the execution of short-lived functions,
 
 To this aim, OSCAR supports the [High Throughput Computing Programming Model](https://scar.readthedocs.io/en/latest/prog_model.html) initially introduced by the [SCAR framework](https://github.com/grycap/scar), to create highly-parallel event-driven file-processing serverless applications that execute on customized runtime environments provided by Docker containers run on AWS Lambda.
 
-With OSCAR, users upload files to a data storage back-end and this automatically triggers the execution of parallel invocations to a function responsible for processing each file. Output files are delivered into a data storage back-end for the convenience of the user. The user only specifies the Docker image and the script to be executed, inside a container created out of that image, in order to process a file that will be automatically made available to the container. The deployment of the computing infrastructure and its scalability is abstracted away from the user.
+With OSCAR, users upload files to a data storage back-end and this automatically triggers the execution of parallel invocations to a service responsible for processing each file. Output files are delivered into a data storage back-end for the convenience of the user. The user only specifies the Docker image and the script to be executed, inside a container created out of that image, in order to process a file that will be automatically made available to the container. The deployment of the computing infrastructure and its scalability is abstracted away from the user.
 
 ### Components
+
+<img align="right" src="docs/source/images/oscar-components.png" alt="OSCAR Components" width="400"></left>
 
 OSCAR runs on an elastic Kubernetes cluster that is deployed using:
 
