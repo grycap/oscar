@@ -33,7 +33,7 @@ jobs:
         fi
 
         TAGS="--tag ${DOCKER_IMAGE}:latest"
-        if [[ ! -v $VERSION ]]; then
+        if [[ ! -z "$VERSION" ]]; then
           TAGS="$TAGS --tag ${DOCKER_IMAGE}:${VERSION}"
         fi
 
