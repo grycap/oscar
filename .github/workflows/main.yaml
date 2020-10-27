@@ -1,0 +1,61 @@
+name: build
+
+on:
+  push:
+    branches: [master]
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2.2.0
+
+    - name: Setup node
+      uses: actions/setup-node@v1
+      with:
+        node-version: '14'
+
+    - name: Build OSCAR-UI
+      run: npm install && npm run build
+      working-directory: ./ui
+
+    - name: Prepare docker buildx
+      id: prepare
+      run: |
+        DOCKER_IMAGE=grycap/oscar
+        DOCKER_PLATFORMS=linux/amd64,linux/arm64
+
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/v}
+        fi
+
+        TAGS="--tag ${DOCKER_IMAGE}:latest"
+        if [[ ! -v $VERSION ]]; then
+          TAGS="$TAGS --tag ${DOCKER_IMAGE}:${VERSION}"
+        fi
+
+        echo ::set-output name=buildx_args::--platform ${DOCKER_PLATFORMS} \
+          --build-arg VERSION=${VERSION} \
+          --build-arg GIT_COMMIT=${GITHUB_SHA::8} \
+          ${TAGS} --file Dockerfile .
+
+    - name: Set up Docker Buildx
+      uses: crazy-max/ghaction-docker-buildx@v3.1.0
+
+    - name: Login
+      env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      run: echo "${DOCKER_PASSWORD}" | docker login --username "${DOCKER_USERNAME}" --password-stdin
+
+    - name: Build and Push
+      run: docker buildx build --output "type=image,push=true" ${{ steps.prepare.outputs.buildx_args }}
+
+    - name: Clear
+      if: always()
+      run: rm -f ${HOME}/.docker/config.json
+
+

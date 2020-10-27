@@ -1,0 +1,48 @@
+name: bin-downloader
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  buildx:
+    runs-on: ubuntu-18.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2.2.0
+
+    - name: Prepare
+      id: prepare
+      run: |
+        DOCKER_IMAGE=grycap/oscar-bin-downloader
+        DOCKER_PLATFORMS=linux/amd64,linux/arm64
+
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/v}
+        fi
+
+        TAGS="--tag ${DOCKER_IMAGE}:latest"
+        if [[ ! -v $VERSION ]]; then
+          TAGS="$TAGS --tag ${DOCKER_IMAGE}:${VERSION}"
+        fi
+
+        echo ::set-output name=buildx_args::--platform ${DOCKER_PLATFORMS} \
+          ${TAGS} --file tools/oscar-bin-downloader/Dockerfile tools/oscar-bin-downloader
+
+    - name: Set up Docker Buildx
+      uses: crazy-max/ghaction-docker-buildx@v3.1.0
+
+    - name: Login
+      env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      run: echo "${DOCKER_PASSWORD}" | docker login --username "${DOCKER_USERNAME}" --password-stdin
+
+    - name: Build and Push
+      run: docker buildx build --output "type=image,push=true" ${{ steps.prepare.outputs.buildx_args }}
+
+    - name: Clear
+      if: always()
+      run: rm -f ${HOME}/.docker/config.json
+
+
