@@ -25,14 +25,13 @@ system front (
   ec3_templates contains 'kubernetes_oscar' and
   disk.0.applications contains (name = 'ansible.modules.grycap.kubernetes') and
   disk.0.applications contains (name = 'ansible.modules.grycap.nfs') and
-  disk.0.applications contains (name = 'ansible.modules.grycap.kubefaas') and
   disk.0.applications contains (name = 'ansible.modules.grycap.kubeminio') and
-  disk.0.applications contains (name = 'ansible.modules.grycap.kuberegistry') and
-  disk.0.applications contains (name = 'ansible.modules.grycap.kubeoscar,oscar1') and
+  disk.0.applications contains (name = 'ansible.modules.grycap.kubefaas') and
+  disk.0.applications contains (name = 'ansible.modules.grycap.kubeoscar') and
   disk.0.applications contains (name = 'ansible.modules.grycap.clues') and
   disk.0.applications contains (name = 'ansible.modules.grycap.im') and
   disk.1.type='standard' and
-  disk.1.size=50GB and
+  disk.1.size=30GB and
   disk.1.device='vdf' and
   disk.1.fstype='ext4' and
   disk.1.mount_path='/pv'
@@ -53,9 +52,10 @@ configure front (
       file: path=/etc/kubernetes/pki state=directory mode=755 recurse=yes
     - name: Create auth data file with an admin user
       copy: content='{{ lookup('password', '/var/tmp/dashboard_token chars=ascii_lowercase,digits length=16') }},kubeuser,100,"users,system:masters"' dest=/etc/kubernetes/pki/auth mode=600
-    - name: Generate minio secret key
+    - name: Generate minio secret key and oscar password
       set_fact:
         minio_secret: "{{ lookup('password', '/var/tmp/minio_secret_key chars=ascii_letters,digits') }}"
+        oscar_password: "{{ lookup('password', '/var/tmp/oscar_password chars=ascii_letters,digits') }}"
 
     roles:
     - role: 'grycap.nfs'
@@ -75,29 +75,24 @@ configure front (
       kube_install_nfs_client: true
       kube_version: 'latest'
 
-    - role: 'grycap.kubefaas'
-      faas_framework: 'openfaas'
-      master_deploy: true
-
     - role: 'grycap.kubeminio'
-      enable_notifications: true
-      webhook_endpoints: [{ id: "1", endpoint: "http://oscar-manager.oscar:8080/events"}]
       minio_secretkey: '{{ minio_secret }}'
       master_deploy: true
-      enable_tls: false
+      enable_tls: true
 
-    - role: 'grycap.kuberegistry'
-      public_access: false
-      type_of_node: "front"
-      delete_enabled: true
+    - role: 'grycap.kubefaas'
+      faas_framework: 'openfaas'
+      functions_namespace: 'oscar-svc'
       master_deploy: true
 
     - role: 'grycap.kubeoscar'
-      minio_pass: '{{ minio_secret }}'
-      vue_app_backend_host: '{{ hostvars[groups["front"][0]]["IM_NODE_PUBLIC_IP"] }}'
+      oscar_pass: '{{ oscar_password }}'
+      create_ingress: true
+      serverless_backend: 'openfaas'
+      minio_endpoint:  'https://{{ IM_NODE_PUBLIC_IP }}:30300'
+      minio_secret_key: '{{ minio_secret }}'
+      minio_tls_verify: false
       master_deploy: true
-      # Last supervisor version until FDL. Not implemented in OSCAR yet.
-      supervisor_version: 1.1.2
 
     - role: 'grycap.im'
 
@@ -141,10 +136,6 @@ configure wn (
       kube_type_of_node: 'wn'
       kube_server: 'kubeserver'
       kube_version: 'latest'
-
-    - role: 'grycap.kuberegistry'
-      public_access: false
-      type_of_node: "wn"
 
 @end
 )
