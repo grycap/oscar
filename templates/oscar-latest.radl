@@ -1,4 +1,4 @@
-description oscar (
+description oscar-latest (
     kind = 'main' and
     short = 'Install and configure a cluster using the grycap.kubernetes ansible role and install all needed services to run OSCAR.' and
     content = 'The template installs the grycap.kubernetes ansible role. Initially the template creates as many working node hostnames as the sum of the values of feature "ec3_max_instances_max" in every system.
@@ -32,7 +32,7 @@ system front (
   disk.0.applications contains (name = 'ansible.modules.grycap.im') and
   disk.1.type='standard' and
   disk.1.size=30GB and
-  disk.1.device='vdf' and
+  disk.1.device='hdb' and
   disk.1.fstype='ext4' and
   disk.1.mount_path='/pv'
 )
