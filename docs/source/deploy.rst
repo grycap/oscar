@@ -1,10 +1,8 @@
 Deploy
 ======
 
-In order to deploy the Kubernetes cluster with all the OSCAR components use `EC3 <https://github.com/grycap/ec3>`_, a tool that deploys elastic virtual clusters. EC3 uses the `Infrastructure Manager (IM) <https://www.grycap.upv.es/im>`_ to deploy such clusters on multiple Cloud back-ends.
-The installation details can be found `here <https://ec3.readthedocs.io/en/latest/intro.html#installation>`_), though this section includes the relevant information to get you started:
-
-
+In order to deploy the Kubernetes cluster with the OSCAR platform, you must use `EC3 <https://github.com/grycap/ec3>`_, a tool that deploys elastic virtual clusters. EC3 uses the `Infrastructure Manager (IM) <https://www.grycap.upv.es/im>`_ to deploy such clusters on multiple Cloud back-ends.
+The installation details can be found `here <https://ec3.readthedocs.io/en/latest/intro.html#installation>`_, though this section includes the relevant information to get you started:
 
 1. Clone the EC3 repository:
 ::
@@ -15,7 +13,7 @@ The installation details can be found `here <https://ec3.readthedocs.io/en/lates
 ::
 
   cd ec3
-  wget -P templates https://raw.githubusercontent.com/grycap/oscar/master/templates/kubernetes_oscar.radl
+  wget -P templates https://raw.githubusercontent.com/grycap/oscar/master/templates/oscar.radl
 
 3. Create an ``auth.txt`` `authorization file <https://ec3.readthedocs.io/en/devel/ec3.html#authorization-file>`_ with valid credentials to access your Cloud provider.  
 As an example, to deploy on an OpenNebula-based Cloud site the contents of the file would be:
