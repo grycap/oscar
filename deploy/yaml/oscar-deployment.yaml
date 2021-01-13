@@ -18,7 +18,7 @@ spec:
       serviceAccountName: oscar-sa
       containers:
       - name: oscar
-        image: "srisco/oscar:2.0.0-preview"
+        image: "grycap/oscar:2.0.0"
         imagePullPolicy: Always
         securityContext:
           readOnlyRootFilesystem: true
@@ -41,7 +41,7 @@ spec:
         - name: MINIO_ACCESS_KEY
           value: minio
         - name: MINIO_SECRET_KEY
-          value: 
+          value: minio123
         - name: MINIO_TLS_VERIFY
           value: "false"
         ports:
@@ -49,7 +49,7 @@ spec:
           containerPort: 8080
           protocol: TCP
         resources:
-          requests:
+          limits:
             cpu: 250m
             memory: 256Mi
       tolerations:
