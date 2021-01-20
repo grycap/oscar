@@ -160,7 +160,7 @@
 				</template>
 				<template slot="items" slot-scope="props" expand="true">
 					<tr :active="props.selected"  @mouseover="c_index=props.index" @mouseleave="c_index=-1" >
-					<td class="justify-center" @click="props.selected = !props.selected" >
+					<td v-if="props.item.name!=''" class="justify-center" @click="props.selected = !props.selected" >
 						<v-icon v-show="c_index!=props.index && props.selected != true" :color="props.item.color">{{props.item.icon}}</v-icon>
 						<v-checkbox
 							:input-value="props.selected"
@@ -169,14 +169,20 @@
 							v-show ="props.index==c_index || props.selected == true"							
 						></v-checkbox>
 					</td>
+					<td v-else class="justify-center" @click="props.selected = !props.selected" >
+						
+					</td>
 					<td v-if="props.item.icon =='folder'" @click="fetchData({'path':props.item.path, 'name':props.item.name})" class="text-xs-center pointer">{{ props.item.name }}</td>
 					<td v-else class="text-xs-center">{{ props.item.name }}</td>
 					<td class="text-xs-center">{{ findFilesize(props.item.size) }}</td>
 					<td class="text-xs-center">{{ findDate(props.item.lastModified) }}</td>
-					<td class="justify-center">
+					<td v-if="props.item.name!=''" class="justify-center">
 						<v-icon style="margin-right:10px;" v-if="props.item.icon=='insert_photo'" small @click="previewFile(props.item)" color="blue darken-2">visibility</v-icon>
 						<v-icon style="margin-right:10px;" v-if="props.item.icon!='insert_photo'" small color="grey">visibility_off</v-icon>
 						<v-icon small @click="removeFile(props.item)" color="red darken-2">delete_forever</v-icon>
+					</td>
+					<td v-else class="justify-center">
+						
 					</td>
 					</tr>
 				</template>

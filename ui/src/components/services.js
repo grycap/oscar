@@ -210,7 +210,7 @@ export default {
         },
 
         getBucketFilesCall(params, callBackHandler){
-            let stream = this.minioClient.listObjects(params.name, params.prefix, true,) 
+            let stream = this.minioClient.listObjectsV2(params.name, params.prefix, true) 
             var funct = {
                 err : "",
                 files: []
@@ -218,7 +218,6 @@ export default {
             stream.on('data', function(obj) 
             {   
                 funct.files.push(obj);
-                
             })    
             stream.on('error', function(err) 
             {       
