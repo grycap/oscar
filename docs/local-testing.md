@@ -1,4 +1,4 @@
-# Local Testing
+# Local Testing with kind
 
 The easiest way to test the OSCAR platform locally is using [kind](https://kind.sigs.k8s.io/). Kind allows the deployment of Kubernetes clusters inside Docker containers and automatically configures `kubectl` to access them.
 
