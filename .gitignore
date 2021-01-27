@@ -32,3 +32,6 @@ ui/package-lock.json
 ui/npm-debug.log*
 ui/yarn-debug.log*
 ui/yarn-error.log*
+
+# mkdocs site
+/site
