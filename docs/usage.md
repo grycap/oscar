@@ -1,6 +1,6 @@
 # Using OSCAR
 
-OSCAR allows the creation of serverless file-processing Services based on container images. These services require a user-defined script with the commands responsible of the processing. The platform automatically mount a volume on the containers with the [FaaS Supervisor](https://github.com/grycap/faas-supervisor) component, which is in charge of:
+OSCAR allows the creation of serverless file-processing services based on container images. These services require a user-defined script with the commands responsible of the processing. The platform automatically mounts a volume on the containers with the [FaaS Supervisor](https://github.com/grycap/faas-supervisor) component, which is in charge of:
 
 - Downloading the file that invokes the service and make it accessible through the `INPUT_FILE_PATH` environment variable.
 - Execute the user-defined script.
@@ -39,7 +39,7 @@ You must fill in the fields indicating the container image to use, the name of t
 
 Next, the credentials of the storage providers to be used must be introduced. As the platform already has a MinIO deployment to operate, it is not necessary to enter its credentials for using it.
 
-Multiple MinIO, Onedata and Amazon S3 storage providers can be used.Remember to click the "ADD" button after completing each one. 
+Multiple MinIO, Onedata and Amazon S3 storage providers can be used. Remember to click the "ADD" button after completing each one. 
 
 ![add storage provider 1](images/usage/usage-04.png)
 
@@ -75,7 +75,7 @@ After clicking the "SUBMIT" button the new service will appear in the main view 
 
 OSCAR services can be invoked through auto-generated HTTP endpoints. Requests to these endpoints can be made in two ways:
 
-- **Synchronous** through the path `/run/<SERVICE_NAME>`. This redirect the request to the OpenFaaS gateway in order to perform the processing.
+- **Synchronous** through the path `/run/<SERVICE_NAME>`. This redirects the request to the OpenFaaS gateway in order to perform the processing.
 - **Asynchronous** through the path `/job/<SERVICE_NAME>`. This mode is used to perform file-processing when files are uploaded to the input storage provider, creating a Kubernetes job per service invocation.
 
 The content of the HTTP request body will be stored as a file that will be available via the `INPUT_FILE_PATH` environment variable to process it.
