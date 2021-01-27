@@ -53,14 +53,14 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/mast
 
 ### Deploy MinIO
 
-OSCAR depends on [MinIO](https://min.io/) as storage provider and function trigger. The easy way to run MinIO in a Kubernetes cluster is by installing its [helm chart](https://github.com/minio/charts). To  install the helm MinIO repo and install the chart, run:
+OSCAR depends on [MinIO](https://min.io/) as storage provider and function trigger. The easy way to run MinIO in a Kubernetes cluster is by installing its [helm chart](https://github.com/minio/charts). To  install the helm MinIO repo and install the chart, run the following commands replacing `<MINIO_PASSWORD>` with a password:
 
 ```sh
 helm repo add minio https://helm.min.io
-helm install minio minio/minio --set accessKey=minio --set secretKey=minio123 --set service.type=NodePort --set service.nodePort=30300
+helm install minio minio/minio --set accessKey=minio --set secretKey=<MINIO_PASSWORD> --set service.type=NodePort --set service.nodePort=30300
 ```
 
-*Note that the deployment has been configured to use the accessKey `minio` and the secretKey `minio123`. The NodePort service type has been used in order to allow access from `http://localhost:30300`*
+*Note that the deployment has been configured to use the accessKey `minio` and the specified password as secretKey. The NodePort service type has been used in order to allow access from `http://localhost:30300`*
 
 ### Deploy NFS server provisioner
 
@@ -81,14 +81,23 @@ First, create the `oscar` and `oscar-svc` namespaces by executing:
 kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/yaml/oscar-namespaces.yaml
 ```
 
-Then, add the [grycap helm repo](https://github.com/grycap/helm-charts) and deploy:
+Then, add the [grycap helm repo](https://github.com/grycap/helm-charts) and deploy by running the following commands replacing `<OSCAR_PASSWORD>` with a password of your choice and `<MINIO_PASSWORD>` with the MinIO accessKey:
 
 ```sh
 helm repo add grycap https://grycap.github.io/helm-charts/
-helm install --namespace=oscar oscar grycap/oscar --set service.type=ClusterIP --set createIngress=true --set minIO.endpoint=http://minio.default:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=minio123
+helm install --namespace=oscar oscar grycap/oscar --set authPass=<OSCAR_PASSWORD> --set service.type=ClusterIP --set createIngress=true --set minIO.endpoint=http://minio.default:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=<MINIO_PASSWORD>
 ```
 
-Now you can access to the OSCAR web interface through `https://localhost` with user `oscar` and password `oscar123`.
+Now you can access to the OSCAR web interface through `https://localhost` with user `oscar` and the specified password.
 
 *Note that the OSCAR server has been configured to use the ClusterIP service of MinIO for internal communication. This blocks the MinIO section in the OSCAR web interface, so to download and upload files you must connect directly to MinIO (`http://localhost:30300`).*
 
+### Delete the cluster
+
+Once you have finished testing the platform, you can remove the local kind cluster by executing:
+
+```sh
+kind delete cluster
+```
+
+*Remember that if you have more than one cluster created, it may be required to set the `--name` flag to specify the name of the cluster to be deleted.*
