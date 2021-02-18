@@ -184,8 +184,9 @@ export default {
 			}			
 			if (this.drawer2 == true){
 				this.expand_sto = "expand_less"	
+				window.getApp.$emit('REFRESH_BUCKETS_LIST')		
 			}else if (this.drawer2 == false){
-				this.expand_sto = "expand_more"				
+				this.expand_sto = "expand_more"		
 			}
 		}			
 		},

@@ -53,6 +53,7 @@ export default {
     
   }),
   created(){
+    localStorage.clear();
     localStorage.setItem("authenticated", false);
   },
 
