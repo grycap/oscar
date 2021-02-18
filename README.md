@@ -13,7 +13,7 @@
 OSCAR is an open-source platform to support the Functions as a Service (FaaS) computing model for file-processing applications. It can be automatically deployed on multi-Clouds in order to create highly-parallel event-driven file-processing serverless applications that execute on customized runtime environments provided by Docker containers than run on an elastic Kubernetes cluster.
 
 [**Deploy**](docs/source/deploy.rst) &nbsp; |
-&nbsp; [**Documentation**](https://o-scar.readthedocs.io) &nbsp;
+&nbsp; [**Documentation**](https://grycap.github.io/oscar/) &nbsp;
 
 ## Overview
 
