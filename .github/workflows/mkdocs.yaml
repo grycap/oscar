@@ -22,7 +22,7 @@ jobs:
         python -m pip install mkdocs-render-swagger-plugin
     - name: Build and deploy to gh-pages
       run: |
-        git branch -D gh-pages
+        git branch -B gh-pages
         git checkout -t origin/gh-pages
         git checkout master
         mkdocs gh-deploy
