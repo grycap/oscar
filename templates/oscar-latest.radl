@@ -26,7 +26,6 @@ system front (
   disk.0.applications contains (name = 'ansible.modules.grycap.kubernetes') and
   disk.0.applications contains (name = 'ansible.modules.grycap.nfs') and
   disk.0.applications contains (name = 'ansible.modules.grycap.kubeminio') and
-  disk.0.applications contains (name = 'ansible.modules.grycap.kubefaas') and
   disk.0.applications contains (name = 'ansible.modules.grycap.kubeoscar') and
   disk.0.applications contains (name = 'ansible.modules.grycap.clues') and
   disk.0.applications contains (name = 'ansible.modules.grycap.im') and
