@@ -10,8 +10,6 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v2
-      with:
-        ref: gh-pages
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
@@ -24,5 +22,7 @@ jobs:
         python -m pip install mkdocs-render-swagger-plugin
     - name: Build and deploy to gh-pages
       run: |
-        git checkout -t origin/master
+        git branch -D gh-pages
+        git checkout -t origin/gh-pages
+        git checkout master
         mkdocs gh-deploy
