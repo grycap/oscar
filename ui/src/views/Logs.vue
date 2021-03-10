@@ -37,7 +37,7 @@
                 <td class="text-xs-center">{{ moment(props.item.creation).format("YYYY-MM-DD HH:mm:ss") }}</td>
                 <td class="text-xs-center" v-if="props.item.status!='Pending'">{{ moment(props.item.start).format("YYYY-MM-DD HH:mm:ss") }}</td>
                 <td class="text-xs-center" v-else></td>
-                <td class="text-xs-center" v-if="props.item.status!='Pending'">{{ moment(props.item.finish).format("YYYY-MM-DD HH:mm:ss") }}</td>
+                <td class="text-xs-center" v-if="props.item.status!='Pending' || props.item.status!='Running'">{{ moment(props.item.finish).format("YYYY-MM-DD HH:mm:ss") }}</td>
                 <td class="text-xs-center" v-else></td>
                 <td class="text-xs-center">
                     <v-icon small class="mr-2" @click="moreLogs(props.item.name);handleUpdate()">autorenew</v-icon>
