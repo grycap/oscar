@@ -20,7 +20,7 @@ import (
 	"net/http/httputil"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/types"
 )
 
 // MakeRunHandler makes a handler to manage sync invocations sending them to the gateway of the ServerlessBackend

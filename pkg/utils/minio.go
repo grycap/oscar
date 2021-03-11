@@ -24,7 +24,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/grycap/oscar/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/types"
 	"github.com/minio/minio/pkg/madmin"
 )
 
@@ -80,12 +80,12 @@ func MakeMinIOAdminClient(cfg *types.Config) (*MinIOAdminClient, error) {
 }
 
 // RegisterWebhook registers a new webhook in the MinIO configuration
-func (minIOAdminClient *MinIOAdminClient) RegisterWebhook(name string) error {
-	err := minIOAdminClient.adminClient.SetConfigKV(context.TODO(), fmt.Sprintf("notify_webhook:%s endpoint=%s/job/%s", name, minIOAdminClient.oscarEndpoint.String(), name))
+func (minIOAdminClient *MinIOAdminClient) RegisterWebhook(name string) (restarted bool, err error) {
+	r, err := minIOAdminClient.adminClient.SetConfigKV(context.TODO(), fmt.Sprintf("notify_webhook:%s endpoint=%s/job/%s", name, minIOAdminClient.oscarEndpoint.String(), name))
 	if err != nil {
-		return err
+		return false, err
 	}
-	return nil
+	return r, nil
 }
 
 // RemoveWebhook removes an existent webhook in the MinIO configuration

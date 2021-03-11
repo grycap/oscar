@@ -29,8 +29,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/cdmi-client-go"
-	"github.com/grycap/oscar/pkg/types"
-	"github.com/grycap/oscar/pkg/utils"
+	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/utils"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -304,12 +304,15 @@ func registerMinIOWebhook(name string, minIO *types.MinIOProvider, cfg *types.Co
 		return fmt.Errorf("The provided MinIO configuration is not valid: %v", err)
 	}
 
-	if err := minIOAdminClient.RegisterWebhook(name); err != nil {
+	restarted, err := minIOAdminClient.RegisterWebhook(name)
+	if err != nil {
 		return fmt.Errorf("Error registering the service's webhook: %v", err)
 	}
 
-	if err := minIOAdminClient.RestartServer(); err != nil {
-		return err
+	if !restarted {
+		if err := minIOAdminClient.RestartServer(); err != nil {
+			return err
+		}
 	}
 
 	return nil
