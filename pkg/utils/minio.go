@@ -80,12 +80,12 @@ func MakeMinIOAdminClient(cfg *types.Config) (*MinIOAdminClient, error) {
 }
 
 // RegisterWebhook registers a new webhook in the MinIO configuration
-func (minIOAdminClient *MinIOAdminClient) RegisterWebhook(name string) (restarted bool, err error) {
-	r, err := minIOAdminClient.adminClient.SetConfigKV(context.TODO(), fmt.Sprintf("notify_webhook:%s endpoint=%s/job/%s", name, minIOAdminClient.oscarEndpoint.String(), name))
+func (minIOAdminClient *MinIOAdminClient) RegisterWebhook(name string) error {
+	_, err := minIOAdminClient.adminClient.SetConfigKV(context.TODO(), fmt.Sprintf("notify_webhook:%s endpoint=%s/job/%s", name, minIOAdminClient.oscarEndpoint.String(), name))
 	if err != nil {
-		return false, err
+		return err
 	}
-	return r, nil
+	return nil
 }
 
 // RemoveWebhook removes an existent webhook in the MinIO configuration

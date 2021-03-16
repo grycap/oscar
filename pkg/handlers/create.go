@@ -304,15 +304,12 @@ func registerMinIOWebhook(name string, minIO *types.MinIOProvider, cfg *types.Co
 		return fmt.Errorf("The provided MinIO configuration is not valid: %v", err)
 	}
 
-	restarted, err := minIOAdminClient.RegisterWebhook(name)
-	if err != nil {
+	if err := minIOAdminClient.RegisterWebhook(name); err != nil {
 		return fmt.Errorf("Error registering the service's webhook: %v", err)
 	}
 
-	if !restarted {
-		if err := minIOAdminClient.RestartServer(); err != nil {
-			return err
-		}
+	if err := minIOAdminClient.RestartServer(); err != nil {
+		return err
 	}
 
 	return nil
