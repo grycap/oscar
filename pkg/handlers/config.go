@@ -20,7 +20,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/types"
 )
 
 // MakeConfigHandler makes a handler for getting server's configuration
