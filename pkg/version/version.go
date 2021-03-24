@@ -19,7 +19,7 @@ package version
 import (
 	"runtime"
 
-	"github.com/grycap/oscar/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/types"
 	"k8s.io/client-go/kubernetes"
 )
 
