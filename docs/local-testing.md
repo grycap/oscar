@@ -85,7 +85,7 @@ Then, add the [grycap helm repo](https://github.com/grycap/helm-charts) and depl
 
 ```sh
 helm repo add grycap https://grycap.github.io/helm-charts/
-helm install --namespace=oscar oscar grycap/oscar --set authPass=<OSCAR_PASSWORD> --set service.type=ClusterIP --set createIngress=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.default:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=<MINIO_PASSWORD>
+helm install --namespace=oscar oscar grycap/oscar --set authPass=<OSCAR_PASSWORD> --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.default:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=<MINIO_PASSWORD>
 ```
 
 Now you can access to the OSCAR web interface through `https://localhost` with user `oscar` and the specified password.
