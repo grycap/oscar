@@ -1,4 +1,4 @@
-# Using OSCAR
+# Using OSCAR through the web-based UI
 
 OSCAR allows the creation of serverless file-processing services based on container images. These services require a user-defined script with the commands responsible of the processing. The platform automatically mounts a volume on the containers with the [FaaS Supervisor](https://github.com/grycap/faas-supervisor) component, which is in charge of:
 
@@ -8,7 +8,9 @@ OSCAR allows the creation of serverless file-processing services based on contai
 
 
 You can follow one of the [examples](https://github.com/grycap/oscar/tree/master/examples) in order to test the OSCAR framework for specific applications. 
-We recommend you to start with the [plant classification example](https://github.com/grycap/oscar/tree/master/examples/imagemagick) detailed bellow.
+We recommend you to start with the [plant classification example](https://github.com/grycap/oscar/tree/master/examples/imagemagick) detailed below.
+
+If you prefer to use the command-line interface rather than the web-based UI, there is an example in [oscar-cli's repository](https://github.com/grycap/oscar-cli/tree/main/example-workflow).
 
 ## Login
 
