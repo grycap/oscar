@@ -30,3 +30,5 @@ As external storage providers, the following services can be used:
 - External [MinIO](https://min.io) servers, which may be in clusters other than the platform.
 - [Amazon S3](https://aws.amazon.com/s3/), the Amazon's  object storage service that offers industry-leading scalability, data availability, security, and performance in the public Cloud.
 - [Onedata](https://onedata.org/), the global data access solution for science used in the [EGI Federated Cloud](https://datahub.egi.eu/).
+
+An OSCAR cluster can be accessed via its [REST API](https://grycap.github.io/oscar/api/), the [web-based UI](https://github.com/grycap/oscar/tree/master/ui) and the the command-line interface  provided by [oscar-cli](https://github.com/grycap/oscar-cli).
