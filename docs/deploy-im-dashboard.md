@@ -1,8 +1,8 @@
 # Deployment with the IM Dashboard
 
-An OSCAR cluster can easily be deployed on multiple Cloud back-ends without requiring any installation by using the [Infrastructure Manager](https://www.grycap.upv.es/im)'s Dashboard ([IM Dashboard](https://appsgrycap.i3m.upv.es:31443/im-dashboard/login)). This is a managed service provided by the [GRyCAP](https://www.grycap.upv.es) research group at the [Universitat Politècnica de València](https://www.upv.es) to deploy customized virtual infrastructures across many Cloud providers. 
+An OSCAR cluster can be easily deployed on multiple Cloud back-ends without requiring any installation by using the [Infrastructure Manager](https://www.grycap.upv.es/im)'s Dashboard ([IM Dashboard](https://appsgrycap.i3m.upv.es:31443/im-dashboard/login)). This is a managed service provided by the [GRyCAP](https://www.grycap.upv.es) research group at the [Universitat Politècnica de València](https://www.upv.es) to deploy customized virtual infrastructures across many Cloud providers. 
 
-Using the IM Dashboard is the easiest and most convenient approach to deploy an OSCAR cluster. It also automatically allocates a DNS entry and TLS certificates to support HTTPS-based access to the OSCAR cluster and companion service (e.g. MinIO).
+Using the IM Dashboard is the easiest and most convenient approach to deploy an OSCAR cluster. It also automatically allocates a DNS entry and TLS certificates to support HTTPS-based access to the OSCAR cluster and companion services (e.g. MinIO).
 
 This example shows how to deploy an OSCAR cluster on [Amazon Web Services (AWS)](https://aws.amazon.com) with two nodes. Thanks to the IM, the very same procedure applies to deploy the OSCAR cluster in an on-premises Cloud (such as OpenStack) or any other Cloud provider supported by the IM.
 
@@ -65,6 +65,20 @@ Once reached the "configured" state, see the "Outputs" to obtain the different e
 
 The OSCAR UI can be accessed with the username ``oscar`` and the password you specified at deployment time.
 
-![access](images/im-dashboard/im-dashboard-08.png)
+![access-oscar](images/im-dashboard/im-dashboard-08.png)
 
 The MinIO UI can be accessed with the username ``minio`` and the password you specified at deployment time.
+
+![access-minio](images/im-dashboard/im-dashboard-09.png)
+
+The Kubernetes Dashboard can be accessed with the token you specified at deployment time.
+![access-kubernetes](images/im-dashboard/im-dashboard-10.png)
+
+You can obtain statistics about the Kubernetes cluster:
+![access-kubernetes-2](images/im-dashboard/im-dashboard-11.png)
+
+
+7. Terminating the OSCAR cluster
+
+You can terminate the OSCAR cluster from the IM Dashboard:
+![terminate](images/im-dashboard/im-dashboard-12.png)
