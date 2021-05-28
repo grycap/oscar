@@ -42,10 +42,10 @@ storage_providers:
 
 ## Top level parameters
 
-| Field                                                         | Description                                                                                                                                                                                              |
-|---------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `functions`   *[Functions](#Functions)*                       | Mandatory parameter to define a Functions Definition Language file. Note that "functions" instead of "services" has been used in order to keep compatibility with [SCAR](https://github.com/grycap/scar) |
-| `storage_providers`   *[StorageProviders](#StorageProviders)* | Parameter to define the credentials for the storage providers to be used in the services                                                                                                                 |
+| Field                                                             | Description                                                                                                                                                                                              |
+|-------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `functions` </br> *[Functions](#functions)*                       | Mandatory parameter to define a Functions Definition Language file. Note that "functions" instead of "services" has been used in order to keep compatibility with [SCAR](https://github.com/grycap/scar) |
+| `storage_providers` </br> *[StorageProviders](#storageproviders)* | Parameter to define the credentials for the storage providers to be used in the services                                                                                                                 |
 
 ## Functions
 
@@ -63,9 +63,9 @@ storage_providers:
 | `memory` </br> *string*                                    | Memory limit for the service following the [kubernetes format](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory). Optional (default: 256Mi) |
 | `cpu` </br> *string*                                       | CPU limit for the service following the [kubernetes format](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu). Optional (default: 0.2)         |
 | `log_level` </br> *string*                                 | Log level for the FaaS Supervisor. Available levels: NOTSET, DEBUG, INFO, WARNING, ERROR and CRITICAL. Optional (default: INFO)                                                                    |
-| `input` </br> *[StorageIOConfig](#storageIOConfig) array*  | Array with the input configuration for the service. Optional                                                                                                                                       |
-| `output` </br> *[StorageIOConfig](#storageIOConfig) array* | Array with the output configuration for the service. Optional                                                                                                                                      |
-| `environment` </br> *[EnvVarsMap](#envvarmaps)*            | The user-defined environment variables assigned to the service. Optional                                                                                                                           |
+| `input` </br> *[StorageIOConfig](#storageioconfig) array*  | Array with the input configuration for the service. Optional                                                                                                                                       |
+| `output` </br> *[StorageIOConfig](#storageioconfig) array* | Array with the output configuration for the service. Optional                                                                                                                                      |
+| `environment` </br> *[EnvVarsMap](#envvarsmap)*            | The user-defined environment variables assigned to the service. Optional                                                                                                                           |
 
 ## StorageIOConfig
 
@@ -86,9 +86,9 @@ storage_providers:
 
 | Field                                                            | Description                                                                                                                |
 |------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
-| `minio` </br> *map[string][MinIOProvider](#MinIOProvider)*       | Map to define the credentials for a MinIO storage provider, being the key the user-defined identifier for the provider     |
-| `s3` </br> *map[string][S3Provider](#S3Provider)*                | Map to define the credentials for a Amazon S3 storage provider, being the key the user-defined identifier for the provider |
-| `onedata` </br> *map[string][OnedataProvider](#OnedataProvider)* | Map to define the credentials for a Onedata storage provider, being the key the user-defined identifier for the provider   |
+| `minio` </br> *map[string][MinIOProvider](#minioprovider)*       | Map to define the credentials for a MinIO storage provider, being the key the user-defined identifier for the provider     |
+| `s3` </br> *map[string][S3Provider](#s3provider)*                | Map to define the credentials for a Amazon S3 storage provider, being the key the user-defined identifier for the provider |
+| `onedata` </br> *map[string][OnedataProvider](#onedataprovider)* | Map to define the credentials for a Onedata storage provider, being the key the user-defined identifier for the provider   |
 
 ## MinIOProvider
 
