@@ -4,6 +4,7 @@ nav:
 - Introduction: index.md
 - Getting started:
   - Local testing: local-testing.md
+  - Deployment with IM Dashboard: deploy-im-dashboard.md
   - Deployment with EC3: deploy-ec3.md
   - Deployment with Helm: deploy-helm.md
 - usage.md
