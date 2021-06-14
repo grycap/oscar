@@ -64,13 +64,12 @@ func NewOFScaler(kubeClientset *kubernetes.Clientset, cfg *types.Config) *Openfa
 }
 
 // Start starts the OpenFaaS scaler
-// TODO: implement!!
 func (ofs *OpenfaasScaler) Start() {
 	// Retrieve the basic auth credentials from secret
 	var basicAuthUser, basicAuthPass string
 	secret, err := ofs.kubeClientset.CoreV1().Secrets(ofs.openfaasNamespace).Get(context.TODO(), ofs.openfaasBasicAuthSecret, metav1.GetOptions{})
 	if err != nil {
-		scalerLogger.Fatalln("Unable to retrieve the OpenFaaS basic auth secret")
+		scalerLogger.Println("Unable to retrieve the OpenFaaS basic auth secret")
 		return
 	}
 	basicAuthUser = string(secret.Data["basic-auth-user"])
@@ -79,7 +78,8 @@ func (ofs *OpenfaasScaler) Start() {
 	// Parse the OPENFAAS_SCALER_INTERVAL parameter
 	reconcileInterval, err := time.ParseDuration(ofs.reconcileInterval)
 	if err != nil {
-		scalerLogger.Fatalln("Invalid OPENFAAS_SCALER_INTERVAL value")
+		scalerLogger.Println("Invalid OPENFAAS_SCALER_INTERVAL value")
+		return
 	}
 
 	// Make prometheus API client
@@ -87,7 +87,8 @@ func (ofs *OpenfaasScaler) Start() {
 		Address: ofs.prometheusEndpoint,
 	})
 	if err != nil {
-		scalerLogger.Fatalln("Unable to create the prometheus client")
+		scalerLogger.Println("Unable to create the prometheus client")
+		return
 	}
 
 	prometheusAPIClient := v1.NewAPI(prometheusClient)
@@ -159,7 +160,7 @@ func isIdle(functionName string, namespace string, inactivityDuration string, pr
 	// Make the query
 	result, warnings, err := prometheusAPIClient.Query(ctx, query, time.Now())
 	if err != nil {
-		scalerLogger.Fatalf("Error querying prometheus API with function \"%s\"\n", functionName)
+		scalerLogger.Printf("Error querying prometheus API with function \"%s\"\n", functionName)
 		return false
 	}
 	if len(warnings) > 0 {
