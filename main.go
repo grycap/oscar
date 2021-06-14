@@ -53,7 +53,12 @@ func main() {
 
 	switch cfg.ServerlessBackend {
 	case "openfaas":
-		back = backends.MakeOpenfaasBackend(kubeClientset, kubeConfig, cfg)
+		ofBack := backends.MakeOpenfaasBackend(kubeClientset, kubeConfig, cfg)
+		back = ofBack
+		// Start OpenFaaS Scaler as a goroutine
+		if cfg.OpenfaasScalerEnable {
+			go ofBack.StartScaler()
+		}
 	// case "knative":
 	// 	back = backends.MakeKnativeBackend()
 	default:

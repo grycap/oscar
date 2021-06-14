@@ -26,16 +26,21 @@ import (
 )
 
 const (
-	defaultMinioTLSVerify    = true
-	defaultMinIOEndpoint     = "https://minio-service.minio:9000"
-	defaultMinIORegion       = "us-east-1"
-	defaultTimeout           = time.Duration(300) * time.Second
-	defaultServiceName       = "oscar"
-	defaultServicePort       = 8080
-	defaultNamespace         = "oscar"
-	defaultServicesNamespace = "oscar-svc"
-	defaultOpenfaasNamespace = "openfaas"
-	defaultOpenfaasPort      = 8080
+	defaultMinioTLSVerify                   = true
+	defaultMinIOEndpoint                    = "https://minio-service.minio:9000"
+	defaultMinIORegion                      = "us-east-1"
+	defaultTimeout                          = time.Duration(300) * time.Second
+	defaultServiceName                      = "oscar"
+	defaultServicePort                      = 8080
+	defaultNamespace                        = "oscar"
+	defaultServicesNamespace                = "oscar-svc"
+	defaultOpenfaasNamespace                = "openfaas"
+	defaultOpenfaasPort                     = 8080
+	defaultOpenfaasBasicAuthSecret          = "basic-auth"
+	defaultOpenfaasPrometheusPort           = 9090
+	defaultOpenfaasScalerEnable             = false
+	defaultOpenfaasScalerInterval           = "2m"
+	defaultOpenfaasScalerInactivityDuration = "10m"
 )
 
 // Config stores the configuration for the OSCAR server
@@ -62,7 +67,7 @@ type Config struct {
 	ServicePort int `json:"-"`
 
 	// Serverless framework used to deploy services (Openfaas | Knative)
-	// If not defined only async invokations allowed (Using KubeBackend)
+	// If not defined only async invocations allowed (Using KubeBackend)
 	ServerlessBackend string `json:"serverless_backend,omitempty"`
 
 	// OpenfaasNamespace namespace where the OpenFaaS gateway is deployed
@@ -70,6 +75,21 @@ type Config struct {
 
 	// OpenfaasPort service port where the OpenFaaS gateway is exposed
 	OpenfaasPort int `json:"-"`
+
+	// OpenfaasBasicAuthSecret name of the secret used to store the OpenFaaS credentials
+	OpenfaasBasicAuthSecret string `json:"-"`
+
+	// OpenfaasPrometheusPort service port where the OpenFaaS' Prometheus is exposed
+	OpenfaasPrometheusPort int `json:"-"`
+
+	// OpenfaasScalerEnable option to enable the Openfaas scaler
+	OpenfaasScalerEnable bool `json:"-"`
+
+	// OpenfaasScalerInterval time interval to check if any function could be scaled
+	OpenfaasScalerInterval string `json:"-"`
+
+	// OpenfaasScalerInactivityDuration
+	OpenfaasScalerInactivityDuration string `json:"-"`
 
 	// HTTP timeout for reading the payload (default: 300)
 	ReadTimeout time.Duration `json:"-"`
@@ -181,6 +201,36 @@ func ReadConfig() (*Config, error) {
 			}
 		} else {
 			config.OpenfaasPort = defaultOpenfaasPort
+		}
+
+		if len(os.Getenv("OPENFAAS_PROMETHEUS_PORT")) > 0 {
+			config.OpenfaasPrometheusPort, err = strconv.Atoi(os.Getenv("OPENFAAS_PROMETHEUS_PORT"))
+			if err != nil {
+				return nil, fmt.Errorf("The OPENFAAS_PORT value is not valid. Error: %s", err)
+			}
+		} else {
+			config.OpenfaasPrometheusPort = defaultOpenfaasPrometheusPort
+		}
+
+		if len(os.Getenv("OPENFAAS_SCALER_ENABLE")) > 0 {
+			config.OpenfaasScalerEnable, err = strconv.ParseBool(os.Getenv("OPENFAAS_SCALER_ENABLE"))
+			if err != nil {
+				return nil, fmt.Errorf("The OPENFAAS_SCALER_ENABLE value must be a boolean")
+			}
+		} else {
+			config.OpenfaasScalerEnable = defaultOpenfaasScalerEnable
+		}
+
+		if len(os.Getenv("OPENFAAS_SCALER_INTERVAL")) > 0 {
+			config.OpenfaasScalerInterval = os.Getenv("OPENFAAS_SCALER_INTERVAL")
+		} else {
+			config.OpenfaasScalerInterval = defaultOpenfaasScalerInterval
+		}
+
+		if len(os.Getenv("OPENFAAS_SCALER_INACTIVITY_DURATION")) > 0 {
+			config.OpenfaasScalerInactivityDuration = os.Getenv("OPENFAAS_SCALER_INACTIVITY_DURATION")
+		} else {
+			config.OpenfaasScalerInactivityDuration = defaultOpenfaasScalerInactivityDuration
 		}
 	}
 

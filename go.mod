@@ -13,6 +13,7 @@ require (
 	github.com/grycap/cdmi-client-go v0.1.1
 	github.com/minio/minio v0.0.0-20210311070216-f92b7a562103
 	github.com/openfaas/faas-netes v0.0.0-20210305091056-d05bda90c357
+	github.com/prometheus/client_golang v1.9.0
 	github.com/smartystreets/assertions v1.2.0 // indirect
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83 // indirect
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110 // indirect
