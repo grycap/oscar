@@ -203,6 +203,12 @@ func ReadConfig() (*Config, error) {
 			config.OpenfaasPort = defaultOpenfaasPort
 		}
 
+		if len(os.Getenv("OPENFAAS_BASIC_AUTH_SECRET")) > 0 {
+			config.OpenfaasBasicAuthSecret = os.Getenv("OPENFAAS_BASIC_AUTH_SECRET")
+		} else {
+			config.OpenfaasBasicAuthSecret = defaultOpenfaasBasicAuthSecret
+		}
+
 		if len(os.Getenv("OPENFAAS_PROMETHEUS_PORT")) > 0 {
 			config.OpenfaasPrometheusPort, err = strconv.Atoi(os.Getenv("OPENFAAS_PROMETHEUS_PORT"))
 			if err != nil {
