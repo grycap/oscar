@@ -25,6 +25,7 @@ import (
 	"net/http"
 
 	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/utils"
 	ofv1 "github.com/openfaas/faas-netes/pkg/apis/openfaas/v1"
 	ofclientset "github.com/openfaas/faas-netes/pkg/client/clientset/versioned"
 
@@ -45,6 +46,7 @@ type OpenfaasBackend struct {
 	ofClientset     *ofclientset.Clientset
 	namespace       string
 	gatewayEndpoint string
+	scaler          *utils.OpenfaasScaler
 }
 
 // MakeOpenfaasBackend makes a OpenfaasBackend from the provided k8S clientset and config
@@ -59,6 +61,7 @@ func MakeOpenfaasBackend(kubeClientset *kubernetes.Clientset, kubeConfig *rest.C
 		ofClientset:     ofClientset,
 		namespace:       cfg.ServicesNamespace,
 		gatewayEndpoint: fmt.Sprintf("gateway.%s:%d", cfg.OpenfaasNamespace, cfg.OpenfaasPort),
+		scaler:          utils.NewOFScaler(kubeClientset, cfg),
 	}
 }
 
@@ -326,4 +329,9 @@ func (of *OpenfaasBackend) createOFFunctionDefinition(service *types.Service) *o
 			Labels: &labels,
 		},
 	}
+}
+
+// StartScaler starts the OpenFaaS Scaler
+func (of *OpenfaasBackend) StartScaler() {
+	of.scaler.Start()
 }
