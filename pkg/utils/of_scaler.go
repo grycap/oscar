@@ -105,7 +105,12 @@ func (ofs *OpenfaasScaler) Start() {
 
 		// Get all scalable functions
 		functionNames, err := ofs.getScalableFunctions()
-		if err != nil || len(functionNames) == 0 {
+		if err != nil {
+			scalerLogger.Println(err.Error())
+			continue
+		}
+
+		if len(functionNames) == 0 {
 			scalerLogger.Println("There are no functions to scale")
 			continue
 		}
@@ -115,7 +120,9 @@ func (ofs *OpenfaasScaler) Start() {
 				// Scale to zero
 				err := ofs.scaleToZero(functionName, basicAuthUser, basicAuthPass, gatewayClient)
 				if err != nil {
-					scalerLogger.Panicf("Error scaling function \"%s\":%v", functionName, err)
+					scalerLogger.Printf("Error scaling function \"%s\": %v\n", functionName, err)
+				} else {
+					scalerLogger.Printf("Function \"%s\" scaled down to zero\n", functionName)
 				}
 			}
 		}
@@ -124,21 +131,18 @@ func (ofs *OpenfaasScaler) Start() {
 }
 
 func (ofs *OpenfaasScaler) getScalableFunctions() ([]string, error) {
-	// Filter options (label "com.openfaas.scale.zero=true")
-	opts := metav1.ListOptions{
-		LabelSelector: "com.openfaas.scale.zero=true",
-	}
-
 	// Get the deployment list
-	deployments, err := ofs.kubeClientset.AppsV1().Deployments(ofs.namespace).List(context.TODO(), opts)
+	deployments, err := ofs.kubeClientset.AppsV1().Deployments(ofs.namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	var functionNames []string
 	for _, deploy := range deployments.Items {
-		if deploy.Status.Replicas != 0 {
-			functionNames = append(functionNames, deploy.Name)
+		if val, ok := deploy.Spec.Template.Labels["com.openfaas.scale.zero"]; ok {
+			if val == "true" && deploy.Status.Replicas != 0 {
+				functionNames = append(functionNames, deploy.Name)
+			}
 		}
 	}
 
@@ -210,9 +214,13 @@ func (ofs *OpenfaasScaler) scaleToZero(functionName, basicAuthUser, basicAuthPas
 	req.SetBasicAuth(basicAuthUser, basicAuthPass)
 
 	// Set the request
-	_, err = gatewayClient.Do(req)
+	res, err := gatewayClient.Do(req)
 	if err != nil {
 		return err
+	}
+
+	if res.StatusCode != 200 && res.StatusCode != 202 {
+		return fmt.Errorf("status code \"%d\"", res.StatusCode)
 	}
 
 	return nil
