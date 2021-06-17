@@ -93,6 +93,7 @@ configure front (
       minio_tls_verify: false
       master_deploy: true
       openfaas_scaler_enable: true
+      serverless_backend: "openfaas"
 
     - role: 'grycap.im'
 
