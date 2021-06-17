@@ -95,6 +95,7 @@ configure front (
       oscar_version: 2.1.0
       supervisor_version: 1.3.2
       openfaas_scaler_enable: true
+      serverless_backend: "openfaas"
 
     - role: 'grycap.im'
 
