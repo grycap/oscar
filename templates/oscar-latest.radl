@@ -79,6 +79,11 @@ configure front (
       master_deploy: true
       enable_tls: true
 
+    - role: 'grycap.kubefaas'
+      faas_framework: 'openfaas'
+      functions_namespace: 'oscar-svc'
+      master_deploy: true
+
     - role: 'grycap.kubeoscar'
       oscar_pass: '{{ oscar_password }}'
       create_ingress: true
@@ -86,6 +91,7 @@ configure front (
       minio_secret_key: '{{ minio_secret }}'
       minio_tls_verify: false
       master_deploy: true
+      openfaas_scaler_enable: true
 
     - role: 'grycap.im'
 

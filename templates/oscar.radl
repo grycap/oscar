@@ -72,12 +72,17 @@ configure front (
       kube_deploy_dashboard: true
       kube_install_metrics: true
       kube_install_nfs_client: true
-      kube_version: 1.19.3
+      kube_version: 1.19.11
 
     - role: 'grycap.kubeminio'
       minio_secretkey: '{{ minio_secret }}'
       master_deploy: true
       enable_tls: true
+
+    - role: 'grycap.kubefaas'
+      faas_framework: 'openfaas'
+      functions_namespace: 'oscar-svc'
+      master_deploy: true
 
     - role: 'grycap.kubeoscar'
       oscar_pass: '{{ oscar_password }}'
@@ -86,8 +91,9 @@ configure front (
       minio_secret_key: '{{ minio_secret }}'
       minio_tls_verify: false
       master_deploy: true
-      oscar_version: 2.0.2
+      oscar_version: 2.1.0
       supervisor_version: 1.3.2
+      openfaas_scaler_enable: true
 
     - role: 'grycap.im'
 
