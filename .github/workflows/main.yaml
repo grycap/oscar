@@ -2,7 +2,9 @@ name: build
 
 on:
   push:
-    branches: [master]
+    branches:
+    - master
+    - devel
   release:
     types: [created]
 
@@ -33,7 +35,12 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/v}
         fi
 
-        TAGS="--tag ${DOCKER_HUB_IMAGE}:latest --tag ${GHCR_IMAGE}:latest"
+        if [[ $GITHUB_REF == refs/heads/devel ]]; then
+          TAGS="--tag ${DOCKER_HUB_IMAGE}:devel --tag ${GHCR_IMAGE}:devel"
+        else
+          TAGS="--tag ${DOCKER_HUB_IMAGE}:latest --tag ${GHCR_IMAGE}:latest"
+        fi
+        
         if [[ ! -z "$VERSION" ]]; then
           TAGS="$TAGS --tag ${DOCKER_HUB_IMAGE}:${VERSION} --tag ${GHCR_IMAGE}:${VERSION}"
         fi
