@@ -70,7 +70,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 		}
 
 		// Get podSpec from the service
-		podSpec, err := service.ToPodSpec()
+		podSpec, err := service.ToPodSpec(cfg)
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return

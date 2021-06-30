@@ -47,6 +47,7 @@ type OpenfaasBackend struct {
 	namespace       string
 	gatewayEndpoint string
 	scaler          *utils.OpenfaasScaler
+	config          *types.Config
 }
 
 // MakeOpenfaasBackend makes a OpenfaasBackend from the provided k8S clientset and config
@@ -62,6 +63,7 @@ func MakeOpenfaasBackend(kubeClientset *kubernetes.Clientset, kubeConfig *rest.C
 		namespace:       cfg.ServicesNamespace,
 		gatewayEndpoint: fmt.Sprintf("gateway.%s:%d", cfg.OpenfaasNamespace, cfg.OpenfaasPort),
 		scaler:          utils.NewOFScaler(kubeClientset, cfg),
+		config:          cfg,
 	}
 }
 
@@ -168,7 +170,7 @@ func (of *OpenfaasBackend) CreateService(service types.Service) error {
 	}
 
 	// Create podSpec from the service
-	podSpec, err := service.ToPodSpec()
+	podSpec, err := service.ToPodSpec(of.config)
 	if err != nil {
 		// Delete the function
 		delErr := of.ofClientset.OpenfaasV1().Functions(of.namespace).Delete(context.TODO(), service.Name, metav1.DeleteOptions{})
@@ -245,7 +247,7 @@ func (of *OpenfaasBackend) UpdateService(service types.Service) error {
 	}
 
 	// Create podSpec from the service
-	podSpec, err := service.ToPodSpec()
+	podSpec, err := service.ToPodSpec(of.config)
 	if err != nil {
 		// Restore the old configMap
 		_, resErr := of.kubeClientset.CoreV1().ConfigMaps(of.namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
