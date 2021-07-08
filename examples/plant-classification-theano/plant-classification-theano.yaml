@@ -1,0 +1,15 @@
+
+functions:
+  oscar:
+  - oscar-cluster:
+      name: plants
+      memory: 1Gi
+      cpu: '1.0'
+      image: grycap/oscar-theano-plants
+      script: plants.sh
+      input:
+      - storage_provider: minio
+        path: plants/in
+      output:
+      - storage_provider: minio
+        path: plants/out
