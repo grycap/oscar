@@ -1,0 +1,14 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: wordcount-compss
+      memory: 1Gi
+      cpu: '1.0'
+      image: srisco/test-compss
+      script: script-compss.sh
+      input:
+      - storage_provider: minio
+        path: wordcount-compss/in
+      output:
+      - storage_provider: minio
+        path: wordcount-compss/out
