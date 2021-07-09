@@ -1,0 +1,26 @@
+functions:
+  oscar:
+  - my_oscar:
+      name: anon-and-split
+      memory: 2Gi
+      cpu: '1.0'
+      image: grycap/blurry-faces
+      script: blurry-faces.sh
+      input:
+      - storage_provider: minio
+        path: mask-detector/input
+      output:
+      - storage_provider: minio
+        path: mask-detector/intermediate
+  - my_oscar:
+      name: mask-detector
+      memory: 1Gi
+      cpu: '1.0'
+      script: mask-detector.sh
+      image: grycap/mask-detector-yolo:mini
+      input:
+      - storage_provider: minio
+        path: mask-detector/intermediate
+      output:
+      - storage_provider: minio
+        path: mask-detector/result
