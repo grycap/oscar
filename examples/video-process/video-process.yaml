@@ -1,0 +1,26 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: split-video
+      memory: 1Gi
+      cpu: '1.0'
+      image: grycap/ffmpeg
+      script: split-video.sh
+      input:
+      - storage_provider: minio
+        path: video-process/in
+      output:
+      - storage_provider: minio
+        path: video-process/med
+  - oscar-cluster:
+      name: darknet
+      memory: 1Gi
+      cpu: '1.0'
+      image: grycap/darknet-v3
+      script: yolov3-object-detection.sh
+      input:
+      - storage_provider: minio
+        path: video-process/med
+      output:
+      - storage_provider: minio
+        path: video-process/out
