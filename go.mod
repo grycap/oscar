@@ -4,7 +4,7 @@ go 1.16
 
 require (
 	github.com/aws/aws-sdk-go v1.37.28
-	github.com/gin-gonic/gin v1.6.3
+	github.com/gin-gonic/gin v1.7.2
 	github.com/goccy/go-yaml v1.8.9
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.2.0
