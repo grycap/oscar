@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/grycap/oscar/v2/pkg/types"
-	"github.com/minio/minio/pkg/madmin"
+	"github.com/minio/madmin-go"
 )
 
 // MinIOAdminClient struct to represent a MinIO Admin client to configure webhook notifications
