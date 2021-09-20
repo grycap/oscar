@@ -70,7 +70,7 @@
 										<v-card-text class="custom-padding">
 											<strong>Token: </strong> 
 											<v-text-field
-												:value="props.item.token"
+												:v-model="props.item.token"
 												:append-icon="show1 ? 'mdi-eye' : 'mdi-eye-off'"
 												:type="show1 ? 'text' : 'password'"
 												name="input-10-1"
@@ -335,6 +335,7 @@ export default {
 					return {
 						service: serv.name,
 						container: serv.image,
+						token: serv.token,
 						cpu: serv.cpu,
 						logLevel: serv.log_level,
 						envVars: serv.environment,
