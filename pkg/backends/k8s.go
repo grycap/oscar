@@ -22,7 +22,7 @@ import (
 	"log"
 
 	"github.com/goccy/go-yaml"
-	"github.com/grycap/oscar/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -32,6 +32,7 @@ import (
 type KubeBackend struct {
 	kubeClientset *kubernetes.Clientset
 	namespace     string
+	config        *types.Config
 }
 
 // MakeKubeBackend makes a KubeBackend with the provided k8s clientset
@@ -39,6 +40,7 @@ func MakeKubeBackend(kubeClientset *kubernetes.Clientset, cfg *types.Config) *Ku
 	return &KubeBackend{
 		kubeClientset: kubeClientset,
 		namespace:     cfg.ServicesNamespace,
+		config:        cfg,
 	}
 }
 
@@ -80,7 +82,7 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 	}
 
 	// Create podSpec from the service
-	podSpec, err := service.ToPodSpec()
+	podSpec, err := service.ToPodSpec(k.config)
 	if err != nil {
 		// Delete the previously created configMap
 		if delErr := deleteServiceConfigMap(service.Name, k.namespace, k.kubeClientset); delErr != nil {
@@ -144,7 +146,7 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 	}
 
 	// Create podSpec from the service
-	podSpec, err := service.ToPodSpec()
+	podSpec, err := service.ToPodSpec(k.config)
 	if err != nil {
 		// Restore the old configMap
 		_, resErr := k.kubeClientset.CoreV1().ConfigMaps(k.namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})

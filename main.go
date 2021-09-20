@@ -22,9 +22,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/pkg/backends"
-	"github.com/grycap/oscar/pkg/handlers"
-	"github.com/grycap/oscar/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/backends"
+	"github.com/grycap/oscar/v2/pkg/handlers"
+	"github.com/grycap/oscar/v2/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -53,7 +53,12 @@ func main() {
 
 	switch cfg.ServerlessBackend {
 	case "openfaas":
-		back = backends.MakeOpenfaasBackend(kubeClientset, kubeConfig, cfg)
+		ofBack := backends.MakeOpenfaasBackend(kubeClientset, kubeConfig, cfg)
+		back = ofBack
+		// Start OpenFaaS Scaler as a goroutine
+		if cfg.OpenfaasScalerEnable {
+			go ofBack.StartScaler()
+		}
 	// case "knative":
 	// 	back = backends.MakeKnativeBackend()
 	default:

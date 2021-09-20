@@ -18,6 +18,7 @@ package types
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/goccy/go-yaml"
 	v1 "k8s.io/api/core/v1"
@@ -110,7 +111,7 @@ type Service struct {
 }
 
 // ToPodSpec returns a k8s podSpec from the Service
-func (service *Service) ToPodSpec() (*v1.PodSpec, error) {
+func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 	resources, err := createResources(service)
 	if err != nil {
 		return nil, err
@@ -162,7 +163,7 @@ func (service *Service) ToPodSpec() (*v1.PodSpec, error) {
 	}
 
 	// Add the required environment variables for the watchdog
-	addWatchdogEnvVars(podSpec)
+	addWatchdogEnvVars(podSpec, cfg)
 
 	return podSpec, nil
 }
@@ -216,7 +217,7 @@ func createResources(service *Service) (v1.ResourceRequirements, error) {
 	return resources, nil
 }
 
-func addWatchdogEnvVars(p *v1.PodSpec) {
+func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config) {
 	requiredEnvVars := []v1.EnvVar{
 		// Use FaaS Supervisor to handle requests
 		{
@@ -224,19 +225,26 @@ func addWatchdogEnvVars(p *v1.PodSpec) {
 			Value: fmt.Sprintf("%s/%s", VolumePath, SupervisorName),
 		},
 		// Other OpenFaaS Watchdog options
-		// https://github.com/openfaas/faas/tree/master/watchdog
-		// TODO: This should be configurable
+		// https://github.com/openfaas/classic-watchdog
 		{
 			Name:  "max_inflight",
-			Value: "1",
+			Value: strconv.Itoa(cfg.WatchdogMaxInflight),
 		},
 		{
 			Name:  "write_debug",
-			Value: "true",
+			Value: strconv.FormatBool(cfg.WatchdogWriteDebug),
 		},
 		{
 			Name:  "exec_timeout",
-			Value: "0",
+			Value: strconv.Itoa(cfg.WatchdogExecTimeout),
+		},
+		{
+			Name:  "read_timeout",
+			Value: strconv.Itoa(cfg.WatchdogReadTimeout),
+		},
+		{
+			Name:  "write_timeout",
+			Value: strconv.Itoa(cfg.WatchdogWriteTimeout),
 		},
 	}
 

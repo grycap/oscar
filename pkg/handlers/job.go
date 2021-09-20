@@ -24,7 +24,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/grycap/oscar/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/types"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -70,7 +70,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 		}
 
 		// Get podSpec from the service
-		podSpec, err := service.ToPodSpec()
+		podSpec, err := service.ToPodSpec(cfg)
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return

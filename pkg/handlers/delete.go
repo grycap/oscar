@@ -26,8 +26,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/pkg/types"
-	"github.com/grycap/oscar/pkg/utils"
+	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/utils"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 

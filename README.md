@@ -6,14 +6,14 @@
 [![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat)](https://pkg.go.dev/github.com/grycap/oscar)
 [![GitHub](https://img.shields.io/github/license/grycap/oscar)](https://github.com/grycap/oscar/blob/master/LICENSE)
 
-![OSCAR-logo](docs/source/images/oscar3.png)
+![OSCAR-logo](docs/images/oscar3.png)
 
 ## Introduction
 
 OSCAR is an open-source platform to support the Functions as a Service (FaaS) computing model for file-processing applications. It can be automatically deployed on multi-Clouds in order to create highly-parallel event-driven file-processing serverless applications that execute on customized runtime environments provided by Docker containers than run on an elastic Kubernetes cluster.
 
-[**Deploy**](docs/source/deploy.rst) &nbsp; |
-&nbsp; [**Documentation**](https://o-scar.readthedocs.io) &nbsp;
+[**Deploy**](https://grycap.github.io/oscar/deploy-im-dashboard/) &nbsp; |
+&nbsp; [**Documentation**](https://grycap.github.io/oscar/) &nbsp;
 
 ## Overview
 
@@ -31,23 +31,29 @@ With OSCAR, users upload files to a data storage back-end and this automatically
 
 ### Components
 
-<img align="right" src="docs/source/images/oscar-components.png" alt="OSCAR Components" width="400"></left>
+<img align="right" src="docs/images/oscar-components.png" alt="OSCAR Components" width="400"></left>
 
 OSCAR runs on an elastic Kubernetes cluster that is deployed using:
 
-* [EC3](http://www.grycap.upv.es/ec3), an open-source tool to deploy compute clusters that can horizontally scale in terms of number of nodes with multiple plugins.
-* [IM](http://www.grycap.upv.es/im), an open-source virtual infrastructure provisioning tool for multi-Clouds.
-* [CLUES](http://github.com/grycap/clues), an elasticity manager that horizontally scales in and out the number of nodes of the Kubernetes cluster according to the workload.
+- [EC3](http://www.grycap.upv.es/ec3), an open-source tool to deploy compute clusters that can horizontally scale in terms of number of nodes with multiple plugins.
+- [IM](http://www.grycap.upv.es/im), an open-source virtual infrastructure provisioning tool for multi-Clouds.
+- [CLUES](http://github.com/grycap/clues), an elasticity manager that horizontally scales in and out the number of nodes of the Kubernetes cluster according to the workload.
 
-The following services are deployed inside the Kubernetes cluster in order to support the OSCAR platform:
+The following components are deployed inside the Kubernetes cluster in order to support the OSCAR platform:
 
-* [Minio](http://minio.io), a high performance distributed object storage server that provides an API compatible with S3. 
-* [OpenFaaS](https://www.openfaas.com/), a FaaS platform that allows creating functions executed via HTTP requests.
-* [OSCAR UI](https://github.com/grycap/oscar-ui), a web-based GUI aimed at end users to facilitate interaction with the OSCAR platform.
+- [MinIO](http://minio.io), a high performance distributed object storage server that provides an API compatible with S3. 
+- [OpenFaaS](https://www.openfaas.com/), a FaaS platform that allows creating functions executed via HTTP requests.
+- OSCAR, the main application, responsible for the management of the services and the integration of the different components to support event-driven serverless computing for file processing. It includes a web-based GUI aimed at end users to facilitate interaction with OSCAR.
 
-OSCAR has also been integrated with the following [EGI](https://www.egi.eu) services: EGI Applications on Demand, to provision the OSCAR cluster from the EGI Federated Cloud and EGI DataHub as the storage back-end and sources of events.
+As external storage providers, the following services can be used:
 
-Further information is available in the [documentation](https://o-scar.readthedocs.io).
+- External [MinIO](https://min.io) servers, which may be in clusters other than the platform.
+- [Amazon S3](https://aws.amazon.com/s3/), the Amazon's  object storage service that offers industry-leading scalability, data availability, security, and performance in the public Cloud.
+- [Onedata](https://onedata.org/), the global data access solution for science used in the [EGI Federated Cloud](https://datahub.egi.eu/).
+
+OSCAR has also been integrated with the [EC3 Portal](https://servproject.i3m.upv.es/ec3-ltos/index.php) available in the [EGI Applications on Demand](https://www.egi.eu/services/applications-on-demand/) service to deploy the platform on the EGI Federated Cloud resources.
+
+Further information is available in the [documentation](https://grycap.github.io/oscar).
 
 ## Licensing
 

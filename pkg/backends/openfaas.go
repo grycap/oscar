@@ -24,7 +24,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/grycap/oscar/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/utils"
 	ofv1 "github.com/openfaas/faas-netes/pkg/apis/openfaas/v1"
 	ofclientset "github.com/openfaas/faas-netes/pkg/client/clientset/versioned"
 
@@ -45,6 +46,8 @@ type OpenfaasBackend struct {
 	ofClientset     *ofclientset.Clientset
 	namespace       string
 	gatewayEndpoint string
+	scaler          *utils.OpenfaasScaler
+	config          *types.Config
 }
 
 // MakeOpenfaasBackend makes a OpenfaasBackend from the provided k8S clientset and config
@@ -59,6 +62,8 @@ func MakeOpenfaasBackend(kubeClientset *kubernetes.Clientset, kubeConfig *rest.C
 		ofClientset:     ofClientset,
 		namespace:       cfg.ServicesNamespace,
 		gatewayEndpoint: fmt.Sprintf("gateway.%s:%d", cfg.OpenfaasNamespace, cfg.OpenfaasPort),
+		scaler:          utils.NewOFScaler(kubeClientset, cfg),
+		config:          cfg,
 	}
 }
 
@@ -165,7 +170,7 @@ func (of *OpenfaasBackend) CreateService(service types.Service) error {
 	}
 
 	// Create podSpec from the service
-	podSpec, err := service.ToPodSpec()
+	podSpec, err := service.ToPodSpec(of.config)
 	if err != nil {
 		// Delete the function
 		delErr := of.ofClientset.OpenfaasV1().Functions(of.namespace).Delete(context.TODO(), service.Name, metav1.DeleteOptions{})
@@ -242,7 +247,7 @@ func (of *OpenfaasBackend) UpdateService(service types.Service) error {
 	}
 
 	// Create podSpec from the service
-	podSpec, err := service.ToPodSpec()
+	podSpec, err := service.ToPodSpec(of.config)
 	if err != nil {
 		// Restore the old configMap
 		_, resErr := of.kubeClientset.CoreV1().ConfigMaps(of.namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
@@ -326,4 +331,9 @@ func (of *OpenfaasBackend) createOFFunctionDefinition(service *types.Service) *o
 			Labels: &labels,
 		},
 	}
+}
+
+// StartScaler starts the OpenFaaS Scaler
+func (of *OpenfaasBackend) StartScaler() {
+	of.scaler.Start()
 }

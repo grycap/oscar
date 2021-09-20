@@ -9,7 +9,7 @@ Webpage: https://kubernetes.io/'
 network public (
   # kubernetes ports
   outbound = 'yes' and
-  outports contains '80/tcp,443/tcp,22/tcp,6443/tcp,31112/tcp,32112/tcp,31852/tcp,8800/tcp'
+  outports contains '80/tcp,443/tcp,22/tcp,6443/tcp,30300/tcp,30303/tcp,8800/tcp,30443/tcp'
 )
 
 network private ()
@@ -73,7 +73,7 @@ configure front (
       kube_deploy_dashboard: true
       kube_install_metrics: true
       kube_install_nfs_client: true
-      kube_version: 1.19.3
+      kube_version: 1.19.11
 
     - role: 'grycap.kubeminio'
       minio_secretkey: '{{ minio_secret }}'
@@ -84,19 +84,18 @@ configure front (
       faas_framework: 'openfaas'
       functions_namespace: 'oscar-svc'
       master_deploy: true
-      faas_chart_version: 6.1.1
-      cli_version: 0.12.14
 
     - role: 'grycap.kubeoscar'
       oscar_pass: '{{ oscar_password }}'
       create_ingress: true
-      serverless_backend: 'openfaas'
       minio_endpoint:  'https://{{ IM_NODE_PUBLIC_IP }}:30300'
       minio_secret_key: '{{ minio_secret }}'
       minio_tls_verify: false
       master_deploy: true
-      oscar_version: 2.0.0
-      supervisor_version: 1.3.0
+      oscar_version: 2.1.0
+      supervisor_version: 1.3.2
+      openfaas_scaler_enable: true
+      serverless_backend: "openfaas"
 
     - role: 'grycap.im'
 

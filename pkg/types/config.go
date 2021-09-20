@@ -26,16 +26,26 @@ import (
 )
 
 const (
-	defaultMinioTLSVerify    = true
-	defaultMinIOEndpoint     = "https://minio-service.minio:9000"
-	defaultMinIORegion       = "us-east-1"
-	defaultTimeout           = time.Duration(300) * time.Second
-	defaultServiceName       = "oscar"
-	defaultServicePort       = 8080
-	defaultNamespace         = "oscar"
-	defaultServicesNamespace = "oscar-svc"
-	defaultOpenfaasNamespace = "openfaas"
-	defaultOpenfaasPort      = 8080
+	defaultMinioTLSVerify                   = true
+	defaultMinIOEndpoint                    = "https://minio-service.minio:9000"
+	defaultMinIORegion                      = "us-east-1"
+	defaultTimeout                          = time.Duration(300) * time.Second
+	defaultServiceName                      = "oscar"
+	defaultServicePort                      = 8080
+	defaultNamespace                        = "oscar"
+	defaultServicesNamespace                = "oscar-svc"
+	defaultOpenfaasNamespace                = "openfaas"
+	defaultOpenfaasPort                     = 8080
+	defaultOpenfaasBasicAuthSecret          = "basic-auth"
+	defaultOpenfaasPrometheusPort           = 9090
+	defaultOpenfaasScalerEnable             = false
+	defaultOpenfaasScalerInterval           = "2m"
+	defaultOpenfaasScalerInactivityDuration = "10m"
+	defaultWatchdogMaxInflight              = 1
+	defaultWatchdogWriteDebug               = true
+	defaultWatchdogExecTimeout              = 0
+	defaultWatchdogReadTimeout              = 300
+	defaultWatchdogWriteTimeout             = 300
 )
 
 // Config stores the configuration for the OSCAR server
@@ -62,7 +72,7 @@ type Config struct {
 	ServicePort int `json:"-"`
 
 	// Serverless framework used to deploy services (Openfaas | Knative)
-	// If not defined only async invokations allowed (Using KubeBackend)
+	// If not defined only async invocations allowed (Using KubeBackend)
 	ServerlessBackend string `json:"serverless_backend,omitempty"`
 
 	// OpenfaasNamespace namespace where the OpenFaaS gateway is deployed
@@ -70,6 +80,36 @@ type Config struct {
 
 	// OpenfaasPort service port where the OpenFaaS gateway is exposed
 	OpenfaasPort int `json:"-"`
+
+	// OpenfaasBasicAuthSecret name of the secret used to store the OpenFaaS credentials
+	OpenfaasBasicAuthSecret string `json:"-"`
+
+	// OpenfaasPrometheusPort service port where the OpenFaaS' Prometheus is exposed
+	OpenfaasPrometheusPort int `json:"-"`
+
+	// OpenfaasScalerEnable option to enable the Openfaas scaler
+	OpenfaasScalerEnable bool `json:"-"`
+
+	// OpenfaasScalerInterval time interval to check if any function could be scaled
+	OpenfaasScalerInterval string `json:"-"`
+
+	// OpenfaasScalerInactivityDuration
+	OpenfaasScalerInactivityDuration string `json:"-"`
+
+	// WatchdogMaxInflight
+	WatchdogMaxInflight int `json:"-"`
+
+	// WatchdogWriteDebug
+	WatchdogWriteDebug bool `json:"-"`
+
+	// WatchdogExecTimeout
+	WatchdogExecTimeout int `json:"-"`
+
+	// WatchdogReadTimeout
+	WatchdogReadTimeout int `json:"-"`
+
+	// WatchdogWriteTimeout
+	WatchdogWriteTimeout int `json:"-"`
 
 	// HTTP timeout for reading the payload (default: 300)
 	ReadTimeout time.Duration `json:"-"`
@@ -136,7 +176,7 @@ func ReadConfig() (*Config, error) {
 	if len(os.Getenv("MINIO_ENDPOINT")) > 0 {
 		config.MinIOProvider.Endpoint = os.Getenv("MINIO_ENDPOINT")
 		if _, err = url.Parse(config.MinIOProvider.Endpoint); err != nil {
-			return nil, fmt.Errorf("The MINIO_ENDPOINT value is not valid. Error: %s", err)
+			return nil, fmt.Errorf("The MINIO_ENDPOINT value is not valid. Error: %v", err)
 		}
 	} else {
 		config.MinIOProvider.Endpoint = defaultMinIOEndpoint
@@ -177,17 +217,98 @@ func ReadConfig() (*Config, error) {
 		if len(os.Getenv("OPENFAAS_PORT")) > 0 {
 			config.OpenfaasPort, err = strconv.Atoi(os.Getenv("OPENFAAS_PORT"))
 			if err != nil {
-				return nil, fmt.Errorf("The OPENFAAS_PORT value is not valid. Error: %s", err)
+				return nil, fmt.Errorf("The OPENFAAS_PORT value is not valid. Error: %v", err)
 			}
 		} else {
 			config.OpenfaasPort = defaultOpenfaasPort
 		}
+
+		if len(os.Getenv("OPENFAAS_BASIC_AUTH_SECRET")) > 0 {
+			config.OpenfaasBasicAuthSecret = os.Getenv("OPENFAAS_BASIC_AUTH_SECRET")
+		} else {
+			config.OpenfaasBasicAuthSecret = defaultOpenfaasBasicAuthSecret
+		}
+
+		if len(os.Getenv("OPENFAAS_PROMETHEUS_PORT")) > 0 {
+			config.OpenfaasPrometheusPort, err = strconv.Atoi(os.Getenv("OPENFAAS_PROMETHEUS_PORT"))
+			if err != nil {
+				return nil, fmt.Errorf("The OPENFAAS_PORT value is not valid. Error: %v", err)
+			}
+		} else {
+			config.OpenfaasPrometheusPort = defaultOpenfaasPrometheusPort
+		}
+
+		if len(os.Getenv("OPENFAAS_SCALER_ENABLE")) > 0 {
+			config.OpenfaasScalerEnable, err = strconv.ParseBool(os.Getenv("OPENFAAS_SCALER_ENABLE"))
+			if err != nil {
+				return nil, fmt.Errorf("The OPENFAAS_SCALER_ENABLE value must be a boolean")
+			}
+		} else {
+			config.OpenfaasScalerEnable = defaultOpenfaasScalerEnable
+		}
+
+		if len(os.Getenv("OPENFAAS_SCALER_INTERVAL")) > 0 {
+			config.OpenfaasScalerInterval = os.Getenv("OPENFAAS_SCALER_INTERVAL")
+		} else {
+			config.OpenfaasScalerInterval = defaultOpenfaasScalerInterval
+		}
+
+		if len(os.Getenv("OPENFAAS_SCALER_INACTIVITY_DURATION")) > 0 {
+			config.OpenfaasScalerInactivityDuration = os.Getenv("OPENFAAS_SCALER_INACTIVITY_DURATION")
+		} else {
+			config.OpenfaasScalerInactivityDuration = defaultOpenfaasScalerInactivityDuration
+		}
+	}
+
+	if len(os.Getenv("WATCHDOG_MAX_INFLIGHT")) > 0 {
+		config.WatchdogMaxInflight, err = strconv.Atoi(os.Getenv("WATCHDOG_MAX_INFLIGHT"))
+		if err != nil {
+			return nil, fmt.Errorf("The WATCHDOG_MAX_INFLIGHT value is not valid. Error: %v", err)
+		}
+	} else {
+		config.WatchdogMaxInflight = defaultWatchdogMaxInflight
+	}
+
+	if len(os.Getenv("WATCHDOG_WRITE_DEBUG")) > 0 {
+		config.WatchdogWriteDebug, err = strconv.ParseBool(os.Getenv("WATCHDOG_WRITE_DEBUG"))
+		if err != nil {
+			return nil, fmt.Errorf("The WATCHDOG_WRITE_DEBUG value must be a boolean")
+		}
+	} else {
+		config.WatchdogWriteDebug = defaultWatchdogWriteDebug
+	}
+
+	if len(os.Getenv("WATCHDOG_EXEC_TIMEOUT")) > 0 {
+		config.WatchdogExecTimeout, err = strconv.Atoi(os.Getenv("WATCHDOG_EXEC_TIMEOUT"))
+		if err != nil {
+			return nil, fmt.Errorf("The WATCHDOG_EXEC_TIMEOUT value is not valid. Error: %v", err)
+		}
+	} else {
+		config.WatchdogExecTimeout = defaultWatchdogExecTimeout
+	}
+
+	if len(os.Getenv("WATCHDOG_READ_TIMEOUT")) > 0 {
+		config.WatchdogReadTimeout, err = strconv.Atoi(os.Getenv("WATCHDOG_READ_TIMEOUT"))
+		if err != nil {
+			return nil, fmt.Errorf("The WATCHDOG_READ_TIMEOUT value is not valid. Error: %v", err)
+		}
+	} else {
+		config.WatchdogReadTimeout = defaultWatchdogReadTimeout
+	}
+
+	if len(os.Getenv("WATCHDOG_WRITE_TIMEOUT")) > 0 {
+		config.WatchdogWriteTimeout, err = strconv.Atoi(os.Getenv("WATCHDOG_WRITE_TIMEOUT"))
+		if err != nil {
+			return nil, fmt.Errorf("The WATCHDOG_WRITE_TIMEOUT value is not valid. Error: %v", err)
+		}
+	} else {
+		config.WatchdogWriteTimeout = defaultWatchdogWriteTimeout
 	}
 
 	if len(os.Getenv("READ_TIMEOUT")) > 0 {
 		config.ReadTimeout, err = parseSeconds(os.Getenv("READ_TIMEOUT"))
 		if err != nil {
-			return nil, fmt.Errorf("The READ_TIMEOUT value is not valid. Error: %s", err)
+			return nil, fmt.Errorf("The READ_TIMEOUT value is not valid. Error: %v", err)
 		}
 	} else {
 		config.ReadTimeout = defaultTimeout
@@ -196,7 +317,7 @@ func ReadConfig() (*Config, error) {
 	if len(os.Getenv("WRITE_TIMEOUT")) > 0 {
 		config.WriteTimeout, err = parseSeconds(os.Getenv("WRITE_TIMEOUT"))
 		if err != nil {
-			return nil, fmt.Errorf("The WRITE_TIMEOUT value is not valid. Error: %s", err)
+			return nil, fmt.Errorf("The WRITE_TIMEOUT value is not valid. Error: %v", err)
 		}
 	} else {
 		config.WriteTimeout = defaultTimeout
@@ -205,7 +326,7 @@ func ReadConfig() (*Config, error) {
 	if len(os.Getenv("OSCAR_SERVICE_PORT")) > 0 {
 		config.ServicePort, err = strconv.Atoi(os.Getenv("OSCAR_SERVICE_PORT"))
 		if err != nil {
-			return nil, fmt.Errorf("The OSCAR_SERVICE_PORT value is not valid. Error: %s", err)
+			return nil, fmt.Errorf("The OSCAR_SERVICE_PORT value is not valid. Error: %v", err)
 		}
 	} else {
 		config.ServicePort = defaultServicePort

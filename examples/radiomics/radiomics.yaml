@@ -1,0 +1,14 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: radiomics
+      memory: 1Gi
+      cpu: '1.0'
+      image: grycap/oscar-radiomics
+      script: user-script.sh
+      input:
+      - storage_provider: minio
+        path: radiomics/in
+      output:
+      - storage_provider: minio
+        path: radiomics/out

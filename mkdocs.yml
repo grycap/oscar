@@ -1,0 +1,26 @@
+site_name: OSCAR Documentation
+repo_url: https://github.com/grycap/oscar
+nav:
+- Introduction: index.md
+- Getting started:
+  - Local testing: local-testing.md
+  - Deployment with IM Dashboard: deploy-im-dashboard.md
+  - Deployment with EC3: deploy-ec3.md
+  - Deployment with Helm: deploy-helm.md
+- usage.md
+- Functions definition Language: fdl.md
+- OSCAR-CLI: https://github.com/grycap/oscar-cli
+- Integration with EGI: egi-integration.md
+- OpenAPI Specification: api.md
+- license.md
+- about.md
+theme:
+  favicon: images/logo.png
+  logo: images/logo.png
+  name: material
+  palette:
+    primary: teal
+plugins:
+- search
+- render_swagger
+copyright: "&copy; 2021, GRyCAP - i3M - Universitat Politècnica de València, Spain."
