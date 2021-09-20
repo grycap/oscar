@@ -67,6 +67,17 @@
 									<v-card flat>
 										<v-card-text class="custom-padding xs6"> <strong>Name: </strong> {{props.item.service}}</v-card-text>
 										<v-card-text class="custom-padding"><strong>Image: </strong> {{props.item.container}}</v-card-text>
+										<v-card-text class="custom-padding">
+											<strong>Token: </strong> 
+											<v-text-field
+												:value="props.item.token"
+												:append-icon="show1 ? 'mdi-eye' : 'mdi-eye-off'"
+												:type="show1 ? 'text' : 'password'"
+												name="input-10-1"
+												@click:append="show1 = !show1"
+												readonly
+											></v-text-field>
+										</v-card-text>
 										<v-card-text class="custom-padding"><strong>Environment variables: </strong> 
 											<pre v-show="Object.keys(props.item.envVars.Variables).length!==0" id="json-renderer"></pre>
 										</v-card-text>
@@ -256,6 +267,7 @@ export default {
 		disable_form: true,
 		disable_storage: true,
 		params_delete: '', 
+		show1:false
 	}),
   	methods: {
 		showEnvVars(value){
