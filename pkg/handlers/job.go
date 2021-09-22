@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -54,6 +55,19 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			} else {
 				c.String(http.StatusInternalServerError, err.Error())
 			}
+			return
+		}
+
+		// Check auth token
+		authHeader := c.GetHeader("Authorization")
+		splitToken := strings.Split(authHeader, "Bearer ")
+		if len(splitToken) != 2 {
+			c.Status(http.StatusUnauthorized)
+			return
+		}
+		reqToken := strings.TrimSpace(splitToken[1])
+		if reqToken != service.Token {
+			c.Status(http.StatusUnauthorized)
 			return
 		}
 
