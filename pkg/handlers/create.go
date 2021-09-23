@@ -69,7 +69,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Register minio webhook and restart the server
-		if err := registerMinIOWebhook(service.Name, service.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
+		if err := registerMinIOWebhook(service.Name, service.Token, service.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
 			back.DeleteService(service.Name)
 			c.String(http.StatusInternalServerError, err.Error())
 			return
@@ -125,6 +125,9 @@ func checkValues(service *types.Service, cfg *types.Config) error {
 			},
 		}
 	}
+
+	// Generate a new access token
+	service.Token = utils.GenerateToken()
 
 	return nil
 }
@@ -298,13 +301,13 @@ func isStorageProviderDefined(storageName string, storageID string, providers *t
 	return ok
 }
 
-func registerMinIOWebhook(name string, minIO *types.MinIOProvider, cfg *types.Config) error {
+func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider, cfg *types.Config) error {
 	minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
 	if err != nil {
 		return fmt.Errorf("The provided MinIO configuration is not valid: %v", err)
 	}
 
-	if err := minIOAdminClient.RegisterWebhook(name); err != nil {
+	if err := minIOAdminClient.RegisterWebhook(name, token); err != nil {
 		return fmt.Errorf("Error registering the service's webhook: %v", err)
 	}
 

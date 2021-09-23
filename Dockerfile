@@ -1,4 +1,4 @@
-FROM golang:1.14 as build
+FROM golang:1.17 as build
 
 ARG VERSION
 ARG GIT_COMMIT
@@ -18,7 +18,7 @@ RUN GOOS=${GOOS} CGO_ENABLED=0 go build --ldflags "-s -w \
 -a -installsuffix cgo -o oscar .
 
 
-FROM alpine:3.11
+FROM alpine:3.14
 
 LABEL org.label-schema.license="Apache 2.0" \
     org.label-schema.vcs-url="https://github.com/grycap/oscar" \

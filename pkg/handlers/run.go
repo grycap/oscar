@@ -17,17 +17,44 @@ limitations under the License.
 package handlers
 
 import (
+	"net/http"
 	"net/http/httputil"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v2/pkg/types"
+	"k8s.io/apimachinery/pkg/api/errors"
 )
 
 // MakeRunHandler makes a handler to manage sync invocations sending them to the gateway of the ServerlessBackend
 func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		service, err := back.ReadService(c.Param("serviceName"))
+		if err != nil {
+			// Check if error is caused because the service is not found
+			if errors.IsNotFound(err) || errors.IsGone(err) {
+				c.Status(http.StatusNotFound)
+			} else {
+				c.String(http.StatusInternalServerError, err.Error())
+			}
+			return
+		}
+
+		// Check auth token
+		authHeader := c.GetHeader("Authorization")
+		splitToken := strings.Split(authHeader, "Bearer ")
+		if len(splitToken) != 2 {
+			c.Status(http.StatusUnauthorized)
+			return
+		}
+		reqToken := strings.TrimSpace(splitToken[1])
+		if reqToken != service.Token {
+			c.Status(http.StatusUnauthorized)
+			return
+		}
+
 		proxy := &httputil.ReverseProxy{
-			Director: back.GetProxyDirector(c.Param("serviceName")),
+			Director: back.GetProxyDirector(service.Name),
 		}
 		proxy.ServeHTTP(c.Writer, c.Request)
 	}
