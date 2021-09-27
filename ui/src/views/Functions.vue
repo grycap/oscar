@@ -67,11 +67,11 @@
 									<v-card flat>
 										<v-card-text class="custom-padding xs6"> <strong>Name: </strong> {{props.item.service}}</v-card-text>
 										<v-card-text class="custom-padding"><strong>Image: </strong> {{props.item.container}}</v-card-text>
-										<v-card-text class="custom-padding">
-											<strong>Token: </strong> 
-											<v-text-field
-												:v-model="props.item.token"
-												:append-icon="show1 ? 'mdi-eye' : 'mdi-eye-off'"
+										<v-card-text style="display:flex;margin-right: 5px;" class="custom-padding">
+											<strong style="padding-top: 12px;margin-right: 5px;">Token: </strong> 
+											<v-text-field style="width: 80%!important;padding-top: 0px!important;margin-top: 0px!important;"
+												:value="props.item.token"
+												:append-icon="show1 ? 'visibility' : 'visibility_off'"
 												:type="show1 ? 'text' : 'password'"
 												name="input-10-1"
 												@click:append="show1 = !show1"
@@ -297,6 +297,7 @@ export default {
 				editionMode: true,
 				name: this.services[index].service,
 				image: this.services[index].container,
+				token: this.services[index].token,
 				input: this.services[index].inputs,
 				output: this.services[index].outputs,
 				log_Level: this.services[index].logLevel,
