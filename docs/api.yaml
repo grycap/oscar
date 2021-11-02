@@ -285,6 +285,8 @@ paths:
           description: Internal Server Error
       tags:
         - async
+      security:
+        - token: []
       description: Invoke a service asynchronously (create kubernetes job)
       requestBody:
         content:
@@ -333,6 +335,8 @@ paths:
       operationId: InvokeSync
       tags:
         - sync
+      security:
+        - token: []
       description: Invoke a service synchronously (a Serverless backend is required)
       requestBody:
         content:
@@ -353,6 +357,9 @@ components:
           type: string
         cpu:
           type: string
+        token:
+          type: string
+          readOnly: true
         log_level:
           type: string
         image:
@@ -493,6 +500,10 @@ components:
     basicAuth:
       type: http
       scheme: basic
+      description: ''
+    token:
+      type: http
+      scheme: bearer
       description: ''
 tags:
   - name: services
