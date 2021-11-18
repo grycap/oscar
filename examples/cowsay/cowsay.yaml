@@ -1,0 +1,12 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: cowsay
+      cpu: 1.0
+      memory: 1Gi
+      image: ghcr.io/grycap/cowsay
+      script: script.sh
+      log_level: CRITICAL   # To avoid supervisor logs in response
+      environment:
+        Variables:
+          INPUT_TYPE: json  # Comment to set input string encoded in base64

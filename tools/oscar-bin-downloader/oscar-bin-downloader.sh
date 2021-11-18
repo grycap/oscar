@@ -11,9 +11,10 @@ if [[ $ARCH == "aarch64" ]] || [[ $ARCH == "arm64" ]]; then
     WATCHDOG_NAME=$WATCHDOG_NAME-arm64
 fi
 
-# Download FaaS Supervisor and set execution permissions
-wget https://github.com/grycap/faas-supervisor/releases/download/$FAAS_SUPERVISOR_VERSION/$FAAS_SUPERVISOR_NAME -O /data/supervisor
-chmod +x /data/supervisor
+# Download FaaS Supervisor and unzip
+wget https://github.com/grycap/faas-supervisor/releases/download/$FAAS_SUPERVISOR_VERSION/$FAAS_SUPERVISOR_NAME.zip -O /tmp/supervisor.zip
+unzip /tmp/supervisor.zip -d /tmp
+cp -r /tmp/supervisor/* /data
 
 # Download OpenFaaS watchdog and set execution permissions
 wget https://github.com/openfaas/faas/releases/download/$WATCHDOG_VERSION/$WATCHDOG_NAME -O /data/fwatchdog
