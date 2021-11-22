@@ -8,8 +8,9 @@ nav:
   - Deployment with EC3: deploy-ec3.md
   - Deployment with Helm: deploy-helm.md
 - usage.md
+- invoking.md
 - Functions definition Language: fdl.md
-- OSCAR-CLI: https://github.com/grycap/oscar-cli
+- OSCAR-CLI: oscar-cli.md
 - Integration with EGI: egi-integration.md
 - OpenAPI Specification: api.md
 - license.md
