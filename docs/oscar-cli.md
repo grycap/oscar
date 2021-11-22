@@ -1,1 +1,1 @@
-oscar-cli/README.md
+../oscar-cli/README.md
