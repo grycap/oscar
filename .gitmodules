@@ -1,0 +1,3 @@
+[submodule "oscar-cli"]
+	path = oscar-cli
+	url = https://github.com/grycap/oscar-cli
