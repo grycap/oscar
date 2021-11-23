@@ -10,7 +10,7 @@ nav:
 - usage.md
 - invoking.md
 - Functions definition Language: fdl.md
-- OSCAR-CLI: oscar-cli.md
+- oscar-cli.md
 - Integration with EGI: egi-integration.md
 - OpenAPI Specification: api.md
 - license.md
