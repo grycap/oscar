@@ -37,6 +37,8 @@ python2 /opt/plant-classification-theano/classify_image.py "$INPUT_FILE_PATH" -o
 
 You must fill in the fields indicating the container image to use, the name of the service and the script file. In addition, you can add environment variables, specify the resources (RAM and CPUs) and choose the log level of the service.
 
+Note that specifying a tag in the container image used can be convenient to avoid problems with quotas for certain container registries such as [Docker Hub](https://docs.docker.com/docker-hub/download-rate-limit/#what-is-the-download-rate-limit-on-docker-hub). This is due to the fact that Kubernetes defaults the [`imagePullPolicy`](https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy) of pods to `Always`, which checks the version of the image in the registry every time a job is launched.
+
 ![new service](images/usage/usage-03.png)
 
 Next, the credentials of the storage providers to be used must be introduced. As the platform already has a MinIO deployment to operate, it is not necessary to enter its credentials for using it.
