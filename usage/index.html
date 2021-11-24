@@ -425,6 +425,21 @@
   
   
     <li class="md-nav__item">
+      <a href="../invoking/" class="md-nav__link">
+        Invoking services
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../fdl/" class="md-nav__link">
         Functions definition Language
       </a>
@@ -440,7 +455,7 @@
   
   
     <li class="md-nav__item">
-      <a href="https://github.com/grycap/oscar-cli" class="md-nav__link">
+      <a href="../oscar-cli/" class="md-nav__link">
         OSCAR-CLI
       </a>
     </li>
@@ -638,6 +653,7 @@ OUTPUT_FILE=&quot;$TMP_OUTPUT_DIR/$FILE_NAME&quot;
 python2 /opt/plant-classification-theano/classify_image.py &quot;$INPUT_FILE_PATH&quot; -o &quot;$OUTPUT_FILE&quot;
 </code></pre>
 <p>You must fill in the fields indicating the container image to use, the name of the service and the script file. In addition, you can add environment variables, specify the resources (RAM and CPUs) and choose the log level of the service.</p>
+<p>Note that specifying a tag in the container image used can be convenient to avoid problems with quotas for certain container registries such as <a href="https://docs.docker.com/docker-hub/download-rate-limit/#what-is-the-download-rate-limit-on-docker-hub">Docker Hub</a>. This is due to the fact that Kubernetes defaults the <a href="https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy"><code>imagePullPolicy</code></a> of pods to <code>Always</code> when no tag or the <code>latest</code> tag is set, which checks the version of the image in the registry every time a job is launched.</p>
 <p><img alt="new service" src="../images/usage/usage-03.png" /></p>
 <p>Next, the credentials of the storage providers to be used must be introduced. As the platform already has a MinIO deployment to operate, it is not necessary to enter its credentials for using it.</p>
 <p>Multiple MinIO, Onedata and Amazon S3 storage providers can be used. Remember to click the "ADD" button after completing each one. </p>
@@ -726,13 +742,13 @@ python2 /opt/plant-classification-theano/classify_image.py &quot;$INPUT_FILE_PAT
       
       
         
-        <a href="../fdl/" class="md-footer__link md-footer__link--next" aria-label="Next: Functions definition Language" rel="next">
+        <a href="../invoking/" class="md-footer__link md-footer__link--next" aria-label="Next: Invoking services" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              Functions definition Language
+              Invoking services
             </div>
           </div>
           <div class="md-footer__button md-icon">
