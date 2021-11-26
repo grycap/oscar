@@ -1,0 +1,56 @@
+---
+- name: Configure front
+  hosts: front
+  become: yes
+  become_user: root
+  pre_tasks:
+  - name: Create dir for the NFS PV
+    file: path=/pv state=directory mode=755
+  - name: Create auth file dir
+    file: path=/etc/kubernetes/pki state=directory mode=755 recurse=yes
+  - name: Create auth data file with an admin user
+    copy: content='{{kube_admin_token}},kubeuser,100,"users,system:masters"' dest=/etc/kubernetes/pki/auth mode=600
+  roles:
+  - role: grycap.nfs
+    nfs_mode: 'front'
+    nfs_exports: [{path: "/pv", export: "*.localdomain(fsid=0,rw,async,no_root_squash,no_subtree_check,insecure)"}]
+  - role: grycap.kubernetes,k3s
+    kube_install_method: k3s
+    kube_server: "{{ hostvars['front']['ansible_default_ipv4']['address'] }}"
+    kube_api_server: "{{ hostvars['front']['ansible_default_ipv4']['address'] }}"
+    kube_apiserver_options:
+      - {option: "--service-node-port-range", value: "80-35000"}
+#      - {option: "--insecure-port", value: "8080"}
+      - {option: "--token-auth-file", value: "/etc/kubernetes/pki/auth"}
+    kube_cert_public_ip: "{{ hostvars['front']['ansible_default_ipv4']['address'] }}"
+  - role: 'grycap.kubeminio'
+    minio_secretkey: '{{ minio_password }}'
+    master_deploy: true
+    enable_tls: true
+    enable_ingress: true
+    public_hostname_api: "{{ minio_dns_host }}"
+    public_hostname_console: "{{ minio_dns_host_console }}"
+  - role: 'grycap.kubefaas'
+    master_deploy: true
+    functions_namespace: oscar-svc
+  - role: 'grycap.kubeoscar'
+    oscar_pass: '{{ oscar_password }}'
+    create_ingress: true
+    minio_endpoint:  'https://{{ minio_dns_host }}'
+    minio_secret_key: '{{ minio_password }}'
+    master_deploy: true
+    openfaas_scaler_enable: true
+    serverless_backend: "openfaas"
+
+- name: Configure WN(s)
+  hosts: wn
+  become: yes
+  become_user: root
+  roles:
+  - role: grycap.nfs
+    nfs_mode: 'wn'
+  - role: grycap.kubernetes,k3s
+    kube_install_method: k3s
+    kube_type_of_node: 'wn'
+    kube_server: "{{ hostvars['front']['ansible_default_ipv4']['address'] }}"
+    kube_api_server: "{{ hostvars['front']['ansible_default_ipv4']['address'] }}"
