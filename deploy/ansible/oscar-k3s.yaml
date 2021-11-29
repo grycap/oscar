@@ -1,8 +1,22 @@
 ---
+- name: Configure hosts files in all nodes
+  hosts: all
+  become: yes
+  become_user: root
+  tasks:
+  - name: Update hostname
+    hostname:
+      name: '{{ ansible_host }}'
+  - name: Configure /etc/hosts files
+    lineinfile: dest=/etc/hosts regexp='.*{{ item }}$' line="{{ hostvars[item].ansible_default_ipv4.address }} {{item}}.localdomain" state=present
+    when: hostvars[item].ansible_default_ipv4.address is defined
+    with_items: "{{groups['all']}}"
+
 - name: Configure front
   hosts: front
   become: yes
   become_user: root
+  vars_files: vars.yaml
   pre_tasks:
   - name: Create dir for the NFS PV
     file: path=/pv state=directory mode=755
@@ -14,15 +28,15 @@
   - role: grycap.nfs
     nfs_mode: 'front'
     nfs_exports: [{path: "/pv", export: "*.localdomain(fsid=0,rw,async,no_root_squash,no_subtree_check,insecure)"}]
-  - role: grycap.kubernetes,k3s
+  - role: grycap.kubernetes
     kube_install_method: k3s
-    kube_server: "{{ hostvars['front']['ansible_default_ipv4']['address'] }}"
-    kube_api_server: "{{ hostvars['front']['ansible_default_ipv4']['address'] }}"
+    kube_install_ingress: true
+    kube_cert_manager: true
+    kube_public_dns_name: '{{ dns_host }}'
     kube_apiserver_options:
       - {option: "--service-node-port-range", value: "80-35000"}
-#      - {option: "--insecure-port", value: "8080"}
+      #- {option: "--insecure-port", value: "8080"}
       - {option: "--token-auth-file", value: "/etc/kubernetes/pki/auth"}
-    kube_cert_public_ip: "{{ hostvars['front']['ansible_default_ipv4']['address'] }}"
   - role: 'grycap.kubeminio'
     minio_secretkey: '{{ minio_password }}'
     master_deploy: true
@@ -46,11 +60,19 @@
   hosts: wn
   become: yes
   become_user: root
+  gather_facts: false
+  vars_files: vars.yaml
+  pre_tasks:
+  - name: Gather facts
+    setup:
+    delegate_to: '{{ item }}'
+    delegate_facts: true
+    loop: "{{ groups['all'] }}"
   roles:
   - role: grycap.nfs
     nfs_mode: 'wn'
-  - role: grycap.kubernetes,k3s
+  - role: grycap.kubernetes
     kube_install_method: k3s
     kube_type_of_node: 'wn'
-    kube_server: "{{ hostvars['front']['ansible_default_ipv4']['address'] }}"
-    kube_api_server: "{{ hostvars['front']['ansible_default_ipv4']['address'] }}"
+    kube_server: "{{ hostvars[groups['front'][0]]['ansible_default_ipv4']['address'] }}"
+    kube_api_server: "{{ hostvars[groups['front'][0]]['ansible_default_ipv4']['address'] }}"

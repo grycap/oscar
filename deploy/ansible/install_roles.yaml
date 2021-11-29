@@ -1,0 +1,8 @@
+---
+roles:
+  - name: grycap.nfs
+  - name: grycap.kubernetes
+    version: k3s
+  - name: grycap.kubeminio
+  - name: grycap.kubefaas
+  - name: grycap.kubeoscar
