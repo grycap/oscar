@@ -7,10 +7,32 @@
   - name: Update hostname
     hostname:
       name: '{{ ansible_host }}'
-  - name: Configure /etc/hosts files
-    lineinfile: dest=/etc/hosts regexp='.*{{ item }}$' line="{{ hostvars[item].ansible_default_ipv4.address }} {{item}}.localdomain" state=present
+  - name: Get private network
+    block:
+    - set_fact:
+        private_addr: "{{hostvars[groups['wn'][0]].ansible_default_ipv4.network}}/{{hostvars[groups['wn'][0]].ansible_default_ipv4.netmask}}"
+    - set_fact:
+        private_network: "{{ private_addr | ipaddr('net')}}"
+    when: hostvars[groups['wn'][0]].ansible_default_ipv4.address is defined
+  - name: Configure front's public IP in /etc/hosts
+    lineinfile:
+      dest: /etc/hosts
+      regexp: ".*{{ groups['front'][0] }}$"
+      line: "{{ hostvars[groups['front'][0]].ansible_default_ipv4.address }} {{ groups['front'][0] }}"
+      state: present
+    when: hostvars[groups['front'][0]].ansible_default_ipv4.address is defined
+  - name: Configure front's private IP in /etc/hosts
+    lineinfile:
+      dest: /etc/hosts
+      regexp: ".*{{ groups['front'][0] }}.localdomain$"
+      line: "{{ hostvars[groups['front'][0]]['ansible_%s' | format(item)]['ipv4']['address'] }} {{groups['front'][0]}}.localdomain"
+      state: present
+    when: private_network | network_in_usable(hostvars[groups['front'][0]]['ansible_%s' | format(item)]['ipv4']['address'])
+    with_items: "{{hostvars[groups['front'][0]]['ansible_interfaces']}}"
+  - name: Configure WNs' IPs /etc/hosts files
+    lineinfile: dest=/etc/hosts regexp='.*{{ item }}$' line="{{ hostvars[item].ansible_default_ipv4.address }} {{item}} {{item}}.localdomain" state=present
     when: hostvars[item].ansible_default_ipv4.address is defined
-    with_items: "{{groups['all']}}"
+    with_items: "{{groups['wn']}}"
 
 - name: Configure front
   hosts: front
@@ -31,6 +53,9 @@
   - role: grycap.kubernetes
     kube_install_method: k3s
     kube_install_ingress: true
+    kube_install_nfs_client: true
+    kube_deploy_dashboard: true
+    kube_nfs_server: '{{ ansible_host }}.localdomain'
     kube_cert_manager: true
     kube_public_dns_name: '{{ dns_host }}'
     kube_apiserver_options:
@@ -50,6 +75,7 @@
   - role: 'grycap.kubeoscar'
     oscar_pass: '{{ oscar_password }}'
     create_ingress: true
+    cert_manager_issuer: 'letsencrypt-prod'
     minio_endpoint:  'https://{{ minio_dns_host }}'
     minio_secret_key: '{{ minio_password }}'
     master_deploy: true
@@ -71,6 +97,8 @@
   roles:
   - role: grycap.nfs
     nfs_mode: 'wn'
+    nfs_client_imports:
+    - {local: "/pv", remote: "/pv", server_host: "{{groups['front'][0]}}.localdomain"}
   - role: grycap.kubernetes
     kube_install_method: k3s
     kube_type_of_node: 'wn'
