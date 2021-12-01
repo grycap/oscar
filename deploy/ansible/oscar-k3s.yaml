@@ -38,6 +38,8 @@
   hosts: front
   become: yes
   become_user: root
+  vars:
+    kubeconfig_path: '/etc/rancher/k3s/k3s.yaml'
   vars_files: vars.yaml
   pre_tasks:
   - name: Create dir for the NFS PV
@@ -60,7 +62,6 @@
     kube_public_dns_name: '{{ dns_host }}'
     kube_apiserver_options:
       - {option: "--service-node-port-range", value: "80-35000"}
-      #- {option: "--insecure-port", value: "8080"}
       - {option: "--token-auth-file", value: "/etc/kubernetes/pki/auth"}
   - role: 'grycap.kubeminio'
     minio_secretkey: '{{ minio_password }}'
@@ -87,6 +88,8 @@
   become: yes
   become_user: root
   gather_facts: false
+  vars:
+    kubeconfig_path: '/etc/rancher/k3s/k3s.yaml'
   vars_files: vars.yaml
   pre_tasks:
   - name: Gather facts
