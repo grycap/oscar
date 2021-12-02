@@ -1,6 +1,6 @@
 [front]
-front
+; Put here the frontend node as defined in .ssh/config (Host)
+
 
 [wn]
-wn0
-wn1
+; Put here the working nodes (one per line) as defined in the .ssh/config (Host)
