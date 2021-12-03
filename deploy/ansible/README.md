@@ -1,12 +1,3 @@
-# Ansible playbook to deploy K3s with the OSCAR platform
+# Ansible playbook to deploy K3s and the OSCAR platform
 
-TBC
-
-```sh
-ansible-galaxy install -r install_roles.yaml --force
-```
-
-
-```sh
-ansible-playbook -i hosts oscar-k3s.yaml
-```
+Please refer to the [docs](https://docs.oscar.grycap.net/deploy-ansible/) for instructions.

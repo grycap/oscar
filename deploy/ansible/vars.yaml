@@ -2,7 +2,7 @@
 # K3s version to be installed
 kube_version: v1.22.3+k3s1
 # Token to login in K3s and the Kubernetes Dashboard
-kube_admin_token: kube-token2021
+kube_admin_token: kube-token123
 # Password for OSCAR
 oscar_password: oscar123
 # DNS name for the OSCAR Ingress and Kubernetes Dashboard (path "/dashboard/")
