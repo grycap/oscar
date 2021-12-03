@@ -13,7 +13,7 @@
     
     
       
-        <title>Deployment with Helm - OSCAR Documentation</title>
+        <title>Deployment on K3s with Ansible - OSCAR Documentation</title>
       
     
     
@@ -62,7 +62,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#deployment-on-an-existing-kubernetes-cluster-using-helm" class="md-skip">
+        <a href="#ansible-playbook-to-deploy-k3s-and-the-oscar-platform" class="md-skip">
           Skip to content
         </a>
       
@@ -94,7 +94,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Deployment with Helm
+              Deployment on K3s with Ansible
             
           </span>
         </div>
@@ -286,6 +286,20 @@
               
   
   
+  
+    <li class="md-nav__item">
+      <a href="../deploy-helm/" class="md-nav__link">
+        Deployment with Helm
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
     
   
   
@@ -297,24 +311,96 @@
         
       
       
-      <a href="./" class="md-nav__link md-nav__link--active">
-        Deployment with Helm
-      </a>
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Deployment on K3s with Ansible
+          <span class="md-nav__icon md-icon"></span>
+        </label>
       
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../deploy-ansible/" class="md-nav__link">
+      <a href="./" class="md-nav__link md-nav__link--active">
         Deployment on K3s with Ansible
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    Requirements
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    Usage
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#clone-the-folder" class="md-nav__link">
+    Clone the folder
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ssh-configuration" class="md-nav__link">
+    SSH configuration
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-of-the-inventory-file" class="md-nav__link">
+    Configuration of the inventory file
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setting-up-the-playbook-variables" class="md-nav__link">
+    Setting up the playbook variables
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installation-of-the-required-ansible-roles" class="md-nav__link">
+    Installation of the required ansible roles
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-the-playbook" class="md-nav__link">
+    Running the playbook
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -466,6 +552,76 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    Requirements
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    Usage
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#clone-the-folder" class="md-nav__link">
+    Clone the folder
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ssh-configuration" class="md-nav__link">
+    SSH configuration
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-of-the-inventory-file" class="md-nav__link">
+    Configuration of the inventory file
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setting-up-the-playbook-variables" class="md-nav__link">
+    Setting up the playbook variables
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installation-of-the-required-ansible-roles" class="md-nav__link">
+    Installation of the required ansible roles
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-the-playbook" class="md-nav__link">
+    Running the playbook
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -476,17 +632,93 @@
             <article class="md-content__inner md-typeset">
               
                 
-<a href="https://github.com/grycap/oscar/edit/master/docs/deploy-helm.md" title="Edit this page" class="md-content__button md-icon">
+<a href="https://github.com/grycap/oscar/edit/master/docs/deploy-ansible.md" title="Edit this page" class="md-content__button md-icon">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"/></svg>
 </a>
 
 
-<h1 id="deployment-on-an-existing-kubernetes-cluster-using-helm">Deployment on an existing Kubernetes cluster using Helm</h1>
-<p>OSCAR can also be deployed on any existing Kubernetes cluster through its <a href="https://github.com/grycap/helm-charts/tree/master/oscar">helm chart</a>. However, to make the platform work properly, the following dependencies must be satisfied</p>
+<h1 id="ansible-playbook-to-deploy-k3s-and-the-oscar-platform">Ansible playbook to deploy K3s and the OSCAR platform</h1>
+<p>The folder <a href="https://github.com/grycap/oscar/tree/master/deploy/ansible"><code>deploy/ansible</code></a> contains all the necessary files to deploy a <a href="https://k3s.io/">K3s</a> cluster together with the OSCAR platform using <a href="https://www.ansible.com/">Ansible</a>. This way, a minified Kubernetes distribution can be used to configure OSCAR on IoT devices located at the Edge, such as <a href="https://www.raspberrypi.org/">Raspberry PIs</a>. Note that this <a href="https://docs.ansible.com/ansible/latest/user_guide/playbooks_intro.html">playbook</a> can also be applied to quickly spread the OSCAR platform on top of any machine or already started cloud instance since the playbook is compatible with GNU/Linux on ARM64 and AMD64 architectures.</p>
+<h2 id="requirements">Requirements</h2>
+<p>In order to use the playbook, you must install the following components:</p>
 <ul>
-<li>A StorageClass with the <code>ReadWriteMany</code> access mode must be configured in the cluster for the creation of the persistent volume mounted on the service containers. For this purpose, we use the <a href="https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner">Kubernetes NFS-Client Provisioner</a>, but there are other <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes">volume plugins</a> that support this access mode.</li>
-<li>MinIO must be deployed and properly configured in the cluster. Its <a href="https://github.com/minio/charts/tree/master/minio">helm chart</a> can be used for this purpose. It is important to configure it properly to have access from inside and outside the cluster, as the OSCAR's web interface connects directly to its API. In the OSCAR helm chart, you must indicate the <a href="https://github.com/grycap/helm-charts/tree/master/oscar#configuration">values</a> corresponding to its credentials and endpoint.</li>
+<li>Ansible, following <a href="https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html">this guide</a>.</li>
+<li>The <a href="https://netaddr.readthedocs.io/en/latest/installation.html"><code>netaddr</code></a> python library.</li>
+<li><a href="https://www.openssh.com/">OpenSSH</a>, to remotely access the hosts to be configured.</li>
 </ul>
+<h2 id="usage">Usage</h2>
+<h3 id="clone-the-folder">Clone the folder</h3>
+<p>First of all, you must clone the OSCAR repo:</p>
+<pre><code>git clone https://github.com/grycap/oscar.git
+</code></pre>
+<p>And place into the <code>ansible</code> directory:</p>
+<pre><code>cd oscar/deploy/ansible
+</code></pre>
+<h3 id="ssh-configuration">SSH configuration</h3>
+<p>As Ansible is an agentless automation tool, you must configure the <code>~/.ssh/config</code> file for granting access to the hosts to be configured via the SSH protocol. This playbook will use the <code>Host</code> field from SSH configuration to set the hostnames of the nodes, so please take care of naming them properly.</p>
+<p>Below you can find an example of a configuration file for four nodes, being the <code>front</code> the only one with a public IP, so it will be used as a proxy for the SSH connection to the working nodes (<a href="https://www.redhat.com/sysadmin/ssh-proxy-bastion-proxyjump"><code>ProxyJump</code></a> option) via its internal network.</p>
+<pre><code class="language-ssh-config">Host front
+  HostName &lt;PUBLIC_IP&gt;
+  User ubuntu
+  IdentityFile ~/.ssh/my_private_key
+
+Host wn1
+  HostName &lt;PRIVATE_IP&gt;
+  User ubuntu
+  IdentityFile ~/.ssh/my_private_key
+  ProxyJump front
+
+Host wn2
+  HostName &lt;PRIVATE_IP&gt;
+  User ubuntu
+  IdentityFile ~/.ssh/my_private_key
+  ProxyJump front
+
+Host wn3
+  HostName &lt;PRIVATE_IP&gt;
+  User ubuntu
+  IdentityFile ~/.ssh/my_private_key
+  ProxyJump front
+</code></pre>
+<h3 id="configuration-of-the-inventory-file">Configuration of the inventory file</h3>
+<p>Now, you have to edit the <code>hosts</code> file and add the hosts to be configured. Note that only one node must be set in the <code>[front]</code> section, while one or more nodes can be configured as working nodes of the cluster in the <code>[wn]</code> section. For example, for the <a href="#ssh-configuration">previous SSH configuration</a> the <code>hosts</code> inventory file should look like this:</p>
+<pre><code class="language-ini">[front]
+; Put here the frontend node as defined in .ssh/config (Host)
+front
+
+[wn]
+; Put here the working nodes (one per line) as defined in the .ssh/config (Host)
+wn1
+wn2
+wn3
+</code></pre>
+<h3 id="setting-up-the-playbook-variables">Setting up the playbook variables</h3>
+<p>You also need to set up some parameters for the configuration of the cluster and OSCAR components, like OSCAR and MinIO credentials and DNS endpoints to configure the Kubernetes Ingress and <a href="https://cert-manager.io/">cert-manager</a> to securely expose the services. To do it, please edit the <code>vars.yaml</code> file and update the variables:</p>
+<pre><code class="language-yaml">---
+# K3s version to be installed
+kube_version: v1.22.3+k3s1
+# Token to login in K3s and the Kubernetes Dashboard
+kube_admin_token: kube-token123
+# Password for OSCAR
+oscar_password: oscar123
+# DNS name for the OSCAR Ingress and Kubernetes Dashboard (path &quot;/dashboard/&quot;)
+dns_host: oscar-cluster.example.com
+# Password for MinIO
+minio_password: minio123
+# DNS name for the MinIO API Ingress
+minio_dns_host: minio.oscar-cluster.example.com
+# DNS name for the MinIO Console Ingress
+minio_dns_host_console: minio-console.oscar-cluster.example.com
+</code></pre>
+<h3 id="installation-of-the-required-ansible-roles">Installation of the required ansible roles</h3>
+<p>To install the required roles you only have to run:</p>
+<pre><code>ansible-galaxy install -r install_roles.yaml --force
+</code></pre>
+<p><em>The <code>--force</code> argument ensures you have the latest version of the roles.</em></p>
+<h3 id="running-the-playbook">Running the playbook</h3>
+<p>Finally, with the following command the ansible playbook will be executed, configuring the nodes set in the <code>hosts</code> inventory file:</p>
+<pre><code>ansible-playbook -i hosts oscar-k3s.yaml
+</code></pre>
 
               
             </article>
@@ -500,7 +732,7 @@
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
-        <a href="../deploy-ec3/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Deployment with EC3" rel="prev">
+        <a href="../deploy-helm/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Deployment with Helm" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
           </div>
@@ -509,20 +741,20 @@
               <span class="md-footer__direction">
                 Previous
               </span>
-              Deployment with EC3
+              Deployment with Helm
             </div>
           </div>
         </a>
       
       
         
-        <a href="../deploy-ansible/" class="md-footer__link md-footer__link--next" aria-label="Next: Deployment on K3s with Ansible" rel="next">
+        <a href="../usage/" class="md-footer__link md-footer__link--next" aria-label="Next: Using OSCAR through the web-based UI" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              Deployment on K3s with Ansible
+              Using OSCAR through the web-based UI
             </div>
           </div>
           <div class="md-footer__button md-icon">
