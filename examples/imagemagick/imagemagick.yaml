@@ -4,7 +4,7 @@ functions:
       name: grayify
       memory: 1Gi
       cpu: '1.0'
-      image: grycap/imagemagick
+      image: ghcr.io/grycap/imagemagick
       script: script.sh
       input:
       - storage_provider: minio
