@@ -90,7 +90,7 @@ func (minIOAdminClient *MinIOAdminClient) RegisterWebhook(name string, token str
 
 // RemoveWebhook removes an existent webhook in the MinIO configuration
 func (minIOAdminClient *MinIOAdminClient) RemoveWebhook(name string) error {
-	err := minIOAdminClient.adminClient.DelConfigKV(context.TODO(), fmt.Sprintf("notify_webhook:%s", name))
+	_, err := minIOAdminClient.adminClient.DelConfigKV(context.TODO(), fmt.Sprintf("notify_webhook:%s", name))
 	if err != nil {
 		return err
 	}
