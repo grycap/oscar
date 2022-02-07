@@ -67,6 +67,21 @@ const (
 
 	// OpenfaasZeroScalingLabel label to enable zero scaling in OpenFaaS functions
 	OpenfaasZeroScalingLabel = "com.openfaas.scale.zero"
+
+	// YunikornApplicationIDLabel label to define the Yunikorn's application ID
+	YunikornApplicationIDLabel = "applicationId"
+
+	// YunikornQueueLabel label to define the Yunikorn's queue
+	YunikornQueueLabel = "queue"
+
+	// YunikornOscarQueue name of the Yunikorn's queue used for OSCAR services
+	YunikornOscarQueue = "oscar-queue"
+
+	// YunikornRootQueue name of the root Yunikorn's queue
+	YunikornRootQueue = "root"
+
+	// YunikornDefaultPartition name of the default Yunikorn partition
+	YunikornDefaultPartition = "default"
 )
 
 // Service represents an OSCAR service following the SCAR Function Definition Language
@@ -83,6 +98,18 @@ type Service struct {
 	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
 	// Optional. (default: 0.2)
 	CPU string `json:"cpu"`
+
+	// TotalMemory limit for the memory used by all the service's jobs running simultaneously
+	// Apache YuniKorn scheduler is required to work
+	// Same format as Memory, but internally translated to MB (integer)
+	// Optional. (default: 0)
+	TotalMemory string `json:"total_memory"`
+
+	// TotalCPU limit for the virtual CPUs used by all the service's jobs running simultaneously
+	// Apache YuniKorn scheduler is required to work
+	// Same format as CPU, but internally translated to millicores (integer)
+	// Optional. (default: 0)
+	TotalCPU string `json:"total_cpu"`
 
 	// Log level for the FaaS Supervisor
 	// Optional. (default: INFO)
@@ -108,6 +135,16 @@ type Service struct {
 	Environment struct {
 		Vars map[string]string `json:"Variables"`
 	} `json:"environment"`
+
+	// User-defined Kubernetes annotations to be set in job's definition
+	// https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+	// Optional
+	Annotations map[string]string `json:"annotations"`
+
+	// User-defined Kubernetes labels to be set in job's definition
+	// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+	// Optional
+	Labels map[string]string `json:"labels"`
 
 	// Configuration for the storage providers used by the service
 	// Optional. (default: MinIOProvider["default"] with the server's config credentials)

@@ -40,7 +40,7 @@ const (
 	defaultLogLevel = "INFO"
 )
 
-var errNoMinIOInput = errors.New("Only MinIO input allowed")
+var errNoMinIOInput = errors.New("only MinIO input allowed")
 
 // MakeCreateHandler makes a handler for creating services
 func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
@@ -86,6 +86,13 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
+		// Add Yunikorn queue if enabled
+		if cfg.YunikornEnable {
+			if err := utils.AddYunikornQueue(cfg, back.GetKubeClientset(), &service); err != nil {
+				log.Println(err.Error())
+			}
+		}
+
 		c.Status(http.StatusCreated)
 	}
 }
@@ -107,6 +114,14 @@ func checkValues(service *types.Service, cfg *types.Config) error {
 	default:
 		service.LogLevel = defaultLogLevel
 	}
+
+	// Add default Labels
+	if service.Labels == nil {
+		service.Labels = make(map[string]string)
+	}
+	service.Labels[types.ServiceLabel] = service.Name
+	service.Labels[types.YunikornApplicationIDLabel] = service.Name
+	service.Labels[types.YunikornQueueLabel] = service.Name
 
 	// Add the default MinIO provider
 	if service.StorageProviders != nil {
@@ -157,13 +172,13 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 
 		// Check if the provider identifier is defined in StorageProviders
 		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
-			return fmt.Errorf("The StorageProvider \"%s.%s\" is not defined", provName, provID)
+			return fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
 		}
 
 		// Check if the input provider is the defined in the server config
 		if provID != types.DefaultProvider {
 			if !reflect.DeepEqual(*cfg.MinIOProvider, *service.StorageProviders.MinIO[provID]) {
-				return fmt.Errorf("The provided MinIO server \"%s\" is not the configured in OSCAR", service.StorageProviders.MinIO[provID].Endpoint)
+				return fmt.Errorf("the provided MinIO server \"%s\" is not the configured in OSCAR", service.StorageProviders.MinIO[provID].Endpoint)
 			}
 		}
 
@@ -183,10 +198,10 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 				if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
 					log.Printf("The bucket \"%s\" already exists\n", splitPath[0])
 				} else {
-					return fmt.Errorf("Error creating bucket %s: %v", splitPath[0], err)
+					return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
 				}
 			} else {
-				return fmt.Errorf("Error creating bucket %s: %v", splitPath[0], err)
+				return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
 			}
 		}
 		// Create folder(s)
@@ -198,7 +213,7 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 				Key:    aws.String(folderKey),
 			})
 			if err != nil {
-				return fmt.Errorf("Error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
+				return fmt.Errorf("error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
 			}
 		}
 
@@ -225,7 +240,7 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 		// Check if the provider identifier is defined in StorageProviders
 		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
 			disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
-			return fmt.Errorf("The StorageProvider \"%s.%s\" is not defined", provName, provID)
+			return fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
 		}
 
 		path := strings.Trim(out.Path, " /")
@@ -251,11 +266,11 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 						log.Printf("The bucket \"%s\" already exists\n", splitPath[0])
 					} else {
 						disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
-						return fmt.Errorf("Error creating bucket %s: %v", splitPath[0], err)
+						return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
 					}
 				} else {
 					disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
-					return fmt.Errorf("Error creating bucket %s: %v", splitPath[0], err)
+					return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
 				}
 			}
 			// Create folder(s)
@@ -268,7 +283,7 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 				})
 				if err != nil {
 					disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
-					return fmt.Errorf("Error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
+					return fmt.Errorf("error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
 				}
 			}
 		case types.OnedataName:
@@ -279,7 +294,7 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 					log.Printf("Error creating \"%s\" folder in Onedata. Error: %v\n", path, err)
 				} else {
 					disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
-					return fmt.Errorf("Error connecting to Onedata's Oneprovider \"%s\". Error: %v", service.StorageProviders.Onedata[provID].OneproviderHost, err)
+					return fmt.Errorf("error connecting to Onedata's Oneprovider \"%s\". Error: %v", service.StorageProviders.Onedata[provID].OneproviderHost, err)
 				}
 			}
 		}
@@ -304,11 +319,11 @@ func isStorageProviderDefined(storageName string, storageID string, providers *t
 func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider, cfg *types.Config) error {
 	minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
 	if err != nil {
-		return fmt.Errorf("The provided MinIO configuration is not valid: %v", err)
+		return fmt.Errorf("the provided MinIO configuration is not valid: %v", err)
 	}
 
 	if err := minIOAdminClient.RegisterWebhook(name, token); err != nil {
-		return fmt.Errorf("Error registering the service's webhook: %v", err)
+		return fmt.Errorf("error registering the service's webhook: %v", err)
 	}
 
 	if err := minIOAdminClient.RestartServer(); err != nil {
@@ -329,7 +344,7 @@ func enableInputNotification(minIOClient *s3.S3, arnStr string, input types.Stor
 	}
 	nCfg, err := minIOClient.GetBucketNotificationConfiguration(gbncRequest)
 	if err != nil {
-		return fmt.Errorf("Error getting bucket \"%s\" notifications: %v", splitPath[0], err)
+		return fmt.Errorf("error getting bucket \"%s\" notifications: %v", splitPath[0], err)
 	}
 	queueConfiguration := s3.QueueConfiguration{
 		QueueArn: aws.String(arnStr),
@@ -360,7 +375,7 @@ func enableInputNotification(minIOClient *s3.S3, arnStr string, input types.Stor
 	// Enable the notification
 	_, err = minIOClient.PutBucketNotificationConfiguration(pbncInput)
 	if err != nil {
-		return fmt.Errorf("Error enabling bucket notification: %v", err)
+		return fmt.Errorf("error enabling bucket notification: %v", err)
 	}
 
 	return nil

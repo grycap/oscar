@@ -16,7 +16,11 @@ limitations under the License.
 
 package types
 
-import "net/http"
+import (
+	"net/http"
+
+	"k8s.io/client-go/kubernetes"
+)
 
 // ServerlessBackend define an interface for OSCAR's backends
 type ServerlessBackend interface {
@@ -26,6 +30,7 @@ type ServerlessBackend interface {
 	ReadService(name string) (*Service, error)
 	UpdateService(service Service) error
 	DeleteService(name string) error
+	GetKubeClientset() *kubernetes.Clientset
 }
 
 // SyncBackend define an interface for serverless backends that allow sync invocations

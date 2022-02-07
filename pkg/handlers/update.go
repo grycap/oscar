@@ -18,10 +18,12 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/utils"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -77,6 +79,13 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
+		// Add Yunikorn queue if enabled
+		if cfg.YunikornEnable {
+			if err := utils.AddYunikornQueue(cfg, back.GetKubeClientset(), &newService); err != nil {
+				log.Println(err.Error())
+			}
+		}
+
 		c.Status(http.StatusNoContent)
 	}
 }
@@ -84,7 +93,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 func updateBuckets(newService, oldService *types.Service, cfg *types.Config) error {
 	// Disable notifications from oldService.Input
 	if err := disableInputNotifications(oldService.GetMinIOWebhookARN(), oldService.Input, oldService.StorageProviders.MinIO[types.DefaultProvider]); err != nil {
-		return fmt.Errorf("Error disabling MinIO input notifications: %v", err)
+		return fmt.Errorf("error disabling MinIO input notifications: %v", err)
 	}
 
 	// Create the input and output buckets/folders from newService

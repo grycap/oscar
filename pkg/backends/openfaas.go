@@ -38,7 +38,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-var errOpenfaasOperator = errors.New("The OpenFaaS Operator is not creating the service deployment")
+var errOpenfaasOperator = errors.New("the OpenFaaS Operator is not creating the service deployment")
 
 // OpenfaasBackend struct to represent an Openfaas client
 type OpenfaasBackend struct {
@@ -238,7 +238,7 @@ func (of *OpenfaasBackend) UpdateService(service types.Service) error {
 	// Get the old service's configMap
 	oldCm, err := of.kubeClientset.CoreV1().ConfigMaps(of.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("The service \"%s\" does not have a registered ConfigMap", service.Name)
+		return fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", service.Name)
 	}
 
 	// Update the configMap with FDL and user-script
@@ -322,8 +322,10 @@ func (of *OpenfaasBackend) createOFFunctionDefinition(service *types.Service) *o
 
 	return &ofv1.Function{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      service.Name,
-			Namespace: of.namespace,
+			Name:        service.Name,
+			Namespace:   of.namespace,
+			Annotations: service.Annotations,
+			Labels:      service.Labels,
 		},
 		Spec: ofv1.FunctionSpec{
 			Image:  service.Image,
@@ -336,4 +338,9 @@ func (of *OpenfaasBackend) createOFFunctionDefinition(service *types.Service) *o
 // StartScaler starts the OpenFaaS Scaler
 func (of *OpenfaasBackend) StartScaler() {
 	of.scaler.Start()
+}
+
+// GetKubeClientset returns the Kubernetes Clientset
+func (of *OpenfaasBackend) GetKubeClientset() *kubernetes.Clientset {
+	return of.kubeClientset
 }
