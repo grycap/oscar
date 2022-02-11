@@ -38,6 +38,9 @@ nodes:
   - containerPort: 30300
     hostPort: 30300
     protocol: TCP
+  - containerPort: 30301
+    hostPort: 30301
+    protocol: TCP
 EOF
 ```
 
@@ -48,7 +51,7 @@ EOF
 To enable Ingress support for accessing the OSCAR server, we must deploy the [NGINX Ingress](https://kubernetes.github.io/ingress-nginx/):
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/kind/deploy.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/helm-chart-3.40.0/deploy/static/provider/kind/deploy.yaml
 ```
 
 ### Deploy MinIO
@@ -56,8 +59,8 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/mast
 OSCAR depends on [MinIO](https://min.io/) as storage provider and function trigger. The easy way to run MinIO in a Kubernetes cluster is by installing its [helm chart](https://github.com/minio/charts). To  install the helm MinIO repo and install the chart, run the following commands replacing `<MINIO_PASSWORD>` with a password:
 
 ```sh
-helm repo add minio https://helm.min.io
-helm install minio minio/minio --set accessKey=minio --set secretKey=<MINIO_PASSWORD> --set service.type=NodePort --set service.nodePort=30300
+helm repo add minio https://charts.min.io
+helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=<MINIO_PASSWORD>,service.type=NodePort,service.nodePort=30300,consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 --create-namespace
 ```
 
 *Note that the deployment has been configured to use the accessKey `minio` and the specified password as secretKey. The NodePort service type has been used in order to allow access from `http://localhost:30300`*
@@ -69,8 +72,8 @@ NFS server provisioner is required for the creation of `ReadWriteMany` Persisten
 To deploy it you can use [this chart](https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner/tree/master/deploy/helm) executing:
 
 ```sh
-helm repo add kvaps https://kvaps.github.io/charts
-helm install nfs-server-provisioner kvaps/nfs-server-provisioner
+helm repo add nfs-ganesha-server-and-external-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
+helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner
 ```
 
 ### Deploy OSCAR
