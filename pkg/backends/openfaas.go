@@ -314,23 +314,19 @@ func (of *OpenfaasBackend) GetProxyDirector(serviceName string) func(req *http.R
 }
 
 func (of *OpenfaasBackend) createOFFunctionDefinition(service *types.Service) *ofv1.Function {
-	labels := map[string]string{
-		// Add label "com.openfaas.scale.zero=true" for scaling to zero
-		types.OpenfaasZeroScalingLabel: "true",
-		types.ServiceLabel:             service.Name,
-	}
+	// Add label "com.openfaas.scale.zero=true" for scaling to zero
+	service.Labels[types.OpenfaasZeroScalingLabel] = "true"
 
 	return &ofv1.Function{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        service.Name,
-			Namespace:   of.namespace,
-			Annotations: service.Annotations,
-			Labels:      service.Labels,
+			Name:      service.Name,
+			Namespace: of.namespace,
 		},
 		Spec: ofv1.FunctionSpec{
-			Image:  service.Image,
-			Name:   service.Name,
-			Labels: &labels,
+			Image:       service.Image,
+			Name:        service.Name,
+			Annotations: &service.Annotations,
+			Labels:      &service.Labels,
 		},
 	}
 }
