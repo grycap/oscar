@@ -121,7 +121,7 @@ func checkValues(service *types.Service, cfg *types.Config) error {
 	}
 	service.Labels[types.ServiceLabel] = service.Name
 	service.Labels[types.YunikornApplicationIDLabel] = service.Name
-	service.Labels[types.YunikornQueueLabel] = service.Name
+	service.Labels[types.YunikornQueueLabel] = fmt.Sprintf("%s.%s.%s", types.YunikornRootQueue, types.YunikornOscarQueue, service.Name)
 
 	// Create default annotations map
 	if service.Annotations == nil {
