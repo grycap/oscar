@@ -104,19 +104,17 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			ObjectMeta: metav1.ObjectMeta{
 				// UUID used as a name for jobs
 				// To filter jobs by service name use the label "oscar_service"
-				Name:      uuid.New().String(),
-				Namespace: cfg.ServicesNamespace,
-				Labels: map[string]string{
-					types.ServiceLabel: service.Name,
-				},
+				Name:        uuid.New().String(),
+				Namespace:   cfg.ServicesNamespace,
+				Labels:      service.Labels,
+				Annotations: service.Annotations,
 			},
 			Spec: batchv1.JobSpec{
 				BackoffLimit: &backoffLimit,
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							types.ServiceLabel: service.Name,
-						},
+						Labels:      service.Labels,
+						Annotations: service.Annotations,
 					},
 					Spec: *podSpec,
 				},

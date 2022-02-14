@@ -123,6 +123,11 @@ func checkValues(service *types.Service, cfg *types.Config) error {
 	service.Labels[types.YunikornApplicationIDLabel] = service.Name
 	service.Labels[types.YunikornQueueLabel] = service.Name
 
+	// Create default annotations map
+	if service.Annotations == nil {
+		service.Annotations = make(map[string]string)
+	}
+
 	// Add the default MinIO provider
 	if service.StorageProviders != nil {
 		if service.StorageProviders.MinIO != nil {
