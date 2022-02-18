@@ -7,8 +7,8 @@ info:
     url: 'https://www.apache.org/licenses/LICENSE-2.0'
   description: OSCAR API documentation
   contact:
-    name: Sebas Risco
-    email: serisgal@i3m.upv.es
+    name: Sebastián Risco
+    email: srisco@i3m.upv.es
 externalDocs:
   description: More documentation available on GitHub
   url: 'https://github.com/grycap/oscar'
@@ -357,6 +357,10 @@ components:
           type: string
         cpu:
           type: string
+        total_memory:
+          type: string
+        total_cpu:
+          type: string
         token:
           type: string
           readOnly: true
@@ -364,6 +368,9 @@ components:
           type: string
         image:
           type: string
+        alpine:
+          type: boolean
+          default: false
         script:
           type: string
         environment:
@@ -371,11 +378,16 @@ components:
           properties:
             Variables:
               type: object
-              properties:
-                '':
-                  allOf:
-                    - {}
-                  type: string
+              additionalProperties:
+                type: string
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+        labels:
+          type: object
+          additionalProperties:
+            type: string
         input:
           type: array
           items:
