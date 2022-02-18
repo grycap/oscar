@@ -52,10 +52,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Check service values and set defaults
-		if err := checkValues(&service, cfg); err != nil {
-			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
-			return
-		}
+		checkValues(&service, cfg)
 
 		// Create the service
 		if err := back.CreateService(service); err != nil {
@@ -97,7 +94,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 	}
 }
 
-func checkValues(service *types.Service, cfg *types.Config) error {
+func checkValues(service *types.Service, cfg *types.Config) {
 	// Add default values for Memory and CPU if they are not set
 	// Do not validate, Kubernetes client throws an error if they are not correct
 	if service.Memory == "" {
@@ -148,8 +145,6 @@ func checkValues(service *types.Service, cfg *types.Config) error {
 
 	// Generate a new access token
 	service.Token = utils.GenerateToken()
-
-	return nil
 }
 
 func createBuckets(service *types.Service, cfg *types.Config) error {

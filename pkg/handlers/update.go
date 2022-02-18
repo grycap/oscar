@@ -37,10 +37,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Check service values and set defaults
-		if err := checkValues(&newService, cfg); err != nil {
-			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
-			return
-		}
+		checkValues(&newService, cfg)
 
 		// Read the current service
 		oldService, err := back.ReadService(newService.Name)
