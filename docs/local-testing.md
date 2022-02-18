@@ -21,7 +21,6 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
 - role: control-plane
-  image: kindest/node:v1.18.6
   kubeadmConfigPatches:
   - |
     kind: InitConfiguration
@@ -38,10 +37,11 @@ nodes:
   - containerPort: 30300
     hostPort: 30300
     protocol: TCP
+  - containerPort: 30301
+    hostPort: 30301
+    protocol: TCP
 EOF
 ```
-
-*As some Linux distributions may have [problems](https://github.com/kubernetes-sigs/kind/issues/1487#issuecomment-694920754) using the [NFS server provisioner](https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner) with the latest kind images, the version v1.18.6 has been used.*
 
 ### Deploy NGINX Ingress
 
@@ -56,11 +56,11 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/mast
 OSCAR depends on [MinIO](https://min.io/) as storage provider and function trigger. The easy way to run MinIO in a Kubernetes cluster is by installing its [helm chart](https://github.com/minio/charts). To  install the helm MinIO repo and install the chart, run the following commands replacing `<MINIO_PASSWORD>` with a password:
 
 ```sh
-helm repo add minio https://helm.min.io
-helm install minio minio/minio --set accessKey=minio --set secretKey=<MINIO_PASSWORD> --set service.type=NodePort --set service.nodePort=30300
+helm repo add minio https://charts.min.io
+helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=<MINIO_PASSWORD>,service.type=NodePort,service.nodePort=30300,consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 --create-namespace
 ```
 
-*Note that the deployment has been configured to use the accessKey `minio` and the specified password as secretKey. The NodePort service type has been used in order to allow access from `http://localhost:30300`*
+*Note that the deployment has been configured to use the rootUser `minio` and the specified password as rootPassword. The NodePort service type has been used in order to allow access from `http://localhost:30300` (API) and `http://localhost:30301` (Console).*
 
 ### Deploy NFS server provisioner
 
@@ -69,9 +69,11 @@ NFS server provisioner is required for the creation of `ReadWriteMany` Persisten
 To deploy it you can use [this chart](https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner/tree/master/deploy/helm) executing:
 
 ```sh
-helm repo add kvaps https://kvaps.github.io/charts
-helm install nfs-server-provisioner kvaps/nfs-server-provisioner
+helm repo add nfs-ganesha-server-and-external-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
+helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner
 ```
+
+*Some Linux distributions may have [problems](https://github.com/kubernetes-sigs/kind/issues/1487#issuecomment-694920754) using the [NFS server provisioner](https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner) with kind due to its default configuration of kernel-limit file descriptors. To workaround it, please run `sudo sysctl -w fs.nr_open=1048576`.*
 
 ### Deploy OSCAR
 
@@ -81,7 +83,7 @@ First, create the `oscar` and `oscar-svc` namespaces by executing:
 kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/yaml/oscar-namespaces.yaml
 ```
 
-Then, add the [grycap helm repo](https://github.com/grycap/helm-charts) and deploy by running the following commands replacing `<OSCAR_PASSWORD>` with a password of your choice and `<MINIO_PASSWORD>` with the MinIO accessKey:
+Then, add the [grycap helm repo](https://github.com/grycap/helm-charts) and deploy by running the following commands replacing `<OSCAR_PASSWORD>` with a password of your choice and `<MINIO_PASSWORD>` with the MinIO rootPassword:
 
 ```sh
 helm repo add grycap https://grycap.github.io/helm-charts/

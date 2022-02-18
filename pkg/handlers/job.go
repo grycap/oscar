@@ -39,9 +39,8 @@ var (
 	backoffLimit int32 = 0
 	// Don't restart jobs in order to keep logs
 	restartPolicy = v1.RestartPolicyNever
-	// commands and args used for passing event to faas-supervisor
+	// command used for passing the event to faas-supervisor
 	command = []string{"/bin/sh"}
-	args    = []string{"-c", fmt.Sprintf("echo $%s | %s/%s", types.EventVariable, types.VolumePath, types.SupervisorName)}
 )
 
 // MakeJobHandler makes a handler to manage async invocations
@@ -94,7 +93,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 		for i, c := range podSpec.Containers {
 			if c.Name == types.ContainerName {
 				podSpec.Containers[i].Command = command
-				podSpec.Containers[i].Args = args
+				podSpec.Containers[i].Args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath())}
 				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, event)
 			}
 		}
@@ -104,19 +103,17 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			ObjectMeta: metav1.ObjectMeta{
 				// UUID used as a name for jobs
 				// To filter jobs by service name use the label "oscar_service"
-				Name:      uuid.New().String(),
-				Namespace: cfg.ServicesNamespace,
-				Labels: map[string]string{
-					types.ServiceLabel: service.Name,
-				},
+				Name:        uuid.New().String(),
+				Namespace:   cfg.ServicesNamespace,
+				Labels:      service.Labels,
+				Annotations: service.Annotations,
 			},
 			Spec: batchv1.JobSpec{
 				BackoffLimit: &backoffLimit,
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							types.ServiceLabel: service.Name,
-						},
+						Labels:      service.Labels,
+						Annotations: service.Annotations,
 					},
 					Spec: *podSpec,
 				},

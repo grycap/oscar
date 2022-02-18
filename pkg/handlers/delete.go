@@ -57,6 +57,13 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			log.Printf("Error removing MinIO webhook for service \"%s\": %v\n", service.Name, err)
 		}
 
+		// Add Yunikorn queue if enabled
+		if cfg.YunikornEnable {
+			if err := utils.DeleteYunikornQueue(cfg, back.GetKubeClientset(), service); err != nil {
+				log.Println(err.Error())
+			}
+		}
+
 		c.Status(http.StatusNoContent)
 	}
 }
@@ -64,11 +71,11 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 func removeMinIOWebhook(name string, cfg *types.Config) error {
 	minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
 	if err != nil {
-		return fmt.Errorf("The provided MinIO configuration is not valid: %v", err)
+		return fmt.Errorf("the provided MinIO configuration is not valid: %v", err)
 	}
 
 	if err := minIOAdminClient.RemoveWebhook(name); err != nil {
-		return fmt.Errorf("Error removing the service's webhook: %v", err)
+		return fmt.Errorf("error removing the service's webhook: %v", err)
 	}
 
 	if err := minIOAdminClient.RestartServer(); err != nil {
@@ -93,7 +100,7 @@ func disableInputNotifications(arnStr string, input []types.StorageIOConfig, min
 		// Get bucket notification
 		nCfg, err := minIOClient.GetBucketNotificationConfiguration(&s3.GetBucketNotificationConfigurationRequest{Bucket: aws.String(splitPath[0])})
 		if err != nil {
-			return fmt.Errorf("Error getting bucket \"%s\" notifications: %v", splitPath[0], err)
+			return fmt.Errorf("error getting bucket \"%s\" notifications: %v", splitPath[0], err)
 		}
 
 		// Filter elements that doesn't match with service's ARN
@@ -113,7 +120,7 @@ func disableInputNotifications(arnStr string, input []types.StorageIOConfig, min
 		}
 		_, err = minIOClient.PutBucketNotificationConfiguration(pbncInput)
 		if err != nil {
-			return fmt.Errorf("Error disabling bucket notification: %v", err)
+			return fmt.Errorf("error disabling bucket notification: %v", err)
 		}
 	}
 

@@ -39,7 +39,7 @@ func MakeMinIOAdminClient(cfg *types.Config) (*MinIOAdminClient, error) {
 	// Parse minIO endpoint
 	endpointURL, err := url.Parse(cfg.MinIOProvider.Endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("The provided MinIO endpoint \"%s\" is not valid", cfg.MinIOProvider.Endpoint)
+		return nil, fmt.Errorf("the provided MinIO endpoint \"%s\" is not valid", cfg.MinIOProvider.Endpoint)
 	}
 
 	// Check URL Scheme for using TLS or not
@@ -50,7 +50,7 @@ func MakeMinIOAdminClient(cfg *types.Config) (*MinIOAdminClient, error) {
 	case "https":
 		enableTLS = true
 	default:
-		return nil, fmt.Errorf("Invalid MinIO Endpoint: %s. Must start with \"http://\" or \"https://\"", cfg.MinIOProvider.Endpoint)
+		return nil, fmt.Errorf("invalid MinIO Endpoint: %s. Must start with \"http://\" or \"https://\"", cfg.MinIOProvider.Endpoint)
 	}
 
 	adminClient, err := madmin.New(endpointURL.Host, cfg.MinIOProvider.AccessKey, cfg.MinIOProvider.SecretKey, enableTLS)
@@ -90,7 +90,7 @@ func (minIOAdminClient *MinIOAdminClient) RegisterWebhook(name string, token str
 
 // RemoveWebhook removes an existent webhook in the MinIO configuration
 func (minIOAdminClient *MinIOAdminClient) RemoveWebhook(name string) error {
-	err := minIOAdminClient.adminClient.DelConfigKV(context.TODO(), fmt.Sprintf("notify_webhook:%s", name))
+	_, err := minIOAdminClient.adminClient.DelConfigKV(context.TODO(), fmt.Sprintf("notify_webhook:%s", name))
 	if err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func (minIOAdminClient *MinIOAdminClient) RestartServer() error {
 	time.Sleep(6 * time.Second)
 	_, err = minIOAdminClient.adminClient.ServerInfo(context.TODO())
 	if err != nil {
-		return fmt.Errorf("Error restarting the MinIO server: %v", err)
+		return fmt.Errorf("error restarting the MinIO server: %v", err)
 	}
 
 	return nil

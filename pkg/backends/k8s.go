@@ -94,11 +94,10 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 	// Create the podTemplate spec
 	podTemplate := &v1.PodTemplate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      service.Name,
-			Namespace: k.namespace,
-			Labels: map[string]string{
-				types.ServiceLabel: service.Name,
-			},
+			Name:        service.Name,
+			Namespace:   k.namespace,
+			Labels:      service.Labels,
+			Annotations: service.Annotations,
 		},
 		Template: v1.PodTemplateSpec{
 			Spec: *podSpec,
@@ -137,7 +136,7 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 	// Get the old service's configMap
 	oldCm, err := k.kubeClientset.CoreV1().ConfigMaps(k.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("The service \"%s\" does not have a registered ConfigMap", service.Name)
+		return fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", service.Name)
 	}
 
 	// Update the configMap with FDL and user-script
@@ -205,13 +204,13 @@ func getServiceFromFDL(name string, namespace string, kubeClientset *kubernetes.
 	// Get the configMap of the Service
 	cm, err := kubeClientset.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("The service \"%s\" does not have a registered ConfigMap", name)
+		return nil, fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", name)
 	}
 	service := &types.Service{}
 
 	// Unmarshal the FDL stored in the configMap
 	if err = yaml.Unmarshal([]byte(cm.Data[types.FDLFileName]), service); err != nil {
-		return nil, fmt.Errorf("The FDL of the service \"%s\" cannot be read", name)
+		return nil, fmt.Errorf("the FDL of the service \"%s\" cannot be read", name)
 	}
 
 	// Add the script to the service from configmap's script value
@@ -318,4 +317,9 @@ func deleteServiceJobs(name string, namespace string, kubeClientset *kubernetes.
 	}
 
 	return nil
+}
+
+// GetKubeClientset returns the Kubernetes Clientset
+func (k *KubeBackend) GetKubeClientset() *kubernetes.Clientset {
+	return k.kubeClientset
 }
