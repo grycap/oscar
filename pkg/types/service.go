@@ -105,13 +105,13 @@ type Service struct {
 	// TotalMemory limit for the memory used by all the service's jobs running simultaneously
 	// Apache YuniKorn scheduler is required to work
 	// Same format as Memory, but internally translated to MB (integer)
-	// Optional. (default: 0)
+	// Optional. (default: "")
 	TotalMemory string `json:"total_memory"`
 
 	// TotalCPU limit for the virtual CPUs used by all the service's jobs running simultaneously
 	// Apache YuniKorn scheduler is required to work
 	// Same format as CPU, but internally translated to millicores (integer)
-	// Optional. (default: 0)
+	// Optional. (default: "")
 	TotalCPU string `json:"total_cpu"`
 
 	// Log level for the FaaS Supervisor
