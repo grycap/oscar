@@ -699,7 +699,7 @@ helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/
 </code></pre>
 <p>Then, add the <a href="https://github.com/grycap/helm-charts">grycap helm repo</a> and deploy by running the following commands replacing <code>&lt;OSCAR_PASSWORD&gt;</code> with a password of your choice and <code>&lt;MINIO_PASSWORD&gt;</code> with the MinIO rootPassword:</p>
 <pre><code class="language-sh">helm repo add grycap https://grycap.github.io/helm-charts/
-helm install --namespace=oscar oscar grycap/oscar --set authPass=&lt;OSCAR_PASSWORD&gt; --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.default:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=&lt;MINIO_PASSWORD&gt;
+helm install --namespace=oscar oscar grycap/oscar --set authPass=&lt;OSCAR_PASSWORD&gt; --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=&lt;MINIO_PASSWORD&gt;
 </code></pre>
 <p>Now you can access to the OSCAR web interface through <code>https://localhost</code> with user <code>oscar</code> and the specified password.</p>
 <p><em>Note that the OSCAR server has been configured to use the ClusterIP service of MinIO for internal communication. This blocks the MinIO section in the OSCAR web interface, so to download and upload files you must connect directly to MinIO (<code>http://localhost:30300</code>).</em></p>
