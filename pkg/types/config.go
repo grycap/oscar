@@ -122,7 +122,7 @@ type Config struct {
 	WriteTimeout time.Duration `json:"-"`
 
 	// YunikornEnable option to configure Apache Yunikorn
-	YunikornEnable bool `json:"-"`
+	YunikornEnable bool `json:"yunikorn_enable"`
 
 	// YunikornNamespace
 	YunikornNamespace string `json:"-"`
