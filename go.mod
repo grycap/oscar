@@ -42,7 +42,10 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-require gopkg.in/yaml.v2 v2.4.0
+require (
+	github.com/barkimedes/go-deepcopy v0.0.0-20200817023428-a044a1957ca4
+	gopkg.in/yaml.v2 v2.4.0
+)
 
 require (
 	github.com/apache/incubator-yunikorn-scheduler-interface v0.12.1 // indirect

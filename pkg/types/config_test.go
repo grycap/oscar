@@ -54,7 +54,6 @@ func TestNoUsername(t *testing.T) {
 	if err == nil {
 		t.Error("OSCAR_USERNAME must be mandatory")
 	}
-
 }
 
 func TestNoPassword(t *testing.T) {
@@ -65,7 +64,6 @@ func TestNoPassword(t *testing.T) {
 	if err == nil {
 		t.Error("OSCAR_PASSWORD must be mandatory")
 	}
-
 }
 
 func TestNoMinIOAccessKey(t *testing.T) {
@@ -77,7 +75,6 @@ func TestNoMinIOAccessKey(t *testing.T) {
 	if err == nil {
 		t.Error("MINIO_ACCESS_KEY must be mandatory")
 	}
-
 }
 
 func TestNoMinIOSecretKey(t *testing.T) {
@@ -90,7 +87,6 @@ func TestNoMinIOSecretKey(t *testing.T) {
 	if err == nil {
 		t.Error("MINIO_SECRET_KEY must be mandatory")
 	}
-
 }
 
 func TestRequiredValues(t *testing.T) {
@@ -570,7 +566,6 @@ func TestCustomValues(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestServerlessBackend(t *testing.T) {
