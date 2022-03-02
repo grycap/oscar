@@ -60,6 +60,7 @@ var (
 			},
 		},
 	}
+
 	testConfig Config = Config{
 		WatchdogMaxInflight:  20,
 		WatchdogWriteDebug:   true,
@@ -317,7 +318,7 @@ func checkEnvVars(cfg *Config, podSpec *v1.PodSpec) error {
 	}
 
 	if len(found) != 5 {
-		return fmt.Errorf("Only the following watchdog environment variables are correctly defined: %v", found)
+		return fmt.Errorf("only the following watchdog environment variables are correctly defined: %v", found)
 	}
 
 	return nil

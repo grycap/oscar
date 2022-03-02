@@ -645,6 +645,7 @@ func TestOpenFaaSValues(t *testing.T) {
 	scenarios := []struct {
 		name        string
 		environment map[string]string
+		returnError bool
 	}{
 		{
 			"Invalid OPENFAAS_PORT",
@@ -656,6 +657,7 @@ func TestOpenFaaSValues(t *testing.T) {
 				"SERVERLESS_BACKEND": "openfaas",
 				"OPENFAAS_PORT":      "test",
 			},
+			true,
 		},
 		{
 			"Invalid OPENFAAS_PROMETHEUS_PORT",
@@ -667,6 +669,7 @@ func TestOpenFaaSValues(t *testing.T) {
 				"SERVERLESS_BACKEND":       "openfaas",
 				"OPENFAAS_PROMETHEUS_PORT": "test",
 			},
+			true,
 		},
 		{
 			"Invalid OPENFAAS_SCALER_ENABLE",
@@ -678,6 +681,23 @@ func TestOpenFaaSValues(t *testing.T) {
 				"SERVERLESS_BACKEND":     "openfaas",
 				"OPENFAAS_SCALER_ENABLE": "test",
 			},
+			true,
+		},
+		{
+			"valid OpenFaaS values",
+			map[string]string{
+				"OSCAR_USERNAME":                      "testuser",
+				"OSCAR_PASSWORD":                      "testpass",
+				"MINIO_ACCESS_KEY":                    "testminioaccess",
+				"MINIO_SECRET_KEY":                    "testminiosecret",
+				"SERVERLESS_BACKEND":                  "openfaas",
+				"OPENFAAS_SCALER_ENABLE":              "true",
+				"OPENFAAS_NAMESPACE":                  "testnamespace",
+				"OPENFAAS_BASIC_AUTH_SECRET":          "testsecret",
+				"OPENFAAS_SCALER_INTERVAL":            "10s",
+				"OPENFAAS_SCALER_INACTIVITY_DURATION": "60s",
+			},
+			false,
 		},
 	}
 
@@ -687,7 +707,9 @@ func TestOpenFaaSValues(t *testing.T) {
 				t.Setenv(k, v)
 			}
 
-			if _, err := ReadConfig(); err == nil {
+			_, err := ReadConfig()
+
+			if s.returnError && err == nil {
 				t.Error("expected error, got nil")
 			}
 		})
