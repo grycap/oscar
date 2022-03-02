@@ -37,13 +37,11 @@ type FakeBackend struct {
 func NewFakeBackend() types.ServerlessBackend {
 	return &FakeBackend{
 		returnError: map[string]bool{
-			"GetInfo":          false,
-			"ListServices":     false,
-			"CreateService":    false,
-			"ReadService":      false,
-			"UpdateService":    false,
-			"DeleteService":    false,
-			"GetKubeClientset": false,
+			"ListServices":  false,
+			"CreateService": false,
+			"ReadService":   false,
+			"UpdateService": false,
+			"DeleteService": false,
 		},
 	}
 }
@@ -109,4 +107,14 @@ func (f *FakeBackend) GetKubeClientset() kubernetes.Interface {
 func getCurrentFuncName() string {
 	pc, _, _, _ := runtime.Caller(1)
 	return fmt.Sprintf("%s", runtime.FuncForPC(pc).Name())
+}
+
+// ReturnError set a specified functionName to return an error
+func (f *FakeBackend) ReturnError(functionName string) {
+	f.returnError[functionName] = true
+}
+
+// NoReturnError set a specified functionName to NOT return an error
+func (f *FakeBackend) NoReturnError(functionName string) {
+	f.returnError[functionName] = false
 }

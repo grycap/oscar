@@ -144,7 +144,7 @@ func AddYunikornQueue(cfg *types.Config, kubeClientset kubernetes.Interface, svc
 }
 
 // DeleteYunikornQueue delete a service's queue in Yunikorn's config
-func DeleteYunikornQueue(cfg *types.Config, kubeClientset *kubernetes.Clientset, svc *types.Service) error {
+func DeleteYunikornQueue(cfg *types.Config, kubeClientset kubernetes.Interface, svc *types.Service) error {
 	// Read the config
 	yConfig, err := readYunikornConfig(cfg, kubeClientset)
 	if err != nil {
