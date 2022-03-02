@@ -337,6 +337,6 @@ func (of *OpenfaasBackend) StartScaler() {
 }
 
 // GetKubeClientset returns the Kubernetes Clientset
-func (of *OpenfaasBackend) GetKubeClientset() *kubernetes.Clientset {
+func (of *OpenfaasBackend) GetKubeClientset() kubernetes.Interface {
 	return of.kubeClientset
 }

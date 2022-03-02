@@ -39,7 +39,7 @@ var scalerLogger = log.New(os.Stderr, "[OF-SCALER] ", log.Ldate|log.Ltime)
 
 // OpenfaasScaler struct to store the parameters required to scale OpenFaaS functions
 type OpenfaasScaler struct {
-	kubeClientset           *kubernetes.Clientset
+	kubeClientset           kubernetes.Interface
 	openfaasNamespace       string
 	namespace               string
 	gatewayEndpoint         string

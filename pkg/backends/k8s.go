@@ -320,6 +320,6 @@ func deleteServiceJobs(name string, namespace string, kubeClientset *kubernetes.
 }
 
 // GetKubeClientset returns the Kubernetes Clientset
-func (k *KubeBackend) GetKubeClientset() *kubernetes.Clientset {
+func (k *KubeBackend) GetKubeClientset() kubernetes.Interface {
 	return k.kubeClientset
 }

@@ -32,7 +32,7 @@ var (
 )
 
 // GetInfo returns version info
-func GetInfo(kubeClientset *kubernetes.Clientset, back types.ServerlessBackend) types.Info {
+func GetInfo(kubeClientset kubernetes.Interface, back types.ServerlessBackend) types.Info {
 	version := "devel"
 
 	if Version != "" {
@@ -49,7 +49,7 @@ func GetInfo(kubeClientset *kubernetes.Clientset, back types.ServerlessBackend) 
 
 }
 
-func getKubeVersion(kubeClientset *kubernetes.Clientset) string {
+func getKubeVersion(kubeClientset kubernetes.Interface) string {
 	version, err := kubeClientset.Discovery().ServerVersion()
 	if err != nil {
 		return ""
