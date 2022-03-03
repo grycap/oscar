@@ -50,7 +50,7 @@ type OpenfaasScaler struct {
 }
 
 // NewOFScaler returns a pointer to a new OpenfaasScaler struct
-func NewOFScaler(kubeClientset *kubernetes.Clientset, cfg *types.Config) *OpenfaasScaler {
+func NewOFScaler(kubeClientset kubernetes.Interface, cfg *types.Config) *OpenfaasScaler {
 	return &OpenfaasScaler{
 		kubeClientset:           kubeClientset,
 		openfaasNamespace:       cfg.OpenfaasNamespace,

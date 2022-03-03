@@ -42,7 +42,7 @@ var errOpenfaasOperator = errors.New("the OpenFaaS Operator is not creating the 
 
 // OpenfaasBackend struct to represent an Openfaas client
 type OpenfaasBackend struct {
-	kubeClientset   *kubernetes.Clientset
+	kubeClientset   kubernetes.Interface
 	ofClientset     *ofclientset.Clientset
 	namespace       string
 	gatewayEndpoint string
@@ -51,7 +51,7 @@ type OpenfaasBackend struct {
 }
 
 // MakeOpenfaasBackend makes a OpenfaasBackend from the provided k8S clientset and config
-func MakeOpenfaasBackend(kubeClientset *kubernetes.Clientset, kubeConfig *rest.Config, cfg *types.Config) *OpenfaasBackend {
+func MakeOpenfaasBackend(kubeClientset kubernetes.Interface, kubeConfig *rest.Config, cfg *types.Config) *OpenfaasBackend {
 	ofClientset, err := ofclientset.NewForConfig(kubeConfig)
 	if err != nil {
 		log.Fatal(err)

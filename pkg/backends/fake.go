@@ -18,8 +18,8 @@ package backends
 
 import (
 	"errors"
-	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/grycap/oscar/v2/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -30,18 +30,18 @@ var errFake = errors.New("fake error")
 
 // FakeBackend fake struct to mock the beahaviour of the ServerlessBackend interface
 type FakeBackend struct {
-	returnError map[string]bool
+	returnError map[string]error
 }
 
 // NewFakeBackend returns the pointer of a new FakeBackend struct
-func NewFakeBackend() types.ServerlessBackend {
+func NewFakeBackend() *FakeBackend {
 	return &FakeBackend{
-		returnError: map[string]bool{
-			"ListServices":  false,
-			"CreateService": false,
-			"ReadService":   false,
-			"UpdateService": false,
-			"DeleteService": false,
+		returnError: map[string]error{
+			"ListServices":  nil,
+			"CreateService": nil,
+			"ReadService":   nil,
+			"UpdateService": nil,
+			"DeleteService": nil,
 		},
 	}
 }
@@ -56,8 +56,8 @@ func (f *FakeBackend) GetInfo() *types.ServerlessBackendInfo {
 
 // ListServices returns a slice with all services registered in the provided namespace (fake)
 func (f *FakeBackend) ListServices() ([]*types.Service, error) {
-	if f.returnError[getCurrentFuncName()] {
-		return nil, errFake
+	if f.returnError[getCurrentFuncName()] != nil {
+		return nil, f.returnError[getCurrentFuncName()]
 	}
 
 	return []*types.Service{}, nil
@@ -65,8 +65,8 @@ func (f *FakeBackend) ListServices() ([]*types.Service, error) {
 
 // CreateService creates a new service as a k8s podTemplate (fake)
 func (f *FakeBackend) CreateService(service types.Service) error {
-	if f.returnError[getCurrentFuncName()] {
-		return errFake
+	if f.returnError[getCurrentFuncName()] != nil {
+		return f.returnError[getCurrentFuncName()]
 	}
 
 	return nil
@@ -74,8 +74,8 @@ func (f *FakeBackend) CreateService(service types.Service) error {
 
 // ReadService returns a Service (fake)
 func (f *FakeBackend) ReadService(name string) (*types.Service, error) {
-	if f.returnError[getCurrentFuncName()] {
-		return nil, errFake
+	if f.returnError[getCurrentFuncName()] != nil {
+		return nil, f.returnError[getCurrentFuncName()]
 	}
 
 	return &types.Service{}, nil
@@ -83,8 +83,8 @@ func (f *FakeBackend) ReadService(name string) (*types.Service, error) {
 
 // UpdateService updates an existent service (fake)
 func (f *FakeBackend) UpdateService(service types.Service) error {
-	if f.returnError[getCurrentFuncName()] {
-		return errFake
+	if f.returnError[getCurrentFuncName()] != nil {
+		return f.returnError[getCurrentFuncName()]
 	}
 
 	return nil
@@ -92,8 +92,8 @@ func (f *FakeBackend) UpdateService(service types.Service) error {
 
 // DeleteService deletes a service (fake)
 func (f *FakeBackend) DeleteService(name string) error {
-	if f.returnError[getCurrentFuncName()] {
-		return errFake
+	if f.returnError[getCurrentFuncName()] != nil {
+		return f.returnError[getCurrentFuncName()]
 	}
 
 	return nil
@@ -106,15 +106,17 @@ func (f *FakeBackend) GetKubeClientset() kubernetes.Interface {
 
 func getCurrentFuncName() string {
 	pc, _, _, _ := runtime.Caller(1)
-	return fmt.Sprintf("%s", runtime.FuncForPC(pc).Name())
+	str := runtime.FuncForPC(pc).Name()
+	slice := strings.Split(str, ".")
+	return slice[len(slice)-1]
 }
 
 // ReturnError set a specified functionName to return an error
-func (f *FakeBackend) ReturnError(functionName string) {
-	f.returnError[functionName] = true
+func (f *FakeBackend) ReturnError(functionName string, err error) {
+	f.returnError[functionName] = err
 }
 
 // NoReturnError set a specified functionName to NOT return an error
-func (f *FakeBackend) NoReturnError(functionName string) {
-	f.returnError[functionName] = false
+func (f *FakeBackend) ReturnNoError(functionName string) {
+	f.returnError[functionName] = nil
 }
