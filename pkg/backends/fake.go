@@ -34,7 +34,7 @@ type FakeBackend struct {
 }
 
 // NewFakeBackend returns the pointer of a new FakeBackend struct
-func NewFakeBackend() *FakeBackend {
+func MakeFakeBackend() *FakeBackend {
 	return &FakeBackend{
 		returnError: map[string]error{
 			"ListServices":  nil,

@@ -25,7 +25,7 @@ import (
 
 func TestGetInfo(t *testing.T) {
 	fakeClientset := testclient.NewSimpleClientset()
-	fakeBackend := backends.NewFakeBackend()
+	fakeBackend := backends.MakeFakeBackend()
 
 	// No set version
 	info := GetInfo(fakeClientset, fakeBackend)
@@ -55,7 +55,7 @@ func TestGetKubeVersion(t *testing.T) {
 	}
 
 	// Invalid
-	// Wait to https://github.com/kubernetes/kubernetes/pull/100564
+	// Wait for https://github.com/kubernetes/kubernetes/pull/100564
 	// reactor := func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 	// 	return true, nil, errors.New("test error")
 	// }

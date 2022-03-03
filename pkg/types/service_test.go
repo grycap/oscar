@@ -217,7 +217,7 @@ storage_providers:
 
 func TestToYAMLError(t *testing.T) {
 	svc := Service{}
-	yamlMarshal = func(interface{}) ([]byte, error) {
+	YAMLMarshal = func(interface{}) ([]byte, error) {
 		return nil, errors.New("test error")
 	}
 

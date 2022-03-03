@@ -23,8 +23,8 @@ import (
 	"github.com/grycap/oscar/v2/pkg/types"
 )
 
-func TestNewFakeBackend(t *testing.T) {
-	back := NewFakeBackend()
+func TestMakeFakeBackend(t *testing.T) {
+	back := MakeFakeBackend()
 
 	for k, v := range back.returnError {
 		if v != nil {
@@ -34,7 +34,7 @@ func TestNewFakeBackend(t *testing.T) {
 }
 
 func TestFakeGetInfo(t *testing.T) {
-	back := NewFakeBackend()
+	back := MakeFakeBackend()
 
 	info := back.GetInfo()
 
@@ -60,7 +60,7 @@ func TestFakeListServices(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			back := NewFakeBackend()
+			back := MakeFakeBackend()
 
 			if s.returnError {
 				back.ReturnError("ListServices", errors.New("fake error"))
@@ -98,7 +98,7 @@ func TestFakeCreateService(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			back := NewFakeBackend()
+			back := MakeFakeBackend()
 
 			if s.returnError {
 				back.ReturnError("CreateService", errFake)
@@ -136,7 +136,7 @@ func TestFakeReadService(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			back := NewFakeBackend()
+			back := MakeFakeBackend()
 
 			if s.returnError {
 				back.ReturnError("ReadService", errFake)
@@ -174,7 +174,7 @@ func TestFakeUpdateService(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			back := NewFakeBackend()
+			back := MakeFakeBackend()
 
 			if s.returnError {
 				back.ReturnError("UpdateService", errFake)
@@ -212,7 +212,7 @@ func TestFakeDeleteService(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			back := NewFakeBackend()
+			back := MakeFakeBackend()
 
 			if s.returnError {
 				back.ReturnError("DeleteService", errFake)
@@ -234,7 +234,7 @@ func TestFakeDeleteService(t *testing.T) {
 }
 
 func TestFakeGetKubeClientset(t *testing.T) {
-	back := NewFakeBackend()
+	back := MakeFakeBackend()
 
 	kubeClientset := back.GetKubeClientset()
 	if kubeClientset == nil {
@@ -251,7 +251,7 @@ func TestGetCurrentFuncName(t *testing.T) {
 }
 
 func TestReturnError(t *testing.T) {
-	back := NewFakeBackend()
+	back := MakeFakeBackend()
 
 	back.ReturnError("ListServices", errFake)
 
