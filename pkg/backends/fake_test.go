@@ -17,7 +17,6 @@ limitations under the License.
 package backends
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/grycap/oscar/v2/pkg/types"
@@ -26,9 +25,9 @@ import (
 func TestMakeFakeBackend(t *testing.T) {
 	back := MakeFakeBackend()
 
-	for k, v := range back.returnError {
-		if v != nil {
-			t.Errorf("invalid returnError value for %s. Expected: false, got %v", k, v)
+	for k, v := range back.errors {
+		if len(v) > 0 {
+			t.Errorf("invalid list of errors for %s. Expected: empty, got %v", k, v)
 		}
 	}
 }
@@ -63,7 +62,7 @@ func TestFakeListServices(t *testing.T) {
 			back := MakeFakeBackend()
 
 			if s.returnError {
-				back.ReturnError("ListServices", errors.New("fake error"))
+				back.AddError("ListServices", errFake)
 			}
 
 			_, err := back.ListServices()
@@ -101,7 +100,7 @@ func TestFakeCreateService(t *testing.T) {
 			back := MakeFakeBackend()
 
 			if s.returnError {
-				back.ReturnError("CreateService", errFake)
+				back.AddError("CreateService", errFake)
 			}
 
 			err := back.CreateService(types.Service{})
@@ -139,7 +138,7 @@ func TestFakeReadService(t *testing.T) {
 			back := MakeFakeBackend()
 
 			if s.returnError {
-				back.ReturnError("ReadService", errFake)
+				back.AddError("ReadService", errFake)
 			}
 
 			_, err := back.ReadService("test")
@@ -177,7 +176,7 @@ func TestFakeUpdateService(t *testing.T) {
 			back := MakeFakeBackend()
 
 			if s.returnError {
-				back.ReturnError("UpdateService", errFake)
+				back.AddError("UpdateService", errFake)
 			}
 
 			err := back.UpdateService(types.Service{})
@@ -215,7 +214,7 @@ func TestFakeDeleteService(t *testing.T) {
 			back := MakeFakeBackend()
 
 			if s.returnError {
-				back.ReturnError("DeleteService", errFake)
+				back.AddError("DeleteService", errFake)
 			}
 
 			err := back.DeleteService("test")
@@ -253,23 +252,9 @@ func TestGetCurrentFuncName(t *testing.T) {
 func TestReturnError(t *testing.T) {
 	back := MakeFakeBackend()
 
-	back.ReturnError("ListServices", errFake)
+	back.AddError("ListServices", errFake)
 
-	if back.returnError["ListServices"] == nil {
-		t.Error("error setting returnError value")
-	}
-}
-
-func TestReturnNoError(t *testing.T) {
-	back := FakeBackend{
-		returnError: map[string]error{
-			"test": errFake,
-		},
-	}
-
-	back.ReturnNoError("test")
-
-	if back.returnError["test"] != nil {
-		t.Error("error unsetting returnError value")
+	if len(back.errors["ListServices"]) <= 0 {
+		t.Error("error setting error value")
 	}
 }
