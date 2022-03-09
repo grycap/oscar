@@ -36,7 +36,7 @@ import (
 // Variables used to configure jobs
 var (
 	// No retries
-	backoffLimit int32 = 0
+	backoffLimit int32
 	// Don't restart jobs in order to keep logs
 	restartPolicy = v1.RestartPolicyNever
 	// command used for passing the event to faas-supervisor
