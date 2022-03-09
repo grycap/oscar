@@ -1,8 +1,10 @@
 # OSCAR - Open Source Serverless Computing for Data-Processing Applications
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/grycap/oscar)](https://goreportcard.com/report/github.com/grycap/oscar)
-[![Docker Image Version (latest semver)](https://img.shields.io/docker/v/grycap/oscar)](https://hub.docker.com/r/grycap/oscar)
+[![Codacy Badge](https://app.codacy.com/project/badge/Coverage/8145efdfb9d24af1b5b53e21c6e2df99)](https://www.codacy.com/gh/grycap/oscar/dashboard?utm_source=github.com&utm_medium=referral&utm_content=grycap/oscar&utm_campaign=Badge_Coverage)
+[![tests](https://github.com/grycap/oscar/actions/workflows/tests.yaml/badge.svg?branch=master)](https://github.com/grycap/oscar/actions/workflows/tests.yaml)
 [![build](https://github.com/grycap/oscar/workflows/build/badge.svg)](https://github.com/grycap/oscar/actions?query=workflow%3Abuild)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/grycap/oscar)](https://github.com/grycap/oscar/pkgs/container/oscar)
 [![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat)](https://pkg.go.dev/github.com/grycap/oscar)
 [![GitHub](https://img.shields.io/github/license/grycap/oscar)](https://github.com/grycap/oscar/blob/master/LICENSE)
 
