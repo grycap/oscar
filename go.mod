@@ -42,7 +42,10 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-require gopkg.in/yaml.v2 v2.4.0
+require (
+	github.com/gin-contrib/cors v1.3.1
+	gopkg.in/yaml.v2 v2.4.0
+)
 
 require (
 	github.com/apache/incubator-yunikorn-scheduler-interface v0.12.1 // indirect

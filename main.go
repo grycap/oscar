@@ -21,6 +21,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v2/pkg/backends"
 	"github.com/grycap/oscar/v2/pkg/handlers"
@@ -67,6 +68,9 @@ func main() {
 
 	// Create the router
 	r := gin.Default()
+
+	// DEVEL - CORS allow all origins
+	r.Use(cors.Default())
 
 	// Define system group with basic auth middleware
 	system := r.Group("/system", gin.BasicAuth(gin.Accounts{
