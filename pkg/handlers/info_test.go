@@ -18,18 +18,26 @@ package handlers
 
 import (
 	"net/http"
+	"net/http/httptest"
+	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v2/pkg/types"
-	"github.com/grycap/oscar/v2/pkg/version"
-	"k8s.io/client-go/kubernetes"
+	"github.com/grycap/oscar/v2/pkg/backends"
 )
 
-// MakeInfoHandler makes a handler to retrieve system info
-func MakeInfoHandler(kubeClientset kubernetes.Interface, back types.ServerlessBackend) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		info := version.GetInfo(kubeClientset, back)
+func TestMakeInfoHandler(t *testing.T) {
+	back := backends.MakeFakeBackend()
 
-		c.JSON(http.StatusOK, info)
+	r := gin.Default()
+	r.GET("/system/info", MakeInfoHandler(back.GetKubeClientset(), back))
+
+	w := httptest.NewRecorder()
+
+	req, _ := http.NewRequest("GET", "/system/info", nil)
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expecting code %d, got %d", http.StatusOK, w.Code)
 	}
 }

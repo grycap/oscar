@@ -39,7 +39,7 @@ var scalerLogger = log.New(os.Stderr, "[OF-SCALER] ", log.Ldate|log.Ltime)
 
 // OpenfaasScaler struct to store the parameters required to scale OpenFaaS functions
 type OpenfaasScaler struct {
-	kubeClientset           *kubernetes.Clientset
+	kubeClientset           kubernetes.Interface
 	openfaasNamespace       string
 	namespace               string
 	gatewayEndpoint         string
@@ -50,7 +50,7 @@ type OpenfaasScaler struct {
 }
 
 // NewOFScaler returns a pointer to a new OpenfaasScaler struct
-func NewOFScaler(kubeClientset *kubernetes.Clientset, cfg *types.Config) *OpenfaasScaler {
+func NewOFScaler(kubeClientset kubernetes.Interface, cfg *types.Config) *OpenfaasScaler {
 	return &OpenfaasScaler{
 		kubeClientset:           kubeClientset,
 		openfaasNamespace:       cfg.OpenfaasNamespace,

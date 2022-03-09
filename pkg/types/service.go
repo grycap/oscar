@@ -87,6 +87,9 @@ const (
 	YunikornDefaultPartition = "default"
 )
 
+// YAMLMarshal package-level yaml marshal function
+var YAMLMarshal = yaml.Marshal
+
 // Service represents an OSCAR service following the SCAR Function Definition Language
 type Service struct {
 	// The name of the service
@@ -219,7 +222,7 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 
 // ToYAML returns the service as a Function Definition Language YAML
 func (service Service) ToYAML() (string, error) {
-	bytes, err := yaml.Marshal(service)
+	bytes, err := YAMLMarshal(service)
 	if err != nil {
 		return "", err
 	}

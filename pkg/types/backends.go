@@ -30,7 +30,7 @@ type ServerlessBackend interface {
 	ReadService(name string) (*Service, error)
 	UpdateService(service Service) error
 	DeleteService(name string) error
-	GetKubeClientset() *kubernetes.Clientset
+	GetKubeClientset() kubernetes.Interface
 }
 
 // SyncBackend define an interface for serverless backends that allow sync invocations

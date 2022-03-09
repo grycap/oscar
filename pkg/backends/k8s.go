@@ -30,13 +30,13 @@ import (
 
 // KubeBackend struct to represent a Kubernetes client to store services as podTemplates
 type KubeBackend struct {
-	kubeClientset *kubernetes.Clientset
+	kubeClientset kubernetes.Interface
 	namespace     string
 	config        *types.Config
 }
 
 // MakeKubeBackend makes a KubeBackend with the provided k8s clientset
-func MakeKubeBackend(kubeClientset *kubernetes.Clientset, cfg *types.Config) *KubeBackend {
+func MakeKubeBackend(kubeClientset kubernetes.Interface, cfg *types.Config) *KubeBackend {
 	return &KubeBackend{
 		kubeClientset: kubeClientset,
 		namespace:     cfg.ServicesNamespace,
@@ -200,7 +200,7 @@ func (k *KubeBackend) DeleteService(name string) error {
 	return nil
 }
 
-func getServiceFromFDL(name string, namespace string, kubeClientset *kubernetes.Clientset) (*types.Service, error) {
+func getServiceFromFDL(name string, namespace string, kubeClientset kubernetes.Interface) (*types.Service, error) {
 	// Get the configMap of the Service
 	cm, err := kubeClientset.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
@@ -219,7 +219,7 @@ func getServiceFromFDL(name string, namespace string, kubeClientset *kubernetes.
 	return service, nil
 }
 
-func createServiceConfigMap(service *types.Service, namespace string, kubeClientset *kubernetes.Clientset) error {
+func createServiceConfigMap(service *types.Service, namespace string, kubeClientset kubernetes.Interface) error {
 	// Copy script from service
 	script := service.Script
 
@@ -254,7 +254,7 @@ func createServiceConfigMap(service *types.Service, namespace string, kubeClient
 	return nil
 }
 
-func updateServiceConfigMap(service *types.Service, namespace string, kubeClientset *kubernetes.Clientset) error {
+func updateServiceConfigMap(service *types.Service, namespace string, kubeClientset kubernetes.Interface) error {
 	// Copy script from service
 	script := service.Script
 
@@ -289,7 +289,7 @@ func updateServiceConfigMap(service *types.Service, namespace string, kubeClient
 	return nil
 }
 
-func deleteServiceConfigMap(name string, namespace string, kubeClientset *kubernetes.Clientset) error {
+func deleteServiceConfigMap(name string, namespace string, kubeClientset kubernetes.Interface) error {
 	err := kubeClientset.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		return err
@@ -298,7 +298,7 @@ func deleteServiceConfigMap(name string, namespace string, kubeClientset *kubern
 	return nil
 }
 
-func deleteServiceJobs(name string, namespace string, kubeClientset *kubernetes.Clientset) error {
+func deleteServiceJobs(name string, namespace string, kubeClientset kubernetes.Interface) error {
 	// ListOptions to select all the associated jobs with the specified service
 	listOpts := metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", types.ServiceLabel, name),
@@ -320,6 +320,6 @@ func deleteServiceJobs(name string, namespace string, kubeClientset *kubernetes.
 }
 
 // GetKubeClientset returns the Kubernetes Clientset
-func (k *KubeBackend) GetKubeClientset() *kubernetes.Clientset {
+func (k *KubeBackend) GetKubeClientset() kubernetes.Interface {
 	return k.kubeClientset
 }

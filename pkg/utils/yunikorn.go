@@ -32,7 +32,7 @@ import (
 )
 
 // readYunikornConfig Read the Yunikorn's config
-func readYunikornConfig(cfg *types.Config, kubeClientset *kubernetes.Clientset) (*configs.SchedulerConfig, error) {
+func readYunikornConfig(cfg *types.Config, kubeClientset kubernetes.Interface) (*configs.SchedulerConfig, error) {
 	cm, err := kubeClientset.CoreV1().ConfigMaps(cfg.YunikornNamespace).Get(context.TODO(), cfg.YunikornConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("cannot read the YuniKorn's \"%s\" configMap in namespace \"%s\"", cfg.YunikornConfigMap, cfg.YunikornNamespace)
@@ -48,7 +48,7 @@ func readYunikornConfig(cfg *types.Config, kubeClientset *kubernetes.Clientset) 
 }
 
 // updateYunikornConfig updates the Yunikorn's configuration file in its configMap
-func updateYunikornConfig(cfg *types.Config, kubeClientset *kubernetes.Clientset, schedulerConfig *configs.SchedulerConfig) error {
+func updateYunikornConfig(cfg *types.Config, kubeClientset kubernetes.Interface, schedulerConfig *configs.SchedulerConfig) error {
 	// Get the old configMap
 	cm, err := kubeClientset.CoreV1().ConfigMaps(cfg.YunikornNamespace).Get(context.TODO(), cfg.YunikornConfigMap, metav1.GetOptions{})
 	if err != nil {
@@ -74,7 +74,7 @@ func updateYunikornConfig(cfg *types.Config, kubeClientset *kubernetes.Clientset
 }
 
 // AddYunikornQueue Add (or update) a service's queue to Yunikorn's config
-func AddYunikornQueue(cfg *types.Config, kubeClientset *kubernetes.Clientset, svc *types.Service) error {
+func AddYunikornQueue(cfg *types.Config, kubeClientset kubernetes.Interface, svc *types.Service) error {
 	// Read the config
 	yConfig, err := readYunikornConfig(cfg, kubeClientset)
 	if err != nil {
@@ -144,7 +144,7 @@ func AddYunikornQueue(cfg *types.Config, kubeClientset *kubernetes.Clientset, sv
 }
 
 // DeleteYunikornQueue delete a service's queue in Yunikorn's config
-func DeleteYunikornQueue(cfg *types.Config, kubeClientset *kubernetes.Clientset, svc *types.Service) error {
+func DeleteYunikornQueue(cfg *types.Config, kubeClientset kubernetes.Interface, svc *types.Service) error {
 	// Read the config
 	yConfig, err := readYunikornConfig(cfg, kubeClientset)
 	if err != nil {
