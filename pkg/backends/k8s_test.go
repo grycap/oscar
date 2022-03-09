@@ -32,7 +32,7 @@ var (
 		ServicesNamespace: "testnamespace",
 	}
 
-	testFDL string = `name: testname
+	testFDL = `name: testname
 memory: 1Gi
 cpu: "1.0"
 total_memory: ""
@@ -551,7 +551,7 @@ func TestKubeUpdateService(t *testing.T) {
 
 		back := MakeKubeBackend(clientset, testConfig)
 
-		var configMapReactorCounter *int = new(int)
+		var configMapReactorCounter = new(int)
 		customConfigMapReactor := func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 			cm := &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
@@ -618,7 +618,7 @@ func TestKubeUpdateService(t *testing.T) {
 
 		back := MakeKubeBackend(clientset, testConfig)
 
-		var configMapReactorCounter *int = new(int)
+		var configMapReactorCounter = new(int)
 		customConfigMapReactor := func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 			cm := &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{

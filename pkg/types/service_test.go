@@ -19,7 +19,6 @@ package types
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"strconv"
 	"testing"
 
@@ -161,19 +160,16 @@ func TestGetSupervisorPath(t *testing.T) {
 
 func TestConvertEnvVars(t *testing.T) {
 	vars := map[string]string{
-		"TEST1": "test1",
-		"TEST2": "test2",
+		"TEST": "test",
 	}
 
 	expected := []v1.EnvVar{
-		{Name: "TEST1", Value: "test1"},
-		{Name: "TEST2", Value: "test2"},
+		{Name: "TEST", Value: "test"},
 	}
 
 	res := convertEnvVars(vars)
 
-	if !reflect.DeepEqual(res, expected) {
-		//TODO: check unordered
+	if res[0].Name != expected[0].Name && res[0].Value != expected[0].Value {
 		t.Errorf("invalid conversion of environment variables. Expected: %v, got %v", expected, res)
 	}
 }
