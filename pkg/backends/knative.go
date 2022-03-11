@@ -61,10 +61,16 @@ func MakeKnativeBackend(kubeClientset kubernetes.Interface, kubeConfig *rest.Con
 
 // GetInfo returns the ServerlessBackendInfo with the name and version
 func (kn *KnativeBackend) GetInfo() *types.ServerlessBackendInfo {
-	return &types.ServerlessBackendInfo{
+	backInfo := &types.ServerlessBackendInfo{
 		Name: "Knative",
-		// TODO: Get version
 	}
+
+	version, err := kn.knClientset.Discovery().ServerVersion()
+	if err == nil {
+		backInfo.Version = version.GitVersion
+	}
+
+	return backInfo
 }
 
 // ListServices returns a slice with all services registered in the provided namespace

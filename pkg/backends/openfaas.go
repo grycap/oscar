@@ -69,10 +69,16 @@ func MakeOpenfaasBackend(kubeClientset kubernetes.Interface, kubeConfig *rest.Co
 
 // GetInfo returns the ServerlessBackendInfo with the name and version
 func (of *OpenfaasBackend) GetInfo() *types.ServerlessBackendInfo {
-	return &types.ServerlessBackendInfo{
+	backInfo := &types.ServerlessBackendInfo{
 		Name: "OpenFaaS",
-		// TODO: Get version
 	}
+
+	version, err := of.ofClientset.Discovery().ServerVersion()
+	if err == nil {
+		backInfo.Version = version.GitVersion
+	}
+
+	return backInfo
 }
 
 // ListServices returns a slice with all services registered in the provided namespace
