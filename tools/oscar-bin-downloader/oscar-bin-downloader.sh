@@ -3,7 +3,7 @@ ARCH=$(uname -m)
 
 FAAS_SUPERVISOR_NAME=supervisor
 FAAS_SUPERVISOR_ALPINE_NAME=supervisor-alpine
-WATCHDOG_NAME=fwatchdog
+WATCHDOG_NAME=fwatchdog-amd64
 
 echo "Downloading binaries for $ARCH..."
 
@@ -26,5 +26,5 @@ unzip /tmp/supervisor-alpine.zip -d /tmp/alpine
 cp -r /tmp/alpine/supervisor/* /data/alpine
 
 # Download OpenFaaS watchdog and set execution permissions
-wget "https://github.com/openfaas/faas/releases/download/$WATCHDOG_VERSION/$WATCHDOG_NAME" -O /data/fwatchdog
+wget "https://github.com/openfaas/classic-watchdog/releases/download/$WATCHDOG_VERSION/$WATCHDOG_NAME" -O /data/fwatchdog
 chmod +x /data/fwatchdog
