@@ -59,8 +59,8 @@ func main() {
 		if cfg.OpenfaasScalerEnable {
 			go ofBack.StartScaler()
 		}
-	// case "knative":
-	// 	back = backends.MakeKnativeBackend()
+	case "knative":
+		back = backends.MakeKnativeBackend(kubeClientset, kubeConfig, cfg)
 	default:
 		back = backends.MakeKubeBackend(kubeClientset, cfg)
 	}
