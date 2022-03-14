@@ -46,6 +46,7 @@ const (
 	defaultWatchdogExecTimeout              = 0
 	defaultWatchdogReadTimeout              = 300
 	defaultWatchdogWriteTimeout             = 300
+	defaultWatchdogHealthCheckInterval      = 5
 	defaultYunikornEnable                   = false
 	defaultYunikornNamespace                = "yunikorn"
 	defaultYunikornConfigMap                = "yunikorn-configs"
@@ -114,6 +115,9 @@ type Config struct {
 
 	// WatchdogWriteTimeout
 	WatchdogWriteTimeout int `json:"-"`
+
+	// WatchdogHealthCheckInterval
+	WatchdogHealthCheckInterval int `json:"-"`
 
 	// HTTP timeout for reading the payload (default: 300)
 	ReadTimeout time.Duration `json:"-"`
@@ -319,6 +323,15 @@ func ReadConfig() (*Config, error) {
 		}
 	} else {
 		config.WatchdogWriteTimeout = defaultWatchdogWriteTimeout
+	}
+
+	if len(os.Getenv("WATCHDOG_HEALTHCHECK_INTERVAL")) > 0 {
+		config.WatchdogHealthCheckInterval, err = strconv.Atoi(os.Getenv("WATCHDOG_HEALTHCHECK_INTERVAL"))
+		if err != nil {
+			return nil, fmt.Errorf("the WATCHDOG_HEALTHCHECK_INTERVAL value is not valid. Error: %v", err)
+		}
+	} else {
+		config.WatchdogHealthCheckInterval = defaultWatchdogHealthCheckInterval
 	}
 
 	if len(os.Getenv("READ_TIMEOUT")) > 0 {

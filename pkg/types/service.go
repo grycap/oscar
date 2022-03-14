@@ -303,6 +303,10 @@ func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) {
 			Name:  "write_timeout",
 			Value: strconv.Itoa(cfg.WatchdogWriteTimeout),
 		},
+		{
+			Name:  "healthcheck_interval",
+			Value: strconv.Itoa(cfg.WatchdogHealthCheckInterval),
+		},
 	}
 
 	for i, cont := range p.Containers {
