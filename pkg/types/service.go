@@ -85,6 +85,12 @@ const (
 
 	// YunikornDefaultPartition name of the default Yunikorn partition
 	YunikornDefaultPartition = "default"
+
+	// KnativeVisibilityLabel name of the knative visibility label
+	KnativeVisibilityLabel = "networking.knative.dev/visibility"
+
+	// KnativeClusterLocalValue cluster-local value for the visibility label
+	KnativeClusterLocalValue = "cluster-local"
 )
 
 // YAMLMarshal package-level yaml marshal function

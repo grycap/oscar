@@ -18,7 +18,9 @@ package backends
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/grycap/oscar/v2/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,19 +30,13 @@ import (
 	knclientset "knative.dev/serving/pkg/client/clientset/versioned"
 )
 
-// TODO
-
-// TODO: add annotation "serving.knative.dev/visibility=cluster-local"
-// to make all services only cluster-local, the Kn serving component can be configured to use the default domain "svc.cluster.local"
-// https://knative.dev/docs/serving/cluster-local-route/
-
 // KnativeBackend struct to represent a Knative client
 type KnativeBackend struct {
 	kubeClientset kubernetes.Interface
 	knClientset   *knclientset.Clientset
 	namespace     string
-	//gatewayEndpoint string
-	config *types.Config
+	serviceSuffix string
+	config        *types.Config
 }
 
 // MakeKnativeBackend makes a KnativeBackend from the provided k8S clientset and config
@@ -54,8 +50,8 @@ func MakeKnativeBackend(kubeClientset kubernetes.Interface, kubeConfig *rest.Con
 		kubeClientset: kubeClientset,
 		knClientset:   knClientset,
 		namespace:     cfg.ServicesNamespace,
-		//gatewayEndpoint: fmt.Sprintf("gateway.%s:%d", cfg.OpenfaasNamespace, cfg.OpenfaasPort),
-		config: cfg,
+		serviceSuffix: fmt.Sprintf(".%s.svc.cluster.local", cfg.ServicesNamespace),
+		config:        cfg,
 	}
 }
 
@@ -103,7 +99,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		return err
 	}
 
-	// Create the Function through the OpenFaaS operator
+	// Create the Knative service definition
 	knSvc, err := kn.createKNServiceDefinition(&service)
 	if err != nil {
 		// Delete the previously created configMap
@@ -113,6 +109,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		return err
 	}
 
+	// Create the Knative service
 	_, err = kn.knClientset.ServingV1().Services(kn.namespace).Create(context.TODO(), knSvc, metav1.CreateOptions{})
 	if err != nil {
 		// Delete the previously created configMap
@@ -141,59 +138,43 @@ func (kn *KnativeBackend) ReadService(name string) (*types.Service, error) {
 	return svc, nil
 }
 
-// TODO
-// // UpdateService updates an existent service
-// func (kn *KnativeBackend) UpdateService(service types.Service) error {
-// 	// Get the old service's configMap
-// 	oldCm, err := kn.kubeClientset.CoreV1().ConfigMaps(kn.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
-// 	if err != nil {
-// 		return fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", service.Name)
-// 	}
+// UpdateService updates an existent service
+func (kn *KnativeBackend) UpdateService(service types.Service) error {
+	// Get the old service's configMap
+	oldCm, err := kn.kubeClientset.CoreV1().ConfigMaps(kn.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", service.Name)
+	}
 
-// 	// Update the configMap with FDL and user-script
-// 	if err := updateServiceConfigMap(&service, kn.namespace, kn.kubeClientset); err != nil {
-// 		return err
-// 	}
+	// Update the configMap with FDL and user-script
+	if err := updateServiceConfigMap(&service, kn.namespace, kn.kubeClientset); err != nil {
+		return err
+	}
 
-// 	// TODO: create new knative service definition (including annotation/labels)
-// 	// Create podSpec from the service
-// 	podSpec, err := service.ToPodSpec(of.config)
-// 	if err != nil {
-// 		// Restore the old configMap
-// 		_, resErr := of.kubeClientset.CoreV1().ConfigMaps(of.namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
-// 		if resErr != nil {
-// 			log.Println(resErr.Error())
-// 		}
-// 		return err
-// 	}
+	// Create the Knative service definition
+	knSvc, err := kn.createKNServiceDefinition(&service)
+	if err != nil {
+		// Restore the old configMap
+		_, resErr := kn.kubeClientset.CoreV1().ConfigMaps(kn.namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
+		if resErr != nil {
+			log.Println(resErr.Error())
+		}
+		return err
+	}
 
-// 	// Get the service's deployment to update its podSpec
-// 	deployment, err := of.kubeClientset.AppsV1().Deployments(of.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
-// 	if err != nil {
-// 		// Restore the old configMap
-// 		_, resErr := of.kubeClientset.CoreV1().ConfigMaps(of.namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
-// 		if resErr != nil {
-// 			log.Println(resErr.Error())
-// 		}
-// 		return err
-// 	}
+	// Update the Knative service
+	_, err = kn.knClientset.ServingV1().Services(kn.namespace).Update(context.TODO(), knSvc, metav1.UpdateOptions{})
+	if err != nil {
+		// Restore the old configMap
+		_, resErr := kn.kubeClientset.CoreV1().ConfigMaps(kn.namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
+		if resErr != nil {
+			log.Println(resErr.Error())
+		}
+		return err
+	}
 
-// 	// Update podSpec in the deployment
-// 	deployment.Spec.Template.Spec = *podSpec
-
-// 	// Update the deployment
-// 	_, err = of.kubeClientset.AppsV1().Deployments(of.namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
-// 	if err != nil {
-// 		// Restore the old configMap
-// 		_, resErr := of.kubeClientset.CoreV1().ConfigMaps(of.namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
-// 		if resErr != nil {
-// 			log.Println(resErr.Error())
-// 		}
-// 		return err
-// 	}
-
-// 	return nil
-// }
+	return nil
+}
 
 // DeleteService deletes a service
 func (kn *KnativeBackend) DeleteService(name string) error {
@@ -214,20 +195,19 @@ func (kn *KnativeBackend) DeleteService(name string) error {
 	return nil
 }
 
-// TODO
-// // GetProxyDirector returns a director function to use in a httputil.ReverseProxy
-// func (of *OpenfaasBackend) GetProxyDirector(serviceName string) func(req *http.Request) {
-// 	return func(req *http.Request) {
-// 		req.URL.Scheme = "http"
-// 		req.URL.Host = of.gatewayEndpoint
-// 		req.URL.Path = fmt.Sprintf("/function/%s", serviceName)
-// 	}
-// }
+// GetProxyDirector returns a director function to use in a httputil.ReverseProxy
+func (kn *KnativeBackend) GetProxyDirector(serviceName string) func(req *http.Request) {
+	return func(req *http.Request) {
+		req.URL.Scheme = "http"
+		req.URL.Host = serviceName + kn.serviceSuffix
+		req.URL.Path = ""
+	}
+}
 
 func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*knv1.Service, error) {
-	// Add label "com.openfaas.scale.zero=true" for scaling to zero
-	// TODO: add here anotation "serving.knative.dev/visibility=cluster-local"
-	service.Labels[types.OpenfaasZeroScalingLabel] = "true"
+	// Add label "serving.knative.dev/visibility=cluster-local"
+	// https://knative.dev/docs/serving/services/private-services/
+	service.Labels[types.KnativeVisibilityLabel] = types.KnativeClusterLocalValue
 
 	podSpec, err := service.ToPodSpec(kn.config)
 	if err != nil {
@@ -241,6 +221,7 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      service.Name,
 			Namespace: kn.namespace,
+			Labels:    service.Labels,
 		},
 		Spec: knv1.ServiceSpec{
 			ConfigurationSpec: knv1.ConfigurationSpec{
