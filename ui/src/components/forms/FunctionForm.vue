@@ -597,7 +597,7 @@
 									<v-btn @click="cleanfieldInput();cleanfieldOutput()" flat color="red">Clear</v-btn>
 									<v-spacer></v-spacer>
 									<v-btn @click="show('profile')" flat color="blue">BACK</v-btn>
-									<v-btn :disabled="!form.valid" @click="submit" flat color="success">submit</v-btn>
+									<v-btn :disabled="!form.valid || progress.active ==true" @click="submit" flat color="success">submit</v-btn>
 									<!-- <v-btn @click="show('input_output')" flat color="success">NEXT</v-btn> -->
 									
 								</v-card-actions>
@@ -1687,8 +1687,8 @@ export default {
 				this.limits_mem = this.form.limits_memory + value;
 			}
 
+			this.progress.active = true
 			var params = {
-				
 				'name': this.form.name, 
 				'image': this.form.image, 
 				'cpu': this.form.limits_cpu,
@@ -1743,6 +1743,7 @@ export default {
 			}else{
 				script = this.script
 			}
+			this.progress.active = true
 			var params = {
 				
 				'name': this.form.name, 
@@ -1826,9 +1827,9 @@ export default {
 			}else{
 				this.showselectEnv = true
 			}
-			setTimeout(function(){
-				this.select_logLevel = data.log_Level
-			},100)
+			this.select_logLevel = data.log_Level
+			console.log(data.log_Level)
+			console.log(this.select_logLevel)
 			if (this.isEmpty(this.inputs)) {
 				this.showselectInput = false
 			}else{
