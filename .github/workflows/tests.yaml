@@ -1,0 +1,26 @@
+name: tests
+
+on:
+  [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: '1.17.8'
+
+    - name: Run tests
+      run: go test ./pkg/... -cover -coverprofile=profile.cov
+
+    - name: Report coverage
+      uses: codacy/codacy-coverage-reporter-action@v1
+      with:
+        project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+        coverage-reports: profile.cov
+        force-coverage-parser: go

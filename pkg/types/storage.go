@@ -94,7 +94,7 @@ func (s3Provider S3Provider) GetS3Client() *s3.S3 {
 		Region:      aws.String(s3Provider.Region),
 	}
 
-	s3Session := session.New(s3Config)
+	s3Session, _ := session.NewSession(s3Config)
 
 	return s3.New(s3Session)
 }
@@ -116,7 +116,7 @@ func (minIOProvider MinIOProvider) GetS3Client() *s3.S3 {
 		s3MinIOConfig.HTTPClient = &http.Client{Transport: tr}
 	}
 
-	minIOSession := session.New(s3MinIOConfig)
+	minIOSession, _ := session.NewSession(s3MinIOConfig)
 
 	return s3.New(minIOSession)
 }

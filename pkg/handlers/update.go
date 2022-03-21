@@ -94,9 +94,5 @@ func updateBuckets(newService, oldService *types.Service, cfg *types.Config) err
 	}
 
 	// Create the input and output buckets/folders from newService
-	if err := createBuckets(newService, cfg); err != nil {
-		return err
-	}
-
-	return nil
+	return createBuckets(newService, cfg)
 }

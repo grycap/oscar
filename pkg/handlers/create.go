@@ -249,7 +249,7 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 
 		switch provName {
 		case types.MinIOName, types.S3Name:
-			// Use the appropiate client
+			// Use the appropriate client
 			if provName == types.MinIOName {
 				s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
 			} else {
@@ -326,11 +326,7 @@ func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider,
 		return fmt.Errorf("error registering the service's webhook: %v", err)
 	}
 
-	if err := minIOAdminClient.RestartServer(); err != nil {
-		return err
-	}
-
-	return nil
+	return minIOAdminClient.RestartServer()
 }
 
 func enableInputNotification(minIOClient *s3.S3, arnStr string, input types.StorageIOConfig) error {

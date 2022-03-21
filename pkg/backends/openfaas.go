@@ -42,7 +42,7 @@ var errOpenfaasOperator = errors.New("the OpenFaaS Operator is not creating the 
 
 // OpenfaasBackend struct to represent an Openfaas client
 type OpenfaasBackend struct {
-	kubeClientset   *kubernetes.Clientset
+	kubeClientset   kubernetes.Interface
 	ofClientset     *ofclientset.Clientset
 	namespace       string
 	gatewayEndpoint string
@@ -51,7 +51,7 @@ type OpenfaasBackend struct {
 }
 
 // MakeOpenfaasBackend makes a OpenfaasBackend from the provided k8S clientset and config
-func MakeOpenfaasBackend(kubeClientset *kubernetes.Clientset, kubeConfig *rest.Config, cfg *types.Config) *OpenfaasBackend {
+func MakeOpenfaasBackend(kubeClientset kubernetes.Interface, kubeConfig *rest.Config, cfg *types.Config) *OpenfaasBackend {
 	ofClientset, err := ofclientset.NewForConfig(kubeConfig)
 	if err != nil {
 		log.Fatal(err)
@@ -69,10 +69,16 @@ func MakeOpenfaasBackend(kubeClientset *kubernetes.Clientset, kubeConfig *rest.C
 
 // GetInfo returns the ServerlessBackendInfo with the name and version
 func (of *OpenfaasBackend) GetInfo() *types.ServerlessBackendInfo {
-	return &types.ServerlessBackendInfo{
+	backInfo := &types.ServerlessBackendInfo{
 		Name: "OpenFaaS",
-		// TODO: Get version
 	}
+
+	version, err := of.ofClientset.Discovery().ServerVersion()
+	if err == nil {
+		backInfo.Version = version.GitVersion
+	}
+
+	return backInfo
 }
 
 // ListServices returns a slice with all services registered in the provided namespace
@@ -337,6 +343,6 @@ func (of *OpenfaasBackend) StartScaler() {
 }
 
 // GetKubeClientset returns the Kubernetes Clientset
-func (of *OpenfaasBackend) GetKubeClientset() *kubernetes.Clientset {
+func (of *OpenfaasBackend) GetKubeClientset() kubernetes.Interface {
 	return of.kubeClientset
 }

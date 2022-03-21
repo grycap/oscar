@@ -10,10 +10,10 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - name: Checkout
-      uses: actions/checkout@v2.2.0
+      uses: actions/checkout@v3
 
     - name: Setup node
       uses: actions/setup-node@v1
@@ -55,14 +55,14 @@ jobs:
 
     - name: Docker Hub login
       env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       run: echo "${DOCKER_PASSWORD}" | docker login --username "${DOCKER_USERNAME}" --password-stdin
 
     - name: GHCR login
       env:
-          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
-          GHCR_PASSWORD: ${{ secrets.GHCR_PASSWORD }}
+        GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+        GHCR_PASSWORD: ${{ secrets.GHCR_PASSWORD }}
       run: echo "${GHCR_PASSWORD}" | docker login ghcr.io --username "${GHCR_USERNAME}" --password-stdin
 
     - name: Build and Push
