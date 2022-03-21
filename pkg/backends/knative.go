@@ -201,6 +201,8 @@ func (kn *KnativeBackend) GetProxyDirector(serviceName string) func(req *http.Re
 		req.URL.Scheme = "http"
 		req.URL.Host = serviceName + kn.serviceSuffix
 		req.URL.Path = ""
+
+		log.Println(req.URL.String())
 	}
 }
 
