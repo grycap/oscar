@@ -35,7 +35,6 @@ type KnativeBackend struct {
 	kubeClientset kubernetes.Interface
 	knClientset   *knclientset.Clientset
 	namespace     string
-	serviceSuffix string
 	config        *types.Config
 }
 
@@ -50,7 +49,6 @@ func MakeKnativeBackend(kubeClientset kubernetes.Interface, kubeConfig *rest.Con
 		kubeClientset: kubeClientset,
 		knClientset:   knClientset,
 		namespace:     cfg.ServicesNamespace,
-		serviceSuffix: fmt.Sprintf(".%s.svc.cluster.local", cfg.ServicesNamespace),
 		config:        cfg,
 	}
 }
@@ -199,7 +197,7 @@ func (kn *KnativeBackend) DeleteService(name string) error {
 func (kn *KnativeBackend) GetProxyDirector(serviceName string) func(req *http.Request) {
 	return func(req *http.Request) {
 		req.URL.Scheme = "http"
-		req.URL.Host = serviceName + kn.serviceSuffix
+		req.URL.Host = fmt.Sprintf("%s.%s:80", serviceName, kn.namespace)
 		req.URL.Path = ""
 
 		log.Println(req.URL.String())
