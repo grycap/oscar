@@ -78,11 +78,7 @@ func removeMinIOWebhook(name string, cfg *types.Config) error {
 		return fmt.Errorf("error removing the service's webhook: %v", err)
 	}
 
-	if err := minIOAdminClient.RestartServer(); err != nil {
-		return err
-	}
-
-	return nil
+	return minIOAdminClient.RestartServer()
 }
 
 func disableInputNotifications(arnStr string, input []types.StorageIOConfig, minIO *types.MinIOProvider) error {

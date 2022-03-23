@@ -36,7 +36,7 @@ import (
 // Variables used to configure jobs
 var (
 	// No retries
-	backoffLimit int32 = 0
+	backoffLimit int32
 	// Don't restart jobs in order to keep logs
 	restartPolicy = v1.RestartPolicyNever
 	// command used for passing the event to faas-supervisor
@@ -82,6 +82,13 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			Value: string(eventBytes),
 		}
 
+		// Make JOB_UUID envVar
+		jobUUID := uuid.New().String()
+		jobUUIDVar := v1.EnvVar{
+			Name:  types.JobUUIDVariable,
+			Value: jobUUID,
+		}
+
 		// Get podSpec from the service
 		podSpec, err := service.ToPodSpec(cfg)
 		if err != nil {
@@ -95,6 +102,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 				podSpec.Containers[i].Command = command
 				podSpec.Containers[i].Args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath())}
 				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, event)
+				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, jobUUIDVar)
 			}
 		}
 
@@ -103,7 +111,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			ObjectMeta: metav1.ObjectMeta{
 				// UUID used as a name for jobs
 				// To filter jobs by service name use the label "oscar_service"
-				Name:        uuid.New().String(),
+				Name:        jobUUID,
 				Namespace:   cfg.ServicesNamespace,
 				Labels:      service.Labels,
 				Annotations: service.Annotations,

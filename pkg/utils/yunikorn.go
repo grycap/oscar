@@ -136,11 +136,7 @@ func AddYunikornQueue(cfg *types.Config, kubeClientset kubernetes.Interface, svc
 	}
 
 	// Update the configMap
-	if err := updateYunikornConfig(cfg, kubeClientset, yConfig); err != nil {
-		return err
-	}
-
-	return nil
+	return updateYunikornConfig(cfg, kubeClientset, yConfig)
 }
 
 // DeleteYunikornQueue delete a service's queue in Yunikorn's config
