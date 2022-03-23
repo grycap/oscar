@@ -18,6 +18,7 @@ package backends
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -197,10 +198,11 @@ func (kn *KnativeBackend) DeleteService(name string) error {
 func (kn *KnativeBackend) GetProxyDirector(serviceName string) func(req *http.Request) {
 	return func(req *http.Request) {
 		req.URL.Scheme = "http"
-		req.URL.Host = fmt.Sprintf("%s.%s:80", serviceName, kn.namespace)
+		req.URL.Host = fmt.Sprintf("%s.%s", serviceName, kn.namespace)
 		req.URL.Path = ""
 
-		log.Println(req.URL.String())
+		reqJSON, _ := json.Marshal(req)
+		log.Println(string(reqJSON))
 	}
 }
 
