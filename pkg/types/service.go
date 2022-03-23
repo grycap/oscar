@@ -68,7 +68,7 @@ const (
 	// EventVariable name used by the environment variable where events are stored
 	EventVariable = "EVENT"
 
-	// JobUUIDVariable name used by the environment variable where events are stored
+	// JobUUIDVariable name used by the environment variable of the job UUID
 	JobUUIDVariable = "JOB_UUID"
 
 	// OpenfaasZeroScalingLabel label to enable zero scaling in OpenFaaS functions
