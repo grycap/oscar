@@ -166,11 +166,16 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		return err
 	}
 
-	// Set the resourceVersion field to avoid issues
-	knSvc.ResourceVersion = oldSvc.ResourceVersion
+	// Set the new service's values on the old Knative service to avoid update issues
+	oldSvc.ObjectMeta.Labels = knSvc.ObjectMeta.Labels
+	oldSvc.Spec = knSvc.Spec
+	// Update the annotations
+	for k, v := range knSvc.ObjectMeta.Annotations {
+		oldSvc.ObjectMeta.Annotations[k] = v
+	}
 
 	// Update the Knative service
-	_, err = kn.knClientset.ServingV1().Services(kn.namespace).Update(context.TODO(), knSvc, metav1.UpdateOptions{})
+	_, err = kn.knClientset.ServingV1().Services(kn.namespace).Update(context.TODO(), oldSvc, metav1.UpdateOptions{})
 	if err != nil {
 		// Restore the old configMap
 		_, resErr := kn.kubeClientset.CoreV1().ConfigMaps(kn.namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
@@ -231,9 +236,10 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 
 	knSvc := &knv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      service.Name,
-			Namespace: kn.namespace,
-			Labels:    service.Labels,
+			Name:        service.Name,
+			Namespace:   kn.namespace,
+			Labels:      service.Labels,
+			Annotations: service.Annotations,
 		},
 		Spec: knv1.ServiceSpec{
 			ConfigurationSpec: knv1.ConfigurationSpec{
