@@ -18,7 +18,6 @@ package backends
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -197,12 +196,14 @@ func (kn *KnativeBackend) DeleteService(name string) error {
 // GetProxyDirector returns a director function to use in a httputil.ReverseProxy
 func (kn *KnativeBackend) GetProxyDirector(serviceName string) func(req *http.Request) {
 	return func(req *http.Request) {
-		req.URL.Scheme = "http"
-		req.URL.Host = fmt.Sprintf("%s.%s", serviceName, kn.namespace)
-		req.URL.Path = ""
+		// Set the request Host parameter to avoid issues in the redirection
+		// related issue: https://github.com/golang/go/issues/7682
+		host := fmt.Sprintf("%s.%s", serviceName, kn.namespace)
+		req.Host = host
 
-		reqJSON, _ := json.Marshal(req)
-		log.Println(string(reqJSON))
+		req.URL.Scheme = "http"
+		req.URL.Host = host
+		req.URL.Path = ""
 	}
 }
 
