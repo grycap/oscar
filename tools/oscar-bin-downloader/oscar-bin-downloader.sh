@@ -10,7 +10,7 @@ echo "Downloading binaries for $ARCH..."
 if [[ $ARCH == "aarch64" ]] || [[ $ARCH == "arm64" ]]; then
     FAAS_SUPERVISOR_NAME=$FAAS_SUPERVISOR_NAME-arm64
     FAAS_SUPERVISOR_ALPINE_NAME=$FAAS_SUPERVISOR_ALPINE_NAME-arm64
-    WATCHDOG_NAME=$WATCHDOG_NAME-arm64
+    WATCHDOG_NAME=fwatchdog-arm64
 fi
 
 # Download FaaS Supervisor and unzip
