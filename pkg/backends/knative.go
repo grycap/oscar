@@ -138,6 +138,12 @@ func (kn *KnativeBackend) ReadService(name string) (*types.Service, error) {
 
 // UpdateService updates an existent service
 func (kn *KnativeBackend) UpdateService(service types.Service) error {
+	// Get the old knative service
+	oldSvc, err := kn.knClientset.ServingV1().Services(kn.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
 	// Get the old service's configMap
 	oldCm, err := kn.kubeClientset.CoreV1().ConfigMaps(kn.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
@@ -159,6 +165,9 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		}
 		return err
 	}
+
+	// Set the resourceVersion field to avoid issues
+	knSvc.ResourceVersion = oldSvc.ResourceVersion
 
 	// Update the Knative service
 	_, err = kn.knClientset.ServingV1().Services(kn.namespace).Update(context.TODO(), knSvc, metav1.UpdateOptions{})
