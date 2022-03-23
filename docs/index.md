@@ -21,7 +21,8 @@ OSCAR runs on an elastic [Kubernetes](http://kubernetes.io) cluster that is depl
 
 The following components are deployed inside the Kubernetes cluster in order to support the OSCAR platform:
 
-- [MinIO](http://minio.io), a high performance distributed object storage server that provides an API compatible with S3. 
+- [MinIO](http://minio.io), a high performance distributed object storage server that provides an API compatible with S3.
+- [Knative](https://knative.dev), a Serverless framework to serve container-based applications for synchronous invocations (default Serverless Backend).
 - [OpenFaaS](https://www.openfaas.com/), a FaaS platform that allows creating functions executed via HTTP requests.
 - OSCAR, the main application, responsible for the management of the services and the integration of the different components to support event-driven serverless computing for file processing. It includes a web-based GUI aimed at end users to facilitate interaction with OSCAR.
 

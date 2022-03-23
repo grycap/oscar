@@ -45,6 +45,7 @@ The following components are deployed inside the Kubernetes cluster in order to 
 
 - [MinIO](http://minio.io), a high performance distributed object storage server that provides an API compatible with S3. 
 - [OpenFaaS](https://www.openfaas.com/), a FaaS platform that allows creating functions executed via HTTP requests.
+- [Knative](https://knative.dev), a Serverless framework to serve container-based applications for synchronous invocations (default Serverless Backend).
 - OSCAR, the main application, responsible for the management of the services and the integration of the different components to support event-driven serverless computing for file processing. It includes a web-based GUI aimed at end users to facilitate interaction with OSCAR.
 
 As external storage providers, the following services can be used:
