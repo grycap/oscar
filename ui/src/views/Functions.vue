@@ -78,11 +78,8 @@
 												readonly
 											></v-text-field>
 										</v-card-text>
-										<v-card-text v-show="Object.keys(props.item.envVars.Variables).length!==0" class="custom-padding"><strong>Environment variables: </strong> 
+										<v-card-text class="custom-padding"><strong>Environment variables: </strong> 
 											<pre v-show="Object.keys(props.item.envVars.Variables).length!==0" id="json-renderer"></pre>
-										</v-card-text>
-										<v-card-text v-show="props.item.log_level!==''" class="custom-padding"><strong>Log Level: </strong> 
-											{{props.item.log_level}}
 										</v-card-text>
 										
 										<v-card-actions>
