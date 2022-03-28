@@ -66,14 +66,13 @@ configure front (
     - role: 'grycap.kubernetes'
       kube_server: 'kubeserver'
       kube_apiserver_options:
-      - {option: "--insecure-port", value: "8080"}
       - {option: "--token-auth-file", value: "/etc/kubernetes/pki/auth"}
       - {option: "--service-node-port-range", value: "80-32767"}
       kube_install_ingress: true
       kube_deploy_dashboard: true
       kube_install_metrics: true
       kube_install_nfs_client: true
-      kube_version: 1.19.11
+      kube_version: "1.23.5"
 
     - role: 'grycap.kubeminio'
       minio_secretkey: '{{ minio_secret }}'
@@ -81,8 +80,8 @@ configure front (
       enable_tls: true
 
     - role: 'grycap.kubefaas'
-      faas_framework: 'openfaas'
-      functions_namespace: 'oscar-svc'
+      faas_framework: 'knative'
+      knative_version: "1.3.0"
       master_deploy: true
 
     - role: 'grycap.kubeoscar'
@@ -92,10 +91,10 @@ configure front (
       minio_secret_key: '{{ minio_secret }}'
       minio_tls_verify: false
       master_deploy: true
-      oscar_version: 2.2.0
-      supervisor_version: 1.4.0
-      openfaas_scaler_enable: true
-      serverless_backend: "openfaas"
+      oscar_version: "2.4.0"
+      supervisor_version: "1.5.0"
+      oscar_cli_version: "v1.2.3"
+      serverless_backend: "knative"
 
     - role: 'grycap.im'
 
@@ -138,7 +137,7 @@ configure wn (
     - role: 'grycap.kubernetes'
       kube_type_of_node: 'wn'
       kube_server: 'kubeserver'
-      kube_version: 1.19.11
+      kube_version: "1.23.5"
 
 @end
 )
