@@ -41,6 +41,7 @@ configure front (
 @begin
 ---
   - vars:
+      KUBE_TOKEN: "{{ lookup('password', '/var/tmp/kube_token chars=ascii_letters,digits') }}"
       AUTH:
         ec3_xpath: /system/front/auth
       SYSTEMS:
@@ -51,7 +52,7 @@ configure front (
     - name: Create auth file dir
       file: path=/etc/kubernetes/pki state=directory mode=755 recurse=yes
     - name: Create auth data file with an admin user
-      copy: content='{{ lookup('password', '/var/tmp/dashboard_token chars=ascii_lowercase,digits length=16') }},kubeuser,100,"users,system:masters"' dest=/etc/kubernetes/pki/auth mode=600
+      copy: content='{{ KUBE_TOKEN }},kubeuser,100,"users,system:masters"' dest=/etc/kubernetes/pki/auth mode=600
     - name: Generate minio secret key and oscar password
       set_fact:
         minio_secret: "{{ lookup('password', '/var/tmp/minio_secret_key chars=ascii_letters,digits') }}"
@@ -96,6 +97,7 @@ configure front (
 
     - role: 'grycap.clues'
       auth: '{{AUTH}}'
+      KUBERNETES_TOKEN: '{{ KUBE_TOKEN }}'
       clues_queue_system: kubernetes
       max_number_of_nodes: '{{ NNODES }}'
       vnode_prefix: 'wn'
@@ -118,7 +120,8 @@ system wn (
   cpu.count>=2 and
   memory.size>=4096m and
   ec3_node_type = 'wn' and
-  net_interface.0.connection='private'
+  net_interface.0.connection='private' and
+  net_interface.0.dns_name = 'wn#N#.localdomain'
 )
 
 configure wn (
@@ -143,3 +146,4 @@ include kube_misc (
 )
 
 deploy front 1
+deploy wn 1
