@@ -9,298 +9,450 @@
 				Deploy New Service
 			</v-btn>
 			<v-card >
-				<v-form ref="form" v-model="form.valid" lazy-validation>
-					<v-toolbar flat :color="formColor" class="white--text" style="margin-bottom:10px;">
-						<span class="headline" style="width:100%;text-align:center">{{ formTitle }}</span>
-					</v-toolbar>
-					
-					<ul class="nav nav-pills nav-fill" id="myTab" role="tablist" style="padding-right:5px; padding-left:5px;">
-						<li class="nav-item" style="margin-rigth:10px;margin-left:10px;">
-							<a class="nav-link active" id="home-tab" @click="show('home')" role="tab" aria-controls="home" aria-selected="true">New Service</a>
-						</li>
-						<li class="nav-item" style="margin-rigth:10px;margin-left:10px;">
-							<a class="nav-link" id="profile-tab" @click="show('profile')" role="tab" aria-controls="profile" aria-selected="false">Storage</a>
-						</li>  
-						<li class="nav-item" style="margin-rigth:10px;margin-left:10px;">
-							<a class="nav-link " id="input_output-tab" @click="show('input_output')" role="tab" aria-controls="input_output" aria-selected="false">Input/Output</a>
-						</li>
-					</ul>
-					 
-					<v-progress-linear :active="progress.active" :indeterminate="true"></v-progress-linear>
-					 
-					<div class="tab-content" id="myTabContent">
-						<div class="tab-pane tab-pane-content fade show active" id="home" role="tabpanel" aria-labelledby="home-tab">
-							<v-card-text>
-									<v-layout wrap>
-										<div style="width:100%;padding: 0px 10px;">
-											<v-flex xs12>
-												<v-text-field
-													v-model="form.image"
-													:rules="form.imageRules"
-													:counter="200"
-													label="Docker image:"
-													required
-												></v-text-field>
-											</v-flex>
+				<v-toolbar flat :color="formColor" class="white--text" style="margin-bottom:10px;">
+					<span class="headline" style="width:100%;text-align:center">{{ formTitle }}</span>
+				</v-toolbar>
+					<v-form  ref="form" v-model="form.valid" lazy-validation>
+						<div>
+						
+						<ul class="nav nav-pills nav-fill" id="myTab" role="tablist" style="padding-right:5px; padding-left:5px;">
+							<li class="nav-item" style="margin-rigth:10px;margin-left:10px;">
+								<a class="nav-link active" id="home-tab" @click="show('home')" role="tab" aria-controls="home" aria-selected="true">New Service</a>
+							</li>
+							<li class="nav-item" style="margin-rigth:10px;margin-left:10px;">
+								<a class="nav-link" id="profile-tab" @click="show('profile')" role="tab" aria-controls="profile" aria-selected="false">Storage</a>
+							</li>  
+							<li class="nav-item" style="margin-rigth:10px;margin-left:10px;">
+								<a class="nav-link " id="input_output-tab" @click="show('input_output')" role="tab" aria-controls="input_output" aria-selected="false">Input/Output</a>
+							</li>
+						</ul>
+						
+						<v-progress-linear :active="progress.active" :indeterminate="true"></v-progress-linear>
+						
+						<div class="tab-content" id="myTabContent">
+							<div class="tab-pane tab-pane-content fade show active" id="home" role="tabpanel" aria-labelledby="home-tab">
+								<v-card-text>
+										<v-layout wrap>
+											<div style="width:100%;padding: 0px 10px;">
+												<v-flex xs12>
+													<v-text-field
+														v-model="form.image"
+														:rules="form.imageRules"
+														:counter="200"
+														label="Docker image:"
+														required
+													></v-text-field>
+												</v-flex>
 
-											<v-flex xs12>
-												<v-text-field
-													v-model="form.name"
-													:rules="form.nameRules"
-													:counter="200"
-													label="Function name"
-													required
-													:disabled="this.editionMode"
-												></v-text-field>
-											</v-flex>               
-										</div>
-										<div class="row" style="width:100%;padding: 0px 10px;"> 	
-											<v-flex xs12  md5 text-xs-center>
-												<v-btn color="primary" class="white--text" @click.native="addFiles()"> Select a file<v-icon right dark>note_add</v-icon></v-btn>
-											</v-flex>
+												<v-flex xs12>
+													<v-text-field
+														v-model="form.name"
+														:rules="form.nameRules"
+														:counter="200"
+														label="Function name"
+														required
+														:disabled="this.editionMode"
+													></v-text-field>
+												</v-flex>               
+											</div>
+											<div class="row" style="width:100%;padding: 0px 10px;"> 	
+												<v-flex xs12  md5 text-xs-center>
+													<v-btn color="primary" class="white--text" @click.native="addFiles()"> Select a file<v-icon right dark>note_add</v-icon></v-btn>
+												</v-flex>
 
-											<v-flex xs12  md2 class="text-xs-center">
-												<v-chip>or</v-chip>
-											</v-flex>
+												<v-flex xs12  md2 class="text-xs-center">
+													<v-chip>or</v-chip>
+												</v-flex>
 
-											<v-flex xs12  md5>
-												<div style="margin:10px" class="form-group">                     
-												<div class="input-group">
-													<input type="text" class="form-control" id="bucketname" autocomplete="off" v-model="url"   placeholder="URL" autofocus  style="border-right: none; border-left:none; border-top:none; hover: "/>                     
-													
-													<div class="input-group-append mr-2">                        
-													<button class="" @click="readurl()" type="button"><v-icon left color="green">check_circle</v-icon></button>
-													<button class="" @click="cleanfield()" type="button" ><v-icon left color="red">cancel</v-icon></button>                        
-													</div>
-												</div>            
-												</div> 
-											</v-flex>
-
-											<v-flex xs12 text-xs-center>
-												<span v-show="filerequire" style="color: #cc3300; font-size: 12px;"><b>Select a file or enter a URL</b></span>                   									
-											</v-flex>
-
-											
-											<v-flex xs12 sm8 offset-sm2 v-show="showSelectedFiles"  id="selectedList" class="text-xs-center">
-													<input type="file" id="files" ref="files" hidden=true  v-on:change="handleFilesUpload()"/>								                  									
-													<v-list subheader dense >
-														<v-subheader inset>File</v-subheader>
-														<v-list-tile
-														v-for="(file, key) in files"
-														:key="key"
-														avatar
-														@click.stop=""
-														>                                    
-																<v-progress-circular
-																indeterminate
-																color="teal"
-																v-show="showUploading"
-																>
-																</v-progress-circular>
-
-																<v-list-tile-content>
-																	<v-list-tile-title>{{ filename }}</v-list-tile-title>														
-																</v-list-tile-content>
-
-																<v-list-tile-action>
-																	<v-btn icon ripple @click="removeFile(key)">
-																	<v-icon color="red lighten-1">remove_circle_outline</v-icon>
-																	</v-btn>
-																</v-list-tile-action>
-														</v-list-tile>
-													</v-list>
-													<v-card flat>
-														<v-card-actions >
-														<v-btn
-															outline color="indigo"
-															round
-															small
-															@click.native="editSummernote()"
-														>
-															Edit															
-														</v-btn>
-														<v-btn
-															outline color="indigo"
-															round
-															small
-															@click.native="saveSummernote()"
-														>
-															Save															
-														</v-btn>
-														</v-card-actions>
-														<v-card-actions>
-														
-														</v-card-actions>
-													</v-card>
-											</v-flex>	
-											<v-flex xs-12 text-center v-show="editionMode==true && showSelectedFiles == false">
-												<span>Note: To edit the script sending in the creation of the service press the Edit button.</span>
-												<v-card flat>
-														<v-card-actions style="justify-content: center;">
-														<v-btn
-															outline color="indigo"
-															round
-															small
-															@click.native="editSummernote()"
-														>
-															Edit															
-														</v-btn>
-														<v-btn
-															outline color="indigo"
-															round
-															small
-															@click.native="saveSummernote()"
-														>
-															Save															
-														</v-btn>
-														</v-card-actions>
-													</v-card>
-											</v-flex>
-											<v-flex xs12>
-                                            	<!-- <div  v-show="editScript==true" style="white-space: pre-wrap;" class="click2edit text-left"></div>				 -->
-												<div class="summernote" style="white-space: pre-wrap;"></div>
-                                            	<!-- <div v-show="editScript==true" style="white-space: pre-wrap;" class="click2edit text-left"></div>				 -->
-											</v-flex>
-									
-											<v-flex xs12>
-													<v-btn
-													outline color="indigo"
-													round
-													small
-													@click.native="collapse()"
-												>
-													More Options
-													<v-icon right dark>{{expand}}</v-icon>
-												</v-btn>                    
-											</v-flex>
-										</div>
-									
-										<v-flex xs12 id="panel">  								
-											<v-container>
-												<v-layout row wrap>
-													<div class="form-group" style="width:100%">                     
+												<v-flex xs12  md5>
+													<div style="margin:10px" class="form-group">                     
 													<div class="input-group">
-														<v-flex xs12 sm5>
-															<v-text-field
-																v-model="form.envVarskey"
-																:counter="200"
-																label="Environment variables (key)"		
-																style="padding-right: 5px;"									
-															></v-text-field>
-														</v-flex>	
-														<v-flex xs10 sm5>
-															<v-text-field
-																v-model="form.envVarsValue"
-																:counter="200"
-																label="Environment variables (value)"		
-																style="padding-right: 5px;"									
-															></v-text-field>
-														</v-flex>	
+														<input type="text" class="form-control" id="bucketname" autocomplete="off" v-model="url"   placeholder="URL" autofocus  style="border-right: none; border-left:none; border-top:none; hover: "/>                     
 														
-														<v-flex xs2 sm2 style="padding-top:20px;" >
-															<div  class="input-group-append mr-2">  														                    
-																<button class="" @click="includeEnv()" type="button"><v-icon left color="green">check_circle</v-icon></button>
-																<button class="" @click="cleanfieldenv()" type="button" ><v-icon left color="red">cancel</v-icon></button>                        
-															</div>
-														</v-flex>
+														<div class="input-group-append mr-2">                        
+														<button class="" @click="readurl()" type="button"><v-icon left color="green">check_circle</v-icon></button>
+														<button class="" @click="cleanfield()" type="button" ><v-icon left color="red">cancel</v-icon></button>                        
+														</div>
 													</div>            
 													</div> 
-												</v-layout>
-
-												<v-flex xs12 sm6 offset-sm3 v-show="showselectEnv">
-													<input type="file" id="envs" hidden="true" multiple />
-													<v-list subheader dense>
-														<v-subheader inset>Env Vars</v-subheader>
-														<v-list-tile
-														v-for="(enVar,key) in envVars"
-														:key="key"
-														avatar
-														@click.stop=""
-														>       
-
-																<v-list-tile-content>
-																	<v-list-tile-title>{{key}}:{{envVars[key]}}</v-list-tile-title>
-																</v-list-tile-content>
-
-																<v-list-tile-action>
-																	<v-btn icon ripple @click="removeEnv(key)">
-																	<v-icon color="red lighten-1">remove_circle_outline</v-icon>
-																	</v-btn>
-																</v-list-tile-action>
-														</v-list-tile>
-													</v-list>
 												</v-flex>
+
+												<v-flex xs12 text-xs-center>
+													<span v-show="filerequire" style="color: #cc3300; font-size: 12px;"><b>Select a file or enter a URL</b></span>                   									
+												</v-flex>
+
 												
-												<v-layout row wrap>
-													<v-flex xs12 sm5>
-														<v-text-field
-															v-model="form.limits_cpu"
-															:counter="10"
-															label="CPU"
-															style="padding-right: 5px;"											
-														></v-text-field>											
+												<v-flex xs12 sm8 offset-sm2 v-show="showSelectedFiles"  id="selectedList" class="text-xs-center">
+														<input type="file" id="files" ref="files" hidden=true  v-on:change="handleFilesUpload()"/>								                  									
+														<v-list subheader dense >
+															<v-subheader inset>File</v-subheader>
+															<v-list-tile
+															v-for="(file, key) in files"
+															:key="key"
+															avatar
+															@click.stop=""
+															>                                    
+																	<v-progress-circular
+																	indeterminate
+																	color="teal"
+																	v-show="showUploading"
+																	>
+																	</v-progress-circular>
+
+																	<v-list-tile-content>
+																		<v-list-tile-title>{{ filename }}</v-list-tile-title>														
+																	</v-list-tile-content>
+
+																	<v-list-tile-action>
+																		<v-btn icon ripple @click="removeFile(key)">
+																		<v-icon color="red lighten-1">remove_circle_outline</v-icon>
+																		</v-btn>
+																	</v-list-tile-action>
+															</v-list-tile>
+														</v-list>
+														<v-card flat>
+															<v-card-actions >
+															<v-btn
+																outline color="indigo"
+																round
+																small
+																@click.native="editSummernote()"
+															>
+																Edit															
+															</v-btn>
+															<v-btn
+																outline color="indigo"
+																round
+																small
+																@click.native="saveSummernote()"
+															>
+																Save															
+															</v-btn>
+															</v-card-actions>
+															<v-card-actions>
+															
+															</v-card-actions>
+														</v-card>
+												</v-flex>	
+												<v-flex xs-12 text-center v-show="editionMode==true && showSelectedFiles == false">
+													<span>Note: To edit the script sending in the creation of the service press the Edit button.</span>
+													<v-card flat>
+															<v-card-actions style="justify-content: center;">
+															<v-btn
+																outline color="indigo"
+																round
+																small
+																@click.native="editSummernote()"
+															>
+																Edit															
+															</v-btn>
+															<v-btn
+																outline color="indigo"
+																round
+																small
+																@click.native="saveSummernote()"
+															>
+																Save															
+															</v-btn>
+															</v-card-actions>
+														</v-card>
+												</v-flex>
+												<v-flex xs12>
+													<!-- <div  v-show="editScript==true" style="white-space: pre-wrap;" class="click2edit text-left"></div>				 -->
+													<div class="summernote" style="white-space: pre-wrap;"></div>
+													<!-- <div v-show="editScript==true" style="white-space: pre-wrap;" class="click2edit text-left"></div>				 -->
+												</v-flex>
+										
+												<v-flex xs12>
+														<v-btn
+														outline color="indigo"
+														round
+														small
+														@click.native="collapse()"
+													>
+														More Options
+														<v-icon right dark>{{expand}}</v-icon>
+													</v-btn>                    
+												</v-flex>
+											</div>
+										
+											<v-flex xs12 id="panel">  								
+												<v-container>
+													<v-layout row wrap>
+														<div class="form-group" style="width:100%">                     
+														<div class="input-group">
+															<v-flex xs12 sm5>
+																<v-text-field
+																	v-model="form.envVarskey"
+																	:counter="200"
+																	label="Environment variables (key)"		
+																	style="padding-right: 5px;"									
+																></v-text-field>
+															</v-flex>	
+															<v-flex xs10 sm5>
+																<v-text-field
+																	v-model="form.envVarsValue"
+																	:counter="200"
+																	label="Environment variables (value)"		
+																	style="padding-right: 5px;"									
+																></v-text-field>
+															</v-flex>	
+															
+															<v-flex xs2 sm2 style="padding-top:20px;" >
+																<div  class="input-group-append mr-2">  														                    
+																	<button class="" @click="includeEnv()" type="button"><v-icon left color="green">check_circle</v-icon></button>
+																	<button class="" @click="cleanfieldenv()" type="button" ><v-icon left color="red">cancel</v-icon></button>                        
+																</div>
+															</v-flex>
+														</div>            
+														</div> 
+													</v-layout>
+
+													<v-flex xs12 sm6 offset-sm3 v-show="showselectEnv">
+														<input type="file" id="envs" hidden="true" multiple />
+														<v-list subheader dense>
+															<v-subheader inset>Env Vars</v-subheader>
+															<v-list-tile
+															v-for="(enVar,key) in envVars"
+															:key="key"
+															avatar
+															@click.stop=""
+															>       
+
+																	<v-list-tile-content>
+																		<v-list-tile-title>{{key}}:{{envVars[key]}}</v-list-tile-title>
+																	</v-list-tile-content>
+
+																	<v-list-tile-action>
+																		<v-btn icon ripple @click="removeEnv(key)">
+																		<v-icon color="red lighten-1">remove_circle_outline</v-icon>
+																		</v-btn>
+																	</v-list-tile-action>
+															</v-list-tile>
+														</v-list>
 													</v-flex>
-
-													<v-flex xs10 sm5>
-														<v-text-field
-															v-model="form.limits_memory"
-															:counter="10"
-															label="Memory"
-															style="padding-right: 5px;"																											
-														></v-text-field>																						
-													</v-flex>  
-													<v-flex xs2 sm2 style="padding-top:10px;">
-														<select id="classmemory" class="custom-select" >																										
-															<option selected value="1">Mi</option>
-															<option value="2">Gi</option>															
-														</select>
-													</v-flex>	
-
-													<v-flex xs12 sm3 style="padding-top:10px;">
-														<v-select
-															:items="form.log_level"
-															label="LOG LEVEL"
-															v-model="select_logLevel"
-														></v-select>
-													</v-flex>	
 													
-												</v-layout>
-											</v-container>								
-										</v-flex> 						
-									</v-layout>
-							</v-card-text>
-							<v-card-actions >
-								<v-btn @click="closeWithoutSave()" flat color="grey">Cancel</v-btn>
-								<v-btn @click="clearHome()" flat color="red">Clear</v-btn>
-								<v-spacer></v-spacer>
-								<v-btn @click="show('profile')" flat color="success">NEXT</v-btn>
-							</v-card-actions>
-						</div>
+													<v-layout row wrap>
+														<v-flex xs12 sm5>
+															<v-text-field
+																v-model="form.limits_cpu"
+																:counter="10"
+																label="CPU"
+																style="padding-right: 5px;"											
+															></v-text-field>											
+														</v-flex>
 
-						<div class="tab-pane tab-pane-content fade" id="input_output" role="tabpanel" aria-labelledby="input_output-tab" style="padding-right:3rem; padding-left:3rem;">
-							
-							<ul class="nav nav-pills nav-fill" id="myTabInOut" role="tablist" style="padding-right:5px; padding-left:5px;">
-								<li class="nav-item" style="margin-rigth:10px;margin-left:10px;">
-									<a class="nav-link active" id="input-tab" @click="show_input('input')" role="tab" aria-controls="home" aria-selected="true">INPUTS</a>
-								</li>
-								<li class="nav-item" style="margin-rigth:10px;margin-left:10px;">
-									<a class="nav-link" id="output-tab" @click="show_input('output')" role="tab" aria-controls="input_output" aria-selected="false">OUTPUTS</a>
-								</li>
-							</ul>
+														<v-flex xs10 sm5>
+															<v-text-field
+																v-model="form.limits_memory"
+																:counter="10"
+																label="Memory"
+																style="padding-right: 5px;"																											
+															></v-text-field>																						
+														</v-flex>  
+														<v-flex xs2 sm2 style="padding-top:10px;">
+															<select id="classmemory" class="custom-select" >																										
+																<option selected value="1">Mi</option>
+																<option value="2">Gi</option>															
+															</select>
+														</v-flex>	
 
-							<div class="tab-content" id="myTabContentInOut">
-								<div class="tab-pane tab-pane-inout fade show active"  id="input" role="tabpanel" aria-labelledby="input-tab" style="padding-right:3rem; padding-left:3rem;">
+														<v-flex xs12 sm3 style="padding-top:10px;">
+															<v-select
+																:items="form.log_level"
+																label="LOG LEVEL"
+																v-model="select_logLevel"
+															></v-select>
+														</v-flex>	
+														
+													</v-layout>
+												</v-container>								
+											</v-flex> 						
+										</v-layout>
+								</v-card-text>
+								<v-card-actions style="background-color:white;">
+									<v-btn @click="closeWithoutSave()" flat color="grey">Cancel</v-btn>
+									<v-btn @click="clearHome()" flat color="red">Clear</v-btn>
+									<v-spacer></v-spacer>
+									<v-btn @click="show('profile')" flat color="success">NEXT</v-btn>
+								</v-card-actions>
+							</div>
+
+							<div class="tab-pane tab-pane-content fade" id="input_output" role="tabpanel" aria-labelledby="input_output-tab" style="padding-right:3rem; padding-left:3rem;">
+								
+								<ul class="nav nav-pills nav-fill" id="myTabInOut" role="tablist" style="padding-right:5px; padding-left:5px;">
+									<li class="nav-item" style="margin-rigth:10px;margin-left:10px;">
+										<a class="nav-link active" id="input-tab" @click="show_input('input')" role="tab" aria-controls="home" aria-selected="true">INPUTS</a>
+									</li>
+									<li class="nav-item" style="margin-rigth:10px;margin-left:10px;">
+										<a class="nav-link" id="output-tab" @click="show_input('output')" role="tab" aria-controls="input_output" aria-selected="false">OUTPUTS</a>
+									</li>
+								</ul>
+
+								<div class="tab-content" id="myTabContentInOut">
+									<div class="tab-pane tab-pane-inout fade show active"  id="input" role="tabpanel" aria-labelledby="input-tab" style="padding-right:3rem; padding-left:3rem;">
+											<v-layout row wrap>
+												<v-flex xs12>  								
+													<v-container>
+														<v-flex xs12 text-xs-center>
+															<span v-show="showErrorInput" style="color: #cc3300; font-size: 12px;"><b>The Storage Provider and Path fields are required.</b></span>                   									
+														</v-flex>
+														<div class="form-group" style="width:100%">                     
+															<div class="input-group">
+																<v-flex class="col-12">
+																	<v-select
+																		v-model="form.storage_provider_in"
+																		:items="storages_all"
+																		label="Storage Provider"
+																		outline
+																	></v-select>																
+																</v-flex>
+																<v-flex>
+																	<v-text-field
+																		v-model="form.path_in"
+																		:counter="200"
+																		label="Path"		
+																		style="padding-right: 5px;"									
+																	></v-text-field>
+																</v-flex>															
+															</div>            
+														</div> 
+
+														<div class="form-group" style="width:100%">                     
+															<div class="input-group">
+																<v-flex>
+																	<v-text-field
+																		v-model="form.prefix_in"
+																		:counter="200"
+																		label="Prefix"		
+																		style="padding-right: 5px;"									
+																	></v-text-field>
+																</v-flex>	
+
+																<div  class="input-group-append mr-2">  														                    
+																	<button class="" @click="includePrefixIn()" type="button"><v-icon left color="green">check_circle</v-icon></button>
+																	<button class="" @click="cleanfieldPrefixIn()" type="button" ><v-icon left color="red">cancel</v-icon></button>                        
+																</div>
+															</div>            
+														</div> 
+
+														<v-flex xs12 sm6 offset-sm3 v-show="showselectPrefixIn">
+															<input type="file" id="prefixs" hidden="true" multiple />
+															<v-list subheader dense>
+																<v-subheader inset>Prefixs</v-subheader>
+																<v-list-tile
+																v-for="(prefix,key) in prefixs_in"
+																:key="key"
+																avatar
+																@click.stop=""
+																>                                    
+																		
+
+																		<v-list-tile-content>
+																			<v-list-tile-title>{{prefix}}</v-list-tile-title>
+																		</v-list-tile-content>
+
+																		<v-list-tile-action>
+																			<v-btn icon ripple @click="removePrefixIn(key)">
+																			<v-icon color="red lighten-1">remove_circle_outline</v-icon>
+																			</v-btn>
+																		</v-list-tile-action>
+																</v-list-tile>
+															</v-list>
+														</v-flex>
+
+
+
+														<div class="form-group" style="width:100%">                     
+															<div class="input-group">
+																<v-flex>
+																	<v-text-field
+																		v-model="form.suffix_in"
+																		:counter="200"
+																		label="Suffix"		
+																		style="padding-right: 5px;"									
+																	></v-text-field>
+																</v-flex>	
+																<div  class="input-group-append mr-2">  														                    
+																	<button class="" @click="includeSuffixIn()" type="button"><v-icon left color="green">check_circle</v-icon></button>
+																	<button class="" @click="cleanfieldSuffixIn()" type="button" ><v-icon left color="red">cancel</v-icon></button>                        
+																</div>
+															</div>            
+														</div> 
+
+														<v-flex xs12 sm6 offset-sm3 v-show="showselectSuffixIn">
+															<input type="file" id="suffix" hidden="true" multiple />
+															<v-list subheader dense>
+																<v-subheader inset>Suffixs</v-subheader>
+																<v-list-tile
+																v-for="(suffix,key) in suffixs_in"
+																:key="key"
+																avatar
+																@click.stop=""
+																>                                    
+
+																	<v-list-tile-content>
+																		<v-list-tile-title>{{suffix}}</v-list-tile-title>
+																	</v-list-tile-content>
+
+																	<v-list-tile-action>
+																		<v-btn icon ripple @click="removeSuffixIn(key)">
+																		<v-icon color="red lighten-1">remove_circle_outline</v-icon>
+																		</v-btn>
+																	</v-list-tile-action>
+																</v-list-tile>
+															</v-list>
+														</v-flex>
+													</v-container>
+												</v-flex>	
+											</v-layout>
+
+											<v-flex xs12 v-show="showselectInput">
+												<input type="file" id="inputs" hidden="true" multiple />
+												<v-list subheader dense three-line>
+													<v-subheader inset>Inputs</v-subheader>
+													<v-list-tile
+													v-for="(input,key) in inputs"
+													:key="key"
+													avatar
+													@click.stop=""
+													style="margin-bottom:10px;"
+													>                                    
+															<v-list-tile-content>
+																<v-list-tile-title style="padding-bottom:20px;">Path: {{input.path}}</v-list-tile-title>
+																<v-list-tile-title style="padding-bottom:20px;">Storage_provider: {{input.storage_provider}}</v-list-tile-title>
+																<v-list-tile-title style="padding-bottom:20px;">Prefix: {{input.prefix}}</v-list-tile-title>
+																<v-list-tile-title style="padding-bottom:25px;">Suffix: {{input.suffix}}</v-list-tile-title> 
+															</v-list-tile-content>
+
+															<v-list-tile-action>
+																<v-btn icon ripple @click="removeInput(key)">
+																<v-icon color="red lighten-1">remove_circle_outline</v-icon>
+																</v-btn>
+															</v-list-tile-action>
+													</v-list-tile>
+												</v-list>
+											</v-flex>
+
+											<v-card-actions class="text-md-center" >
+												<v-spacer></v-spacer>
+												<v-btn @click="includeInput()"  color="info">ADD INPUT</v-btn>
+												
+											</v-card-actions>
+									</div>
+
+									<div class="tab-pane tab-pane-inout fade"  id="output" role="tabpanel" aria-labelledby="output-tab" style="padding-right:3rem; padding-left:3rem;">
 										<v-layout row wrap>
 											<v-flex xs12>  								
 												<v-container>
 													<v-flex xs12 text-xs-center>
-														<span v-show="showErrorInput" style="color: #cc3300; font-size: 12px;"><b>The Storage Provider and Path fields are required.</b></span>                   									
+														<span v-show="showErrorOutput" style="color: #cc3300; font-size: 12px;"><b>The Storage Provider and Path fields are required.</b></span>                   									
 													</v-flex>
 													<div class="form-group" style="width:100%">                     
 														<div class="input-group">
 															<v-flex class="col-12">
 																<v-select
-																	v-model="form.storage_provider_in"
+																	v-model="form.storage_provider_out"
 																	:items="storages_all"
 																	label="Storage Provider"
 																	outline
@@ -308,12 +460,13 @@
 															</v-flex>
 															<v-flex>
 																<v-text-field
-																	v-model="form.path_in"
+																	v-model="form.path_out"
 																	:counter="200"
 																	label="Path"		
 																	style="padding-right: 5px;"									
 																></v-text-field>
-															</v-flex>															
+															</v-flex>	
+															
 														</div>            
 													</div> 
 
@@ -321,7 +474,7 @@
 														<div class="input-group">
 															<v-flex>
 																<v-text-field
-																	v-model="form.prefix_in"
+																	v-model="form.prefix_out"
 																	:counter="200"
 																	label="Prefix"		
 																	style="padding-right: 5px;"									
@@ -329,18 +482,18 @@
 															</v-flex>	
 
 															<div  class="input-group-append mr-2">  														                    
-																<button class="" @click="includePrefixIn()" type="button"><v-icon left color="green">check_circle</v-icon></button>
-																<button class="" @click="cleanfieldPrefixIn()" type="button" ><v-icon left color="red">cancel</v-icon></button>                        
+																<button class="" @click="includePrefixOut()" type="button"><v-icon left color="green">check_circle</v-icon></button>
+																<button class="" @click="cleanfieldPrefixOut()" type="button" ><v-icon left color="red">cancel</v-icon></button>                        
 															</div>
 														</div>            
 													</div> 
 
-													<v-flex xs12 sm6 offset-sm3 v-show="showselectPrefixIn">
+													<v-flex xs12 sm6 offset-sm3 v-show="showselectPrefixOut">
 														<input type="file" id="prefixs" hidden="true" multiple />
 														<v-list subheader dense>
 															<v-subheader inset>Prefixs</v-subheader>
 															<v-list-tile
-															v-for="(prefix,key) in prefixs_in"
+															v-for="(prefix,key) in prefixs_out"
 															:key="key"
 															avatar
 															@click.stop=""
@@ -352,7 +505,7 @@
 																	</v-list-tile-content>
 
 																	<v-list-tile-action>
-																		<v-btn icon ripple @click="removePrefixIn(key)">
+																		<v-btn icon ripple @click="removePrefixOut(key)">
 																		<v-icon color="red lighten-1">remove_circle_outline</v-icon>
 																		</v-btn>
 																	</v-list-tile-action>
@@ -366,25 +519,27 @@
 														<div class="input-group">
 															<v-flex>
 																<v-text-field
-																	v-model="form.suffix_in"
+																	v-model="form.suffix_out"
 																	:counter="200"
 																	label="Suffix"		
 																	style="padding-right: 5px;"									
 																></v-text-field>
 															</v-flex>	
 															<div  class="input-group-append mr-2">  														                    
-																<button class="" @click="includeSuffixIn()" type="button"><v-icon left color="green">check_circle</v-icon></button>
-																<button class="" @click="cleanfieldSuffixIn()" type="button" ><v-icon left color="red">cancel</v-icon></button>                        
+																<button class="" @click="includeSuffixOut()" type="button"><v-icon left color="green">check_circle</v-icon></button>
+																<button class="" @click="cleanfieldSuffixOut()" type="button" ><v-icon left color="red">cancel</v-icon></button>                        
 															</div>
 														</div>            
 													</div> 
 
-													<v-flex xs12 sm6 offset-sm3 v-show="showselectSuffixIn">
+
+
+													<v-flex xs12 sm6 offset-sm3 v-show="showselectSuffixOut">
 														<input type="file" id="suffix" hidden="true" multiple />
 														<v-list subheader dense>
 															<v-subheader inset>Suffixs</v-subheader>
 															<v-list-tile
-															v-for="(suffix,key) in suffixs_in"
+															v-for="(suffix,key) in suffixs_out"
 															:key="key"
 															avatar
 															@click.stop=""
@@ -395,7 +550,7 @@
 																</v-list-tile-content>
 
 																<v-list-tile-action>
-																	<v-btn icon ripple @click="removeSuffixIn(key)">
+																	<v-btn icon ripple @click="removeSuffixOut(key)">
 																	<v-icon color="red lighten-1">remove_circle_outline</v-icon>
 																	</v-btn>
 																</v-list-tile-action>
@@ -406,26 +561,26 @@
 											</v-flex>	
 										</v-layout>
 
-										<v-flex xs12 v-show="showselectInput">
+										<v-flex xs12 v-show="showselectOutput">
 											<input type="file" id="inputs" hidden="true" multiple />
 											<v-list subheader dense three-line>
-												<v-subheader inset>Inputs</v-subheader>
+												<v-subheader inset>Outputs</v-subheader>
 												<v-list-tile
-												v-for="(input,key) in inputs"
+												v-for="(output,key) in outputs"
 												:key="key"
 												avatar
 												@click.stop=""
 												style="margin-bottom:10px;"
 												>                                    
 														<v-list-tile-content>
-															<v-list-tile-title style="padding-bottom:20px;">Path: {{input.path}}</v-list-tile-title>
-															<v-list-tile-title style="padding-bottom:20px;">Storage_provider: {{input.storage_provider}}</v-list-tile-title>
-															<v-list-tile-title style="padding-bottom:20px;">Prefix: {{input.prefix}}</v-list-tile-title>
-															<v-list-tile-title style="padding-bottom:25px;">Suffix: {{input.suffix}}</v-list-tile-title> 
+															<v-list-tile-title style="padding-bottom:20px;">Path: {{output.path}}</v-list-tile-title>
+															<v-list-tile-title style="padding-bottom:20px;">Storage_provider: {{output.storage_provider}}</v-list-tile-title>
+															<v-list-tile-title style="padding-bottom:20px;">Prefix: {{output.prefix}}</v-list-tile-title>
+															<v-list-tile-title style="padding-bottom:25px;">Suffix: {{output.suffix}}</v-list-tile-title> 
 														</v-list-tile-content>
 
 														<v-list-tile-action>
-															<v-btn icon ripple @click="removeInput(key)">
+															<v-btn icon ripple @click="removeOutput(key)">
 															<v-icon color="red lighten-1">remove_circle_outline</v-icon>
 															</v-btn>
 														</v-list-tile-action>
@@ -435,293 +590,139 @@
 
 										<v-card-actions class="text-md-center" >
 											<v-spacer></v-spacer>
-											<v-btn @click="includeInput()"  color="info">ADD INPUT</v-btn>
-											
+											<v-btn @click="includeOutput()"  color="info">ADD OUTPUT</v-btn>
 										</v-card-actions>
-								</div>
-
-								<div class="tab-pane tab-pane-inout fade"  id="output" role="tabpanel" aria-labelledby="output-tab" style="padding-right:3rem; padding-left:3rem;">
-									<v-layout row wrap>
-										<v-flex xs12>  								
-											<v-container>
-												<v-flex xs12 text-xs-center>
-													<span v-show="showErrorOutput" style="color: #cc3300; font-size: 12px;"><b>The Storage Provider and Path fields are required.</b></span>                   									
-												</v-flex>
-												<div class="form-group" style="width:100%">                     
-													<div class="input-group">
-														<v-flex class="col-12">
-															<v-select
-																v-model="form.storage_provider_out"
-																:items="storages_all"
-																label="Storage Provider"
-																outline
-															></v-select>																
-														</v-flex>
-														<v-flex>
-															<v-text-field
-																v-model="form.path_out"
-																:counter="200"
-																label="Path"		
-																style="padding-right: 5px;"									
-															></v-text-field>
-														</v-flex>	
-														
-													</div>            
-												</div> 
-
-												<div class="form-group" style="width:100%">                     
-													<div class="input-group">
-														<v-flex>
-															<v-text-field
-																v-model="form.prefix_out"
-																:counter="200"
-																label="Prefix"		
-																style="padding-right: 5px;"									
-															></v-text-field>
-														</v-flex>	
-
-														<div  class="input-group-append mr-2">  														                    
-															<button class="" @click="includePrefixOut()" type="button"><v-icon left color="green">check_circle</v-icon></button>
-															<button class="" @click="cleanfieldPrefixOut()" type="button" ><v-icon left color="red">cancel</v-icon></button>                        
-														</div>
-													</div>            
-												</div> 
-
-												<v-flex xs12 sm6 offset-sm3 v-show="showselectPrefixOut">
-													<input type="file" id="prefixs" hidden="true" multiple />
-													<v-list subheader dense>
-														<v-subheader inset>Prefixs</v-subheader>
-														<v-list-tile
-														v-for="(prefix,key) in prefixs_out"
-														:key="key"
-														avatar
-														@click.stop=""
-														>                                    
-																
-
-																<v-list-tile-content>
-																	<v-list-tile-title>{{prefix}}</v-list-tile-title>
-																</v-list-tile-content>
-
-																<v-list-tile-action>
-																	<v-btn icon ripple @click="removePrefixOut(key)">
-																	<v-icon color="red lighten-1">remove_circle_outline</v-icon>
-																	</v-btn>
-																</v-list-tile-action>
-														</v-list-tile>
-													</v-list>
-												</v-flex>
-
-
-
-												<div class="form-group" style="width:100%">                     
-													<div class="input-group">
-														<v-flex>
-															<v-text-field
-																v-model="form.suffix_out"
-																:counter="200"
-																label="Suffix"		
-																style="padding-right: 5px;"									
-															></v-text-field>
-														</v-flex>	
-														<div  class="input-group-append mr-2">  														                    
-															<button class="" @click="includeSuffixOut()" type="button"><v-icon left color="green">check_circle</v-icon></button>
-															<button class="" @click="cleanfieldSuffixOut()" type="button" ><v-icon left color="red">cancel</v-icon></button>                        
-														</div>
-													</div>            
-												</div> 
-
-
-
-												<v-flex xs12 sm6 offset-sm3 v-show="showselectSuffixOut">
-													<input type="file" id="suffix" hidden="true" multiple />
-													<v-list subheader dense>
-														<v-subheader inset>Suffixs</v-subheader>
-														<v-list-tile
-														v-for="(suffix,key) in suffixs_out"
-														:key="key"
-														avatar
-														@click.stop=""
-														>                                    
-
-															<v-list-tile-content>
-																<v-list-tile-title>{{suffix}}</v-list-tile-title>
-															</v-list-tile-content>
-
-															<v-list-tile-action>
-																<v-btn icon ripple @click="removeSuffixOut(key)">
-																<v-icon color="red lighten-1">remove_circle_outline</v-icon>
-																</v-btn>
-															</v-list-tile-action>
-														</v-list-tile>
-													</v-list>
-												</v-flex>
-											</v-container>
-										</v-flex>	
-									</v-layout>
-
-									<v-flex xs12 v-show="showselectOutput">
-										<input type="file" id="inputs" hidden="true" multiple />
-										<v-list subheader dense three-line>
-											<v-subheader inset>Outputs</v-subheader>
-											<v-list-tile
-											v-for="(output,key) in outputs"
-											:key="key"
-											avatar
-											@click.stop=""
-											style="margin-bottom:10px;"
-											>                                    
-													<v-list-tile-content>
-														<v-list-tile-title style="padding-bottom:20px;">Path: {{output.path}}</v-list-tile-title>
-														<v-list-tile-title style="padding-bottom:20px;">Storage_provider: {{output.storage_provider}}</v-list-tile-title>
-														<v-list-tile-title style="padding-bottom:20px;">Prefix: {{output.prefix}}</v-list-tile-title>
-														<v-list-tile-title style="padding-bottom:25px;">Suffix: {{output.suffix}}</v-list-tile-title> 
-													</v-list-tile-content>
-
-													<v-list-tile-action>
-														<v-btn icon ripple @click="removeOutput(key)">
-														<v-icon color="red lighten-1">remove_circle_outline</v-icon>
-														</v-btn>
-													</v-list-tile-action>
-											</v-list-tile>
-										</v-list>
-									</v-flex>
-
-									<v-card-actions class="text-md-center" >
+									</div>
+									<v-card-actions style="background-color:white;" >
+										<v-btn @click="closeWithoutSave()" flat color="grey">Cancel</v-btn>
+										<v-btn @click="cleanfieldInput();cleanfieldOutput()" flat color="red">Clear</v-btn>
 										<v-spacer></v-spacer>
-										<v-btn @click="includeOutput()"  color="info">ADD OUTPUT</v-btn>
+										<v-btn @click="show('profile')" flat color="blue">BACK</v-btn>
+										<v-btn :disabled="!form.valid || disabled_submit==true" @click="submit" flat color="success">Submit</v-btn>
+										<!-- <v-btn @click="show('input_output')" flat color="success">NEXT</v-btn> -->
+										
 									</v-card-actions>
-								</div>
-								<v-card-actions >
-									<v-btn @click="closeWithoutSave()" flat color="grey">Cancel</v-btn>
-									<v-btn @click="cleanfieldInput();cleanfieldOutput()" flat color="red">Clear</v-btn>
-									<v-spacer></v-spacer>
-									<v-btn @click="show('profile')" flat color="blue">BACK</v-btn>
-									<v-btn :disabled="!form.valid" @click="submit" flat color="success">submit</v-btn>
-									<!-- <v-btn @click="show('input_output')" flat color="success">NEXT</v-btn> -->
-									
-								</v-card-actions>
-							</div>		
-									
-						</div>
+								</div>		
+										
+							</div>
 
-						<div class="tab-pane tab-pane-content fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
+							<div class="tab-pane tab-pane-content fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
 
-							<div class=" div-list-content" >
-								<v-card style="padding:0 2rem 2rem 2rem;">
+								<div class=" div-list-content" >
+									<v-card style="padding:0 2rem 2rem 2rem;">
 
-									<v-tabs
-										fixed-tabs
-										v-model="model_create"
-										centered
-									>
-										<v-tab
-										:href="`#tab-minio`"
+										<v-tabs
+											fixed-tabs
+											v-model="model_create"
+											centered
 										>
-											MINIO
-										</v-tab>
-										<v-tab
-										:href="`#tab-onedata`"
-										>
-											ONE DATA
-										</v-tab>
-										<v-tab
-										:href="`#tab-s3`"
-										>
-											S3
-										</v-tab>
-									</v-tabs>
+											<v-tab
+											:href="`#tab-minio`"
+											>
+												MINIO
+											</v-tab>
+											<v-tab
+											:href="`#tab-onedata`"
+											>
+												ONE DATA
+											</v-tab>
+											<v-tab
+											:href="`#tab-s3`"
+											>
+												S3
+											</v-tab>
+										</v-tabs>
 
-									<v-tabs-items v-model="model_create" >
-										<v-tab-item  :value="`tab-onedata`">
-											<v-container>
-												
-									
-												<v-layout row style="padding:0px,10px;justify-content: center;">										
-													<img src="../../img/logo_one_data.jpg" alt=""> 
-												</v-layout>
-												<br>
-												<v-flex xs12 text-xs-center>
-													<span v-show="showErrorOneData" style="color: #cc3300; font-size: 12px;"><b>To add a storage option you must complete all the information.</b></span>                   									
-												</v-flex>
-												<br>
-
-												<v-layout row style="padding:0px,10px;" >										
-													<v-flex xs12 sm8 offset-sm2>
-														<v-text-field
-															v-model="onedata.id"
-															:counter="200"		
-															label="ID"																
-														></v-text-field>
-													</v-flex>									
-												</v-layout>
-
-												<v-layout row style="padding:0px,10px;" >										
-													<v-flex xs12 sm8 offset-sm2>
-														<v-text-field
-															v-model="onedata.oneprovider_host"
-															:counter="200"		
-															label="ONEPROVIDER HOST:"																
-														></v-text-field>
-													</v-flex>									
-												</v-layout>
-
-												<v-flex xs12 text-xs-center>
-													<span v-show="envrequirehost" style="color: #cc3300; font-size: 12px;"><b>ONEPROVIDER HOST is required</b></span>                   									
-												</v-flex>
-
-												<v-layout row style="padding:0px,10px;">
-													<v-flex xs12 sm8 offset-sm2>
-														<v-text-field 
-															v-model="onedata.token"
-															:append-icon="showOneDataToken ? 'visibility_off' : 'visibility'"
-															:type="showOneDataToken ? 'text' : 'password'"
-															:counter="200"
-															label="ACCESS TOKEN:"
-															@click:append="showOneDataToken = !showOneDataToken"
-														></v-text-field>
+										<v-tabs-items v-model="model_create" >
+											<v-tab-item  :value="`tab-onedata`">
+												<v-container>
+													
+										
+													<v-layout row style="padding:0px,10px;justify-content: center;">										
+														<img src="../../img/logo_one_data.jpg" alt=""> 
+													</v-layout>
+													<br>
+													<v-flex xs12 text-xs-center>
+														<span v-show="showErrorOneData" style="color: #cc3300; font-size: 12px;"><b>To add a storage option you must complete all the information.</b></span>                   									
 													</v-flex>
-												</v-layout>
+													<br>
 
-												<v-flex xs12 text-xs-center>
-													<span v-show="envrequiretoken" style="color: #cc3300; font-size: 12px;"><b>ACCESS TOKEN is required</b></span>                   									
-												</v-flex>
+													<v-layout row style="padding:0px,10px;" >										
+														<v-flex xs12 sm8 offset-sm2>
+															<v-text-field
+																v-model="onedata.id"
+																:counter="200"		
+																label="ID"																
+															></v-text-field>
+														</v-flex>									
+													</v-layout>
 
-												<v-layout row style="padding:0px,10px;">
-													<v-flex xs12 sm8 offset-sm2>
-														<v-text-field 
-															v-model="onedata.space"
-															:counter="200"
-															label="SPACE:"
-														></v-text-field>
-													</v-flex>										
-												</v-layout>
+													<v-layout row style="padding:0px,10px;" >										
+														<v-flex xs12 sm8 offset-sm2>
+															<v-text-field
+																v-model="onedata.oneprovider_host"
+																:counter="200"		
+																label="ONEPROVIDER HOST:"																
+															></v-text-field>
+														</v-flex>									
+													</v-layout>
 
-												<v-flex xs12 sm6 offset-sm3 v-show="showOneData">
-													<input type="file" id="onedata" hidden="true" multiple />
-													<v-list subheader dense>
-														<v-subheader inset>ONEDATA</v-subheader>
-														<v-list-tile
-														v-for="(id,key) in ONEDATA_DICT"
-														:key="key"
-														avatar
-														@click.stop=""
-														style="margin-bottom:40px;"
-														>                                    
-																
+													<v-flex xs12 text-xs-center>
+														<span v-show="envrequirehost" style="color: #cc3300; font-size: 12px;"><b>ONEPROVIDER HOST is required</b></span>                   									
+													</v-flex>
 
-																<v-list-tile-content style="height:80px;">
-																	<v-list-tile-title style="padding-bottom:20px;">ID: {{key}}</v-list-tile-title>
-																	<v-list-tile-title style="padding-bottom:20px;">ONEPROVIDER HOST: {{id.oneprovider_host}}</v-list-tile-title>
-																	<v-list-tile-title style="padding-bottom:20px;">ACCES TOKEN: <span class="hide_text">*********</span> </v-list-tile-title>
-																	<v-list-tile-title style="padding-bottom:20px;">SPACE: {{id.space}}</v-list-tile-title>
-																	<!-- <v-list-tile-title>{{key}}</v-list-tile-title> -->
-																</v-list-tile-content>
+													<v-layout row style="padding:0px,10px;">
+														<v-flex xs12 sm8 offset-sm2>
+															<v-text-field 
+																v-model="onedata.token"
+																:append-icon="showOneDataToken ? 'visibility_off' : 'visibility'"
+																:type="showOneDataToken ? 'text' : 'password'"
+																:counter="200"
+																label="ACCESS TOKEN:"
+																@click:append="showOneDataToken = !showOneDataToken"
+															></v-text-field>
+														</v-flex>
+													</v-layout>
 
-																<v-list-tile-action>
-																	<v-btn icon ripple @click="removeOneData(key)">
-																	<v-icon color="red lighten-1">remove_circle_outline</v-icon>
-																	</v-btn>
+													<v-flex xs12 text-xs-center>
+														<span v-show="envrequiretoken" style="color: #cc3300; font-size: 12px;"><b>ACCESS TOKEN is required</b></span>                   									
+													</v-flex>
+
+													<v-layout row style="padding:0px,10px;">
+														<v-flex xs12 sm8 offset-sm2>
+															<v-text-field 
+																v-model="onedata.space"
+																:counter="200"
+																label="SPACE:"
+															></v-text-field>
+														</v-flex>										
+													</v-layout>
+
+													<v-flex xs12 sm6 offset-sm3 v-show="showOneData">
+														<input type="file" id="onedata" hidden="true" multiple />
+														<v-list subheader dense>
+															<v-subheader inset>ONEDATA</v-subheader>
+															<v-list-tile
+															v-for="(id,key) in ONEDATA_DICT"
+															:key="key"
+															avatar
+															@click.stop=""
+															style="margin-bottom:40px;"
+															>                                    
+																	
+
+																	<v-list-tile-content style="height:80px;">
+																		<v-list-tile-title style="padding-bottom:20px;">ID: {{key}}</v-list-tile-title>
+																		<v-list-tile-title style="padding-bottom:20px;">ONEPROVIDER HOST: {{id.oneprovider_host}}</v-list-tile-title>
+																		<v-list-tile-title style="padding-bottom:20px;">ACCES TOKEN: <span class="hide_text">*********</span> </v-list-tile-title>
+																		<v-list-tile-title style="padding-bottom:20px;">SPACE: {{id.space}}</v-list-tile-title>
+																		<!-- <v-list-tile-title>{{key}}</v-list-tile-title> -->
+																	</v-list-tile-content>
+
+																	<v-list-tile-action>
+																		<v-btn icon ripple @click="removeOneData(key)">
+																		<v-icon color="red lighten-1">remove_circle_outline</v-icon>
+																		</v-btn>
 																</v-list-tile-action>
 														</v-list-tile>
 													</v-list>
@@ -735,43 +736,43 @@
 
 
 											</v-container>	
-										</v-tab-item>
+											</v-tab-item>
 
-										<v-tab-item  :value="`tab-minio`">
-											<v-container>
-												
-									
-												<v-layout row style="padding:0px,10px;justify-content: center;">										
-													<img src="../../img/minio-storage.png" height="110px" alt=""> 
-												</v-layout>
-												<br>
-												<v-flex xs12 text-xs-center>
-													<span v-show="showErrorMinio" style="color: #cc3300; font-size: 12px;"><b>To add a storage option you must complete all the information.</b></span>                   									
-												</v-flex>
-												<br>
-
-												<v-layout row style="padding:0px,10px;">
-													<v-flex xs12 sm8 offset-sm2>
-														<v-text-field 
-															v-model="minio.id"
-															:counter="200"
-															label="ID"
-														></v-text-field>
+											<v-tab-item  :value="`tab-minio`">
+												<v-container>
+													
+										
+													<v-layout row style="padding:0px,10px;justify-content: center;">										
+														<img src="../../img/minio-storage.png" height="110px" alt=""> 
+													</v-layout>
+													<br>
+													<v-flex xs12 text-xs-center>
+														<span v-show="showErrorMinio" style="color: #cc3300; font-size: 12px;"><b>To add a storage option you must complete all the information.</b></span>                   									
 													</v-flex>
-												</v-layout>
+													<br>
 
-												<v-layout row style="padding:0px,10px;">
-													<v-flex xs12 sm8 offset-sm2>
-														<v-text-field 
-															v-model="minio.endpoint"
-															:counter="200"
-															label="ENDPOINT"
-														></v-text-field>
-													</v-flex>
-												</v-layout>
+													<v-layout row style="padding:0px,10px;">
+														<v-flex xs12 sm8 offset-sm2>
+															<v-text-field 
+																v-model="minio.id"
+																:counter="200"
+																label="ID"
+															></v-text-field>
+														</v-flex>
+													</v-layout>
 
-												<v-layout row style="padding:0px,10px;">
-													<v-flex xs12 sm8 offset-sm2>
+													<v-layout row style="padding:0px,10px;">
+														<v-flex xs12 sm8 offset-sm2>
+															<v-text-field 
+																v-model="minio.endpoint"
+																:counter="200"
+																label="ENDPOINT"
+															></v-text-field>
+														</v-flex>
+													</v-layout>
+
+													<v-layout row style="padding:0px,10px;">
+														<v-flex xs12 sm8 offset-sm2>
 														<v-text-field 
 															v-model="minio.region"
 															:counter="200"
@@ -780,195 +781,196 @@
 													</v-flex>										
 												</v-layout>
 												<v-layout row style="padding:0px,10px;">
-													<v-flex xs12 sm8 offset-sm2>
-														<v-text-field 
-															v-model="minio.secret_key"
-															:append-icon="showMinioSecretKey ? 'visibility_off' : 'visibility'"
-															:type="showMinioSecretKey ? 'text' : 'password'"
-															:counter="200"
-															label="SECRET KEY"
-															@click:append="showMinioSecretKey = !showMinioSecretKey"
-														></v-text-field>
+														<v-flex xs12 sm8 offset-sm2>
+															<v-text-field 
+																v-model="minio.secret_key"
+																:append-icon="showMinioSecretKey ? 'visibility_off' : 'visibility'"
+																:type="showMinioSecretKey ? 'text' : 'password'"
+																:counter="200"
+																label="SECRET KEY"
+																@click:append="showMinioSecretKey = !showMinioSecretKey"
+															></v-text-field>
+														</v-flex>
+													</v-layout>
+
+													<v-layout row style="padding:0px,10px;">
+														<v-flex xs12 sm8 offset-sm2>
+															<v-text-field 
+																v-model="minio.access_key"
+																:append-icon="showMinioAccessKey ? 'visibility_off' : 'visibility'"
+																:type="showMinioAccessKey ? 'text' : 'password'"
+																:counter="200"
+																label="ACCESS KEY"
+																@click:append="showMinioAccessKey = !showMinioAccessKey"
+															></v-text-field>
+														</v-flex>
+													</v-layout>
+
+													<v-layout row style="padding:0px,10px;">
+														<v-flex row xs12 sm8 offset-sm2>
+																<span style="margin-top:16px;padding-top:4px;color:#605C5C;padding-right:10px;">VERIFY</span>
+																<v-switch
+																	v-model="minio.verify"
+																></v-switch>
+														</v-flex>										
+													</v-layout>
+
+													<v-flex xs12 sm6 offset-sm3 v-show="showMinio">
+														<input type="file" id="minio" hidden="true" multiple />
+														<v-list subheader dense>
+															<v-subheader inset>MINIO</v-subheader>
+															<v-list-tile
+															v-for="(id,key) in MINIO_DICT"
+															:key="key"
+															avatar
+															@click.stop=""
+															style="margin-bottom:80px;"
+															>                                    
+																	
+
+																	<v-list-tile-content style="height:120px;margin-top:40px;">
+																		<v-list-tile-title style="padding-bottom:20px;">ID: {{key}}</v-list-tile-title>
+																		<v-list-tile-title style="padding-bottom:20px;">ENDPOINT: {{id.endpoint}}</v-list-tile-title>
+																		<v-list-tile-title style="padding-bottom:20px;">REGION: {{id.region}}</v-list-tile-title>
+																		<v-list-tile-title style="padding-bottom:20px;">SECRET KEY: <span class="hide_text">*********</span></v-list-tile-title>
+																		<v-list-tile-title style="padding-bottom:20px;">ACCESS KEY: <span class="hide_text">*********</span></v-list-tile-title>
+																		<v-list-tile-title style="padding-bottom:20px;">VERIFY: {{id.verify}}</v-list-tile-title>
+																		<!-- <v-list-tile-title>{{key}}</v-list-tile-title> -->
+																	</v-list-tile-content>
+
+																	<v-list-tile-action>
+																		<v-btn icon ripple @click="removeMinio(key)">
+																		<v-icon color="red lighten-1">remove_circle_outline</v-icon>
+																		</v-btn>
+																	</v-list-tile-action>
+															</v-list-tile>
+														</v-list>
 													</v-flex>
-												</v-layout>
 
-												<v-layout row style="padding:0px,10px;">
-													<v-flex xs12 sm8 offset-sm2>
-														<v-text-field 
-															v-model="minio.access_key"
-															:append-icon="showMinioAccessKey ? 'visibility_off' : 'visibility'"
-															:type="showMinioAccessKey ? 'text' : 'password'"
-															:counter="200"
-															label="ACCESS KEY"
-															@click:append="showMinioAccessKey = !showMinioAccessKey"
-														></v-text-field>
-													</v-flex>
-												</v-layout>
+													<v-card-actions class="text-md-center" >
+														<v-spacer></v-spacer>
+														<v-btn @click="includeMinio()"  color="info">ADD</v-btn>
+														
+													</v-card-actions>
 
-												<v-layout row style="padding:0px,10px;">
-													<v-flex row xs12 sm8 offset-sm2>
-															<span style="margin-top:16px;padding-top:4px;color:#605C5C;padding-right:10px;">VERIFY</span>
-															<v-switch
-																v-model="minio.verify"
-															></v-switch>
-													</v-flex>										
-												</v-layout>
+												</v-container>
+											</v-tab-item>
 
-												<v-flex xs12 sm6 offset-sm3 v-show="showMinio">
-													<input type="file" id="minio" hidden="true" multiple />
-													<v-list subheader dense>
-														<v-subheader inset>MINIO</v-subheader>
-														<v-list-tile
-														v-for="(id,key) in MINIO_DICT"
-														:key="key"
-														avatar
-														@click.stop=""
-														style="margin-bottom:80px;"
-														>                                    
-																
-
-																<v-list-tile-content style="height:120px;margin-top:40px;">
-																	<v-list-tile-title style="padding-bottom:20px;">ID: {{key}}</v-list-tile-title>
-																	<v-list-tile-title style="padding-bottom:20px;">ENDPOINT: {{id.endpoint}}</v-list-tile-title>
-																	<v-list-tile-title style="padding-bottom:20px;">REGION: {{id.region}}</v-list-tile-title>
-																	<v-list-tile-title style="padding-bottom:20px;">SECRET KEY: <span class="hide_text">*********</span></v-list-tile-title>
-																	<v-list-tile-title style="padding-bottom:20px;">ACCESS KEY: <span class="hide_text">*********</span></v-list-tile-title>
-																	<v-list-tile-title style="padding-bottom:20px;">VERIFY: {{id.verify}}</v-list-tile-title>
-																	<!-- <v-list-tile-title>{{key}}</v-list-tile-title> -->
-																</v-list-tile-content>
-
-																<v-list-tile-action>
-																	<v-btn icon ripple @click="removeMinio(key)">
-																	<v-icon color="red lighten-1">remove_circle_outline</v-icon>
-																	</v-btn>
-																</v-list-tile-action>
-														</v-list-tile>
-													</v-list>
-												</v-flex>
-
-												<v-card-actions class="text-md-center" >
-													<v-spacer></v-spacer>
-													<v-btn @click="includeMinio()"  color="info">ADD</v-btn>
+											<v-tab-item  :value="`tab-s3`">
+												<v-container>
 													
-												</v-card-actions>
+										
+													<v-layout row style="padding:0px,10px;justify-content: center;">										
+														<img src="../../img/amazon-s3.png" height="110px" alt=""> 
+													</v-layout>
+													<br>
+													<v-flex xs12 text-xs-center>
+														<span v-show="showErrorS3" style="color: #cc3300; font-size: 12px;"><b>To add a storage option you must complete all the information.</b></span>                   									
+													</v-flex>
+													<br>
+													<v-layout row style="padding:0px,10px;">
+														<v-flex xs12 sm8 offset-sm2>
+															<v-text-field 
+																v-model="s3.id"
+																:counter="200"
+																label="ID"
+															></v-text-field>
+														</v-flex>										
+													</v-layout>
 
-											</v-container>
-										</v-tab-item>
+													<v-layout row style="padding:0px,10px;">
+														<v-flex xs12 sm8 offset-sm2>
+															<v-text-field 
+																v-model="s3.access_key"
+																:append-icon="showS3AccessKey ? 'visibility_off' : 'visibility'"
+																:type="showS3AccessKey ? 'text' : 'password'"
+																:counter="200"
+																label="ACCESS KEY"
+																@click:append="showS3AccessKey = !showS3AccessKey"
+															></v-text-field>
+														</v-flex>
+													</v-layout>
 
-										<v-tab-item  :value="`tab-s3`">
-											<v-container>
-												
+													<v-layout row style="padding:0px,10px;">
+														<v-flex xs12 sm8 offset-sm2>
+															<v-text-field 
+																v-model="s3.secret_key"
+																:append-icon="showS3SecretKey ? 'visibility_off' : 'visibility'"
+																:type="showS3SecretKey ? 'text' : 'password'"
+																:counter="200"
+																label="SECRET KEY"
+																@click:append="showS3SecretKey = !showS3SecretKey"
+															></v-text-field>
+														</v-flex>
+													</v-layout>
+
+													<v-flex xs12 text-xs-center>
+														<span v-show="envrequiretoken" style="color: #cc3300; font-size: 12px;"><b>ACCESS TOKEN is required</b></span>                   									
+													</v-flex>
+
+													<v-layout row style="padding:0px,10px;">
+														<v-flex xs12 sm8 offset-sm2>
+															<v-text-field 
+																v-model="s3.region"
+																:counter="200"
+																label="REGION"
+															></v-text-field>
+														</v-flex>										
+													</v-layout>
+
+													<v-flex xs12 sm6 offset-sm3 v-show="showS3">
+														<input type="file" id="s3" hidden="true" multiple />
+														<v-list subheader dense>
+															<v-subheader inset>S3</v-subheader>
+															<v-list-tile
+															v-for="(id,key) in S3_DICT"
+															:key="key"
+															avatar
+															@click.stop=""
+															style="margin-bottom:40px;"
+															>                                    
+																	
+
+																	<v-list-tile-content style="height:80px;">
+																		<v-list-tile-title style="padding-bottom:20px;">ID: {{key}}</v-list-tile-title>
+																		<v-list-tile-title style="padding-bottom:20px;">ACCESS KEY: <span class="hide_text">*********</span></v-list-tile-title>
+																		<v-list-tile-title style="padding-bottom:20px;">SECRET TOKEN: <span class="hide_text">*********</span></v-list-tile-title>
+																		<v-list-tile-title style="padding-bottom:20px;">REGION: {{id.region}}</v-list-tile-title>
+																		<!-- <v-list-tile-title>{{key}}</v-list-tile-title> -->
+																	</v-list-tile-content>
+
+																	<v-list-tile-action>
+																		<v-btn icon ripple @click="removeS3(key)">
+																		<v-icon color="red lighten-1">remove_circle_outline</v-icon>
+																		</v-btn>
+																	</v-list-tile-action>
+															</v-list-tile>
+														</v-list>
+													</v-flex>
+
+													<v-card-actions class="text-md-center" >
+														<v-spacer></v-spacer>
+														<v-btn @click="includeS3()"  color="info">ADD</v-btn>
+														
+													</v-card-actions>
+
+
+												</v-container>
+											</v-tab-item>
+										</v-tabs-items>	
+									</v-card>
+								</div>
+								<v-card-actions style="background-color:white;">
+									<v-btn @click="closeWithoutSave()" flat color="grey">Cancel</v-btn>
+									<v-btn @click="cleanfieldMinio();cleanfieldOneData();cleanfieldS3()" flat color="red">Clear</v-btn>
+									<v-spacer></v-spacer>
+									<v-btn  @click="show('home')" flat color="primary">BACK</v-btn>								
+									<v-btn @click="show('input_output')" flat color="success">NEXT</v-btn>
 									
-												<v-layout row style="padding:0px,10px;justify-content: center;">										
-													<img src="../../img/amazon-s3.png" height="110px" alt=""> 
-												</v-layout>
-												<br>
-												<v-flex xs12 text-xs-center>
-													<span v-show="showErrorS3" style="color: #cc3300; font-size: 12px;"><b>To add a storage option you must complete all the information.</b></span>                   									
-												</v-flex>
-												<br>
-												<v-layout row style="padding:0px,10px;">
-													<v-flex xs12 sm8 offset-sm2>
-														<v-text-field 
-															v-model="s3.id"
-															:counter="200"
-															label="ID"
-														></v-text-field>
-													</v-flex>										
-												</v-layout>
-
-												<v-layout row style="padding:0px,10px;">
-													<v-flex xs12 sm8 offset-sm2>
-														<v-text-field 
-															v-model="s3.access_key"
-															:append-icon="showS3AccessKey ? 'visibility_off' : 'visibility'"
-															:type="showS3AccessKey ? 'text' : 'password'"
-															:counter="200"
-															label="ACCESS KEY"
-															@click:append="showS3AccessKey = !showS3AccessKey"
-														></v-text-field>
-													</v-flex>
-												</v-layout>
-
-												<v-layout row style="padding:0px,10px;">
-													<v-flex xs12 sm8 offset-sm2>
-														<v-text-field 
-															v-model="s3.secret_key"
-															:append-icon="showS3SecretKey ? 'visibility_off' : 'visibility'"
-															:type="showS3SecretKey ? 'text' : 'password'"
-															:counter="200"
-															label="SECRET KEY"
-															@click:append="showS3SecretKey = !showS3SecretKey"
-														></v-text-field>
-													</v-flex>
-												</v-layout>
-
-												<v-flex xs12 text-xs-center>
-													<span v-show="envrequiretoken" style="color: #cc3300; font-size: 12px;"><b>ACCESS TOKEN is required</b></span>                   									
-												</v-flex>
-
-												<v-layout row style="padding:0px,10px;">
-													<v-flex xs12 sm8 offset-sm2>
-														<v-text-field 
-															v-model="s3.region"
-															:counter="200"
-															label="REGION"
-														></v-text-field>
-													</v-flex>										
-												</v-layout>
-
-												<v-flex xs12 sm6 offset-sm3 v-show="showS3">
-													<input type="file" id="s3" hidden="true" multiple />
-													<v-list subheader dense>
-														<v-subheader inset>S3</v-subheader>
-														<v-list-tile
-														v-for="(id,key) in S3_DICT"
-														:key="key"
-														avatar
-														@click.stop=""
-														style="margin-bottom:40px;"
-														>                                    
-																
-
-																<v-list-tile-content style="height:80px;">
-																	<v-list-tile-title style="padding-bottom:20px;">ID: {{key}}</v-list-tile-title>
-																	<v-list-tile-title style="padding-bottom:20px;">ACCESS KEY: <span class="hide_text">*********</span></v-list-tile-title>
-																	<v-list-tile-title style="padding-bottom:20px;">SECRET TOKEN: <span class="hide_text">*********</span></v-list-tile-title>
-																	<v-list-tile-title style="padding-bottom:20px;">REGION: {{id.region}}</v-list-tile-title>
-																	<!-- <v-list-tile-title>{{key}}</v-list-tile-title> -->
-																</v-list-tile-content>
-
-																<v-list-tile-action>
-																	<v-btn icon ripple @click="removeS3(key)">
-																	<v-icon color="red lighten-1">remove_circle_outline</v-icon>
-																	</v-btn>
-																</v-list-tile-action>
-														</v-list-tile>
-													</v-list>
-												</v-flex>
-
-												<v-card-actions class="text-md-center" >
-													<v-spacer></v-spacer>
-													<v-btn @click="includeS3()"  color="info">ADD</v-btn>
-													
-												</v-card-actions>
-
-
-											</v-container>
-										</v-tab-item>
-									</v-tabs-items>	
-								</v-card>
-							</div>
-							<v-card-actions >
-								<v-btn @click="closeWithoutSave()" flat color="grey">Cancel</v-btn>
-								<v-btn @click="cleanfieldMinio();cleanfieldOneData();cleanfieldS3()" flat color="red">Clear</v-btn>
-								<v-spacer></v-spacer>
-								<v-btn  @click="show('home')" flat color="primary">BACK</v-btn>								
-								<v-btn @click="show('input_output')" flat color="success">NEXT</v-btn>
-								
-							</v-card-actions>						
-						</div>  
-					</div>									
+								</v-card-actions>						
+							</div>  
+						</div>									
+					</div>	
 				</v-form>			
 			</v-card>			
 		</v-dialog>    
@@ -1029,7 +1031,7 @@ export default {
 			envVarsAll:{},
 			limits_mem: '',
 			request_mem: '',
-			select_logLevel: 'INFO',
+			select_logLevel: '',
 			ONEDATA_DICT:{},
 			S3_DICT:{},
 			MINIO_DICT:{},
@@ -1109,7 +1111,8 @@ export default {
 			varsEnv: '',
 			editScript: false,
 			storages_all:[],
-			select_tab:''
+			select_tab:'',
+			disabled_submit:false
 
 
 		}
@@ -1721,6 +1724,7 @@ export default {
 
 		},
 		editFunction () {
+			console.log('here')
 			if (this.isEmpty(this.MINIO_DICT)==false) {
 				this.form.storage_provider["minio"]=this.MINIO_DICT
 			}
@@ -1759,6 +1763,8 @@ export default {
 				'storage_providers':this.form.storage_provider
 
 			}	
+			this.progress.active = true;
+			this.disabled_submit = true;
 			this.editServiceCall(params, this.editServiceCallBack)
 			
 		},
@@ -1772,7 +1778,9 @@ export default {
 			}else {
 				window.getApp.$emit('APP_SHOW_SNACKBAR', { text: response, color: 'error' })
 			}
-			this.progress.active = false
+			this.progress.active = false;
+			this.disabled_submit = false;
+
 
 		},
 		updateFunctionsGrid () {
@@ -1795,6 +1803,7 @@ export default {
 	},
   
 	created: function () {
+		this.select_logLevel = 'INFO';
 		window.getApp.$on('FUNC_OPEN_MANAGEMENT_DIALOG', (data) => {
 			this.dialog = true
 			this.editionMode = data.editionMode
@@ -1826,9 +1835,7 @@ export default {
 			}else{
 				this.showselectEnv = true
 			}
-			setTimeout(function(){
-				this.select_logLevel = data.log_Level
-			},100)
+			this.select_logLevel = data.log_Level
 			if (this.isEmpty(this.inputs)) {
 				this.showselectInput = false
 			}else{
