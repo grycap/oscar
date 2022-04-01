@@ -180,6 +180,9 @@ memory: 1Gi
 cpu: "1.0"
 total_memory: ""
 total_cpu: ""
+synchronous:
+  min_scale: 0
+  max_scale: 0
 log_level: ""
 image: testimage
 alpine: false
