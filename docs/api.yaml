@@ -361,6 +361,15 @@ components:
           type: string
         total_cpu:
           type: string
+        synchronous:
+          type: object
+          properties:
+            min_scale:
+              type: integer
+              default: 0
+            max_scale:
+              type: integer
+              default: 0
         token:
           type: string
           readOnly: true
