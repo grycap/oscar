@@ -77,10 +77,15 @@ helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/
 
 ### Deploy Knative Serving as Serverless Backend (OPTIONAL)
 
+OSCAR supports [Knative Serving](https://knative.dev/docs/serving/) as Serverless Backend to process [synchronous invocations](invoking.md#synchronous-invocations). If you want to deploy it in the kind cluster, first you must deploy the [Knative Operator](https://knative.dev/docs/install/operator/knative-with-operators/)
+
 ```
 kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.3.1/operator.yaml
 ```
 
+*Note that the above command deploys the version `v1.3.1` of the Operator. You can check if there are new versions [here](https://github.com/knative/operator/releases).*
+
+Once the Operator has been successfully deployed, you can install the Knative Serving stack with the following command:
 
 ```
 cat <<EOF | kubectl apply -f -
@@ -118,7 +123,7 @@ First, create the `oscar` and `oscar-svc` namespaces by executing:
 kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/yaml/oscar-namespaces.yaml
 ```
 
-Then, add the [grycap helm repo](https://github.com/grycap/helm-charts) and deploy by running the following commands replacing `<OSCAR_PASSWORD>` with a password of your choice and `<MINIO_PASSWORD>` with the MinIO rootPassword:
+Then, add the [grycap helm repo](https://github.com/grycap/helm-charts) and deploy by running the following commands replacing `<OSCAR_PASSWORD>` with a password of your choice and `<MINIO_PASSWORD>` with the MinIO rootPassword, and remember to add the flag `--set serverlessBackend=knative` if you deployed it in the previous step:
 
 ```sh
 helm repo add grycap https://grycap.github.io/helm-charts/
