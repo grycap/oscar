@@ -94,6 +94,12 @@ const (
 
 	// KnativeClusterLocalValue cluster-local value for the visibility label
 	KnativeClusterLocalValue = "cluster-local"
+
+	// KnativeAnnotationMinScale annotation key to set the minimum number of replicas for a Knative service
+	KnativeAnnotationMinScale = "autoscaling.knative.dev/min-scale"
+
+	// KnativeAnnotationMaxScale annotation key to set the maximum number of replicas for a Knative service
+	KnativeAnnotationMaxScale = "autoscaling.knative.dev/max-scale"
 )
 
 // YAMLMarshal package-level yaml marshal function
@@ -125,6 +131,18 @@ type Service struct {
 	// Same format as CPU, but internally translated to millicores (integer)
 	// Optional. (default: "")
 	TotalCPU string `json:"total_cpu"`
+
+	// Synchronous struct to configure specific sync parameters
+	// Only Knative ServerlessBackend applies this settings
+	// Optional.
+	Synchronous struct {
+		// MinScale minimum number of active replicas (pods) for the service
+		// Optional. (default: 0)
+		MinScale int `json:"min_scale"`
+		// MaxScale maximum number of active replicas (pods) for the service
+		// Optional. (default: 0 [Unlimited])
+		MaxScale int `json:"max_scale"`
+	} `json:"synchronous"`
 
 	// Log level for the FaaS Supervisor
 	// Optional. (default: INFO)

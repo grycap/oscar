@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/grycap/oscar/v2/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -225,6 +226,10 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 	// Add label "serving.knative.dev/visibility=cluster-local"
 	// https://knative.dev/docs/serving/services/private-services/
 	service.Labels[types.KnativeVisibilityLabel] = types.KnativeClusterLocalValue
+
+	// Set autoscaling bounds (min_scale and max_scale)
+	service.Annotations[types.KnativeAnnotationMinScale] = strconv.Itoa(service.Synchronous.MinScale)
+	service.Annotations[types.KnativeAnnotationMaxScale] = strconv.Itoa(service.Synchronous.MaxScale)
 
 	podSpec, err := service.ToPodSpec(kn.config)
 	if err != nil {
