@@ -227,10 +227,6 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 	// https://knative.dev/docs/serving/services/private-services/
 	service.Labels[types.KnativeVisibilityLabel] = types.KnativeClusterLocalValue
 
-	// Set autoscaling bounds (min_scale and max_scale)
-	service.Annotations[types.KnativeAnnotationMinScale] = strconv.Itoa(service.Synchronous.MinScale)
-	service.Annotations[types.KnativeAnnotationMaxScale] = strconv.Itoa(service.Synchronous.MaxScale)
-
 	podSpec, err := service.ToPodSpec(kn.config)
 	if err != nil {
 		return nil, err
@@ -249,6 +245,13 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 		Spec: knv1.ServiceSpec{
 			ConfigurationSpec: knv1.ConfigurationSpec{
 				Template: knv1.RevisionTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							// Set autoscaling bounds (min_scale and max_scale)
+							types.KnativeAnnotationMinScale: strconv.Itoa(service.Synchronous.MinScale),
+							types.KnativeAnnotationMaxScale: strconv.Itoa(service.Synchronous.MaxScale),
+						},
+					},
 					Spec: knv1.RevisionSpec{
 						ContainerConcurrency: &containerConcurrency,
 						PodSpec:              *podSpec,
