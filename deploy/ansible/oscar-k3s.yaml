@@ -51,6 +51,7 @@
     kube_install_nfs_client: true
     kube_deploy_dashboard: true
     kube_nfs_server: '{{ ansible_host }}.localdomain'
+    kube_version: "1.23.5"
     kube_cert_manager: true
     kube_public_dns_name: '{{ dns_host }}'
     kube_apiserver_options:
@@ -64,8 +65,9 @@
     public_hostname_api: "{{ minio_dns_host }}"
     public_hostname_console: "{{ minio_dns_host_console }}"
   - role: 'grycap.kubefaas'
+    faas_framework: 'knative'
+    knative_version: "1.3.0"
     master_deploy: true
-    functions_namespace: oscar-svc
   - role: 'grycap.kubeoscar'
     oscar_pass: '{{ oscar_password }}'
     create_ingress: true
@@ -73,8 +75,7 @@
     minio_endpoint:  'https://{{ minio_dns_host }}'
     minio_secret_key: '{{ minio_password }}'
     master_deploy: true
-    openfaas_scaler_enable: true
-    serverless_backend: "openfaas"
+    serverless_backend: "knative"
 
 - name: Configure WN(s)
   hosts: wn
@@ -91,5 +92,6 @@
   - role: grycap.kubernetes
     kube_install_method: k3s
     kube_type_of_node: 'wn'
+    kube_version: "1.23.5"
     kube_server: "{{ groups['front'][0] }}"
     kube_api_server: "{{ groups['front'][0] }}"
