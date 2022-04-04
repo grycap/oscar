@@ -302,6 +302,8 @@ export default {
 				output: this.services[index].outputs,
 				log_Level: this.services[index].logLevel,
 				envVars: this.services[index].envVars,
+				annotations: this.services[index].annotations?this.services[index].annotations:{},
+				labels: this.services[index].labels?this.services[index].labels:{},
 				cpu: this.services[index].cpu,
 				script: this.services[index].script,
 				memory: this.services[index].memory,

@@ -1986,22 +1986,27 @@ export default {
 			for (let i = 0; i < key.length; i++) {
 				this.envVars[key[i]]=values[i]
 			}
-			if(key.length){
+			if(key.length > 0){
 				this.showselectEnv = true
 			}else{
 				this.showselectEnv = true
+			}			
+			if(Object.keys(data.annotations).length > 0){
+				this.annotations = data.annotations;
+				this.showselectAnn = true;
+			}else{
+				this.annotations = {};
+				this.showselectAnn = false;
+				
 			}
-			var key=''
-			var values= ''
+			if(Object.keys(data.labels).length > 0){
+				this.labels = data.labels;
+				this.showselectLabel = true;
+			}else{
+				this.showselectLabel = false;
+				this.labels = {};
+			}
 			
-			for (let i = 0; i < key.length; i++) {
-				this.envVars[key[i]]=values[i]
-			}
-			if(key.length){
-				this.showselectEnv = true
-			}else{
-				this.showselectEnv = true
-			}
 			this.select_logLevel = data.log_Level
 			if (this.isEmpty(this.inputs)) {
 				this.showselectInput = false
