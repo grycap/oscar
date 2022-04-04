@@ -231,6 +231,114 @@
 															</v-list-tile>
 														</v-list>
 													</v-flex>
+
+													<v-layout row wrap>
+														<div class="form-group" style="width:100%">                     
+														<div class="input-group">
+															<v-flex xs12 sm5>
+																<v-text-field
+																	v-model="form.annotkey"
+																	:counter="200"
+																	label="Annotation (key)"		
+																	style="padding-right: 5px;"									
+																></v-text-field>
+															</v-flex>	
+															<v-flex xs10 sm5>
+																<v-text-field
+																	v-model="form.annotvalue"
+																	:counter="200"
+																	label="Annotation (value)"		
+																	style="padding-right: 5px;"									
+																></v-text-field>
+															</v-flex>	
+															
+															<v-flex xs2 sm2 style="padding-top:20px;" >
+																<div  class="input-group-append mr-2">  														                    
+																	<button class="" @click="includeAnnot()" type="button"><v-icon left color="green">check_circle</v-icon></button>
+																	<button class="" @click="cleanfieldAnn()" type="button" ><v-icon left color="red">cancel</v-icon></button>                        
+																</div>
+															</v-flex>
+														</div>            
+														</div> 
+													</v-layout>
+
+													<v-flex xs12 sm6 offset-sm3 v-show="showselectAnn">
+														<input type="file" id="envs" hidden="true" multiple />
+														<v-list subheader dense>
+															<v-subheader inset>Annotations</v-subheader>
+															<v-list-tile
+															v-for="(enVar,key) in annotations"
+															:key="key"
+															avatar
+															@click.stop=""
+															>       
+
+																	<v-list-tile-content>
+																		<v-list-tile-title>{{key}}:{{annotations[key]}}</v-list-tile-title>
+																	</v-list-tile-content>
+
+																	<v-list-tile-action>
+																		<v-btn icon ripple @click="removeAnn(key)">
+																		<v-icon color="red lighten-1">remove_circle_outline</v-icon>
+																		</v-btn>
+																	</v-list-tile-action>
+															</v-list-tile>
+														</v-list>
+													</v-flex>
+
+													<v-layout row wrap>
+														<div class="form-group" style="width:100%">                     
+														<div class="input-group">
+															<v-flex xs12 sm5>
+																<v-text-field
+																	v-model="form.labelskey"
+																	:counter="200"
+																	label="Label (key)"		
+																	style="padding-right: 5px;"									
+																></v-text-field>
+															</v-flex>	
+															<v-flex xs10 sm5>
+																<v-text-field
+																	v-model="form.labelsvalue"
+																	:counter="200"
+																	label="Label (value)"		
+																	style="padding-right: 5px;"									
+																></v-text-field>
+															</v-flex>	
+															
+															<v-flex xs2 sm2 style="padding-top:20px;" >
+																<div  class="input-group-append mr-2">  														                    
+																	<button class="" @click="includeLabels()" type="button"><v-icon left color="green">check_circle</v-icon></button>
+																	<button class="" @click="cleanfieldLabels()" type="button" ><v-icon left color="red">cancel</v-icon></button>                        
+																</div>
+															</v-flex>
+														</div>            
+														</div> 
+													</v-layout>
+
+													<v-flex xs12 sm6 offset-sm3 v-show="showselectLabel">
+														<input type="file" id="envs" hidden="true" multiple />
+														<v-list subheader dense>
+															<v-subheader inset>Labels</v-subheader>
+															<v-list-tile
+															v-for="(enVar,key) in labels"
+															:key="key"
+															avatar
+															@click.stop=""
+															>       
+
+																	<v-list-tile-content>
+																		<v-list-tile-title>{{key}}:{{labels[key]}}</v-list-tile-title>
+																	</v-list-tile-content>
+
+																	<v-list-tile-action>
+																		<v-btn icon ripple @click="removeLabels(key)">
+																		<v-icon color="red lighten-1">remove_circle_outline</v-icon>
+																		</v-btn>
+																	</v-list-tile-action>
+															</v-list-tile>
+														</v-list>
+													</v-flex>
 													
 													<v-layout row wrap>
 														<v-flex xs12 sm5>
@@ -1003,13 +1111,14 @@ export default {
 			suffixs_out:[],  
 			showUploading: false,
 			showselectEnv: false,
+			showselectAnn: false,
+			showselectLabel: false,
 			showselectInput: false,
 			showselectPrefixIn: false,
 			showselectSuffixIn: false,
 			showselectOutput: false,
 			showselectPrefixOut: false,
-			showselectSuffixOut: false,
-			showselectAnn: false,
+			showselectSuffixOut: false,		
 			showOneDataToken: false,
 			showS3AccessKey: false,
 			showS3SecretKey: false,
@@ -1028,6 +1137,8 @@ export default {
 			envrequiretoken : false,
 			envrequirespace : false,
 			envVars:{},
+			annotations:{},
+			labels:{},
 			envVarsAll:{},
 			limits_mem: '',
 			request_mem: '',
@@ -1070,6 +1181,10 @@ export default {
 				],
 				envVarskey: "",
 				envVarsValue: "",	
+				annotkey:"",
+				annotvalue:"",
+				labelskey:"",
+				labelsvalue:"",
 				path_in:"",
 				log_level:['CRITICAL','ERROR','WARNING','INFO','DEBUG','NOTSET'],
 				storage_provider_in:"",
@@ -1201,6 +1316,14 @@ export default {
 			this.form.envVarskey=""
 			this.form.envVarsValue=""
 		},		
+		cleanfieldAnn(){
+			this.form.annotkey=""
+			this.form.annotvalue=""
+		},		
+		cleanfieldLabels(){
+			this.form.labelskey=""
+			this.form.labelsvalue=""
+		},		
 		cleanfieldInput(){
 			this.form.path_in=""		
 			this.form.storage_provider_in=""	
@@ -1314,6 +1437,24 @@ export default {
 				var value = this.form.envVarsValue.replace(" ", "")
 				this.envVars[key]=value
 				this.cleanfieldenv()						
+			}
+		},		
+		includeAnnot(){
+			if(this.form.annotkey != null && this.form.annotkey != '' && this.form.annotvalue != null && this.form.annotvalue != ''){
+				this.showselectAnn=true
+				var key= this.form.annotkey.replace(" ", "")
+				var value = this.form.annotvalue.replace(" ", "")
+				this.annotations[key]=value
+				this.cleanfieldAnn()						
+			}
+		},		
+		includeLabels(){
+			if(this.form.labelskey != null && this.form.labelskey != '' && this.form.labelsvalue != null && this.form.labelsvalue != ''){
+				this.showselectLabel=true
+				var key= this.form.labelskey.replace(" ", "")
+				var value = this.form.labelsvalue.replace(" ", "")
+				this.labels[key]=value
+				this.cleanfieldLabels()						
 			}
 		},		
 		includeOneData(){
@@ -1434,6 +1575,18 @@ export default {
 			this.$delete(this.envVars,key)			
 			if (this.isEmpty(this.envVars)) {
 				this.showselectEnv = false
+			}		
+		},	
+		removeAnn (key) {     
+			this.$delete(this.annotations,key)			
+			if (this.isEmpty(this.annotations)) {
+				this.showselectAnn = false
+			}		
+		},	
+		removeLabels (key) {     
+			this.$delete(this.labels,key)			
+			if (this.isEmpty(this.labels)) {
+				this.showselectLabel = false
 			}		
 		},	
 		removeInput (key) {     
@@ -1700,6 +1853,8 @@ export default {
 				'environment': {
 					"Variables":this.envVars
 				},
+				'annotations':this.annotations,
+				'labels':this.labels,
 				'input': this.inputs,
 				'output': this.outputs,
 				'script': this.base64String,
@@ -1724,7 +1879,6 @@ export default {
 
 		},
 		editFunction () {
-			console.log('here')
 			if (this.isEmpty(this.MINIO_DICT)==false) {
 				this.form.storage_provider["minio"]=this.MINIO_DICT
 			}
@@ -1757,6 +1911,8 @@ export default {
 				'environment': {
 					"Variables":this.envVars
 				},
+				'annotations':this.annotations,
+				'labels':this.labels,
 				'input': this.inputs,
 				'output': this.outputs,
 				'script': this.base64String,
@@ -1827,6 +1983,17 @@ export default {
 			var values= ''
 			key = Object.keys(data.envVars.Variables)
 			values = Object.values(data.envVars.Variables)
+			for (let i = 0; i < key.length; i++) {
+				this.envVars[key[i]]=values[i]
+			}
+			if(key.length){
+				this.showselectEnv = true
+			}else{
+				this.showselectEnv = true
+			}
+			var key=''
+			var values= ''
+			
 			for (let i = 0; i < key.length; i++) {
 				this.envVars[key[i]]=values[i]
 			}
