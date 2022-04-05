@@ -34,7 +34,7 @@ import (
 // KnativeBackend struct to represent a Knative client
 type KnativeBackend struct {
 	kubeClientset kubernetes.Interface
-	knClientset   *knclientset.Clientset
+	knClientset   knclientset.Interface
 	namespace     string
 	config        *types.Config
 }
