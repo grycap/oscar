@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/grycap/oscar/v2/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +34,7 @@ import (
 // KnativeBackend struct to represent a Knative client
 type KnativeBackend struct {
 	kubeClientset kubernetes.Interface
-	knClientset   *knclientset.Clientset
+	knClientset   knclientset.Interface
 	namespace     string
 	config        *types.Config
 }
@@ -244,6 +245,13 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 		Spec: knv1.ServiceSpec{
 			ConfigurationSpec: knv1.ConfigurationSpec{
 				Template: knv1.RevisionTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							// Set autoscaling bounds (min_scale and max_scale)
+							types.KnativeAnnotationMinScale: strconv.Itoa(service.Synchronous.MinScale),
+							types.KnativeAnnotationMaxScale: strconv.Itoa(service.Synchronous.MaxScale),
+						},
+					},
 					Spec: knv1.RevisionSpec{
 						ContainerConcurrency: &containerConcurrency,
 						PodSpec:              *podSpec,

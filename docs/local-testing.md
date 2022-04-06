@@ -75,6 +75,46 @@ helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/
 
 *Some Linux distributions may have [problems](https://github.com/kubernetes-sigs/kind/issues/1487#issuecomment-694920754) using the [NFS server provisioner](https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner) with kind due to its default configuration of kernel-limit file descriptors. To workaround it, please run `sudo sysctl -w fs.nr_open=1048576`.*
 
+### Deploy Knative Serving as Serverless Backend (OPTIONAL)
+
+OSCAR supports [Knative Serving](https://knative.dev/docs/serving/) as Serverless Backend to process [synchronous invocations](invoking.md#synchronous-invocations). If you want to deploy it in the kind cluster, first you must deploy the [Knative Operator](https://knative.dev/docs/install/operator/knative-with-operators/)
+
+```
+kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.3.1/operator.yaml
+```
+
+*Note that the above command deploys the version `v1.3.1` of the Operator. You can check if there are new versions [here](https://github.com/knative/operator/releases).*
+
+Once the Operator has been successfully deployed, you can install the Knative Serving stack with the following command:
+
+```
+cat <<EOF | kubectl apply -f -
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: knative-serving
+---
+apiVersion: operator.knative.dev/v1beta1
+kind: KnativeServing
+metadata:
+  name: knative-serving
+  namespace: knative-serving
+spec:
+  version: 1.3.0
+  ingress:
+    kourier:
+      enabled: true
+      service-type: ClusterIP
+  config:
+    config-features:
+      kubernetes.podspec-persistent-volume-claim: enabled
+      kubernetes.podspec-persistent-volume-write: enabled
+    network:
+      ingress-class: "kourier.ingress.networking.knative.dev"
+EOF
+```
+
 ### Deploy OSCAR
 
 First, create the `oscar` and `oscar-svc` namespaces by executing:
@@ -83,7 +123,7 @@ First, create the `oscar` and `oscar-svc` namespaces by executing:
 kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/yaml/oscar-namespaces.yaml
 ```
 
-Then, add the [grycap helm repo](https://github.com/grycap/helm-charts) and deploy by running the following commands replacing `<OSCAR_PASSWORD>` with a password of your choice and `<MINIO_PASSWORD>` with the MinIO rootPassword:
+Then, add the [grycap helm repo](https://github.com/grycap/helm-charts) and deploy by running the following commands replacing `<OSCAR_PASSWORD>` with a password of your choice and `<MINIO_PASSWORD>` with the MinIO rootPassword, and remember to add the flag `--set serverlessBackend=knative` if you deployed it in the previous step:
 
 ```sh
 helm repo add grycap https://grycap.github.io/helm-charts/

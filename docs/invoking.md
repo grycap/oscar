@@ -11,7 +11,7 @@ As detailed in the [API specification](api.md), invocation paths require the ser
 
 ## Synchronous invocations
 
-Synchronous invocations allow obtaining the execution output as the response to the HTTP call to the `/run/<SERVICE_NAME>` path. For this, OSCAR delegates the execution to a Serverless Backend (currently only [OpenFaaS](https://www.openfaas.com/) is supported, but we plan to integrate [Knative](https://knative.dev) in the near future). Unlike asynchronous invocations that are translated into Kubernetes jobs, synchronous invocations use a "function" pod to handle requests. This is possible thanks to the [OpenFaaS Watchdog](https://github.com/openfaas/of-watchdog), which is injected into each service and is in charge of forking the process to be executed for each request received.
+Synchronous invocations allow obtaining the execution output as the response to the HTTP call to the `/run/<SERVICE_NAME>` path. For this, OSCAR delegates the execution to a Serverless Backend ([Knative](https://knative.dev) or [OpenFaaS](https://www.openfaas.com/)). Unlike asynchronous invocations, that are translated into Kubernetes jobs, synchronous invocations use a "function" pod to handle requests. This is possible thanks to the [OpenFaaS Watchdog](https://github.com/openfaas/classic-watchdog), which is injected into each service and is in charge of forking the process to be executed for each request received.
 
 ![oscar-sync.png](images/oscar-sync.png)
 
