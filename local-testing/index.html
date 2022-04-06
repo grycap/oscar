@@ -324,6 +324,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#deploy-knative-serving-as-serverless-backend-optional" class="md-nav__link">
+    Deploy Knative Serving as Serverless Backend (OPTIONAL)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#deploy-oscar" class="md-nav__link">
     Deploy OSCAR
   </a>
@@ -603,6 +610,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#deploy-knative-serving-as-serverless-backend-optional" class="md-nav__link">
+    Deploy Knative Serving as Serverless Backend (OPTIONAL)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#deploy-oscar" class="md-nav__link">
     Deploy OSCAR
   </a>
@@ -694,11 +708,43 @@ helm install minio minio/minio --namespace minio --set rootUser=minio,rootPasswo
 helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner
 </code></pre>
 <p><em>Some Linux distributions may have <a href="https://github.com/kubernetes-sigs/kind/issues/1487#issuecomment-694920754">problems</a> using the <a href="https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner">NFS server provisioner</a> with kind due to its default configuration of kernel-limit file descriptors. To workaround it, please run <code>sudo sysctl -w fs.nr_open=1048576</code>.</em></p>
+<h3 id="deploy-knative-serving-as-serverless-backend-optional">Deploy Knative Serving as Serverless Backend (OPTIONAL)</h3>
+<p>OSCAR supports <a href="https://knative.dev/docs/serving/">Knative Serving</a> as Serverless Backend to process <a href="../invoking/#synchronous-invocations">synchronous invocations</a>. If you want to deploy it in the kind cluster, first you must deploy the <a href="https://knative.dev/docs/install/operator/knative-with-operators/">Knative Operator</a></p>
+<pre><code>kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.3.1/operator.yaml
+</code></pre>
+<p><em>Note that the above command deploys the version <code>v1.3.1</code> of the Operator. You can check if there are new versions <a href="https://github.com/knative/operator/releases">here</a>.</em></p>
+<p>Once the Operator has been successfully deployed, you can install the Knative Serving stack with the following command:</p>
+<pre><code>cat &lt;&lt;EOF | kubectl apply -f -
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: knative-serving
+---
+apiVersion: operator.knative.dev/v1beta1
+kind: KnativeServing
+metadata:
+  name: knative-serving
+  namespace: knative-serving
+spec:
+  version: 1.3.0
+  ingress:
+    kourier:
+      enabled: true
+      service-type: ClusterIP
+  config:
+    config-features:
+      kubernetes.podspec-persistent-volume-claim: enabled
+      kubernetes.podspec-persistent-volume-write: enabled
+    network:
+      ingress-class: &quot;kourier.ingress.networking.knative.dev&quot;
+EOF
+</code></pre>
 <h3 id="deploy-oscar">Deploy OSCAR</h3>
 <p>First, create the <code>oscar</code> and <code>oscar-svc</code> namespaces by executing:</p>
 <pre><code class="language-sh">kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/yaml/oscar-namespaces.yaml
 </code></pre>
-<p>Then, add the <a href="https://github.com/grycap/helm-charts">grycap helm repo</a> and deploy by running the following commands replacing <code>&lt;OSCAR_PASSWORD&gt;</code> with a password of your choice and <code>&lt;MINIO_PASSWORD&gt;</code> with the MinIO rootPassword:</p>
+<p>Then, add the <a href="https://github.com/grycap/helm-charts">grycap helm repo</a> and deploy by running the following commands replacing <code>&lt;OSCAR_PASSWORD&gt;</code> with a password of your choice and <code>&lt;MINIO_PASSWORD&gt;</code> with the MinIO rootPassword, and remember to add the flag <code>--set serverlessBackend=knative</code> if you deployed it in the previous step:</p>
 <pre><code class="language-sh">helm repo add grycap https://grycap.github.io/helm-charts/
 helm install --namespace=oscar oscar grycap/oscar --set authPass=&lt;OSCAR_PASSWORD&gt; --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=&lt;MINIO_PASSWORD&gt;
 </code></pre>

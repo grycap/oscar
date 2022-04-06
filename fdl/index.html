@@ -408,6 +408,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#synchronoussettings" class="md-nav__link">
+    SynchronousSettings
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#storageioconfig" class="md-nav__link">
     StorageIOConfig
   </a>
@@ -575,6 +582,13 @@
         <li class="md-nav__item">
   <a href="#service" class="md-nav__link">
     Service
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#synchronoussettings" class="md-nav__link">
+    SynchronousSettings
   </a>
   
 </li>
@@ -753,6 +767,10 @@ storage_providers:
 <td>Limit for the virtual CPUs used by all the service's jobs running simultaneously. Apache YuniKorn scheduler is required to work. Same format as CPU, but internally translated to millicores (integer). Optional (default: "")</td>
 </tr>
 <tr>
+<td><code>synchronous</code> </br> <em><a href="#synchronoussettings">SynchronousSettings</a></em></td>
+<td>Struct to configure specific sync parameters. This settings are only applied on Knative ServerlessBackend. Optional.</td>
+</tr>
+<tr>
 <td><code>log_level</code> </br> <em>string</em></td>
 <td>Log level for the FaaS Supervisor. Available levels: NOTSET, DEBUG, INFO, WARNING, ERROR and CRITICAL. Optional (default: INFO)</td>
 </tr>
@@ -775,6 +793,25 @@ storage_providers:
 <tr>
 <td><code>labels</code> </br> <em>map[string]string</em></td>
 <td>User-defined Kubernetes <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/">labels</a> to be set in job's definition. Optional</td>
+</tr>
+</tbody>
+</table>
+<h2 id="synchronoussettings">SynchronousSettings</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>min_scale</code> </br> <em>integer</em></td>
+<td>Minimum number of active replicas (pods) for the service. Optional. (default: 0)</td>
+</tr>
+<tr>
+<td><code>max_scale</code> </br> <em>integer</em></td>
+<td>Maximum number of active replicas (pods) for the service. Optional. (default: 0 (Unlimited))</td>
 </tr>
 </tbody>
 </table>
