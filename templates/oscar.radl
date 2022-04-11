@@ -92,9 +92,9 @@ configure front (
       minio_secret_key: '{{ minio_secret }}'
       minio_tls_verify: false
       master_deploy: true
-      oscar_version: "2.4.0"
+      oscar_version: "2.4.2"
       supervisor_version: "1.5.0"
-      oscar_cli_version: "v1.2.4"
+      oscar_cli_version: "v1.2.5"
       serverless_backend: "knative"
 
     - role: 'grycap.im'
