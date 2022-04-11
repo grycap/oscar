@@ -89,6 +89,16 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			Value: jobUUID,
 		}
 
+		// Make RESOURCE_ID envVar
+		resourceIDVar := v1.EnvVar{
+			Name: "RESOURCE_ID",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{
+					FieldPath: "spec.nodeName",
+				},
+			},
+		}
+
 		// Get podSpec from the service
 		podSpec, err := service.ToPodSpec(cfg)
 		if err != nil {
@@ -103,6 +113,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 				podSpec.Containers[i].Args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath())}
 				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, event)
 				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, jobUUIDVar)
+				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, resourceIDVar)
 			}
 		}
 
