@@ -10,6 +10,8 @@ NFS_HELM_NAME="nfs-server-provisioner"
 OSCAR_HELM_NAME="oscar"
 MIN_PASS_CHAR=8
 
+#TODO check exit in MacOS
+
 #Check if Docker is installed
 checkDocker(){
     if  ! command -v docker &> /dev/null; then
@@ -62,10 +64,11 @@ checkHelm(){
 checkKind(){
     if  ! command -v kind &> /dev/null; then
     echo -e "$RED[*]$END_COLOR Kind installation not found."
-    read -s "Kind allows you to create a local kubernetes cluster easly. Do you want to install it? [y/n]"
+    read -p "Kind allows you to create a local kubernetes cluster easly. Do you want to install it? [y/n]" res
     #Installation here
         if [ `echo $res | tr '[:upper:]' '[:lower:]'` == "y" ]; then
-            curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-$(uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]')-amd64
+            #Forced to accept insecure cert
+            curl -k -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-$(uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]')-amd64
             chmod +x ./kind
 
             if `whoami` 2>/dev/null != "root"; then
@@ -177,7 +180,6 @@ EOF
 
 #Create kind cluster
 echo -e "\n[*] Creating kind cluster"
-#Cambiar a eof
 kind create cluster --config=$CONFIG_FILEPATH
 
 #Deploy nginx ingress
@@ -195,8 +197,7 @@ echo -e "\n[*] Deploying NFS server provider ..."
 helm repo add nfs-ganesha-server-and-external-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
 helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner
 
-#Ask use of knative
-
+#Deploy Knative Serving
 if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
     deployKnative
 fi
