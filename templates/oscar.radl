@@ -73,7 +73,7 @@ configure front (
       kube_deploy_dashboard: true
       kube_install_metrics: true
       kube_install_nfs_client: true
-      kube_version: "1.23.5"
+      kube_version: "1.23.6"
 
     - role: 'grycap.kubeminio'
       minio_secretkey: '{{ minio_secret }}'
@@ -140,7 +140,7 @@ configure wn (
     - role: 'grycap.kubernetes'
       kube_type_of_node: 'wn'
       kube_server: 'kubeserver'
-      kube_version: "1.23.5"
+      kube_version: "1.23.6"
 
 @end
 )
