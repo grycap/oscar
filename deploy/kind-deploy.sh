@@ -94,7 +94,7 @@ checkKind(){
 }
 
 checkIngressStatus(){
-    timeout=100
+    timeout=500
     echo -e "\n[*] Waiting for running ingress-controller pod ..."
     sleep 5
     start=$(date +%s)
