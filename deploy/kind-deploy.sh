@@ -32,7 +32,7 @@ checkKubectl(){
     #Installation here
         if [ $(echo $res | tr '[:upper:]' '[:lower:]') == "y" ]; then
             curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/$(uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]')/amd64/kubectl"
-            if [ $(uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]') == "darwin" ] then
+            if [ $(uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]') == "darwin" ]; then
                 chmod +x ./kubectl
                 sudo mv ./kubectl /usr/local/bin/kubectl
                 sudo chown root: /usr/local/bin/kubectl
@@ -104,6 +104,7 @@ checkIngressStatus(){
         if [ `expr $actual - $start` -gt $timeout ]; then
             echo -e "\n$RED[!]$END_COLOR Error: Timeout"
             exit
+        fi
     done
     echo -e "\n[$CHECK] ingress-controller pod running correctly"
 }
@@ -117,6 +118,7 @@ checkOSCARDeploy(){
         if [ `expr $actual - $start` -gt $timeout ]; then
             echo -e "\n$RED[!]$END_COLOR Error: Timeout"
             exit
+        fi
     done
     echo -e "\n[$CHECK] OSCAR platform deployed correctly"
     echo -e "\n > You can now acces to the OSCAR web interface through https://localhost"
