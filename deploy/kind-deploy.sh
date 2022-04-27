@@ -28,10 +28,17 @@ checkDocker(){
 checkKubectl(){
     if  ! command -v kubectl &> /dev/null; then
     echo -e "$RED[*]$END_COLOR kubectl installation not found."
-    read -s "Kubectl is required to communicate with the Kubernetes cluster. Do you want to install it? [y/n]" res
+    read -p "Kubectl is required to communicate with the Kubernetes cluster. Do you want to install it? [y/n]" res
     #Installation here
-        if [ `echo $res | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+        if [ $(echo $res | tr '[:upper:]' '[:lower:]') == "y" ]; then
             curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/$(uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]')/amd64/kubectl"
+            if [ $(uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]') == "darwin" ] then
+                chmod +x ./kubectl
+                sudo mv ./kubectl /usr/local/bin/kubectl
+                sudo chown root: /usr/local/bin/kubectl
+            else
+                sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+            fi
         else
             "Stopping execution ... "
             exit
@@ -47,7 +54,7 @@ checkHelm(){
     echo -e "$RED[*]$END_COLOR Helm installation not found."
     read -p "Helm is required to deploy applications in kubernetes. Do you want to install it? [y/n] " res
     #Installation here
-        if [ `echo $res | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+        if [ $(echo $res | tr '[:upper:]' '[:lower:]') == "y" ]; then
             curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
             chmod 700 get_helm.sh
             ./get_helm.sh
@@ -66,7 +73,7 @@ checkKind(){
     echo -e "$RED[*]$END_COLOR Kind installation not found."
     read -p "Kind allows you to create a local kubernetes cluster easly. Do you want to install it? [y/n]" res
     #Installation here
-        if [ `echo $res | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+        if [ $(echo $res | tr '[:upper:]' '[:lower:]') == "y" ]; then
             #Forced to accept insecure cert
             curl -k -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-$(uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]')-amd64
             chmod +x ./kind
@@ -86,22 +93,35 @@ checkKind(){
     fi
 }
 
-checkIngressStatus(){ #TODO add timeout
+checkIngressStatus(){
+    timeout=100
     echo -e "\n[*] Waiting for running ingress-controller pod ..."
     sleep 5
+    start=$(date +%s)
     while [ "$status" != "Running" ]; do
         status=`kubectl get pods -n ingress-nginx 2>/dev/null | awk '/controller/ {print $3}'`
+        actual=$(date +%s)
+        if [ `expr $actual - $start` -gt $timeout ]; then
+            echo -e "\n$RED[!]$END_COLOR Error: Timeout"
+            exit
     done
-    echo -e "\n[$CHECK ] ingress-controller pod running correctly"
+    echo -e "\n[$CHECK] ingress-controller pod running correctly"
 }
 
-checkOSCARDeploy(){ #TODO add timeout
+checkOSCARDeploy(){
+    timeout=100
+    start=$(date +%s)
     while [ "$status" != "Running" ]; do
         status=`kubectl get pods -n oscar 2>/dev/null | awk '/oscar/ {print $3}'`
+        actual=$(date +%s)
+        if [ `expr $actual - $start` -gt $timeout ]; then
+            echo -e "\n$RED[!]$END_COLOR Error: Timeout"
+            exit
     done
-    echo -e "\n[$CHECK ] OSCAR platform deployed correctly"
+    echo -e "\n[$CHECK] OSCAR platform deployed correctly"
     echo -e "\n > You can now acces to the OSCAR web interface through https://localhost"
     echo -e " > You can now access to MinIO console through https://localhost:30300 \n"
+    echo -e "\n[*] Note: To delete the cluster type 'kind delete cluster'"
 }
 
 deployKnative(){
@@ -182,6 +202,11 @@ EOF
 echo -e "\n[*] Creating kind cluster"
 kind create cluster --config=$CONFIG_FILEPATH
 
+if [ ! `kubectl cluster-info --context kind-kind` &> /dev/null ]; then
+    echo -e "$RED[*]$END_COLOR Kind cluster not found."
+    echo "Stopping execution ...."
+    exit
+fi
 #Deploy nginx ingress
 echo -e "\n[*] Deploying NGINX Ingress ..."
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/kind/deploy.yaml
