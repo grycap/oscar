@@ -9,8 +9,20 @@ MINIO_HELM_NAME="minio"
 NFS_HELM_NAME="nfs-server-provisioner"
 OSCAR_HELM_NAME="oscar"
 MIN_PASS_CHAR=8
+OSCAR_PASSWORD=`< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-8}`
+MINIO_PASSWORD=`< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-8}` 
 
-#TODO check exit in MacOS
+showInfo(){
+    echo "[*] This script will install a Kubernetes cluster using Kind along with all the required OSCAR services (if not installed): "
+    echo -e "\n- MinIO"
+    echo -e "- Helm"
+    echo -e "- Kubectl\n"
+    read -p "No additional changes to your system will be performed. Would you like to continue? Y/n? [y/n] " res
+
+    if [ $(echo $res | tr '[:upper:]' '[:lower:]') == 'n' ]; then 
+        exit
+    fi
+}
 
 #Check if Docker is installed
 checkDocker(){
@@ -20,6 +32,10 @@ checkDocker(){
     exit
     else
     echo -e "$CHECK Docker installation found"
+    docker_status=`/etc/init.d/docker status | awk '/Active:/ {print $0}' | awk '{print $2}'`
+    if [ $docker_status != 'active' ]; then
+        echo -e "[!] Error: Docker daemon is not working!"
+    fi
     #check docker not sudo
     fi
 }
@@ -98,11 +114,11 @@ checkIngressStatus(){
     echo -e "\n[*] Waiting for running ingress-controller pod ..."
     sleep 5
     start=$(date +%s)
-    while [ "$status" != "Running" ]; do
-        status=`kubectl get pods -n ingress-nginx 2>/dev/null | awk '/controller/ {print $3}'`
+    while [ "$ing_status" != "Running" ]; do
+        ing_status=`kubectl get pods -n ingress-nginx 2>/dev/null | awk '/controller/ {print $3}'`
         actual=$(date +%s)
         if [ `expr $actual - $start` -gt $timeout ]; then
-            echo -e "\n$RED[!]$END_COLOR Error: Timeout"
+            echo -e "\n$RED[!]$END_COLOR Error: Timeout: Pod status: $status"
             exit
         fi
     done
@@ -116,14 +132,18 @@ checkOSCARDeploy(){
         status=`kubectl get pods -n oscar 2>/dev/null | awk '/oscar/ {print $3}'`
         actual=$(date +%s)
         if [ `expr $actual - $start` -gt $timeout ]; then
-            echo -e "\n$RED[!]$END_COLOR Error: Timeout"
+            echo -e "\n$RED[!]$END_COLOR Error: Timeout: Pod status: $status"
             exit
         fi
     done
     echo -e "\n[$CHECK] OSCAR platform deployed correctly"
-    echo -e "\n > You can now acces to the OSCAR web interface through https://localhost"
-    echo -e " > You can now access to MinIO console through https://localhost:30300 \n"
-    echo -e "\n[*] Note: To delete the cluster type 'kind delete cluster'"
+    echo -e "\n > You can now acces to the OSCAR web interface through https://localhost with the following credentials: "
+    echo "  - username: oscar"
+    echo "  - password: $OSCAR_PASSWORD"
+    echo -e "\n > You can now access to MinIO console through https://localhost:30300 with the following credentials: "
+    echo "  - username: minio"
+    echo "  - password: $MINIO_PASSWORD"
+    echo -e "\n[*] Note: To delete the cluster type 'kind delete cluster'\n"
 }
 
 deployKnative(){
@@ -158,20 +178,15 @@ EOF
     kubectl apply -f $KNATIVE_FILEPATH
 }
 
+showInfo
 
-echo "[*] Checking prerequisites ..."
+echo "\n[*] Checking prerequisites ..."
 checkDocker
 checkKubectl
 checkHelm
 checkKind
 
 echo -e "\n"
-read -sp "Enter a password for Oscar: "$'\n' OSCAR_PASSWORD
-
-while [ `echo $MINIO_PASSWORD | awk '{print length}'` -lt $MIN_PASS_CHAR ]; do 
-    read -sp "Enter a password for MinIO (min 8 characters): "$'\n' MINIO_PASSWORD
-done
-
 read -p "Do you want to use Knative Serving as Serverless Backend? [y/n] " use_knative
 
 cat > $CONFIG_FILEPATH <<EOF
