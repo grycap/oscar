@@ -1,6 +1,7 @@
 #!/bin/bash
 CHECK="\e[32m\xE2\x9C\x94\e[0m"
 RED="\e[31m"
+ORANGE="\e[167m"
 END_COLOR="\e[0m"
 
 CONFIG_FILEPATH="/tmp/config.yaml"
@@ -43,10 +44,8 @@ checkDocker(){
 #Check if kubectl is installed
 checkKubectl(){
     if  ! command -v kubectl &> /dev/null; then
-    echo -e "$RED[*]$END_COLOR kubectl installation not found."
-    read -p "Kubectl is required to communicate with the Kubernetes cluster. Do you want to install it? [y/n]" res
-    #Installation here
-        if [ $(echo $res | tr '[:upper:]' '[:lower:]') == "y" ]; then
+        echo -e "$ORANGE[*]$END_COLOR kubectl installation not found."
+        #Installation here
             curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/$(uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]')/amd64/kubectl"
             if [ $(uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]') == "darwin" ]; then
                 chmod +x ./kubectl
@@ -54,58 +53,42 @@ checkKubectl(){
                 sudo chown root: /usr/local/bin/kubectl
             else
                 sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+                rm kubectl
             fi
-        else
-            "Stopping execution ... "
-            exit
-        fi
     else
-    echo -e "$CHECK kubectl client found"
+        echo -e "$CHECK kubectl client found"
     fi
 }
 
 #Check if helm is installed
 checkHelm(){
     if ! command -v helm &> /dev/null; then
-    echo -e "$RED[*]$END_COLOR Helm installation not found."
-    read -p "Helm is required to deploy applications in kubernetes. Do you want to install it? [y/n] " res
-    #Installation here
-        if [ $(echo $res | tr '[:upper:]' '[:lower:]') == "y" ]; then
+        echo -e "$ORANGE[*]$END_COLOR Helm installation not found."
+        #Installation here
             curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
             chmod 700 get_helm.sh
             ./get_helm.sh
-        else 
-            "Stopping execution ... "
-            exit
-        fi
     else
-    echo -e "$CHECK Helm installation found"
+        echo -e "$CHECK Helm installation found"
     fi
 }
 
 #Check if kind is installed
 checkKind(){
     if  ! command -v kind &> /dev/null; then
-    echo -e "$RED[*]$END_COLOR Kind installation not found."
-    read -p "Kind allows you to create a local kubernetes cluster easly. Do you want to install it? [y/n]" res
-    #Installation here
-        if [ $(echo $res | tr '[:upper:]' '[:lower:]') == "y" ]; then
-            #Forced to accept insecure cert
-            curl -k -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-$(uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]')-amd64
-            chmod +x ./kind
+        echo -e "$ORANGE[*]$END_COLOR Kind installation not found."
+        #Installation here
+        #Forced to accept insecure cert
+        curl -k -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-$(uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]')-amd64
+        chmod +x ./kind
 
-            if `whoami` 2>/dev/null != "root"; then
-                sudo mv ./kind /usr/local/bin/kind
-            else
-                mv ./kind /usr/local/bin/kind
-            fi
+        if `whoami` 2>/dev/null != "root"; then
+            sudo mv ./kind /usr/local/bin/kind
         else
-        echo "Stopping execution ... "
-        exit
+            mv ./kind /usr/local/bin/kind
         fi
-
     else
-    echo -e "$CHECK kind installation found"
+        echo -e "$CHECK kind installation found"
     fi
 }
 
