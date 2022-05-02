@@ -4,8 +4,8 @@ RED="\e[31m"
 ORANGE="\e[167m"
 END_COLOR="\e[0m"
 
-CONFIG_FILEPATH="/tmp/config.yaml"
-KNATIVE_FILEPATH="/tmp/knative.yaml"
+CONFIG_FILEPATH="$(pwd)/config.yaml"
+KNATIVE_FILEPATH="$(pwd)/knative.yaml"
 MINIO_HELM_NAME="minio"
 NFS_HELM_NAME="nfs-server-provisioner"
 OSCAR_HELM_NAME="oscar"
@@ -20,7 +20,7 @@ showInfo(){
     echo -e "\n- MinIO"
     echo -e "- Helm"
     echo -e "- Kubectl\n"
-    read -p "No additional changes to your system will be performed. Would you like to continue? Y/n? [y/n] " res
+    read -p "No additional changes to your system will be performed. Would you like to continue? [y/n] " res </dev/tty
 
     if [ $(echo $res | tr '[:upper:]' '[:lower:]') == 'n' ]; then 
         exit
@@ -41,10 +41,9 @@ checkDocker(){
             docker_status=`systemctl status docker.service | awk '/Active:/ {print $0}' | awk '{print $2}'`
         fi
         if [ $docker_status != "active" ]; then
-            echo -e "[!] Error: Docker daemon is not working!"
+            echo -e "$RED[!] Error: Docker daemon is not working!$END_COLOR"
             exit
         fi
-        #check docker not sudo
     fi
 }
 
@@ -176,8 +175,7 @@ checkKubectl
 checkHelm
 checkKind
 
-echo -e "\n"
-read -p "Do you want to use Knative Serving as Serverless Backend? [y/n] " use_knative
+read -p "Do you want to use Knative Serving as Serverless Backend? [y/n] " use_knative </dev/tty
 
 cat > $CONFIG_FILEPATH <<EOF
 kind: Cluster
@@ -221,12 +219,12 @@ checkIngressStatus
 
 #Deploy MinIO
 echo -e "\n[*] Deploying MinIO storage provider ..."
-helm repo add minio https://charts.min.io
+helm repo add --force-update minio https://charts.min.io
 helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=30300,consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 --create-namespace
 
 #Deploy NFS server provisioner
 echo -e "\n[*] Deploying NFS server provider ..."
-helm repo add nfs-ganesha-server-and-external-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
+helm repo add --force-update nfs-ganesha-server-and-external-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
 helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner
 
 #Deploy Knative Serving
@@ -240,8 +238,14 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 
 # #Deploy oscar using helm
 echo -e "\n[*] Deploying OSCAR ..."
-helm repo add grycap https://grycap.github.io/helm-charts/
+helm repo add --force-update grycap https://grycap.github.io/helm-charts/
 helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD
 
 #Wait for cluster creation
 checkOSCARDeploy
+
+rm $CONFIG_FILEPATH
+
+if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
+    rm $KNATIVE_FILEPATH
+fi
