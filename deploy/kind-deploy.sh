@@ -25,7 +25,12 @@ showInfo(){
     echo -e "- Kubectl\n"
     read -p "No additional changes to your system will be performed. Would you like to continue? [y/n] " res </dev/tty
 
-    if [ $(echo $res | tr '[:upper:]' '[:lower:]') == 'n' ] || [ -z "$res" ]; then 
+    if [ -z "$res" ]; then
+        echo -e "$RED[!]$END_COLOR Error: Response cannot be empty"
+        exit
+    fi
+
+    if [ $(echo $res | tr '[:upper:]' '[:lower:]') == 'n' ]; then 
         echo "Stopping execution ..."
         exit
     fi
