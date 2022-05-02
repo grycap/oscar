@@ -15,6 +15,9 @@ MINIO_PASSWORD=`< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-8}`
 
 SO=`uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]'`
 
+#Not use knative by default
+use_knative="n"
+
 showInfo(){
     echo "[*] This script will install a Kubernetes cluster using Kind along with all the required OSCAR services (if not installed): "
     echo -e "\n- MinIO"
@@ -22,7 +25,8 @@ showInfo(){
     echo -e "- Kubectl\n"
     read -p "No additional changes to your system will be performed. Would you like to continue? [y/n] " res </dev/tty
 
-    if [ $(echo $res | tr '[:upper:]' '[:lower:]') == 'n' ]; then 
+    if [ $(echo $res | tr '[:upper:]' '[:lower:]') == 'n' || -z "$res" ]; then 
+        echo "Stopping execution ..."
         exit
     fi
 }
@@ -41,7 +45,7 @@ checkDocker(){
             docker_status=`systemctl status docker.service | awk '/Active:/ {print $0}' | awk '{print $2}'`
         fi
         if [ $docker_status != "active" ]; then
-            echo -e "$RED[!] Error: Docker daemon is not working!$END_COLOR"
+            echo -e "$RED[!]$END_COLOR Error: Docker daemon is not working!"
             exit
         fi
     fi
@@ -83,7 +87,6 @@ checkHelm(){
 checkKind(){
     if  ! command -v kind &> /dev/null; then
         echo -e "$ORANGE[*]$END_COLOR Kind installation not found."
-        #Installation here
         #Forced to accept insecure cert
         curl -k -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-$SO-amd64
         chmod +x ./kind
@@ -129,7 +132,7 @@ checkOSCARDeploy(){
     echo -e "\n > You can now acces to the OSCAR web interface through https://localhost with the following credentials: "
     echo "  - username: oscar"
     echo "  - password: $OSCAR_PASSWORD"
-    echo -e "\n > You can now access to MinIO console through https://localhost:30300 with the following credentials: "
+    echo -e "\n > You can now access to MinIO console through http://localhost:30300 with the following credentials: "
     echo "  - username: minio"
     echo "  - password: $MINIO_PASSWORD"
     echo -e "\n[*] Note: To delete the cluster type 'kind delete cluster'\n"
@@ -212,6 +215,7 @@ if [ ! `kubectl cluster-info --context kind-kind` &> /dev/null ]; then
     echo "Stopping execution ...."
     exit
 fi
+
 #Deploy nginx ingress
 echo -e "\n[*] Deploying NGINX Ingress ..."
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/kind/deploy.yaml
@@ -233,15 +237,19 @@ if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then
 fi
 
 echo -e "\n[*] Creating namespaces ..."
-# #Create namespaces
+#Create namespaces
 kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/yaml/oscar-namespaces.yaml
 
-# #Deploy oscar using helm
+#Deploy oscar using helm
 echo -e "\n[*] Deploying OSCAR ..."
 helm repo add --force-update grycap https://grycap.github.io/helm-charts/
-helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD
+if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative
+else
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD
+fi
 
-#Wait for cluster creation
+#Wait for OSCAR deployment
 checkOSCARDeploy
 
 rm $CONFIG_FILEPATH
