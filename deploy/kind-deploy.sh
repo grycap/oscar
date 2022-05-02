@@ -25,7 +25,7 @@ showInfo(){
     echo -e "- Kubectl\n"
     read -p "No additional changes to your system will be performed. Would you like to continue? [y/n] " res </dev/tty
 
-    if [ $(echo $res | tr '[:upper:]' '[:lower:]') == 'n' || -z "$res" ]; then 
+    if [ $(echo $res | tr '[:upper:]' '[:lower:]') == 'n' ] || [ -z "$res" ]; then 
         echo "Stopping execution ..."
         exit
     fi
@@ -135,7 +135,7 @@ checkOSCARDeploy(){
     echo -e "\n > You can now access to MinIO console through http://localhost:30300 with the following credentials: "
     echo "  - username: minio"
     echo "  - password: $MINIO_PASSWORD"
-    echo -e "\n[*] Note: To delete the cluster type 'kind delete cluster'\n"
+    echo -e "\n[*] Note: To delete the cluster type 'kind delete cluster --name=oscar-test'\n"
 }
 
 deployKnative(){
@@ -178,6 +178,7 @@ checkKubectl
 checkHelm
 checkKind
 
+echo -e "\n"
 read -p "Do you want to use Knative Serving as Serverless Backend? [y/n] " use_knative </dev/tty
 
 cat > $CONFIG_FILEPATH <<EOF
@@ -208,9 +209,9 @@ EOF
 
 #Create kind cluster
 echo -e "\n[*] Creating kind cluster"
-kind create cluster --config=$CONFIG_FILEPATH
+kind create cluster --config=$CONFIG_FILEPATH --name=oscar-test
 
-if [ ! `kubectl cluster-info --context kind-kind` &> /dev/null ]; then
+if [ ! `kubectl cluster-info --context kind-oscar-test` &> /dev/null ]; then
     echo -e "$RED[*]$END_COLOR Kind cluster not found."
     echo "Stopping execution ...."
     exit
