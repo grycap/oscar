@@ -13,6 +13,8 @@ MIN_PASS_CHAR=8
 OSCAR_PASSWORD=`< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-8}`
 MINIO_PASSWORD=`< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-8}` 
 
+SO=`uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]'`
+
 showInfo(){
     echo "[*] This script will install a Kubernetes cluster using Kind along with all the required OSCAR services (if not installed): "
     echo -e "\n- MinIO"
@@ -28,16 +30,21 @@ showInfo(){
 #Check if Docker is installed
 checkDocker(){
     if  ! command -v docker &> /dev/null; then
-    echo -e "$RED[!]$END_COLOR Docker installation not found. Install Docker to run this test."
-    echo -e "Stopping execution ..."
-    exit
+        echo -e "$RED[!]$END_COLOR Docker installation not found. Install Docker to run this test."
+        echo -e "Stopping execution ..."
+        exit
     else
-    echo -e "$CHECK Docker installation found"
-    docker_status=`/etc/init.d/docker status | awk '/Active:/ {print $0}' | awk '{print $2}'`
-    if [ $docker_status != 'active' ]; then
-        echo -e "[!] Error: Docker daemon is not working!"
-    fi
-    #check docker not sudo
+        echo -e "$CHECK Docker installation found"
+        if [ $SO == "darwin" ]; then
+            docker_status=`/etc/init.d/docker status | awk '/Active:/ {print $0}' | awk '{print $2}'`
+        else
+            docker_status=`systemctl status docker.service | awk '/Active:/ {print $0}' | awk '{print $2}'`
+        fi
+        if [ $docker_status != "active" ]; then
+            echo -e "[!] Error: Docker daemon is not working!"
+            exit
+        fi
+        #check docker not sudo
     fi
 }
 
@@ -46,8 +53,8 @@ checkKubectl(){
     if  ! command -v kubectl &> /dev/null; then
         echo -e "$ORANGE[*]$END_COLOR kubectl installation not found."
         #Installation here
-            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/$(uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]')/amd64/kubectl"
-            if [ $(uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]') == "darwin" ]; then
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/$SO/amd64/kubectl"
+            if [ $SO == "darwin" ]; then
                 chmod +x ./kubectl
                 sudo mv ./kubectl /usr/local/bin/kubectl
                 sudo chown root: /usr/local/bin/kubectl
@@ -79,7 +86,7 @@ checkKind(){
         echo -e "$ORANGE[*]$END_COLOR Kind installation not found."
         #Installation here
         #Forced to accept insecure cert
-        curl -k -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-$(uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]')-amd64
+        curl -k -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-$SO-amd64
         chmod +x ./kind
 
         if `whoami` 2>/dev/null != "root"; then
@@ -163,7 +170,7 @@ EOF
 
 showInfo
 
-echo "\n[*] Checking prerequisites ..."
+echo -e "\n[*] Checking prerequisites ..."
 checkDocker
 checkKubectl
 checkHelm
