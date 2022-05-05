@@ -9,7 +9,16 @@ The easiest way to test the OSCAR platform locally is using [kind](https://kind.
 - [Helm](https://helm.sh/docs/intro/install/) to easily deploy applications on Kubernetes.
 - [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) to deploy the local Kubernetes cluster.
 
-## Steps
+## Automated local testing
+
+To set up the enviroment for the platform testing you can run the following command. This script automatically executes all the necessary steps to deploy the local cluster and the OSCAR platform along with all the required tools.
+
+``` sh
+curl -sSL http://get.oscar.grycap.net | bash
+```
+## Steps for manual local testing
+
+If you want to do it manualy you can follow the listed steps.
 
 ### Create the cluster
 
