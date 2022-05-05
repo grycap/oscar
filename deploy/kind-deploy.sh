@@ -10,10 +10,13 @@ MINIO_HELM_NAME="minio"
 NFS_HELM_NAME="nfs-server-provisioner"
 OSCAR_HELM_NAME="oscar"
 MIN_PASS_CHAR=8
-OSCAR_PASSWORD=`< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-8}`
-MINIO_PASSWORD=`< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-8}` 
 
 SO=`uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]'`
+
+#Generate simple random passwords for OSCAR and MinIO
+OSCAR_PASSWORD=`date +%s | sha256sum | base64 | head -c 8`
+sleep 1
+MINIO_PASSWORD=`date +%s | sha256sum | base64 | head -c 8` 
 
 #Not use knative by default
 use_knative="n"
@@ -44,15 +47,15 @@ checkDocker(){
         exit
     else
         echo -e "$CHECK Docker installation found"
-        if [ $SO == "darwin" ]; then
-            docker_status=`/etc/init.d/docker status | awk '/Active:/ {print $0}' | awk '{print $2}'`
-        else
-            docker_status=`systemctl status docker.service | awk '/Active:/ {print $0}' | awk '{print $2}'`
-        fi
-        if [ $docker_status != "active" ]; then
+
+        rep=$(curl -s --unix-socket /var/run/docker.sock http://ping > /dev/null)
+        status=$?
+
+        if [ "$status" == "7" ]; then
             echo -e "$RED[!]$END_COLOR Error: Docker daemon is not working!"
             exit
         fi
+
     fi
 }
 
