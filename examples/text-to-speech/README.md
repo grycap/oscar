@@ -26,14 +26,35 @@ To create the function we are going to use the command line interface [OSCAR-CLI
 
 Check in the yaml file that the cluster name exist and select in which language you want to hear the voice. If you do not know the code language, you will found it in this [page](https://www.andiamo.co.uk/resources/iso-language-codes/).
 
-![02-oscar-yamlfile.png](img/02-oscar-yamlfile.png)
+```yaml
+functions:
+  oscar:
+  - hola:
+      name: text-to-speech
+      memory: 1Gi
+      cpu: '1.0'
+      image: ghcr.io/grycap/text-to-speech
+      script: script.sh
+      log_level: CRITICAL
+      input:
+      - storage_provider: minio
+        path: tts/input
+      output:
+      - storage_provider: minio
+        path: tts/output
+      environment: 
+        Variables:
+          language: en
+```
+
+
 
 
 ### STEP 2.2: Deploy the Service
 
 To deploy the service use the command:
 ```sh
- oscar-cli apply tts.yaml
+oscar-cli apply tts.yaml
 ```
 ![03-oscar-apply.png](img/03-oscar-apply.png)
 
@@ -50,34 +71,27 @@ oscar-cli services list
 ![04-oscar-checkServices.png](img/04-oscar-checkServices.png)
 
 
-## STEP 4: Invoke the Service Synchronously
+## STEP 4: Invoke the Service Synchronously And Access the Output Files
 
 To run the service synchronously use:
 ```sh
-oscar-cli service run text-to-speech --text-input "Hello everyone"
+oscar-cli service run text-to-speech --text-input "Hello everyone"  --output "output.mp3"
 ```
 You also can pass a file text substituing the flag `--text-input {string}` to `--input {filepath}`
 
-
-
-## STEP 5: Access the Output Files
-
-The output that will be printed in the screen is the sound file encoded in base64. If you want to save it locally use this command:
-```sh
-oscar-cli service run text-to-speech --text-input "Hello everyone" | grep -v supervisor | base64 --decode  > output.mp3
-```
 And if you have installed vlc and you want to play it use this one:
 ```sh
-oscar-cli service run text-to-speech --text-input "Hello everyone" | grep -v supervisor | base64 --decode  > output.mp3 && vlc output.mp3
+oscar-cli service run text-to-speech --text-input "Hello everyone"  --output "output.mp3" && vlc output.mp3
 ```
-
 ![05-oscar-run.png](img/05-oscar-run.png)
 
 
+### STEP 4.1: Asynchronously
+
+You can run the service in an asynchronous way just uploading a file to minio bucket
 
 
-
-## STEP 6: Remove the Function
+## STEP 5: Remove the Function
 
 
 Once you have finished you could delete the service using the command:
@@ -87,14 +101,3 @@ oscar-cli services remove text-to-speech
 ```
 
 ![06-oscar-remove.png](img/06-oscar-remove.png)
-
-
-## STEP 8: Terminate the OSCAR Cluster
-
-You can terminate the Kubernetes cluster with the [EC3](https://github.com/grycap/ec3) command:
-
-```sh
-ec3 destroy <cluster-name>
-```
-
-

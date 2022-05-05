@@ -6,6 +6,7 @@ functions:
       cpu: '1.0'
       image: ghcr.io/grycap/text-to-speech
       script: script.sh
+      log_level: CRITICAL
       input:
       - storage_provider: minio
         path: tts/input
