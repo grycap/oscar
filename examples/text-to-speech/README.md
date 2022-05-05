@@ -14,7 +14,7 @@ curl -L http://go.oscar.grycap.net | bash
 
 ### STEP 1.1: Log in the OSCAR UI
 
-Log in into the OSCAR UI using the [Default Service Endpoints](https://o-scar.readthedocs.io/en/latest/usage.html#default-service-endpoints) and access credentials. To verify the succesfull instalation.
+Log in into the OSCAR UI using the [Default Service Endpoints](https://o-scar.readthedocs.io/en/latest/usage.html#default-service-endpoints) and access credentials. To verify the succesfull installation.
 
 ![01-oscar-login.png](img/01-oscar-login.png)
 
@@ -22,11 +22,11 @@ Log in into the OSCAR UI using the [Default Service Endpoints](https://o-scar.re
 
 ## STEP 2: Create the Service
 
-To create the function we are going to use the command line interface [OSCAR-CLI](https://docs.oscar.grycap.net/oscar-cli/)
+To create the function we are going to use the command line interface [OSCAR-CLI](https://docs.oscar.grycap.net/oscar-cli/).
 
 ### STEP 2.1: Get the file .yaml ready
 
-Check in the yaml file that the cluster name exist and select in which language you want to hear the voice. If you do not know the code language, you will found it in this [page](https://www.andiamo.co.uk/resources/iso-language-codes/)
+Check in the yaml file that the cluster name exist and select in which language you want to hear the voice. If you do not know the code language, you will found it in this [page](https://www.andiamo.co.uk/resources/iso-language-codes/).
 
 ![02-oscar-yamlfile.png](img/02-oscar-yamlfile.png)
 
