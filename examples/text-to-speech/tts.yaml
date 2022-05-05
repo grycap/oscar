@@ -1,0 +1,17 @@
+functions:
+  oscar:
+  - hola:
+      name: text-to-speech
+      memory: 1Gi
+      cpu: '1.0'
+      image: ghcr.io/grycap/text-to-speech
+      script: script.sh
+      input:
+      - storage_provider: minio
+        path: tts/input
+      output:
+      - storage_provider: minio
+        path: tts/output
+      environment: 
+        Variables:
+          language: en
