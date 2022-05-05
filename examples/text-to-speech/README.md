@@ -59,7 +59,7 @@ To run the service synchronously use:
 ```sh
 oscar-cli service run text-to-speech --text-input "Hello everyone"
 ```
-You also can pass a file text substituting the flag `--text-input {string}` to `--input {filepath}`
+You also can pass a file text substituing the flag `--text-input {string}` to `--input {filepath}`
 
 
 
