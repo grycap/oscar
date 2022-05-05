@@ -1,6 +1,6 @@
 # Text to Speech
 
-Example of text to speech in OSCAR using [Google Speech](https://pypi.org/project/google-speech/) library, where introducing an input of text string or text file return an audio file
+Example of text to speech in OSCAR using [Google Speech](https://pypi.org/project/google-speech/) library, where introducing an input of text string or text file return an audio file.
 
 ## STEP 1: Deploy the OSCAR cluster on an IaaS Cloud
 
