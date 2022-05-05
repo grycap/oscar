@@ -88,8 +88,7 @@ oscar-cli service run text-to-speech --text-input "Hello everyone"  --output "ou
 
 ### STEP 4.1: Asynchronously
 
-You can run the service in an asynchronous way just uploading a file to a minio bucket in `text-to-speech/input` and the result can be found in `text-to-speech/output`
-
+You can trigger the service in an asynchronous way just uploading a file to a minio bucket in `text-to-speech/input` and the result can be found in `text-to-speech/output`. Input and output fields in yaml file could be remove if only we are going to use the services synchronously.
 
 ## STEP 5: Remove the Function
 
