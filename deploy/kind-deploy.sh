@@ -1,15 +1,15 @@
 #!/bin/bash
-CHECK="\e[32m\xE2\x9C\x94\e[0m"
+CHECK="\xE2\x9C\x94"
+GREEN="\e[32m"
 RED="\e[31m"
 ORANGE="\e[167m"
-END_COLOR="\e[0m"
+END_COLOR="\033[0m"
 
 CONFIG_FILEPATH="$(pwd)/config.yaml"
 KNATIVE_FILEPATH="$(pwd)/knative.yaml"
 MINIO_HELM_NAME="minio"
 NFS_HELM_NAME="nfs-server-provisioner"
 OSCAR_HELM_NAME="oscar"
-MIN_PASS_CHAR=8
 
 SO=`uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]'`
 
@@ -46,7 +46,7 @@ checkDocker(){
         echo -e "Stopping execution ..."
         exit
     else
-        echo -e "$CHECK Docker installation found"
+        echo -e "$GREEN$CHECK$END_COLOR Docker installation found"
 
         rep=$(curl -s --unix-socket /var/run/docker.sock http://ping > /dev/null)
         status=$?
@@ -74,7 +74,7 @@ checkKubectl(){
                 rm kubectl
             fi
     else
-        echo -e "$CHECK kubectl client found"
+        echo -e "$GREEN$CHECK$END_COLOR kubectl client found"
     fi
 }
 
@@ -87,7 +87,7 @@ checkHelm(){
             chmod 700 get_helm.sh
             ./get_helm.sh
     else
-        echo -e "$CHECK Helm installation found"
+        echo -e "$GREEN$CHECK$END_COLOR Helm installation found"
     fi
 }
 
@@ -105,7 +105,7 @@ checkKind(){
             mv ./kind /usr/local/bin/kind
         fi
     else
-        echo -e "$CHECK kind installation found"
+        echo -e "$GREEN$CHECK$END_COLOR kind installation found"
     fi
 }
 
@@ -122,7 +122,7 @@ checkIngressStatus(){
             exit
         fi
     done
-    echo -e "\n[$CHECK] ingress-controller pod running correctly"
+    echo -e "\n[$GREEN$CHECK$END_COLOR] ingress-controller pod running correctly"
 }
 
 checkOSCARDeploy(){
@@ -136,7 +136,7 @@ checkOSCARDeploy(){
             exit
         fi
     done
-    echo -e "\n[$CHECK] OSCAR platform deployed correctly"
+    echo -e "\n[$GREEN$CHECK$END_COLOR] OSCAR platform deployed correctly"
     echo -e "\n > You can now acces to the OSCAR web interface through https://localhost with the following credentials: "
     echo "  - username: oscar"
     echo "  - password: $OSCAR_PASSWORD"
