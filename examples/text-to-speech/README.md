@@ -4,9 +4,7 @@ Example of text to speech in OSCAR using [Google Speech](https://pypi.org/projec
 
 ## STEP 1: Deploy the OSCAR cluster on an IaaS Cloud
 
-Follow the [deployment instructions](https://o-scar.readthedocs.io/en/latest/deploy.html).
-
-Or you can execute this script to install it locally
+Follow the [deployment instructions](https://o-scar.readthedocs.io/en/latest/deploy.html). Or you can execute this script to install it locally.
 ```sh
 curl -L http://go.oscar.grycap.net | bash
 ```
