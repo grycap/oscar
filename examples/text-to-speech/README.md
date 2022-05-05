@@ -8,33 +8,33 @@ This example use [Google Speech](https://pypi.org/project/google-speech/)
 
 Follow the [deployment instructions](https://o-scar.readthedocs.io/en/latest/deploy.html).
 
-Or you can execute this script
+Or you can execute this script to install it locally
 ```sh
 curl -L http://go.oscar.grycap.net | bash
 ```
 
 
-## STEP 1.1: Log in the OSCAR UI
+### STEP 1.1: Log in the OSCAR UI
 
-Log in into the OSCAR UI using the [Default Service Endpoints](https://o-scar.readthedocs.io/en/latest/usage.html#default-service-endpoints) and access credentials.
+Log in into the OSCAR UI using the [Default Service Endpoints](https://o-scar.readthedocs.io/en/latest/usage.html#default-service-endpoints) and access credentials. To verify the succesfull instalation.
 
 ![01-oscar-login.png](img/01-oscar-login.png)
 
 ## STEP 2: Create the Service
 
-To create the function we are going to use [OSCAR-CLI](https://docs.oscar.grycap.net/oscar-cli/)
+To create the function we are going to use the command line interface [OSCAR-CLI](https://docs.oscar.grycap.net/oscar-cli/)
 
 
 ### STEP 2.1: Get the file .yaml ready
 
-Check that the cluster name exist and select in which language you want to hear the voice. If you do not know the code language, you will found it in this [page](https://www.andiamo.co.uk/resources/iso-language-codes/)
+Check in the yaml file that the cluster name exist and select in which language you want to hear the voice. If you do not know the code language, you will found it in this [page](https://www.andiamo.co.uk/resources/iso-language-codes/)
 
 ![01-oscar-yamlfile.png](img/01-oscar-yamlfile.png)
 
 
 ### STEP 2.2: Deploy the Service
 
-To deploy the services use the command
+To deploy the service use the command:
 ```sh
  oscar-cli apply tts.yaml
 ```
@@ -44,8 +44,7 @@ To deploy the services use the command
 
 ## STEP 3: Verify the Service
 
-After some minutes the functions will be created and can be seen in the interface. The input and output buckets will be automatically created as well:
-Verify that the service is up with the command:
+After some minutes the service will be created. The input and output buckets will be automatically created as well. Verify that the service is up with the command:
 
 ```sh
 oscar-cli services list
@@ -54,20 +53,13 @@ oscar-cli services list
 ![03-oscar-checkServices.png](img/03-oscar-checkServices.png)
 
 
-
-
-
 ## STEP 4: Invoke the Service Synchronously
 
 To run the service synchronously use:
-
 ```sh
 oscar-cli service run text-to-speech --text-input "Hello everyone"
 ```
-
 You also can pass a file text substituting the flag `--text-input {string}` to `--input {filepath}`
-
-
 
 
 
@@ -77,7 +69,6 @@ The output that will be printed in the screen is the sound file encoded in base6
 ```sh
 oscar-cli service run text-to-speech --text-input "Hello everyone" | grep -v supervisor | base64 --decode  > output.mp3
 ```
-
 And if you have installed vlc and you want to play it use this one:
 ```sh
 oscar-cli service run text-to-speech --text-input "Hello everyone" | grep -v supervisor | base64 --decode  > output.mp3 && vlc output.mp3
