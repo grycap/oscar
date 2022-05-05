@@ -29,7 +29,7 @@ To create the function we are going to use the command line interface [OSCAR-CLI
 
 Check in the yaml file that the cluster name exist and select in which language you want to hear the voice. If you do not know the code language, you will found it in this [page](https://www.andiamo.co.uk/resources/iso-language-codes/)
 
-![01-oscar-yamlfile.png](img/01-oscar-yamlfile.png)
+![02-oscar-yamlfile.png](img/02-oscar-yamlfile.png)
 
 
 ### STEP 2.2: Deploy the Service
@@ -38,7 +38,7 @@ To deploy the service use the command:
 ```sh
  oscar-cli apply tts.yaml
 ```
-![02-oscar-apply.png](img/02-oscar-apply.png)
+![03-oscar-apply.png](img/03-oscar-apply.png)
 
 
 
@@ -50,7 +50,7 @@ After some minutes the service will be created. The input and output buckets wil
 oscar-cli services list
 ```
 
-![03-oscar-checkServices.png](img/03-oscar-checkServices.png)
+![04-oscar-checkServices.png](img/04-oscar-checkServices.png)
 
 
 ## STEP 4: Invoke the Service Synchronously
@@ -74,7 +74,7 @@ And if you have installed vlc and you want to play it use this one:
 oscar-cli service run text-to-speech --text-input "Hello everyone" | grep -v supervisor | base64 --decode  > output.mp3 && vlc output.mp3
 ```
 
-![04-oscar-run.png](img/04-oscar-run.png)
+![05-oscar-run.png](img/05-oscar-run.png)
 
 
 
@@ -89,7 +89,7 @@ Once you have finished you could delete the service using the command:
 oscar-cli services remove text-to-speech
 ```
 
-![05-oscar-remove.png](img/05-oscar-remove.png)
+![06-oscar-remove.png](img/06-oscar-remove.png)
 
 
 ## STEP 8: Terminate the OSCAR Cluster
