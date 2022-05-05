@@ -1,10 +1,8 @@
 # Text to Speech
 
-This example use [Google Speech](https://pypi.org/project/google-speech/)
-
+Example of text to speech in OSCAR using [Google Speech](https://pypi.org/project/google-speech/) library, where introducing an input of text string or text file return an audio file
 
 ## STEP 1: Deploy the OSCAR cluster on an IaaS Cloud
-
 
 Follow the [deployment instructions](https://o-scar.readthedocs.io/en/latest/deploy.html).
 
@@ -20,10 +18,11 @@ Log in into the OSCAR UI using the [Default Service Endpoints](https://o-scar.re
 
 ![01-oscar-login.png](img/01-oscar-login.png)
 
+
+
 ## STEP 2: Create the Service
 
 To create the function we are going to use the command line interface [OSCAR-CLI](https://docs.oscar.grycap.net/oscar-cli/)
-
 
 ### STEP 2.1: Get the file .yaml ready
 
