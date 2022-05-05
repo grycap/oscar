@@ -24,12 +24,12 @@ To create the function we are going to use the command line interface [OSCAR-CLI
 
 ### STEP 2.1: Get the file .yaml ready
 
-Check in the yaml file that the cluster name exist and select in which language you want to hear the voice. If you do not know the code language, you will found it in this [page](https://www.andiamo.co.uk/resources/iso-language-codes/).
+Check in the yaml file that the cluster name exist,(as well OSCAR-CLI has to be configured with the same cluster name) and select in which language you want to hear the voice. If you do not know the code language, you will found it in this [page](https://www.andiamo.co.uk/resources/iso-language-codes/).
 
 ```yaml
 functions:
   oscar:
-  - hola:
+  - oscar-cluster:
       name: text-to-speech
       memory: 1Gi
       cpu: '1.0'
@@ -38,10 +38,10 @@ functions:
       log_level: CRITICAL
       input:
       - storage_provider: minio
-        path: tts/input
+        path: text-to-speech/input
       output:
       - storage_provider: minio
-        path: tts/output
+        path: text-to-speech/output
       environment: 
         Variables:
           language: en
@@ -88,7 +88,7 @@ oscar-cli service run text-to-speech --text-input "Hello everyone"  --output "ou
 
 ### STEP 4.1: Asynchronously
 
-You can run the service in an asynchronous way just uploading a file to minio bucket
+You can run the service in an asynchronous way just uploading a file to a minio bucket in `text-to-speech/input` and the result can be found in `text-to-speech/output`
 
 
 ## STEP 5: Remove the Function

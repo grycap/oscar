@@ -1,6 +1,6 @@
 functions:
   oscar:
-  - hola:
+  - oscar-cluster:
       name: text-to-speech
       memory: 1Gi
       cpu: '1.0'
@@ -9,10 +9,10 @@ functions:
       log_level: CRITICAL
       input:
       - storage_provider: minio
-        path: tts/input
+        path: text-to-speech/input
       output:
       - storage_provider: minio
-        path: tts/output
+        path: text-to-speech/output
       environment: 
         Variables:
           language: en
