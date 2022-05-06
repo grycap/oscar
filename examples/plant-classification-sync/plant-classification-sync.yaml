@@ -1,0 +1,9 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: plant-classification-sync
+      memory: 2Gi
+      cpu: '1.0'
+      image: deephdc/deep-oc-plants-classification-tf
+      log_level: CRITICAL
+      script: script.sh
