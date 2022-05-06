@@ -1,0 +1,12 @@
+functions:
+  oscar:
+  - cluster-test:
+      name: plants-function
+      memory: 2Gi
+      cpu: '1.0'
+      image: deephdc/deep-oc-plants-classification-tf
+      log_level: CRITICAL
+      script: script.sh
+      output:
+      - storage_provider: minio.default
+        path: plants-sync-function/output
