@@ -7,3 +7,5 @@ RUN apt-get update && \
 RUN pip3 install google-speech
 
 COPY tts.py /opt/tts.py
+
+ENTRYPOINT ["python3","/opt/tts.py" "--lenguage=","$lenguage","-o","$OUTPUT_FILE","$INPUT_FILE_PATH"]
