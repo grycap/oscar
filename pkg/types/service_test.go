@@ -28,12 +28,13 @@ import (
 
 var (
 	testService Service = Service{
-		Name:   "testname",
-		Image:  "testimage",
-		Alpine: false,
-		Memory: "1Gi",
-		CPU:    "1.0",
-		Script: "testscript",
+		Name:             "testname",
+		Image:            "testimage",
+		Alpine:           false,
+		Memory:           "1Gi",
+		CPU:              "1.0",
+		ImagePullSecrets: []string{"testcred1", "testcred2"},
+		Script:           "testscript",
 		Environment: struct {
 			Vars map[string]string `json:"Variables"`
 		}{
@@ -174,6 +175,17 @@ func TestConvertEnvVars(t *testing.T) {
 	}
 }
 
+func TestConvertLocalObj(t *testing.T) {
+	secrets := []string{"testcred1"}
+	expected := []v1.LocalObjectReference{
+		{Name: "testcred1"},
+	}
+	result := convertLocalObjects(secrets)
+	if result[0].Name != expected[0].Name {
+		t.Errorf("invalid conversion of local object. Expected: %v, got %v", expected, result)
+	}
+}
+
 func TestToYAML(t *testing.T) {
 	expected := `name: testname
 memory: 1Gi
@@ -190,6 +202,9 @@ token: ""
 input: []
 output: []
 script: testscript
+imagePullSecrets:
+- testcred1
+- testcred2
 environment:
   Variables:
     TEST_VAR: testvalue
@@ -259,6 +274,7 @@ func TestToPodSpec(t *testing.T) {
 			// Assign resources from scenario
 			svc.Memory = s.memory
 			svc.CPU = s.cpu
+			//svc.ImagePullSecrets = []string{"testcred"}
 
 			podSpec, err := svc.ToPodSpec(&testConfig)
 
