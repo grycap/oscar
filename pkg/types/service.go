@@ -168,7 +168,9 @@ type Service struct {
 	// The user script to execute when the service is invoked
 	Script string `json:"script,omitempty" binding:"required"`
 
-	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+	//The kubernetes secret to use a private registry
+	//Optional
+	ImagePullSecrets []string `json:"image_pull_secrets,omitempty"`
 
 	// The user-defined environment variables assigned to the service
 	// Optional
@@ -199,7 +201,7 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 	}
 
 	podSpec := &v1.PodSpec{
-		ImagePullSecrets: convertLocalObjects(service.ImagePullSecrets),
+		ImagePullSecrets: setImagePullSecrets(service.ImagePullSecrets),
 		Containers: []v1.Container{
 			{
 				Name:  ContainerName,
@@ -274,7 +276,7 @@ func convertEnvVars(vars map[string]string) []v1.EnvVar {
 	return envVars
 }
 
-func convertLocalObjects(secrets []string) []v1.LocalObjectReference {
+func setImagePullSecrets(secrets []string) []v1.LocalObjectReference {
 	objects := []v1.LocalObjectReference{}
 	for _, s := range secrets {
 		objects = append(objects, v1.LocalObjectReference{

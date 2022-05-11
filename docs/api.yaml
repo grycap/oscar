@@ -382,6 +382,10 @@ components:
           default: false
         script:
           type: string
+        image_pull_secrets: 
+          type: array
+          items: 
+            type: string
         environment:
           type: object
           properties:

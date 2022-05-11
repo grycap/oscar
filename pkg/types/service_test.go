@@ -175,12 +175,12 @@ func TestConvertEnvVars(t *testing.T) {
 	}
 }
 
-func TestConvertLocalObj(t *testing.T) {
+func TestSetImagePullSecrets(t *testing.T) {
 	secrets := []string{"testcred1"}
 	expected := []v1.LocalObjectReference{
 		{Name: "testcred1"},
 	}
-	result := convertLocalObjects(secrets)
+	result := setImagePullSecrets(secrets)
 	if result[0].Name != expected[0].Name {
 		t.Errorf("invalid conversion of local object. Expected: %v, got %v", expected, result)
 	}
