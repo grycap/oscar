@@ -8,4 +8,4 @@ RUN pip3 install google-speech
 
 COPY tts.py /opt/tts.py
 
-ENTRYPOINT ["python3","/opt/tts.py" "--lenguage=","$lenguage","-o","$OUTPUT_FILE","$INPUT_FILE_PATH"]
+ENTRYPOINT ["python3","/opt/tts.py" "--language=","$language","-o","$OUTPUT_FILE","$INPUT_FILE_PATH"]
