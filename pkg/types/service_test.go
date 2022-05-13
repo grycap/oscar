@@ -202,7 +202,7 @@ token: ""
 input: []
 output: []
 script: testscript
-imagePullSecrets:
+image_pull_secrets:
 - testcred1
 - testcred2
 environment:
