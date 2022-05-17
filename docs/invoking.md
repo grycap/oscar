@@ -15,6 +15,29 @@ Synchronous invocations allow obtaining the execution output as the response to 
 
 ![oscar-sync.png](images/oscar-sync.png)
 
+Synchronous invocations also can be invocated by OSCAR-CLI, using the comand `oscar-cli service run`:
+
+```sh
+oscar-cli service run [SERVICE_NAME] {--input | --text-input} {-o | -output }
+```
+
+You can check these use-cases:
+- [plant-classification-sync](https://oscar.grycap.net/blog/post-oscar-faas-sync-ml-inference/)
+- [text-to-speech](https://oscar.grycap.net/blog/post-oscar-text-to-speech/). 
+
+
+Where it can be sent a file, in this case, is an image, and the result will show up on the terminal:
+```sh
+oscar-cli service run plant-classification-sync --input images/image3.jpg
+```
+
+Alternatively, it can be sent a text and redirected the result into a file:
+```sh
+oscar-cli service run text-to-speech --text-input "Hello everyone"  --output output.mp3
+```
+
+
+
 ### Input/Output
 
 [FaaS Supervisor](https://github.com/grycap/faas-supervisor), the component in charge of managing the input and output of services, allows JSON or base64 encoded body in service requests. The body of these requests will be automatically decoded into the invocation's input file available from the script through the `$INPUT_FILE_PATH` environment variable.

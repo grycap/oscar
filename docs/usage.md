@@ -139,3 +139,9 @@ Services can be deleted by clicking on the trash can icon from the main view.
 Once you have accepted the message shown in the image above, the service will be deleted after a few seconds.
 
 ![function deleted](images/usage/usage-22.png)
+
+
+## MinIO Storage Tab
+
+
+MinIO Storage Tab is made to manage buckets without using MinIO UI. It simplifies the process. From MinIO Storage Tab can be created buckets and folders inside them. Furthermore, files can be uploaded to the buckets and downloaded from them. Each time a service is created or submitted an edit, the buckets that are not created will be formed.
