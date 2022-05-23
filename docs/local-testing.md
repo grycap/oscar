@@ -14,7 +14,7 @@ The easiest way to test the OSCAR platform locally is using [kind](https://kind.
 To set up the enviroment for the platform testing you can run the following command. This script automatically executes all the necessary steps to deploy the local cluster and the OSCAR platform along with all the required tools.
 
 ``` sh
-curl -sSL http://get.oscar.grycap.net | bash
+curl -sSL http://go.oscar.grycap.net | bash
 ```
 ## Steps for manual local testing
 

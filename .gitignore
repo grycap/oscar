@@ -22,6 +22,7 @@ docs/source/_build
 work/
 test/*.zip
 .settings/
+.DS_Store
 
 #Files from ui
 ui/node_modules
