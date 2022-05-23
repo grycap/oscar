@@ -144,4 +144,4 @@ Once you have accepted the message shown in the image above, the service will be
 ## MinIO Storage Tab
 
 
-MinIO Storage Tab is made to manage buckets without using MinIO UI. It simplifies the process. From MinIO Storage Tab can be created buckets and folders inside them. Furthermore, files can be uploaded to the buckets and downloaded from them. Each time a service is created or submitted an edit, the buckets that are not created will be formed.
+MinIO Storage Tab is made to manage buckets without using MinIO UI. It simplifies the process. From MinIO Storage Tab, buckets can be created or removed and folders inside them. Furthermore, files can be uploaded to the buckets and downloaded from them. Each time a service is created or submitted an edit, the buckets that are not created will be formed.
