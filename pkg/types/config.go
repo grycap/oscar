@@ -18,8 +18,10 @@ package types
 
 import (
 	"fmt"
+	"log"
 	"net/url"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -51,7 +53,19 @@ const (
 	defaultYunikornNamespace                = "yunikorn"
 	defaultYunikornConfigMap                = "yunikorn-configs"
 	defaultYunikornConfigFileName           = "queues.yaml"
+
+	stringType  = "string"
+	intType     = "int"
+	boolType    = "bool"
+	secondsType = "seconds"
 )
+
+type configVar struct {
+	name       string
+	envVarName string
+	required   bool
+	varType    string
+}
 
 // Config stores the configuration for the OSCAR server
 type Config struct {
@@ -138,6 +152,40 @@ type Config struct {
 	YunikornConfigFileName string `json:"-"`
 }
 
+var configVars = []configVar{
+	{"Username", "OSCAR_USERNAME", true, stringType},
+	// TODO: add all vars
+}
+
+func readConfigVar(cfgVar configVar) (string, error) {
+	value := os.Getenv(cfgVar.envVarName)
+	if cfgVar.required && len(value) == 0 {
+		return "", fmt.Errorf("the configuration variable %s must be provided", cfgVar.envVarName)
+	}
+	return value, nil
+}
+
+func setValue(value any, configField string, cfg *Config) {
+	// Check if there if the field is inside a substruct
+	fields := strings.Split(configField, ".")
+	if len(fields) > 2 {
+		log.Fatalf("cannot access field %s", configField)
+	}
+
+	// Get the reflect value of cfg (pointer)
+	valPtr := reflect.ValueOf(cfg)
+	// Get the reflect value of the cfg struct
+	valCfg := reflect.Indirect(valPtr).FieldByName(fields[0])
+
+	// If there is a subfield get its value
+	if len(fields) == 2 {
+		valCfg = reflect.Indirect(valCfg).FieldByName(fields[1])
+	}
+
+	// Set the value
+	valCfg.Set(reflect.ValueOf(value))
+}
+
 func parseSeconds(s string) (time.Duration, error) {
 	if len(s) > 0 {
 		parsed, err := strconv.Atoi(s)
@@ -154,6 +202,25 @@ func ReadConfig() (*Config, error) {
 	config.MinIOProvider = &MinIOProvider{}
 	var err error
 
+	for _, cv := range configVars {
+		// TODO: implement!
+		strValue, err := readConfigVar(cv)
+
+		switch cv.varType {
+		case stringType:
+		case intType:
+		case boolType:
+		case secondsType:
+		default:
+			continue
+		}
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// TODO: remove this...
 	if len(os.Getenv("OSCAR_USERNAME")) > 0 {
 		config.Username = os.Getenv("OSCAR_USERNAME")
 	} else {
