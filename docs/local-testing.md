@@ -158,7 +158,7 @@ kind delete cluster
 
 To use OSCAR-CLI in localhost deployment, you should change the ssl_verify option to false in the file $HOME/.oscar-cli/config.yaml
 ```sh
-$HOME/.oscar-cli/config.yaml
+nano $HOME/.oscar-cli/config.yaml
 ```
 
 ```
