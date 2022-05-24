@@ -118,90 +118,90 @@ func TestRequiredValues(t *testing.T) {
 	}
 }
 
-func TestDefaultValues(t *testing.T) {
-	t.Setenv("OSCAR_USERNAME", "testuser")
-	t.Setenv("OSCAR_PASSWORD", "testpass")
-	t.Setenv("MINIO_ACCESS_KEY", "minioaccess")
-	t.Setenv("MINIO_SECRET_KEY", "miniosecret")
+// func TestDefaultValues(t *testing.T) {
+// 	t.Setenv("OSCAR_USERNAME", "testuser")
+// 	t.Setenv("OSCAR_PASSWORD", "testpass")
+// 	t.Setenv("MINIO_ACCESS_KEY", "minioaccess")
+// 	t.Setenv("MINIO_SECRET_KEY", "miniosecret")
 
-	cfg, _ := ReadConfig()
+// 	cfg, _ := ReadConfig()
 
-	if cfg.MinIOProvider.Verify != defaultMinioTLSVerify {
-		t.Errorf("expected minio tls verify: %t, got: %t", defaultMinioTLSVerify, cfg.MinIOProvider.Verify)
-	}
+// 	if cfg.MinIOProvider.Verify != defaultMinioTLSVerify {
+// 		t.Errorf("expected minio tls verify: %t, got: %t", defaultMinioTLSVerify, cfg.MinIOProvider.Verify)
+// 	}
 
-	if cfg.MinIOProvider.Endpoint != defaultMinIOEndpoint {
-		t.Errorf("expected minio endpoint: %s, got: %s", defaultMinIOEndpoint, cfg.MinIOProvider.Endpoint)
-	}
+// 	if cfg.MinIOProvider.Endpoint != defaultMinIOEndpoint {
+// 		t.Errorf("expected minio endpoint: %s, got: %s", defaultMinIOEndpoint, cfg.MinIOProvider.Endpoint)
+// 	}
 
-	if cfg.MinIOProvider.Region != defaultMinIORegion {
-		t.Errorf("expected minio region: %s, got: %s", defaultMinIORegion, cfg.MinIOProvider.Region)
-	}
+// 	if cfg.MinIOProvider.Region != defaultMinIORegion {
+// 		t.Errorf("expected minio region: %s, got: %s", defaultMinIORegion, cfg.MinIOProvider.Region)
+// 	}
 
-	if cfg.Name != defaultServiceName {
-		t.Errorf("expected name: %s, got: %s", defaultServiceName, cfg.Name)
-	}
+// 	if cfg.Name != defaultServiceName {
+// 		t.Errorf("expected name: %s, got: %s", defaultServiceName, cfg.Name)
+// 	}
 
-	if cfg.Namespace != defaultNamespace {
-		t.Errorf("expected namespace: %s, got: %s", defaultNamespace, cfg.Namespace)
-	}
+// 	if cfg.Namespace != defaultNamespace {
+// 		t.Errorf("expected namespace: %s, got: %s", defaultNamespace, cfg.Namespace)
+// 	}
 
-	if cfg.ServicesNamespace != defaultServicesNamespace {
-		t.Errorf("expected services namespace: %s, got: %s", defaultServicesNamespace, cfg.ServicesNamespace)
-	}
+// 	if cfg.ServicesNamespace != defaultServicesNamespace {
+// 		t.Errorf("expected services namespace: %s, got: %s", defaultServicesNamespace, cfg.ServicesNamespace)
+// 	}
 
-	if cfg.ServerlessBackend != "" {
-		t.Errorf("expected empty serverless backend, got: %s", cfg.ServerlessBackend)
-	}
+// 	if cfg.ServerlessBackend != "" {
+// 		t.Errorf("expected empty serverless backend, got: %s", cfg.ServerlessBackend)
+// 	}
 
-	if cfg.WatchdogMaxInflight != defaultWatchdogMaxInflight {
-		t.Errorf("expected watchdog maxInflight: %d, got: %d", defaultWatchdogMaxInflight, cfg.WatchdogMaxInflight)
-	}
+// 	if cfg.WatchdogMaxInflight != defaultWatchdogMaxInflight {
+// 		t.Errorf("expected watchdog maxInflight: %d, got: %d", defaultWatchdogMaxInflight, cfg.WatchdogMaxInflight)
+// 	}
 
-	if cfg.WatchdogWriteDebug != defaultWatchdogWriteDebug {
-		t.Errorf("expected watchdog writeDebug: %t, got: %t", defaultWatchdogWriteDebug, cfg.WatchdogWriteDebug)
-	}
+// 	if cfg.WatchdogWriteDebug != defaultWatchdogWriteDebug {
+// 		t.Errorf("expected watchdog writeDebug: %t, got: %t", defaultWatchdogWriteDebug, cfg.WatchdogWriteDebug)
+// 	}
 
-	if cfg.WatchdogExecTimeout != defaultWatchdogExecTimeout {
-		t.Errorf("expected watchdog execTimeout: %d, got: %d", defaultWatchdogExecTimeout, cfg.WatchdogExecTimeout)
-	}
+// 	if cfg.WatchdogExecTimeout != defaultWatchdogExecTimeout {
+// 		t.Errorf("expected watchdog execTimeout: %d, got: %d", defaultWatchdogExecTimeout, cfg.WatchdogExecTimeout)
+// 	}
 
-	if cfg.WatchdogReadTimeout != defaultWatchdogReadTimeout {
-		t.Errorf("expected watchdog readTimeout: %d, got: %d", defaultWatchdogReadTimeout, cfg.WatchdogReadTimeout)
-	}
+// 	if cfg.WatchdogReadTimeout != defaultWatchdogReadTimeout {
+// 		t.Errorf("expected watchdog readTimeout: %d, got: %d", defaultWatchdogReadTimeout, cfg.WatchdogReadTimeout)
+// 	}
 
-	if cfg.WatchdogWriteTimeout != defaultWatchdogWriteTimeout {
-		t.Errorf("expected watchdog writeTimeout: %d, got: %d", defaultWatchdogWriteTimeout, cfg.WatchdogWriteTimeout)
-	}
+// 	if cfg.WatchdogWriteTimeout != defaultWatchdogWriteTimeout {
+// 		t.Errorf("expected watchdog writeTimeout: %d, got: %d", defaultWatchdogWriteTimeout, cfg.WatchdogWriteTimeout)
+// 	}
 
-	if cfg.ReadTimeout != defaultTimeout {
-		t.Errorf("expected readTimeout: %d, got: %d", defaultTimeout, cfg.ReadTimeout)
-	}
+// 	if cfg.ReadTimeout != defaultTimeout {
+// 		t.Errorf("expected readTimeout: %d, got: %d", defaultTimeout, cfg.ReadTimeout)
+// 	}
 
-	if cfg.WriteTimeout != defaultTimeout {
-		t.Errorf("expected writeTimeout: %d, got: %d", defaultTimeout, cfg.WriteTimeout)
-	}
+// 	if cfg.WriteTimeout != defaultTimeout {
+// 		t.Errorf("expected writeTimeout: %d, got: %d", defaultTimeout, cfg.WriteTimeout)
+// 	}
 
-	if cfg.ServicePort != defaultServicePort {
-		t.Errorf("expected servicePort: %d, got: %d", defaultServicePort, cfg.ServicePort)
-	}
+// 	if cfg.ServicePort != defaultServicePort {
+// 		t.Errorf("expected servicePort: %d, got: %d", defaultServicePort, cfg.ServicePort)
+// 	}
 
-	if cfg.YunikornEnable != defaultYunikornEnable {
-		t.Errorf("expected yunikornEnable: %t, got: %t", defaultYunikornEnable, cfg.YunikornEnable)
-	}
+// 	if cfg.YunikornEnable != defaultYunikornEnable {
+// 		t.Errorf("expected yunikornEnable: %t, got: %t", defaultYunikornEnable, cfg.YunikornEnable)
+// 	}
 
-	if cfg.YunikornNamespace != defaultYunikornNamespace {
-		t.Errorf("expected yunikornNamespace: %s, got: %s", defaultYunikornNamespace, cfg.YunikornNamespace)
-	}
+// 	if cfg.YunikornNamespace != defaultYunikornNamespace {
+// 		t.Errorf("expected yunikornNamespace: %s, got: %s", defaultYunikornNamespace, cfg.YunikornNamespace)
+// 	}
 
-	if cfg.YunikornConfigMap != defaultYunikornConfigMap {
-		t.Errorf("expected yunikornConfigMap: %s, got: %s", defaultYunikornConfigMap, cfg.YunikornConfigMap)
-	}
+// 	if cfg.YunikornConfigMap != defaultYunikornConfigMap {
+// 		t.Errorf("expected yunikornConfigMap: %s, got: %s", defaultYunikornConfigMap, cfg.YunikornConfigMap)
+// 	}
 
-	if cfg.YunikornConfigFileName != defaultYunikornConfigFileName {
-		t.Errorf("expected yunikornConfigFileName: %s, got: %s", defaultYunikornConfigFileName, cfg.YunikornConfigFileName)
-	}
-}
+// 	if cfg.YunikornConfigFileName != defaultYunikornConfigFileName {
+// 		t.Errorf("expected yunikornConfigFileName: %s, got: %s", defaultYunikornConfigFileName, cfg.YunikornConfigFileName)
+// 	}
+// }
 
 func TestCustomValues(t *testing.T) {
 	scenarios := []struct {
