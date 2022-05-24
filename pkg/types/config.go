@@ -28,8 +28,10 @@ import (
 )
 
 const (
+	// OpenFaaSBackend string to identify the OpenFaaS Serverless Backend in the configuration
 	OpenFaaSBackend = "openfaas"
-	KnativeBackend  = "knative"
+	// KnativeBackend string to identify the Knative Serverless Backend in the configuration
+	KnativeBackend = "knative"
 
 	stringType            = "string"
 	intType               = "int"
