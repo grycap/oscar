@@ -10,18 +10,18 @@ You can specify the language of the resulting voice in the `language` environmen
 functions:
   oscar:
   - oscar-cluster:
-      name: text-to-speech
+      name: text-to-speech-google
       memory: 1Gi
       cpu: '1.0'
-      image: ghcr.io/grycap/text-to-speech
+      image: ghcr.io/grycap/text-to-speech-google
       script: script.sh
       log_level: CRITICAL
       input:
       - storage_provider: minio
-        path: text-to-speech/input
+        path: text-to-speech-google/input
       output:
       - storage_provider: minio
-        path: text-to-speech/output
+        path: text-to-speech-google/output
       environment: 
         Variables:
           language: en
@@ -29,18 +29,18 @@ functions:
 
 To deploy the service use the command:
 ```sh
-oscar-cli apply tts.yaml
+oscar-cli apply text-to-speech-google.yaml
 ```
 
 To run the service synchronously use:
 ```sh
-oscar-cli service run text-to-speech --text-input "Hello everyone"  --output output.mp3
+oscar-cli service run text-to-speech-google --text-input "Hello everyone"  --output output.mp3
 ```
 You also can pass a file text substituing the flag `--text-input {string}` to `--input {filepath}`
 
 And if you have installed the [VLC player](https://www.videolan.org/vlc/) and you want to play it use this one:
 ```sh
-oscar-cli service run text-to-speech --text-input "Hello everyone"  --output output.mp3 && vlc output.mp3
+oscar-cli service run text-to-speech-google --text-input "Hello everyone"  --output output.mp3 && vlc output.mp3
 ```
 
-You can trigger the service in an asynchronous way just uploading files to the MinIO input bucket `text-to-speech/input`, result files can be found in the `text-to-speech/output` bucket. Input and output fields in the FDL file can be removed if we are only going to use the service synchronously.
+You can trigger the service in an asynchronous way just uploading files to the MinIO input bucket `text-to-speech-google/input`, result files can be found in the `text-to-speech-google/output` bucket. Input and output fields in the FDL file can be removed if we are only going to use the service synchronously.
