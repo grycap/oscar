@@ -4,7 +4,7 @@ functions:
       name: text-to-speech-coqui
       memory: 2Gi
       cpu: '4.0'
-      image: ghcr.io/grycap/text-to-speech-coqui
+      image: ghcr.io/grycap/text-to-speech-coqui:minicon
       log_level: CRITICAL
       script: script.sh
       input:
