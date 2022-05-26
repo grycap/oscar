@@ -154,22 +154,10 @@ kind delete cluster
 *Remember that if you have more than one cluster created, it may be required to set the `--name` flag to specify the name of the cluster to be deleted.*
 
 
-### Using OSCAR-CLI in localhost
+### Using OSCAR-CLI
 
-To use OSCAR-CLI in localhost deployment, you should change the ssl_verify option to false in the file $HOME/.oscar-cli/config.yaml
+To use OSCAR-CLI in a local deployment, you should set the `--disable-ssl` flag to disable verification of the self-signed certificates:
+
 ```sh
-nano $HOME/.oscar-cli/config.yaml
-```
-
-```
-oscar:
-  oscar-cluster:
-    endpoint: https://localhost:443
-    auth_user: $oscar_username
-    auth_password: $oscar_password
-    ssl_verify: false
-    memory: 256Mi
-    log_level: INFO
-default: oscar-cluster
-
+oscar-cli cluster add oscar-cluster https://localhost oscar <OSCAR_PASSWORD>
 ```
