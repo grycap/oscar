@@ -159,5 +159,5 @@ kind delete cluster
 To use OSCAR-CLI in a local deployment, you should set the `--disable-ssl` flag to disable verification of the self-signed certificates:
 
 ```sh
-oscar-cli cluster add oscar-cluster https://localhost oscar <OSCAR_PASSWORD>
+oscar-cli cluster add oscar-cluster https://localhost oscar <OSCAR_PASSWORD> --disable-ssl
 ```
