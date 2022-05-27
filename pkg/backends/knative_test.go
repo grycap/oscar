@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/grycap/oscar/v2/pkg/types"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -49,6 +50,36 @@ var (
 				},
 			}
 			return true, knSvcList, nil
+		},
+	}
+
+	knGetSvcReactor = k8stesting.SimpleReactor{
+		Verb:     "get",
+		Resource: "services",
+		Reaction: func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+			knSvc := &knv1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test",
+					Namespace:   "testnamespace",
+					Labels:      map[string]string{},
+					Annotations: map[string]string{},
+				},
+			}
+			return true, knSvc, nil
+		},
+	}
+
+	knUpdateSvcReactor = k8stesting.SimpleReactor{
+		Verb:     "update",
+		Resource: "services",
+		Reaction: func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+			knSvc := &knv1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "testnamespace",
+				},
+			}
+			return true, knSvc, nil
 		},
 	}
 )
@@ -280,15 +311,387 @@ func TestKnativeCreateService(t *testing.T) {
 }
 
 func TestKnativeReadService(t *testing.T) {
-	//TODO
+	scenarios := []knativeBackendTestScenario{
+		{
+			"Error getting knative service",
+			[]k8stesting.SimpleReactor{},
+			[]k8stesting.SimpleReactor{
+				{
+					Verb:     "get",
+					Resource: "services",
+					Reaction: errorReaction,
+				}},
+			true,
+		},
+		{
+			"Error getting configmap",
+			[]k8stesting.SimpleReactor{
+				{
+					Verb:     "get",
+					Resource: "configmaps",
+					Reaction: errorReaction,
+				},
+			},
+			[]k8stesting.SimpleReactor{knGetSvcReactor},
+			true,
+		},
+	}
+
+	for _, s := range scenarios {
+		t.Run(s.name, func(t *testing.T) {
+			t.Logf("%v", s.name)
+			fakeClientset := fake.NewSimpleClientset()
+			back := MakeKnativeBackend(fakeClientset, fakeConfig, testConfig)
+			back.knClientset = knFake.NewSimpleClientset()
+
+			for _, r := range s.k8sReactors {
+				back.kubeClientset.(*fake.Clientset).Fake.PrependReactor(r.Verb, r.Resource, r.Reaction)
+			}
+
+			for _, r := range s.knReactors {
+				back.knClientset.(*knFake.Clientset).Fake.PrependReactor(r.Verb, r.Resource, r.Reaction)
+			}
+
+			// Read service
+			svc, err := back.ReadService("test")
+			if s.returnError {
+				if err == nil {
+					t.Errorf("expected error, got: %v", svc)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+
+		})
+	}
+	t.Run("Valid read service scenario", func(t *testing.T) {
+		fakeClientset := fake.NewSimpleClientset()
+		back := MakeKnativeBackend(fakeClientset, fakeConfig, testConfig)
+		back.knClientset = knFake.NewSimpleClientset()
+
+		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReaction)
+
+		back.knClientset.(*knFake.Clientset).Fake.PrependReactor("get", "services", knGetSvcReactor.React)
+
+		// Read service
+		_, err := back.ReadService("test")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+	})
+
 }
 
 func TestKnativeUpdateService(t *testing.T) {
-	//TODO
+	newService := types.Service{
+		Name:   "test",
+		CPU:    "2.0",
+		Labels: map[string]string{},
+		Annotations: map[string]string{
+			"testannotationkey": "testannotationvalue",
+		},
+	}
+
+	newInvalidService := types.Service{
+		Name:        "test",
+		CPU:         "asdfg",
+		Labels:      map[string]string{},
+		Annotations: map[string]string{},
+	}
+
+	scenarios := []knativeBackendTestScenario{
+		{
+			"Valid",
+			[]k8stesting.SimpleReactor{
+				{
+					Verb:     "get",
+					Resource: "configmaps",
+					Reaction: validConfigMapReaction,
+				},
+				{
+					Verb:     "update",
+					Resource: "configmaps",
+					Reaction: validConfigMapReaction,
+				},
+			},
+			[]k8stesting.SimpleReactor{knGetSvcReactor, knUpdateSvcReactor},
+			false,
+		},
+		{
+			"Error getting old knative service",
+			[]k8stesting.SimpleReactor{},
+			[]k8stesting.SimpleReactor{
+				{
+					Verb:     "get",
+					Resource: "services",
+					Reaction: errorReaction,
+				},
+			},
+			true,
+		},
+		{
+			"Error getting configmap",
+			[]k8stesting.SimpleReactor{
+				{
+					Verb:     "get",
+					Resource: "configmaps",
+					Reaction: errorReaction,
+				},
+			},
+			[]k8stesting.SimpleReactor{knGetSvcReactor},
+			true,
+		},
+		{
+			"Error updating configmap",
+			[]k8stesting.SimpleReactor{
+				{
+					Verb:     "get",
+					Resource: "configmaps",
+					Reaction: validConfigMapReaction,
+				},
+				{
+					Verb:     "update",
+					Resource: "configmaps",
+					Reaction: errorReaction,
+				},
+			},
+			[]k8stesting.SimpleReactor{knGetSvcReactor},
+			true,
+		},
+		{
+			"Error updating service",
+			[]k8stesting.SimpleReactor{
+				{
+					Verb:     "get",
+					Resource: "configmaps",
+					Reaction: validConfigMapReaction,
+				},
+				{
+					Verb:     "update",
+					Resource: "configmaps",
+					Reaction: validConfigMapReaction,
+				},
+			},
+			[]k8stesting.SimpleReactor{
+				knGetSvcReactor,
+				{
+					Verb:     "update",
+					Resource: "services",
+					Reaction: errorReaction,
+				},
+			},
+			true,
+		},
+	}
+
+	for _, s := range scenarios {
+		t.Run(s.name, func(t *testing.T) {
+			fakeClientset := fake.NewSimpleClientset()
+			back := MakeKnativeBackend(fakeClientset, fakeConfig, testConfig)
+			back.knClientset = knFake.NewSimpleClientset()
+
+			for _, r := range s.k8sReactors {
+				back.kubeClientset.(*fake.Clientset).Fake.PrependReactor(r.Verb, r.Resource, r.Reaction)
+			}
+
+			for _, r := range s.knReactors {
+				back.knClientset.(*knFake.Clientset).Fake.PrependReactor(r.Verb, r.Resource, r.Reaction)
+			}
+
+			// Update with valid service
+			err := back.UpdateService(newService)
+			if s.returnError {
+				if err == nil {
+					t.Error("expected error, got: nil")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
+
+	// Error creating service definition and restoring old configMap
+	t.Run("Error creating service definition and restoring old configMap", func(t *testing.T) {
+		fakeClientset := fake.NewSimpleClientset()
+
+		back := MakeKnativeBackend(fakeClientset, fakeConfig, testConfig)
+		back.knClientset = knFake.NewSimpleClientset()
+
+		var configMapReactorCounter = new(int)
+		customConfigMapReactor := func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+			cm := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "testnamespace",
+				},
+				Data: map[string]string{
+					types.ScriptFileName: "testscript",
+					types.FDLFileName:    testFDL,
+				},
+			}
+
+			if *configMapReactorCounter == 0 {
+				*configMapReactorCounter++
+				return true, cm, nil
+			}
+
+			*configMapReactorCounter++
+			return true, nil, errFake
+		}
+
+		// Return valid configmap
+		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReaction)
+
+		// Return valid knative service
+		back.knClientset.(*knFake.Clientset).Fake.PrependReactor("get", "services", knGetSvcReactor.Reaction)
+
+		// Return error updating knative service
+		back.knClientset.(*knFake.Clientset).Fake.PrependReactor("update", "services", errorReaction)
+
+		// Custom reactor for configmap update
+		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "configmaps", customConfigMapReactor)
+
+		// Call
+		err := back.UpdateService(newInvalidService)
+		if err == nil {
+			t.Error("expecting error, got: nil")
+		}
+	})
+
+	// Error updating service and restoring old configMap
+	t.Run("Error updating service and restoring old configMap", func(t *testing.T) {
+		fakeClientset := fake.NewSimpleClientset()
+
+		back := MakeKnativeBackend(fakeClientset, fakeConfig, testConfig)
+		back.knClientset = knFake.NewSimpleClientset()
+
+		var configMapReactorCounter = new(int)
+		customConfigMapReactor := func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+			cm := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "testnamespace",
+				},
+				Data: map[string]string{
+					types.ScriptFileName: "testscript",
+					types.FDLFileName:    testFDL,
+				},
+			}
+
+			if *configMapReactorCounter == 0 {
+				*configMapReactorCounter++
+				return true, cm, nil
+			}
+
+			*configMapReactorCounter++
+			return true, nil, errFake
+		}
+
+		// Return valid configmap
+		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReaction)
+
+		// Return valid knative service
+		back.knClientset.(*knFake.Clientset).Fake.PrependReactor("get", "services", knGetSvcReactor.Reaction)
+
+		// Return error updating knative service
+		back.knClientset.(*knFake.Clientset).Fake.PrependReactor("update", "services", errorReaction)
+
+		// Custom reactor for configmap update
+		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "configmaps", customConfigMapReactor)
+
+		// Call
+		err := back.UpdateService(newService)
+		if err == nil {
+			t.Error("expecting error, got: nil")
+		}
+	})
 }
 
 func TestKnativeDeleteService(t *testing.T) {
-	//TODO
+	scenarios := []knativeBackendTestScenario{
+		{
+			"Error deleting knative service",
+			[]k8stesting.SimpleReactor{},
+			[]k8stesting.SimpleReactor{
+				{
+					Verb:     "delete",
+					Resource: "services",
+					Reaction: errorReaction,
+				}},
+			true,
+		},
+		{
+			"Error deleting configmap",
+			[]k8stesting.SimpleReactor{
+				{
+					Verb:     "delete",
+					Resource: "configmaps",
+					Reaction: errorReaction,
+				},
+			},
+			[]k8stesting.SimpleReactor{
+				{
+					Verb:     "delete",
+					Resource: "services",
+					Reaction: validDeleteReaction,
+				},
+			},
+			false,
+		},
+		{
+			"Error deleting jobs",
+			[]k8stesting.SimpleReactor{
+				{
+					Verb:     "delete-collection",
+					Resource: "jobs",
+					Reaction: errorReaction,
+				},
+			},
+			[]k8stesting.SimpleReactor{
+				{
+					Verb:     "delete",
+					Resource: "services",
+					Reaction: validDeleteReaction,
+				},
+			},
+			false,
+		},
+	}
+
+	for _, s := range scenarios {
+		t.Run(s.name, func(t *testing.T) {
+			t.Logf("%v", s.name)
+			fakeClientset := fake.NewSimpleClientset()
+			back := MakeKnativeBackend(fakeClientset, fakeConfig, testConfig)
+			back.knClientset = knFake.NewSimpleClientset()
+
+			for _, r := range s.k8sReactors {
+				back.kubeClientset.(*fake.Clientset).Fake.PrependReactor(r.Verb, r.Resource, r.Reaction)
+			}
+
+			for _, r := range s.knReactors {
+				back.knClientset.(*knFake.Clientset).Fake.PrependReactor(r.Verb, r.Resource, r.Reaction)
+			}
+
+			// Delete service
+			err := back.DeleteService("test")
+			if s.returnError {
+				if err == nil {
+					t.Error("expected error, got: nil")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+
+		})
+	}
 }
 
 func TestKnativeGetProxyDirector(t *testing.T) {
