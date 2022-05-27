@@ -1,7 +1,12 @@
-FROM ubuntu:20.04
-RUN apt-get update && apt-get -y install git pip python
-RUN pip install TTS
-RUN git clone https://github.com/coqui-ai/TTS /opt
-RUN DEBIAN_FRONTEND=noninteractive TZ=Europe/UTC apt-get -y install tzdata
-RUN apt-get install -y libsndfile1-dev 
+FROM bitnami/minideb:bullseye
 
+ENV LANG C.UTF-8
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt update && \
+    apt upgrade -y && \
+    apt -y install --no-install-recommends python3-pip build-essential python3-dev libsndfile1-dev && \
+    apt clean && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN pip install TTS
