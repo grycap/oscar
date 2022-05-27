@@ -78,6 +78,10 @@ storage_providers:
 		}
 		return true, validCM, nil
 	}
+
+	validDeleteReaction = func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+		return true, nil, nil
+	}
 )
 
 func TestMakeKubeBackend(t *testing.T) {
@@ -659,23 +663,19 @@ func TestKubeUpdateService(t *testing.T) {
 }
 
 func TestKubeDeleteService(t *testing.T) {
-	validReactor := func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
-		return true, nil, nil
-	}
-
 	t.Run("valid", func(t *testing.T) {
 		clientset := fake.NewSimpleClientset()
 
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return no error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", validReactor)
+		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", validDeleteReaction)
 
 		// Return no error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", validReactor)
+		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", validDeleteReaction)
 
 		// Return no error deleting jobs
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete-collection", "jobs", validReactor)
+		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete-collection", "jobs", validDeleteReaction)
 
 		// Call
 		err := back.DeleteService("test")
@@ -705,7 +705,7 @@ func TestKubeDeleteService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return no error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", validReactor)
+		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", validDeleteReaction)
 
 		// Return error deleting podTemplate
 		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", errorReaction)
@@ -723,10 +723,10 @@ func TestKubeDeleteService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return no error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", validReactor)
+		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", validDeleteReaction)
 
 		// Return no error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", validReactor)
+		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", validDeleteReaction)
 
 		// Return no error deleting jobs
 		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete-collection", "jobs", errorReaction)
