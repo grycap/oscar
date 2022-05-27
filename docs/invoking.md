@@ -15,7 +15,7 @@ Synchronous invocations allow obtaining the execution output as the response to 
 
 ![oscar-sync.png](images/oscar-sync.png)
 
-Synchronous invocations also can be invocated by OSCAR-CLI, using the comand `oscar-cli service run`:
+Synchronous invocations can be made through OSCAR-CLI, using the comand `oscar-cli service run`:
 
 ```sh
 oscar-cli service run [SERVICE_NAME] {--input | --text-input} {-o | -output }
@@ -26,16 +26,17 @@ You can check these use-cases:
 - [text-to-speech](https://oscar.grycap.net/blog/post-oscar-text-to-speech/). 
 
 
-Where it can be sent a file, in this case, is an image, and the result will show up on the terminal:
+The input can be sent as a file via the `--input` flag, and the result of the execution will be displayed directly in the terminal:
+
 ```sh
 oscar-cli service run plant-classification-sync --input images/image3.jpg
 ```
 
-Alternatively, it can be sent a text and redirected the result into a file:
+Alternatively, it can be sent as plain text using the `--text-input` flag and the result stored in a file using the `--output` flag:
+
 ```sh
 oscar-cli service run text-to-speech --text-input "Hello everyone"  --output output.mp3
 ```
-
 
 
 ### Input/Output
