@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.15">
+      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.16">
     
     
       
@@ -17,7 +17,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.c382b1dc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.1c3799f8.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.cc9b2e1e.min.css">
@@ -617,6 +617,18 @@
 <h2 id="synchronous-invocations">Synchronous invocations</h2>
 <p>Synchronous invocations allow obtaining the execution output as the response to the HTTP call to the <code>/run/&lt;SERVICE_NAME&gt;</code> path. For this, OSCAR delegates the execution to a Serverless Backend (<a href="https://knative.dev">Knative</a> or <a href="https://www.openfaas.com/">OpenFaaS</a>). Unlike asynchronous invocations, that are translated into Kubernetes jobs, synchronous invocations use a "function" pod to handle requests. This is possible thanks to the <a href="https://github.com/openfaas/classic-watchdog">OpenFaaS Watchdog</a>, which is injected into each service and is in charge of forking the process to be executed for each request received.</p>
 <p><img alt="oscar-sync.png" src="../images/oscar-sync.png" /></p>
+<p>Synchronous invocations can be made through OSCAR-CLI, using the comand <code>oscar-cli service run</code>:</p>
+<pre><code class="language-sh">oscar-cli service run [SERVICE_NAME] {--input | --text-input} {-o | -output }
+</code></pre>
+<p>You can check these use-cases:
+- <a href="https://oscar.grycap.net/blog/post-oscar-faas-sync-ml-inference/">plant-classification-sync</a>
+- <a href="https://oscar.grycap.net/blog/post-oscar-text-to-speech/">text-to-speech</a>. </p>
+<p>The input can be sent as a file via the <code>--input</code> flag, and the result of the execution will be displayed directly in the terminal:</p>
+<pre><code class="language-sh">oscar-cli service run plant-classification-sync --input images/image3.jpg
+</code></pre>
+<p>Alternatively, it can be sent as plain text using the <code>--text-input</code> flag and the result stored in a file using the <code>--output</code> flag:</p>
+<pre><code class="language-sh">oscar-cli service run text-to-speech --text-input &quot;Hello everyone&quot;  --output output.mp3
+</code></pre>
 <h3 id="inputoutput">Input/Output</h3>
 <p><a href="https://github.com/grycap/faas-supervisor">FaaS Supervisor</a>, the component in charge of managing the input and output of services, allows JSON or base64 encoded body in service requests. The body of these requests will be automatically decoded into the invocation's input file available from the script through the <code>$INPUT_FILE_PATH</code> environment variable.</p>
 <p>The output of synchronous invocations will depend on the application itself:</p>
@@ -708,7 +720,7 @@
     <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.2a1c317c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.a6c66575.min.js"></script>
+      <script src="../assets/javascripts/bundle.3a4b43e5.min.js"></script>
       
     
   </body>

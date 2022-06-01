@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.15">
+      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.16">
     
     
       
@@ -17,7 +17,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.c382b1dc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.1c3799f8.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.cc9b2e1e.min.css">
@@ -351,6 +351,13 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#using-oscar-cli" class="md-nav__link">
+    Using OSCAR-CLI
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -644,6 +651,13 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#using-oscar-cli" class="md-nav__link">
+    Using OSCAR-CLI
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -715,7 +729,7 @@ EOF
 <pre><code class="language-sh">kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/kind/deploy.yaml
 </code></pre>
 <h3 id="deploy-minio">Deploy MinIO</h3>
-<p>OSCAR depends on <a href="https://min.io/">MinIO</a> as storage provider and function trigger. The easy way to run MinIO in a Kubernetes cluster is by installing its <a href="https://github.com/minio/charts">helm chart</a>. To  install the helm MinIO repo and install the chart, run the following commands replacing <code>&lt;MINIO_PASSWORD&gt;</code> with a password:</p>
+<p>OSCAR depends on <a href="https://min.io/">MinIO</a> as a storage provider and function trigger. The easy way to run MinIO in a Kubernetes cluster is by installing its <a href="https://github.com/minio/charts">helm chart</a>. To  install the helm MinIO repo and install the chart, run the following commands replacing <code>&lt;MINIO_PASSWORD&gt;</code> with a password. It must have at least 8 characters:</p>
 <pre><code class="language-sh">helm repo add minio https://charts.min.io
 helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=&lt;MINIO_PASSWORD&gt;,service.type=NodePort,service.nodePort=30300,consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 --create-namespace
 </code></pre>
@@ -774,6 +788,10 @@ helm install --namespace=oscar oscar grycap/oscar --set authPass=&lt;OSCAR_PASSW
 <pre><code class="language-sh">kind delete cluster
 </code></pre>
 <p><em>Remember that if you have more than one cluster created, it may be required to set the <code>--name</code> flag to specify the name of the cluster to be deleted.</em></p>
+<h3 id="using-oscar-cli">Using OSCAR-CLI</h3>
+<p>To use OSCAR-CLI in a local deployment, you should set the <code>--disable-ssl</code> flag to disable verification of the self-signed certificates:</p>
+<pre><code class="language-sh">oscar-cli cluster add oscar-cluster https://localhost oscar &lt;OSCAR_PASSWORD&gt; --disable-ssl
+</code></pre>
 
               
             </article>
@@ -846,7 +864,7 @@ helm install --namespace=oscar oscar grycap/oscar --set authPass=&lt;OSCAR_PASSW
     <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.2a1c317c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.a6c66575.min.js"></script>
+      <script src="../assets/javascripts/bundle.3a4b43e5.min.js"></script>
       
     
   </body>

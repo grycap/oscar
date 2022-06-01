@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.15">
+      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.16">
     
     
       
@@ -17,7 +17,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.c382b1dc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.1c3799f8.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.cc9b2e1e.min.css">
@@ -385,6 +385,19 @@
   
 </li>
         
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#minio-storage-tab" class="md-nav__link">
+    MinIO Storage Tab
+  </a>
+  
+    <nav class="md-nav" aria-label="MinIO Storage Tab">
+      <ul class="md-nav__list">
+        
           <li class="md-nav__item">
   <a href="#uploading-files" class="md-nav__link">
     Uploading files
@@ -586,6 +599,19 @@
   
 </li>
         
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#minio-storage-tab" class="md-nav__link">
+    MinIO Storage Tab
+  </a>
+  
+    <nav class="md-nav" aria-label="MinIO Storage Tab">
+      <ul class="md-nav__list">
+        
           <li class="md-nav__item">
   <a href="#uploading-files" class="md-nav__link">
     Uploading files
@@ -644,7 +670,7 @@
 <li>Execute the user-defined script.</li>
 <li>Upload the content of the output folder accessible via the <code>TMP_OUTPUT_DIR</code> environment variable.</li>
 </ul>
-<p>You can follow one of the <a href="https://github.com/grycap/oscar/tree/master/examples">examples</a> in order to test the OSCAR framework for specific applications. 
+<p>You can follow one of the <a href="https://github.com/grycap/oscar/tree/master/examples">examples</a> in order to test the OSCAR framework for specific applications.
 We recommend you to start with the <a href="https://github.com/grycap/oscar/tree/master/examples/imagemagick">plant classification example</a> detailed below.</p>
 <p>If you prefer to use the command-line interface rather than the web-based UI, there is an example in <a href="https://github.com/grycap/oscar-cli/tree/main/example-workflow">oscar-cli's repository</a>.</p>
 <h2 id="login">Login</h2>
@@ -665,7 +691,7 @@ python2 /opt/plant-classification-theano/classify_image.py &quot;$INPUT_FILE_PAT
 <p>Note that specifying a tag in the container image used can be convenient to avoid problems with quotas for certain container registries such as <a href="https://docs.docker.com/docker-hub/download-rate-limit/#what-is-the-download-rate-limit-on-docker-hub">Docker Hub</a>. This is due to the fact that Kubernetes defaults the <a href="https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy"><code>imagePullPolicy</code></a> of pods to <code>Always</code> when no tag or the <code>latest</code> tag is set, which checks the version of the image in the registry every time a job is launched.</p>
 <p><img alt="new service" src="../images/usage/usage-03.png" /></p>
 <p>Next, the credentials of the storage providers to be used must be introduced. As the platform already has a MinIO deployment to operate, it is not necessary to enter its credentials for using it.</p>
-<p>Multiple MinIO, Onedata and Amazon S3 storage providers can be used. Remember to click the "ADD" button after completing each one. </p>
+<p>Multiple MinIO, Onedata and Amazon S3 storage providers can be used. Remember to click the "ADD" button after completing each one.</p>
 <p><img alt="add storage provider 1" src="../images/usage/usage-04.png" /></p>
 <p>Then, click the "NEXT" button to go to the last section of the wizard.</p>
 <p><img alt="add storage provider 2" src="../images/usage/usage-05.png" /></p>
@@ -689,6 +715,8 @@ python2 /opt/plant-classification-theano/classify_image.py &quot;$INPUT_FILE_PAT
 </ul>
 <p>The content of the HTTP request body will be stored as a file that will be available via the <code>INPUT_FILE_PATH</code> environment variable to process it.</p>
 <p>A detailed specification of the OSCAR's API and its different paths can be found <a href="../api/">here</a>.</p>
+<h2 id="minio-storage-tab">MinIO Storage Tab</h2>
+<p>MinIO Storage Tab is made to manage buckets without using MinIO UI. It simplifies the process. From MinIO Storage Tab, buckets can be created or removed and folders inside them. Furthermore, files can be uploaded to the buckets and downloaded from them. Each time a service is created or submitted an edit, the buckets that are not created will be formed.</p>
 <h3 id="uploading-files">Uploading files</h3>
 <p>Once a service has been created, it can be invoked by uploading files to its input bucket/folder. This can be done through the MinIO web interface (accessible from the Kubernetes frontend IP, on port <code>30300</code>) or from the "Minio Storage" section in the side menu of the OSCAR web interface. Expanding down that menu will list the buckets created and, by clicking on their name, you will be able to see their content, upload and download files.</p>
 <p><img alt="minio storage" src="../images/usage/usage-11.png" /></p>
@@ -788,7 +816,7 @@ python2 /opt/plant-classification-theano/classify_image.py &quot;$INPUT_FILE_PAT
     <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.2a1c317c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.a6c66575.min.js"></script>
+      <script src="../assets/javascripts/bundle.3a4b43e5.min.js"></script>
       
     
   </body>
