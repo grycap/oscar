@@ -1,0 +1,15 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: text-to-speech-coqui
+      memory: 2Gi
+      cpu: '4.0'
+      image: ghcr.io/grycap/text-to-speech-coqui
+      log_level: CRITICAL
+      script: script.sh
+      input:
+      - storage_provider: minio
+        path: text-to-speech-coqui/input
+      output:
+      - storage_provider: minio
+        path: text-to-speech-coqui/output

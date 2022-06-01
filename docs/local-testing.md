@@ -62,7 +62,7 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/mast
 
 ### Deploy MinIO
 
-OSCAR depends on [MinIO](https://min.io/) as storage provider and function trigger. The easy way to run MinIO in a Kubernetes cluster is by installing its [helm chart](https://github.com/minio/charts). To  install the helm MinIO repo and install the chart, run the following commands replacing `<MINIO_PASSWORD>` with a password:
+OSCAR depends on [MinIO](https://min.io/) as a storage provider and function trigger. The easy way to run MinIO in a Kubernetes cluster is by installing its [helm chart](https://github.com/minio/charts). To  install the helm MinIO repo and install the chart, run the following commands replacing `<MINIO_PASSWORD>` with a password. It must have at least 8 characters:
 
 ```sh
 helm repo add minio https://charts.min.io
@@ -152,3 +152,12 @@ kind delete cluster
 ```
 
 *Remember that if you have more than one cluster created, it may be required to set the `--name` flag to specify the name of the cluster to be deleted.*
+
+
+### Using OSCAR-CLI
+
+To use OSCAR-CLI in a local deployment, you should set the `--disable-ssl` flag to disable verification of the self-signed certificates:
+
+```sh
+oscar-cli cluster add oscar-cluster https://localhost oscar <OSCAR_PASSWORD> --disable-ssl
+```

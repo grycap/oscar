@@ -7,7 +7,7 @@ OSCAR allows the creation of serverless file-processing services based on contai
 - Upload the content of the output folder accessible via the `TMP_OUTPUT_DIR` environment variable.
 
 
-You can follow one of the [examples](https://github.com/grycap/oscar/tree/master/examples) in order to test the OSCAR framework for specific applications. 
+You can follow one of the [examples](https://github.com/grycap/oscar/tree/master/examples) in order to test the OSCAR framework for specific applications.
 We recommend you to start with the [plant classification example](https://github.com/grycap/oscar/tree/master/examples/imagemagick) detailed below.
 
 If you prefer to use the command-line interface rather than the web-based UI, there is an example in [oscar-cli's repository](https://github.com/grycap/oscar-cli/tree/main/example-workflow).
@@ -43,7 +43,7 @@ Note that specifying a tag in the container image used can be convenient to avoi
 
 Next, the credentials of the storage providers to be used must be introduced. As the platform already has a MinIO deployment to operate, it is not necessary to enter its credentials for using it.
 
-Multiple MinIO, Onedata and Amazon S3 storage providers can be used. Remember to click the "ADD" button after completing each one. 
+Multiple MinIO, Onedata and Amazon S3 storage providers can be used. Remember to click the "ADD" button after completing each one.
 
 ![add storage provider 1](images/usage/usage-04.png)
 
@@ -85,6 +85,11 @@ OSCAR services can be invoked through auto-generated HTTP endpoints. Requests to
 The content of the HTTP request body will be stored as a file that will be available via the `INPUT_FILE_PATH` environment variable to process it.
 
 A detailed specification of the OSCAR's API and its different paths can be found [here](api.md).
+
+
+## MinIO Storage Tab
+
+MinIO Storage Tab is made to manage buckets without using MinIO UI. It simplifies the process. From MinIO Storage Tab, buckets can be created or removed and folders inside them. Furthermore, files can be uploaded to the buckets and downloaded from them. Each time a service is created or submitted an edit, the buckets that are not created will be formed.
 
 ### Uploading files
 
