@@ -14,6 +14,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v3
+      with:
+        submodules: "true"
 
     - name: Setup node
       uses: actions/setup-node@v1
@@ -21,7 +23,7 @@ jobs:
         node-version: '14'
 
     - name: Build OSCAR-UI
-      run: npm install && npm run build
+      run: npm install && npm run deploy_container
       working-directory: ./ui
 
     - name: Prepare docker buildx
