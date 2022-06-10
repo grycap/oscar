@@ -4,7 +4,7 @@ Writing an entire workflow in plain text could be tough to make it. To simplify 
 
 ## How to access
 
-It does not require installation, just access to [fdl-composer web](https://composer.oscar.grycap.net/) if you would prefer to execute on your computer instead of using the web. Clone the repository GitHub:
+It does not require installation, just access to [fdl-composer web](https://composer.oscar.grycap.net/). If you would prefer to execute on your computer instead of using the web. Clone the repository GitHub:
 
 ``` sh
 git clone https://github.com/grycap/fdl-composer
