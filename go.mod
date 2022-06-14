@@ -21,7 +21,7 @@ require (
 	github.com/tinylib/msgp v1.1.6 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/net v0.0.0-20220526153639-5463443f8c37 // indirect
-	golang.org/x/oauth2 v0.0.0-20220524215830-622c5d57e401 // indirect
+	golang.org/x/oauth2 v0.0.0-20220524215830-622c5d57e401
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	k8s.io/api v0.24.1
 	k8s.io/apimachinery v0.24.1
@@ -43,6 +43,7 @@ require (
 require (
 	github.com/apache/yunikorn-core v1.0.0
 	github.com/barkimedes/go-deepcopy v0.0.0-20220514131651-17c30cfc62df
+	github.com/coreos/go-oidc v2.2.1+incompatible
 	knative.dev/serving v0.31.0
 )
 
@@ -79,6 +80,7 @@ require (
 	github.com/philhofer/fwd v1.1.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/power-devops/perfstat v0.0.0-20220216144756-c35f1ee13d7c // indirect
+	github.com/pquerna/cachecontrol v0.1.0 // indirect
 	github.com/prometheus/common v0.34.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/rogpeppe/go-internal v1.8.1 // indirect
@@ -101,6 +103,7 @@ require (
 	google.golang.org/grpc v1.46.2 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
+	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0 // indirect
 	knative.dev/networking v0.0.0-20220524205304-22d1b933cf73 // indirect

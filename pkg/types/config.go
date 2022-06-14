@@ -34,6 +34,7 @@ const (
 	KnativeBackend = "knative"
 
 	stringType            = "string"
+	stringSliceType       = "slice"
 	intType               = "int"
 	boolType              = "bool"
 	secondsType           = "seconds"
@@ -145,7 +146,7 @@ type Config struct {
 	// OIDCGroups OpenID comma-separated group list to grant access in the cluster.
 	// Groups defined in the "eduperson_entitlement" OIDC scope,
 	// as described here: https://docs.egi.eu/providers/check-in/sp/#10-groups
-	OIDCGroups string `json:"-"`
+	OIDCGroups []string `json:"-"`
 }
 
 var configVars = []configVar{
@@ -183,7 +184,7 @@ var configVars = []configVar{
 	{"OIDCEnable", "OIDC_ENABLE", false, boolType, "false"},
 	{"OIDCIssuer", "OIDC_ISSUER", false, stringType, "https://aai.egi.eu/oidc/"},
 	{"OIDCSubject", "OIDC_SUBJECT", false, stringType, ""},
-	{"OIDCGroups", "OIDC_GROUPS", false, stringType, ""},
+	{"OIDCGroups", "OIDC_GROUPS", false, stringSliceType, ""},
 }
 
 func readConfigVar(cfgVar configVar) (string, error) {
@@ -216,6 +217,20 @@ func setValue(value any, configField string, cfg *Config) {
 
 	// Set the value
 	valCfg.Set(reflect.ValueOf(value))
+}
+
+func parseStringSlice(s string) []string {
+	strs := []string{}
+
+	// Split by commas
+	vals := strings.Split(s, ",")
+
+	// Trim spaces and append
+	for _, v := range vals {
+		strs = append(strs, strings.TrimSpace(v))
+	}
+
+	return strs
 }
 
 func parseSeconds(s string) (time.Duration, error) {
@@ -256,6 +271,8 @@ func ReadConfig() (*Config, error) {
 		switch cv.varType {
 		case stringType:
 			value = strings.ToLower(strValue)
+		case stringSliceType:
+			value = parseStringSlice(strValue)
 		case intType:
 			value, parseErr = strconv.Atoi(strValue)
 		case boolType:
