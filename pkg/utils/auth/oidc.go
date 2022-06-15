@@ -21,13 +21,15 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/coreos/go-oidc"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
 )
 
+// EGIGroupsURNPrefix prefix to identify EGI group URNs
 const EGIGroupsURNPrefix = "urn:mace:egi.eu:group"
 
+// oidcManager struct to represent a OIDC manager, including a cache of tokens
 type oidcManager struct {
 	provider   *oidc.Provider
 	subject    string
@@ -41,6 +43,7 @@ type userInfo struct {
 	groups  []string
 }
 
+// newOIDCManager returns a new oidcManager or error if the oidc.Provider can't be created
 func newOIDCManager(issuer string, subject string, groups []string) (*oidcManager, error) {
 	provider, err := oidc.NewProvider(context.TODO(), issuer)
 	if err != nil {
