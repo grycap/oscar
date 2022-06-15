@@ -2,6 +2,8 @@
 
 Writing an entire workflow in plain text could be a tough task for many users. To simplify the process you can use FDL Composer, a tool developed by [GRyCAP](https://www.grycap.upv.es/) to facilitate the definition of FDL YAML files for [OSCAR](https://oscar.grycap.net/) and [SCAR](https://scar.readthedocs.io) platforms from a user-friendly interactive graphic interface.
 
+![fdl-composer-workflow.png](images/fdl-composer/fdl-composer-workflow.png)
+
 ## How to access
 
 It does not require installation, just access to [FDL Composer web](https://composer.oscar.grycap.net/). If you prefer to execute on your computer instead of using the web. Clone the git repository:
