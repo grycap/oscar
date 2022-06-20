@@ -8,7 +8,6 @@ As detailed in the [API specification](api.md), invocation paths require the ser
 
 ![oscar-ui-service-token.png](images/usage/oscar-ui-service-token.png)
 
-
 ## Synchronous invocations
 
 Synchronous invocations allow obtaining the execution output as the response to the HTTP call to the `/run/<SERVICE_NAME>` path. For this, OSCAR delegates the execution to a Serverless Backend ([Knative](https://knative.dev) or [OpenFaaS](https://www.openfaas.com/)). Unlike asynchronous invocations, that are translated into Kubernetes jobs, synchronous invocations use a "function" pod to handle requests. This is possible thanks to the [OpenFaaS Watchdog](https://github.com/openfaas/classic-watchdog), which is injected into each service and is in charge of forking the process to be executed for each request received.
@@ -22,9 +21,9 @@ oscar-cli service run [SERVICE_NAME] {--input | --text-input} {-o | -output }
 ```
 
 You can check these use-cases:
-- [plant-classification-sync](https://oscar.grycap.net/blog/post-oscar-faas-sync-ml-inference/)
-- [text-to-speech](https://oscar.grycap.net/blog/post-oscar-text-to-speech/). 
 
+- [plant-classification-sync](https://oscar.grycap.net/blog/post-oscar-faas-sync-ml-inference/)
+- [text-to-speech](https://oscar.grycap.net/blog/post-oscar-text-to-speech/).
 
 The input can be sent as a file via the `--input` flag, and the result of the execution will be displayed directly in the terminal:
 
@@ -37,7 +36,6 @@ Alternatively, it can be sent as plain text using the `--text-input` flag and th
 ```sh
 oscar-cli service run text-to-speech --text-input "Hello everyone"  --output output.mp3
 ```
-
 
 ### Input/Output
 
@@ -64,6 +62,12 @@ An illustration of triggering a service synchronously through OSCAR-CLI can be f
 Naturally, OSCAR services can also be invoked via traditional HTTP clients such as [cURL](https://curl.se/) via the path `/run/<SERVICE_NAME>`. However, you must take care to properly format the input to one of the two supported formats (JSON or base64 encoded) and include the [service access token](#service-access-tokens) in the request.
 
 An illustration of triggering a service synchronously through cURL can be found in the [cowsay example](https://github.com/grycap/oscar/tree/master/examples/cowsay#curl).
+
+When a service is invoked, the input must be encoded with base64. If the services are invoked synchronously, using the "run" URL, remember to put log_level as CRITICAL. The output, which is encoded in base64, should be decoded. Otherwise, some logs will appear as output, and decoding will not be a success. Save output with the same format as input.
+
+``` sh
+base64 input.png | curl -X POST -H "Authorization: Bearer <TOKEN>" -d @- http://<CLUSTER-ENDPOINT>/run/<OSCAR-SERVICE> | base64 -d > resultado.png
+```
 
 ### Limitations
 
