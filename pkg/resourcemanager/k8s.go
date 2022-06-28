@@ -16,20 +16,83 @@ limitations under the License.
 
 package resourcemanager
 
-import "github.com/grycap/oscar/v2/pkg/types"
+import (
+	"context"
+	"fmt"
 
-// TODO: implement!!
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+)
 
-// TODO: add apropriate variables to store cpu and memory usage
 // KubeResourceManager
 type KubeResourceManager struct {
+	// memory in bytes, as returned by quantity.Value()
+	memory int64
+	// cpu in MilliValue, as returned by quantity.MilliValue()
+	cpu           int64
+	kubeClientset kubernetes.Interface
 }
 
+// UpdateResources update the available resources in the cluster
 func (krm *KubeResourceManager) UpdateResources() error {
-	// Count only schedulable (working) nodes
+	// List all (working) nodes
+	nodes, err := krm.kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("Error getting node list: %v", err)
+	}
+
+	// Get list all Running pods
+	pods, err := krm.kubeClientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Succeeded,status.phase!=Failed"})
+	if err != nil {
+		return fmt.Errorf("Error getting pod list: %v", err)
+	}
+
+	// Get available resources from all nodes
+	var memory int64 = 0
+	var cpu int64 = 0
+
+	for _, node := range nodes.Items {
+		// Only count Schedulable nodes
+		if !node.Spec.Unschedulable {
+			nodeCPU, nodeMemory := getNodeAvailableResources(node, pods)
+			memory += nodeMemory
+			cpu += nodeCPU
+		}
+	}
+
+	krm.memory = memory
+	krm.cpu = cpu
+
 	return nil
 }
 
-func (krm *KubeResourceManager) IsSchedulable(*types.Service) bool {
-	return true
+// IsSchedulable check if a Service's v1.ResourceRequirements can be scheduled in the cluster
+func (krm *KubeResourceManager) IsSchedulable(resources v1.ResourceRequirements) bool {
+	serviceMemory := resources.Limits.Memory().Value()
+	serviceCPU := resources.Limits.Cpu().MilliValue()
+
+	if serviceMemory < krm.memory && serviceCPU < krm.cpu {
+		return true
+	}
+
+	return false
+}
+
+func getNodeAvailableResources(node v1.Node, pods *v1.PodList) (cpu int64, memory int64) {
+	// Get allocatable resources from node status
+	memory = node.Status.Allocatable.Memory().Value()
+	cpu = node.Status.Allocatable.Cpu().MilliValue()
+
+	// Filter podList by nodename and subtract used resources
+	for _, pod := range pods.Items {
+		if pod.Spec.NodeName == node.Name {
+			for _, container := range pod.Spec.Containers {
+				memory -= container.Resources.Requests.Memory().Value()
+				cpu -= container.Resources.Requests.Cpu().MilliValue()
+			}
+		}
+	}
+
+	return
 }

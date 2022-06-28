@@ -112,6 +112,7 @@ func checkValues(service *types.Service, cfg *types.Config) {
 		service.LogLevel = defaultLogLevel
 	}
 
+	// TODO: add label if is re-schedulable!! (this can be only added in jobs too, (job handler))
 	// Add default Labels
 	if service.Labels == nil {
 		service.Labels = make(map[string]string)

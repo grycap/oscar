@@ -16,27 +16,22 @@ limitations under the License.
 
 package resourcemanager
 
-import "github.com/grycap/oscar/v2/pkg/types"
+import (
+	"log"
+	"os"
+	"time"
 
-// TODO: add comment!
-// ReScheduledEvent
-type ReScheduledEvent struct {
-	StorageProviderID string `json:"storage_provider"`
-	Event             string `json:"event"`
-}
+	"github.com/grycap/oscar/v2/pkg/types"
+)
 
-// TODO: implement:
-// get svc configMap (FDL), get service token in the replica, update event with "storage_provider" field
-// DelegateJob sends the event to a service's replica
-func DelegateJob(service types.Service, event string) error {
+// Custom logger
+var reSchLogger = log.New(os.Stdout, "[RE-SCHEDULER] ", log.Flags())
 
-	return nil
-}
+// StartReScheduler starts the ReScheduler loop to check if there are pending pods exceeding the xx every cfg.ResourceManagerInterval
+func StartReScheduler(rm ResourceManager, cfg *types.Config) {
+	// TODO
+	for {
 
-// WrapEvent wraps an event adding the storage_provider field (from the service's cluster_id)
-func WrapEvent(providerID string, event string) ReScheduledEvent {
-	return ReScheduledEvent{
-		StorageProviderID: providerID,
-		Event:             event,
+		time.Sleep(time.Duration(cfg.ReSchedulerInterval) * time.Second)
 	}
 }

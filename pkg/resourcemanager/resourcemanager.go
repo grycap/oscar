@@ -19,8 +19,11 @@ package resourcemanager
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/grycap/oscar/v2/pkg/types"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // Custom logger
@@ -29,18 +32,28 @@ var resManLogger = log.New(os.Stdout, "[RESOURCE-MANAGER] ", log.Flags())
 // ResourceManager interface to define cluster-level resource managers
 type ResourceManager interface {
 	UpdateResources() error
-	IsSchedulable(*types.Service) bool
+	IsSchedulable(v1.ResourceRequirements) bool
 }
 
-func startResourceManager(rm ResourceManager, cfg *types.Config) {
-	// TODO
+func MakeResourceManager(cfg *types.Config, kubeClientset kubernetes.Interface) ResourceManager {
+	if cfg.ResourceManagerEnable {
+		if !cfg.YunikornEnable {
+			return &KubeResourceManager{
+				kubeClientset: kubeClientset,
+			}
+		}
+	}
+
+	return nil
+}
+
+// StartResourceManager starts the ResourceManager loop to check cluster resources every cfg.ResourceManagerInterval
+func StartResourceManager(rm ResourceManager, interval int) {
 	for {
 		if err := rm.UpdateResources(); err != nil {
-			// TODO: check how to add prefix to logs!! e.g. [RESOURCE-MANAGER]
 			resManLogger.Println(err.Error())
 		}
 
-		// TODO when the 'RESOURCE_MANAGER_INTERVAL' variable has been defined
-		//time.Sleep()
+		time.Sleep(time.Duration(interval) * time.Second)
 	}
 }
