@@ -35,6 +35,8 @@ type ResourceManager interface {
 	IsSchedulable(v1.ResourceRequirements) bool
 }
 
+// MakeResourceManager returns a new ResourceManager if it is enabled in the config
+// Apache's YuniKorn scheduler not supported yet
 func MakeResourceManager(cfg *types.Config, kubeClientset kubernetes.Interface) ResourceManager {
 	if cfg.ResourceManagerEnable {
 		if !cfg.YunikornEnable {

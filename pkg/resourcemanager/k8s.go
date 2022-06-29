@@ -19,19 +19,25 @@ package resourcemanager
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
-// KubeResourceManager
-type KubeResourceManager struct {
+type nodeResources struct {
 	// memory in bytes, as returned by quantity.Value()
 	memory int64
 	// cpu in MilliValue, as returned by quantity.MilliValue()
-	cpu           int64
+	cpu int64
+}
+
+// KubeResourceManager struct to represent the Kubernetes resource manager
+type KubeResourceManager struct {
+	resources     []nodeResources
 	kubeClientset kubernetes.Interface
+	mutex         sync.Mutex
 }
 
 // UpdateResources update the available resources in the cluster
@@ -48,21 +54,22 @@ func (krm *KubeResourceManager) UpdateResources() error {
 		return fmt.Errorf("Error getting pod list: %v", err)
 	}
 
-	// Get available resources from all nodes
-	var memory int64 = 0
-	var cpu int64 = 0
+	// Define new nodeResources slice
+	res := []nodeResources{}
 
 	for _, node := range nodes.Items {
-		// Only count Schedulable nodes
-		if !node.Spec.Unschedulable {
+		// Only count Schedulable and Ready nodes
+		if !node.Spec.Unschedulable && isNodeReady(node) {
 			nodeCPU, nodeMemory := getNodeAvailableResources(node, pods)
-			memory += nodeMemory
-			cpu += nodeCPU
+			nodeRes := nodeResources{memory: nodeMemory, cpu: nodeCPU}
+			res = append(res, nodeRes)
 		}
 	}
 
-	krm.memory = memory
-	krm.cpu = cpu
+	// Ensure mutual exclusion
+	krm.mutex.Lock()
+	krm.resources = res
+	krm.mutex.Unlock()
 
 	return nil
 }
@@ -72,8 +79,15 @@ func (krm *KubeResourceManager) IsSchedulable(resources v1.ResourceRequirements)
 	serviceMemory := resources.Limits.Memory().Value()
 	serviceCPU := resources.Limits.Cpu().MilliValue()
 
-	if serviceMemory < krm.memory && serviceCPU < krm.cpu {
-		return true
+	// Ensure mutual exclusion
+	krm.mutex.Lock()
+	defer krm.mutex.Unlock()
+
+	// Check if the job can be scheduled at least in one node
+	for _, nodeRes := range krm.resources {
+		if serviceMemory < nodeRes.memory && serviceCPU < nodeRes.cpu {
+			return true
+		}
 	}
 
 	return false
@@ -95,4 +109,13 @@ func getNodeAvailableResources(node v1.Node, pods *v1.PodList) (cpu int64, memor
 	}
 
 	return
+}
+
+func isNodeReady(node v1.Node) bool {
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == v1.NodeReady && condition.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }

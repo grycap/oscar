@@ -24,6 +24,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v2/pkg/backends"
 	"github.com/grycap/oscar/v2/pkg/handlers"
+	"github.com/grycap/oscar/v2/pkg/resourcemanager"
 	"github.com/grycap/oscar/v2/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -63,6 +64,12 @@ func main() {
 		back = backends.MakeKnativeBackend(kubeClientset, kubeConfig, cfg)
 	default:
 		back = backends.MakeKubeBackend(kubeClientset, cfg)
+	}
+
+	// Create the ResourceManager and start it if enabled
+	resMan := resourcemanager.MakeResourceManager(cfg, kubeClientset)
+	if resMan != nil {
+		resourcemanager.StartResourceManager(resMan, cfg.ResourceManagerInterval)
 	}
 
 	// Create the router
