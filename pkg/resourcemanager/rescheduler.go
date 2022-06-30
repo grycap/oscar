@@ -22,16 +22,27 @@ import (
 	"time"
 
 	"github.com/grycap/oscar/v2/pkg/types"
+	"k8s.io/client-go/kubernetes"
 )
 
 // Custom logger
 var reSchLogger = log.New(os.Stdout, "[RE-SCHEDULER] ", log.Flags())
 
-// StartReScheduler starts the ReScheduler loop to check if there are pending pods exceeding the xx every cfg.ResourceManagerInterval
+type reScheduleInfo struct {
+	service *types.Service
+	event   string
+}
+
+// StartReScheduler starts the ReScheduler loop to check if there are pending pods exceeding the cfg.ReSchedulerThreshold every cfg.ReSchedulerInterval
 func StartReScheduler(rm ResourceManager, cfg *types.Config) {
 	// TODO
 	for {
 
 		time.Sleep(time.Duration(cfg.ReSchedulerInterval) * time.Second)
 	}
+}
+
+// TODO: implement!! get
+func getReSchedulableJobs(kubeClientset kubernetes.Interface, threshold int) []reScheduleInfo {
+
 }

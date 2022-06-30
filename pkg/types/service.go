@@ -101,11 +101,11 @@ const (
 	// KnativeMaxScaleAnnotation annotation key to set the maximum number of replicas for a Knative service
 	KnativeMaxScaleAnnotation = "autoscaling.knative.dev/max-scale"
 
-	// ReSchedulerAnnotation annotation key to enable/disable the ReScheduler
-	ReSchedulerAnnotation = "oscar_rescheduler"
+	// ReSchedulerLabelKey label key to enable/disable the ReScheduler
+	ReSchedulerLabelKey = "oscar_rescheduler"
 
-	// ReSchedulerTimeoutAnnotation annotation key to set the ReScheduler timeout (in seconds)
-	ReSchedulerTimeoutAnnotation = "oscar_rescheduler_timeout"
+	// ReSchedulerLabelEnableValue label value to enable the ReScheduler
+	ReSchedulerLabelEnableValue = "enable"
 )
 
 // YAMLMarshal package-level yaml marshal function
@@ -154,7 +154,7 @@ type Service struct {
 	} `json:"synchronous"`
 
 	// Replicas list of replicas to delegate jobs
-	Replicas []Replica `json:"replicas"`
+	Replicas ReplicaList `json:"replicas"`
 
 	// LogLevel log level for the FaaS Supervisor
 	// Optional. (default: INFO)
@@ -210,43 +210,6 @@ type Service struct {
 	// Clusters configuration for the OSCAR clusters that can be used as service's replicas
 	// Optional
 	Clusters map[string]Cluster `json:"clusters"`
-}
-
-// Replica struct to define service's replicas in other clusters or endpoints
-type Replica struct {
-	// Type of the replica to re-send events (can be "oscar" or "endpoint")
-	Type string `json:"type"`
-	// ClusterID identifier of the cluster as defined in the "clusters" FDL field
-	ClusterID string `json:"cluster_id"`
-	// ServiceName name of the service in the replica cluster.
-	// Only used if Type is "oscar"
-	ServiceName string `json:"service_name"`
-	// URL url of the endpoint to re-send events (HTTP POST).
-	// Only used if Type is "endpoint"
-	URL string `json:"url"`
-	// SSLVerify parameter to enable or disable the verification of SSL certificates.
-	// Only used if Type is "endpoint"
-	// Optional. (default: true)
-	SSLVerify bool `json:"ssl_verify"`
-	// Priority value to define delegation priority. Highest priority is defined as 0.
-	// If a delegation fails, OSCAR will try to delegate to another replica with lower priority
-	// Optional. (default: 0)
-	Priority int `json:"priority"`
-	// Headers headers to send in delegation requests
-	// Optional
-	Headers map[string]string `json:"headers"`
-}
-
-// Cluster struct to store cluster access data
-type Cluster struct {
-	// Endpoint endpoint of the OSCAR cluster API
-	Endpoint string `json:"endpoint"`
-	// AuthUser username to connect to the cluster (basic auth)
-	AuthUser string `json:"auth_user"`
-	// AuthPassword password to connect to the cluster (basic auth)
-	AuthPassword string `json:"auth_password"`
-	// SSLVerify parameter to enable or disable the verification of SSL certificates
-	SSLVerify bool `json:"ssl_verify"`
 }
 
 // ToPodSpec returns a k8s podSpec from the Service
@@ -414,4 +377,12 @@ func (service *Service) GetSupervisorPath() string {
 		return fmt.Sprintf("%s/%s/%s", VolumePath, AlpineDirectory, SupervisorName)
 	}
 	return fmt.Sprintf("%s/%s", VolumePath, SupervisorName)
+}
+
+// HasReplicas checks if the service has replicas defined
+func (service *Service) HasReplicas() bool {
+	if len(service.Replicas) > 0 {
+		return true
+	}
+	return false
 }

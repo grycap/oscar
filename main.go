@@ -69,7 +69,7 @@ func main() {
 	// Create the ResourceManager and start it if enabled
 	resMan := resourcemanager.MakeResourceManager(cfg, kubeClientset)
 	if resMan != nil {
-		resourcemanager.StartResourceManager(resMan, cfg.ResourceManagerInterval)
+		go resourcemanager.StartResourceManager(resMan, cfg.ResourceManagerInterval)
 	}
 
 	// Create the router
@@ -98,7 +98,7 @@ func main() {
 	system.DELETE("/logs/:serviceName/:jobName", handlers.MakeDeleteJobHandler(kubeClientset, cfg.ServicesNamespace))
 
 	// Job path for async invocations
-	r.POST("/job/:serviceName", handlers.MakeJobHandler(cfg, kubeClientset, back))
+	r.POST("/job/:serviceName", handlers.MakeJobHandler(cfg, kubeClientset, back, resMan))
 
 	// Service path for sync invocations (only if ServerlessBackend is enabled)
 	syncBack, ok := back.(types.SyncBackend)

@@ -18,6 +18,7 @@ package resourcemanager
 
 import "github.com/grycap/oscar/v2/pkg/types"
 
+// tokenCache[CLUSTER_ENDPOINT][SERVICE_NAME]
 var tokenCache map[string]map[string]string
 
 // DelegatedEvent wraps the original input event by adding the storage provider ID
@@ -31,7 +32,7 @@ type DelegatedEvent struct {
 // read the service token from cache -> if is not valid or not available get it!
 // REMEMBER TO CHECK REPLICA'S PRIORITY
 // DelegateJob sends the event to a service's replica
-func DelegateJob(service types.Service, event string) error {
+func DelegateJob(service *types.Service, event string) error {
 
 	return nil
 }
