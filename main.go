@@ -25,6 +25,7 @@ import (
 	"github.com/grycap/oscar/v2/pkg/backends"
 	"github.com/grycap/oscar/v2/pkg/handlers"
 	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/utils/auth"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -69,10 +70,7 @@ func main() {
 	r := gin.Default()
 
 	// Define system group with basic auth middleware
-	system := r.Group("/system", gin.BasicAuth(gin.Accounts{
-		// Use the config's username and password for basic auth
-		cfg.Username: cfg.Password,
-	}))
+	system := r.Group("/system", auth.GetAuthMiddleware(cfg))
 
 	// Config path
 	system.GET("/config", handlers.MakeConfigHandler(cfg))
