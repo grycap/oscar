@@ -45,13 +45,13 @@ func (krm *KubeResourceManager) UpdateResources() error {
 	// List all (working) nodes
 	nodes, err := krm.kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("Error getting node list: %v", err)
+		return fmt.Errorf("error getting node list: %v", err)
 	}
 
 	// Get list all Running pods
 	pods, err := krm.kubeClientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Succeeded,status.phase!=Failed"})
 	if err != nil {
-		return fmt.Errorf("Error getting pod list: %v", err)
+		return fmt.Errorf("error getting pod list: %v", err)
 	}
 
 	// Define new nodeResources slice

@@ -17,11 +17,15 @@ limitations under the License.
 package resourcemanager
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"os"
 	"time"
 
 	"github.com/grycap/oscar/v2/pkg/types"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -30,19 +34,117 @@ var reSchLogger = log.New(os.Stdout, "[RE-SCHEDULER] ", log.Flags())
 
 type reScheduleInfo struct {
 	service *types.Service
+	jobName string
 	event   string
 }
 
 // StartReScheduler starts the ReScheduler loop to check if there are pending pods exceeding the cfg.ReSchedulerThreshold every cfg.ReSchedulerInterval
-func StartReScheduler(rm ResourceManager, cfg *types.Config) {
-	// TODO
+func StartReScheduler(kubeClientset kubernetes.Interface, back types.ServerlessBackend, cfg *types.Config) {
 	for {
+		// Get ReSchedulable pods
+		pods, err := getReSchedulablePods(kubeClientset, cfg.ServicesNamespace, cfg.ReSchedulerThreshold)
+		if err != nil {
+			reSchLogger.Println(err.Error())
+			continue
+		}
+
+		// Get all reScheduleInfo elements
+		reScheduleInfos := getReScheduleInfos(pods, back)
+
+		// Delegate jobs
+		for _, rsi := range reScheduleInfos {
+			err := DelegateJob(rsi.service, rsi.event)
+			if err != nil {
+				reSchLogger.Println(err.Error())
+			} else {
+				// Delete successfully reScheduled job from the cluster
+				// Create DeleteOptions and configure PropagationPolicy for deleting associated pods in background
+				background := metav1.DeletePropagationBackground
+				delOpts := metav1.DeleteOptions{
+					PropagationPolicy: &background,
+				}
+				err := kubeClientset.BatchV1().Jobs(cfg.ServicesNamespace).Delete(context.TODO(), rsi.jobName, delOpts)
+				if err != nil {
+					reSchLogger.Printf("error deleting job \"%s\": %v", rsi.jobName, err)
+				}
+			}
+		}
 
 		time.Sleep(time.Duration(cfg.ReSchedulerInterval) * time.Second)
 	}
 }
 
-// TODO: implement!! get
-func getReSchedulableJobs(kubeClientset kubernetes.Interface, threshold int) []reScheduleInfo {
+func getReSchedulablePods(kubeClientset kubernetes.Interface, namespace string, threshold int) ([]v1.Pod, error) {
+	reSchedulablePods := []v1.Pod{}
 
+	// List all schedulable jobs' pods (pending)
+	listOpts := metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", types.ReSchedulerLabelKey, types.ReSchedulerLabelEnableValue),
+		FieldSelector: fmt.Sprintf("status.phase=%s", v1.PodPending),
+	}
+	pods, err := kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), listOpts)
+	if err != nil {
+		return reSchedulablePods, fmt.Errorf("error getting pod list: %v", err)
+	}
+
+	for _, pod := range pods.Items {
+		// Check that pod has the ServiceLabel
+		if _, ok := pod.Labels[types.ServiceLabel]; ok {
+			now := time.Now()
+			pendingTime := now.Sub(pod.CreationTimestamp.Time).Seconds()
+
+			// Check if threshold is exceeded
+			if int(pendingTime) > threshold {
+				reSchedulablePods = append(reSchedulablePods, pod)
+			}
+		}
+	}
+
+	return reSchedulablePods, nil
+}
+
+func getReScheduleInfos(pods []v1.Pod, back types.ServerlessBackend) []reScheduleInfo {
+	rsi := []reScheduleInfo{}
+
+	// Map to store services' pointers
+	svcPtrs := map[string]*types.Service{}
+
+	for _, pod := range pods {
+		serviceName := pod.Labels[types.ServiceLabel]
+
+		// Check if service is already in svcPtrs
+		if _, ok := svcPtrs[serviceName]; !ok {
+			var err error
+			svcPtrs[serviceName], err = back.ReadService(serviceName)
+			if err != nil {
+				reSchLogger.Printf("error getting service: %v\n", err)
+			}
+		}
+
+		// Check if pod has the "job-name" label
+		if jobName, ok := pod.Labels["job-name"]; ok {
+			rsi = append(rsi, reScheduleInfo{
+				service: svcPtrs[serviceName],
+				event:   getEvent(pod.Spec),
+				jobName: jobName,
+			})
+		}
+
+	}
+
+	return rsi
+}
+
+func getEvent(podSpec v1.PodSpec) string {
+	for _, c := range podSpec.Containers {
+		if c.Name == types.ContainerName {
+			for _, envVar := range c.Env {
+				if envVar.Name == types.EventVariable {
+					return envVar.Value
+				}
+			}
+		}
+	}
+
+	return ""
 }
