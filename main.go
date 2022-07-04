@@ -73,6 +73,11 @@ func main() {
 		go resourcemanager.StartResourceManager(resMan, cfg.ResourceManagerInterval)
 	}
 
+	// Start the ReScheduler if enabled
+	if cfg.ReSchedulerEnable {
+		go resourcemanager.StartReScheduler(cfg, back, kubeClientset)
+	}
+
 	// Create the router
 	r := gin.Default()
 

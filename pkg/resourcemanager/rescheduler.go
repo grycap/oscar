@@ -39,7 +39,7 @@ type reScheduleInfo struct {
 }
 
 // StartReScheduler starts the ReScheduler loop to check if there are pending pods exceeding the cfg.ReSchedulerThreshold every cfg.ReSchedulerInterval
-func StartReScheduler(kubeClientset kubernetes.Interface, back types.ServerlessBackend, cfg *types.Config) {
+func StartReScheduler(cfg *types.Config, back types.ServerlessBackend, kubeClientset kubernetes.Interface) {
 	for {
 		// Get ReSchedulable pods
 		pods, err := getReSchedulablePods(kubeClientset, cfg.ServicesNamespace, cfg.ReSchedulerThreshold)
