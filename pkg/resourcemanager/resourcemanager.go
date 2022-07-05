@@ -27,7 +27,7 @@ import (
 )
 
 // Custom logger
-var resManLogger = log.New(os.Stdout, "[RESOURCE-MANAGER] ", log.Flags())
+var resourceManagerLogger = log.New(os.Stdout, "[RESOURCE-MANAGER] ", log.Flags())
 
 // ResourceManager interface to define cluster-level resource managers
 type ResourceManager interface {
@@ -53,7 +53,7 @@ func MakeResourceManager(cfg *types.Config, kubeClientset kubernetes.Interface) 
 func StartResourceManager(rm ResourceManager, interval int) {
 	for {
 		if err := rm.UpdateResources(); err != nil {
-			resManLogger.Println(err.Error())
+			resourceManagerLogger.Println(err.Error())
 		}
 
 		time.Sleep(time.Duration(interval) * time.Second)

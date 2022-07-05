@@ -50,21 +50,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Create the ServerlessBackend based on the configuration
-	var back types.ServerlessBackend
+	// Create the ServerlessBackend
+	back := backends.MakeServerlessBackend(kubeClientset, kubeConfig, cfg)
 
-	switch cfg.ServerlessBackend {
-	case "openfaas":
-		ofBack := backends.MakeOpenfaasBackend(kubeClientset, kubeConfig, cfg)
-		back = ofBack
-		// Start OpenFaaS Scaler as a goroutine
-		if cfg.OpenfaasScalerEnable {
-			go ofBack.StartScaler()
-		}
-	case "knative":
-		back = backends.MakeKnativeBackend(kubeClientset, kubeConfig, cfg)
-	default:
-		back = backends.MakeKubeBackend(kubeClientset, cfg)
+	// Start OpenFaaS Scaler
+	if cfg.ServerlessBackend == "openfaas" && cfg.OpenfaasScalerEnable {
+		ofBack := back.(*backends.OpenfaasBackend)
+		go ofBack.StartScaler()
 	}
 
 	// Create the ResourceManager and start it if enabled

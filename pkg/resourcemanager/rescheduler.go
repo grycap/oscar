@@ -30,7 +30,7 @@ import (
 )
 
 // Custom logger
-var reSchLogger = log.New(os.Stdout, "[RE-SCHEDULER] ", log.Flags())
+var reSchedulerLogger = log.New(os.Stdout, "[RE-SCHEDULER] ", log.Flags())
 
 type reScheduleInfo struct {
 	service *types.Service
@@ -44,7 +44,7 @@ func StartReScheduler(cfg *types.Config, back types.ServerlessBackend, kubeClien
 		// Get ReSchedulable pods
 		pods, err := getReSchedulablePods(kubeClientset, cfg.ServicesNamespace, cfg.ReSchedulerThreshold)
 		if err != nil {
-			reSchLogger.Println(err.Error())
+			reSchedulerLogger.Println(err.Error())
 			continue
 		}
 
@@ -55,7 +55,7 @@ func StartReScheduler(cfg *types.Config, back types.ServerlessBackend, kubeClien
 		for _, rsi := range reScheduleInfos {
 			err := DelegateJob(rsi.service, rsi.event)
 			if err != nil {
-				reSchLogger.Println(err.Error())
+				reSchedulerLogger.Println(err.Error())
 			} else {
 				// Delete successfully reScheduled job from the cluster
 				// Create DeleteOptions and configure PropagationPolicy for deleting associated pods in background
@@ -65,7 +65,7 @@ func StartReScheduler(cfg *types.Config, back types.ServerlessBackend, kubeClien
 				}
 				err := kubeClientset.BatchV1().Jobs(cfg.ServicesNamespace).Delete(context.TODO(), rsi.jobName, delOpts)
 				if err != nil {
-					reSchLogger.Printf("error deleting job \"%s\": %v", rsi.jobName, err)
+					reSchedulerLogger.Printf("error deleting job \"%s\": %v", rsi.jobName, err)
 				}
 			}
 		}
@@ -117,7 +117,7 @@ func getReScheduleInfos(pods []v1.Pod, back types.ServerlessBackend) []reSchedul
 			var err error
 			svcPtrs[serviceName], err = back.ReadService(serviceName)
 			if err != nil {
-				reSchLogger.Printf("error getting service: %v\n", err)
+				reSchedulerLogger.Printf("error getting service: %v\n", err)
 			}
 		}
 
