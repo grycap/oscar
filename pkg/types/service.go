@@ -117,6 +117,7 @@ type Service struct {
 	Name string `json:"name" binding:"required,max=39,min=1"`
 
 	// ClusterID identifier for the current cluster, used to specify the cluster's StorageProvider in job delegations
+	// Optional. (default: ""). OSCAR-CLI sets it using the ClusterID from the FDL
 	ClusterID string `json:"cluster_id"`
 
 	// Memory memory limit for the service following the kubernetes format
