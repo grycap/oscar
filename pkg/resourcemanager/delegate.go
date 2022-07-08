@@ -17,6 +17,8 @@ limitations under the License.
 package resourcemanager
 
 import (
+	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -25,6 +27,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/grycap/oscar/v2/pkg/types"
 )
@@ -37,19 +40,12 @@ const (
 // tokenCache map to store tokens from services and endpoints -> [CLUSTER_ENDPOINT][SERVICE_NAME]
 var tokenCache = map[string]map[string]string{}
 
-// cacheReads variable to store the number of accesses to tokenCache
-// automatically clear the cache every 500 reads
-var cacheReads = 0
-
 // DelegatedEvent wraps the original input event by adding the storage provider ID
 type DelegatedEvent struct {
 	StorageProviderID string `json:"storage_provider"`
 	Event             string `json:"event"`
 }
 
-// TODO: implement:
-// get svc configMap (FDL), get service token in the replica, update event with "storage_provider" field
-// read the service token from cache -> if is not valid or not available get it!
 // DelegateJob sends the event to a service's replica
 func DelegateJob(service *types.Service, event string) error {
 	// Check if replicas are sorted by priority and sort it if needed
@@ -58,8 +54,11 @@ func DelegateJob(service *types.Service, event string) error {
 	}
 
 	delegatedEvent := WrapEvent(service.ClusterID, event)
+	eventJSON, err := json.Marshal(delegatedEvent)
+	if err != nil {
+		return fmt.Errorf("error marshalling delegated event: %v", err)
+	}
 
-	// TODO: implement!!
 	for _, replica := range service.Replicas {
 		// Manage if replica.Type is "oscar"
 		if strings.ToLower(replica.Type) == oscarReplicaType {
@@ -73,20 +72,122 @@ func DelegateJob(service *types.Service, event string) error {
 			// Get token
 			token, err := getServiceToken(replica, cluster)
 			if err != nil {
-				log.Printf("Error delegating service \"%s\" to ClusterID \"%s\": %v\n", service.Name, replica.ClusterID, err)
+				log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": %v\n", service.Name, replica.ClusterID, err)
 				continue
 			}
 
-			// TODO: make request...
+			// Parse the cluster's endpoint URL and add the service's path
+			postJobURL, err := url.Parse(cluster.Endpoint)
+			if err != nil {
+				log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", service.Name, replica.ClusterID, cluster.Endpoint, err)
+				continue
+			}
+			postJobURL.Path = path.Join(postJobURL.Path, "job", replica.ServiceName)
+
+			// Make request to get service's definition (including token) from cluster
+			req, err := http.NewRequest(http.MethodPost, postJobURL.String(), bytes.NewBuffer(eventJSON))
+			if err != nil {
+				log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to make request: %v\n", service.Name, replica.ClusterID, err)
+				continue
+			}
+
+			// Add Headers
+			for k, v := range replica.Headers {
+				req.Header.Add(k, v)
+			}
+
+			// Add service token to the request
+			req.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
+
+			// Make HTTP client
+			var transport http.RoundTripper = &http.Transport{
+				// Enable/disable SSL verification
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
+			}
+			client := &http.Client{
+				Transport: transport,
+				Timeout:   time.Second * 20,
+			}
+
+			// Send the request
+			res, err := client.Do(req)
+			if err != nil {
+				log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
+				continue
+			}
+
+			// Check status code
+			if res.StatusCode == http.StatusCreated {
+				log.Printf("Job successfully delegated to cluster \"%s\"\n", replica.ClusterID)
+				return nil
+			} else if res.StatusCode == http.StatusUnauthorized {
+				// Retry updating the token
+				token, err := updateServiceToken(replica, cluster)
+				if err != nil {
+					log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": %v\n", service.Name, replica.ClusterID, err)
+					continue
+				}
+				// Add service token to the request
+				req.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
+
+				// Send the request
+				res, err = http.DefaultClient.Do(req)
+				if err != nil {
+					log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
+					continue
+				}
+			}
+			log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": Status code %d\n", service.Name, replica.ClusterID, res.StatusCode)
 		}
 
 		// Manage if replica.Type is "endpoint"
 		if strings.ToLower(replica.Type) == endpointReplicaType {
-			// Check ClusterID is defined in 'Clusters'
+			// Parse the replica URL to check if it's valid
+			replicaURL, err := url.Parse(replica.URL)
+			if err != nil {
+				log.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": unable to parse URL: %v\n", service.Name, replica.URL, err)
+				continue
+			}
+
+			// Make request to get service's definition (including token) from cluster
+			req, err := http.NewRequest(http.MethodPost, replicaURL.String(), bytes.NewBuffer(eventJSON))
+			if err != nil {
+				log.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": unable to make request: %v\n", service.Name, replica.URL, err)
+				continue
+			}
+
+			// Add Headers
+			for k, v := range replica.Headers {
+				req.Header.Add(k, v)
+			}
+
+			// Make HTTP client
+			var transport http.RoundTripper = &http.Transport{
+				// Enable/disable SSL verification
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !replica.SSLVerify},
+			}
+			client := &http.Client{
+				Transport: transport,
+				Timeout:   time.Second * 20,
+			}
+
+			// Send the request
+			res, err := client.Do(req)
+			if err != nil {
+				log.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": unable to send request: %v\n", service.Name, replica.URL, err)
+				continue
+			}
+
+			// Check status code
+			if res.StatusCode == http.StatusOK {
+				log.Printf("Job successfully delegated to endpoint \"%s\"\n", replica.URL)
+				return nil
+			}
+			log.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": Status code %d\n", service.Name, replica.URL, res.StatusCode)
 		}
 	}
 
-	return fmt.Errorf("unable to delegate job from service \"%s\" to any replica", service.Name)
+	return fmt.Errorf("unable to delegate job from service \"%s\" to any replica, scheduling in the current cluster", service.Name)
 }
 
 // WrapEvent wraps an event adding the storage_provider field (from the service's cluster_id)
@@ -97,32 +198,35 @@ func WrapEvent(providerID string, event string) DelegatedEvent {
 	}
 }
 
-func getServiceToken(serviceName string, replica types.Replica, cluster types.Cluster) (string, error) {
-	// Clear tokenCache if cacheReads > 500
-	if cacheReads > 500 {
-		tokenCache = map[string]map[string]string{}
-	}
-
+func getServiceToken(replica types.Replica, cluster types.Cluster) (string, error) {
 	endpoint := strings.Trim(cluster.Endpoint, " /")
 	_, ok := tokenCache[endpoint]
 	if ok {
-		token, ok := tokenCache[endpoint][serviceName]
+		token, ok := tokenCache[endpoint][replica.ServiceName]
 		if ok && token != "" {
-			cacheReads++
 			return token, nil
 		}
 	}
 
-	return updateServiceToken(serviceName, replica, cluster)
+	return updateServiceToken(replica, cluster)
 }
 
-func updateServiceToken(serviceName string, replica types.Replica, cluster types.Cluster) (string, error) {
+func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, error) {
+	// Clear tokenCache if there are more than 500 tokens stored
+	length := 0
+	for _, subMap := range tokenCache {
+		length += len(subMap)
+	}
+	if length > 500 {
+		tokenCache = map[string]map[string]string{}
+	}
+
 	// Parse the cluster's endpoint URL and add the service's path
 	getServiceURL, err := url.Parse(cluster.Endpoint)
 	if err != nil {
 		return "", fmt.Errorf("unable to parse cluster endpoint \"%s\": %v", cluster.Endpoint, err)
 	}
-	getServiceURL.Path = path.Join(getServiceURL.Path, "services", serviceName)
+	getServiceURL.Path = path.Join(getServiceURL.Path, "services", replica.ServiceName)
 
 	// Make request to get service's definition (including token) from cluster
 	req, err := http.NewRequest(http.MethodGet, getServiceURL.String(), nil)
@@ -139,7 +243,7 @@ func updateServiceToken(serviceName string, replica types.Replica, cluster types
 		return "", fmt.Errorf("unable to send request to cluster endpoint \"%s\": %v", cluster.Endpoint, err)
 	}
 
-	// Check status code (OSCAR always returns)
+	// Check status code (OSCAR always returns 200 if it's OK)
 	if res.StatusCode != 200 {
 		return "", fmt.Errorf("error in response from cluster endpoint \"%s\": Status code %d", cluster.Endpoint, res.StatusCode)
 	}
@@ -158,7 +262,7 @@ func updateServiceToken(serviceName string, replica types.Replica, cluster types
 		// Create empty map if nil
 		tokenCache[endpoint] = map[string]string{}
 	}
-	tokenCache[endpoint][serviceName] = svc.Token
+	tokenCache[endpoint][replica.ServiceName] = svc.Token
 
 	return svc.Token, nil
 }
