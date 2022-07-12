@@ -20,11 +20,13 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/grycap/oscar/v2/pkg/resourcemanager"
 	"github.com/grycap/oscar/v2/pkg/types"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -44,7 +46,7 @@ var (
 )
 
 // MakeJobHandler makes a handler to manage async invocations
-func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back types.ServerlessBackend) gin.HandlerFunc {
+func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back types.ServerlessBackend, rm resourcemanager.ResourceManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		service, err := back.ReadService(c.Param("serviceName"))
 		if err != nil {
@@ -117,6 +119,19 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			}
 		}
 
+		// Delegate job if can't be scheduled and has defined replicas
+		if rm != nil && service.HasReplicas() {
+			if !rm.IsSchedulable(podSpec.Containers[0].Resources) {
+				err := resourcemanager.DelegateJob(service, event.Value)
+				if err == nil {
+					// TODO: check if another status code suits better
+					c.Status(http.StatusCreated)
+					return
+				}
+				log.Printf("unable to delegate job. Error: %v\n", err)
+			}
+		}
+
 		// Create job definition
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
@@ -137,6 +152,11 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 					Spec: *podSpec,
 				},
 			},
+		}
+
+		// Add ReScheduler label if there are replicas defined and the cfg.ReSchedulerEnable is true
+		if service.HasReplicas() && cfg.ReSchedulerEnable {
+			job.Labels[types.ReSchedulerLabelKey] = types.ReSchedulerLabelEnableValue
 		}
 
 		// Create job
