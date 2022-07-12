@@ -87,6 +87,13 @@ type OnedataProvider struct {
 	Space           string `json:"space"`
 }
 
+// WebDavProvider stores the credentials of the a storage provider that can be accessed via webdav
+type WebDavProvider struct {
+	Hostname string `json:"hostname"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
 // GetS3Client creates a new S3 Client from a S3Provider
 func (s3Provider S3Provider) GetS3Client() *s3.S3 {
 	s3Config := &aws.Config{
