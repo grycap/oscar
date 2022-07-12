@@ -62,6 +62,7 @@ type StorageProviders struct {
 	S3      map[string]*S3Provider      `json:"s3,omitempty"`
 	MinIO   map[string]*MinIOProvider   `json:"minio,omitempty"`
 	Onedata map[string]*OnedataProvider `json:"onedata,omitempty"`
+	WebDav  map[string]*WebDavProvider  `json:"webdata,omitempty"`
 }
 
 // S3Provider stores the credentials of the AWS S3 storage provider
