@@ -297,7 +297,7 @@ func ReadConfig() (*Config, error) {
 		// Parse the environment variable depending of its type
 		switch cv.varType {
 		case stringType:
-			value = strings.ToLower(strValue)
+			value = strings.TrimSpace(strValue)
 		case stringSliceType:
 			value = parseStringSlice(strValue)
 		case intType:
