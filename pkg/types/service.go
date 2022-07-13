@@ -155,7 +155,7 @@ type Service struct {
 	} `json:"synchronous"`
 
 	// Replicas list of replicas to delegate jobs
-	Replicas ReplicaList `json:"replicas"`
+	Replicas ReplicaList `json:"replicas,omitempty"`
 
 	// LogLevel log level for the FaaS Supervisor
 	// Optional. (default: INFO)
@@ -210,7 +210,7 @@ type Service struct {
 
 	// Clusters configuration for the OSCAR clusters that can be used as service's replicas
 	// Optional
-	Clusters map[string]Cluster `json:"clusters"`
+	Clusters map[string]Cluster `json:"clusters,omitempty"`
 }
 
 // ToPodSpec returns a k8s podSpec from the Service
