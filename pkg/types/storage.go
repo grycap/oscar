@@ -42,7 +42,10 @@ const (
 
 	// OnedataName string representing the Onedata provider name
 	OnedataName = "onedata"
-
+	
+	// WebDavName string representing a storage provider accessed via webdav
+	WebDavName = "webdav"
+	
 	// ProviderSeparator separator character used to split provider's name and identifier
 	ProviderSeparator = "."
 )
