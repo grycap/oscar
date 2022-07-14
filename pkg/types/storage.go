@@ -94,7 +94,7 @@ type OnedataProvider struct {
 // WebDavProvider stores the credentials of the a storage provider that can be accessed via webdav
 type WebDavProvider struct {
 	Hostname string `json:"hostname"`
-	Username string `json:"username"`
+	Login string `json:"login"`
 	Password string `json:"password"`
 }
 
