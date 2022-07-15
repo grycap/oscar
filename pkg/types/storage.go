@@ -43,6 +43,9 @@ const (
 	// OnedataName string representing the Onedata provider name
 	OnedataName = "onedata"
 
+	// WebDavName string representing a storage provider accessed via webdav
+	WebDavName = "webdav"
+
 	// ProviderSeparator separator character used to split provider's name and identifier
 	ProviderSeparator = "."
 )
@@ -62,6 +65,7 @@ type StorageProviders struct {
 	S3      map[string]*S3Provider      `json:"s3,omitempty"`
 	MinIO   map[string]*MinIOProvider   `json:"minio,omitempty"`
 	Onedata map[string]*OnedataProvider `json:"onedata,omitempty"`
+	WebDav  map[string]*WebDavProvider  `json:"webdav,omitempty"`
 }
 
 // S3Provider stores the credentials of the AWS S3 storage provider
@@ -85,6 +89,12 @@ type OnedataProvider struct {
 	OneproviderHost string `json:"oneprovider_host"`
 	Token           string `json:"token"`
 	Space           string `json:"space"`
+}
+
+type WebDavProvider struct {
+	Hostname string `json:"hostname"`
+	Login    string `json:"login"`
+	Password string `json:"password"`
 }
 
 // GetS3Client creates a new S3 Client from a S3Provider
