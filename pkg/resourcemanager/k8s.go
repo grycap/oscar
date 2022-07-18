@@ -43,7 +43,7 @@ type KubeResourceManager struct {
 // UpdateResources update the available resources in the cluster
 func (krm *KubeResourceManager) UpdateResources() error {
 	// List all (working) nodes
-	nodes, err := krm.kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	nodes, err := krm.kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: "!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master"})
 	if err != nil {
 		return fmt.Errorf("error getting node list: %v", err)
 	}
@@ -68,6 +68,7 @@ func (krm *KubeResourceManager) UpdateResources() error {
 
 	// Ensure mutual exclusion
 	krm.mutex.Lock()
+	resourceManagerLogger.Printf("Available resources %v\n", res)
 	krm.resources = res
 	krm.mutex.Unlock()
 
@@ -89,7 +90,6 @@ func (krm *KubeResourceManager) IsSchedulable(resources v1.ResourceRequirements)
 			return true
 		}
 	}
-
 	return false
 }
 
