@@ -1,6 +1,6 @@
 functions:
   oscar:
-  - raspb-cluster:
+  - oscar-cluster:
       name: fire-detection
       cpu: 1.0
       memory: 3Gi

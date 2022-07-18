@@ -1,3 +1,17 @@
+
+##########################################################################
+
+# Example : perform live fire detection in image/video/webcam using
+# NasNet-A-OnFire, ShuffleNetV2-OnFire CNN models.
+
+# Copyright (c) 2020/21 - William Thompson / Neelanjan Bhowmik / Toby
+# Breckon, Durham University, UK
+
+# License :
+# https://github.com/NeelBhowmik/efficient-compact-fire-detection-cnn/blob/main/LICENSE
+
+##########################################################################
+
 import cv2
 import os
 import sys
@@ -240,8 +254,8 @@ if args.image:
         # save prdiction visualisation in output path
         infs_small_frame = cv2.resize(infs_small_frame, (width, height), cv2.INTER_AREA)
         f_name = os.path.basename(im)
-        output_file = args.output+"/"+randchars+"-"+f_name+".txt"
-        output_image = randchars+"-"+f_name
+        output_file = args.output+"/"+"output-"+f_name+".txt"
+        output_image = "output-"+f_name
         print(output_file)
         print(output_image)
         cv2.imwrite(f'{args.output}/{output_image}', infs_small_frame)
