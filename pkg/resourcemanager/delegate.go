@@ -226,7 +226,7 @@ func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, e
 	if err != nil {
 		return "", fmt.Errorf("unable to parse cluster endpoint \"%s\": %v", cluster.Endpoint, err)
 	}
-	getServiceURL.Path = path.Join(getServiceURL.Path, "services", replica.ServiceName)
+	getServiceURL.Path = path.Join(getServiceURL.Path, "system", "services", replica.ServiceName)
 
 	// Make request to get service's definition (including token) from cluster
 	req, err := http.NewRequest(http.MethodGet, getServiceURL.String(), nil)
