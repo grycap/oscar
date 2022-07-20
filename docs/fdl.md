@@ -31,6 +31,8 @@ functions:
         path: example-workflow/res
       - storage_provider: onedata.my_onedata
         path: result-example-workflow
+      - storage_provider: webdav.dcache
+        path: example-workflow/res
 
 storage_providers:
   onedata:
@@ -38,6 +40,11 @@ storage_providers:
       oneprovider_host: my_provider.com
       token: my_very_secret_token
       space: my_onedata_space
+  webdav:
+    dcache:
+      hostname: my_dcache.com
+      login: my_username
+      password: my_password
 ```
 
 ## Top level parameters
@@ -113,11 +120,12 @@ storage_providers:
 
 ## StorageProviders
 
-| Field                                                            | Description                                                                                                                |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `minio` </br> *map[string][MinIOProvider](#minioprovider)*       | Map to define the credentials for a MinIO storage provider, being the key the user-defined identifier for the provider     |
-| `s3` </br> *map[string][S3Provider](#s3provider)*                | Map to define the credentials for a Amazon S3 storage provider, being the key the user-defined identifier for the provider |
-| `onedata` </br> *map[string][OnedataProvider](#onedataprovider)* | Map to define the credentials for a Onedata storage provider, being the key the user-defined identifier for the provider   |
+| Field                                                            | Description                                                                                                                                    |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `minio` </br> *map[string][MinIOProvider](#minioprovider)*       | Map to define the credentials for a MinIO storage provider, being the key the user-defined identifier for the provider                         |
+| `s3` </br> *map[string][S3Provider](#s3provider)*                | Map to define the credentials for a Amazon S3 storage provider, being the key the user-defined identifier for the provider                     |
+| `onedata` </br> *map[string][OnedataProvider](#onedataprovider)* | Map to define the credentials for a Onedata storage provider, being the key the user-defined identifier for the provider                       |
+| `webdav` </br> *map[string][WebDavProvider](#webdavprovider)*    | Map to define the credentials for a storage provider accesible via WebDav protocol, being the key the user-defined identifier for the provider |
 
 ## Cluster
 
@@ -153,3 +161,11 @@ storage_providers:
 | `oneprovider_host` </br> *string* | Endpoint of the Oneprovider |
 | `token` </br> *string*            | Onedata access token        |
 | `space` </br> *string*            | Name of the Onedata space   |
+
+## WebDAVProvider
+
+| Field                     | Description               |
+| ------------------------- | ------------------------- |
+| `hostname` </br> *string* | Provider hostname         |
+| `login` </br> *string*    | Provider account username |
+| `password` </br> *string* | Provider account password |
