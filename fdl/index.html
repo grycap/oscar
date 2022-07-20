@@ -471,6 +471,13 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#webdavprovider" class="md-nav__link">
+    WebDAVProvider
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -679,6 +686,13 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#webdavprovider" class="md-nav__link">
+    WebDAVProvider
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -727,6 +741,8 @@
         path: example-workflow/res
       - storage_provider: onedata.my_onedata
         path: result-example-workflow
+      - storage_provider: webdav.dcache
+        path: example-workflow/res
 
 storage_providers:
   onedata:
@@ -734,6 +750,11 @@ storage_providers:
       oneprovider_host: my_provider.com
       token: my_very_secret_token
       space: my_onedata_space
+  webdav:
+    dcache:
+      hostname: my_dcache.com
+      login: my_username
+      password: my_password
 </code></pre>
 <h2 id="top-level-parameters">Top level parameters</h2>
 <table>
@@ -977,6 +998,10 @@ storage_providers:
 <td><code>onedata</code> </br> <em>map[string]<a href="#onedataprovider">OnedataProvider</a></em></td>
 <td>Map to define the credentials for a Onedata storage provider, being the key the user-defined identifier for the provider</td>
 </tr>
+<tr>
+<td><code>webdav</code> </br> <em>map[string]<a href="#webdavprovider">WebDavProvider</a></em></td>
+<td>Map to define the credentials for a storage provider accesible via WebDav protocol, being the key the user-defined identifier for the provider</td>
+</tr>
 </tbody>
 </table>
 <h2 id="cluster">Cluster</h2>
@@ -1080,6 +1105,29 @@ storage_providers:
 <tr>
 <td><code>space</code> </br> <em>string</em></td>
 <td>Name of the Onedata space</td>
+</tr>
+</tbody>
+</table>
+<h2 id="webdavprovider">WebDAVProvider</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hostname</code> </br> <em>string</em></td>
+<td>Provider hostname</td>
+</tr>
+<tr>
+<td><code>login</code> </br> <em>string</em></td>
+<td>Provider account username</td>
+</tr>
+<tr>
+<td><code>password</code> </br> <em>string</em></td>
+<td>Provider account password</td>
 </tr>
 </tbody>
 </table>
