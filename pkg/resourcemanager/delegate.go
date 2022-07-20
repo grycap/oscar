@@ -131,7 +131,7 @@ func DelegateJob(service *types.Service, event string) error {
 				req.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
 
 				// Send the request
-				res, err = http.DefaultClient.Do(req)
+				res, err = client.Do(req)
 				if err != nil {
 					log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
 					continue
@@ -237,8 +237,18 @@ func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, e
 	// Add cluster's basic auth credentials
 	req.SetBasicAuth(cluster.AuthUser, cluster.AuthPassword)
 
+	// Make HTTP client
+	var transport http.RoundTripper = &http.Transport{
+		// Enable/disable SSL verification
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
+	}
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   time.Second * 20,
+	}
+
 	// Send the request
-	res, err := http.DefaultClient.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("unable to send request to cluster endpoint \"%s\": %v", cluster.Endpoint, err)
 	}
