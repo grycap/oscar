@@ -1,4 +1,4 @@
 [submodule "ui"]
 	path = ui
-	url = git@github.com:grycap/oscar-ui.git
+	url = https://github.com/grycap/oscar-ui.git
 	branch = master
