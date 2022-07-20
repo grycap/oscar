@@ -494,6 +494,18 @@ components:
                   type: string
                 space:
                   type: string
+        webdav:
+          type: object
+          properties:
+            id:
+              type: object
+              properties:
+                hostname:
+                  type: string
+                login:
+                  type: string
+                password:
+                  type: string
     Clusters:
       title: Clusters
       type: object
