@@ -46,6 +46,7 @@ storage_providers:
 | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `functions` </br> *[Functions](#functions)*                       | Mandatory parameter to define a Functions Definition Language file. Note that "functions" instead of "services" has been used in order to keep compatibility with [SCAR](https://github.com/grycap/scar) |
 | `storage_providers` </br> *[StorageProviders](#storageproviders)* | Parameter to define the credentials for the storage providers to be used in the services                                                                                                                 |
+| `clusters` </br> *map[string][Cluster](#cluster)*                 | configuration for the OSCAR clusters that can be used as service's replicas, being the key the user-defined identifier for the cluster. Optional                                                         |
 
 ## Functions
 
@@ -58,6 +59,7 @@ storage_providers:
 | Field                                                             | Description                                                                                                                                                                                                                    |
 | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `name` </br> *string*                                             | The name of the service                                                                                                                                                                                                        |
+| `cluster_id` </br> *string*                                       | Identifier for the current cluster, used to specify the cluster's StorageProvider in job delegations. OSCAR-CLI sets it using the ClusterID from the FDL. Optional. (default: "")                                              |
 | `image` </br> *string*                                            | Docker image for the service                                                                                                                                                                                                   |
 | `alpine` </br> *boolean*                                          | Alpine parameter to set if image is based on Alpine. If `true` a custom release of faas-supervisor will be used. Optional (default: false)                                                                                     |
 | `script` </br> *string*                                           | Local path to the user script to be executed in the service container                                                                                                                                                          |
@@ -67,6 +69,7 @@ storage_providers:
 | `total_memory` </br> *string*                                     | Limit for the memory used by all the service's jobs running simultaneously. Apache YuniKorn scheduler is required to work. Same format as Memory, but internally translated to MB (integer). Optional (default: "")            |
 | `total_cpu` </br> *string*                                        | Limit for the virtual CPUs used by all the service's jobs running simultaneously. Apache YuniKorn scheduler is required to work. Same format as CPU, but internally translated to millicores (integer). Optional (default: "") |
 | `synchronous` </br> *[SynchronousSettings](#synchronoussettings)* | Struct to configure specific sync parameters. This settings are only applied on Knative ServerlessBackend. Optional.                                                                                                           |
+| `replicas` </br> *[Replica](#replica) array*                      | List of replicas to delegate jobs. Optional.                                                                                                                                                                                   |
 | `log_level` </br> *string*                                        | Log level for the FaaS Supervisor. Available levels: NOTSET, DEBUG, INFO, WARNING, ERROR and CRITICAL. Optional (default: INFO)                                                                                                |
 | `input` </br> *[StorageIOConfig](#storageioconfig) array*         | Array with the input configuration for the service. Optional                                                                                                                                                                   |
 | `output` </br> *[StorageIOConfig](#storageioconfig) array*        | Array with the output configuration for the service. Optional                                                                                                                                                                  |
@@ -80,6 +83,18 @@ storage_providers:
 | --------------------------- | -------------------------------------------------------------------------------------------- |
 | `min_scale` </br> *integer* | Minimum number of active replicas (pods) for the service. Optional. (default: 0)             |
 | `max_scale` </br> *integer* | Maximum number of active replicas (pods) for the service. Optional. (default: 0 (Unlimited)) |
+
+## Replica
+
+| Field                               | Description                                                                                                                                                                                      |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `type` </br> *string*               | Type of the replica to re-send events (can be `oscar` or `endpoint`)                                                                                                                             |
+| `cluster_id` </br> *string*         | Identifier of the cluster as defined in the "clusters" FDL field. Only used if Type is `oscar`                                                                                                   |
+| `service_name` </br> *string*       | Name of the service in the replica cluster. Only used if Type is `oscar`                                                                                                                         |
+| `url` </br> *string*                | URL of the endpoint to re-send events (HTTP POST). Only used if Type is `endpoint`                                                                                                               |
+| `ssl_verify` </br> *boolean*        | Parameter to enable or disable the verification of SSL certificates. Only used if Type is `endpoint`. Optional. (default: true)                                                                  |
+| `priority` </br> *integer*          | Priority value to define delegation priority. Highest priority is defined as 0. If a delegation fails, OSCAR will try to delegate to another replica with lower priority. Optional. (default: 0) |
+| `headers` </br> *map[string]string* | Headers to send in delegation requests. Optional                                                                                                                                                 |
 
 ## StorageIOConfig
 
@@ -103,6 +118,15 @@ storage_providers:
 | `minio` </br> *map[string][MinIOProvider](#minioprovider)*       | Map to define the credentials for a MinIO storage provider, being the key the user-defined identifier for the provider     |
 | `s3` </br> *map[string][S3Provider](#s3provider)*                | Map to define the credentials for a Amazon S3 storage provider, being the key the user-defined identifier for the provider |
 | `onedata` </br> *map[string][OnedataProvider](#onedataprovider)* | Map to define the credentials for a Onedata storage provider, being the key the user-defined identifier for the provider   |
+
+## Cluster
+
+| Field                          | Description                                                         |
+| ------------------------------ | ------------------------------------------------------------------- |
+| `endpoint` </br> *string*      | Endpoint of the OSCAR cluster API                                   |
+| `auth_user` </br> *string*     | Username to connect to the cluster (basic auth)                     |
+| `auth_password` </br> *string* | Password to connect to the cluster (basic auth)                     |
+| `ssl_verify` </br> *boolean*   | Parameter to enable or disable the verification of SSL certificates |
 
 ## MinIOProvider
 

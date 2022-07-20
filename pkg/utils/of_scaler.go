@@ -35,7 +35,7 @@ import (
 
 const scalePath = "/system/scale-function/"
 
-var scalerLogger = log.New(os.Stderr, "[OF-SCALER] ", log.Ldate|log.Ltime)
+var scalerLogger = log.New(os.Stdout, "[OF-SCALER] ", log.Flags())
 
 // OpenfaasScaler struct to store the parameters required to scale OpenFaaS functions
 type OpenfaasScaler struct {

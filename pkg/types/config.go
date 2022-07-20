@@ -134,6 +134,27 @@ type Config struct {
 	// YunikornConfigFileName
 	YunikornConfigFileName string `json:"-"`
 
+	// ResourceManagerEnable option to enable the Resource Manager to delegate jobs
+	// when there are no available resources in the cluster (if the service has replicas)
+	ResourceManagerEnable bool `json:"-"`
+
+	// // ResourceManager parameter to set the ResourceManager to use ("kubernetes" or "yunikorn")
+	// // TODO: decide if this parameter is necessary or use kubernetes by default and yunikorn always if it's enabled
+	// ResourceManager string `json:"-"`
+
+	// ResourceManagerInterval time interval (in seconds) to update the available resources in the cluster
+	ResourceManagerInterval int `json:"-"`
+
+	// ReSchedulerEnable option to enable the ReScheduler to delegate jobs to a replica
+	// when a threshold is reached
+	ReSchedulerEnable bool `json:"-"`
+
+	// ReSchedulerInterval time interval (in seconds) to check if pending jobs
+	ReSchedulerInterval int `json:"-"`
+
+	// ReSchedulerThreshold default time (in seconds) that a job (with replicas) can be queued before delegating it
+	ReSchedulerThreshold int `json:"-"`
+
 	// OIDCEnable parameter to enable OIDC support
 	OIDCEnable bool `json:"-"`
 
@@ -181,6 +202,12 @@ var configVars = []configVar{
 	{"YunikornNamespace", "YUNIKORN_NAMESPACE", false, stringType, "yunikorn"},
 	{"YunikornConfigMap", "YUNIKORN_CONFIGMAP", false, stringType, "yunikorn-configs"},
 	{"YunikornConfigFileName", "YUNIKORN_CONFIG_FILENAME", false, stringType, "queues.yaml"},
+	{"ResourceManagerEnable", "RESOURCE_MANAGER_ENABLE", false, boolType, "false"},
+	//{"ResourceManager", "RESOURCE_MANAGER", false, resourceManagerType, "kubernetes"},
+	{"ResourceManagerInterval", "RESOURCE_MANAGER_INTERVAL", false, intType, "15"},
+	{"ReSchedulerEnable", "RESCHEDULER_ENABLE", false, boolType, "false"},
+	{"ReSchedulerInterval", "RESCHEDULER_INTERVAL", false, intType, "15"},
+	{"ReSchedulerThreshold", "RESCHEDULER_THRESHOLD", false, intType, "30"},
 	{"OIDCEnable", "OIDC_ENABLE", false, boolType, "false"},
 	{"OIDCIssuer", "OIDC_ISSUER", false, stringType, "https://aai.egi.eu/oidc/"},
 	{"OIDCSubject", "OIDC_SUBJECT", false, stringType, ""},
@@ -270,7 +297,7 @@ func ReadConfig() (*Config, error) {
 		// Parse the environment variable depending of its type
 		switch cv.varType {
 		case stringType:
-			value = strings.ToLower(strValue)
+			value = strings.TrimSpace(strValue)
 		case stringSliceType:
 			value = parseStringSlice(strValue)
 		case intType:

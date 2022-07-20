@@ -32,6 +32,7 @@ const EGIGroupsURNPrefix = "urn:mace:egi.eu:group"
 // oidcManager struct to represent a OIDC manager, including a cache of tokens
 type oidcManager struct {
 	provider   *oidc.Provider
+	config     *oidc.Config
 	subject    string
 	groups     []string
 	tokenCache map[string]*userInfo
@@ -50,8 +51,13 @@ func newOIDCManager(issuer string, subject string, groups []string) (*oidcManage
 		return nil, err
 	}
 
+	config := &oidc.Config{
+		SkipClientIDCheck: true,
+	}
+
 	return &oidcManager{
 		provider:   provider,
+		config:     config,
 		subject:    subject,
 		groups:     groups,
 		tokenCache: map[string]*userInfo{},
@@ -88,8 +94,8 @@ func getOIDCMiddleware(issuer string, subject string, groups []string) gin.Handl
 // clearExpired delete expired tokens from the cache
 func (om *oidcManager) clearExpired() {
 	for rawToken := range om.tokenCache {
-		token := &oauth2.Token{AccessToken: rawToken}
-		if !token.Valid() {
+		_, err := om.provider.Verifier(om.config).Verify(context.TODO(), rawToken)
+		if err != nil {
 			delete(om.tokenCache, rawToken)
 		}
 	}
@@ -138,13 +144,12 @@ func getGroups(urns []string) []string {
 // isAuthorised checks if a token is authorised to access the API
 func (om *oidcManager) isAuthorised(rawToken string) bool {
 	// Check if the token is valid
-	token := &oauth2.Token{AccessToken: rawToken}
-	if !token.Valid() {
+	_, err := om.provider.Verifier(om.config).Verify(context.TODO(), rawToken)
+	if err != nil {
 		return false
 	}
 
 	// Check if token is in cache
-	var err error
 	ui, found := om.tokenCache[rawToken]
 	if !found {
 		// Get userInfo from the issuer

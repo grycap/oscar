@@ -28,11 +28,22 @@ import (
 
 var (
 	testService Service = Service{
-		Name:             "testname",
-		Image:            "testimage",
-		Alpine:           false,
-		Memory:           "1Gi",
-		CPU:              "1.0",
+		Name:      "testname",
+		ClusterID: "testcluster",
+		Image:     "testimage",
+		Alpine:    false,
+		Memory:    "1Gi",
+		CPU:       "1.0",
+		Replicas: []Replica{
+			{
+				Type:        "oscar",
+				ClusterID:   "test",
+				ServiceName: "testreplicaname",
+				Headers: map[string]string{
+					"Authorization": "Bearer testtoken",
+				},
+			},
+		},
 		ImagePullSecrets: []string{"testcred1", "testcred2"},
 		Script:           "testscript",
 		Environment: struct {
@@ -57,6 +68,14 @@ var (
 					SecretKey: "testsecretkey",
 					Region:    "testregion",
 				},
+			},
+		},
+		Clusters: map[string]Cluster{
+			"test": {
+				Endpoint:     "https://test.oscar.endpoint",
+				AuthUser:     "testuser",
+				AuthPassword: "testpass",
+				SSLVerify:    true,
 			},
 		},
 	}
@@ -177,9 +196,11 @@ func TestConvertEnvVars(t *testing.T) {
 
 func TestSetImagePullSecrets(t *testing.T) {
 	secrets := []string{"testcred1"}
+
 	expected := []v1.LocalObjectReference{
 		{Name: "testcred1"},
 	}
+
 	result := setImagePullSecrets(secrets)
 	if result[0].Name != expected[0].Name {
 		t.Errorf("invalid conversion of local object. Expected: %v, got %v", expected, result)
@@ -188,6 +209,7 @@ func TestSetImagePullSecrets(t *testing.T) {
 
 func TestToYAML(t *testing.T) {
 	expected := `name: testname
+cluster_id: testcluster
 memory: 1Gi
 cpu: "1.0"
 total_memory: ""
@@ -195,6 +217,15 @@ total_cpu: ""
 synchronous:
   min_scale: 0
   max_scale: 0
+replicas:
+- type: oscar
+  cluster_id: test
+  service_name: testreplicaname
+  url: ""
+  ssl_verify: false
+  priority: 0
+  headers:
+    Authorization: Bearer testtoken
 log_level: ""
 image: testimage
 alpine: false
@@ -220,6 +251,12 @@ storage_providers:
       access_key: testaccesskey
       secret_key: testsecretkey
       region: testregion
+clusters:
+  test:
+    endpoint: https://test.oscar.endpoint
+    auth_user: testuser
+    auth_password: testpass
+    ssl_verify: true
 `
 
 	str, _ := testService.ToYAML()

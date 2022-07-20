@@ -312,6 +312,8 @@ func isStorageProviderDefined(storageName string, storageID string, providers *t
 		_, ok = providers.S3[storageID]
 	case types.OnedataName:
 		_, ok = providers.Onedata[storageID]
+	case types.WebDavName:
+	_, ok = providers.WebDav[storageID]
 	}
 	return ok
 }
