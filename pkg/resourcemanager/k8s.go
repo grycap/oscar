@@ -90,6 +90,7 @@ func (krm *KubeResourceManager) IsSchedulable(resources v1.ResourceRequirements)
 			return true
 		}
 	}
+
 	return false
 }
 

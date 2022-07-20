@@ -21,6 +21,7 @@ type Replica struct {
 	// Type of the replica to re-send events (can be "oscar" or "endpoint")
 	Type string `json:"type"`
 	// ClusterID identifier of the cluster as defined in the "clusters" FDL field
+	// Only used if Type is "oscar"
 	ClusterID string `json:"cluster_id"`
 	// ServiceName name of the service in the replica cluster.
 	// Only used if Type is "oscar"

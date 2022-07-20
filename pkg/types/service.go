@@ -155,6 +155,7 @@ type Service struct {
 	} `json:"synchronous"`
 
 	// Replicas list of replicas to delegate jobs
+	// Optional
 	Replicas ReplicaList `json:"replicas,omitempty"`
 
 	// LogLevel log level for the FaaS Supervisor
