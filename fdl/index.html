@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.3.8">
+      <meta name="generator" content="mkdocs-1.3.1, mkdocs-material-8.3.9">
     
     
       
@@ -416,6 +416,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#replica" class="md-nav__link">
+    Replica
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#storageioconfig" class="md-nav__link">
     StorageIOConfig
   </a>
@@ -432,6 +439,13 @@
         <li class="md-nav__item">
   <a href="#storageproviders" class="md-nav__link">
     StorageProviders
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cluster" class="md-nav__link">
+    Cluster
   </a>
   
 </li>
@@ -610,6 +624,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#replica" class="md-nav__link">
+    Replica
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#storageioconfig" class="md-nav__link">
     StorageIOConfig
   </a>
@@ -626,6 +647,13 @@
         <li class="md-nav__item">
   <a href="#storageproviders" class="md-nav__link">
     StorageProviders
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cluster" class="md-nav__link">
+    Cluster
   </a>
   
 </li>
@@ -724,6 +752,10 @@ storage_providers:
 <td><code>storage_providers</code> </br> <em><a href="#storageproviders">StorageProviders</a></em></td>
 <td>Parameter to define the credentials for the storage providers to be used in the services</td>
 </tr>
+<tr>
+<td><code>clusters</code> </br> <em>map[string]<a href="#cluster">Cluster</a></em></td>
+<td>configuration for the OSCAR clusters that can be used as service's replicas, being the key the user-defined identifier for the cluster. Optional</td>
+</tr>
 </tbody>
 </table>
 <h2 id="functions">Functions</h2>
@@ -753,6 +785,10 @@ storage_providers:
 <tr>
 <td><code>name</code> </br> <em>string</em></td>
 <td>The name of the service</td>
+</tr>
+<tr>
+<td><code>cluster_id</code> </br> <em>string</em></td>
+<td>Identifier for the current cluster, used to specify the cluster's StorageProvider in job delegations. OSCAR-CLI sets it using the ClusterID from the FDL. Optional. (default: "")</td>
 </tr>
 <tr>
 <td><code>image</code> </br> <em>string</em></td>
@@ -789,6 +825,10 @@ storage_providers:
 <tr>
 <td><code>synchronous</code> </br> <em><a href="#synchronoussettings">SynchronousSettings</a></em></td>
 <td>Struct to configure specific sync parameters. This settings are only applied on Knative ServerlessBackend. Optional.</td>
+</tr>
+<tr>
+<td><code>replicas</code> </br> <em><a href="#replica">Replica</a> array</em></td>
+<td>List of replicas to delegate jobs. Optional.</td>
 </tr>
 <tr>
 <td><code>log_level</code> </br> <em>string</em></td>
@@ -832,6 +872,45 @@ storage_providers:
 <tr>
 <td><code>max_scale</code> </br> <em>integer</em></td>
 <td>Maximum number of active replicas (pods) for the service. Optional. (default: 0 (Unlimited))</td>
+</tr>
+</tbody>
+</table>
+<h2 id="replica">Replica</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code> </br> <em>string</em></td>
+<td>Type of the replica to re-send events (can be <code>oscar</code> or <code>endpoint</code>)</td>
+</tr>
+<tr>
+<td><code>cluster_id</code> </br> <em>string</em></td>
+<td>Identifier of the cluster as defined in the "clusters" FDL field. Only used if Type is <code>oscar</code></td>
+</tr>
+<tr>
+<td><code>service_name</code> </br> <em>string</em></td>
+<td>Name of the service in the replica cluster. Only used if Type is <code>oscar</code></td>
+</tr>
+<tr>
+<td><code>url</code> </br> <em>string</em></td>
+<td>URL of the endpoint to re-send events (HTTP POST). Only used if Type is <code>endpoint</code></td>
+</tr>
+<tr>
+<td><code>ssl_verify</code> </br> <em>boolean</em></td>
+<td>Parameter to enable or disable the verification of SSL certificates. Only used if Type is <code>endpoint</code>. Optional. (default: true)</td>
+</tr>
+<tr>
+<td><code>priority</code> </br> <em>integer</em></td>
+<td>Priority value to define delegation priority. Highest priority is defined as 0. If a delegation fails, OSCAR will try to delegate to another replica with lower priority. Optional. (default: 0)</td>
+</tr>
+<tr>
+<td><code>headers</code> </br> <em>map[string]string</em></td>
+<td>Headers to send in delegation requests. Optional</td>
 </tr>
 </tbody>
 </table>
@@ -897,6 +976,33 @@ storage_providers:
 <tr>
 <td><code>onedata</code> </br> <em>map[string]<a href="#onedataprovider">OnedataProvider</a></em></td>
 <td>Map to define the credentials for a Onedata storage provider, being the key the user-defined identifier for the provider</td>
+</tr>
+</tbody>
+</table>
+<h2 id="cluster">Cluster</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>endpoint</code> </br> <em>string</em></td>
+<td>Endpoint of the OSCAR cluster API</td>
+</tr>
+<tr>
+<td><code>auth_user</code> </br> <em>string</em></td>
+<td>Username to connect to the cluster (basic auth)</td>
+</tr>
+<tr>
+<td><code>auth_password</code> </br> <em>string</em></td>
+<td>Password to connect to the cluster (basic auth)</td>
+</tr>
+<tr>
+<td><code>ssl_verify</code> </br> <em>boolean</em></td>
+<td>Parameter to enable or disable the verification of SSL certificates</td>
 </tr>
 </tbody>
 </table>
@@ -1051,7 +1157,7 @@ storage_providers:
     <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.b97dbffb.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.0238f547.min.js"></script>
+      <script src="../assets/javascripts/bundle.6c7ad80a.min.js"></script>
       
     
   </body>

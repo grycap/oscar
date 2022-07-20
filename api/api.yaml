@@ -353,6 +353,8 @@ components:
       properties:
         name:
           type: string
+        cluster_id:
+          type: string
         memory:
           type: string
         cpu:
@@ -370,6 +372,32 @@ components:
             max_scale:
               type: integer
               default: 0
+        replicas:
+          type: array
+          items:
+            type: object
+            properties:
+              type: 
+                type: string
+              cluster_id: 
+                type: string
+              service_name: 
+                type: string
+              url: 
+                type: string
+              ssl_verify: 
+                type: boolean
+                default: true
+              priority: 
+                type: integer
+                default: 0
+              headers:
+                type: object
+                additionalProperties:
+                  type: string
+                  properties:
+                    value:
+                      type: string
         token:
           type: string
           readOnly: true
@@ -411,6 +439,8 @@ components:
             $ref: '#/components/schemas/StorageIOConfig'
         storage_providers:
           $ref: '#/components/schemas/StorageProviders'
+        clusters:
+          $ref: '#/components/schemas/Clusters'
       required:
         - name
         - image
@@ -464,6 +494,21 @@ components:
                   type: string
                 space:
                   type: string
+    Clusters:
+      title: Clusters
+      type: object
+      properties:
+        id:
+          type: object
+          properties:
+            endpoint:
+              type: string
+            auth_user:
+              type: string
+            auth_password:
+              type: string
+            ssl_verify:
+              type: boolean
     JobInfo:
       title: JobInfo
       type: object
