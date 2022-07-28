@@ -12,6 +12,7 @@ RUN apt-get update -y && \
 
 RUN pip3 install numpy --upgrade
 RUN pip3 install torch torchvision
+RUN pip3 install awscli
 RUN git clone https://github.com/NeelBhowmik/efficient-compact-fire-detection-cnn.git
 RUN pip3 install -r efficient-compact-fire-detection-cnn/requirements.txt
 
