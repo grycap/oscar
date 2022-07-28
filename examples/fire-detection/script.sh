@@ -12,3 +12,11 @@ python3 efficient-compact-fire-detection-cnn/inference_ff_oscar.py --image "$INP
 
 zip -r "output-$filename_wo_extension-$tmp_dir.zip" aux_output
 mv output-$filename_wo_extension-$tmp_dir.zip $TMP_OUTPUT_DIR
+
+if $SEND_SNS ; then
+   result=`cat aux_output/output-*.txt`
+   if [ $result = "FIRE" ]; then
+	echo "Fire detected. Sending message..."
+	aws sns publish --topic-arn $TOPIC_ARN --message "fire" --subject "Fire detection service"
+   fi
+fi
