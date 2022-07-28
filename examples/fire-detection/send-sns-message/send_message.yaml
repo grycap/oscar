@@ -1,0 +1,19 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: send-sns-message
+      cpu: 1.0
+      memory: 1Gi
+      image: ghcr.io/catttam/send-sns-messages:latest
+      script: send_message.sh
+      alpine: true
+      input:
+      - storage_provider: minio.default
+        path: fire/output
+      log_level: CRITICAL   # To avoid supervisor logs in response
+      environment:
+        Variables: 
+          AWS_ACCESS_KEY_ID: [your aws_access_key_id]
+          AWS_SECRET_ACCESS_KEY: [your aws_secret_access_key_id]
+          AWS_DEFAULT_REGION: [your account region]
+          TOPIC_ARN: [arn of the sns topic]

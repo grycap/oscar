@@ -31,5 +31,8 @@ As external storage providers, the following services can be used:
 - External [MinIO](https://min.io) servers, which may be in clusters other than the platform.
 - [Amazon S3](https://aws.amazon.com/s3/), the Amazon's  object storage service that offers industry-leading scalability, data availability, security, and performance in the public Cloud.
 - [Onedata](https://onedata.org/), the global data access solution for science used in the [EGI Federated Cloud](https://datahub.egi.eu/).
+- Any storage provider that can be accessible through [WebDAV](http://www.webdav.org/) protocol. An example of a storage provider supporting this protocol is [dCache](https://dcache.org/), a storage middleware system capable of manage the storage and exchange of large data quantities.
 
+***Note**: All of the mentioned storage providers can be used as output but only MinIO can be used as input.*
+  
 An OSCAR cluster can be accessed via its [REST API](https://grycap.github.io/oscar/api/), the [web-based UI](https://github.com/grycap/oscar/tree/master/ui) and the the command-line interface  provided by [oscar-cli](https://github.com/grycap/oscar-cli).

@@ -42,10 +42,10 @@ const (
 
 	// OnedataName string representing the Onedata provider name
 	OnedataName = "onedata"
-	
+
 	// WebDavName string representing a storage provider accessed via webdav
 	WebDavName = "webdav"
-	
+
 	// ProviderSeparator separator character used to split provider's name and identifier
 	ProviderSeparator = "."
 )
@@ -94,7 +94,7 @@ type OnedataProvider struct {
 // WebDavProvider stores the credentials of the a storage provider that can be accessed via webdav
 type WebDavProvider struct {
 	Hostname string `json:"hostname"`
-	Login string `json:"login"`
+	Login    string `json:"login"`
 	Password string `json:"password"`
 }
 

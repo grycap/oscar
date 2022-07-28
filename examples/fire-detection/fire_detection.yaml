@@ -1,0 +1,14 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: fire-detection
+      cpu: 1.0
+      memory: 3Gi
+      image: ghcr.io/catttam/fire-detection:latest 
+      script: script.sh
+      input:
+      - storage_provider: minio.default
+        path: fire-detect/input
+      output:
+      - storage_provider: minio.default
+        path: fire-detect/output
