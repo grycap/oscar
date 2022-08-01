@@ -95,7 +95,7 @@ func getReSchedulablePods(kubeClientset kubernetes.Interface, namespace string) 
 			pendingTime := now.Sub(pod.CreationTimestamp.Time).Seconds()
 			threshold, err := strconv.Atoi(pod.Labels[types.ReSchedulerLabelKey])
 			if err != nil {
-				reSchedulerLogger.Printf("unable to parse rescheduler threshold from pod %s. Error: %v", pod.Name, err)
+				reSchedulerLogger.Printf("unable to parse rescheduler threshold from pod %s. Error: %v\n", pod.Name, err)
 				continue
 			}
 			// Check if threshold is exceeded

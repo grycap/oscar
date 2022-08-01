@@ -398,7 +398,7 @@ components:
                   properties:
                     value:
                       type: string
-        scheduler_threshold:
+        rescheduler_threshold:
           type: string
         token:
           type: string

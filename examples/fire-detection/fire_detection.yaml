@@ -4,7 +4,7 @@ functions:
       name: fire-detection
       cpu: 1.0
       memory: 1Gi
-      image: ghcr.io/catttam/fire-detection:latest 
+      image: ghcr.io/grycap/fire-detection:latest 
       script: script.sh
       input:
       - storage_provider: minio.default

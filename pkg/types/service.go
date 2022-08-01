@@ -155,7 +155,7 @@ type Service struct {
 	// Optional
 	Replicas ReplicaList `json:"replicas,omitempty"`
 
-	//Threshold time for the scheduler to delegate jobs at service level
+	// ReSchedulerThreshold time (in seconds) that a job (with replicas) can be queued before delegating it
 	// Optional
 	ReSchedulerThreshold int `json:"rescheduler_threshold"`
 
