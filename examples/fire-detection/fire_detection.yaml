@@ -3,7 +3,7 @@ functions:
   - oscar-cluster:
       name: fire-detection
       cpu: 1.0
-      memory: 3Gi
+      memory: 1Gi
       image: ghcr.io/catttam/fire-detection:latest 
       script: script.sh
       input:
@@ -12,3 +12,12 @@ functions:
       output:
       - storage_provider: minio.default
         path: fire-detect/output
+      environment:
+        Variables:
+          SEND_SNS: false
+          # aws-cli configuration variables are only needed if 'SEND_SNS' is true
+          AWS_ACCESS_KEY_ID: [aws_access_key_id]
+          AWS_SECRET_ACCESS_KEY: [aws_secret_access_key]
+          AWS_DEFAULT_REGION: [aws_default_region]
+          AWS_DEFAULT_OUTPUT: json
+          TOPIC_ARN: [topic_arn]

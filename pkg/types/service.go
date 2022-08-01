@@ -103,9 +103,6 @@ const (
 
 	// ReSchedulerLabelKey label key to enable/disable the ReScheduler
 	ReSchedulerLabelKey = "oscar_rescheduler"
-
-	// ReSchedulerLabelEnableValue label value to enable the ReScheduler
-	ReSchedulerLabelEnableValue = "enable"
 )
 
 // YAMLMarshal package-level yaml marshal function
@@ -157,6 +154,10 @@ type Service struct {
 	// Replicas list of replicas to delegate jobs
 	// Optional
 	Replicas ReplicaList `json:"replicas,omitempty"`
+
+	//Threshold time for the scheduler to delegate jobs at service level
+	// Optional
+	ReSchedulerThreshold int `json:"rescheduler_threshold"`
 
 	// LogLevel log level for the FaaS Supervisor
 	// Optional. (default: INFO)
