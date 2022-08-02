@@ -5,7 +5,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -y && \
     apt-get upgrade -y && \
-    apt-get install -y git curl zip \
+    apt-get install -y git curl zip jq \
 	libgl1-mesa-glx \
         libglib2.0-0 \
 	python3 python3-pip 

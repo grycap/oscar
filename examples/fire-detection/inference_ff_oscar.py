@@ -28,6 +28,7 @@ import torch
 import torchvision.transforms as transforms
 from models import shufflenetv2
 from models import nasnet_mobile_onfire
+from pathlib import Path
 
 # create random characters for filename
 S = 10
@@ -253,8 +254,13 @@ if args.image:
         
         # save prdiction visualisation in output path
         infs_small_frame = cv2.resize(infs_small_frame, (width, height), cv2.INTER_AREA)
-        f_name = os.path.basename(im)
-        output_file = args.output+"/"+"output-"+f_name+".txt"
+        
+        file = Path(im)
+        file_txt = file.with_suffix('.txt')
+        f_name = os.path.basename(file)
+        f_name_txt = os.path.basename(file_txt)
+
+        output_file = args.output+"/"+"output-"+f_name_txt
         output_image = "output-"+f_name
         print(output_file)
         print(output_image)
