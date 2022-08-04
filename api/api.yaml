@@ -398,6 +398,8 @@ components:
                   properties:
                     value:
                       type: string
+        rescheduler_threshold:
+          type: string
         token:
           type: string
           readOnly: true

@@ -584,7 +584,9 @@ An user-provided shell script is executed inside the container run from the user
 <li>External <a href="https://min.io">MinIO</a> servers, which may be in clusters other than the platform.</li>
 <li><a href="https://aws.amazon.com/s3/">Amazon S3</a>, the Amazon's  object storage service that offers industry-leading scalability, data availability, security, and performance in the public Cloud.</li>
 <li><a href="https://onedata.org/">Onedata</a>, the global data access solution for science used in the <a href="https://datahub.egi.eu/">EGI Federated Cloud</a>.</li>
+<li>Any storage provider that can be accessible through <a href="http://www.webdav.org/">WebDAV</a> protocol. An example of a storage provider supporting this protocol is <a href="https://dcache.org/">dCache</a>, a storage middleware system capable of manage the storage and exchange of large data quantities.</li>
 </ul>
+<p><em><strong>Note</strong>: All of the mentioned storage providers can be used as output but only MinIO can be used as input.</em></p>
 <p>An OSCAR cluster can be accessed via its <a href="https://grycap.github.io/oscar/api/">REST API</a>, the <a href="https://github.com/grycap/oscar/tree/master/ui">web-based UI</a> and the the command-line interface  provided by <a href="https://github.com/grycap/oscar-cli">oscar-cli</a>.</p>
 
               
