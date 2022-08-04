@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -156,7 +157,11 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 
 		// Add ReScheduler label if there are replicas defined and the cfg.ReSchedulerEnable is true
 		if service.HasReplicas() && cfg.ReSchedulerEnable {
-			job.Labels[types.ReSchedulerLabelKey] = types.ReSchedulerLabelEnableValue
+			if service.ReSchedulerThreshold != 0 {
+				job.Labels[types.ReSchedulerLabelKey] = strconv.Itoa(service.ReSchedulerThreshold)
+			} else {
+				job.Labels[types.ReSchedulerLabelKey] = strconv.Itoa(cfg.ReSchedulerThreshold)
+			}
 		}
 
 		// Create job

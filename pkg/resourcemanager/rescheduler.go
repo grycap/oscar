@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/grycap/oscar/v2/pkg/types"
@@ -42,7 +43,7 @@ type reScheduleInfo struct {
 func StartReScheduler(cfg *types.Config, back types.ServerlessBackend, kubeClientset kubernetes.Interface) {
 	for {
 		// Get ReSchedulable pods
-		pods, err := getReSchedulablePods(kubeClientset, cfg.ServicesNamespace, cfg.ReSchedulerThreshold)
+		pods, err := getReSchedulablePods(kubeClientset, cfg.ServicesNamespace)
 		if err != nil {
 			reSchedulerLogger.Println(err.Error())
 			continue
@@ -74,12 +75,12 @@ func StartReScheduler(cfg *types.Config, back types.ServerlessBackend, kubeClien
 	}
 }
 
-func getReSchedulablePods(kubeClientset kubernetes.Interface, namespace string, threshold int) ([]v1.Pod, error) {
+func getReSchedulablePods(kubeClientset kubernetes.Interface, namespace string) ([]v1.Pod, error) {
 	reSchedulablePods := []v1.Pod{}
 
 	// List all schedulable jobs' pods (pending)
 	listOpts := metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", types.ReSchedulerLabelKey, types.ReSchedulerLabelEnableValue),
+		LabelSelector: types.ReSchedulerLabelKey,
 		FieldSelector: fmt.Sprintf("status.phase=%s", v1.PodPending),
 	}
 	pods, err := kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), listOpts)
@@ -92,7 +93,11 @@ func getReSchedulablePods(kubeClientset kubernetes.Interface, namespace string, 
 		if _, ok := pod.Labels[types.ServiceLabel]; ok {
 			now := time.Now()
 			pendingTime := now.Sub(pod.CreationTimestamp.Time).Seconds()
-
+			threshold, err := strconv.Atoi(pod.Labels[types.ReSchedulerLabelKey])
+			if err != nil {
+				reSchedulerLogger.Printf("unable to parse rescheduler threshold from pod %s. Error: %v\n", pod.Name, err)
+				continue
+			}
 			// Check if threshold is exceeded
 			if int(pendingTime) > threshold {
 				reSchedulablePods = append(reSchedulablePods, pod)
