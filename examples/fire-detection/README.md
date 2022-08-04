@@ -22,5 +22,58 @@ As mentioned, the output would be an image and a textfile like the ones shown ne
 Here is an example of a prediction output:
 ![Prediction output](readme-images/prediction-output.png)
 
+    In addition, this example has another function definition which uses the replica feature, where the main cluster can delegate jobs to another when it is saturated. As you can see, the file includes two definitions of the function, one for each cluster, and the `replicas` field on the main cluster (`oscar-cluster-edge`), referencing the delegated cluster (`oscar-cluster`) and the function name (`fire-detection`).
 
+```
+functions:
+  oscar:
+  - oscar-cluster-edge:
+      name: fire-detection
+      cpu: 1.0
+      memory: 1Gi
+      image: ghcr.io/grycap/fire-detection:latest 
+      script: script.sh
+      replicas:
+      - type: oscar
+        cluster_id: oscar-cluster
+        service_name: fire-detection
+      input:
+      - storage_provider: minio
+        path: fire-detect/input
+      output:
+      - storage_provider: minio
+        path: fire-detect/output
+      environment:
+        Variables:
+          SEND_SNS: false
+          # aws-cli configuration variables are only needed if 'SEND_SNS' is true
+          AWS_ACCESS_KEY_ID: [aws_access_key_id]
+          AWS_SECRET_ACCESS_KEY: [aws_secret_access_key]
+          AWS_DEFAULT_REGION: [aws_default_region]
+          AWS_DEFAULT_OUTPUT: json
+          TOPIC_ARN: [topic_arn] 
+  - oscar-cluster:
+      name: fire-detection
+      cpu: 1.0
+      memory: 1Gi
+      image: ghcr.io/grycap/fire-detection:latest 
+      script: script.sh
+      input:
+      - storage_provider: minio
+        path: fire-detect/input
+      output:
+      - storage_provider: minio
+        path: fire-detect/output
+      - storage_provider: minio.oscar-cluster-edge
+        path: fire-detect/output
+      environment:
+        Variables:
+          SEND_SNS: false
+          # aws-cli configuration variables are only needed if 'SEND_SNS' is true
+          AWS_ACCESS_KEY_ID: [aws_access_key_id]
+          AWS_SECRET_ACCESS_KEY: [aws_secret_access_key]
+          AWS_DEFAULT_REGION: [aws_default_region]
+          AWS_DEFAULT_OUTPUT: json
+          TOPIC_ARN: [topic_arn]
+```
 
