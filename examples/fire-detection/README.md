@@ -22,7 +22,9 @@ As mentioned, the output would be an image and a textfile like the ones shown ne
 Here is an example of a prediction output:
 ![Prediction output](readme-images/prediction-output.png)
 
-    In addition, this example has another function definition which uses the replica feature, where the main cluster can delegate jobs to another when it is saturated. As you can see, the file includes two definitions of the function, one for each cluster, and the `replicas` field on the main cluster (`oscar-cluster-edge`), referencing the delegated cluster (`oscar-cluster`) and the function name (`fire-detection`).
+## Example with replicas
+
+In addition, this example has another function definition file (`fire_detection_replicas.yaml`) which uses the ReScheduler and Resource Manager features, where the main cluster can delegate jobs to another when it is overloaded. As you can see, the file includes two definitions of the function, one for each cluster, and the `replicas` field in the cluster `oscar-cluster-edge`, referencing the service in the `oscar-cluster` as a replica to delegate jobs.
 
 ```
 functions:
@@ -76,4 +78,7 @@ functions:
           AWS_DEFAULT_OUTPUT: json
           TOPIC_ARN: [topic_arn]
 ```
+
+
+*This feature is introduced in OSCAR v2.5.0 and oscar-cli v1.3.0. Remember to set the environment variables `RESOURCE_MANAGER_ENABLE` and `RESCHEDULER_ENABLE` to `true` to enable it.*
 
