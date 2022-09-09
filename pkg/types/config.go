@@ -75,7 +75,7 @@ type Config struct {
 	ServicesNamespace string `json:"services_namespace"`
 
 	// Parameter used to check if the cluster have GPUs
-	HasGPU string `json:"-"`
+	HasGPU bool `json:"-"`
 
 	// Port used for the ClusterIP k8s service (default: 8080)
 	ServicePort int `json:"-"`
