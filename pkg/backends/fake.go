@@ -18,6 +18,7 @@ package backends
 
 import (
 	"errors"
+	"net/http"
 	"runtime"
 	"strings"
 
@@ -46,6 +47,19 @@ func MakeFakeBackend() *FakeBackend {
 	}
 }
 
+func MakeFakeSyncBackend() *FakeBackend {
+	return &FakeBackend{
+		errors: map[string][]error{
+			"ListServices":     {},
+			"CreateService":    {},
+			"ReadService":      {},
+			"UpdateService":    {},
+			"DeleteService":    {},
+			"GetProxyDirector": {},
+		},
+	}
+}
+
 // GetInfo returns the ServerlessBackendInfo with the name and version (fake)
 func (f *FakeBackend) GetInfo() *types.ServerlessBackendInfo {
 	return &types.ServerlessBackendInfo{
@@ -66,7 +80,7 @@ func (f *FakeBackend) CreateService(service types.Service) error {
 
 // ReadService returns a Service (fake)
 func (f *FakeBackend) ReadService(name string) (*types.Service, error) {
-	return &types.Service{}, f.returnError(getCurrentFuncName())
+	return &types.Service{Token: "AbCdEf123456"}, f.returnError(getCurrentFuncName())
 }
 
 // UpdateService updates an existent service (fake)
@@ -82,6 +96,17 @@ func (f *FakeBackend) DeleteService(name string) error {
 // GetKubeClientset returns the Kubernetes Clientset (fake)
 func (f *FakeBackend) GetKubeClientset() kubernetes.Interface {
 	return testclient.NewSimpleClientset()
+}
+
+func (f *FakeBackend) GetProxyDirector(serviceName string) func(req *http.Request) {
+	return func(req *http.Request) {
+		host := "httpbin.org"
+		req.Host = host
+
+		req.URL.Scheme = "https"
+		req.URL.Host = host
+		req.URL.Path = "/status/200"
+	}
 }
 
 func getCurrentFuncName() string {
