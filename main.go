@@ -50,9 +50,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Check if the cluster uses GPUs
+	types.GPUConfig(kubeClientset, cfg)
+
 	// Create the ServerlessBackend
 	back := backends.MakeServerlessBackend(kubeClientset, kubeConfig, cfg)
-
 	// Start OpenFaaS Scaler
 	if cfg.ServerlessBackend == "openfaas" && cfg.OpenfaasScalerEnable {
 		ofBack := back.(*backends.OpenfaasBackend)

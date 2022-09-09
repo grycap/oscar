@@ -8,7 +8,27 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v2/pkg/backends"
+	"github.com/grycap/oscar/v2/pkg/types"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+)
+
+var (
+	testMinIOProviderRun types.MinIOProvider = types.MinIOProvider{
+		Endpoint:  "http://minio.minio:30300",
+		Verify:    true,
+		AccessKey: "minio",
+		SecretKey: "ZjhhMWZk",
+		Region:    "us-east-1",
+	}
+
+	testConfigValidRun types.Config = types.Config{
+		MinIOProvider:        &testMinIOProviderValid,
+		WatchdogMaxInflight:  20,
+		WatchdogWriteDebug:   true,
+		WatchdogExecTimeout:  60,
+		WatchdogReadTimeout:  60,
+		WatchdogWriteTimeout: 60,
+	}
 )
 
 type GinResponseRecorder struct {
@@ -25,7 +45,7 @@ func (GinResponseRecorder) Flush() {
 func TestMakeRunHandler(t *testing.T) {
 	back := backends.MakeFakeSyncBackend()
 	r := gin.Default()
-	r.POST("/run/:serviceName", MakeRunHandler(&testConfigValid, back))
+	r.POST("/run/:serviceName", MakeRunHandler(&testConfigValidRun, back))
 
 	scenarios := []struct {
 		name        string

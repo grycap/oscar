@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/url"
@@ -25,6 +26,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -69,6 +73,9 @@ type Config struct {
 
 	// Kubernetes namespace for services and jobs (default: oscar-svc)
 	ServicesNamespace string `json:"services_namespace"`
+
+	// Parameter used to check if the cluster have GPUs
+	HasGPU string `json:"-"`
 
 	// Port used for the ClusterIP k8s service (default: 8080)
 	ServicePort int `json:"-"`
@@ -180,6 +187,7 @@ var configVars = []configVar{
 	{"MinIOProvider.Endpoint", "MINIO_ENDPOINT", false, urlType, "https://minio-service.minio:9000"},
 	{"Name", "OSCAR_NAME", false, stringType, "oscar"},
 	{"Namespace", "OSCAR_NAMESPACE", false, stringType, "oscar"},
+	{"HasGPU", "HAS_GPU", false, boolType, "false"},
 	{"ServicesNamespace", "OSCAR_SERVICES_NAMESPACE", false, stringType, "oscar-svc"},
 	{"ServerlessBackend", "SERVERLESS_BACKEND", false, serverlessBackendType, ""},
 	{"OpenfaasNamespace", "OPENFAAS_NAMESPACE", false, stringType, "openfaas"},
@@ -323,7 +331,22 @@ func ReadConfig() (*Config, error) {
 
 		// Set the value in the Config struct
 		setValue(value, cv.name, config)
+
 	}
 
 	return config, nil
+}
+
+func GPUConfig(kubeClientset *kubernetes.Clientset, cfg *Config) error {
+	nodes, err := kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: "!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master"})
+	if err != nil {
+		return fmt.Errorf("error getting node list: %v", err)
+	}
+	for _, node := range nodes.Items {
+		gpu := node.Status.Allocatable["nvidia.com/gpu"]
+		if gpu.Value() > 0 {
+			setValue(true, "HasGPU", cfg)
+		}
+	}
+	return nil
 }
