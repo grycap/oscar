@@ -18,40 +18,37 @@ package types
 
 import (
 	"fmt"
+	"log"
 	"net/url"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
 )
 
 const (
-	defaultMinioTLSVerify                   = true
-	defaultMinIOEndpoint                    = "https://minio-service.minio:9000"
-	defaultMinIORegion                      = "us-east-1"
-	defaultTimeout                          = time.Duration(300) * time.Second
-	defaultServiceName                      = "oscar"
-	defaultServicePort                      = 8080
-	defaultNamespace                        = "oscar"
-	defaultServicesNamespace                = "oscar-svc"
-	defaultOpenfaasNamespace                = "openfaas"
-	defaultOpenfaasPort                     = 8080
-	defaultOpenfaasBasicAuthSecret          = "basic-auth"
-	defaultOpenfaasPrometheusPort           = 9090
-	defaultOpenfaasScalerEnable             = false
-	defaultOpenfaasScalerInterval           = "2m"
-	defaultOpenfaasScalerInactivityDuration = "10m"
-	defaultWatchdogMaxInflight              = 1
-	defaultWatchdogWriteDebug               = true
-	defaultWatchdogExecTimeout              = 0
-	defaultWatchdogReadTimeout              = 300
-	defaultWatchdogWriteTimeout             = 300
-	defaultWatchdogHealthCheckInterval      = 5
-	defaultYunikornEnable                   = false
-	defaultYunikornNamespace                = "yunikorn"
-	defaultYunikornConfigMap                = "yunikorn-configs"
-	defaultYunikornConfigFileName           = "queues.yaml"
+	// OpenFaaSBackend string to identify the OpenFaaS Serverless Backend in the configuration
+	OpenFaaSBackend = "openfaas"
+	// KnativeBackend string to identify the Knative Serverless Backend in the configuration
+	KnativeBackend = "knative"
+
+	stringType            = "string"
+	stringSliceType       = "slice"
+	intType               = "int"
+	boolType              = "bool"
+	secondsType           = "seconds"
+	urlType               = "url"
+	serverlessBackendType = "serverlessBackend"
 )
+
+type configVar struct {
+	name         string
+	envVarName   string
+	required     bool
+	varType      string
+	defaultValue string
+}
 
 // Config stores the configuration for the OSCAR server
 type Config struct {
@@ -136,6 +133,131 @@ type Config struct {
 
 	// YunikornConfigFileName
 	YunikornConfigFileName string `json:"-"`
+
+	// ResourceManagerEnable option to enable the Resource Manager to delegate jobs
+	// when there are no available resources in the cluster (if the service has replicas)
+	ResourceManagerEnable bool `json:"-"`
+
+	// // ResourceManager parameter to set the ResourceManager to use ("kubernetes" or "yunikorn")
+	// // TODO: decide if this parameter is necessary or use kubernetes by default and yunikorn always if it's enabled
+	// ResourceManager string `json:"-"`
+
+	// ResourceManagerInterval time interval (in seconds) to update the available resources in the cluster
+	ResourceManagerInterval int `json:"-"`
+
+	// ReSchedulerEnable option to enable the ReScheduler to delegate jobs to a replica
+	// when a threshold is reached
+	ReSchedulerEnable bool `json:"-"`
+
+	// ReSchedulerInterval time interval (in seconds) to check if pending jobs
+	ReSchedulerInterval int `json:"-"`
+
+	// ReSchedulerThreshold default time (in seconds) that a job (with replicas) can be queued before delegating it
+	ReSchedulerThreshold int `json:"-"`
+
+	// OIDCEnable parameter to enable OIDC support
+	OIDCEnable bool `json:"-"`
+
+	// OIDCIssuer OpenID Connect issuer as returned in the "iss" field of the JWT payload
+	OIDCIssuer string `json:"-"`
+
+	// OIDCSubject OpenID Connect Subject (user identifier)
+	OIDCSubject string `json:"-"`
+
+	// OIDCGroups OpenID comma-separated group list to grant access in the cluster.
+	// Groups defined in the "eduperson_entitlement" OIDC scope,
+	// as described here: https://docs.egi.eu/providers/check-in/sp/#10-groups
+	OIDCGroups []string `json:"-"`
+}
+
+var configVars = []configVar{
+	{"Username", "OSCAR_USERNAME", true, stringType, ""},
+	{"Password", "OSCAR_PASSWORD", true, stringType, ""},
+	{"MinIOProvider.AccessKey", "MINIO_ACCESS_KEY", true, stringType, ""},
+	{"MinIOProvider.SecretKey", "MINIO_SECRET_KEY", true, stringType, ""},
+	{"MinIOProvider.Region", "MINIO_REGION", false, stringType, "us-east-1"},
+	{"MinIOProvider.Verify", "MINIO_TLS_VERIFY", false, boolType, "true"},
+	{"MinIOProvider.Endpoint", "MINIO_ENDPOINT", false, urlType, "https://minio-service.minio:9000"},
+	{"Name", "OSCAR_NAME", false, stringType, "oscar"},
+	{"Namespace", "OSCAR_NAMESPACE", false, stringType, "oscar"},
+	{"ServicesNamespace", "OSCAR_SERVICES_NAMESPACE", false, stringType, "oscar-svc"},
+	{"ServerlessBackend", "SERVERLESS_BACKEND", false, serverlessBackendType, ""},
+	{"OpenfaasNamespace", "OPENFAAS_NAMESPACE", false, stringType, "openfaas"},
+	{"OpenfaasPort", "OPENFAAS_PORT", false, intType, "8080"},
+	{"OpenfaasBasicAuthSecret", "OPENFAAS_BASIC_AUTH_SECRET", false, stringType, "basic-auth"},
+	{"OpenfaasPrometheusPort", "OPENFAAS_PROMETHEUS_PORT", false, intType, "9090"},
+	{"OpenfaasScalerEnable", "OPENFAAS_SCALER_ENABLE", false, boolType, "false"},
+	{"OpenfaasScalerInterval", "OPENFAAS_SCALER_INTERVAL", false, stringType, "2m"},
+	{"OpenfaasScalerInactivityDuration", "OPENFAAS_SCALER_INACTIVITY_DURATION", false, stringType, "10m"},
+	{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
+	{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
+	{"WatchdogExecTimeout", "WATCHDOG_EXEC_TIMEOUT", false, intType, "0"},
+	{"WatchdogReadTimeout", "WATCHDOG_READ_TIMEOUT", false, intType, "300"},
+	{"WatchdogWriteTimeout", "WATCHDOG_WRITE_TIMEOUT", false, intType, "300"},
+	{"WatchdogHealthCheckInterval", "WATCHDOG_HEALTHCHECK_INTERVAL", false, intType, "5"},
+	{"ReadTimeout", "READ_TIMEOUT", false, secondsType, "300"},
+	{"WriteTimeout", "WRITE_TIMEOUT", false, secondsType, "300"},
+	{"ServicePort", "OSCAR_SERVICE_PORT", false, intType, "8080"},
+	{"YunikornEnable", "YUNIKORN_ENABLE", false, boolType, "false"},
+	{"YunikornNamespace", "YUNIKORN_NAMESPACE", false, stringType, "yunikorn"},
+	{"YunikornConfigMap", "YUNIKORN_CONFIGMAP", false, stringType, "yunikorn-configs"},
+	{"YunikornConfigFileName", "YUNIKORN_CONFIG_FILENAME", false, stringType, "queues.yaml"},
+	{"ResourceManagerEnable", "RESOURCE_MANAGER_ENABLE", false, boolType, "false"},
+	//{"ResourceManager", "RESOURCE_MANAGER", false, resourceManagerType, "kubernetes"},
+	{"ResourceManagerInterval", "RESOURCE_MANAGER_INTERVAL", false, intType, "15"},
+	{"ReSchedulerEnable", "RESCHEDULER_ENABLE", false, boolType, "false"},
+	{"ReSchedulerInterval", "RESCHEDULER_INTERVAL", false, intType, "15"},
+	{"ReSchedulerThreshold", "RESCHEDULER_THRESHOLD", false, intType, "30"},
+	{"OIDCEnable", "OIDC_ENABLE", false, boolType, "false"},
+	{"OIDCIssuer", "OIDC_ISSUER", false, stringType, "https://aai.egi.eu/oidc/"},
+	{"OIDCSubject", "OIDC_SUBJECT", false, stringType, ""},
+	{"OIDCGroups", "OIDC_GROUPS", false, stringSliceType, ""},
+}
+
+func readConfigVar(cfgVar configVar) (string, error) {
+	value := os.Getenv(cfgVar.envVarName)
+	if len(value) == 0 {
+		if cfgVar.required {
+			return "", fmt.Errorf("the configuration variable %s must be provided", cfgVar.envVarName)
+		}
+		value = cfgVar.defaultValue
+	}
+	return value, nil
+}
+
+func setValue(value any, configField string, cfg *Config) {
+	// Check if there if the field is inside a substruct
+	fields := strings.Split(configField, ".")
+	if len(fields) > 2 {
+		log.Fatalf("cannot access field %s", configField)
+	}
+
+	// Get the reflect value of cfg (pointer)
+	valPtr := reflect.ValueOf(cfg)
+	// Get the reflect value of the cfg struct
+	valCfg := reflect.Indirect(valPtr).FieldByName(fields[0])
+
+	// If there is a subfield get its value
+	if len(fields) == 2 {
+		valCfg = reflect.Indirect(valCfg).FieldByName(fields[1])
+	}
+
+	// Set the value
+	valCfg.Set(reflect.ValueOf(value))
+}
+
+func parseStringSlice(s string) []string {
+	strs := []string{}
+
+	// Split by commas
+	vals := strings.Split(s, ",")
+
+	// Trim spaces and append
+	for _, v := range vals {
+		strs = append(strs, strings.TrimSpace(v))
+	}
+
+	return strs
 }
 
 func parseSeconds(s string) (time.Duration, error) {
@@ -148,244 +270,59 @@ func parseSeconds(s string) (time.Duration, error) {
 	return time.Duration(0), fmt.Errorf("the value must be a positive integer")
 }
 
+func parseServerlessBackend(s string) (string, error) {
+	if len(s) > 0 {
+		str := strings.ToLower(s)
+		if str != OpenFaaSBackend && str != KnativeBackend {
+			return "", fmt.Errorf("must be \"Openfaas\" or \"Knative\"")
+		}
+		return str, nil
+	}
+	return s, nil
+}
+
 // ReadConfig reads environment variables to create the OSCAR server configuration
 func ReadConfig() (*Config, error) {
 	config := &Config{}
 	config.MinIOProvider = &MinIOProvider{}
-	var err error
 
-	if len(os.Getenv("OSCAR_USERNAME")) > 0 {
-		config.Username = os.Getenv("OSCAR_USERNAME")
-	} else {
-		return nil, fmt.Errorf("an OSCAR_USERNAME must be provided")
-	}
-
-	if len(os.Getenv("OSCAR_PASSWORD")) > 0 {
-		config.Password = os.Getenv("OSCAR_PASSWORD")
-	} else {
-		return nil, fmt.Errorf("an OSCAR_PASSWORD must be provided")
-	}
-
-	if len(os.Getenv("MINIO_ACCESS_KEY")) > 0 {
-		config.MinIOProvider.AccessKey = os.Getenv("MINIO_ACCESS_KEY")
-	} else {
-		return nil, fmt.Errorf("a MINIO_ACCESS_KEY must be provided")
-	}
-
-	if len(os.Getenv("MINIO_SECRET_KEY")) > 0 {
-		config.MinIOProvider.SecretKey = os.Getenv("MINIO_SECRET_KEY")
-	} else {
-		return nil, fmt.Errorf("a MINIO_SECRET_KEY must be provided")
-	}
-
-	if len(os.Getenv("MINIO_REGION")) > 0 {
-		config.MinIOProvider.Region = os.Getenv("MINIO_REGION")
-	} else {
-		config.MinIOProvider.Region = defaultMinIORegion
-	}
-
-	if len(os.Getenv("MINIO_TLS_VERIFY")) > 0 {
-		config.MinIOProvider.Verify, err = strconv.ParseBool(os.Getenv("MINIO_TLS_VERIFY"))
+	for _, cv := range configVars {
+		var value any
+		var parseErr error
+		strValue, err := readConfigVar(cv)
 		if err != nil {
-			return nil, fmt.Errorf("the MINIO_TLS_VERIFY value must be a boolean")
-		}
-	} else {
-		config.MinIOProvider.Verify = defaultMinioTLSVerify
-	}
-
-	if len(os.Getenv("MINIO_ENDPOINT")) > 0 {
-		config.MinIOProvider.Endpoint = os.Getenv("MINIO_ENDPOINT")
-		if _, err = url.Parse(config.MinIOProvider.Endpoint); err != nil {
-			return nil, fmt.Errorf("the MINIO_ENDPOINT value is not valid. Error: %v", err)
-		}
-	} else {
-		config.MinIOProvider.Endpoint = defaultMinIOEndpoint
-	}
-
-	if len(os.Getenv("OSCAR_NAME")) > 0 {
-		config.Name = os.Getenv("OSCAR_NAME")
-	} else {
-		config.Name = defaultServiceName
-	}
-
-	if len(os.Getenv("OSCAR_NAMESPACE")) > 0 {
-		config.Namespace = os.Getenv("OSCAR_NAMESPACE")
-	} else {
-		config.Namespace = defaultNamespace
-	}
-
-	if len(os.Getenv("OSCAR_SERVICES_NAMESPACE")) > 0 {
-		config.ServicesNamespace = os.Getenv("OSCAR_SERVICES_NAMESPACE")
-	} else {
-		config.ServicesNamespace = defaultServicesNamespace
-	}
-
-	if len(os.Getenv("SERVERLESS_BACKEND")) > 0 {
-		config.ServerlessBackend = strings.ToLower(os.Getenv("SERVERLESS_BACKEND"))
-		if config.ServerlessBackend != "openfaas" && config.ServerlessBackend != "knative" {
-			return nil, fmt.Errorf("the SERVERLESS_BACKEND is not valid. Must be \"Openfaas\" or \"Knative\"")
-		}
-	}
-
-	if config.ServerlessBackend == "openfaas" {
-		if len(os.Getenv("OPENFAAS_NAMESPACE")) > 0 {
-			config.OpenfaasNamespace = strings.ToLower(os.Getenv("OPENFAAS_NAMESPACE"))
-		} else {
-			config.OpenfaasNamespace = defaultOpenfaasNamespace
+			return nil, err
 		}
 
-		if len(os.Getenv("OPENFAAS_PORT")) > 0 {
-			config.OpenfaasPort, err = strconv.Atoi(os.Getenv("OPENFAAS_PORT"))
-			if err != nil {
-				return nil, fmt.Errorf("the OPENFAAS_PORT value is not valid. Error: %v", err)
-			}
-		} else {
-			config.OpenfaasPort = defaultOpenfaasPort
+		// Parse the environment variable depending of its type
+		switch cv.varType {
+		case stringType:
+			value = strings.TrimSpace(strValue)
+		case stringSliceType:
+			value = parseStringSlice(strValue)
+		case intType:
+			value, parseErr = strconv.Atoi(strValue)
+		case boolType:
+			value, parseErr = strconv.ParseBool(strValue)
+		case secondsType:
+			value, parseErr = parseSeconds(strValue)
+		case serverlessBackendType:
+			value, parseErr = parseServerlessBackend(strValue)
+		case urlType:
+			// Only check if can be parsed
+			_, parseErr = url.Parse(strValue)
+			value = strValue
+		default:
+			continue
 		}
 
-		if len(os.Getenv("OPENFAAS_BASIC_AUTH_SECRET")) > 0 {
-			config.OpenfaasBasicAuthSecret = os.Getenv("OPENFAAS_BASIC_AUTH_SECRET")
-		} else {
-			config.OpenfaasBasicAuthSecret = defaultOpenfaasBasicAuthSecret
+		// If there are some parseErr return error
+		if parseErr != nil {
+			return nil, fmt.Errorf("the %s value is not valid. Expected type: %s. Error: %v", cv.envVarName, cv.varType, parseErr)
 		}
 
-		if len(os.Getenv("OPENFAAS_PROMETHEUS_PORT")) > 0 {
-			config.OpenfaasPrometheusPort, err = strconv.Atoi(os.Getenv("OPENFAAS_PROMETHEUS_PORT"))
-			if err != nil {
-				return nil, fmt.Errorf("the OPENFAAS_PORT value is not valid. Error: %v", err)
-			}
-		} else {
-			config.OpenfaasPrometheusPort = defaultOpenfaasPrometheusPort
-		}
-
-		if len(os.Getenv("OPENFAAS_SCALER_ENABLE")) > 0 {
-			config.OpenfaasScalerEnable, err = strconv.ParseBool(os.Getenv("OPENFAAS_SCALER_ENABLE"))
-			if err != nil {
-				return nil, fmt.Errorf("the OPENFAAS_SCALER_ENABLE value must be a boolean")
-			}
-		} else {
-			config.OpenfaasScalerEnable = defaultOpenfaasScalerEnable
-		}
-
-		if len(os.Getenv("OPENFAAS_SCALER_INTERVAL")) > 0 {
-			config.OpenfaasScalerInterval = os.Getenv("OPENFAAS_SCALER_INTERVAL")
-		} else {
-			config.OpenfaasScalerInterval = defaultOpenfaasScalerInterval
-		}
-
-		if len(os.Getenv("OPENFAAS_SCALER_INACTIVITY_DURATION")) > 0 {
-			config.OpenfaasScalerInactivityDuration = os.Getenv("OPENFAAS_SCALER_INACTIVITY_DURATION")
-		} else {
-			config.OpenfaasScalerInactivityDuration = defaultOpenfaasScalerInactivityDuration
-		}
-	}
-
-	if len(os.Getenv("WATCHDOG_MAX_INFLIGHT")) > 0 {
-		config.WatchdogMaxInflight, err = strconv.Atoi(os.Getenv("WATCHDOG_MAX_INFLIGHT"))
-		if err != nil {
-			return nil, fmt.Errorf("the WATCHDOG_MAX_INFLIGHT value is not valid. Error: %v", err)
-		}
-	} else {
-		config.WatchdogMaxInflight = defaultWatchdogMaxInflight
-	}
-
-	if len(os.Getenv("WATCHDOG_WRITE_DEBUG")) > 0 {
-		config.WatchdogWriteDebug, err = strconv.ParseBool(os.Getenv("WATCHDOG_WRITE_DEBUG"))
-		if err != nil {
-			return nil, fmt.Errorf("the WATCHDOG_WRITE_DEBUG value must be a boolean")
-		}
-	} else {
-		config.WatchdogWriteDebug = defaultWatchdogWriteDebug
-	}
-
-	if len(os.Getenv("WATCHDOG_EXEC_TIMEOUT")) > 0 {
-		config.WatchdogExecTimeout, err = strconv.Atoi(os.Getenv("WATCHDOG_EXEC_TIMEOUT"))
-		if err != nil {
-			return nil, fmt.Errorf("the WATCHDOG_EXEC_TIMEOUT value is not valid. Error: %v", err)
-		}
-	} else {
-		config.WatchdogExecTimeout = defaultWatchdogExecTimeout
-	}
-
-	if len(os.Getenv("WATCHDOG_READ_TIMEOUT")) > 0 {
-		config.WatchdogReadTimeout, err = strconv.Atoi(os.Getenv("WATCHDOG_READ_TIMEOUT"))
-		if err != nil {
-			return nil, fmt.Errorf("the WATCHDOG_READ_TIMEOUT value is not valid. Error: %v", err)
-		}
-	} else {
-		config.WatchdogReadTimeout = defaultWatchdogReadTimeout
-	}
-
-	if len(os.Getenv("WATCHDOG_WRITE_TIMEOUT")) > 0 {
-		config.WatchdogWriteTimeout, err = strconv.Atoi(os.Getenv("WATCHDOG_WRITE_TIMEOUT"))
-		if err != nil {
-			return nil, fmt.Errorf("the WATCHDOG_WRITE_TIMEOUT value is not valid. Error: %v", err)
-		}
-	} else {
-		config.WatchdogWriteTimeout = defaultWatchdogWriteTimeout
-	}
-
-	if len(os.Getenv("WATCHDOG_HEALTHCHECK_INTERVAL")) > 0 {
-		config.WatchdogHealthCheckInterval, err = strconv.Atoi(os.Getenv("WATCHDOG_HEALTHCHECK_INTERVAL"))
-		if err != nil {
-			return nil, fmt.Errorf("the WATCHDOG_HEALTHCHECK_INTERVAL value is not valid. Error: %v", err)
-		}
-	} else {
-		config.WatchdogHealthCheckInterval = defaultWatchdogHealthCheckInterval
-	}
-
-	if len(os.Getenv("READ_TIMEOUT")) > 0 {
-		config.ReadTimeout, err = parseSeconds(os.Getenv("READ_TIMEOUT"))
-		if err != nil {
-			return nil, fmt.Errorf("the READ_TIMEOUT value is not valid. Error: %v", err)
-		}
-	} else {
-		config.ReadTimeout = defaultTimeout
-	}
-
-	if len(os.Getenv("WRITE_TIMEOUT")) > 0 {
-		config.WriteTimeout, err = parseSeconds(os.Getenv("WRITE_TIMEOUT"))
-		if err != nil {
-			return nil, fmt.Errorf("the WRITE_TIMEOUT value is not valid. Error: %v", err)
-		}
-	} else {
-		config.WriteTimeout = defaultTimeout
-	}
-
-	if len(os.Getenv("OSCAR_SERVICE_PORT")) > 0 {
-		config.ServicePort, err = strconv.Atoi(os.Getenv("OSCAR_SERVICE_PORT"))
-		if err != nil {
-			return nil, fmt.Errorf("the OSCAR_SERVICE_PORT value is not valid. Error: %v", err)
-		}
-	} else {
-		config.ServicePort = defaultServicePort
-	}
-
-	if len(os.Getenv("YUNIKORN_ENABLE")) > 0 {
-		config.YunikornEnable, err = strconv.ParseBool(os.Getenv("YUNIKORN_ENABLE"))
-		if err != nil {
-			return nil, fmt.Errorf("the YUNIKORN_ENABLE value must be a boolean")
-		}
-	} else {
-		config.YunikornEnable = defaultYunikornEnable
-	}
-
-	if len(os.Getenv("YUNIKORN_NAMESPACE")) > 0 {
-		config.YunikornNamespace = os.Getenv("YUNIKORN_NAMESPACE")
-	} else {
-		config.YunikornNamespace = defaultYunikornNamespace
-	}
-
-	if len(os.Getenv("YUNIKORN_CONFIGMAP")) > 0 {
-		config.YunikornConfigMap = os.Getenv("YUNIKORN_CONFIGMAP")
-	} else {
-		config.YunikornConfigMap = defaultYunikornConfigMap
-	}
-
-	if len(os.Getenv("YUNIKORN_CONFIG_FILENAME")) > 0 {
-		config.YunikornConfigFileName = os.Getenv("YUNIKORN_CONFIG_FILENAME")
-	} else {
-		config.YunikornConfigFileName = defaultYunikornConfigFileName
+		// Set the value in the Config struct
+		setValue(value, cv.name, config)
 	}
 
 	return config, nil

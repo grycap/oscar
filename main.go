@@ -24,7 +24,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v2/pkg/backends"
 	"github.com/grycap/oscar/v2/pkg/handlers"
+	"github.com/grycap/oscar/v2/pkg/resourcemanager"
 	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/utils/auth"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -48,31 +50,31 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Create the ServerlessBackend based on the configuration
-	var back types.ServerlessBackend
+	// Create the ServerlessBackend
+	back := backends.MakeServerlessBackend(kubeClientset, kubeConfig, cfg)
 
-	switch cfg.ServerlessBackend {
-	case "openfaas":
-		ofBack := backends.MakeOpenfaasBackend(kubeClientset, kubeConfig, cfg)
-		back = ofBack
-		// Start OpenFaaS Scaler as a goroutine
-		if cfg.OpenfaasScalerEnable {
-			go ofBack.StartScaler()
-		}
-	case "knative":
-		back = backends.MakeKnativeBackend(kubeClientset, kubeConfig, cfg)
-	default:
-		back = backends.MakeKubeBackend(kubeClientset, cfg)
+	// Start OpenFaaS Scaler
+	if cfg.ServerlessBackend == "openfaas" && cfg.OpenfaasScalerEnable {
+		ofBack := back.(*backends.OpenfaasBackend)
+		go ofBack.StartScaler()
+	}
+
+	// Create the ResourceManager and start it if enabled
+	resMan := resourcemanager.MakeResourceManager(cfg, kubeClientset)
+	if resMan != nil {
+		go resourcemanager.StartResourceManager(resMan, cfg.ResourceManagerInterval)
+	}
+
+	// Start the ReScheduler if enabled
+	if cfg.ReSchedulerEnable {
+		go resourcemanager.StartReScheduler(cfg, back, kubeClientset)
 	}
 
 	// Create the router
 	r := gin.Default()
 
 	// Define system group with basic auth middleware
-	system := r.Group("/system", gin.BasicAuth(gin.Accounts{
-		// Use the config's username and password for basic auth
-		cfg.Username: cfg.Password,
-	}))
+	system := r.Group("/system", auth.GetAuthMiddleware(cfg))
 
 	// Config path
 	system.GET("/config", handlers.MakeConfigHandler(cfg))
@@ -91,7 +93,7 @@ func main() {
 	system.DELETE("/logs/:serviceName/:jobName", handlers.MakeDeleteJobHandler(kubeClientset, cfg.ServicesNamespace))
 
 	// Job path for async invocations
-	r.POST("/job/:serviceName", handlers.MakeJobHandler(cfg, kubeClientset, back))
+	r.POST("/job/:serviceName", handlers.MakeJobHandler(cfg, kubeClientset, back, resMan))
 
 	// Service path for sync invocations (only if ServerlessBackend is enabled)
 	syncBack, ok := back.(types.SyncBackend)

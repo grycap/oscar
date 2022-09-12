@@ -248,8 +248,8 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{
 							// Set autoscaling bounds (min_scale and max_scale)
-							types.KnativeAnnotationMinScale: strconv.Itoa(service.Synchronous.MinScale),
-							types.KnativeAnnotationMaxScale: strconv.Itoa(service.Synchronous.MaxScale),
+							types.KnativeMinScaleAnnotation: strconv.Itoa(service.Synchronous.MinScale),
+							types.KnativeMaxScaleAnnotation: strconv.Itoa(service.Synchronous.MaxScale),
 						},
 					},
 					Spec: knv1.RevisionSpec{

@@ -148,7 +148,7 @@ checkOSCARDeploy(){
 
 deployKnative(){
     echo -e "\n[*] Deploying Knative Serving ..."
-    kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.3.1/operator.yaml
+    kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.6.0/operator.yaml
     cat  > $KNATIVE_FILEPATH <<EOF
 ---
 apiVersion: v1
@@ -162,7 +162,7 @@ metadata:
   name: knative-serving
   namespace: knative-serving
 spec:
-  version: 1.3.0
+  version: 1.6.0
   ingress:
     kourier:
       enabled: true
@@ -233,7 +233,7 @@ checkIngressStatus
 #Deploy MinIO
 echo -e "\n[*] Deploying MinIO storage provider ..."
 helm repo add --force-update minio https://charts.min.io
-helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=30300,consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 --create-namespace
+helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=30300,consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 --create-namespace --version 4.0.7
 
 #Deploy NFS server provisioner
 echo -e "\n[*] Deploying NFS server provider ..."

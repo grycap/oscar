@@ -63,10 +63,10 @@ Naturally, OSCAR services can also be invoked via traditional HTTP clients such 
 
 An illustration of triggering a service synchronously through cURL can be found in the [cowsay example](https://github.com/grycap/oscar/tree/master/examples/cowsay#curl).
 
-When a service is invoked, the input must be encoded with base64. If the services are invoked synchronously, using the "run" URL, remember to put log_level as CRITICAL. The output, which is encoded in base64, should be decoded. Otherwise, some logs will appear as output, and decoding will not be a success. Save output with the same format as input.
+To send an input file through cURL, you must encode it in base64. To avoid issues with the output in synchronous invocations remember to put the `log_level` as `CRITICAL`. Output, which is encoded in base64, should be decoded as well. Save output in the expected format of the use-case.
 
 ``` sh
-base64 input.png | curl -X POST -H "Authorization: Bearer <TOKEN>" -d @- http://<CLUSTER-ENDPOINT>/run/<OSCAR-SERVICE> | base64 -d > resultado.png
+base64 input.png | curl -X POST -H "Authorization: Bearer <TOKEN>" -d @- https://<CLUSTER_ENDPOINT>/run/<OSCAR_SERVICE> | base64 -d > result.png
 ```
 
 ### Limitations
