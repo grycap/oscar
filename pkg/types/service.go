@@ -141,7 +141,7 @@ type Service struct {
 
 	// GPU parameter to request gpu usage in service's executions (synchronous and asynchronous)
 	// Optional. (default: false)
-	UseGPU bool `json:"use_gpu"`
+	EnableGPU bool `json:"enable_gpu"`
 
 	// Synchronous struct to configure specific sync parameters
 	// Only Knative ServerlessBackend applies this settings
@@ -333,7 +333,7 @@ func createResources(service *Service) (v1.ResourceRequirements, error) {
 		resources.Limits[v1.ResourceMemory] = memory
 	}
 
-	if service.UseGPU {
+	if service.EnableGPU {
 		gpu, err := resource.ParseQuantity("1")
 		if err != nil {
 			return resources, err
