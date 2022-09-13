@@ -11,10 +11,4 @@ Most of the passwords/tokens are dynamically generated at deployment time and ma
 | Kubernetes API  | https://{KUBE}:6443     |              |  tokenpass       |
 | Kube. Dashboard | https://{KUBE}:30443    |              | dashboard_token  |
 
-Note that `{KUBE}` refers to the public IP of the front-end of the Kubernetes cluster. 
-
-For example, to get the OSCAR password, you can execute:
-
-```
-./ec3 ssh oscar-cluster cat /var/tmp/oscar_password
-```
+Note that `{KUBE}` refers to the public IP of the front-end of the Kubernetes cluster.

@@ -8,6 +8,7 @@ nav:
   - Deployment with EC3: deploy-ec3.md
   - Deployment with Helm: deploy-helm.md
   - Deployment on K3s with Ansible: deploy-ansible.md
+- default-endpoints.md
 - usage.md
 - invoking.md
 - Functions definition Language: fdl.md
