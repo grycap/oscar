@@ -4,13 +4,13 @@
 
 The [EGI Federated Cloud](https://www.egi.eu/federation/egi-federated-cloud/) is an IaaS-type cloud, made of academic private clouds and virtualised resources and built around open standards. Its development is driven by requirements of the scientific communities.
 
-## EGI Applications on Demand: EC3 Portal
+## EGI Applications on Demand: IM Dashboard
 
-The OSCAR platform can be deployed on the EGI Federated Cloud resources through the [EC3 Portal](https://servproject.i3m.upv.es/ec3-ltos/index.php) available in the [EGI Applications on Demand](https://www.egi.eu/services/applications-on-demand/) service.
+The OSCAR platform can be deployed on the EGI Federated Cloud resources through the [IM Dashboard](https://appsgrycap.i3m.upv.es:31443/im-dashboard/) available in the [EGI Applications on Demand](https://marketplace.egi.eu/42-applications-on-demand) service.
 
-The [EC3 Web Interface documentation](https://ec3.readthedocs.io/en/devel/ec3aas.html) can be followed in order to deploy the platform. Remember to pick "OSCAR" as the Local Resource Management System (LRMS).
+The [IM Dashboard documentation](https://docs.egi.eu/users/compute/orchestration/im/dashboard/) can be followed in order to deploy the platform.
 
-![OSCAR on EGI](images/oscar-egi-ec3.png)
+![OSCAR on IM](images/oscar-egi-im.png)
 
 ## EGI DataHub
 
