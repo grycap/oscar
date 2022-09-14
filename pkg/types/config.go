@@ -75,7 +75,7 @@ type Config struct {
 	ServicesNamespace string `json:"services_namespace"`
 
 	// Parameter used to check if the cluster have GPUs
-	HasGPU bool `json:"-"`
+	GPUAvaliable bool `json:"gpu_avaliable"`
 
 	// Port used for the ClusterIP k8s service (default: 8080)
 	ServicePort int `json:"-"`
@@ -187,7 +187,6 @@ var configVars = []configVar{
 	{"MinIOProvider.Endpoint", "MINIO_ENDPOINT", false, urlType, "https://minio-service.minio:9000"},
 	{"Name", "OSCAR_NAME", false, stringType, "oscar"},
 	{"Namespace", "OSCAR_NAMESPACE", false, stringType, "oscar"},
-	{"HasGPU", "HAS_GPU", false, boolType, "false"},
 	{"ServicesNamespace", "OSCAR_SERVICES_NAMESPACE", false, stringType, "oscar-svc"},
 	{"ServerlessBackend", "SERVERLESS_BACKEND", false, serverlessBackendType, ""},
 	{"OpenfaasNamespace", "OPENFAAS_NAMESPACE", false, stringType, "openfaas"},
@@ -345,7 +344,7 @@ func GPUConfig(kubeClientset *kubernetes.Clientset, cfg *Config) error {
 	for _, node := range nodes.Items {
 		gpu := node.Status.Allocatable["nvidia.com/gpu"]
 		if gpu.Value() > 0 {
-			setValue(true, "HasGPU", cfg)
+			setValue(true, "GPUAvaliable", cfg)
 		}
 	}
 	return nil
