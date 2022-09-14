@@ -396,8 +396,5 @@ func (service *Service) GetSupervisorPath() string {
 
 // HasReplicas checks if the service has replicas defined
 func (service *Service) HasReplicas() bool {
-	if len(service.Replicas) > 0 {
-		return true
-	}
-	return false
+	return len(service.Replicas) > 0
 }

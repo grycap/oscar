@@ -336,16 +336,16 @@ func ReadConfig() (*Config, error) {
 	return config, nil
 }
 
-func GPUConfig(kubeClientset *kubernetes.Clientset, cfg *Config) error {
+func (cfg *Config) CheckAvailableGPUs(kubeClientset kubernetes.Interface) {
 	nodes, err := kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: "!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master"})
 	if err != nil {
-		return fmt.Errorf("error getting node list: %v", err)
+		log.Printf("Error getting list of nodes: %v\n", err)
 	}
 	for _, node := range nodes.Items {
 		gpu := node.Status.Allocatable["nvidia.com/gpu"]
 		if gpu.Value() > 0 {
-			setValue(true, "GPUAvaliable", cfg)
+			cfg.GPUAvaliable = true
+			return
 		}
 	}
-	return nil
 }
