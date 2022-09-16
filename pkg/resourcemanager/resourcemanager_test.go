@@ -25,15 +25,15 @@ import (
 
 func TestMakeResourceManager(t *testing.T) {
 	cfg := types.Config{}
-	enable_cfg := types.Config{ResourceManagerEnable: true}
+	enableCfg := types.Config{ResourceManagerEnable: true}
 
-	rm_enable := MakeResourceManager(&enable_cfg, fake.NewSimpleClientset())
+	rmEnable := MakeResourceManager(&enableCfg, fake.NewSimpleClientset())
 	rm := MakeResourceManager(&cfg, fake.NewSimpleClientset())
 
 	if rm != nil {
 		t.Errorf("expecting nil, got %d", rm)
 	}
-	if rm_enable == nil {
-		t.Errorf("expecting resource manager instance, got %d", rm_enable)
+	if rmEnable == nil {
+		t.Errorf("expecting resource manager instance, got %d", rmEnable)
 	}
 }

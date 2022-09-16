@@ -47,6 +47,7 @@ func MakeFakeBackend() *FakeBackend {
 	}
 }
 
+// MakeFakeSyncBackend returns the pointer of a new FakeSyncBackend struct
 func MakeFakeSyncBackend() *FakeBackend {
 	return &FakeBackend{
 		errors: map[string][]error{
@@ -98,6 +99,7 @@ func (f *FakeBackend) GetKubeClientset() kubernetes.Interface {
 	return testclient.NewSimpleClientset()
 }
 
+// GetProxyDirector returns the ProxyDirector (fake)
 func (f *FakeBackend) GetProxyDirector(serviceName string) func(req *http.Request) {
 	return func(req *http.Request) {
 		host := "httpbin.org"

@@ -336,6 +336,7 @@ func ReadConfig() (*Config, error) {
 	return config, nil
 }
 
+// CheckAvailableGPUs checks if there are "nvidia.com/gpu" resources in the cluster
 func (cfg *Config) CheckAvailableGPUs(kubeClientset kubernetes.Interface) {
 	nodes, err := kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: "!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master"})
 	if err != nil {
