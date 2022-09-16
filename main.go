@@ -55,6 +55,7 @@ func main() {
 
 	// Create the ServerlessBackend
 	back := backends.MakeServerlessBackend(kubeClientset, kubeConfig, cfg)
+
 	// Start OpenFaaS Scaler
 	if cfg.ServerlessBackend == "openfaas" && cfg.OpenfaasScalerEnable {
 		ofBack := back.(*backends.OpenfaasBackend)

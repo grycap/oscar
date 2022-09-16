@@ -75,7 +75,7 @@ type Config struct {
 	ServicesNamespace string `json:"services_namespace"`
 
 	// Parameter used to check if the cluster have GPUs
-	GPUAvaliable bool `json:"gpu_avaliable"`
+	GPUAvailable bool `json:"gpu_available"`
 
 	// Port used for the ClusterIP k8s service (default: 8080)
 	ServicePort int `json:"-"`
@@ -344,7 +344,7 @@ func (cfg *Config) CheckAvailableGPUs(kubeClientset kubernetes.Interface) {
 	for _, node := range nodes.Items {
 		gpu := node.Status.Allocatable["nvidia.com/gpu"]
 		if gpu.Value() > 0 {
-			cfg.GPUAvaliable = true
+			cfg.GPUAvailable = true
 			return
 		}
 	}
