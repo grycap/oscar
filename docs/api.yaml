@@ -359,6 +359,9 @@ components:
           type: string
         cpu:
           type: string
+        enable_gpu:
+          type: bool
+          default: false
         total_memory:
           type: string
         total_cpu:
@@ -564,6 +567,8 @@ components:
           type: string
         namespace:
           type: string
+        gpu_avaliable:
+          type: bool
         serverless_backend:
           type: string
         yunikorn_enable:

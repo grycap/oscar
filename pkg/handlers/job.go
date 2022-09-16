@@ -19,7 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -74,7 +74,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 		}
 
 		// Get the event from request body
-		eventBytes, err := ioutil.ReadAll(c.Request.Body)
+		eventBytes, err := io.ReadAll(c.Request.Body)
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return

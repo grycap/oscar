@@ -139,6 +139,10 @@ type Service struct {
 	// Optional. (default: "")
 	TotalCPU string `json:"total_cpu"`
 
+	// GPU parameter to request gpu usage in service's executions (synchronous and asynchronous)
+	// Optional. (default: false)
+	EnableGPU bool `json:"enable_gpu"`
+
 	// Synchronous struct to configure specific sync parameters
 	// Only Knative ServerlessBackend applies this settings
 	// Optional.
@@ -329,6 +333,14 @@ func createResources(service *Service) (v1.ResourceRequirements, error) {
 		resources.Limits[v1.ResourceMemory] = memory
 	}
 
+	if service.EnableGPU {
+		gpu, err := resource.ParseQuantity("1")
+		if err != nil {
+			return resources, err
+		}
+		resources.Limits["nvidia.com/gpu"] = gpu
+	}
+
 	return resources, nil
 }
 
@@ -384,8 +396,5 @@ func (service *Service) GetSupervisorPath() string {
 
 // HasReplicas checks if the service has replicas defined
 func (service *Service) HasReplicas() bool {
-	if len(service.Replicas) > 0 {
-		return true
-	}
-	return false
+	return len(service.Replicas) > 0
 }
