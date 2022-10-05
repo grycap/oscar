@@ -13,7 +13,7 @@ The easy way to download OSCAR-CLI is through the github [releases page](https:/
 If you have [go](https://golang.org/doc/install) installed and [configured](https://github.com/golang/go/wiki/SettingGOPATH), you can get it from source directly by executing:
 
 ```sh
-go get github.com/grycap/oscar-cli
+go install github.com/grycap/oscar-cli@latest
 ```
 
 ## Available commands
@@ -67,15 +67,17 @@ Add a new existing cluster to oscar-cli.
 
 ```
 Usage:
-  oscar-cli cluster add IDENTIFIER ENDPOINT USERNAME {PASSWORD | --password-stdin} [flags]
+  oscar-cli cluster add IDENTIFIER ENDPOINT {USERNAME {PASSWORD | --password-stdin} | --oidc-account-name ACCOUNT} [flags]
 
 Aliases:
   add, a
 
 Flags:
-      --disable-ssl      disable verification of ssl certificates for the added cluster
-  -h, --help             help for add
-      --password-stdin   take the password from stdin
+      --disable-ssl                disable verification of ssl certificates for the added cluster
+  -h, --help                       help for add
+  -o, --oidc-account-name string   OIDC account name to authenticate using oidc-agent. Note that oidc-agent must be started and properly configured
+                                   (See: https://indigo-dc.gitbook.io/oidc-agent/)
+      --password-stdin             take the password from stdin
 
 Global Flags:
       --config string   set the location of the config file (YAML or JSON)
