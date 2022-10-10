@@ -29,7 +29,7 @@ LABEL org.label-schema.license="Apache 2.0" \
 
 RUN addgroup -S app \
     && adduser -S -g app app \
-    && apk add --no-cache ca-certificates
+    && apk add --no-cache ca-certificates=20161130-r0
 
 WORKDIR /home/app
 
