@@ -14,7 +14,7 @@ nav:
 - FDL Composer: fdl-composer.md
 - oscar-cli.md
 - Integration with EGI: egi-integration.md
-- OIDC Authorization: OpenID Connect Authorization
+- OIDC Authorization: oidc-auth.md
 - OpenAPI Specification: api.md
 - license.md
 - about.md
