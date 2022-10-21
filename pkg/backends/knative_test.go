@@ -122,10 +122,10 @@ func TestKnativeGetInfo(t *testing.T) {
 
 		if info == nil {
 			t.Error("invalid info. Got: nil")
-		}
-
-		if info.Name != "Knative" {
-			t.Errorf("invalid name. Expecting: Knative, got: %s", info.Name)
+		} else {
+			if info.Name != "Knative" {
+				t.Errorf("invalid name. Expecting: Knative, got: %s", info.Name)
+			}
 		}
 	})
 }

@@ -70,7 +70,6 @@ func getOIDCMiddleware(issuer string, subject string, groups []string) gin.Handl
 	if err != nil {
 		return func(c *gin.Context) {
 			c.AbortWithStatus(http.StatusUnauthorized)
-			return
 		}
 	}
 

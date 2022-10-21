@@ -17,7 +17,7 @@ functions:
       memory: 1Gi
       cpu: '1.0'
       script: mask-detector.sh
-      image: grycap/mask-detector-yolo:mini
+      image: grycap/mask-detector-yolo:full
       input:
       - storage_provider: minio
         path: mask-detector/intermediate

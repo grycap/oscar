@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/url"
@@ -25,6 +26,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -69,6 +73,9 @@ type Config struct {
 
 	// Kubernetes namespace for services and jobs (default: oscar-svc)
 	ServicesNamespace string `json:"services_namespace"`
+
+	// Parameter used to check if the cluster have GPUs
+	GPUAvailable bool `json:"gpu_available"`
 
 	// Port used for the ClusterIP k8s service (default: 8080)
 	ServicePort int `json:"-"`
@@ -323,7 +330,23 @@ func ReadConfig() (*Config, error) {
 
 		// Set the value in the Config struct
 		setValue(value, cv.name, config)
+
 	}
 
 	return config, nil
+}
+
+// CheckAvailableGPUs checks if there are "nvidia.com/gpu" resources in the cluster
+func (cfg *Config) CheckAvailableGPUs(kubeClientset kubernetes.Interface) {
+	nodes, err := kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: "!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master"})
+	if err != nil {
+		log.Printf("Error getting list of nodes: %v\n", err)
+	}
+	for _, node := range nodes.Items {
+		gpu := node.Status.Allocatable["nvidia.com/gpu"]
+		if gpu.Value() > 0 {
+			cfg.GPUAvailable = true
+			return
+		}
+	}
 }

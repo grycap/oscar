@@ -8,13 +8,13 @@ nav:
   - Deployment with EC3: deploy-ec3.md
   - Deployment with Helm: deploy-helm.md
   - Deployment on K3s with Ansible: deploy-ansible.md
-- default-endpoints.md
 - usage.md
 - invoking.md
 - Functions definition Language: fdl.md
 - FDL Composer: fdl-composer.md
 - oscar-cli.md
 - Integration with EGI: egi-integration.md
+- OIDC Authorization: oidc-auth.md
 - OpenAPI Specification: api.md
 - license.md
 - about.md
@@ -27,4 +27,4 @@ theme:
 plugins:
 - search
 - render_swagger
-copyright: "&copy; 2021, GRyCAP - i3M - Universitat Politècnica de València, Spain."
+copyright: "&copy; 2022, GRyCAP - i3M - Universitat Politècnica de València, Spain."

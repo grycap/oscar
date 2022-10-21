@@ -74,3 +74,25 @@ which obtains:
 ```
 
 The working nodes transition from `off` to `powon` and, finally, to the `used` status. 
+
+
+## Default Service Endpoints
+
+Once the OSCAR framework is running on the Kubernetes cluster, the endpoints described in the following table should be available.
+Most of the passwords/tokens are dynamically generated at deployment time and made available in the `/var/tmp` folder of the front-end node of the cluster.
+
+| Service         | Endpoint                   | Default User | Password File    |
+| --------------- | -------------------------- | ------------ | ---------------- |
+| OSCAR           | https://{FRONT_NODE}       | oscar        | oscar_password   |
+| MinIO           | https://{FRONT_NODE}:30300 | minio        | minio_secret_key |
+| OpenFaaS        | http://{FRONT_NODE}:31112  | admin        | gw_password      |
+| Kubernetes API  | https://{FRONT_NODE}:6443  |              | tokenpass        |
+| Kube. Dashboard | https://{FRONT_NODE}:30443 |              | dashboard_token  |
+
+Note that `{FRONT_NODE}` refers to the public IP of the front-end of the Kubernetes cluster. 
+
+For example, to get the OSCAR password, you can execute:
+
+```
+./ec3 ssh oscar-cluster cat /var/tmp/oscar_password
+```

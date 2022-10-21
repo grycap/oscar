@@ -214,6 +214,7 @@ memory: 1Gi
 cpu: "1.0"
 total_memory: ""
 total_cpu: ""
+enable_gpu: false
 synchronous:
   min_scale: 0
   max_scale: 0
