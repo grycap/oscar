@@ -1,7 +1,9 @@
 # Default Service Endpoints
 
-Once the OSCAR framework is running on the Kubernetes cluster, the endpoints described in the following table should be available.
-Most of the passwords/tokens are dynamically generated at deployment time and made available in the `/var/tmp` folder of the front-end node of the cluster.
+Once the OSCAR framework is running on the Kubernetes cluster, the endpoints
+described in the following table should be available.
+Most of the passwords/tokens are dynamically generated at deployment time and
+made available in the `/var/tmp` folder of the front-end node of the cluster.
 
 | Service         | Endpoint                | Default User |  Password File   |
 |-----------------|-------------------------|--------------|------------------|

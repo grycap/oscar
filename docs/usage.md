@@ -6,7 +6,6 @@ OSCAR allows the creation of serverless file-processing services based on contai
 - Execute the user-defined script.
 - Upload the content of the output folder accessible via the `TMP_OUTPUT_DIR` environment variable.
 
-
 You can follow one of the [examples](https://github.com/grycap/oscar/tree/master/examples) in order to test the OSCAR framework for specific applications.
 We recommend you to start with the [plant classification example](https://github.com/grycap/oscar/tree/master/examples/imagemagick) detailed below.
 
@@ -85,7 +84,6 @@ OSCAR services can be invoked through auto-generated HTTP endpoints. Requests to
 The content of the HTTP request body will be stored as a file that will be available via the `INPUT_FILE_PATH` environment variable to process it.
 
 A detailed specification of the OSCAR's API and its different paths can be found [here](api.md).
-
 
 ## MinIO Storage Tab
 

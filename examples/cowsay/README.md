@@ -69,7 +69,7 @@ and via the web interface:
 Finally, to invoke the service if the `INPUT_TYPE` is configured as `json`, you can run:
 
 ```sh
-curl -H 'Authorization: Bearer <SERVICE_TOKEN>' -d '{"message": "Hi there"}' https://<CLUSTER_ENDPOINT>/run/cowsay 
+curl -H 'Authorization: Bearer <SERVICE_TOKEN>' -d '{"message": "Hi there"}' https://<CLUSTER_ENDPOINT>/run/cowsay
 ```
 
 and if `INPUT_TYPE` not defined or other than `json`:

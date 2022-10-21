@@ -12,7 +12,12 @@
 
 ## Introduction
 
-OSCAR is an open-source platform to support the Functions as a Service (FaaS) computing model for file-processing applications. It can be automatically deployed on multi-Clouds in order to create highly-parallel event-driven file-processing serverless applications that execute on customized runtime environments provided by Docker containers than run on an elastic Kubernetes cluster.
+OSCAR is an open-source platform to support the Functions as a Service (FaaS)
+computing model for file-processing applications. It can be automatically
+deployed on multi-Clouds in order to create highly-parallel event-driven
+file-processing serverless applications that execute on customized runtime
+environments provided by Docker containers than run on an elastic Kubernetes
+cluster.
 
 [**Deploy**](https://grycap.github.io/oscar/deploy-im-dashboard/) &nbsp; |
 &nbsp; [**Documentation**](https://grycap.github.io/oscar/) &nbsp;
@@ -25,6 +30,7 @@ OSCAR is an open-source platform to support the Functions as a Service (FaaS) co
 - [**Acknowledgements**](#acknowledgements)
 
 ### Why OSCAR?
+
 FaaS platforms are typically oriented to the execution of short-lived functions, coded in a certain programming language, in response to events. Scientific application can greatly benefit from this event-driven computing paradigm in order to trigger on demand the execution of a resource-intensive application that requires processing a certain file that was just uploaded to a storage service. This requires additional support for the execution of generic applications in existing open-source FaaS frameworks.
 
 To this aim, OSCAR supports the [High Throughput Computing Programming Model](https://scar.readthedocs.io/en/latest/prog_model.html) initially introduced by the [SCAR framework](https://github.com/grycap/scar), to create highly-parallel event-driven file-processing serverless applications that execute on customized runtime environments provided by Docker containers run on AWS Lambda.
@@ -43,7 +49,7 @@ OSCAR runs on an elastic Kubernetes cluster that is deployed using:
 
 The following components are deployed inside the Kubernetes cluster in order to support the OSCAR platform:
 
-- [MinIO](http://minio.io), a high performance distributed object storage server that provides an API compatible with S3. 
+- [MinIO](http://minio.io), a high performance distributed object storage server that provides an API compatible with S3.
 - [OpenFaaS](https://www.openfaas.com/), a FaaS platform that allows creating functions executed via HTTP requests.
 - [Knative](https://knative.dev), a Serverless framework to serve container-based applications for synchronous invocations (default Serverless Backend).
 - OSCAR, the main application, responsible for the management of the services and the integration of the different components to support event-driven serverless computing for file processing. It includes a web-based GUI aimed at end users to facilitate interaction with OSCAR.
@@ -66,7 +72,7 @@ license text.
 
 ## Acknowledgements
 
-This development is partially funded by the [EGI Strategic and Innovation Fund](https://www.egi.eu/about/egi-council/egi-strategic-and-innovation-fund/). 
+This development is partially funded by the [EGI Strategic and Innovation Fund](https://www.egi.eu/about/egi-council/egi-strategic-and-innovation-fund/).
 
 Please acknowledge the use of OSCAR by citing the following scientific publication ([preprint available](https://www.grycap.upv.es/gmolto/publications/preprints/Perez2019osc.pdf)):
 ```

@@ -12,14 +12,20 @@ To run this example you need:
       docker build -t {docker-hub-user}/{docker-hub-image} .
       docker push {docker-hub-user}/{docker-hub-image}
       ```
-  * Or use the [grycap/oscar-theano-plants](https://hub.docker.com/r/grycap/oscar-theano-plants/) Docker image already available in Docker Hub (created out of this [Dockerfile](https://github.com/grycap/oscar/blob/master/examples/plant-classification-theano/Dockerfile)).
+  * Or use the [grycap/oscar-theano-plants]
+  (https://hub.docker.com/r/grycap/oscar-theano-plants/) Docker image already
+  available in Docker Hub (created out of this [Dockerfile]
+  (https://github.com/grycap/oscar/blob/master/examples/
+  plant-classification-theano/Dockerfile)).
 
 3. Then, to create the function you have two options:
-  * Option 1: Use the OSCAR web-based interface available at the IP of the front-end of the Kubernetes cluster (port `31114`) and specify the `script.sh` available in this folder:
+  * Option 1: Use the OSCAR web-based interface available at the IP of the
+  front-end of the Kubernetes cluster (port `31114`) and specify the `script.sh`
+  available in this folder:
   
   ![post.png](img/oscar-ui-create-function.png)
   * Option 2: Use curl to do a POST request:
- 
+
    In this case you need to pass the script in Base64. You can use the python script available in the examples folder:
   ```
   python ../tobase64.py < script.sh

@@ -153,7 +153,6 @@ kind delete cluster
 
 *Remember that if you have more than one cluster created, it may be required to set the `--name` flag to specify the name of the cluster to be deleted.*
 
-
 ### Using OSCAR-CLI
 
 To use OSCAR-CLI in a local deployment, you should set the `--disable-ssl` flag to disable verification of the self-signed certificates:

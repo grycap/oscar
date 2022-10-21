@@ -1,14 +1,24 @@
 # Ansible playbook to deploy K3s and the OSCAR platform
 
-The folder [`deploy/ansible`](https://github.com/grycap/oscar/tree/master/deploy/ansible) contains all the necessary files to deploy a [K3s](https://k3s.io/) cluster together with the OSCAR platform using [Ansible](https://www.ansible.com/). This way, a minified Kubernetes distribution can be used to configure OSCAR on IoT devices located at the Edge, such as [Raspberry PIs](https://www.raspberrypi.org/). Note that this [playbook](https://docs.ansible.com/ansible/latest/user_guide/playbooks_intro.html) can also be applied to quickly spread the OSCAR platform on top of any machine or already started cloud instance since the playbook is compatible with GNU/Linux on ARM64 and AMD64 architectures.
+The folder [`deploy/ansible`](https://github.com/grycap/oscar/tree/master/deploy/ansible) contains all the necessary files to deploy a [K3s](https://k3s.io/) cluster together with the OSCAR platform using
+[Ansible](https://www.ansible.com/). This way, a minified Kubernetes
+distribution can be used to configure OSCAR on IoT devices located at the
+Edge, such as [Raspberry PIs](https://www.raspberrypi.org/). Note that this
+[playbook](https://docs.ansible.com/ansible/latest/user_guide/
+playbooks_intro.html) can also be applied to quickly spread the OSCAR
+platform on top of any machine or already started cloud instance since the
+playbook is compatible with GNU/Linux on ARM64 and AMD64 architectures.
 
 ## Requirements
 
 In order to use the playbook, you must install the following components:
 
-- Ansible, following [this guide](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html).
-- The [`netaddr`](https://netaddr.readthedocs.io/en/latest/installation.html) python library.
-- [OpenSSH](https://www.openssh.com/), to remotely access the hosts to be configured.
+- Ansible, following [this guide](https://docs.ansible.com/ansible/
+latest/installation_guide/intro_installation.html).
+- The [`netaddr`](https://netaddr.readthedocs.io/en/latest/installation.html)
+python library.
+- [OpenSSH](https://www.openssh.com/), to remotely access the hosts to be
+configured.
 
 ## Usage
 
