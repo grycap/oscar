@@ -1,13 +1,24 @@
 # Ansible playbook to deploy K3s and the OSCAR platform
 
-The folder [`deploy/ansible`](https://github.com/grycap/oscar/tree/master/deploy/ansible) contains all the necessary files to deploy a [K3s](https://k3s.io/) cluster together with the OSCAR platform using [Ansible](https://www.ansible.com/). This way, a minified Kubernetes distribution can be used to configure OSCAR on IoT devices located at the Edge, such as [Raspberry PIs](https://www.raspberrypi.org/). Note that this [playbook](https://docs.ansible.com/ansible/latest/user_guide/playbooks_intro.html) can also be applied to quickly spread the OSCAR platform on top of any machine or already started cloud instance since the playbook is compatible with GNU/Linux on ARM64 and AMD64 architectures.
+The folder
+[`deploy/ansible`](https://github.com/grycap/oscar/tree/master/deploy/ansible)
+contains all the necessary files to deploy a [K3s](https://k3s.io/) cluster
+together with the OSCAR platform using [Ansible](https://www.ansible.com/).
+This way, a minified Kubernetes distribution can be used to configure OSCAR on
+IoT devices located at the Edge, such as
+[Raspberry PIs](https://www.raspberrypi.org/). Note that this
+[playbook](https://docs.ansible.com/ansible/latest/user_guide/playbooks_intro.html)
+can also be applied to quickly spread the OSCAR platform on top of any machine
+or already started cloud instance since the playbook is compatible with
+GNU/Linux on ARM64 and AMD64 architectures.
 
 ## Requirements
 
 In order to use the playbook, you must install the following components:
 
 - Ansible, following [this guide](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html).
-- The [`netaddr`](https://netaddr.readthedocs.io/en/latest/installation.html) python library.
+- The [`netaddr`](https://netaddr.readthedocs.io/en/latest/installation.html)
+  python library.
 - [OpenSSH](https://www.openssh.com/), to remotely access the hosts to be configured.
 
 ## Usage
@@ -28,9 +39,17 @@ cd oscar/deploy/ansible
 
 ### SSH configuration
 
-As Ansible is an agentless automation tool, you must configure the `~/.ssh/config` file for granting access to the hosts to be configured via the SSH protocol. This playbook will use the `Host` field from SSH configuration to set the hostnames of the nodes, so please take care of naming them properly.
+As Ansible is an agentless automation tool, you must configure the
+`~/.ssh/config` file for granting access to the hosts to be configured via
+the SSH protocol. This playbook will use the `Host` field from SSH
+configuration to set the hostnames of the nodes, so please take care of naming
+them properly.
 
-Below you can find an example of a configuration file for four nodes, being the `front` the only one with a public IP, so it will be used as a proxy for the SSH connection to the working nodes ([`ProxyJump`](https://www.redhat.com/sysadmin/ssh-proxy-bastion-proxyjump) option) via its internal network.
+Below you can find an example of a configuration file for four nodes, being
+the `front` the only one with a public IP, so it will be used as a proxy for
+the SSH connection to the working nodes
+([`ProxyJump`](https://www.redhat.com/sysadmin/ssh-proxy-bastion-proxyjump)
+option) via its internal network.
 
 ```ssh-config
 Host front
@@ -59,7 +78,11 @@ Host wn3
 
 ### Configuration of the inventory file
 
-Now, you have to edit the `hosts` file and add the hosts to be configured. Note that only one node must be set in the `[front]` section, while one or more nodes can be configured as working nodes of the cluster in the `[wn]` section. For example, for the [previous SSH configuration](#ssh-configuration) the `hosts` inventory file should look like this:
+Now, you have to edit the `hosts` file and add the hosts to be configured.
+Note that only one node must be set in the `[front]` section, while one or
+more nodes can be configured as working nodes of the cluster in the `[wn]`
+section. For example, for the [previous SSH configuration](#ssh-configuration)
+the `hosts` inventory file should look like this:
 
 ```ini
 [front]
@@ -75,7 +98,11 @@ wn3
 
 ### Setting up the playbook variables
 
-You also need to set up some parameters for the configuration of the cluster and OSCAR components, like OSCAR and MinIO credentials and DNS endpoints to configure the Kubernetes Ingress and [cert-manager](https://cert-manager.io/) to securely expose the services. To do it, please edit the `vars.yaml` file and update the variables:
+You also need to set up some parameters for the configuration of the cluster
+and OSCAR components, like OSCAR and MinIO credentials and DNS endpoints to
+configure the Kubernetes Ingress and [cert-manager](https://cert-manager.io/)
+to securely expose the services. To do it, please edit the `vars.yaml` file
+and update the variables:
 
 ```yaml
 ---
@@ -107,7 +134,8 @@ ansible-galaxy install -r install_roles.yaml --force
 
 ### Running the playbook
 
-Finally, with the following command the ansible playbook will be executed, configuring the nodes set in the `hosts` inventory file:
+Finally, with the following command the ansible playbook will be executed,
+configuring the nodes set in the `hosts` inventory file:
 
 ```
 ansible-playbook -i hosts oscar-k3s.yaml

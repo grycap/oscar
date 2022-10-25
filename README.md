@@ -39,7 +39,7 @@ that requires processing a certain file that was just uploaded to a storage
 service. This requires additional support for the execution of generic
 applications in existing open-source FaaS frameworks.
 
-To this aim, OSCAR supports the 
+To this aim, OSCAR supports the
 [High Throughput Computing Programming Model](https://scar.readthedocs.io/en/latest/prog_model.html)
 initially introduced by the [SCAR framework](https://github.com/grycap/scar),
 to create highly-parallel event-driven file-processing serverless applications
