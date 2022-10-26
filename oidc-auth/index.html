@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.0, mkdocs-material-8.5.6">
+      <meta name="generator" content="mkdocs-1.4.1, mkdocs-material-8.5.7">
     
     
       
@@ -577,14 +577,32 @@
 
 
 <h1 id="openid-connect-authorization">OpenID Connect Authorization</h1>
-<p>OSCAR REST API supports OIDC (OpenID Connect) access tokens to authorize users since release <code>v2.5.0</code>. By default, OSCAR clusters deployed via the <a href="../deploy-im-dashboard/">IM Dashboard</a> are configured to allow authorization via basic auth and OIDC tokens using the <a href="https://www.egi.eu/service/check-in/">EGI Check-in</a> issuer. From the IM Dashboard deployment window, users can add one <a href="https://operations-portal.egi.eu/vo/a/list">EGI Virtual Organization</a> to grant access for all users from that VO.</p>
+<p>OSCAR REST API supports OIDC (OpenID Connect) access tokens to authorize users
+since release <code>v2.5.0</code>. By default, OSCAR clusters deployed via the
+<a href="../deploy-im-dashboard/">IM Dashboard</a> are configured to allow authorization
+via basic auth and OIDC tokens using the
+<a href="https://www.egi.eu/service/check-in/">EGI Check-in</a> issuer. From the IM
+Dashboard deployment window, users can add one
+<a href="https://operations-portal.egi.eu/vo/a/list">EGI Virtual Organization</a> to
+grant access for all users from that VO.</p>
 <p><img alt="oscar-ui.png" src="../images/oidc/im-dashboard-oidc.png" /></p>
 <h2 id="accessing-from-oscar-ui">Accessing from OSCAR-UI</h2>
-<p>The static web interface of OSCAR has been integrated with EGI Check-in and published in <a href="https://ui.oscar.grycap.net">ui.oscar.grycap.net</a> to facilitate the authorization of users. To login through EGI Checkín using OIDC tokens, users only have to put the endpoint of its OSCAR cluster and click on the "EGI CHECK-IN" button.</p>
+<p>The static web interface of OSCAR has been integrated with EGI Check-in and
+published in <a href="https://ui.oscar.grycap.net">ui.oscar.grycap.net</a> to facilitate
+the authorization of users. To login through EGI Checkín using OIDC tokens,
+users only have to put the endpoint of its OSCAR cluster and click on the
+"EGI CHECK-IN" button.</p>
 <p><img alt="im-dashboard-oidc.png" src="../images/oidc/oscar-ui.png" /></p>
 <h2 id="integration-with-oscar-cli-via-oidc-agent">Integration with OSCAR-CLI via OIDC Agent</h2>
-<p>Since version <code>v1.4.0</code> <a href="../oscar-cli/">OSCAR-CLI</a> supports API authorization via OIDC tokens thanks to the integration with <a href="https://indigo-dc.gitbook.io/oidc-agent/">oidc-agent</a>.</p>
-<p>Users must install the oidc-agent following its <a href="https://indigo-dc.gitbook.io/oidc-agent/installation">instructions</a> and create a new account configuration for the <code>https://aai.egi.eu/auth/realms/egi/</code> issuer. After that, clusters can be added with the command <a href="../oscar-cli/#add"><code>oscar-cli cluster add</code></a> specifying the oidc-agent account name with the <code>--oidc-account-name</code> flag.</p>
+<p>Since version <code>v1.4.0</code> <a href="../oscar-cli/">OSCAR-CLI</a> supports API authorization
+via OIDC tokens thanks to the integration with
+<a href="https://indigo-dc.gitbook.io/oidc-agent/">oidc-agent</a>.</p>
+<p>Users must install the oidc-agent following its
+<a href="https://indigo-dc.gitbook.io/oidc-agent/installation">instructions</a> and
+create a new account configuration for the
+<code>https://aai.egi.eu/auth/realms/egi/</code> issuer. After that, clusters can be
+added with the command <a href="../oscar-cli/#add"><code>oscar-cli cluster add</code></a> specifying
+the oidc-agent account name with the <code>--oidc-account-name</code> flag.</p>
 
 
 
@@ -662,10 +680,10 @@
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.5bf1dace.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.16e2a7d4.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.078830c0.min.js"></script>
+      <script src="../assets/javascripts/bundle.8492ddcf.min.js"></script>
       
     
   </body>

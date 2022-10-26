@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.0, mkdocs-material-8.5.6">
+      <meta name="generator" content="mkdocs-1.4.1, mkdocs-material-8.5.7">
     
     
       
@@ -578,35 +578,70 @@
 
 <h1 id="introduction">Introduction</h1>
 <p><img alt="OSCAR-logo" src="images/oscar3.png" /></p>
-<p>OSCAR is a framework to efficiently support on-premises FaaS (Functions as a Service) for general-purpose file-processing computing applications. 
-It represents the porting to an on-premises scenario of the <a href="https://github.com/grycap/scar">SCAR framework</a>, which supports a <a href="https://scar.readthedocs.io/en/latest/prog_model.html">High Throughput Computing Programming Model</a> to create highly-parallel event-driven file-processing serverless applications that execute on customized runtime environments provided by Docker containers run on AWS Lambda.</p>
+<p>OSCAR is a framework to efficiently support on-premises FaaS (Functions as a
+Service)for general-purpose file-processing computing applications.
+It represents the porting to an on-premises scenario of the
+<a href="https://github.com/grycap/scar">SCAR framework</a>, which supports a
+<a href="https://scar.readthedocs.io/en/latest/prog_model.html">High Throughput Computing Programming Model</a>
+to create highly-parallel event-driven file-processing serverless applications
+that execute on customized runtime environments provided by Docker containers
+run on AWS Lambda.</p>
 <h2 id="goal">Goal</h2>
-<p>Users upload files to a bucket and this automatically triggers the execution of parallel invocations to a function responsible for processing each file. Output files are delivered into an output bucket for the convenience of the user. Highly scalable HTTP-based endpoints can also be offered in order to expose a generic application. 
-An user-provided shell script is executed inside the container run from the user-defined Docker image in order to achieve the right execution environment for the application.</p>
+<p>Users upload files to a bucket and this automatically triggers the execution
+of parallel invocations to a function responsible for processing each file.
+Output files are delivered into an output bucket for the convenience of the
+user. Highly scalable HTTP-based endpoints can also be offered in order to
+expose a generic application. An user-provided shell script is executed inside
+the container run from the user-defined Docker image in order to achieve the
+right execution environment for the application.</p>
 <h2 id="components">Components</h2>
 <p><img alt="oscar arch" src="images/oscar-arch.png" /></p>
-<p>OSCAR runs on an elastic <a href="http://kubernetes.io">Kubernetes</a> cluster that is deployed using:</p>
+<p>OSCAR runs on an elastic <a href="http://kubernetes.io">Kubernetes</a> cluster that is
+deployed using:</p>
 <ul>
-<li><a href="http://www.grycap.upv.es/ec3">EC3</a>, an open-source tool to deploy compute clusters that can horizontally scale in terms of number of nodes with multiple plugins.</li>
-<li><a href="http://www.grycap.upv.es/im">IM</a>, an open-source virtual infrastructure provisioning tool for multi-Clouds.</li>
-<li><a href="http://github.com/grycap/clues">CLUES</a>, an elasticity manager that horizontally scales in and out the number of nodes of the Kubernetes cluster according to the workload.</li>
+<li><a href="http://www.grycap.upv.es/ec3">EC3</a>, an open-source tool to deploy compute
+clusters that can horizontally scale in terms of number of nodes with multiple
+plugins.</li>
+<li><a href="http://www.grycap.upv.es/im">IM</a>, an open-source virtual infrastructure
+provisioning tool for multi-Clouds.</li>
+<li><a href="http://github.com/grycap/clues">CLUES</a>, an elasticity manager that
+horizontally scales in and out the number of nodes of the Kubernetes cluster according to the workload.</li>
 </ul>
-<p>The following components are deployed inside the Kubernetes cluster in order to support the OSCAR platform:</p>
+<p>The following components are deployed inside the Kubernetes cluster in order
+to support the OSCAR platform:</p>
 <ul>
-<li><a href="http://minio.io">MinIO</a>, a high performance distributed object storage server that provides an API compatible with S3.</li>
-<li><a href="https://knative.dev">Knative</a>, a Serverless framework to serve container-based applications for synchronous invocations (default Serverless Backend).</li>
-<li><a href="https://www.openfaas.com/">OpenFaaS</a>, a FaaS platform that allows creating functions executed via HTTP requests.</li>
-<li>OSCAR, the main application, responsible for the management of the services and the integration of the different components to support event-driven serverless computing for file processing. It includes a web-based GUI aimed at end users to facilitate interaction with OSCAR.</li>
+<li><a href="http://minio.io">MinIO</a>, a high performance distributed object storage
+server that provides an API compatible with S3.</li>
+<li><a href="https://knative.dev">Knative</a>, a Serverless framework to serve
+container-based applications for synchronous invocations (default Serverless Backend).</li>
+<li><a href="https://www.openfaas.com/">OpenFaaS</a>, a FaaS platform that allows creating
+functions executed via HTTP requests.</li>
+<li>OSCAR, the main application, responsible for the management of the services
+and the integration of the different components to support event-driven
+serverless computing for file processing. It includes a web-based GUI aimed
+at end users to facilitate interaction with OSCAR.</li>
 </ul>
 <p>As external storage providers, the following services can be used:</p>
 <ul>
-<li>External <a href="https://min.io">MinIO</a> servers, which may be in clusters other than the platform.</li>
-<li><a href="https://aws.amazon.com/s3/">Amazon S3</a>, the Amazon's  object storage service that offers industry-leading scalability, data availability, security, and performance in the public Cloud.</li>
-<li><a href="https://onedata.org/">Onedata</a>, the global data access solution for science used in the <a href="https://datahub.egi.eu/">EGI Federated Cloud</a>.</li>
-<li>Any storage provider that can be accessible through <a href="http://www.webdav.org/">WebDAV</a> protocol. An example of a storage provider supporting this protocol is <a href="https://dcache.org/">dCache</a>, a storage middleware system capable of manage the storage and exchange of large data quantities.</li>
+<li>External <a href="https://min.io">MinIO</a> servers, which may be in clusters other
+than the platform.</li>
+<li><a href="https://aws.amazon.com/s3/">Amazon S3</a>, the Amazon's  object storage
+service that offers industry-leading scalability, data availability,
+security, and performance in the public Cloud.</li>
+<li><a href="https://onedata.org/">Onedata</a>, the global data access solution for science
+used in the <a href="https://datahub.egi.eu/">EGI Federated Cloud</a>.</li>
+<li>Any storage provider that can be accessible through
+<a href="http://www.webdav.org/">WebDAV</a> protocol. An example of a storage provider
+supporting this protocol is <a href="https://dcache.org/">dCache</a>, a storage
+middleware system capable of manage the storage and exchange of large data
+quantities.</li>
 </ul>
-<p><em><strong>Note</strong>: All of the mentioned storage providers can be used as output but only MinIO can be used as input.</em></p>
-<p>An OSCAR cluster can be accessed via its <a href="https://grycap.github.io/oscar/api/">REST API</a>, the <a href="https://github.com/grycap/oscar/tree/master/ui">web-based UI</a> and the the command-line interface  provided by <a href="https://github.com/grycap/oscar-cli">oscar-cli</a>.</p>
+<p><em><strong>Note</strong>: All of the mentioned storage providerscan be used as output but only MinIO can be used as input.</em></p>
+<p>An OSCAR cluster can be accessed via its
+<a href="https://grycap.github.io/oscar/api/">REST API</a>, the
+<a href="https://github.com/grycap/oscar/tree/master/ui">web-based UI</a> and the the
+command-line interface  provided by
+<a href="https://github.com/grycap/oscar-cli">oscar-cli</a>.</p>
 
 
 
@@ -669,10 +704,10 @@ An user-provided shell script is executed inside the container run from the user
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-    <script id="__config" type="application/json">{"base": ".", "features": [], "search": "assets/javascripts/workers/search.5bf1dace.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": ".", "features": [], "search": "assets/javascripts/workers/search.16e2a7d4.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="assets/javascripts/bundle.078830c0.min.js"></script>
+      <script src="assets/javascripts/bundle.8492ddcf.min.js"></script>
       
     
   </body>

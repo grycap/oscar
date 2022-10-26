@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.0, mkdocs-material-8.5.6">
+      <meta name="generator" content="mkdocs-1.4.1, mkdocs-material-8.5.7">
     
     
       
@@ -619,8 +619,15 @@
 
 
 <h1 id="deployment-with-ec3">Deployment with EC3</h1>
-<p>In order to deploy an elastic Kubernetes cluster with the OSCAR platform, it is preferable to use the <a href="https://appsgrycap.i3m.upv.es:31443/im-dashboard">IM Dashboard</a>. Alternatively, you can also use <a href="https://github.com/grycap/ec3">EC3</a>, a tool that deploys elastic virtual clusters. EC3 uses the <a href="https://www.grycap.upv.es/im">Infrastructure Manager (IM)</a> to deploy such clusters on multiple Cloud back-ends.
-The installation details can be found <a href="https://ec3.readthedocs.io/en/latest/intro.html#installation">here</a>, though this section includes the relevant information to get you started.</p>
+<p>In order to deploy an elastic Kubernetes cluster with the OSCAR platform, it
+is preferable to use the
+<a href="https://appsgrycap.i3m.upv.es:31443/im-dashboard">IM Dashboard</a>.
+Alternatively, you can also use <a href="https://github.com/grycap/ec3">EC3</a>, a tool
+that deploys elastic virtual clusters. EC3 uses the
+<a href="https://www.grycap.upv.es/im">Infrastructure Manager (IM)</a> to deploy such
+clusters on multiple Cloud back-ends. The installation details can be found
+<a href="https://ec3.readthedocs.io/en/latest/intro.html#installation">here</a>, though
+this section includes the relevant information to get you started.</p>
 <h2 id="prepare-ec3">Prepare EC3</h2>
 <p>Clone the EC3 repository:</p>
 <pre><code>git clone https://github.com/grycap/ec3
@@ -629,29 +636,43 @@ The installation details can be found <a href="https://ec3.readthedocs.io/en/lat
 <pre><code>cd ec3
 wget -P templates https://raw.githubusercontent.com/grycap/oscar/master/templates/oscar.radl
 </code></pre>
-<p>Create an <code>auth.txt</code> <a href="https://ec3.readthedocs.io/en/devel/ec3.html#authorization-file">authorization file</a> with valid credentials to access your Cloud provider. As an example, to deploy on an OpenNebula-based Cloud site the contents of the file would be:</p>
-<pre><code>type = OpenNebula; host = opennebula-host:2633; username = your-user; password = you-password
+<p>Create an <code>auth.txt</code>
+<a href="https://ec3.readthedocs.io/en/devel/ec3.html#authorization-file">authorization file</a>
+with valid credentials to access your Cloud provider. As an example, to deploy
+on an OpenNebula-based Cloud site the contents of the file would be:</p>
+<pre><code>type = OpenNebula; host = opennebula-host:2633;
+username = your-user;
+password = you-password
 </code></pre>
-<p>Modify the corresponding <a href="https://imdocs.readthedocs.io/en/latest/radl.html#resource-and-application-description-language-radl">RADL</a> template in order to determine the appropriate configuration for your deployment:</p>
+<p>Modify the corresponding
+<a href="https://imdocs.readthedocs.io/en/latest/radl.html#resource-and-application-description-language-radl">RADL</a>
+template in order to determine the appropriate configuration for your
+deployment:</p>
 <ul>
-<li>Virtual Machine Image identifiers </li>
+<li>Virtual Machine Image identifiers</li>
 <li>Hardware Configuration</li>
 </ul>
-<p>As an example, to deploy in OpenNebula, one would modify the <code>ubuntu-opennebula.radl</code> (or create a new one).</p>
+<p>As an example, to deploy in OpenNebula, one would modify the
+<code>ubuntu-opennebula.radl</code> (or create a new one).</p>
 <h2 id="deploy-the-cluster">Deploy the cluster</h2>
 <p>To deploy the cluster, execute:</p>
 <pre><code>./ec3 launch oscar-cluster oscar ubuntu-opennebula -a auth.txt
 </code></pre>
-<p>This will take several minutes until the Kubernetes cluster and all the required services have been deployed.
-You will obtain the IP of the front-end of the cluster and a confirmation message that the front-end is ready.
-Notice that it will still take few minutes before the services in the Kubernetes cluster are up &amp; running.</p>
+<p>This will take several minutes until the Kubernetes cluster and all the
+required services have been deployed. You will obtain the IP of the front-end
+of the cluster and a confirmation message that the front-end is ready. Notice
+that it will still take few minutes before the services in the Kubernetes
+cluster are up &amp; running.</p>
 <h3 id="check-the-cluster-state">Check the cluster state</h3>
-<p>The cluster will be fully configured when all the Kubernetes pods are in the <code>Running</code> state.</p>
+<p>The cluster will be fully configured when all the Kubernetes pods are in the
+<code>Running</code> state.</p>
 <pre><code> ./ec3 ssh oscar-cluster
  sudo kubectl get pods --all-namespaces 
 </code></pre>
-<p>Notice that initially only the front-end node of the cluster is deployed. 
-As soon as the OSCAR framework is deployed, together with its services, the CLUES elasticity manager powers on a new (working) node on which these services will be run.</p>
+<p>Notice that initially only the front-end node of the cluster is deployed.
+As soon as the OSCAR framework is deployed, together with its services, the
+CLUES elasticity manager powers on a new (working) node on which these
+services will be run.</p>
 <p>You can see the status of the provisioned node(s) by issuing:</p>
 <pre><code> clues status
 </code></pre>
@@ -664,10 +685,12 @@ As soon as the OSCAR framework is deployed, together with its services, the CLUE
   wn4.localdomain                 off    enabled     00h06'43&quot;      0,0              1,1073741824
   wn5.localdomain                 off    enabled     00h06'43&quot;      0,0              1,1073741824
 </code></pre>
-<p>The working nodes transition from <code>off</code> to <code>powon</code> and, finally, to the <code>used</code> status. </p>
+<p>The working nodes transition from <code>off</code> to <code>powon</code> and, finally, to the <code>used</code> status.</p>
 <h2 id="default-service-endpoints">Default Service Endpoints</h2>
-<p>Once the OSCAR framework is running on the Kubernetes cluster, the endpoints described in the following table should be available.
-Most of the passwords/tokens are dynamically generated at deployment time and made available in the <code>/var/tmp</code> folder of the front-end node of the cluster.</p>
+<p>Once the OSCAR framework is running on the Kubernetes cluster, the endpoints
+described in the following table should be available.
+Most of the passwords/tokens are dynamically generated at deployment time and
+made available in the <code>/var/tmp</code> folder of the front-end node of the cluster.</p>
 <table>
 <thead>
 <tr>
@@ -710,7 +733,8 @@ Most of the passwords/tokens are dynamically generated at deployment time and ma
 </tr>
 </tbody>
 </table>
-<p>Note that <code>{FRONT_NODE}</code> refers to the public IP of the front-end of the Kubernetes cluster. </p>
+<p>Note that <code>{FRONT_NODE}</code> refers to the public IP of the front-end of the
+Kubernetes cluster.</p>
 <p>For example, to get the OSCAR password, you can execute:</p>
 <pre><code>./ec3 ssh oscar-cluster cat /var/tmp/oscar_password
 </code></pre>
@@ -791,10 +815,10 @@ Most of the passwords/tokens are dynamically generated at deployment time and ma
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.5bf1dace.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.16e2a7d4.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.078830c0.min.js"></script>
+      <script src="../assets/javascripts/bundle.8492ddcf.min.js"></script>
       
     
   </body>

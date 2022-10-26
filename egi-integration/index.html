@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.0, mkdocs-material-8.5.6">
+      <meta name="generator" content="mkdocs-1.4.1, mkdocs-material-8.5.7">
     
     
       
@@ -577,20 +577,45 @@
 
 
 <h1 id="integration-with-the-egi-federated-cloud">Integration with the EGI Federated Cloud</h1>
-<p><a href="https://www.egi.eu/">EGI</a> is a federation of many cloud providers and hundreds of data centres, spread across Europe and worldwide that delivers advanced computing services to support scientists, multinational projects and research infrastructures.</p>
-<p>The <a href="https://www.egi.eu/federation/egi-federated-cloud/">EGI Federated Cloud</a> is an IaaS-type cloud, made of academic private clouds and virtualised resources and built around open standards. Its development is driven by requirements of the scientific communities.</p>
+<p><a href="https://www.egi.eu/">EGI</a> is a federation of many cloud providers and
+hundreds of data centres, spread across Europe and worldwide that delivers
+advanced computing services to support scientists, multinational projects and
+research infrastructures.</p>
+<p>The <a href="https://www.egi.eu/federation/egi-federated-cloud/">EGI Federated Cloud</a>
+is an IaaS-type cloud, made of academic private clouds and virtualised
+resources and built around open standards. Its development is driven by
+requirements of the scientific communities.</p>
 <h2 id="egi-applications-on-demand-im-dashboard">EGI Applications on Demand: IM Dashboard</h2>
-<p>The OSCAR platform can be deployed on the EGI Federated Cloud resources through the <a href="https://appsgrycap.i3m.upv.es:31443/im-dashboard/">IM Dashboard</a> available in the <a href="https://marketplace.egi.eu/42-applications-on-demand">EGI Applications on Demand</a> service.</p>
-<p>The <a href="https://docs.egi.eu/users/compute/orchestration/im/dashboard/">IM Dashboard documentation</a> can be followed in order to deploy the platform.</p>
+<p>The OSCAR platform can be deployed on the EGI Federated Cloud resources
+through the <a href="https://appsgrycap.i3m.upv.es:31443/im-dashboard/">IM Dashboard</a>
+available in the
+<a href="https://marketplace.egi.eu/42-applications-on-demand">EGI Applications on Demand</a>
+service.</p>
+<p>The <a href="https://docs.egi.eu/users/compute/orchestration/im/dashboard/">IM Dashboard documentation</a>
+can be followed in order to deploy the platform.</p>
 <p><img alt="OSCAR on IM" src="../images/oscar-egi-im.png" /></p>
 <h2 id="egi-datahub">EGI DataHub</h2>
-<p><a href="https://datahub.egi.eu/">EGI DataHub</a>, based on <a href="https://onedata.org/#/home">Onedata</a>, provides a global data access solution for science. Integrated with the EGI AAI, it allows users to have Onedata spaces supported by providers across Europe for replicated storage and on-demand caching. </p>
-<p>EGI DataHub can be used as an output storage provider for OSCAR, allowing users to store the resulting files of their OSCAR services on a Onedata space. This can be done thanks to the <a href="https://github.com/grycap/faas-supervisor">FaaS Supervisor</a>. Used in OSCAR and <a href="https://github.com/grycap/scar">SCAR</a>, responsible for managing the data Input/Output and the user code execution.</p>
-<p>To deploy a function with Onedata as output storage provider you only have to specify an identifier, the URL of the Oneprovider host, your access token and the name of your Onedata space in the "Storage" tab of the service creation wizard:</p>
+<p><a href="https://datahub.egi.eu/">EGI DataHub</a>, based on
+<a href="https://onedata.org/#/home">Onedata</a>, provides a global data access solution
+for science. Integrated with the EGI AAI, it allows users to have Onedata
+spaces supported by providers across Europe for replicated storage and
+on-demand caching.</p>
+<p>EGI DataHub can be used as an output storage provider for OSCAR, allowing
+users to store the resulting files of their OSCAR services on a Onedata
+space. This can be done thanks to the
+<a href="https://github.com/grycap/faas-supervisor">FaaS Supervisor</a>. Used in OSCAR
+and <a href="https://github.com/grycap/scar">SCAR</a>, responsible for managing the data
+Input/Output and the user code execution.</p>
+<p>To deploy a function with Onedata as output storage provider you only have to
+specify an identifier, the URL of the Oneprovider host, your access token and
+the name of your Onedata space in the "Storage" tab of the service creation
+wizard:</p>
 <p><img alt="Onedata provider" src="../images/onedata-provider.png" /></p>
 <p>And the path where you want to store the files in the "OUTPUTS" tab:</p>
 <p><img alt="Onedata output" src="../images/onedata-output.png" /></p>
-<p>This means that scientists can store their output files on their Onedata space in the EGI DataHub for long-time persistence and easy sharing of experimental results between researchers.</p>
+<p>This means that scientists can store their output files on their Onedata space
+in the EGI DataHub for long-time persistence and easy sharing of experimental
+results between researchers.</p>
 
 
 
@@ -668,10 +693,10 @@
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.5bf1dace.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.16e2a7d4.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.078830c0.min.js"></script>
+      <script src="../assets/javascripts/bundle.8492ddcf.min.js"></script>
       
     
   </body>

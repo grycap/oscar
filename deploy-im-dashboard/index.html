@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.0, mkdocs-material-8.5.6">
+      <meta name="generator" content="mkdocs-1.4.1, mkdocs-material-8.5.7">
     
     
       
@@ -519,23 +519,45 @@
 
 
 <h1 id="deployment-with-the-im-dashboard">Deployment with the IM Dashboard</h1>
-<p>An OSCAR cluster can be easily deployed on multiple Cloud back-ends without requiring any installation by using the <a href="https://www.grycap.upv.es/im">Infrastructure Manager</a>'s Dashboard (<a href="https://appsgrycap.i3m.upv.es:31443/im-dashboard/login">IM Dashboard</a>). This is a managed service provided by the <a href="https://www.grycap.upv.es">GRyCAP</a> research group at the <a href="https://www.upv.es">Universitat Politècnica de València</a> to deploy customized virtual infrastructures across many Cloud providers. </p>
-<p>Using the IM Dashboard is the easiest and most convenient approach to deploy an OSCAR cluster. It also automatically allocates a DNS entry and TLS certificates to support HTTPS-based access to the OSCAR cluster and companion services (e.g. MinIO).</p>
-<p>This example shows how to deploy an OSCAR cluster on <a href="https://aws.amazon.com">Amazon Web Services (AWS)</a> with two nodes. Thanks to the IM, the very same procedure applies to deploy the OSCAR cluster in an on-premises Cloud (such as OpenStack) or any other Cloud provider supported by the IM.</p>
+<p>An OSCAR cluster can be easily deployed on multiple Cloud back-ends without
+requiring any installation by using the
+<a href="https://www.grycap.upv.es/im">Infrastructure Manager</a>'s
+Dashboard
+(<a href="https://appsgrycap.i3m.upv.es:31443/im-dashboard/login">IM Dashboard</a>). This
+is a managed service provided by the <a href="https://www.grycap.upv.es">GRyCAP</a>
+research group at the <a href="https://www.upv.es">Universitat Politècnica de València</a>
+to deploy customized virtual infrastructures across many Cloud providers.</p>
+<p>Using the IM Dashboard is the easiest and most convenient approach to deploy
+an OSCAR cluster. It also automatically allocates a DNS entry and TLS
+certificates to support HTTPS-based access to the OSCAR cluster and companion
+services (e.g. MinIO).</p>
+<p>This example shows how to deploy an OSCAR cluster on
+<a href="https://aws.amazon.com">Amazon Web Services (AWS)</a> with two nodes. Thanks to
+the IM, the very same procedure applies to deploy the OSCAR cluster in an
+on-premises Cloud (such as OpenStack) or any other Cloud provider supported
+by the IM.</p>
 <p>These are the steps:</p>
 <ol>
 <li>
 <p>Access the <a href="https://appsgrycap.i3m.upv.es:31443/im-dashboard/login">IM Dashboard</a></p>
 <p><img alt="login" src="../images/im-dashboard/im-dashboard-00.png" /></p>
-<p>You will need to authenticate via <a href="https://www.egi.eu/services/check-in/">EGI Check-In</a>, which supports mutiple Identity Providers (IdP). </p>
+<p>You will need to authenticate via
+<a href="https://www.egi.eu/services/check-in/">EGI Check-In</a>, which supports
+mutiple Identity Providers (IdP).</p>
 </li>
 <li>
 <p>Configure the Cloud Credentials</p>
-<p>Once logged in, you need to define the access credentials to the Cloud on which the OSCAR cluster will be deployed. These should be temporary credentials under the <a href="https://searchsecurity.techtarget.com/definition/principle-of-least-privilege-POLP">principle of least privilege (PoLP)</a>.</p>
+<p>Once logged in, you need to define the access credentials to the Cloud on
+which the OSCAR cluster will be deployed. These should be temporary
+credentials under the
+<a href="https://searchsecurity.techtarget.com/definition/principle-of-least-privilege-POLP">principle of least privilege (PoLP)</a>.</p>
 <p><img alt="credentials" src="../images/im-dashboard/im-dashboard-00-2.png" /></p>
 <p><img alt="credentials" src="../images/im-dashboard/im-dashboard-00-3.png" /></p>
 <p><img alt="credentials" src="../images/im-dashboard/im-dashboard-00-4.png" /></p>
-<p>In our case we indicate an identifier for the set of credentials, <a href="https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html">the Access Key ID and the Secret Access Key</a> for an <a href="https://aws.amazon.com/iam/">IAM</a> user that has privileges to deploy Virtual Machines in <a href="https://aws.amazon.com/ec2">Amazon EC2</a>. </p>
+<p>In our case we indicate an identifier for the set of credentials,
+<a href="https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html">the Access Key ID and the Secret Access Key</a>
+for an <a href="https://aws.amazon.com/iam/">IAM</a> user that has privileges to
+deploy Virtual Machines in <a href="https://aws.amazon.com/ec2">Amazon EC2</a>.</p>
 </li>
 <li>
 <p>Select the OSCAR template</p>
@@ -543,19 +565,32 @@
 </li>
 <li>
 <p>Customize and deploy the OSCAR cluster</p>
-<p>In this panel you can specify the number of Working Nodes (WNs) of the cluster together with the computational requirements for each node. We leave the default values.
+<p>In this panel you can specify the number of Working Nodes (WNs) of the
+cluster together with the computational requirements for each node. We
+leave the default values.
 <img alt="template-hw" src="../images/im-dashboard/im-dashboard-02.png" /></p>
-<p>In this panel, specify the passwords to be employed to access the Kubernetes Web UI (Dashboard), to access the OSCAR web UI and to access the MinIO dashboard. These tokens can also be used for programmatic access to the respective services.
+<p>In this panel, specify the passwords to be employed to access the
+Kubernetes Web UI (Dashboard), to access the OSCAR web UI and to access
+the MinIO dashboard. These tokens can also be used for programmatic access
+to the respective services.
 <img alt="template-param" src="../images/im-dashboard/im-dashboard-03.png" /></p>
-<p>Now, choose the Cloud provider. The ID specified when creating the Cloud credentials will be shown.
-You will also need to specify the <a href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AMIs.html">Amazon Machine Image (AMI) identifier</a>. We chose an AMI based on Ubuntu 20.04 provided by Canonical whose identifier for the us-east-1 region is: ami-09e67e426f25ce0d7</p>
-<p>NOTE: You should obtain the AMI identifier for the latest version of the OS. This way, security patches will be already installed. You can obtain this AMI identifier from the AWS Marketplace or the Amazon EC2 service. </p>
+<p>Now, choose the Cloud provider. The ID specified when creating the Cloud
+credentials will be shown.
+You will also need to specify the
+<a href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AMIs.html">Amazon Machine Image (AMI) identifier</a>.
+We chose an AMI based on Ubuntu 20.04 provided by Canonical whose
+identifier for the us-east-1 region is: ami-09e67e426f25ce0d7</p>
+<p>NOTE: You should obtain the AMI identifier for the latest version of the
+OS. This way, security patches will be already installed. You can obtain
+this AMI identifier from the AWS Marketplace or the Amazon EC2 service.</p>
 <p><img alt="template-param" src="../images/im-dashboard/im-dashboard-04.png" /></p>
 <p>Give the infrastructure a name and press "Submit".</p>
 </li>
 <li>
 <p>Check the status of the deployment OSCAR cluster</p>
-<p>You will see that the OSCAR cluster is being deployed and the infrastructure reaches the status "running". The process will not finish until it reaches the state "configured".</p>
+<p>You will see that the OSCAR cluster is being deployed and the
+infrastructure reaches the status "running". The process will not finish
+until it reaches the state "configured".</p>
 <p><img alt="status-general" src="../images/im-dashboard/im-dashboard-05.png" /></p>
 <p>If you are interested in understanding what is happening under the hood you can see the logs:</p>
 <p><img alt="status-log" src="../images/im-dashboard/im-dashboard-06.png" /></p>
@@ -564,11 +599,14 @@ You will also need to specify the <a href="https://docs.aws.amazon.com/AWSEC2/la
 <p>Accessing the OSCAR cluster</p>
 <p>Once reached the "configured" state, see the "Outputs" to obtain the different endpoints:</p>
 <p><img alt="outputs" src="../images/im-dashboard/im-dashboard-07.png" /></p>
-<p>The OSCAR UI can be accessed with the username <code>oscar</code> and the password you specified at deployment time.</p>
+<p>The OSCAR UI can be accessed with the username <code>oscar</code> and the password
+you specified at deployment time.</p>
 <p><img alt="access-oscar" src="../images/im-dashboard/im-dashboard-08.png" /></p>
-<p>The MinIO UI can be accessed with the username <code>minio</code> and the password you specified at deployment time.</p>
+<p>The MinIO UI can be accessed with the username <code>minio</code> and the password
+you specified at deployment time.</p>
 <p><img alt="access-minio" src="../images/im-dashboard/im-dashboard-09.png" /></p>
-<p>The Kubernetes Dashboard can be accessed with the token you specified at deployment time.
+<p>The Kubernetes Dashboard can be accessed with the token you specified at
+deployment time.
 <img alt="access-kubernetes" src="../images/im-dashboard/im-dashboard-10.png" /></p>
 <p>You can obtain statistics about the Kubernetes cluster:
 <img alt="access-kubernetes-2" src="../images/im-dashboard/im-dashboard-11.png" /></p>
@@ -656,10 +694,10 @@ You will also need to specify the <a href="https://docs.aws.amazon.com/AWSEC2/la
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.5bf1dace.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.16e2a7d4.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.078830c0.min.js"></script>
+      <script src="../assets/javascripts/bundle.8492ddcf.min.js"></script>
       
     
   </body>

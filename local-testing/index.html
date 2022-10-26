@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.0, mkdocs-material-8.5.6">
+      <meta name="generator" content="mkdocs-1.4.1, mkdocs-material-8.5.7">
     
     
       
@@ -717,7 +717,10 @@
 
 
 <h1 id="local-testing-with-kind">Local Testing with kind</h1>
-<p>The easiest way to test the OSCAR platform locally is using <a href="https://kind.sigs.k8s.io/">kind</a>. Kind allows the deployment of Kubernetes clusters inside Docker containers and automatically configures <code>kubectl</code> to access them.</p>
+<p>The easiest way to test the OSCAR platform locally is using
+<a href="https://kind.sigs.k8s.io/">kind</a>. Kind allows the deployment of Kubernetes
+clusters inside Docker containers and automatically configures <code>kubectl</code> to
+access them.</p>
 <h2 id="prerequisites">Prerequisites</h2>
 <ul>
 <li><a href="https://docs.docker.com/get-docker/">Docker</a>, required by kind to launch the Kubernetes nodes on containers.</li>
@@ -726,13 +729,16 @@
 <li><a href="https://kind.sigs.k8s.io/docs/user/quick-start/#installation">Kind</a> to deploy the local Kubernetes cluster.</li>
 </ul>
 <h2 id="automated-local-testing">Automated local testing</h2>
-<p>To set up the enviroment for the platform testing you can run the following command. This script automatically executes all the necessary steps to deploy the local cluster and the OSCAR platform along with all the required tools.</p>
+<p>To set up the enviroment for the platform testing you can run the following
+command. This script automatically executes all the necessary steps to deploy
+the local cluster and the OSCAR platform along with all the required tools.</p>
 <pre><code class="language-sh">curl -sSL http://go.oscar.grycap.net | bash
 </code></pre>
 <h2 id="steps-for-manual-local-testing">Steps for manual local testing</h2>
 <p>If you want to do it manualy you can follow the listed steps.</p>
 <h3 id="create-the-cluster">Create the cluster</h3>
-<p>To create a single node cluster with MinIO and Ingress controller ports locally accessible, run:</p>
+<p>To create a single node cluster with MinIO and Ingress controller ports
+locally accessible, run:</p>
 <pre><code class="language-sh">cat &lt;&lt;EOF | kind create cluster --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
@@ -760,28 +766,44 @@ nodes:
 EOF
 </code></pre>
 <h3 id="deploy-nginx-ingress">Deploy NGINX Ingress</h3>
-<p>To enable Ingress support for accessing the OSCAR server, we must deploy the <a href="https://kubernetes.github.io/ingress-nginx/">NGINX Ingress</a>:</p>
+<p>To enable Ingress support for accessing the OSCAR server, we must deploy the
+<a href="https://kubernetes.github.io/ingress-nginx/">NGINX Ingress</a>:</p>
 <pre><code class="language-sh">kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/kind/deploy.yaml
 </code></pre>
 <h3 id="deploy-minio">Deploy MinIO</h3>
-<p>OSCAR depends on <a href="https://min.io/">MinIO</a> as a storage provider and function trigger. The easy way to run MinIO in a Kubernetes cluster is by installing its <a href="https://github.com/minio/charts">helm chart</a>. To  install the helm MinIO repo and install the chart, run the following commands replacing <code>&lt;MINIO_PASSWORD&gt;</code> with a password. It must have at least 8 characters:</p>
+<p>OSCAR depends on <a href="https://min.io/">MinIO</a> as a storage provider and function
+trigger. The easy way to run MinIO in a Kubernetes cluster is by installing
+its <a href="https://github.com/minio/charts">helm chart</a>. To  install the helm MinIO
+repo and install the chart, run the following commands replacing
+<code>&lt;MINIO_PASSWORD&gt;</code> with a password. It must have at least 8 characters:</p>
 <pre><code class="language-sh">helm repo add minio https://charts.min.io
 helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=&lt;MINIO_PASSWORD&gt;,service.type=NodePort,service.nodePort=30300,consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 --create-namespace
 </code></pre>
 <p><em>Note that the deployment has been configured to use the rootUser <code>minio</code> and the specified password as rootPassword. The NodePort service type has been used in order to allow access from <code>http://localhost:30300</code> (API) and <code>http://localhost:30301</code> (Console).</em></p>
 <h3 id="deploy-nfs-server-provisioner">Deploy NFS server provisioner</h3>
-<p>NFS server provisioner is required for the creation of <code>ReadWriteMany</code> PersistentVolumes in the kind cluster. This is needed by the OSCAR services to mount the volume with the <a href="https://github.com/grycap/faas-supervisor">FaaS Supervisor</a> inside the job containers.</p>
-<p>To deploy it you can use <a href="https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner/tree/master/deploy/helm">this chart</a> executing:</p>
+<p>NFS server provisioner is required for the creation of <code>ReadWriteMany</code>
+PersistentVolumes in the kind cluster. This is needed by the OSCAR services
+to mount the volume with the
+<a href="https://github.com/grycap/faas-supervisor">FaaS Supervisor</a> inside the job
+containers.</p>
+<p>To deploy it you can use
+<a href="https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner/tree/master/deploy/helm">this chart</a>
+executing:</p>
 <pre><code class="language-sh">helm repo add nfs-ganesha-server-and-external-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
 helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner
 </code></pre>
 <p><em>Some Linux distributions may have <a href="https://github.com/kubernetes-sigs/kind/issues/1487#issuecomment-694920754">problems</a> using the <a href="https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner">NFS server provisioner</a> with kind due to its default configuration of kernel-limit file descriptors. To workaround it, please run <code>sudo sysctl -w fs.nr_open=1048576</code>.</em></p>
 <h3 id="deploy-knative-serving-as-serverless-backend-optional">Deploy Knative Serving as Serverless Backend (OPTIONAL)</h3>
-<p>OSCAR supports <a href="https://knative.dev/docs/serving/">Knative Serving</a> as Serverless Backend to process <a href="../invoking/#synchronous-invocations">synchronous invocations</a>. If you want to deploy it in the kind cluster, first you must deploy the <a href="https://knative.dev/docs/install/operator/knative-with-operators/">Knative Operator</a></p>
+<p>OSCAR supports <a href="https://knative.dev/docs/serving/">Knative Serving</a> as
+Serverless Backend to process
+<a href="../invoking/#synchronous-invocations">synchronous invocations</a>. If you want
+to deploy it in the kind cluster, first you must deploy the
+<a href="https://knative.dev/docs/install/operator/knative-with-operators/">Knative Operator</a></p>
 <pre><code>kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.3.1/operator.yaml
 </code></pre>
 <p><em>Note that the above command deploys the version <code>v1.3.1</code> of the Operator. You can check if there are new versions <a href="https://github.com/knative/operator/releases">here</a>.</em></p>
-<p>Once the Operator has been successfully deployed, you can install the Knative Serving stack with the following command:</p>
+<p>Once the Operator has been successfully deployed, you can install the Knative
+Serving stack with the following command:</p>
 <pre><code>cat &lt;&lt;EOF | kubectl apply -f -
 ---
 apiVersion: v1
@@ -812,19 +834,26 @@ EOF
 <p>First, create the <code>oscar</code> and <code>oscar-svc</code> namespaces by executing:</p>
 <pre><code class="language-sh">kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/yaml/oscar-namespaces.yaml
 </code></pre>
-<p>Then, add the <a href="https://github.com/grycap/helm-charts">grycap helm repo</a> and deploy by running the following commands replacing <code>&lt;OSCAR_PASSWORD&gt;</code> with a password of your choice and <code>&lt;MINIO_PASSWORD&gt;</code> with the MinIO rootPassword, and remember to add the flag <code>--set serverlessBackend=knative</code> if you deployed it in the previous step:</p>
+<p>Then, add the <a href="https://github.com/grycap/helm-charts">grycap helm repo</a> and
+deploy by running the following commands replacing <code>&lt;OSCAR_PASSWORD&gt;</code> with a
+password of your choice and <code>&lt;MINIO_PASSWORD&gt;</code> with the MinIO rootPassword,
+and remember to add the flag <code>--set serverlessBackend=knative</code> if you deployed
+it in the previous step:</p>
 <pre><code class="language-sh">helm repo add grycap https://grycap.github.io/helm-charts/
 helm install --namespace=oscar oscar grycap/oscar --set authPass=&lt;OSCAR_PASSWORD&gt; --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=&lt;MINIO_PASSWORD&gt;
 </code></pre>
-<p>Now you can access to the OSCAR web interface through <code>https://localhost</code> with user <code>oscar</code> and the specified password.</p>
+<p>Now you can access to the OSCAR web interface through <code>https://localhost</code> with
+user <code>oscar</code> and the specified password.</p>
 <p><em>Note that the OSCAR server has been configured to use the ClusterIP service of MinIO for internal communication. This blocks the MinIO section in the OSCAR web interface, so to download and upload files you must connect directly to MinIO (<code>http://localhost:30300</code>).</em></p>
 <h3 id="delete-the-cluster">Delete the cluster</h3>
-<p>Once you have finished testing the platform, you can remove the local kind cluster by executing:</p>
+<p>Once you have finished testing the platform, you can remove the local kind
+cluster by executing:</p>
 <pre><code class="language-sh">kind delete cluster
 </code></pre>
 <p><em>Remember that if you have more than one cluster created, it may be required to set the <code>--name</code> flag to specify the name of the cluster to be deleted.</em></p>
 <h3 id="using-oscar-cli">Using OSCAR-CLI</h3>
-<p>To use OSCAR-CLI in a local deployment, you should set the <code>--disable-ssl</code> flag to disable verification of the self-signed certificates:</p>
+<p>To use OSCAR-CLI in a local deployment, you should set the <code>--disable-ssl</code>
+flag to disable verification of the self-signed certificates:</p>
 <pre><code class="language-sh">oscar-cli cluster add oscar-cluster https://localhost oscar &lt;OSCAR_PASSWORD&gt; --disable-ssl
 </code></pre>
 
@@ -904,10 +933,10 @@ helm install --namespace=oscar oscar grycap/oscar --set authPass=&lt;OSCAR_PASSW
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.5bf1dace.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.16e2a7d4.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.078830c0.min.js"></script>
+      <script src="../assets/javascripts/bundle.8492ddcf.min.js"></script>
       
     
   </body>

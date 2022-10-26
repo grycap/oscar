@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.0, mkdocs-material-8.5.6">
+      <meta name="generator" content="mkdocs-1.4.1, mkdocs-material-8.5.7">
     
     
       
@@ -675,12 +675,23 @@
 
 
 <h1 id="ansible-playbook-to-deploy-k3s-and-the-oscar-platform">Ansible playbook to deploy K3s and the OSCAR platform</h1>
-<p>The folder <a href="https://github.com/grycap/oscar/tree/master/deploy/ansible"><code>deploy/ansible</code></a> contains all the necessary files to deploy a <a href="https://k3s.io/">K3s</a> cluster together with the OSCAR platform using <a href="https://www.ansible.com/">Ansible</a>. This way, a minified Kubernetes distribution can be used to configure OSCAR on IoT devices located at the Edge, such as <a href="https://www.raspberrypi.org/">Raspberry PIs</a>. Note that this <a href="https://docs.ansible.com/ansible/latest/user_guide/playbooks_intro.html">playbook</a> can also be applied to quickly spread the OSCAR platform on top of any machine or already started cloud instance since the playbook is compatible with GNU/Linux on ARM64 and AMD64 architectures.</p>
+<p>The folder
+<a href="https://github.com/grycap/oscar/tree/master/deploy/ansible"><code>deploy/ansible</code></a>
+contains all the necessary files to deploy a <a href="https://k3s.io/">K3s</a> cluster
+together with the OSCAR platform using <a href="https://www.ansible.com/">Ansible</a>.
+This way, a minified Kubernetes distribution can be used to configure OSCAR on
+IoT devices located at the Edge, such as
+<a href="https://www.raspberrypi.org/">Raspberry PIs</a>. Note that this
+<a href="https://docs.ansible.com/ansible/latest/user_guide/playbooks_intro.html">playbook</a>
+can also be applied to quickly spread the OSCAR platform on top of any machine
+or already started cloud instance since the playbook is compatible with
+GNU/Linux on ARM64 and AMD64 architectures.</p>
 <h2 id="requirements">Requirements</h2>
 <p>In order to use the playbook, you must install the following components:</p>
 <ul>
 <li>Ansible, following <a href="https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html">this guide</a>.</li>
-<li>The <a href="https://netaddr.readthedocs.io/en/latest/installation.html"><code>netaddr</code></a> python library.</li>
+<li>The <a href="https://netaddr.readthedocs.io/en/latest/installation.html"><code>netaddr</code></a>
+  python library.</li>
 <li><a href="https://www.openssh.com/">OpenSSH</a>, to remotely access the hosts to be configured.</li>
 </ul>
 <h2 id="usage">Usage</h2>
@@ -692,8 +703,16 @@
 <pre><code>cd oscar/deploy/ansible
 </code></pre>
 <h3 id="ssh-configuration">SSH configuration</h3>
-<p>As Ansible is an agentless automation tool, you must configure the <code>~/.ssh/config</code> file for granting access to the hosts to be configured via the SSH protocol. This playbook will use the <code>Host</code> field from SSH configuration to set the hostnames of the nodes, so please take care of naming them properly.</p>
-<p>Below you can find an example of a configuration file for four nodes, being the <code>front</code> the only one with a public IP, so it will be used as a proxy for the SSH connection to the working nodes (<a href="https://www.redhat.com/sysadmin/ssh-proxy-bastion-proxyjump"><code>ProxyJump</code></a> option) via its internal network.</p>
+<p>As Ansible is an agentless automation tool, you must configure the
+<code>~/.ssh/config</code> file for granting access to the hosts to be configured via
+the SSH protocol. This playbook will use the <code>Host</code> field from SSH
+configuration to set the hostnames of the nodes, so please take care of naming
+them properly.</p>
+<p>Below you can find an example of a configuration file for four nodes, being
+the <code>front</code> the only one with a public IP, so it will be used as a proxy for
+the SSH connection to the working nodes
+(<a href="https://www.redhat.com/sysadmin/ssh-proxy-bastion-proxyjump"><code>ProxyJump</code></a>
+option) via its internal network.</p>
 <pre><code class="language-ssh-config">Host front
   HostName &lt;PUBLIC_IP&gt;
   User ubuntu
@@ -718,7 +737,11 @@ Host wn3
   ProxyJump front
 </code></pre>
 <h3 id="configuration-of-the-inventory-file">Configuration of the inventory file</h3>
-<p>Now, you have to edit the <code>hosts</code> file and add the hosts to be configured. Note that only one node must be set in the <code>[front]</code> section, while one or more nodes can be configured as working nodes of the cluster in the <code>[wn]</code> section. For example, for the <a href="#ssh-configuration">previous SSH configuration</a> the <code>hosts</code> inventory file should look like this:</p>
+<p>Now, you have to edit the <code>hosts</code> file and add the hosts to be configured.
+Note that only one node must be set in the <code>[front]</code> section, while one or
+more nodes can be configured as working nodes of the cluster in the <code>[wn]</code>
+section. For example, for the <a href="#ssh-configuration">previous SSH configuration</a>
+the <code>hosts</code> inventory file should look like this:</p>
 <pre><code class="language-ini">[front]
 ; Put here the frontend node as defined in .ssh/config (Host)
 front
@@ -730,7 +753,11 @@ wn2
 wn3
 </code></pre>
 <h3 id="setting-up-the-playbook-variables">Setting up the playbook variables</h3>
-<p>You also need to set up some parameters for the configuration of the cluster and OSCAR components, like OSCAR and MinIO credentials and DNS endpoints to configure the Kubernetes Ingress and <a href="https://cert-manager.io/">cert-manager</a> to securely expose the services. To do it, please edit the <code>vars.yaml</code> file and update the variables:</p>
+<p>You also need to set up some parameters for the configuration of the cluster
+and OSCAR components, like OSCAR and MinIO credentials and DNS endpoints to
+configure the Kubernetes Ingress and <a href="https://cert-manager.io/">cert-manager</a>
+to securely expose the services. To do it, please edit the <code>vars.yaml</code> file
+and update the variables:</p>
 <pre><code class="language-yaml">---
 # K3s version to be installed
 kube_version: v1.22.3+k3s1
@@ -753,7 +780,8 @@ minio_dns_host_console: minio-console.oscar-cluster.example.com
 </code></pre>
 <p><em>The <code>--force</code> argument ensures you have the latest version of the roles.</em></p>
 <h3 id="running-the-playbook">Running the playbook</h3>
-<p>Finally, with the following command the ansible playbook will be executed, configuring the nodes set in the <code>hosts</code> inventory file:</p>
+<p>Finally, with the following command the ansible playbook will be executed,
+configuring the nodes set in the <code>hosts</code> inventory file:</p>
 <pre><code>ansible-playbook -i hosts oscar-k3s.yaml
 </code></pre>
 
@@ -833,10 +861,10 @@ minio_dns_host_console: minio-console.oscar-cluster.example.com
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.5bf1dace.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.16e2a7d4.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.078830c0.min.js"></script>
+      <script src="../assets/javascripts/bundle.8492ddcf.min.js"></script>
       
     
   </body>

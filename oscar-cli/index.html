@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.0, mkdocs-material-8.5.6">
+      <meta name="generator" content="mkdocs-1.4.1, mkdocs-material-8.5.7">
     
     
       
@@ -531,11 +531,11 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#subcommands_1" class="md-nav__link">
-    Subcommands
+  <a href="#subcommands-of-services" class="md-nav__link">
+    Subcommands of services
   </a>
   
-    <nav class="md-nav" aria-label="Subcommands">
+    <nav class="md-nav" aria-label="Subcommands of services">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -546,15 +546,15 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#list_1" class="md-nav__link">
-    list
+  <a href="#list-services" class="md-nav__link">
+    list services
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#remove_1" class="md-nav__link">
-    remove
+  <a href="#remove-services" class="md-nav__link">
+    remove services
   </a>
   
 </li>
@@ -858,11 +858,11 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#subcommands_1" class="md-nav__link">
-    Subcommands
+  <a href="#subcommands-of-services" class="md-nav__link">
+    Subcommands of services
   </a>
   
-    <nav class="md-nav" aria-label="Subcommands">
+    <nav class="md-nav" aria-label="Subcommands of services">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -873,15 +873,15 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#list_1" class="md-nav__link">
-    list
+  <a href="#list-services" class="md-nav__link">
+    list services
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#remove_1" class="md-nav__link">
-    remove
+  <a href="#remove-services" class="md-nav__link">
+    remove services
   </a>
   
 </li>
@@ -985,26 +985,35 @@
 
 
 <h1 id="oscar-cli">OSCAR-CLI</h1>
-<p>OSCAR-CLI provides a command line interface to interact with <a href="https://github.com/grycap/oscar">OSCAR</a> clusters in a simple way. It supports service management, workflows definition from FDL (Functions Definition Language) files and the ability to manage files from OSCAR's compatible storage providers (MinIO, AWS S3 and Onedata). The folder <a href="https://github.com/grycap/oscar-cli/tree/main/example-workflow"><code>example-workflow</code></a> contains all the necessary files to create a simple workflow to test the tool.</p>
+<p>OSCAR-CLI provides a command line interface to interact with
+<a href="https://github.com/grycap/oscar">OSCAR</a> clusters in a simple way. It supports
+service management, workflows definition from FDL (Functions Definition
+Language) files and the ability to manage files from OSCAR's compatible
+storage providers (MinIO, AWS S3 and Onedata). The folder
+<a href="https://github.com/grycap/oscar-cli/tree/main/example-workflow"><code>example-workflow</code></a>
+contains all the necessary files to create a simple workflow to test the tool.</p>
 <h2 id="download">Download</h2>
 <h3 id="releases">Releases</h3>
-<p>The easy way to download OSCAR-CLI is through the github <a href="https://github.com/grycap/oscar-cli/releases">releases page</a>. There are binaries for multiple platforms and OS. If you need a binary for another platform, please open an <a href="https://github.com/grycap/oscar-cli/issues">issue</a>.</p>
+<p>The easy way to download OSCAR-CLI is through the github
+<a href="https://github.com/grycap/oscar-cli/releases">releases page</a>. There are
+binaries for multiple platforms and OS. If you need a binary for another
+platform, please open an <a href="https://github.com/grycap/oscar-cli/issues">issue</a>.</p>
 <h3 id="install-from-source">Install from source</h3>
-<p>If you have <a href="https://golang.org/doc/install">go</a> installed and <a href="https://github.com/golang/go/wiki/SettingGOPATH">configured</a>, you can get it from source directly by executing:</p>
+<p>If you have <a href="https://golang.org/doc/install">go</a> installed and
+<a href="https://github.com/golang/go/wiki/SettingGOPATH">configured</a>, you can get it
+from source directly by executing:</p>
 <pre><code class="language-sh">go install github.com/grycap/oscar-cli@latest
 </code></pre>
 <h2 id="available-commands">Available commands</h2>
 <ul>
 <li><a href="#apply">apply</a></li>
-<li><a href="#cluster">cluster</a><ul>
+<li><a href="#cluster">cluster</a></li>
 <li><a href="#add">add</a></li>
 <li><a href="#default">default</a></li>
 <li><a href="#info">info</a></li>
 <li><a href="#list">list</a></li>
 <li><a href="#remove">remove</a></li>
-</ul>
-</li>
-<li><a href="#service">service</a><ul>
+<li><a href="#service">service</a></li>
 <li><a href="#get">get</a></li>
 <li><a href="#list-1">list</a></li>
 <li><a href="#remove-1">remove</a></li>
@@ -1015,8 +1024,6 @@
 <li><a href="#get-file">get-file</a></li>
 <li><a href="#put-file">put-file</a></li>
 <li><a href="#list-files">list-files</a></li>
-</ul>
-</li>
 <li><a href="#version">version</a></li>
 <li><a href="#help">help</a></li>
 </ul>
@@ -1113,7 +1120,7 @@ Global Flags:
 </code></pre>
 <h3 id="service">service</h3>
 <p>Manages the services within a cluster.</p>
-<h4 id="subcommands_1">Subcommands</h4>
+<h4 id="subcommands-of-services">Subcommands of services</h4>
 <h5 id="get">get</h5>
 <p>Get the definition of a service.</p>
 <pre><code>Usage:
@@ -1129,7 +1136,7 @@ Flags:
 Global Flags:
       --config string   set the location of the config file (YAML or JSON)
 </code></pre>
-<h5 id="list_1">list</h5>
+<h5 id="list-services">list services</h5>
 <p>List the available services in a cluster.</p>
 <pre><code>Usage:
   oscar-cli service list [flags]
@@ -1144,7 +1151,7 @@ Flags:
 Global Flags:
       --config string   set the location of the config file (YAML or JSON)
 </code></pre>
-<h5 id="remove_1">remove</h5>
+<h5 id="remove-services">remove services</h5>
 <p>Remove a service from the cluster.</p>
 <pre><code>Usage:
   oscar-cli service remove SERVICE_NAME... [flags]
@@ -1228,9 +1235,11 @@ Global Flags:
 </code></pre>
 <h5 id="get-file">get-file</h5>
 <p>Get a file from a service's storage provider.</p>
-<p>The STORAGE_PROVIDER argument follows the format STORAGE_PROVIDER_TYPE.STORAGE_PROVIDER_NAME,
-being the STORAGE_PROVIDER_TYPE one of the three supported storage providers (MinIO, S3 or Onedata)
-and the STORAGE_PROVIDER_NAME is the identifier for the provider set in the service's definition.</p>
+<p>The STORAGE_PROVIDER argument follows the format
+STORAGE_PROVIDER_TYPE.STORAGE_PROVIDER_NAME, being the STORAGE_PROVIDER_TYPE
+one of the three supported storage providers (MinIO, S3 or Onedata) and the
+STORAGE_PROVIDER_NAME is the identifier for the provider set in the service's
+definition.</p>
 <pre><code>Usage:
   oscar-cli service get-file SERVICE_NAME STORAGE_PROVIDER REMOTE_FILE LOCAL_FILE [flags]
 
@@ -1246,9 +1255,11 @@ Global Flags:
 </code></pre>
 <h5 id="put-file">put-file</h5>
 <p>Put a file in a service's storage provider.</p>
-<p>The STORAGE_PROVIDER argument follows the format STORAGE_PROVIDER_TYPE.STORAGE_PROVIDER_NAME,
-being the STORAGE_PROVIDER_TYPE one of the three supported storage providers (MinIO, S3 or Onedata)
-and the STORAGE_PROVIDER_NAME is the identifier for the provider set in the service's definition.</p>
+<p>The STORAGE_PROVIDER argument follows the format
+STORAGE_PROVIDER_TYPE.STORAGE_PROVIDER_NAME, being the STORAGE_PROVIDER_TYPE
+one of the three supported storage providers (MinIO, S3 or Onedata) and the
+STORAGE_PROVIDER_NAME is the identifier for the provider set in the service's
+definition.</p>
 <pre><code>Usage:
   oscar-cli service put-file SERVICE_NAME STORAGE_PROVIDER LOCAL_FILE REMOTE_FILE [flags]
 
@@ -1265,8 +1276,9 @@ Global Flags:
 <h5 id="list-files">list-files</h5>
 <p>List files from a service's storage provider path.</p>
 <p>The STORAGE_PROVIDER argument follows the format STORAGE_PROVIDER_TYPE.STORAGE_PROVIDER_NAME,
-being the STORAGE_PROVIDER_TYPE one of the three supported storage providers (MinIO, S3 or Onedata)
-and the STORAGE_PROVIDER_NAME is the identifier for the provider set in the service's definition.</p>
+being the STORAGE_PROVIDER_TYPE one of the three supported storage providers
+(MinIO, S3 or Onedata) and the STORAGE_PROVIDER_NAME is the identifier for the
+provider set in the service's definition.</p>
 <pre><code>Usage:
   oscar-cli service list-files SERVICE_NAME STORAGE_PROVIDER REMOTE_PATH [flags]
 
@@ -1377,10 +1389,10 @@ Flags:
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.5bf1dace.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.16e2a7d4.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.078830c0.min.js"></script>
+      <script src="../assets/javascripts/bundle.8492ddcf.min.js"></script>
       
     
   </body>

@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.0, mkdocs-material-8.5.6">
+      <meta name="generator" content="mkdocs-1.4.1, mkdocs-material-8.5.7">
     
     
       
@@ -519,10 +519,25 @@
 
 
 <h1 id="deployment-on-an-existing-kubernetes-cluster-using-helm">Deployment on an existing Kubernetes cluster using Helm</h1>
-<p>OSCAR can also be deployed on any existing Kubernetes cluster through its <a href="https://github.com/grycap/helm-charts/tree/master/oscar">helm chart</a>. However, to make the platform work properly, the following dependencies must be satisfied</p>
+<p>OSCAR can also be deployed on any existing Kubernetes cluster through its
+<a href="https://github.com/grycap/helm-charts/tree/master/oscar">helm chart</a>.
+However, to make the platform work properly, the following dependencies must
+be satisfied.</p>
 <ul>
-<li>A StorageClass with the <code>ReadWriteMany</code> access mode must be configured in the cluster for the creation of the persistent volume mounted on the service containers. For this purpose, we use the <a href="https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner">Kubernetes NFS-Client Provisioner</a>, but there are other <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes">volume plugins</a> that support this access mode.</li>
-<li>MinIO must be deployed and properly configured in the cluster. Its <a href="https://github.com/minio/charts/tree/master/minio">helm chart</a> can be used for this purpose. It is important to configure it properly to have access from inside and outside the cluster, as the OSCAR's web interface connects directly to its API. In the OSCAR helm chart, you must indicate the <a href="https://github.com/grycap/helm-charts/tree/master/oscar#configuration">values</a> corresponding to its credentials and endpoint.</li>
+<li>A StorageClass with the <code>ReadWriteMany</code> access mode must be configured in
+the cluster for the creation of the persistent volume mounted on the service
+containers. For this purpose, we use the
+<a href="https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner">Kubernetes NFS-Client Provisioner</a>,
+but there are other
+<a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes">volume plugins</a>
+that support this access mode.</li>
+<li>MinIO must be deployed and properly configured in the cluster. Its
+<a href="https://github.com/minio/charts/tree/master/minio">helm chart</a> can be used
+for this purpose. It is important to configure it properly to have access from
+inside and outside the cluster, as the OSCAR's web interface connects directly
+to its API. In the OSCAR helm chart, you must indicate the
+<a href="https://github.com/grycap/helm-charts/tree/master/oscar#configuration">values</a>
+corresponding to its credentials and endpoint.</li>
 </ul>
 
 
@@ -601,10 +616,10 @@
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.5bf1dace.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.16e2a7d4.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.078830c0.min.js"></script>
+      <script src="../assets/javascripts/bundle.8492ddcf.min.js"></script>
       
     
   </body>

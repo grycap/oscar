@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.0, mkdocs-material-8.5.6">
+      <meta name="generator" content="mkdocs-1.4.1, mkdocs-material-8.5.7">
     
     
       
@@ -645,14 +645,35 @@
 
 
 <h1 id="invoking-services">Invoking services</h1>
-<p>OSCAR services can be invoked synchronously and asynchronously sending an HTTP POST request to paths <code>/run/&lt;SERVICE_NAME&gt;</code> and <code>/job/&lt;SERVICE_NAME&gt;</code> respectively. For file processing, OSCAR automatically manages the creation and <a href="https://docs.min.io/minio/baremetal/monitoring/bucket-notifications/bucket-notifications.html#minio-bucket-notifications">notification system</a> of MinIO buckets in order to allow the event-driven invocation of services using asynchronous requests, generating a Kubernetes job for every file to be processed.</p>
+<p>OSCAR services can be invoked synchronously and asynchronously sending an
+HTTP POST request to paths <code>/run/&lt;SERVICE_NAME&gt;</code> and <code>/job/&lt;SERVICE_NAME&gt;</code>
+respectively. For file processing, OSCAR automatically manages the creation
+and <a href="https://docs.min.io/minio/baremetal/monitoring/bucket-notifications/bucket-notifications.html#minio-bucket-notifications">notification system</a>
+of MinIO buckets in order to allow the event-driven invocation of services
+using asynchronous requests, generating a Kubernetes job for every file to be
+processed.</p>
 <h2 id="service-access-tokens">Service access tokens</h2>
-<p>As detailed in the <a href="../api/">API specification</a>, invocation paths require the service access token in the request header for authentication. Service access tokens are auto-generated in service creation and update, and MinIO eventing system is automatically configured to use them for event-driven file processing. Tokens can be obtained through the API, using the <a href="../oscar-cli/#get"><code>oscar-cli service get</code></a> command or directly from the web interface.</p>
+<p>As detailed in the <a href="../api/">API specification</a>, invocation paths require the
+service access token in the request header for authentication. Service access
+tokens are auto-generated in service creation and update, and MinIO eventing
+system is automatically configured to use them for event-driven file
+processing. Tokens can be obtained through the API, using the
+<a href="../oscar-cli/#get"><code>oscar-cli service get</code></a> command or directly from the web
+interface.</p>
 <p><img alt="oscar-ui-service-token.png" src="../images/usage/oscar-ui-service-token.png" /></p>
 <h2 id="synchronous-invocations">Synchronous invocations</h2>
-<p>Synchronous invocations allow obtaining the execution output as the response to the HTTP call to the <code>/run/&lt;SERVICE_NAME&gt;</code> path. For this, OSCAR delegates the execution to a Serverless Backend (<a href="https://knative.dev">Knative</a> or <a href="https://www.openfaas.com/">OpenFaaS</a>). Unlike asynchronous invocations, that are translated into Kubernetes jobs, synchronous invocations use a "function" pod to handle requests. This is possible thanks to the <a href="https://github.com/openfaas/classic-watchdog">OpenFaaS Watchdog</a>, which is injected into each service and is in charge of forking the process to be executed for each request received.</p>
+<p>Synchronous invocations allow obtaining the execution output as the response
+to the HTTP call to the <code>/run/&lt;SERVICE_NAME&gt;</code> path. For this, OSCAR delegates
+the execution to a Serverless Backend (<a href="https://knative.dev">Knative</a> or
+<a href="https://www.openfaas.com/">OpenFaaS</a>). Unlike asynchronous invocations, that
+are translated into Kubernetes jobs, synchronous invocations use a "function"
+pod to handle requests. This is possible thanks to the
+<a href="https://github.com/openfaas/classic-watchdog">OpenFaaS Watchdog</a>, which is
+injected into each service and is in charge of forking the process to be
+executed for each request received.</p>
 <p><img alt="oscar-sync.png" src="../images/oscar-sync.png" /></p>
-<p>Synchronous invocations can be made through OSCAR-CLI, using the comand <code>oscar-cli service run</code>:</p>
+<p>Synchronous invocations can be made through OSCAR-CLI, using the comand
+<code>oscar-cli service run</code>:</p>
 <pre><code class="language-sh">oscar-cli service run [SERVICE_NAME] {--input | --text-input} {-o | -output }
 </code></pre>
 <p>You can check these use-cases:</p>
@@ -660,34 +681,77 @@
 <li><a href="https://oscar.grycap.net/blog/post-oscar-faas-sync-ml-inference/">plant-classification-sync</a></li>
 <li><a href="https://oscar.grycap.net/blog/post-oscar-text-to-speech/">text-to-speech</a>.</li>
 </ul>
-<p>The input can be sent as a file via the <code>--input</code> flag, and the result of the execution will be displayed directly in the terminal:</p>
+<p>The input can be sent as a file via the <code>--input</code> flag, and the result of the
+execution will be displayed directly in the terminal:</p>
 <pre><code class="language-sh">oscar-cli service run plant-classification-sync --input images/image3.jpg
 </code></pre>
-<p>Alternatively, it can be sent as plain text using the <code>--text-input</code> flag and the result stored in a file using the <code>--output</code> flag:</p>
+<p>Alternatively, it can be sent as plain text using the <code>--text-input</code> flag and
+the result stored in a file using the <code>--output</code> flag:</p>
 <pre><code class="language-sh">oscar-cli service run text-to-speech --text-input &quot;Hello everyone&quot;  --output output.mp3
 </code></pre>
 <h3 id="inputoutput">Input/Output</h3>
-<p><a href="https://github.com/grycap/faas-supervisor">FaaS Supervisor</a>, the component in charge of managing the input and output of services, allows JSON or base64 encoded body in service requests. The body of these requests will be automatically decoded into the invocation's input file available from the script through the <code>$INPUT_FILE_PATH</code> environment variable.</p>
+<p><a href="https://github.com/grycap/faas-supervisor">FaaS Supervisor</a>, the component in
+charge of managing the input and output of services, allows JSON or base64
+encoded body in service requests. The body of these requests will be
+automatically decoded into the invocation's input file available from the
+script through the <code>$INPUT_FILE_PATH</code> environment variable.</p>
 <p>The output of synchronous invocations will depend on the application itself:</p>
 <ol>
-<li>If the script generates a file inside the output dir available through the <code>$TMP_OUTPUT_DIR</code> environment variable, the result will be the file encoded in base64.</li>
-<li>If the script generates more than one file inside <code>$TMP_OUTPUT_DIR</code>, the result will be a zip archive containing all files encoded in base64.</li>
-<li>If there are no files in <code>$TMP_OUTPUT_DIR</code>, FaaS Supervisor will return its logs, including the stdout of the user script run. <strong>To avoid FaaS Supervisor's logs, you must set the service's <code>log_level</code> to <code>CRITICAL</code>.</strong></li>
+<li>If the script generates a file inside the output dir available through the
+<code>$TMP_OUTPUT_DIR</code> environment variable, the result will be the file encoded in
+base64.</li>
+<li>If the script generates more than one file inside <code>$TMP_OUTPUT_DIR</code>, the
+result will be a zip archive containing all files encoded in base64.</li>
+<li>If there are no files in <code>$TMP_OUTPUT_DIR</code>, FaaS Supervisor will return its
+logs, including the stdout of the user script run.
+<strong>To avoid FaaS Supervisor's logs, you must set the service's <code>log_level</code> to <code>CRITICAL</code>.</strong></li>
 </ol>
 <p>This way users can adapt OSCAR's services to their own needs.</p>
 <h3 id="oscar-cli">OSCAR-CLI</h3>
-<p>OSCAR-CLI simplifies the execution of services synchronously via the <a href="../oscar-cli/#run"><code>oscar-cli service run</code></a> command. This command requires the input to be passed as text through the <code>--text-input</code> flag or directly a file to be sent by passing its path through the <code>--input</code> flag. Both input types are automatically encoded in base64.</p>
-<p>It also allow setting the <code>--output</code> flag to indicate a path for storing (and decoding if needed) the output body in a file, otherwise the output will be shown in stdout.</p>
-<p>An illustration of triggering a service synchronously through OSCAR-CLI can be found in the <a href="https://github.com/grycap/oscar/tree/master/examples/cowsay#oscar-cli">cowsay example</a>.</p>
+<p>OSCAR-CLI simplifies the execution of services synchronously via the
+<a href="../oscar-cli/#run"><code>oscar-cli service run</code></a> command. This command requires the
+input to be passed as text through the <code>--text-input</code> flag or directly a file
+to be sent by passing its path through the <code>--input</code> flag. Both input types
+are automatically encoded in base64.</p>
+<p>It also allow setting the <code>--output</code> flag to indicate a path for storing
+(and decoding if needed) the output body in a file, otherwise the output will
+be shown in stdout.</p>
+<p>An illustration of triggering a service synchronously through OSCAR-CLI can be
+found in the <a href="https://github.com/grycap/oscar/tree/master/examples/cowsay#oscar-cli">cowsay example</a>.</p>
 <h3 id="curl">cURL</h3>
-<p>Naturally, OSCAR services can also be invoked via traditional HTTP clients such as <a href="https://curl.se/">cURL</a> via the path <code>/run/&lt;SERVICE_NAME&gt;</code>. However, you must take care to properly format the input to one of the two supported formats (JSON or base64 encoded) and include the <a href="#service-access-tokens">service access token</a> in the request.</p>
-<p>An illustration of triggering a service synchronously through cURL can be found in the <a href="https://github.com/grycap/oscar/tree/master/examples/cowsay#curl">cowsay example</a>.</p>
-<p>To send an input file through cURL, you must encode it in base64. To avoid issues with the output in synchronous invocations remember to put the <code>log_level</code> as <code>CRITICAL</code>. Output, which is encoded in base64, should be decoded as well. Save output in the expected format of the use-case.</p>
+<p>Naturally, OSCAR services can also be invoked via traditional HTTP clients
+such as <a href="https://curl.se/">cURL</a> via the path <code>/run/&lt;SERVICE_NAME&gt;</code>. However,
+you must take care to properly format the input to one of the two supported
+formats (JSON or base64 encoded) and include the
+<a href="#service-access-tokens">service access token</a> in the request.</p>
+<p>An illustration of triggering a service synchronously through cURL can be
+found in the
+<a href="https://github.com/grycap/oscar/tree/master/examples/cowsay#curl">cowsay example</a>.</p>
+<p>To send an input file through cURL, you must encode it in base64. To avoid
+issues with the output in synchronous invocations remember to put the
+<code>log_level</code> as <code>CRITICAL</code>. Output, which is encoded in base64, should be
+decoded as well. Save output in the expected format of the use-case.</p>
 <pre><code class="language-sh">base64 input.png | curl -X POST -H &quot;Authorization: Bearer &lt;TOKEN&gt;&quot; -d @- https://&lt;CLUSTER_ENDPOINT&gt;/run/&lt;OSCAR_SERVICE&gt; | base64 -d &gt; result.png
 </code></pre>
 <h3 id="limitations">Limitations</h3>
-<p>Using synchronous invocations couldn't be the best way to run long-running resource-demanding applications, like deep learning inference or video processing. This is due to the fact that Kubernetes Serverless Backends do not handle elasticity in the same way as their counterparts in public clouds, such as AWS Lambda. When multiple requests come to OpenFaaS, the function pod itself, with its resource specification (i.e. memory and CPU limits and requests), tries to process them simultaneously, which can cause an overload. Therefore, we consider Kubernetes job generation as the optimal approach to handle event-driven file processing through asynchronous invocations in OSCAR, being the execution of synchronous services a convenient way to support general lightweight container-based applications.</p>
-<p>Otherwise, OSCAR allows the configuration of the OpenFaaS Watchdog to limit the number of events to be processed by a function pod simultaneously. This can be done through the <code>max_inflight</code> option of the watchdog, which can be configured globally in the OSCAR deployment through the <code>WATCHDOG_MAX_INFLIGHT</code> environment variable and the <a href="https://github.com/grycap/helm-charts/tree/master/oscar">helm chart parameter</a> <code>openfaas.watchdog.maxInflight</code>.</p>
+<p>Using synchronous invocations couldn't be the best way to run long-running
+resource-demanding applications, like deep learning inference or video
+processing. This is due to the fact that Kubernetes Serverless Backends do not
+handle elasticity in the same way as their counterparts in public clouds, such
+as AWS Lambda. When multiple requests come to OpenFaaS, the function pod
+itself, with its resource specification (i.e. memory and CPU limits and
+requests), tries to process them simultaneously, which can cause an overload.
+Therefore, we consider Kubernetes job generation as the optimal approach to
+handle event-driven file processing through asynchronous invocations in OSCAR,
+being the execution of synchronous services a convenient way to support
+general lightweight container-based applications.</p>
+<p>Otherwise, OSCAR allows the configuration of the OpenFaaS Watchdog to limit
+the number of events to be processed by a function pod simultaneously. This
+can be done through the <code>max_inflight</code> option of the watchdog, which can be
+configured globally in the OSCAR deployment through the
+<code>WATCHDOG_MAX_INFLIGHT</code> environment variable and the
+<a href="https://github.com/grycap/helm-charts/tree/master/oscar">helm chart parameter</a>
+<code>openfaas.watchdog.maxInflight</code>.</p>
 
 
 
@@ -765,10 +829,10 @@
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.5bf1dace.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.16e2a7d4.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.078830c0.min.js"></script>
+      <script src="../assets/javascripts/bundle.8492ddcf.min.js"></script>
       
     
   </body>

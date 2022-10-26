@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.0, mkdocs-material-8.5.6">
+      <meta name="generator" content="mkdocs-1.4.1, mkdocs-material-8.5.7">
     
     
       
@@ -687,10 +687,17 @@
 
 
 <h1 id="functions-definition-language-composer">Functions Definition Language Composer</h1>
-<p>Writing an entire workflow in plain text could be a tough task for many users. To simplify the process you can use FDL Composer, a tool developed by <a href="https://www.grycap.upv.es/">GRyCAP</a> to facilitate the definition of FDL YAML files for <a href="https://oscar.grycap.net/">OSCAR</a> and <a href="https://scar.readthedocs.io">SCAR</a> platforms from a user-friendly interactive graphic interface.</p>
+<p>Writing an entire workflow in plain text could be a tough task for many users.
+To simplify the process you can use FDL Composer, a tool developed by
+<a href="https://www.grycap.upv.es/">GRyCAP</a> to facilitate the definition of FDL YAML
+files for <a href="https://oscar.grycap.net/">OSCAR</a> and
+<a href="https://scar.readthedocs.io">SCAR</a> platforms from a user-friendly interactive
+graphic interface.</p>
 <p><img alt="fdl-composer-workflow.png" src="../images/fdl-composer/fdl-composer-workflow.png" /></p>
 <h2 id="how-to-access">How to access</h2>
-<p>It does not require installation, just access to <a href="https://composer.oscar.grycap.net/">FDL Composer web</a>. If you prefer to execute on your computer instead of using the web. Clone the git repository:</p>
+<p>It does not require installation, just access to
+<a href="https://composer.oscar.grycap.net/">FDL Composer web</a>. If you prefer to
+execute on your computer instead of using the web. Clone the git repository:</p>
 <pre><code class="language-sh">git clone https://github.com/grycap/fdl-composer
 </code></pre>
 <p>Run the app with npm:</p>
@@ -698,19 +705,45 @@
 </code></pre>
 <h2 id="basic-elements">Basic elements</h2>
 <h3 id="oscar-services">OSCAR services</h3>
-<p>It requires filling at least the name, image, and script fields inputs. To define environment variables you must add them as a comma separated string of <em>key=value</em> entries. For example,  to create a variable with the name <code>firstName</code> and the value <code>John</code>, the "Environment variables" field should look like <code>firstName=John</code>. If you want to assign more than one variable, for example, <code>firstName</code> and <code>lastName</code> with the values <code>John</code> and <code>Keats</code>, the input field should fill with <code>firstName=John,lastName=Keats</code>.</p>
+<p>It requires filling at least the name, image, and script fields inputs. To
+define environment variables you must add them as a comma separated string of
+<em>key=value</em> entries. For example,  to create a variable with the name
+<code>firstName</code> and the value <code>John</code>, the "Environment variables" field should
+look like <code>firstName=John</code>. If you want to assign more than one variable, for
+example, <code>firstName</code> and <code>lastName</code> with the values <code>John</code> and <code>Keats</code>, the
+input field should fill with <code>firstName=John,lastName=Keats</code>.</p>
 <h3 id="storage-providers-and-bucketsfolders">Storage providers and buckets/folders</h3>
-<p>Three types of storage providers can be used in OSCAR FDLs: MinIO, S3, and OneData. First of all, they must be configured, to do it drag the storage provider from the menu to the canvas and double click on the item created, a window with a single input will appear. Then introduce the path of the folder name. To edit one of the storage providers, move the mouse over the item and select the edit option. <strong>Remember that only MinIO can be used as input storage provider for OSCAR services.</strong></p>
+<p>Three types of storage providers can be used in OSCAR FDLs: MinIO, S3, and
+OneData. First of all, they must be configured, to do it drag the storage
+provider from the menu to the canvas and double click on the item created, a
+window with a single input will appear. Then introduce the path of the folder
+name. To edit one of the storage providers, move the mouse over the item and
+select the edit option.
+<strong>Remember that only MinIO can be used as input storage provider for OSCAR services.</strong></p>
 <h3 id="download-and-load-state">Download and load state</h3>
-<p>The graphic workflow can be saved in a file using the "Download state" button. OSCAR services, Storage Providers, and Buckets are kept in the file. The graphic workflow can be edited later by loading it with the "Load state" button.</p>
+<p>The graphic workflow can be saved in a file using the "Download state" button.
+OSCAR services, Storage Providers, and Buckets are kept in the file. The
+graphic workflow can be edited later by loading it with the "Load state" button.</p>
 <h3 id="create-a-yaml-file">Create a YAML file</h3>
-<p>You can easily download the workflow's YAML file through the "Export Yaml" button. In case of an error, a window will appear warning about it.</p>
+<p>You can easily download the workflow's YAML file through the "Export Yaml"
+ button. In case of an error, a window will appear warning about it.</p>
 <h2 id="connecting-components">Connecting components</h2>
-<p>All components have four ports, up and left ones are input ports and right and down ports can be used as output. Services can only be connected with storage providers, always linked in the same direction (the output of one element with the input of the other). When two services are connected between them, both will be declared in the YAML the file, but they will work separately, and there will be no workflow between them. If two storage providers are connected between them, it will have no effect, both storages will be declared.</p>
+<p>All components have four ports, up and left ones are input ports and right and
+down ports can be used as output. Services can only be connected with storage
+providers, always linked in the same direction (the output of one element with
+the input of the other). When two services are connected between them, both
+will be declared in the YAML the file, but they will work separately, and
+there will be no workflow between them. If two storage providers are connected
+between them, it will have no effect, both storages will be declared.</p>
 <h2 id="scar-options">SCAR options</h2>
-<p>FDL Composer can also create FDL files for the SCAR tool. Using it, you can define workflows that can be executed on the Edge or on On-premises Clouds through OSCAR, and on the public Cloud (AWS Lambda and/or AWS Batch) through SCAR.</p>
+<p>FDL Composer can also create FDL files for the SCAR tool. Using it, you can
+define workflows that can be executed on the Edge or on On-premises Clouds
+through OSCAR, and on the public Cloud (AWS Lambda and/or AWS Batch) through
+SCAR.</p>
 <h2 id="example">Example</h2>
-<p>There is an example of fdl-composer implementing the <a href="https://github.com/grycap/oscar/tree/master/examples/video-process">video-process</a> use case in our <a href="https://oscar.grycap.net/blog/post-oscar-fdl-composer/">blog</a>.</p>
+<p>There is an example of fdl-composer implementing the
+<a href="https://github.com/grycap/oscar/tree/master/examples/video-process">video-process</a>
+use case in our <a href="https://oscar.grycap.net/blog/post-oscar-fdl-composer/">blog</a>.</p>
 
 
 
@@ -788,10 +821,10 @@
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.5bf1dace.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.16e2a7d4.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.078830c0.min.js"></script>
+      <script src="../assets/javascripts/bundle.8492ddcf.min.js"></script>
       
     
   </body>
