@@ -62,14 +62,16 @@ is abstracted away from the user.
 OSCAR runs on an elastic Kubernetes cluster that is deployed using:
 
 - [EC3](http://www.grycap.upv.es/ec3), an open-source tool to deploy compute
-    clusters that can horizontally scale in terms of number of nodes with multiple plugins.
+    clusters that can horizontally scale in terms of number of nodes with
+    multiple plugins.
 - [IM](http://www.grycap.upv.es/im), an open-source virtual infrastructure
     provisioning tool for multi-Clouds.
 - [CLUES](http://github.com/grycap/clues), an elasticity manager that
     horizontally scales in and out the number of nodes of the Kubernetes cluster
     according to the workload.
 
-The following components are deployed inside the Kubernetes cluster in order to support the OSCAR platform:
+The following components are deployed inside the Kubernetes cluster in order
+to support the OSCAR platform:
 
 - [MinIO](http://minio.io), a high performance distributed object storage
     server that provides an API compatible with S3.
@@ -109,8 +111,11 @@ license text.
 
 This development is partially funded by the [EGI Strategic and Innovation Fund](https://www.egi.eu/about/egi-council/egi-strategic-and-innovation-fund/).
 
-Please acknowledge the use of OSCAR by citing the following scientific publication ([preprint available](https://www.grycap.upv.es/gmolto/publications/preprints/Perez2019osc.pdf)):
+Please acknowledge the use of OSCAR by citing the following scientific
+publication ([preprint available](https://www.grycap.upv.es/gmolto/publications/preprints/Perez2019osc.pdf)):
 
 ```
-A. Pérez, S. Risco, D. M. Naranjo, M. Caballer, and G. Moltó, “Serverless Computing for Event-Driven Data Processing Applications,” in 2019 IEEE International Conference on Cloud Computing (CLOUD 2019), 2019.
+A. Pérez, S. Risco, D. M. Naranjo, M. Caballer, and G. Moltó,
+“Serverless Computing for Event-Driven Data Processing Applications,”
+in 2019 IEEE International Conference on Cloud Computing (CLOUD 2019), 2019.
 ```

@@ -8,10 +8,10 @@ volume on the containers with the
 is in charge of:
 
 - Downloading the file that invokes the service and make it accessible through
-the `INPUT_FILE_PATH` environment variable.
+    the `INPUT_FILE_PATH` environment variable.
 - Execute the user-defined script.
 - Upload the content of the output folder accessible via the `TMP_OUTPUT_DIR`
-environment variable.
+    environment variable.
 
 You can follow one of the
 [examples](https://github.com/grycap/oscar/tree/master/examples)
@@ -117,11 +117,11 @@ view after a few seconds.
 OSCAR services can be invoked through auto-generated HTTP endpoints. Requests
 to these endpoints can be made in two ways:
 
-- **Synchronous** through the path `/run/<SERVICE_NAME>`. This redirects the request to the
-OpenFaaS gateway in order to perform the processing.
+- **Synchronous** through the path `/run/<SERVICE_NAME>`. This redirects the
+    request to the OpenFaaS gateway in order to perform the processing.
 - **Asynchronous** through the path `/job/<SERVICE_NAME>`. This mode is used
-to perform file-processing when files are uploaded to the input storage
-provider, creating a Kubernetes job per service invocation.
+    to perform file-processing when files are uploaded to the input storage
+    provider, creating a Kubernetes job per service invocation.
 
 The content of the HTTP request body will be stored as a file that will be
 available via the `INPUT_FILE_PATH` environment variable to process it.

@@ -7,10 +7,13 @@ access them.
 
 ## Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/), required by kind to launch the Kubernetes nodes on containers.
-- [Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/) to communicate with the Kubernetes cluster.
+- [Docker](https://docs.docker.com/get-docker/), required by kind to launch
+  the Kubernetes nodes on containers.
+- [Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/) to
+  communicate with the Kubernetes cluster.
 - [Helm](https://helm.sh/docs/intro/install/) to easily deploy applications on Kubernetes.
-- [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) to deploy the local Kubernetes cluster.
+- [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) to
+  deploy the local Kubernetes cluster.
 
 ## Automated local testing
 
@@ -81,7 +84,10 @@ helm repo add minio https://charts.min.io
 helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=<MINIO_PASSWORD>,service.type=NodePort,service.nodePort=30300,consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 --create-namespace
 ```
 
-*Note that the deployment has been configured to use the rootUser `minio` and the specified password as rootPassword. The NodePort service type has been used in order to allow access from `http://localhost:30300` (API) and `http://localhost:30301` (Console).*
+*Note that the deployment has been configured to use the rootUser `minio` and
+the specified password as rootPassword. The NodePort service type has been
+used in order to allow access from `http://localhost:30300` (API) and
+`http://localhost:30301` (Console).*
 
 ### Deploy NFS server provisioner
 
@@ -100,7 +106,11 @@ helm repo add nfs-ganesha-server-and-external-provisioner https://kubernetes-sig
 helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner
 ```
 
-*Some Linux distributions may have [problems](https://github.com/kubernetes-sigs/kind/issues/1487#issuecomment-694920754) using the [NFS server provisioner](https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner) with kind due to its default configuration of kernel-limit file descriptors. To workaround it, please run `sudo sysctl -w fs.nr_open=1048576`.*
+*Some Linux distributions may have
+[problems](https://github.com/kubernetes-sigs/kind/issues/1487#issuecomment-694920754)
+using the [NFS server provisioner](https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner)
+with kind due to its default configuration of kernel-limit file descriptors.
+To workaround it, please run `sudo sysctl -w fs.nr_open=1048576`.*
 
 ### Deploy Knative Serving as Serverless Backend (OPTIONAL)
 
@@ -114,7 +124,8 @@ to deploy it in the kind cluster, first you must deploy the
 kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.3.1/operator.yaml
 ```
 
-*Note that the above command deploys the version `v1.3.1` of the Operator. You can check if there are new versions [here](https://github.com/knative/operator/releases).*
+*Note that the above command deploys the version `v1.3.1` of the Operator.
+You can check if there are new versions [here](https://github.com/knative/operator/releases).*
 
 Once the Operator has been successfully deployed, you can install the Knative
 Serving stack with the following command:
@@ -169,7 +180,10 @@ helm install --namespace=oscar oscar grycap/oscar --set authPass=<OSCAR_PASSWORD
 Now you can access to the OSCAR web interface through `https://localhost` with
 user `oscar` and the specified password.
 
-*Note that the OSCAR server has been configured to use the ClusterIP service of MinIO for internal communication. This blocks the MinIO section in the OSCAR web interface, so to download and upload files you must connect directly to MinIO (`http://localhost:30300`).*
+*Note that the OSCAR server has been configured to use the ClusterIP service
+of MinIO for internal communication. This blocks the MinIO section in the
+OSCAR web interface, so to download and upload files you must connect directly
+to MinIO (`http://localhost:30300`).*
 
 ### Delete the cluster
 
@@ -180,7 +194,8 @@ cluster by executing:
 kind delete cluster
 ```
 
-*Remember that if you have more than one cluster created, it may be required to set the `--name` flag to specify the name of the cluster to be deleted.*
+*Remember that if you have more than one cluster created, it may be required
+to set the `--name` flag to specify the name of the cluster to be deleted.*
 
 ### Using OSCAR-CLI
 

@@ -10,6 +10,7 @@ The easy way to deploy the services is via
 
 ![oscar-cli-apply.gif](img/oscar-cli-apply.gif)
 
-To trigger the workflow you only have to upload a video into the `input` folder of the
-`mask-detector` MinIO bucket, result images will be stored into the `result` folder of
-the same bucket when the workflow execution has been completed.
+To trigger the workflow you only have to upload a video into the `input`
+folder of the `mask-detector` MinIO bucket, result images will be stored into
+the `result` folder of the same bucket when the workflow execution has been
+completed.
