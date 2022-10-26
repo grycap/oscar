@@ -140,13 +140,19 @@ storage_providers:
 
 ## MinIOProvider
 
-| Field                       | Description                                           |
-| --------------------------- | ----------------------------------------------------- |
-| `endpoint` </br> *string*   | MinIO endpoint                                        |
-| `verify` </br> *bool*       | Verify MinIO's TLS certificates for HTTPS connections |
-| `access_key` </br> *string* | Access key of the MinIO server                        |
-| `secret_key` </br> *string* | Secret key of the MinIO server                        |
-| `region` </br> *string*     | Region of the MinIO server                            |
+| Field                       | Description                     |
+|-----------------------------|---------------------------------|
+| `endpoint` </br> *string*   | MinIO endpoint                  |
+|-----------------------------|---------------------------------|
+| `verify` </br> *bool*       | Verify MinIO's TLS certificates |
+|                             | for HTTPS connections           |
+|-----------------------------|---------------------------------|
+| `access_key` </br> *string* | Access key of the MinIO server  |
+|-----------------------------|---------------------------------|
+| `secret_key` </br> *string* | Secret key of the MinIO server  |
+|-----------------------------|---------------------------------|
+| `region` </br> *string*     | Region of the MinIO server      |
+|-----------------------------|---------------------------------|
 
 ## S3Provider
 
