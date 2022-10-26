@@ -141,7 +141,7 @@ storage_providers:
 ## MinIOProvider
 
 | Field                       | Description                                           |
-| --------------------------- | ----------------------------------------------------- |
+|-----------------------------|-------------------------------------------------------|
 | `endpoint` </br> *string*   | MinIO endpoint                                        |
 | `verify` </br> *bool*       | Verify MinIO's TLS certificates for HTTPS connections |
 | `access_key` </br> *string* | Access key of the MinIO server                        |

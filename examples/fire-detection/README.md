@@ -22,7 +22,10 @@ variable $SEND_SNS to true and adding the following aws-cli configuration variab
 The image for the service has been build an pushed to a public github registry
 but you can see the Dockerfile that generates it [here](Dockerfile).
 
-Because this example is an asynchronous one, once you have the function deployed into an OSCAR cluster, you can upload to the specified input bucket the image that you want to process, through oscar-ui or whichever storage provider that you are using.
+Because this example is an asynchronous one, once you have the function
+deployed into an OSCAR cluster, you can upload to the specified input bucket
+the image that you want to process, through oscar-ui or whichever storage
+provider that you are using.
 
 As mentioned, the output would be an image and a textfile like the ones shown
 next, zipped within the corresponding input image.
@@ -93,4 +96,6 @@ functions:
           TOPIC_ARN: [topic_arn]
 ```
 
-*This feature is introduced in OSCAR v2.5.0 and oscar-cli v1.3.0. Remember to set the environment variables `RESOURCE_MANAGER_ENABLE` and `RESCHEDULER_ENABLE` to `true` to enable it.*
+*This feature is introduced in OSCAR v2.5.0 and oscar-cli v1.3.0. Remember to
+set the environment variables `RESOURCE_MANAGER_ENABLE` and
+`RESCHEDULER_ENABLE` to `true` to enable it.*

@@ -13,7 +13,8 @@ either by the OSCAR UI or by using the FLD within the following command.
 oscar-cli apply plant-classification-sync.yaml
 ```
 
-**Note: if you create the service via the OSCAR UI you have to select the option LOG LEVEL: CRITICAL on the creation panel.**
+**Note: if you create the service via the OSCAR UI you have to select the
+option LOG LEVEL: CRITICAL on the creation panel.**
 
 Once the service is created you can make the invocation with the following
 command, which will store the output on a minio bucket and also print it on

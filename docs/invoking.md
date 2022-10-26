@@ -71,13 +71,13 @@ script through the `$INPUT_FILE_PATH` environment variable.
 The output of synchronous invocations will depend on the application itself:
 
 1. If the script generates a file inside the output dir available through the
-`$TMP_OUTPUT_DIR` environment variable, the result will be the file encoded in
-base64.
+    `$TMP_OUTPUT_DIR` environment variable, the result will be the file encoded in
+    base64.
 2. If the script generates more than one file inside `$TMP_OUTPUT_DIR`, the
-result will be a zip archive containing all files encoded in base64.
+    result will be a zip archive containing all files encoded in base64.
 3. If there are no files in `$TMP_OUTPUT_DIR`, FaaS Supervisor will return its
-logs, including the stdout of the user script run.
-**To avoid FaaS Supervisor's logs, you must set the service's `log_level` to `CRITICAL`.**
+    logs, including the stdout of the user script run.
+    **To avoid FaaS Supervisor's logs, you must set the service's `log_level` to `CRITICAL`.**
 
 This way users can adapt OSCAR's services to their own needs.
 

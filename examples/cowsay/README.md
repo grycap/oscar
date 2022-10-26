@@ -38,7 +38,8 @@ oscar-cli apply cowsay.yaml
 
 It can also be deployed through the OSCAR's web interface using the container
 image `ghcr.io/grycap/cowsay` and the user script available in this folder.
-**Remember to set the service's log_level to "CRITICAL" to avoid FaaS Supervisor logs in the response.**
+**Remember to set the service's log_level to "CRITICAL" to avoid FaaS
+Supervisor logs in the response.**
 
 ## Input types
 
@@ -74,7 +75,8 @@ and if `INPUT_TYPE` not defined or other than `json`:
 oscar-cli service run cowsay --text-input "Hi there"
 ```
 
-*Note that in the latter case the OSCAR-CLI automatically encodes the input before sending it to the OSCAR cluster.*
+*Note that in the latter case the OSCAR-CLI automatically encodes the input
+before sending it to the OSCAR cluster.*
 
 ### cURL
 

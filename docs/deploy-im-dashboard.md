@@ -88,13 +88,15 @@ These are the steps:
 
     ![status-general](images/im-dashboard/im-dashboard-05.png)
 
-    If you are interested in understanding what is happening under the hood you can see the logs:
+    If you are interested in understanding what is happening under the hood
+    you can see the logs:
 
     ![status-log](images/im-dashboard/im-dashboard-06.png)
 
 6. Accessing the OSCAR cluster
 
-    Once reached the "configured" state, see the "Outputs" to obtain the different endpoints:
+    Once reached the "configured" state, see the "Outputs" to obtain the
+    different endpoints:
 
     ![outputs](images/im-dashboard/im-dashboard-07.png)
 

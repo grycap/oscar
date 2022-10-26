@@ -4,7 +4,9 @@ This example applies text to speech as an OSCAR service by using the
 [Google Speech](https://pypi.org/project/google-speech/) library, obtaining
 audio files from plain text.
 
-*Note: If you're going to invoke the service [synchronously](https://docs.oscar.grycap.net/invoking/#synchronous-invocations), you must enable a ServerlessBackend in OSCAR (Knative or OpenFaaS).*
+*Note: If you're going to invoke the service
+[synchronously](https://docs.oscar.grycap.net/invoking/#synchronous-invocations),
+you must enable a ServerlessBackend in OSCAR (Knative or OpenFaaS).*
 
 You can specify the language of the resulting voice in the `language`
 environment variable of the FDL YAML file. If you don't know the code

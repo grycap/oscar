@@ -31,7 +31,7 @@ You will use the following information:
 
 * Docker image: [grycap/oscar-radiomics](https://hub.docker.com/r/grycap/oscar-radiomics)
 * Script: The `user-script.sh` file in this directory in charge of processing
-the image.
+    the image.
 
 Create a new function and specify the aforementioned details:
 

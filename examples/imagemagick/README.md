@@ -5,7 +5,9 @@ grayscale using the popular [ImageMagick](https://www.imagemagick.org)
 software. The goal is to have:
 
 * An input bucket created in Minio on which the user uploads the files to be converted.
-* A function that is triggered upon each file upload in order to trigger the file conversion, which is automatically handled by an elastic Kubernetes cluster that provisions additional nodes on-demand if required.
+* A function that is triggered upon each file upload in order to trigger the
+    file conversion, which is automatically handled by an elastic Kubernetes
+    cluster that provisions additional nodes on-demand if required.
 * An output bucket created in Minio on which the user will find the converted files.
 
 ## STEP 1: Deploy the OSCAR cluster on an IaaS Cloud

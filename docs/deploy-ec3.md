@@ -68,7 +68,7 @@ The cluster will be fully configured when all the Kubernetes pods are in the
 
 ```
  ./ec3 ssh oscar-cluster
- sudo kubectl get pods --all-namespaces 
+ sudo kubectl get pods --all-namespaces
 ```
 
 Notice that initially only the front-end node of the cluster is deployed.
@@ -85,13 +85,13 @@ You can see the status of the provisioned node(s) by issuing:
 which obtains:
 
 ```
-  node                          state    enabled   time stable   (cpu,mem) used   (cpu,mem) total
-  -----------------------------------------------------------------------------------------------
-  wn1.localdomain                used    enabled     00h00'49"    0.0,825229312      1,1992404992
-  wn2.localdomain                 off    enabled     00h06'43"      0,0              1,1073741824
-  wn3.localdomain                 off    enabled     00h06'43"      0,0              1,1073741824
-  wn4.localdomain                 off    enabled     00h06'43"      0,0              1,1073741824
-  wn5.localdomain                 off    enabled     00h06'43"      0,0              1,1073741824
+| node            |state| enabled |time stable|(cpu,mem) used |(cpu,mem) total|
+|-----------------|-----|---------|-----------|---------------|---------------|
+| wn1.localdomain | used| enabled | 00h00'49" | 0.0,825229312 | 1,1992404992  |
+| wn2.localdomain | off | enabled | 00h06'43" | 0,0           | 1,1073741824  |
+| wn3.localdomain | off | enabled | 00h06'43" | 0,0           | 1,1073741824  |
+| wn4.localdomain | off | enabled | 00h06'43" | 0,0           | 1,1073741824  |
+| wn5.localdomain | off | enabled | 00h06'43" | 0,0           | 1,1073741824  |
 ```
 
 The working nodes transition from `off` to `powon` and, finally, to the `used` status.
@@ -103,13 +103,13 @@ described in the following table should be available.
 Most of the passwords/tokens are dynamically generated at deployment time and
 made available in the `/var/tmp` folder of the front-end node of the cluster.
 
-| Service         | Endpoint                   | Default User | Password File    |
-| --------------- | -------------------------- | ------------ | ---------------- |
-| OSCAR           | https://{FRONT_NODE}       | oscar        | oscar_password   |
-| MinIO           | https://{FRONT_NODE}:30300 | minio        | minio_secret_key |
-| OpenFaaS        | http://{FRONT_NODE}:31112  | admin        | gw_password      |
-| Kubernetes API  | https://{FRONT_NODE}:6443  |              | tokenpass        |
-| Kube. Dashboard | https://{FRONT_NODE}:30443 |              | dashboard_token  |
+| Service        | Endpoint                  | Default User | Password File   |
+|----------------|---------------------------|--------------|-----------------|
+| OSCAR          | https://{FRONT_NODE}      | oscar        | oscar_password  |
+| MinIO          | https://{FRONT_NODE}:30300| minio        | minio_secret_key|
+| OpenFaaS       | http://{FRONT_NODE}:31112 | admin        | gw_password     |
+| Kubernetes API | https://{FRONT_NODE}:6443 |              | tokenpass       |
+| Kube. Dashboard| https://{FRONT_NODE}:30443|              | dashboard_token |
 
 Note that `{FRONT_NODE}` refers to the public IP of the front-end of the
 Kubernetes cluster.

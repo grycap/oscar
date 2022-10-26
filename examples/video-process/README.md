@@ -9,10 +9,10 @@ composition to create more complex workflows. The goal is to have:
 
 * An input bucket created in Minio on which the user uploads the video to be analyzed.
 * A video processing function that is triggered upon each video upload which
-extracts the video keyframes.
+    extracts the video keyframes.
 * An output bucket created in Minio on which the video funciton stores the
-extracted keyframes. This bucket is also the input bucket of the the image
-processing function,
+    extracted keyframes. This bucket is also the input bucket of the the image
+    processing function,
 * A function that is triggered upon each video upload that extracts the video keyframes.
 * An output bucket created in Minio on which the user will find the converted files.
 
@@ -39,7 +39,7 @@ You will use the following information:
 
 * Docker image: [grycap/ffmpeg](https://hub.docker.com/r/grycap/ffmpeg)
 * Script: The `split-video.sh` file in this directory in charge of processing
-the video.
+    the video.
 
 Create a new function and specify the aforementioned details:
 
@@ -59,7 +59,7 @@ You will use the following information:
 
 * Docker image: [grycap/darknet-v3](https://hub.docker.com/r/grycap/imagemagick)
 * Script: The `yolov3-object-detection.sh` file in this directory in charge of
-processing the image.
+    processing the image.
 
 Create a new function and specify the aforementioned details:
 
