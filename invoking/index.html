@@ -698,13 +698,13 @@ script through the <code>$INPUT_FILE_PATH</code> environment variable.</p>
 <p>The output of synchronous invocations will depend on the application itself:</p>
 <ol>
 <li>If the script generates a file inside the output dir available through the
-<code>$TMP_OUTPUT_DIR</code> environment variable, the result will be the file encoded in
-base64.</li>
+    <code>$TMP_OUTPUT_DIR</code> environment variable, the result will be the file encoded in
+    base64.</li>
 <li>If the script generates more than one file inside <code>$TMP_OUTPUT_DIR</code>, the
-result will be a zip archive containing all files encoded in base64.</li>
+    result will be a zip archive containing all files encoded in base64.</li>
 <li>If there are no files in <code>$TMP_OUTPUT_DIR</code>, FaaS Supervisor will return its
-logs, including the stdout of the user script run.
-<strong>To avoid FaaS Supervisor's logs, you must set the service's <code>log_level</code> to <code>CRITICAL</code>.</strong></li>
+    logs, including the stdout of the user script run.
+    <strong>To avoid FaaS Supervisor's logs, you must set the service's <code>log_level</code> to <code>CRITICAL</code>.</strong></li>
 </ol>
 <p>This way users can adapt OSCAR's services to their own needs.</p>
 <h3 id="oscar-cli">OSCAR-CLI</h3>

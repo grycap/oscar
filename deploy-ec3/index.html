@@ -667,7 +667,7 @@ cluster are up &amp; running.</p>
 <p>The cluster will be fully configured when all the Kubernetes pods are in the
 <code>Running</code> state.</p>
 <pre><code> ./ec3 ssh oscar-cluster
- sudo kubectl get pods --all-namespaces 
+ sudo kubectl get pods --all-namespaces
 </code></pre>
 <p>Notice that initially only the front-end node of the cluster is deployed.
 As soon as the OSCAR framework is deployed, together with its services, the
@@ -677,13 +677,13 @@ services will be run.</p>
 <pre><code> clues status
 </code></pre>
 <p>which obtains:</p>
-<pre><code>  node                          state    enabled   time stable   (cpu,mem) used   (cpu,mem) total
-  -----------------------------------------------------------------------------------------------
-  wn1.localdomain                used    enabled     00h00'49&quot;    0.0,825229312      1,1992404992
-  wn2.localdomain                 off    enabled     00h06'43&quot;      0,0              1,1073741824
-  wn3.localdomain                 off    enabled     00h06'43&quot;      0,0              1,1073741824
-  wn4.localdomain                 off    enabled     00h06'43&quot;      0,0              1,1073741824
-  wn5.localdomain                 off    enabled     00h06'43&quot;      0,0              1,1073741824
+<pre><code>| node            |state| enabled |time stable|(cpu,mem) used |(cpu,mem) total|
+|-----------------|-----|---------|-----------|---------------|---------------|
+| wn1.localdomain | used| enabled | 00h00'49&quot; | 0.0,825229312 | 1,1992404992  |
+| wn2.localdomain | off | enabled | 00h06'43&quot; | 0,0           | 1,1073741824  |
+| wn3.localdomain | off | enabled | 00h06'43&quot; | 0,0           | 1,1073741824  |
+| wn4.localdomain | off | enabled | 00h06'43&quot; | 0,0           | 1,1073741824  |
+| wn5.localdomain | off | enabled | 00h06'43&quot; | 0,0           | 1,1073741824  |
 </code></pre>
 <p>The working nodes transition from <code>off</code> to <code>powon</code> and, finally, to the <code>used</code> status.</p>
 <h2 id="default-service-endpoints">Default Service Endpoints</h2>

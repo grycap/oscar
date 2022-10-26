@@ -723,10 +723,13 @@ clusters inside Docker containers and automatically configures <code>kubectl</co
 access them.</p>
 <h2 id="prerequisites">Prerequisites</h2>
 <ul>
-<li><a href="https://docs.docker.com/get-docker/">Docker</a>, required by kind to launch the Kubernetes nodes on containers.</li>
-<li><a href="https://kubernetes.io/docs/tasks/tools/install-kubectl/">Kubectl</a> to communicate with the Kubernetes cluster.</li>
+<li><a href="https://docs.docker.com/get-docker/">Docker</a>, required by kind to launch
+  the Kubernetes nodes on containers.</li>
+<li><a href="https://kubernetes.io/docs/tasks/tools/install-kubectl/">Kubectl</a> to
+  communicate with the Kubernetes cluster.</li>
 <li><a href="https://helm.sh/docs/intro/install/">Helm</a> to easily deploy applications on Kubernetes.</li>
-<li><a href="https://kind.sigs.k8s.io/docs/user/quick-start/#installation">Kind</a> to deploy the local Kubernetes cluster.</li>
+<li><a href="https://kind.sigs.k8s.io/docs/user/quick-start/#installation">Kind</a> to
+  deploy the local Kubernetes cluster.</li>
 </ul>
 <h2 id="automated-local-testing">Automated local testing</h2>
 <p>To set up the enviroment for the platform testing you can run the following
@@ -779,7 +782,10 @@ repo and install the chart, run the following commands replacing
 <pre><code class="language-sh">helm repo add minio https://charts.min.io
 helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=&lt;MINIO_PASSWORD&gt;,service.type=NodePort,service.nodePort=30300,consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 --create-namespace
 </code></pre>
-<p><em>Note that the deployment has been configured to use the rootUser <code>minio</code> and the specified password as rootPassword. The NodePort service type has been used in order to allow access from <code>http://localhost:30300</code> (API) and <code>http://localhost:30301</code> (Console).</em></p>
+<p><em>Note that the deployment has been configured to use the rootUser <code>minio</code> and
+the specified password as rootPassword. The NodePort service type has been
+used in order to allow access from <code>http://localhost:30300</code> (API) and
+<code>http://localhost:30301</code> (Console).</em></p>
 <h3 id="deploy-nfs-server-provisioner">Deploy NFS server provisioner</h3>
 <p>NFS server provisioner is required for the creation of <code>ReadWriteMany</code>
 PersistentVolumes in the kind cluster. This is needed by the OSCAR services
@@ -792,7 +798,11 @@ executing:</p>
 <pre><code class="language-sh">helm repo add nfs-ganesha-server-and-external-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
 helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner
 </code></pre>
-<p><em>Some Linux distributions may have <a href="https://github.com/kubernetes-sigs/kind/issues/1487#issuecomment-694920754">problems</a> using the <a href="https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner">NFS server provisioner</a> with kind due to its default configuration of kernel-limit file descriptors. To workaround it, please run <code>sudo sysctl -w fs.nr_open=1048576</code>.</em></p>
+<p><em>Some Linux distributions may have
+<a href="https://github.com/kubernetes-sigs/kind/issues/1487#issuecomment-694920754">problems</a>
+using the <a href="https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner">NFS server provisioner</a>
+with kind due to its default configuration of kernel-limit file descriptors.
+To workaround it, please run <code>sudo sysctl -w fs.nr_open=1048576</code>.</em></p>
 <h3 id="deploy-knative-serving-as-serverless-backend-optional">Deploy Knative Serving as Serverless Backend (OPTIONAL)</h3>
 <p>OSCAR supports <a href="https://knative.dev/docs/serving/">Knative Serving</a> as
 Serverless Backend to process
@@ -801,7 +811,8 @@ to deploy it in the kind cluster, first you must deploy the
 <a href="https://knative.dev/docs/install/operator/knative-with-operators/">Knative Operator</a></p>
 <pre><code>kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.3.1/operator.yaml
 </code></pre>
-<p><em>Note that the above command deploys the version <code>v1.3.1</code> of the Operator. You can check if there are new versions <a href="https://github.com/knative/operator/releases">here</a>.</em></p>
+<p><em>Note that the above command deploys the version <code>v1.3.1</code> of the Operator.
+You can check if there are new versions <a href="https://github.com/knative/operator/releases">here</a>.</em></p>
 <p>Once the Operator has been successfully deployed, you can install the Knative
 Serving stack with the following command:</p>
 <pre><code>cat &lt;&lt;EOF | kubectl apply -f -
@@ -844,13 +855,17 @@ helm install --namespace=oscar oscar grycap/oscar --set authPass=&lt;OSCAR_PASSW
 </code></pre>
 <p>Now you can access to the OSCAR web interface through <code>https://localhost</code> with
 user <code>oscar</code> and the specified password.</p>
-<p><em>Note that the OSCAR server has been configured to use the ClusterIP service of MinIO for internal communication. This blocks the MinIO section in the OSCAR web interface, so to download and upload files you must connect directly to MinIO (<code>http://localhost:30300</code>).</em></p>
+<p><em>Note that the OSCAR server has been configured to use the ClusterIP service
+of MinIO for internal communication. This blocks the MinIO section in the
+OSCAR web interface, so to download and upload files you must connect directly
+to MinIO (<code>http://localhost:30300</code>).</em></p>
 <h3 id="delete-the-cluster">Delete the cluster</h3>
 <p>Once you have finished testing the platform, you can remove the local kind
 cluster by executing:</p>
 <pre><code class="language-sh">kind delete cluster
 </code></pre>
-<p><em>Remember that if you have more than one cluster created, it may be required to set the <code>--name</code> flag to specify the name of the cluster to be deleted.</em></p>
+<p><em>Remember that if you have more than one cluster created, it may be required
+to set the <code>--name</code> flag to specify the name of the cluster to be deleted.</em></p>
 <h3 id="using-oscar-cli">Using OSCAR-CLI</h3>
 <p>To use OSCAR-CLI in a local deployment, you should set the <code>--disable-ssl</code>
 flag to disable verification of the self-signed certificates:</p>
