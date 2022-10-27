@@ -49,22 +49,22 @@ storage_providers:
 
 ## Top level parameters
 
-| Field                                                             | Description                                                                                                                                                                                              |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
 | `functions` </br> *[Functions](#functions)*                       | Mandatory parameter to define a Functions Definition Language file. Note that "functions" instead of "services" has been used in order to keep compatibility with [SCAR](https://github.com/grycap/scar) |
 | `storage_providers` </br> *[StorageProviders](#storageproviders)* | Parameter to define the credentials for the storage providers to be used in the services                                                                                                                 |
 | `clusters` </br> *map[string][Cluster](#cluster)*                 | configuration for the OSCAR clusters that can be used as service's replicas, being the key the user-defined identifier for the cluster. Optional                                                         |
 
 ## Functions
 
-| Field                                                | Description                                                                                                                                                                                                                                                            |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
 | `oscar` </br> *map[string][Service](#service) array* | Main object with the definition of the OSCAR services to be deployed. The components of the array are Service maps, where the key of every service is the identifier of the cluster where the service (defined as the value of the entry on the map) will be deployed. |
 
 ## Service
 
-| Field                                                             | Description                                                                                                                                                                                                                                                  |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
 | `name` </br> *string*                                             | The name of the service                                                                                                                                                                                                                                      |
 | `cluster_id` </br> *string*                                       | Identifier for the current cluster, used to specify the cluster's StorageProvider in job delegations. OSCAR-CLI sets it using the ClusterID from the FDL. Optional. (default: "")                                                                            |
 | `image` </br> *string*                                            | Docker image for the service                                                                                                                                                                                                                                 |
@@ -88,15 +88,15 @@ storage_providers:
 
 ## SynchronousSettings
 
-| Field                       | Description                                                                                  |
-| --------------------------- | -------------------------------------------------------------------------------------------- |
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
 | `min_scale` </br> *integer* | Minimum number of active replicas (pods) for the service. Optional. (default: 0)             |
 | `max_scale` </br> *integer* | Maximum number of active replicas (pods) for the service. Optional. (default: 0 (Unlimited)) |
 
 ## Replica
 
-| Field                               | Description                                                                                                                                                                                      |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
 | `type` </br> *string*               | Type of the replica to re-send events (can be `oscar` or `endpoint`)                                                                                                                             |
 | `cluster_id` </br> *string*         | Identifier of the cluster as defined in the "clusters" FDL field. Only used if Type is `oscar`                                                                                                   |
 | `service_name` </br> *string*       | Name of the service in the replica cluster. Only used if Type is `oscar`                                                                                                                         |
@@ -107,8 +107,8 @@ storage_providers:
 
 ## StorageIOConfig
 
-| Field                             | Description                                                                                                                                                                                                                                      |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
 | `storage_provider` </br> *string* | Reference to the storage provider defined in [storage_providers](#storage_providers). This string is composed by the provider's name (minio, s3, onedata) and identifier (defined by the user), separated by a point (e.g. "minio.myidentifier") |
 | `path` </br> *string*             | Path in the storage provider. In MinIO and S3 the first directory of the specified path is translated into the bucket's name (e.g. "bucket/folder/subfolder")                                                                                    |
 | `suffix` </br> *string array*     | Array of suffixes for filtering the files to be uploaded. Only used in the `output` field. Optional                                                                                                                                              |
@@ -116,9 +116,9 @@ storage_providers:
 
 ## EnvVarsMap
 
-| Field                                 | Description                                                                             |
-| ------------------------------------- | --------------------------------------------------------------------------------------- |
-| `Variables` </br> *map[string]string* | Map to define the environment variables that will be available in the service container |
+| Field                                | Description                          |
+| -------------------------------------| -------------------------------------|
+|`Variables` </br> *map[string]string* | Map to define the environment variables that will be available in the service container |
 
 ## StorageProviders
 
@@ -131,22 +131,22 @@ storage_providers:
 
 ## Cluster
 
-| Field                          | Description                                                         |
-| ------------------------------ | ------------------------------------------------------------------- |
-| `endpoint` </br> *string*      | Endpoint of the OSCAR cluster API                                   |
-| `auth_user` </br> *string*     | Username to connect to the cluster (basic auth)                     |
-| `auth_password` </br> *string* | Password to connect to the cluster (basic auth)                     |
-| `ssl_verify` </br> *boolean*   | Parameter to enable or disable the verification of SSL certificates |
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
+| `endpoint`</br>*string*      | Endpoint of the OSCAR cluster API           |
+| `auth_user`</br>*string*| Username to connect to the cluster (basic auth) |
+|`auth_password`</br>*string*|Password to connect to the cluster (basic auth)|
+|`ssl_verify`</br>*boolean*|Parameter to enable or disable the verification of </br> SSL certificates|
 
 ## MinIOProvider
 
-| Field                       | Description                                           |
-|-----------------------------|-------------------------------------------------------|
-| `endpoint` </br> *string*   | MinIO endpoint                                        |
-| `verify` </br> *bool*       | Verify MinIO's TLS certificates for HTTPS connections |
-| `access_key` </br> *string* | Access key of the MinIO server                        |
-| `secret_key` </br> *string* | Secret key of the MinIO server                        |
-| `region` </br> *string*     | Region of the MinIO server                            |
+| Field                       | Description                                    |
+|-----------------------------|------------------------------------------------|
+| `endpoint` </br> *string* | MinIO endpoint                                   |
+| `verify` </br> *bool* | Verify MinIO's TLS certificates for HTTPS connections|
+| `access_key` </br> *string* | Access key of the MinIO server                 |
+| `secret_key` </br> *string* | Secret key of the MinIO server                 |
+| `region` </br> *string*     | Region of the MinIO server                     |
 
 ## S3Provider
 
