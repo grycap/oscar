@@ -59,6 +59,8 @@ is abstracted away from the user.
 
 <img align="right" src="docs/images/oscar-components.png" alt="OSCAR Components" width="400"></left>
 
+![OSCAR Components](docs/images/oscar-components.png {width=400})
+
 OSCAR runs on an elastic Kubernetes cluster that is deployed using:
 
 - [EC3](http://www.grycap.upv.es/ec3), an open-source tool to deploy compute
