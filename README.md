@@ -57,9 +57,7 @@ is abstracted away from the user.
 
 ### Components
 
-<img align="right" src="docs/images/oscar-components.png" alt="OSCAR Components" width="400"></left>
-
-![OSCAR Components](docs/images/oscar-components.png {width=400})
+![OSCAR Components](docs/images/oscar-components.png)
 
 OSCAR runs on an elastic Kubernetes cluster that is deployed using:
 
