@@ -29,7 +29,7 @@ cluster.
 - [**Licensing**](#licensing)
 - [**Acknowledgements**](#acknowledgements)
 
-### Why OSCAR?
+### Why OSCAR
 
 FaaS platforms are typically oriented to the execution of short-lived functions,
 coded in a certain programming language, in response to events. Scientific
