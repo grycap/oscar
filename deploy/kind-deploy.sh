@@ -11,6 +11,7 @@ MINIO_HELM_NAME="minio"
 NFS_HELM_NAME="nfs-server-provisioner"
 OSCAR_HELM_NAME="oscar"
 
+ARCH=`uname -m`
 SO=`uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]'`
 
 #Generate simple random passwords for OSCAR and MinIO
@@ -238,7 +239,11 @@ helm install minio minio/minio --namespace minio --set rootUser=minio,rootPasswo
 #Deploy NFS server provisioner
 echo -e "\n[*] Deploying NFS server provider ..."
 helm repo add --force-update nfs-ganesha-server-and-external-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
-helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner
+if [ $ARCH == "arm64"]; then
+    helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner --set image.repository=ghcr.io/grycap/nfs-provisioner-arm64 --set image.tag=latest
+else
+    helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner
+fi
 
 #Deploy Knative Serving
 if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
