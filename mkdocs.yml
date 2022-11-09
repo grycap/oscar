@@ -10,7 +10,7 @@ nav:
   - Deployment on K3s with Ansible: deploy-ansible.md
 - usage.md
 - invoking.md
-- Functions definition Language: fdl.md
+- Functions Definition Language (FDL): fdl.md
 - FDL Composer: fdl-composer.md
 - oscar-cli.md
 - Integration with EGI: egi-integration.md
