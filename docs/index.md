@@ -38,8 +38,7 @@ deployed using:
 
 The following components are deployed inside the Kubernetes cluster in order
 to support the OSCAR platform:
-
-- [MinIO](http://minio.io), a high performance distributed object storage
+- [MinIO](https://min.io), a high-performance distributed object storage
     server that provides an API compatible with S3.
 - [Knative](https://knative.dev), a Serverless framework to serve
     container-based applications for synchronous invocations (default Serverless Backend).
