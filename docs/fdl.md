@@ -136,7 +136,7 @@ storage_providers:
 | `endpoint`</br>*string*      | Endpoint of the OSCAR cluster API           |
 | `auth_user`</br>*string*| Username to connect to the cluster (basic auth) |
 |`auth_password`</br>*string*|Password to connect to the cluster (basic auth)|
-|`ssl_verify`</br>*boolean*|Parameter to enable or disable the verification of </br> SSL certificates|
+|`ssl_verify`</br>*boolean*| Parameter to enable or disable the verification of SSL certificates|
 
 ## MinIOProvider
 
