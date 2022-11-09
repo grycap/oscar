@@ -9,7 +9,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-8.5.8">
+      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-8.5.9">
     
     
       
@@ -20,7 +20,7 @@
       <link rel="stylesheet" href="../assets/stylesheets/main.20d9efc8.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.815d1a91.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.08040f6c.min.css">
         
           
           
@@ -56,7 +56,7 @@
     
     
     
-    <body dir="ltr" data-md-color-scheme="" data-md-color-primary="teal" data-md-color-accent="">
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="indigo">
   
     
     
@@ -357,7 +357,7 @@
   
     <li class="md-nav__item">
       <a href="../fdl/" class="md-nav__link">
-        Functions definition Language
+        Functions Definition Language (FDL)
       </a>
     </li>
   
@@ -405,8 +405,8 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#how-to-access" class="md-nav__link">
-    How to access
+  <a href="#how-to-access-fdl-composer" class="md-nav__link">
+    How to access FDl Composer
   </a>
   
 </li>
@@ -598,8 +598,8 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#how-to-access" class="md-nav__link">
-    How to access
+  <a href="#how-to-access-fdl-composer" class="md-nav__link">
+    How to access FDl Composer
   </a>
   
 </li>
@@ -687,57 +687,70 @@
 
 
 <h1 id="functions-definition-language-composer">Functions Definition Language Composer</h1>
-<p>Writing an entire workflow in plain text could be a tough task for many users.
-To simplify the process you can use FDL Composer, a tool developed by
-<a href="https://www.grycap.upv.es/">GRyCAP</a> to facilitate the definition of FDL YAML
+<p>Writing an entire workflow in plain text could be a difficult task for many
+users. To simplify the process you can use
+<a href="http://composer.oscar.grycap.net">FDL Composer</a>, a web-based user interface
+to facilitate the definition of <a href="https://docs.oscar.grycap.net/fdl/">FDL</a> YAML
 files for <a href="https://oscar.grycap.net/">OSCAR</a> and
-<a href="https://scar.readthedocs.io">SCAR</a> platforms from a user-friendly interactive
-graphic interface.</p>
+<a href="https://scar.readthedocs.io">SCAR</a>.</p>
 <p><img alt="fdl-composer-workflow.png" src="../images/fdl-composer/fdl-composer-workflow.png" /></p>
-<h2 id="how-to-access">How to access</h2>
-<p>It does not require installation, just access to
+<h2 id="how-to-access-fdl-composer">How to access FDl Composer</h2>
+<p>It does not require to be installed. Just access
 <a href="https://composer.oscar.grycap.net/">FDL Composer web</a>. If you prefer to
-execute on your computer instead of using the web. Clone the git repository:</p>
+execute it on your computer instead of using the web, clone the git repository
+by using the following command:</p>
 <pre><code class="language-sh">git clone https://github.com/grycap/fdl-composer
 </code></pre>
-<p>Run the app with npm:</p>
+<p>And the run the app with <code>npm</code>:</p>
 <pre><code class="language-sh">npm start
 </code></pre>
 <h2 id="basic-elements">Basic elements</h2>
+<p>Workflows are composed of <code>OSCAR services</code> and <code>Storage providers</code>:</p>
 <h3 id="oscar-services">OSCAR services</h3>
-<p>It requires filling at least the name, image, and script fields inputs. To
-define environment variables you must add them as a comma separated string of
+<p><code>OSCAR services</code> are responsible for processing the data uploaded to
+<code>Storage providers</code>.</p>
+<p>Defining a new <code>OSCAR service</code>  requires filling at least the <code>name</code>, <code>image</code>,
+and <code>script</code> fields.</p>
+<p>To define environment variables you must add them as a comma separated string of
 <em>key=value</em> entries. For example,  to create a variable with the name
 <code>firstName</code> and the value <code>John</code>, the "Environment variables" field should
 look like <code>firstName=John</code>. If you want to assign more than one variable, for
 example, <code>firstName</code> and <code>lastName</code> with the values <code>John</code> and <code>Keats</code>, the
-input field should fill with <code>firstName=John,lastName=Keats</code>.</p>
+input field should include them all separated by commas (e.g.,
+<code>firstName=John,lastName=Keats</code>).</p>
 <h3 id="storage-providers-and-bucketsfolders">Storage providers and buckets/folders</h3>
-<p>Three types of storage providers can be used in OSCAR FDLs: MinIO, S3, and
-OneData. First of all, they must be configured, to do it drag the storage
-provider from the menu to the canvas and double click on the item created, a
-window with a single input will appear. Then introduce the path of the folder
+<p><code>Storage providers</code> are object storage systems  responsible for storing both
+the input files to be processed by <code>OSCAR services</code> and the output files
+generated as a result of the processing.</p>
+<p>Three types of storage providers can be used in OSCAR
+<a href="https://docs.oscar.grycap.net/fdl/">FDLs</a>: <a href="https://min.io">MinIO</a>,
+<a href="https://aws.amazon.com/s3">Amazon S3</a>, and <a href="https://onedata.org">OneData</a>.</p>
+<p>To configure them, drag the storage
+provider from the menu to the canvas and double click on the item created. A
+window with a single input will appear. Then, insert the path of the folder
 name. To edit one of the storage providers, move the mouse over the item and
-select the edit option.
-<strong>Remember that only MinIO can be used as input storage provider for OSCAR services.</strong></p>
+select the edit option.</p>
+<p><strong>Remember that only MinIO can be used as input storage provider for OSCAR
+services.</strong></p>
 <h3 id="download-and-load-state">Download and load state</h3>
 <p>The graphic workflow can be saved in a file using the "Download state" button.
 OSCAR services, Storage Providers, and Buckets are kept in the file. The
 graphic workflow can be edited later by loading it with the "Load state" button.</p>
 <h3 id="create-a-yaml-file">Create a YAML file</h3>
-<p>You can easily download the workflow's YAML file through the "Export Yaml"
- button. In case of an error, a window will appear warning about it.</p>
+<p>You can easily download the workflow's FDL file (in YAML) through the "Export
+ YAML" button.</p>
 <h2 id="connecting-components">Connecting components</h2>
-<p>All components have four ports, up and left ones are input ports and right and
-down ports can be used as output. Services can only be connected with storage
-providers, always linked in the same direction (the output of one element with
-the input of the other). When two services are connected between them, both
-will be declared in the YAML the file, but they will work separately, and
+<p>All components have four ports: The up and left ones are input ports while the
+right and down ports are used as output. <code>OSCAR Services</code> can only be
+connected with <code>Storage providers</code>, always linked in the same direction
+(the output of one element with the input of the other).</p>
+<p>When two services are connected, both
+will be declared in the FDL file, but they will work separately, and
 there will be no workflow between them. If two storage providers are connected
-between them, it will have no effect, both storages will be declared.</p>
+between them, it will have no effect, but both storages will be declared.</p>
 <h2 id="scar-options">SCAR options</h2>
-<p>FDL Composer can also create FDL files for the SCAR tool. Using it, you can
-define workflows that can be executed on the Edge or on On-premises Clouds
+<p>FDL Composer can also create FDL files for <a href="https://github.com/grycap/scar">SCAR</a>. This allows to
+define workflows that can be executed on the Edge or in on-premises Clouds
 through OSCAR, and on the public Cloud (AWS Lambda and/or AWS Batch) through
 SCAR.</p>
 <h2 id="example">Example</h2>
@@ -764,7 +777,7 @@ use case in our <a href="https://oscar.grycap.net/blog/post-oscar-fdl-composer/"
     <nav class="md-footer__inner md-grid" aria-label="Footer" >
       
         
-        <a href="../fdl/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Functions definition Language" rel="prev">
+        <a href="../fdl/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Functions Definition Language (FDL)" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
           </div>
@@ -773,7 +786,7 @@ use case in our <a href="https://oscar.grycap.net/blog/post-oscar-fdl-composer/"
               <span class="md-footer__direction">
                 Previous
               </span>
-              Functions definition Language
+              Functions Definition Language (FDL)
             </div>
           </div>
         </a>
