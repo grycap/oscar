@@ -98,6 +98,20 @@ These are the steps:
     Once reached the "configured" state, see the "Outputs" to obtain the
     different endpoints:
 
+    * console_minio_endpoint: This endpoint brings access to MinIO web user
+        interfaces.
+    * dashboard_endpoint: This endpoint redirects to the Kubernetes dashboard
+        where the OSCAR cluster is built.
+    * local_oscarui_endpoint: This endpoint access to OSCAR user interface. In
+        this endpoint, only the user-password process authentication is
+        allowed. It can not be accessed with EGI credentials.
+    * minio_endpoint: Endpoint where MinIO is listening to a petition. If you
+        access it by the browser, you will be redirected to
+        "console_minio_endpoint".
+    * oscarui_endpoint: Endpoint of OSCAR user interfaces that EGI or
+        user-password credentials are available. In both cases, they need the
+        endpoint of the OSCAR variable.
+
     ![outputs](images/im-dashboard/im-dashboard-07.png)
 
     The OSCAR UI can be accessed with the username ``oscar`` and the password
