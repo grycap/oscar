@@ -16,6 +16,7 @@ nav:
 - Integration with EGI: egi-integration.md
 - OIDC Authorization: oidc-auth.md
 - OpenAPI Specification: api.md
+- MinIO bucket replication: minio-bucket-replication.md
 - license.md
 - about.md
 theme:
