@@ -625,12 +625,16 @@
 <p>An example of this scenario is shown on the following diagram, where there are two MinIO instances (each one on a different OSCAR cluster), and the output of the execution of <em>service_x</em> on the source serves as input for the <em>service_y</em> on the remote cluster.</p>
 <p><img alt="minio-replication-diagram" src="../images/minio-bucket-replication/minio-replication-diagram.png" /></p>
 <p>Here is in more detail the data flow between the buckets:</p>
-<p><strong>MinIO instance source</strong>
-- <code>input</code>: receives data and triggers the execution of OSCAR <em>service_x</em>.
-- <code>intermediate</code>: the output files from <em>service_x</em> are stored on this bucket and synchronized with the intermediate bucket on the remote instance. </p>
-<p><strong>MinIO instance remote</strong>
-- <code>intermediate</code>: the synchronized bucket that stores the replicated data and triggers OSCAR <em>service_y</em>.
-- <code>output</code>: stores the output files of <em>service_y</em>.</p>
+<p><strong>MinIO instance source</strong></p>
+<ul>
+<li><code>input</code>: receives data and triggers the execution of OSCAR <em>service_x</em>.</li>
+<li><code>intermediate</code>: the output files from <em>service_x</em> are stored on this bucket and synchronized with the intermediate bucket on the remote instance. </li>
+</ul>
+<p><strong>MinIO instance remote</strong></p>
+<ul>
+<li><code>intermediate</code>: the synchronized bucket that stores the replicated data and triggers OSCAR <em>service_y</em>.</li>
+<li><code>output</code>: stores the output files of <em>service_y</em>.</li>
+</ul>
 <h3 id="considerations">Considerations</h3>
 <p>When you create the service on the remote OSCAR cluster, the <code>intermediate</code> bucket which is both the replica and input of the OSCAR service will have the webhook event for PUT actions enabled so it can trigger the OSCAR service.</p>
 <p>Because, as explained below on <a href="#Event-handling-on-replication-events">Event handling on replication events</a>, there are some specific events for replicated buckets, it is important to delete this event webhook to avoid getting both events every time.</p>
