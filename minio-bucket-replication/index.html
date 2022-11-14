@@ -487,6 +487,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#helm-installation" class="md-nav__link">
+    Helm installation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#minio-setup" class="md-nav__link">
     MinIO setup
   </a>
@@ -572,6 +579,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#helm-installation" class="md-nav__link">
+    Helm installation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#minio-setup" class="md-nav__link">
     MinIO setup
   </a>
@@ -620,54 +634,41 @@
 <h3 id="considerations">Considerations</h3>
 <p>When you create the service on the remote OSCAR cluster, the <code>intermediate</code> bucket which is both the replica and input of the OSCAR service will have the webhook event for PUT actions enabled so it can trigger the OSCAR service.</p>
 <p>Because, as explained below on <a href="#Event-handling-on-replication-events">Event handling on replication events</a>, there are some specific events for replicated buckets, it is important to delete this event webhook to avoid getting both events every time.</p>
-<p>```bash!
-mc event remove originminio/intermediate arn:aws:sqs::intermediate:webhook --event put</p>
-<pre><code>
-## Helm installation
-
-To be able to use replication each MinIO instance deployed with Helm has to be configured in distributed mode. This is done by adding the parameters `mode=distributed,replicas=NUM_REPLICAS`.
-
-Here is an example of a local MinIO replicated deployment with Helm:
-
-```bash!
-helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=minio123,service.type=NodePort,service.nodePort=30300,consoleService.type=NodePort,consoleService.nodePort=30301,mode=distributed,replicas=2,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 --create-namespace
+<pre><code>mc event remove originminio/intermediate arn:aws:sqs::intermediate:webhook --event put
+</code></pre>
+<h2 id="helm-installation">Helm installation</h2>
+<p>To be able to use replication each MinIO instance deployed with Helm has to be configured in distributed mode. This is done by adding the parameters <code>mode=distributed,replicas=NUM_REPLICAS</code>.</p>
+<p>Here is an example of a local MinIO replicated deployment with Helm:</p>
+<pre><code>helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=minio123,service.type=NodePort,service.nodePort=30300,consoleService.type=NodePort,consoleService.nodePort=30301,mode=distributed,replicas=2,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 --create-namespace
 </code></pre>
 <h2 id="minio-setup">MinIO setup</h2>
 <p>To use the replication service it is necessary to set up manually both the requirements and the replication, either by command line or via the MinIO console. We created a test environment with replication via the command line as follows.</p>
 <p>First, we define our minIO instances (<code>originminio</code> and <code>remoteminio</code>) on the minio client.</p>
-<p>```bash!
-mc alias set originminio https://localminio minioadminuser minioadminpassword</p>
-<p>mc alias set remoteminio https://remoteminio minioadminuser minioadminpassword</p>
-<pre><code>
-A requisite for replication is to enable the versioning on the buckets that will serve as origin and replica. When we create a service through OSCAR and the minIO buckets are created, versioning is not enabled by default, so we have to do it manually.
+<pre><code>mc alias set originminio https://localminio minioadminuser minioadminpassword
 
-```bash!
-mc version enable originminio/intermediate
+mc alias set remoteminio https://remoteminio minioadminuser minioadminpassword
+</code></pre>
+<p>A requisite for replication is to enable the versioning on the buckets that will serve as origin and replica. When we create a service through OSCAR and the minIO buckets are created, versioning is not enabled by default, so we have to do it manually.</p>
+<pre><code>mc version enable originminio/intermediate
 
 mc version enable remoteminio/intermediate
 </code></pre>
 <p>Then, you can create the replication remote target</p>
-<p>```bash!
-mc admin bucket remote add originminio/intermediate                    \
-   https://RemoteUser:Password@HOSTNAME/intermediate  \
-   --service "replication"</p>
-<pre><code>
-and add the bucket replication rule so the actions on the origin bucket get synchronized on the replica.
-
-```bash!
-mc replicate add originminio/intermediate \
+<pre><code>mc admin bucket remote add originminio/intermediate \
+  https://RemoteUser:Password@HOSTNAME/intermediate \
+  --service &quot;replication&quot;
+</code></pre>
+<p>and add the bucket replication rule so the actions on the origin bucket get synchronized on the replica.</p>
+<pre><code>mc replicate add originminio/intermediate \
    --remote-bucket 'arn:minio:replication::&lt;UUID&gt;:intermediate' \
    --replicate &quot;delete,delete-marker,existing-objects&quot;
 </code></pre>
 <h2 id="event-handling-on-replication-events">Event handling on replication events</h2>
 <p>Once you have replica instances you can add a specific event webhook for the replica-related events.</p>
-<p>```bash!
-mc event add originminio/intermediate arn:minio:sqs::intermediate:webhook --event replica</p>
-<pre><code>
-The replication events sometimes arrive duplicated. Although this is not yet implemented, a solution to the duplicated events would be to filter them by the `userMetadata`, which is marked as *&quot;PENDING&quot;* on the events to be discarded.
-
-```json=
-  &quot;userMetadata&quot;: {
+<pre><code>mc event add originminio/intermediate arn:minio:sqs::intermediate:webhook --event replica
+</code></pre>
+<p>The replication events sometimes arrive duplicated. Although this is not yet implemented, a solution to the duplicated events would be to filter them by the <code>userMetadata</code>, which is marked as <em>"PENDING"</em> on the events to be discarded.</p>
+<pre><code>  &quot;userMetadata&quot;: {
     &quot;X-Amz-Replication-Status&quot;: &quot;PENDING&quot;
   }
 </code></pre>
