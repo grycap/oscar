@@ -11,10 +11,12 @@ An example of this scenario is shown on the following diagram, where there are t
 Here is in more detail the data flow between the buckets:
 
 **MinIO instance source**
+
 - `input`: receives data and triggers the execution of OSCAR *service_x*.
 - `intermediate`: the output files from *service_x* are stored on this bucket and synchronized with the intermediate bucket on the remote instance. 
 
 **MinIO instance remote**
+
 - `intermediate`: the synchronized bucket that stores the replicated data and triggers OSCAR *service_y*.
 - `output`: stores the output files of *service_y*.
 
