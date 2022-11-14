@@ -24,7 +24,7 @@ When you create the service on the remote OSCAR cluster, the `intermediate` buck
 
 Because, as explained below on [Event handling on replication events](#Event-handling-on-replication-events), there are some specific events for replicated buckets, it is important to delete this event webhook to avoid getting both events every time.
 
-```bash!
+```
 mc event remove originminio/intermediate arn:aws:sqs::intermediate:webhook --event put
 ```
 
@@ -34,7 +34,7 @@ To be able to use replication each MinIO instance deployed with Helm has to be c
 
 Here is an example of a local MinIO replicated deployment with Helm:
 
-```bash!
+```
 helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=minio123,service.type=NodePort,service.nodePort=30300,consoleService.type=NodePort,consoleService.nodePort=30301,mode=distributed,replicas=2,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 --create-namespace
 ```
 
@@ -44,7 +44,7 @@ To use the replication service it is necessary to set up manually both the requi
 
 First, we define our minIO instances (`originminio` and `remoteminio`) on the minio client.
 
-```bash!
+```
 mc alias set originminio https://localminio minioadminuser minioadminpassword
 
 mc alias set remoteminio https://remoteminio minioadminuser minioadminpassword
@@ -52,7 +52,7 @@ mc alias set remoteminio https://remoteminio minioadminuser minioadminpassword
 
 A requisite for replication is to enable the versioning on the buckets that will serve as origin and replica. When we create a service through OSCAR and the minIO buckets are created, versioning is not enabled by default, so we have to do it manually.
 
-```bash!
+```
 mc version enable originminio/intermediate
 
 mc version enable remoteminio/intermediate
@@ -60,15 +60,15 @@ mc version enable remoteminio/intermediate
 
 Then, you can create the replication remote target
 
-```bash!
-mc admin bucket remote add originminio/intermediate                    \
-   https://RemoteUser:Password@HOSTNAME/intermediate  \
-   --service "replication"
+```
+mc admin bucket remote add originminio/intermediate \
+  https://RemoteUser:Password@HOSTNAME/intermediate \
+  --service "replication"
 ```
 
 and add the bucket replication rule so the actions on the origin bucket get synchronized on the replica.
 
-```bash!
+```
 mc replicate add originminio/intermediate \
    --remote-bucket 'arn:minio:replication::<UUID>:intermediate' \
    --replicate "delete,delete-marker,existing-objects"
@@ -78,13 +78,13 @@ mc replicate add originminio/intermediate \
 
 Once you have replica instances you can add a specific event webhook for the replica-related events.
 
-```bash!
+```
 mc event add originminio/intermediate arn:minio:sqs::intermediate:webhook --event replica
 ```
 
 The replication events sometimes arrive duplicated. Although this is not yet implemented, a solution to the duplicated events would be to filter them by the `userMetadata`, which is marked as *"PENDING"* on the events to be discarded.
 
-```json=
+```
   "userMetadata": {
     "X-Amz-Replication-Status": "PENDING"
   }
