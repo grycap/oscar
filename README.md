@@ -127,7 +127,7 @@ Estatal de Investigación/ 10.13039/501100011033.
 <div style="display: inline-block;vertical-align: middle">
     <img src="docs/images/financing/logo-AEI.svg" width="120" height="120" />
     <img src="docs/images/financing/logo-gob.svg" width="120" height="120" />
-    <div style = "display: inline-block; position:relative; top:-25px;">
+    <div style = "display: inline-block; position:relative; top:-25px; vertical-align: middle">
         <img src="docs/images/financing/logo-ministerio-ciencia.svg" width="70" height="70"   />
     </div>
     <div style = "display: inline-block; position:relative; top:-35px;">
