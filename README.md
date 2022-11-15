@@ -124,7 +124,7 @@ Estatal de Investigación/ 10.13039/501100011033 and by “European Union NextGe
 Grant PID2020-113126RB-I00 funded by Ministerio de Ciencia e Innovación/Agencia
 Estatal de Investigación/ 10.13039/501100011033.
 
-<div style="display: inline-block;vertical-align: middle; background:white">
+<div style="display: inline-block;vertical-align: middle; background-color:white">
 <img src="docs/images/financing/logo-AEI.svg" width="120" height="120" />
 <img src="docs/images/financing/logo-gob.svg" width="120" height="120" />
 <img src="docs/images/financing/logo-ministerio-ciencia.svg" width="70" height="70" style = "position:relative; top:-25px;"  />
