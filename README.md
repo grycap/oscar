@@ -110,7 +110,8 @@ license text.
 ## Software Quality Assurance as a Service
 
 [SQAaaS Web](https://sqaaas.eosc-synergy.eu/#/auth/full-assessment) inside the
-European Open Science Cloud (EOSC-SYNERGY) project has assigned a silver badge
+European Open Science Cloud (EOSC-SYNERGY) project has assigned a 
+[silver badge](https://eu.badgr.com/public/assertions/0vLlQBANQzyHMOrmcsck3w?identity__url=https:%2F%2Fgithub.com%2FEOSC-synergy%2Foscar.assess.sqaaas%2Fcommit%2F10254d15a9230f45c84dae22f3711653162faf78)
 to this repository.
 
 ![Silver Badge](docs/images/badge_software_silver.png)
