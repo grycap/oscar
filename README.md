@@ -125,17 +125,11 @@ Grant PID2020-113126RB-I00 funded by Ministerio de Ciencia e Innovación/Agencia
 Estatal de Investigación/ 10.13039/501100011033.
 
 <div style="display: inline-block;vertical-align: middle">
-    <img src="docs/images/financing/logo-AEI.svg" width="120" height="120" />
-    <img src="docs/images/financing/logo-gob.svg" width="120" height="120" />
-    <div style = "display: inline-block; position:relative; top:-25px; vertical-align: middle">
-        <img src="docs/images/financing/logo-ministerio-ciencia.svg" width="70" height="70"   />
-    </div>
-    <div style = "display: inline-block; position:relative; top:-35px;">
-        <img src="docs/images/financing/logo-nextgen.png"   width="150" height="50" />
-    </div>
-    <div style = "display: inline-block; position:relative; top:-35px;">
-        <img src="docs/images/financing/logo-PRTR2.png" width="120" height="50"  />
-    </div>
+<img src="docs/images/financing/logo-AEI.svg" width="120" height="120" />
+<img src="docs/images/financing/logo-gob.svg" width="120" height="120" />
+<img src="docs/images/financing/logo-ministerio-ciencia.svg" width="70" height="70"   />
+<img src="docs/images/financing/logo-nextgen.png" width="150" height="50" />
+<img src="docs/images/financing/logo-PRTR2.png" width="120" height="50"  />
 </div>
 
 ## Acknowledgements
