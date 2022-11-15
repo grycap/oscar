@@ -107,6 +107,28 @@ OSCAR is licensed under the Apache License, Version 2.0. See
 [LICENSE](https://github.com/grycap/scar/blob/master/LICENSE) for the full
 license text.
 
+## Software Quality Assurance as a Service
+
+[SQAaaS Web](https://sqaaas.eosc-synergy.eu/#/auth/full-assessment) inside the
+European Open Science Cloud (EOSC-SYNERGY) project has assigned a silver badge
+to this repository.
+
+![Silver Badge](docs/images/badge_software_silver.png)
+
+## Financing by
+
+Grant PDC2021-120844-I00 funded by Ministerio de Ciencia e Innovación/Agencia
+Estatal de Investigación/ 10.13039/501100011033 and by “European Union NextGenerationEU/PRTR”.
+
+Grant PID2020-113126RB-I00 funded by Ministerio de Ciencia e Innovación/Agencia
+Estatal de Investigación/ 10.13039/501100011033.
+
+<img src="docs/images/financing/logo-AEI.svg" width="120" height="120" />
+<img src="docs/images/financing/logo-gob.svg" width="120" height="120" />
+<img src="docs/images/financing/logo-ministerio-ciencia.svg" width="70" height="70" />
+<img src="docs/images/financing/logo-nextgen.png" width="150" height="50" />
+<img src="docs/images/financing/logo-PRTR2.png" width="120" height="50" />
+
 ## Acknowledgements
 
 This development is partially funded by the [EGI Strategic and Innovation Fund](https://www.egi.eu/about/egi-council/egi-strategic-and-innovation-fund/).
