@@ -57,7 +57,7 @@ is abstracted away from the user.
 
 ### Components
 
-![OSCAR Components](docs/images/oscar-components.png)
+<img align="right" src="docs/images/oscar-components.png" alt="OSCAR Components" width="400"></left>
 
 OSCAR runs on an elastic Kubernetes cluster that is deployed using:
 
@@ -124,11 +124,13 @@ Estatal de Investigación/ 10.13039/501100011033 and by “European Union NextGe
 Grant PID2020-113126RB-I00 funded by Ministerio de Ciencia e Innovación/Agencia
 Estatal de Investigación/ 10.13039/501100011033.
 
+<div style="display: inline-block;vertical-align: middle;">
 <img src="docs/images/financing/logo-AEI.svg" width="120" height="120" />
 <img src="docs/images/financing/logo-gob.svg" width="120" height="120" />
 <img src="docs/images/financing/logo-ministerio-ciencia.svg" width="70" height="70" />
 <img src="docs/images/financing/logo-nextgen.png" width="150" height="50" />
 <img src="docs/images/financing/logo-PRTR2.png" width="120" height="50" />
+</div>
 
 ## Acknowledgements
 
