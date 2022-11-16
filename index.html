@@ -605,9 +605,9 @@ run on AWS Lambda.</p>
 <p>Users upload files to a bucket and this automatically triggers the execution
 of parallel invocations to a function responsible for processing each file.
 Output files are delivered into an output bucket for the convenience of the
-user. Highly scalable HTTP-based endpoints can also be offered in order to
-expose a generic application. An user-provided shell script is executed inside
-the container run from the user-defined Docker image in order to achieve the
+user. Highly scalable HTTP-based endpoints can also be offered to expose a generic
+application. A user-provided shell script is executed inside
+the container run from the user-defined Docker image to achieve the
 right execution environment for the application.</p>
 <h2 id="components">Components</h2>
 <p><img alt="oscar arch" src="images/oscar-arch.png" /></p>
@@ -615,7 +615,7 @@ right execution environment for the application.</p>
 deployed using:</p>
 <ul>
 <li><a href="http://www.grycap.upv.es/ec3">EC3</a>, an open-source tool to deploy compute
-    clusters that can horizontally scale in terms of number of nodes with multiple
+    clusters that can horizontally scale in terms of the number of nodes with multiple
     plugins.</li>
 <li><a href="http://www.grycap.upv.es/im">IM</a>, an open-source virtual infrastructure
     provisioning tool for multi-Clouds.</li>
@@ -624,25 +624,23 @@ deployed using:</p>
     cluster according to the workload.</li>
 </ul>
 <p>The following components are deployed inside the Kubernetes cluster in order
-to support the OSCAR platform:</p>
-<ul>
-<li><a href="http://minio.io">MinIO</a>, a high performance distributed object storage
-    server that provides an API compatible with S3.</li>
-<li><a href="https://knative.dev">Knative</a>, a Serverless framework to serve
+to support the OSCAR platform:
+- <a href="https://min.io">MinIO</a>, a high-performance distributed object storage
+    server that provides an API compatible with S3.
+- <a href="https://knative.dev">Knative</a>, a Serverless framework to serve
     container-based applications for synchronous invocations (default
-    Serverless Backend).</li>
-<li><a href="https://www.openfaas.com/">OpenFaaS</a>, a FaaS platform that allows creating
-    functions executed via HTTP requests.</li>
-<li>OSCAR, the main application, responsible for the management of the services
+    Serverless Backend).
+- <a href="https://www.openfaas.com/">OpenFaaS</a>, a FaaS platform that allows creating
+    functions executed via HTTP requests.
+- OSCAR, the main application, responsible for the management of the services
     and the integration of the different components to support event-driven
     serverless computing for file processing. It includes a web-based GUI aimed
-    at end users to facilitate interaction with OSCAR.</li>
-</ul>
+    at end users to facilitate interaction with OSCAR.</p>
 <p>As external storage providers, the following services can be used:</p>
 <ul>
 <li>External <a href="https://min.io">MinIO</a> servers, which may be in clusters other
     than the platform.</li>
-<li><a href="https://aws.amazon.com/s3/">Amazon S3</a>, the Amazon's  object storage
+<li>[Amazon <a href="https://aws.amazon.com/s3/">S3</a>, AWS's object storage
     service that offers industry-leading scalability, data availability,
     security, and performance in the public Cloud.</li>
 <li><a href="https://onedata.org/">Onedata</a>, the global data access solution for science
@@ -650,15 +648,14 @@ to support the OSCAR platform:</p>
 <li>Any storage provider that can be accessible through
     <a href="http://www.webdav.org/">WebDAV</a> protocol. An example of a storage provider
     supporting this protocol is <a href="https://dcache.org/">dCache</a>, a storage
-    middleware system capable of manage the storage and exchange of large data
+    middleware system capable of managing the storage and exchange of large data
     quantities.</li>
 </ul>
-<p><em><strong>Note</strong>: All of the mentioned storage providerscan be used as output but
+<p><em><strong>Note</strong>: All of the mentioned storage providers can be used as output, but
 only MinIO can be used as input.</em></p>
 <p>An OSCAR cluster can be accessed via its
 <a href="https://grycap.github.io/oscar/api/">REST API</a>, the
-<a href="https://github.com/grycap/oscar/tree/master/ui">web-based UI</a> and the the
-command-line interface  provided by
+[web-based <a href="https://github.com/grycap/oscar/tree/master/ui">UI</a> and the command-line interface provided by
 <a href="https://github.com/grycap/oscar-cli">oscar-cli</a>.</p>
 
 
