@@ -121,11 +121,7 @@ Also, Grant PDC2021-120844-I00 funded by Ministerio de Ciencia e Innovación/Age
     <img align="left" src="docs/images/badge_software_silver.png" alt="Silver Badge" width="90">
 </a>
 
-This software has received a silver badge according to the [Software Quality Baseline criteria](https://www.eosc-synergy.eu/for-developers/) defined by the [EOSC-Synergy](https://www.eosc-synergy.eu) project.
-
-
-
-Please acknowledge the use of OSCAR by citing the following scientific
+This software has received a silver badge according to the [Software Quality Baseline criteria](https://www.eosc-synergy.eu/for-developers/) defined by the [EOSC-Synergy](https://www.eosc-synergy.eu) project. Please acknowledge the use of OSCAR by citing the following scientific
 publication ([preprint available](https://www.grycap.upv.es/gmolto/publications/preprints/Perez2019osc.pdf)):
 
 ```
