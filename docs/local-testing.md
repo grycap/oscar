@@ -81,7 +81,12 @@ repo and install the chart, run the following commands replacing
 
 ```sh
 helm repo add minio https://charts.min.io
-helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=<MINIO_PASSWORD>,service.type=NodePort,service.nodePort=30300,consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 --create-namespace
+helm install minio minio/minio --namespace minio --set rootUser=minio,\
+rootPassword=<MINIO_PASSWORD>,service.type=NodePort,service.nodePort=30300,\
+consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,\
+resources.requests.memory=512Mi,\
+environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 \
+ --create-namespace
 ```
 
 *Note that the deployment has been configured to use the rootUser `minio` and
@@ -174,7 +179,11 @@ it in the previous step:
 
 ```sh
 helm repo add grycap https://grycap.github.io/helm-charts/
-helm install --namespace=oscar oscar grycap/oscar --set authPass=<OSCAR_PASSWORD> --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=<MINIO_PASSWORD>
+helm install --namespace=oscar oscar grycap/oscar \
+ --set authPass=<OSCAR_PASSWORD> --set service.type=ClusterIP \
+ --set ingress.create=true --set volume.storageClassName=nfs \
+ --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false \
+ --set minIO.accessKey=minio --set minIO.secretKey=<MINIO_PASSWORD>
 ```
 
 Now you can access to the OSCAR web interface through `https://localhost` with

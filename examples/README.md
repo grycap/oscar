@@ -12,7 +12,7 @@ framework for event-driven high-throughput processing of files:
 * Mask detector workflow, which employs [FFmpeg](https://ffmpeg.org/) and
     [Blurry Faces](https://github.com/asmaamirkhan/BlurryFaces) to extract frames
     out of an input video and anonymise them before being processed by the
-[Mask detector](https://github.com/adityap27/face-mask-detector).
+    [Mask detector](https://github.com/adityap27/face-mask-detector).
 * Video processing workflow, which uses [FFmpeg](https://ffmpeg.org/) to
     extract keyframes of the input video and apply the
     [YOLOv3](https://pjreddie.com/darknet/yolo/) inference model to recognise

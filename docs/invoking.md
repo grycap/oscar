@@ -73,11 +73,12 @@ The output of synchronous invocations will depend on the application itself:
 1. If the script generates a file inside the output dir available through the
     `$TMP_OUTPUT_DIR` environment variable, the result will be the file encoded in
     base64.
-2. If the script generates more than one file inside `$TMP_OUTPUT_DIR`, the
+1. If the script generates more than one file inside `$TMP_OUTPUT_DIR`, the
     result will be a zip archive containing all files encoded in base64.
-3. If there are no files in `$TMP_OUTPUT_DIR`, FaaS Supervisor will return its
+1. If there are no files in `$TMP_OUTPUT_DIR`, FaaS Supervisor will return its
     logs, including the stdout of the user script run.
-    **To avoid FaaS Supervisor's logs, you must set the service's `log_level` to `CRITICAL`.**
+    **To avoid FaaS Supervisor's logs, you must set the service's `log_level`
+    to `CRITICAL`.**
 
 This way users can adapt OSCAR's services to their own needs.
 
@@ -114,7 +115,8 @@ issues with the output in synchronous invocations remember to put the
 decoded as well. Save output in the expected format of the use-case.
 
 ``` sh
-base64 input.png | curl -X POST -H "Authorization: Bearer <TOKEN>" -d @- https://<CLUSTER_ENDPOINT>/run/<OSCAR_SERVICE> | base64 -d > result.png
+base64 input.png | curl -X POST -H "Authorization: Bearer <TOKEN>" \
+ -d @- https://<CLUSTER_ENDPOINT>/run/<OSCAR_SERVICE> | base64 -d > result.png
 ```
 
 ### Limitations

@@ -106,5 +106,6 @@ curl -H 'Authorization: Bearer <SERVICE_TOKEN>' -d '{"message": "Hi there"}' htt
 and if `INPUT_TYPE` not defined or other than `json`:
 
 ```sh
-echo "Hi there" | base64 | curl -H 'Authorization: Bearer <SERVICE_TOKEN>' -d @- https://<CLUSTER_ENDPOINT>/run/cowsay
+echo "Hi there" | base64 | curl -H 'Authorization: Bearer <SERVICE_TOKEN>' \
+-d @- https://<CLUSTER_ENDPOINT>/run/cowsay
 ```

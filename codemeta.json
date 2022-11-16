@@ -1,0 +1,119 @@
+{
+    "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+    "@type": "SoftwareSourceCode",
+    "license": "https://spdx.org/licenses/Apache-2.0",
+    "codeRepository": "https://github.com/grycap/oscar",
+    "contIntegration": "https://github.com/grycap/oscar/actions",
+    "dateCreated": "2018-06-15",
+    "datePublished": "2018-10-01",
+    "dateModified": "2022-11-07",
+    "downloadUrl": "https://github.com/grycap/oscar/archive/refs/tags/v2.5.2.zip",
+    "issueTracker": "https://github.com/grycap/oscar/issues",
+    "name": "OSCAR",
+    "version": "2.5.2",
+    "identifier": "https://oscar.grycap.net",
+    "description": "OSCAR is an open-source platform to support the Functions as a Service (FaaS) computing model for file-processing applications. It can be automatically deployed on multi-Clouds in order to create highly-parallel event-driven file-processing serverless applications that execute on customized runtime environments provided by Docker containers than run on an elastic Kubernetes cluster.",
+    "applicationCategory": "Computing",
+    "releaseNotes": "What's Changed\n\n    Fix mask-detector-workflow FDL by @srisco in #165\n    Add oidc authorization docs by @srisco in #166\n    update doc, change contributing and readme by @SergioLangaritaBenitez in #167\n    update documentation 2:fixing files of documentation by @SergioLangaritaBenitez in #168\n    Update oscar-ui ref by @srisco in #170\n\nFull Changelog: v2.5.1...v2.5.2\n",
+    "funding": "TIN2016-79951-R, PID2020-113126RB-I00, PDC2021-120844-I00, 101016577",
+    "developmentStatus": "active",
+    "isPartOf": "https://oscar.grycap.net",
+    "referencePublication": "https://dx.doi.org/10.1109/CLOUD.2019.00073",
+    "funder": {
+        "@type": "Organization",
+        "name": "MCIN/AEI/10.13039/501100011033, European Union’s Horizon 2020"
+    },
+    "keywords": [
+        "Serverless",
+        "Cloud computing"
+    ],
+    "programmingLanguage": [
+        "Go",
+        "Shell",
+        "Dockerfile"
+    ],
+    "runtimePlatform": [
+        "Kubernetes"
+    ],
+    "operatingSystem": [
+        "Linux",
+        "macOS"
+    ],
+    "relatedLink": [
+        "https://oscar.grycap.net/"
+    ],
+    "author": [
+        {
+            "@type": "Person",
+            "@id": "https://orcid.org/0000-0002-7710-2182",
+            "givenName": "Sebastián",
+            "familyName": "Risco",
+            "email": "serisgal@i3m.upv.es",
+            "affiliation": {
+                "@type": "Organization",
+                "name": "Instituto de Instrumentación para Imagen Molecular (I3M), Centro Mixto CSIC — Universitat Politècnica de València, Camino de Vera s/n, 46022 Valencia, España"
+            }
+        },
+        {
+            "@type": "Person",
+            "@id": "https://www.grycap.upv.es/gmolto",
+            "givenName": "Germán",
+            "familyName": "Moltó",
+            "email": "gmolto@dsic.upv.es",
+            "affiliation": {
+                "@type": "Organization",
+                "name": "Instituto de Instrumentación para Imagen Molecular (I3M), Centro Mixto CSIC — Universitat Politècnica de València, Camino de Vera s/n, 46022 Valencia, España"
+            }
+        },
+        {
+            "@type": "Person",
+            "givenName": "Caterina",
+            "familyName": "Alarcón",
+            "email": "calarcon@i3m.upv.es",
+            "affiliation": {
+                "@type": "Organization",
+                "name": "Instituto de Instrumentación para Imagen Molecular (I3M), Centro Mixto CSIC — Universitat Politècnica de València, Camino de Vera s/n, 46022 Valencia, España"
+            }
+        },
+        {
+            "@type": "Person",
+            "givenName": "Sergio",
+            "familyName": "Langarita",
+            "email": "slangarita@i3m.upv.es",
+            "affiliation": {
+                "@type": "Organization",
+                "name": "Instituto de Instrumentación para Imagen Molecular (I3M), Centro Mixto CSIC — Universitat Politècnica de València, Camino de Vera s/n, 46022 Valencia, España"
+            }
+        },
+        {
+            "@type": "Person",
+            "givenName": "Alfonso",
+            "familyName": "Pérez",
+            "email": "alpegon3@upv.es",
+            "affiliation": {
+                "@type": "Organization",
+                "name": "Instituto de Instrumentación para Imagen Molecular (I3M), Centro Mixto CSIC — Universitat Politècnica de València, Camino de Vera s/n, 46022 Valencia, España"
+            }
+        },
+        {
+            "@type": "Person",
+            "givenName": "Diana M.",
+            "familyName": "Naranjo",
+            "email": "dnaranjo@upv.es",
+            "affiliation": {
+                "@type": "Organization",
+                "name": "Instituto de Instrumentación para Imagen Molecular (I3M), Centro Mixto CSIC — Universitat Politècnica de València, Camino de Vera s/n, 46022 Valencia, España"
+            }
+        },
+        {
+            "@type": "Person",
+            "givenName": "Miguel",
+            "familyName": "Caballer",
+            "email": "micafer1@upv.es",
+            "affiliation": {
+                "@type": "Organization",
+                "name": "Instituto de Instrumentación para Imagen Molecular (I3M), Centro Mixto CSIC — Universitat Politècnica de València, Camino de Vera s/n, 46022 Valencia, España"
+            }
+        }
+    ]
+}

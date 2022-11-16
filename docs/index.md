@@ -43,7 +43,8 @@ to support the OSCAR platform:
 - [MinIO](http://minio.io), a high performance distributed object storage
     server that provides an API compatible with S3.
 - [Knative](https://knative.dev), a Serverless framework to serve
-    container-based applications for synchronous invocations (default Serverless Backend).
+    container-based applications for synchronous invocations (default
+    Serverless Backend).
 - [OpenFaaS](https://www.openfaas.com/), a FaaS platform that allows creating
     functions executed via HTTP requests.
 - OSCAR, the main application, responsible for the management of the services
@@ -68,7 +69,7 @@ As external storage providers, the following services can be used:
 
 ***Note**: All of the mentioned storage providerscan be used as output but
 only MinIO can be used as input.*
-  
+
 An OSCAR cluster can be accessed via its
 [REST API](https://grycap.github.io/oscar/api/), the
 [web-based UI](https://github.com/grycap/oscar/tree/master/ui) and the the

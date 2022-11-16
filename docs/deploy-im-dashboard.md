@@ -30,7 +30,7 @@ These are the steps:
     [EGI Check-In](https://www.egi.eu/services/check-in/), which supports
     mutiple Identity Providers (IdP).
 
-2. Configure the Cloud Credentials
+1. Configure the Cloud Credentials
 
     Once logged in, you need to define the access credentials to the Cloud on
     which the OSCAR cluster will be deployed. These should be temporary
@@ -48,11 +48,11 @@ These are the steps:
     for an [IAM](https://aws.amazon.com/iam/) user that has privileges to
     deploy Virtual Machines in [Amazon EC2](https://aws.amazon.com/ec2).
 
-3. Select the OSCAR template
+1. Select the OSCAR template
 
     ![template](images/im-dashboard/im-dashboard-01.png)
 
-4. Customize and deploy the OSCAR cluster
+1. Customize and deploy the OSCAR cluster
 
     In this panel you can specify the number of Working Nodes (WNs) of the
     cluster together with the computational requirements for each node. We
@@ -80,7 +80,7 @@ These are the steps:
 
     Give the infrastructure a name and press "Submit".
 
-5. Check the status of the deployment OSCAR cluster
+1. Check the status of the deployment OSCAR cluster
 
     You will see that the OSCAR cluster is being deployed and the
     infrastructure reaches the status "running". The process will not finish
@@ -93,10 +93,22 @@ These are the steps:
 
     ![status-log](images/im-dashboard/im-dashboard-06.png)
 
-6. Accessing the OSCAR cluster
+1. Accessing the OSCAR cluster
 
     Once reached the "configured" state, see the "Outputs" to obtain the
     different endpoints:
+
+    * console_minio_endpoint: This endpoint brings access to the MinIO web
+        user interface.
+    * dashboard_endpoint: This endpoint redirects to the Kubernetes dashboard
+        where the OSCAR cluster is deployed.
+    * local_oscarui_endpoint: This endpoint is where the OSCAR backend is
+        listening. It supports authentication only via basic-auth.
+    * minio_endpoint: Endpoint where the MinIO API is listening. If you
+        access it through a web browser, you will be redirected to
+        "console_minio_endpoint".
+    * oscarui_endpoint: Public endpoint of the OSCAR web user interface. It
+        supports OIDC connections via EGI Check-in, as well as basic auth.
 
     ![outputs](images/im-dashboard/im-dashboard-07.png)
 
@@ -117,7 +129,7 @@ These are the steps:
     You can obtain statistics about the Kubernetes cluster:
     ![access-kubernetes-2](images/im-dashboard/im-dashboard-11.png)
 
-7. Terminating the OSCAR cluster
+2. Terminating the OSCAR cluster
 
     You can terminate the OSCAR cluster from the IM Dashboard:
     ![terminate](images/im-dashboard/im-dashboard-12.png)

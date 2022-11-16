@@ -43,7 +43,8 @@ oscar-cli apply text-to-speech-google.yaml
 To run the service synchronously use:
 
 ```sh
-oscar-cli service run text-to-speech-google --text-input "Hello everyone"  --output output.mp3
+oscar-cli service run text-to-speech-google --text-input "Hello everyone" \
+  --output output.mp3
 ```
 
 You also can pass a file text substituing the flag `--text-input {string}` to
@@ -53,7 +54,8 @@ And if you have installed the [VLC player](https://www.videolan.org/vlc/) and
 you want to play it use this one:
 
 ```sh
-oscar-cli service run text-to-speech-google --text-input "Hello everyone"  --output output.mp3 && vlc output.mp3
+oscar-cli service run text-to-speech-google --text-input "Hello everyone" \
+  --output output.mp3 && vlc output.mp3
 ```
 
 You can trigger the service in an asynchronous way just uploading files to the

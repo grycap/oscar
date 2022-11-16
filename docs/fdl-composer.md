@@ -90,7 +90,8 @@ between them, it will have no effect, but both storages will be declared.
 
 ## SCAR options
 
-FDL Composer can also create FDL files for [SCAR](https://github.com/grycap/scar). This allows to
+FDL Composer can also create FDL files for
+[SCAR](https://github.com/grycap/scar). This allows to
 define workflows that can be executed on the Edge or in on-premises Clouds
 through OSCAR, and on the public Cloud (AWS Lambda and/or AWS Batch) through
 SCAR.

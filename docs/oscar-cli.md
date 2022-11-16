@@ -78,17 +78,21 @@ Add a new existing cluster to oscar-cli.
 
 ```
 Usage:
-  oscar-cli cluster add IDENTIFIER ENDPOINT {USERNAME {PASSWORD | --password-stdin} | --oidc-account-name ACCOUNT} [flags]
+  oscar-cli cluster add IDENTIFIER ENDPOINT {USERNAME {PASSWORD | \
+  --password-stdin} | --oidc-account-name ACCOUNT} [flags]
 
 Aliases:
   add, a
 
 Flags:
-      --disable-ssl                disable verification of ssl certificates for the added cluster
-  -h, --help                       help for add
-  -o, --oidc-account-name string   OIDC account name to authenticate using oidc-agent. Note that oidc-agent must be started and properly configured
-                                   (See: https://indigo-dc.gitbook.io/oidc-agent/)
-      --password-stdin             take the password from stdin
+      --disable-ssl               disable verification of ssl certificates for the
+                                  added cluster
+  -h, --help                      help for add
+  -o, --oidc-account-name string  OIDC account name to authenticate using
+                                  oidc-agent. Note that oidc-agent must be
+                                  started and properly configured
+                                  (See:https://indigo-dc.gitbook.io/oidc-agent/)
+      --password-stdin            take the password from stdin
 
 Global Flags:
       --config string   set the location of the config file (YAML or JSON)
@@ -266,7 +270,9 @@ Aliases:
 
 Flags:
   -h, --help             help for list
-  -s, --status strings   filter by status (Pending, Running, Succeeded or Failed), multiple values can be specified by a comma-separated string
+  -s, --status strings   filter by status (Pending, Running, Succeeded or
+                         Failed), multiple values can be specified by a
+                         comma-separated string
 
 Global Flags:
   -c, --cluster string   set the cluster
@@ -299,7 +305,8 @@ Remove a service's job along with its logs.
 
 ```
 Usage:
-  oscar-cli service logs remove SERVICE_NAME {JOB_NAME... | --succeeded | --all} [flags]
+  oscar-cli service logs remove SERVICE_NAME \
+   {JOB_NAME... | --succeeded | --all} [flags]
 
 Aliases:
   remove, rm
@@ -326,7 +333,8 @@ definition.
 
 ```
 Usage:
-  oscar-cli service get-file SERVICE_NAME STORAGE_PROVIDER REMOTE_FILE LOCAL_FILE [flags]
+  oscar-cli service get-file SERVICE_NAME STORAGE_PROVIDER REMOTE_FILE \
+   LOCAL_FILE [flags]
 
 Aliases:
   get-file, gf
@@ -351,7 +359,8 @@ definition.
 
 ```
 Usage:
-  oscar-cli service put-file SERVICE_NAME STORAGE_PROVIDER LOCAL_FILE REMOTE_FILE [flags]
+  oscar-cli service put-file SERVICE_NAME STORAGE_PROVIDER LOCAL_FILE \
+   REMOTE_FILE [flags]
 
 Aliases:
   put-file, pf
