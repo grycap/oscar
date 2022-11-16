@@ -16,7 +16,8 @@ run on AWS Lambda.
 Users upload files to a bucket and this automatically triggers the execution
 of parallel invocations to a function responsible for processing each file.
 Output files are delivered into an output bucket for the convenience of the
-user. Highly scalable HTTP-based endpoints can also be offered to expose a generic application. A user-provided shell script is executed inside
+user. Highly scalable HTTP-based endpoints can also be offered to expose a generic
+application. A user-provided shell script is executed inside
 the container run from the user-defined Docker image to achieve the
 right execution environment for the application.
 
