@@ -27,6 +27,7 @@ cluster.
 - [**About OSCAR**](#why-oscar)
 - [**Components**](#components)
 - [**Licensing**](#licensing)
+- [**Software Quality Assurance as a Service**](#software-quality-assurance-as-a-service)
 - [**Acknowledgements**](#acknowledgements)
 
 ### Why OSCAR
@@ -116,7 +117,10 @@ to this repository.
 
 ![Silver Badge](docs/images/badge_software_silver.png)
 
-## Financing by
+
+## Acknowledgements
+
+This development is partially funded by the [EGI Strategic and Innovation Fund](https://www.egi.eu/about/egi-council/egi-strategic-and-innovation-fund/).
 
 Grant PDC2021-120844-I00 funded by Ministerio de Ciencia e Innovación/Agencia
 Estatal de Investigación/ 10.13039/501100011033 and by “European Union NextGenerationEU/PRTR”.
@@ -125,11 +129,6 @@ Grant PID2020-113126RB-I00 funded by Ministerio de Ciencia e Innovación/Agencia
 Estatal de Investigación/ 10.13039/501100011033.
 
 ![financing](docs/images/financing/funded.png)
-
-
-## Acknowledgements
-
-This development is partially funded by the [EGI Strategic and Innovation Fund](https://www.egi.eu/about/egi-council/egi-strategic-and-innovation-fund/).
 
 Please acknowledge the use of OSCAR by citing the following scientific
 publication ([preprint available](https://www.grycap.upv.es/gmolto/publications/preprints/Perez2019osc.pdf)):
