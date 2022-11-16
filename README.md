@@ -111,22 +111,19 @@ license text.
 
 This development is partially funded by the [EGI Strategic and Innovation Fund](https://www.egi.eu/about/egi-council/egi-strategic-and-innovation-fund/).
 
-Grant PDC2021-120844-I00 funded by Ministerio de Ciencia e Innovación/Agencia
-Estatal de Investigación/ 10.13039/501100011033 and by “European Union NextGenerationEU/PRTR”.
+Partially funded by the project [AI-SPRINT](https://ai-sprint-project.eu) "AI in Secure Privacy-Preserving Computing Continuum" that has received funding from the European Union’s Horizon 2020 Research and Innovation Programme under Grant 101016577.
 
-Grant PID2020-113126RB-I00 funded by Ministerio de Ciencia e Innovación/Agencia
-Estatal de Investigación/ 10.13039/501100011033.
+Also, Grant PDC2021-120844-I00 funded by Ministerio de Ciencia e Innovación/Agencia Estatal de Investigación/ 10.13039/501100011033 and by “European Union NextGenerationEU/PRTR” and Grant PID2020-113126RB-I00 funded by Ministerio de Ciencia e Innovación/Agencia Estatal de Investigación/ 10.13039/501100011033.
 
 ![financing](docs/images/financing/funded.png)
 
 <a href="https://eu.badgr.com/public/assertions/0vLlQBANQzyHMOrmcsck3w?identity__url=https:%2F%2Fgithub.com%2FEOSC-synergy%2Foscar.assess.sqaaas%2Fcommit%2F10254d15a9230f45c84dae22f3711653162faf78">
-    <img align="left" src="docs/images/badge_software_silver.png" alt="Silver Badge" width="60">
+    <img align="left" src="docs/images/badge_software_silver.png" alt="Silver Badge" width="100">
 </a>
 
-[SQAaaS Web](https://sqaaas.eosc-synergy.eu/#/auth/full-assessment) inside the
-European Open Science Cloud (EOSC-SYNERGY) project has assigned a 
-[silver badge](https://eu.badgr.com/public/assertions/0vLlQBANQzyHMOrmcsck3w?identity__url=https:%2F%2Fgithub.com%2FEOSC-synergy%2Foscar.assess.sqaaas%2Fcommit%2F10254d15a9230f45c84dae22f3711653162faf78)
-to this repository.
+This software has received a silver badge according to the [Software Quality Baseline criteria](https://www.eosc-synergy.eu/for-developers/) defined by the [EOSC-Synergy](https://www.eosc-synergy.eu) project.
+
+
 
 Please acknowledge the use of OSCAR by citing the following scientific
 publication ([preprint available](https://www.grycap.upv.es/gmolto/publications/preprints/Perez2019osc.pdf)):
