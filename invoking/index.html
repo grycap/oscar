@@ -719,7 +719,8 @@ script through the <code>$INPUT_FILE_PATH</code> environment variable.</p>
     result will be a zip archive containing all files encoded in base64.</li>
 <li>If there are no files in <code>$TMP_OUTPUT_DIR</code>, FaaS Supervisor will return its
     logs, including the stdout of the user script run.
-    <strong>To avoid FaaS Supervisor's logs, you must set the service's <code>log_level</code> to <code>CRITICAL</code>.</strong></li>
+    <strong>To avoid FaaS Supervisor's logs, you must set the service's <code>log_level</code>
+    to <code>CRITICAL</code>.</strong></li>
 </ol>
 <p>This way users can adapt OSCAR's services to their own needs.</p>
 <h3 id="oscar-cli">OSCAR-CLI</h3>
@@ -746,7 +747,8 @@ found in the
 issues with the output in synchronous invocations remember to put the
 <code>log_level</code> as <code>CRITICAL</code>. Output, which is encoded in base64, should be
 decoded as well. Save output in the expected format of the use-case.</p>
-<pre><code class="language-sh">base64 input.png | curl -X POST -H &quot;Authorization: Bearer &lt;TOKEN&gt;&quot; -d @- https://&lt;CLUSTER_ENDPOINT&gt;/run/&lt;OSCAR_SERVICE&gt; | base64 -d &gt; result.png
+<pre><code class="language-sh">base64 input.png | curl -X POST -H &quot;Authorization: Bearer &lt;TOKEN&gt;&quot; \
+ -d @- https://&lt;CLUSTER_ENDPOINT&gt;/run/&lt;OSCAR_SERVICE&gt; | base64 -d &gt; result.png
 </code></pre>
 <h3 id="limitations">Limitations</h3>
 <p>Using synchronous invocations couldn't be the best way to run long-running

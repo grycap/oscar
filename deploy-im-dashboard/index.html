@@ -615,7 +615,20 @@ you can see the logs:</p>
 <p>Accessing the OSCAR cluster</p>
 <p>Once reached the "configured" state, see the "Outputs" to obtain the
 different endpoints:</p>
-<p><img alt="outputs" src="../images/im-dashboard/im-dashboard-07.png" /></p>
+<ul>
+<li>console_minio_endpoint: This endpoint brings access to the MinIO web
+    user interface.</li>
+<li>dashboard_endpoint: This endpoint redirects to the Kubernetes dashboard
+    where the OSCAR cluster is deployed.</li>
+<li>local_oscarui_endpoint: This endpoint is where the OSCAR backend is
+    listening. It supports authentication only via basic-auth.</li>
+<li>minio_endpoint: Endpoint where the MinIO API is listening. If you
+    access it through a web browser, you will be redirected to
+    "console_minio_endpoint".</li>
+<li>oscarui_endpoint: Public endpoint of the OSCAR web user interface. It
+    supports OIDC connections via EGI Check-in, as well as basic auth.</li>
+</ul>
+<p><img alt="outputs" src="images/im-dashboard/im-dashboard-07.png" /></p>
 <p>The OSCAR UI can be accessed with the username <code>oscar</code> and the password
 you specified at deployment time.</p>
 <p><img alt="access-oscar" src="../images/im-dashboard/im-dashboard-08.png" /></p>

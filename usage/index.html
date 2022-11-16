@@ -754,7 +754,8 @@ folder where to save the results respectively:</p>
 echo &quot;SCRIPT: Invoked classify_image.py. File available in $INPUT_FILE_PATH&quot;
 FILE_NAME=`basename &quot;$INPUT_FILE_PATH&quot;`
 OUTPUT_FILE=&quot;$TMP_OUTPUT_DIR/$FILE_NAME&quot;
-python2 /opt/plant-classification-theano/classify_image.py &quot;$INPUT_FILE_PATH&quot; -o &quot;$OUTPUT_FILE&quot;
+python2 /opt/plant-classification-theano/classify_image.py \
+ &quot;$INPUT_FILE_PATH&quot; -o &quot;$OUTPUT_FILE&quot;
 </code></pre>
 <p>You must fill in the fields indicating the container image to use, the name of
 the service and the script file. In addition, you can add environment

@@ -795,7 +795,12 @@ its <a href="https://github.com/minio/charts">helm chart</a>. To  install the he
 repo and install the chart, run the following commands replacing
 <code>&lt;MINIO_PASSWORD&gt;</code> with a password. It must have at least 8 characters:</p>
 <pre><code class="language-sh">helm repo add minio https://charts.min.io
-helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=&lt;MINIO_PASSWORD&gt;,service.type=NodePort,service.nodePort=30300,consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 --create-namespace
+helm install minio minio/minio --namespace minio --set rootUser=minio,\
+rootPassword=&lt;MINIO_PASSWORD&gt;,service.type=NodePort,service.nodePort=30300,\
+consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,\
+resources.requests.memory=512Mi,\
+environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 \
+ --create-namespace
 </code></pre>
 <p><em>Note that the deployment has been configured to use the rootUser <code>minio</code> and
 the specified password as rootPassword. The NodePort service type has been
@@ -866,7 +871,11 @@ password of your choice and <code>&lt;MINIO_PASSWORD&gt;</code> with the MinIO r
 and remember to add the flag <code>--set serverlessBackend=knative</code> if you deployed
 it in the previous step:</p>
 <pre><code class="language-sh">helm repo add grycap https://grycap.github.io/helm-charts/
-helm install --namespace=oscar oscar grycap/oscar --set authPass=&lt;OSCAR_PASSWORD&gt; --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=&lt;MINIO_PASSWORD&gt;
+helm install --namespace=oscar oscar grycap/oscar \
+ --set authPass=&lt;OSCAR_PASSWORD&gt; --set service.type=ClusterIP \
+ --set ingress.create=true --set volume.storageClassName=nfs \
+ --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false \
+ --set minIO.accessKey=minio --set minIO.secretKey=&lt;MINIO_PASSWORD&gt;
 </code></pre>
 <p>Now you can access to the OSCAR web interface through <code>https://localhost</code> with
 user <code>oscar</code> and the specified password.</p>
