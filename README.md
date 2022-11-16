@@ -27,7 +27,6 @@ cluster.
 - [**About OSCAR**](#why-oscar)
 - [**Components**](#components)
 - [**Licensing**](#licensing)
-- [**Software Quality Assurance as a Service**](#software-quality-assurance-as-a-service)
 - [**Acknowledgements**](#acknowledgements)
 
 ### Why OSCAR
@@ -108,16 +107,6 @@ OSCAR is licensed under the Apache License, Version 2.0. See
 [LICENSE](https://github.com/grycap/scar/blob/master/LICENSE) for the full
 license text.
 
-## Software Quality Assurance as a Service
-
-[SQAaaS Web](https://sqaaas.eosc-synergy.eu/#/auth/full-assessment) inside the
-European Open Science Cloud (EOSC-SYNERGY) project has assigned a 
-[silver badge](https://eu.badgr.com/public/assertions/0vLlQBANQzyHMOrmcsck3w?identity__url=https:%2F%2Fgithub.com%2FEOSC-synergy%2Foscar.assess.sqaaas%2Fcommit%2F10254d15a9230f45c84dae22f3711653162faf78)
-to this repository.
-
-![Silver Badge](docs/images/badge_software_silver.png)
-
-
 ## Acknowledgements
 
 This development is partially funded by the [EGI Strategic and Innovation Fund](https://www.egi.eu/about/egi-council/egi-strategic-and-innovation-fund/).
@@ -129,6 +118,15 @@ Grant PID2020-113126RB-I00 funded by Ministerio de Ciencia e Innovación/Agencia
 Estatal de Investigación/ 10.13039/501100011033.
 
 ![financing](docs/images/financing/funded.png)
+
+<a href="https://eu.badgr.com/public/assertions/0vLlQBANQzyHMOrmcsck3w?identity__url=https:%2F%2Fgithub.com%2FEOSC-synergy%2Foscar.assess.sqaaas%2Fcommit%2F10254d15a9230f45c84dae22f3711653162faf78">
+    <img align="left" src="docs/images/badge_software_silver.png" alt="Silver Badge" width="60">
+</a>
+
+[SQAaaS Web](https://sqaaas.eosc-synergy.eu/#/auth/full-assessment) inside the
+European Open Science Cloud (EOSC-SYNERGY) project has assigned a 
+[silver badge](https://eu.badgr.com/public/assertions/0vLlQBANQzyHMOrmcsck3w?identity__url=https:%2F%2Fgithub.com%2FEOSC-synergy%2Foscar.assess.sqaaas%2Fcommit%2F10254d15a9230f45c84dae22f3711653162faf78)
+to this repository.
 
 Please acknowledge the use of OSCAR by citing the following scientific
 publication ([preprint available](https://www.grycap.upv.es/gmolto/publications/preprints/Perez2019osc.pdf)):
