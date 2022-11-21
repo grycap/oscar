@@ -1,10 +1,14 @@
 # Image Conversion to Grayscale with ImageMagick
 
-This example supports highly-scalable event-driven image conversion to grayscale using the popular [ImageMagick](https://www.imagemagick.org) software. The goal is to have: 
+This example supports highly-scalable event-driven image conversion to
+grayscale using the popular [ImageMagick](https://www.imagemagick.org)
+software. The goal is to have:
 
- * An input bucket created in Minio on which the user uploads the files to be converted.
- * A function that is triggered upon each file upload in order to trigger the file conversion, which is automatically handled by an elastic Kubernetes cluster that provisions additional nodes on-demand if required.
- * An output bucket created in Minio on which the user will find the converted files.
+* An input bucket created in Minio on which the user uploads the files to be converted.
+* A function that is triggered upon each file upload in order to trigger the
+    file conversion, which is automatically handled by an elastic Kubernetes
+    cluster that provisions additional nodes on-demand if required.
+* An output bucket created in Minio on which the user will find the converted files.
 
 ## STEP 1: Deploy the OSCAR cluster on an IaaS Cloud
 
@@ -12,15 +16,18 @@ Follow the [deployment instructions](https://o-scar.readthedocs.io/en/latest/dep
 
 ## STEP 2: Log in the OSCAR UI
 
-Log in into the OSCAR UI using the [Default Service Endpoints](https://o-scar.readthedocs.io/en/latest/usage.html#default-service-endpoints) and access credentials.
+Log in into the OSCAR UI using the
+[Default Service Endpoints](https://o-scar.readthedocs.io/en/latest/usage.html#default-service-endpoints)
+and access credentials.
 
 ![oscar-ui-login.png](img/oscar-ui-login.png)
 
 ## STEP 3: Create the Function
 
 You will use the following information:
- * Docker image: [grycap/imagemagick](https://hub.docker.com/r/grycap/imagemagick)
- * Script: The `script.sh` file in this directory in charge of processing the image.
+
+* Docker image: [grycap/imagemagick](https://hub.docker.com/r/grycap/imagemagick)
+* Script: The `script.sh` file in this directory in charge of processing the image.
 
 Create a new function and specify the aforementioned details:
 
@@ -40,7 +47,8 @@ and the input and output buckets will be automatically created as well:
 
 ## STEP 5: Upload Image File to Trigger the Function
 
-Upload an image to the input bucket created. You have to select the image first and then upload it. You can upload a bunch of images at the same time.
+Upload an image to the input bucket created. You have to select the image
+first and then upload it. You can upload a bunch of images at the same time.
 
 ![oscar-ui-put-file.png](img/oscar-ui-put-file.png)
 
@@ -72,7 +80,8 @@ Then, delete the bucket:
 
 ## STEP 8: Terminate the OSCAR Cluster
 
-You can terminate the Kubernetes cluster with the [EC3](https://github.com/grycap/ec3) command:
+You can terminate the Kubernetes cluster with the
+[EC3](https://github.com/grycap/ec3) command:
 
 ```sh
 ec3 destroy <cluster-name>

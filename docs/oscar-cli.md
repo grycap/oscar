@@ -1,16 +1,27 @@
 # OSCAR-CLI
 
-OSCAR-CLI provides a command line interface to interact with [OSCAR](https://github.com/grycap/oscar) clusters in a simple way. It supports service management, workflows definition from FDL (Functions Definition Language) files and the ability to manage files from OSCAR's compatible storage providers (MinIO, AWS S3 and Onedata). The folder [`example-workflow`](https://github.com/grycap/oscar-cli/tree/main/example-workflow) contains all the necessary files to create a simple workflow to test the tool.
+OSCAR-CLI provides a command line interface to interact with
+[OSCAR](https://github.com/grycap/oscar) clusters in a simple way. It supports
+service management, workflows definition from FDL (Functions Definition
+Language) files and the ability to manage files from OSCAR's compatible
+storage providers (MinIO, AWS S3 and Onedata). The folder
+[`example-workflow`](https://github.com/grycap/oscar-cli/tree/main/example-workflow)
+contains all the necessary files to create a simple workflow to test the tool.
 
 ## Download
 
 ### Releases
 
-The easy way to download OSCAR-CLI is through the github [releases page](https://github.com/grycap/oscar-cli/releases). There are binaries for multiple platforms and OS. If you need a binary for another platform, please open an [issue](https://github.com/grycap/oscar-cli/issues).
+The easy way to download OSCAR-CLI is through the github
+[releases page](https://github.com/grycap/oscar-cli/releases). There are
+binaries for multiple platforms and OS. If you need a binary for another
+platform, please open an [issue](https://github.com/grycap/oscar-cli/issues).
 
 ### Install from source
 
-If you have [go](https://golang.org/doc/install) installed and [configured](https://github.com/golang/go/wiki/SettingGOPATH), you can get it from source directly by executing:
+If you have [go](https://golang.org/doc/install) installed and
+[configured](https://github.com/golang/go/wiki/SettingGOPATH), you can get it
+from source directly by executing:
 
 ```sh
 go install github.com/grycap/oscar-cli@latest
@@ -18,26 +29,26 @@ go install github.com/grycap/oscar-cli@latest
 
 ## Available commands
 
-  - [apply](#apply)
-  - [cluster](#cluster)
-    - [add](#add)
-    - [default](#default)
-    - [info](#info)
-    - [list](#list)
-    - [remove](#remove)
-  - [service](#service)
-    - [get](#get)
-    - [list](#list-1)
-    - [remove](#remove-1)
-    - [run](#run)
-    - [logs list](#logs-list)
-    - [logs get](#logs-get)
-    - [logs remove](#logs-remove)
-    - [get-file](#get-file)
-    - [put-file](#put-file)
-    - [list-files](#list-files)
-  - [version](#version)
-  - [help](#help)
+- [apply](#apply)
+- [cluster](#cluster)
+  - [add](#add)
+  - [default](#default)
+  - [info](#info)
+  - [list](#list)
+  - [remove](#remove)
+- [service](#service)
+  - [get](#get)
+  - [list](#list-1)
+  - [remove](#remove-1)
+  - [run](#run)
+  - [logs list](#logs-list)
+  - [logs get](#logs-get)
+  - [logs remove](#logs-remove)
+  - [get-file](#get-file)
+  - [put-file](#put-file)
+  - [list-files](#list-files)
+- [version](#version)
+- [help](#help)
 
 ### apply
 
@@ -67,17 +78,21 @@ Add a new existing cluster to oscar-cli.
 
 ```
 Usage:
-  oscar-cli cluster add IDENTIFIER ENDPOINT {USERNAME {PASSWORD | --password-stdin} | --oidc-account-name ACCOUNT} [flags]
+  oscar-cli cluster add IDENTIFIER ENDPOINT {USERNAME {PASSWORD | \
+  --password-stdin} | --oidc-account-name ACCOUNT} [flags]
 
 Aliases:
   add, a
 
 Flags:
-      --disable-ssl                disable verification of ssl certificates for the added cluster
-  -h, --help                       help for add
-  -o, --oidc-account-name string   OIDC account name to authenticate using oidc-agent. Note that oidc-agent must be started and properly configured
-                                   (See: https://indigo-dc.gitbook.io/oidc-agent/)
-      --password-stdin             take the password from stdin
+      --disable-ssl               disable verification of ssl certificates for the
+                                  added cluster
+  -h, --help                      help for add
+  -o, --oidc-account-name string  OIDC account name to authenticate using
+                                  oidc-agent. Note that oidc-agent must be
+                                  started and properly configured
+                                  (See:https://indigo-dc.gitbook.io/oidc-agent/)
+      --password-stdin            take the password from stdin
 
 Global Flags:
       --config string   set the location of the config file (YAML or JSON)
@@ -161,7 +176,7 @@ Global Flags:
 
 Manages the services within a cluster.
 
-#### Subcommands
+#### Subcommands of services
 
 ##### get
 
@@ -182,7 +197,7 @@ Global Flags:
       --config string   set the location of the config file (YAML or JSON)
 ```
 
-##### list
+##### list services
 
 List the available services in a cluster.
 
@@ -201,7 +216,7 @@ Global Flags:
       --config string   set the location of the config file (YAML or JSON)
 ```
 
-##### remove
+##### remove services
 
 Remove a service from the cluster.
 
@@ -255,7 +270,9 @@ Aliases:
 
 Flags:
   -h, --help             help for list
-  -s, --status strings   filter by status (Pending, Running, Succeeded or Failed), multiple values can be specified by a comma-separated string
+  -s, --status strings   filter by status (Pending, Running, Succeeded or
+                         Failed), multiple values can be specified by a
+                         comma-separated string
 
 Global Flags:
   -c, --cluster string   set the cluster
@@ -288,7 +305,8 @@ Remove a service's job along with its logs.
 
 ```
 Usage:
-  oscar-cli service logs remove SERVICE_NAME {JOB_NAME... | --succeeded | --all} [flags]
+  oscar-cli service logs remove SERVICE_NAME \
+   {JOB_NAME... | --succeeded | --all} [flags]
 
 Aliases:
   remove, rm
@@ -307,13 +325,16 @@ Global Flags:
 
 Get a file from a service's storage provider.
 
-The STORAGE_PROVIDER argument follows the format STORAGE_PROVIDER_TYPE.STORAGE_PROVIDER_NAME,
-being the STORAGE_PROVIDER_TYPE one of the three supported storage providers (MinIO, S3 or Onedata)
-and the STORAGE_PROVIDER_NAME is the identifier for the provider set in the service's definition.
+The STORAGE_PROVIDER argument follows the format
+STORAGE_PROVIDER_TYPE.STORAGE_PROVIDER_NAME, being the STORAGE_PROVIDER_TYPE
+one of the three supported storage providers (MinIO, S3 or Onedata) and the
+STORAGE_PROVIDER_NAME is the identifier for the provider set in the service's
+definition.
 
 ```
 Usage:
-  oscar-cli service get-file SERVICE_NAME STORAGE_PROVIDER REMOTE_FILE LOCAL_FILE [flags]
+  oscar-cli service get-file SERVICE_NAME STORAGE_PROVIDER REMOTE_FILE \
+   LOCAL_FILE [flags]
 
 Aliases:
   get-file, gf
@@ -330,13 +351,16 @@ Global Flags:
 
 Put a file in a service's storage provider.
 
-The STORAGE_PROVIDER argument follows the format STORAGE_PROVIDER_TYPE.STORAGE_PROVIDER_NAME,
-being the STORAGE_PROVIDER_TYPE one of the three supported storage providers (MinIO, S3 or Onedata)
-and the STORAGE_PROVIDER_NAME is the identifier for the provider set in the service's definition.
+The STORAGE_PROVIDER argument follows the format
+STORAGE_PROVIDER_TYPE.STORAGE_PROVIDER_NAME, being the STORAGE_PROVIDER_TYPE
+one of the three supported storage providers (MinIO, S3 or Onedata) and the
+STORAGE_PROVIDER_NAME is the identifier for the provider set in the service's
+definition.
 
 ```
 Usage:
-  oscar-cli service put-file SERVICE_NAME STORAGE_PROVIDER LOCAL_FILE REMOTE_FILE [flags]
+  oscar-cli service put-file SERVICE_NAME STORAGE_PROVIDER LOCAL_FILE \
+   REMOTE_FILE [flags]
 
 Aliases:
   put-file, pf
@@ -354,8 +378,9 @@ Global Flags:
 List files from a service's storage provider path.
 
 The STORAGE_PROVIDER argument follows the format STORAGE_PROVIDER_TYPE.STORAGE_PROVIDER_NAME,
-being the STORAGE_PROVIDER_TYPE one of the three supported storage providers (MinIO, S3 or Onedata)
-and the STORAGE_PROVIDER_NAME is the identifier for the provider set in the service's definition.
+being the STORAGE_PROVIDER_TYPE one of the three supported storage providers
+(MinIO, S3 or Onedata) and the STORAGE_PROVIDER_NAME is the identifier for the
+provider set in the service's definition.
 
 ```
 Usage:

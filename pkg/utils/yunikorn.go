@@ -20,13 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
-	"strconv"
 
 	"github.com/apache/yunikorn-core/pkg/common/configs"
 	"github.com/goccy/go-yaml"
 	"github.com/grycap/oscar/v2/pkg/types"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -84,33 +81,13 @@ func AddYunikornQueue(cfg *types.Config, kubeClientset kubernetes.Interface, svc
 	// Get the pointer of the Oscar queue
 	oQueue := getOscarQueue(yConfig)
 
-	// Parse the total resources
-	var memory string
-	var cpu string
-	if svc.TotalMemory != "" {
-		intMemory, err := convertMemory(svc.TotalMemory)
-		if err != nil {
-			log.Println(err.Error())
-		} else {
-			memory = strconv.Itoa(intMemory)
-		}
-	}
-	if svc.TotalCPU != "" {
-		intCPU, err := convertCPU(svc.TotalCPU)
-		if err != nil {
-			log.Println(err.Error())
-		} else {
-			cpu = strconv.Itoa(intCPU)
-		}
-	}
-
 	// Create the Resources struct
 	maxResources := make(map[string]string)
-	if memory != "" {
-		maxResources["memory"] = memory
+	if svc.TotalMemory != "" {
+		maxResources["memory"] = svc.TotalMemory
 	}
-	if cpu != "" {
-		maxResources["vcore"] = cpu
+	if svc.TotalCPU != "" {
+		maxResources["vcore"] = svc.TotalCPU
 	}
 
 	resources := configs.Resources{
@@ -170,28 +147,6 @@ func DeleteYunikornQueue(cfg *types.Config, kubeClientset kubernetes.Interface, 
 	}
 
 	return nil
-}
-
-// convertMemory parse the memory k8s resource to integer (MB)
-// https://yunikorn.apache.org/docs/user_guide/resource_quota_management/#converting-kubernetes-resources-and-quotas
-func convertMemory(stringMemory string) (int, error) {
-	quantity, err := resource.ParseQuantity(stringMemory)
-	if err != nil {
-		return -1, fmt.Errorf("unable to parse total_memory: %v", err)
-	}
-	bytes := quantity.Value()
-	return int(bytes) / 1000 / 1000, nil
-}
-
-// convertCPU parse the CPU k8s resource to integer (Milli cpu)
-// https://yunikorn.apache.org/docs/user_guide/resource_quota_management/#converting-kubernetes-resources-and-quotas
-func convertCPU(stringCPU string) (int, error) {
-	quantity, err := resource.ParseQuantity(stringCPU)
-	if err != nil {
-		return -1, fmt.Errorf("unable to parse total_cpu: %v", err)
-	}
-	millicpu := quantity.MilliValue()
-	return int(millicpu), nil
 }
 
 // getOscarQueue returns a pointer to the OSCAR's Yunikorn queue (configs.QueueConfig)
