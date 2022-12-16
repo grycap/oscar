@@ -183,6 +183,7 @@ if args.cpu and args.trt:
     print(f'\n>>>>TensorRT runs only on gpu. Exit.')
     exit()
 
+torch.set_num_threads(1)
 # model load
 if args.model == "shufflenetonfire":
     model = shufflenetv2.shufflenet_v2_x0_5(
