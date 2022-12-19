@@ -47,7 +47,7 @@ type DelegatedEvent struct {
 }
 
 // DelegateJob sends the event to a service's replica
-func DelegateJob(service *types.Service, event string) error {
+func DelegateJob(service *types.Service, event string, logger *log.Logger) error {
 	// Check if replicas are sorted by priority and sort it if needed
 	if !sort.IsSorted(service.Replicas) {
 		sort.Stable(service.Replicas)
@@ -65,21 +65,21 @@ func DelegateJob(service *types.Service, event string) error {
 			// Check ClusterID is defined in 'Clusters'
 			cluster, ok := service.Clusters[replica.ClusterID]
 			if !ok {
-				log.Printf("Error delegating service \"%s\" to ClusterID \"%s\": Cluster not defined\n", service.Name, replica.ClusterID)
+				logger.Printf("Error delegating service \"%s\" to ClusterID \"%s\": Cluster not defined\n", service.Name, replica.ClusterID)
 				continue
 			}
 
 			// Get token
 			token, err := getServiceToken(replica, cluster)
 			if err != nil {
-				log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": %v\n", service.Name, replica.ClusterID, err)
+				logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": %v\n", service.Name, replica.ClusterID, err)
 				continue
 			}
 
 			// Parse the cluster's endpoint URL and add the service's path
 			postJobURL, err := url.Parse(cluster.Endpoint)
 			if err != nil {
-				log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", service.Name, replica.ClusterID, cluster.Endpoint, err)
+				logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", service.Name, replica.ClusterID, cluster.Endpoint, err)
 				continue
 			}
 			postJobURL.Path = path.Join(postJobURL.Path, "job", replica.ServiceName)
@@ -87,7 +87,7 @@ func DelegateJob(service *types.Service, event string) error {
 			// Make request to get service's definition (including token) from cluster
 			req, err := http.NewRequest(http.MethodPost, postJobURL.String(), bytes.NewBuffer(eventJSON))
 			if err != nil {
-				log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to make request: %v\n", service.Name, replica.ClusterID, err)
+				logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to make request: %v\n", service.Name, replica.ClusterID, err)
 				continue
 			}
 
@@ -112,19 +112,19 @@ func DelegateJob(service *types.Service, event string) error {
 			// Send the request
 			res, err := client.Do(req)
 			if err != nil {
-				log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
+				logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
 				continue
 			}
 
 			// Check status code
 			if res.StatusCode == http.StatusCreated {
-				log.Printf("Job successfully delegated to cluster \"%s\"\n", replica.ClusterID)
+				logger.Printf("Job successfully delegated to cluster \"%s\"\n", replica.ClusterID)
 				return nil
 			} else if res.StatusCode == http.StatusUnauthorized {
 				// Retry updating the token
 				token, err := updateServiceToken(replica, cluster)
 				if err != nil {
-					log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": %v\n", service.Name, replica.ClusterID, err)
+					logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": %v\n", service.Name, replica.ClusterID, err)
 					continue
 				}
 				// Add service token to the request
@@ -133,7 +133,7 @@ func DelegateJob(service *types.Service, event string) error {
 				// Send the request
 				res, err = client.Do(req)
 				if err != nil {
-					log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
+					logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
 					continue
 				}
 			}
@@ -145,14 +145,14 @@ func DelegateJob(service *types.Service, event string) error {
 			// Parse the replica URL to check if it's valid
 			replicaURL, err := url.Parse(replica.URL)
 			if err != nil {
-				log.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": unable to parse URL: %v\n", service.Name, replica.URL, err)
+				logger.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": unable to parse URL: %v\n", service.Name, replica.URL, err)
 				continue
 			}
 
 			// Make request to get service's definition (including token) from cluster
 			req, err := http.NewRequest(http.MethodPost, replicaURL.String(), bytes.NewBuffer(eventJSON))
 			if err != nil {
-				log.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": unable to make request: %v\n", service.Name, replica.URL, err)
+				logger.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": unable to make request: %v\n", service.Name, replica.URL, err)
 				continue
 			}
 
@@ -174,16 +174,16 @@ func DelegateJob(service *types.Service, event string) error {
 			// Send the request
 			res, err := client.Do(req)
 			if err != nil {
-				log.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": unable to send request: %v\n", service.Name, replica.URL, err)
+				logger.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": unable to send request: %v\n", service.Name, replica.URL, err)
 				continue
 			}
 
 			// Check status code
 			if res.StatusCode == http.StatusOK {
-				log.Printf("Job successfully delegated to endpoint \"%s\"\n", replica.URL)
+				logger.Printf("Job successfully delegated to endpoint \"%s\"\n", replica.URL)
 				return nil
 			}
-			log.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": Status code %d\n", service.Name, replica.URL, res.StatusCode)
+			logger.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": Status code %d\n", service.Name, replica.URL, res.StatusCode)
 		}
 	}
 

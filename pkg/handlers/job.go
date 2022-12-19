@@ -123,7 +123,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 		// Delegate job if can't be scheduled and has defined replicas
 		if rm != nil && service.HasReplicas() {
 			if !rm.IsSchedulable(podSpec.Containers[0].Resources) {
-				err := resourcemanager.DelegateJob(service, event.Value)
+				err := resourcemanager.DelegateJob(service, event.Value, resourcemanager.ResourceManagerLogger)
 				if err == nil {
 					// TODO: check if another status code suits better
 					c.Status(http.StatusCreated)

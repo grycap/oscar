@@ -68,7 +68,7 @@ func (krm *KubeResourceManager) UpdateResources() error {
 
 	// Ensure mutual exclusion
 	krm.mutex.Lock()
-	resourceManagerLogger.Printf("Available resources %v\n", res)
+	ResourceManagerLogger.Printf("Available resources %v\n", res)
 	krm.resources = res
 	krm.mutex.Unlock()
 

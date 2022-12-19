@@ -54,15 +54,15 @@ func StartReScheduler(cfg *types.Config, back types.ServerlessBackend, kubeClien
 
 		// Delegate jobs
 		for _, rsi := range reScheduleInfos {
-			err := DelegateJob(rsi.service, rsi.event)
+			err := DelegateJob(rsi.service, rsi.event, reSchedulerLogger)
 			if err != nil {
 				reSchedulerLogger.Println(err.Error())
 			} else {
 				// Delete successfully reScheduled job from the cluster
-				// Create DeleteOptions and configure PropagationPolicy for deleting associated pods in foreground
-				foreground := metav1.DeletePropagationForeground
+				// Create DeleteOptions and configure PropagationPolicy for deleting associated pods in background
+				background := metav1.DeletePropagationBackground
 				delOpts := metav1.DeleteOptions{
-					PropagationPolicy: &foreground,
+					PropagationPolicy: &background,
 				}
 				err := kubeClientset.BatchV1().Jobs(cfg.ServicesNamespace).Delete(context.TODO(), rsi.jobName, delOpts)
 				if err != nil {
