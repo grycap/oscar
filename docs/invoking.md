@@ -97,6 +97,10 @@ be shown in stdout.
 An illustration of triggering a service synchronously through OSCAR-CLI can be
 found in the [cowsay example](https://github.com/grycap/oscar/tree/master/examples/cowsay#oscar-cli).
 
+```sh
+oscar-cli service run cowsay --text-input '{"message":"Hello World"}'
+```
+
 ### cURL
 
 Naturally, OSCAR services can also be invoked via traditional HTTP clients
@@ -125,7 +129,7 @@ Using synchronous invocations couldn't be the best way to run long-running
 resource-demanding applications, like deep learning inference or video
 processing. This is due to the fact that Kubernetes Serverless Backends do not
 handle elasticity in the same way as their counterparts in public clouds, such
-as AWS Lambda. When multiple requests come to OpenFaaS, the function pod
+as AWS Lambda. When multiple requests come to the cluster, the function pod
 itself, with its resource specification (i.e. memory and CPU limits and
 requests), tries to process them simultaneously, which can cause an overload.
 Therefore, we consider Kubernetes job generation as the optimal approach to
