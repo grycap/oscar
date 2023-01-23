@@ -223,6 +223,9 @@ kind create cluster --config=$CONFIG_FILEPATH --name=oscar-test
 if [ ! `kubectl cluster-info --context kind-oscar-test` &> /dev/null ]; then
     echo -e "$RED[*]$END_COLOR Kind cluster not found."
     echo "Stopping execution ...."
+    if [ -f $CONFIG_FILEPATH ]; then 
+        rm $CONFIG_FILEPATH
+    fi
     exit
 fi
 
@@ -242,7 +245,7 @@ helm repo add --force-update nfs-ganesha-server-and-external-provisioner https:/
 if [ $ARCH == "arm64" ]; then
     helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner --set image.repository=ghcr.io/grycap/nfs-provisioner-arm64 --set image.tag=latest
 else
-    helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner
+    helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner --set image.tag=v3.0.1
 fi
 
 #Deploy Knative Serving
