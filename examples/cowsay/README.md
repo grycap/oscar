@@ -109,3 +109,4 @@ and if `INPUT_TYPE` not defined or other than `json`:
 echo "Hi there" | base64 | curl -H 'Authorization: Bearer <SERVICE_TOKEN>' \
 -d @- https://<CLUSTER_ENDPOINT>/run/cowsay
 ```
+Note that if the OSCAR cluster has been locally deployed with a self-signed certificate, you will need to use the `--insecure` flag for `curl` to disable the verification of the legitimacy of the server.
