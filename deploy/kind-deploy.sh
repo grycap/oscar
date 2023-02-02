@@ -179,6 +179,20 @@ EOF
     kubectl apply -f $KNATIVE_FILEPATH
 }
 
+createKindCluster(){
+    echo -e "\n[*] Creating kind cluster"
+    kind create cluster --config=$CONFIG_FILEPATH --name=oscar-test
+
+    if [ ! `kubectl cluster-info --context kind-oscar-test` &> /dev/null ]; then
+        echo -e "$RED[*]$END_COLOR Kind cluster not found."
+        echo "Stopping execution ...."
+        if [ -f $CONFIG_FILEPATH ]; then 
+            rm $CONFIG_FILEPATH
+        fi
+        exit
+    fi
+}
+
 showInfo
 
 echo -e "\n[*] Checking prerequisites ..."
@@ -189,7 +203,74 @@ checkKind
 
 echo -e "\n"
 read -p "Do you want to use Knative Serving as Serverless Backend? [y/n] " use_knative </dev/tty
+read -p "Do you want suport for local docker images? [y/n] " local_reg </dev/tty
 
+#Deploy Knative Serving
+if [ `echo $local_reg | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
+    reg_name='local-registry'
+    reg_port='5001'
+
+    # create registry container unless it already exists
+    if [ "$(docker inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || true)" != 'true' ]; then
+        docker run -d --restart=always -p "127.0.0.1:${reg_port}:5000" --name "${reg_name}" registry:2
+    fi
+
+# Kind cluster definition with local registry
+cat > $CONFIG_FILEPATH <<EOF
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+containerdConfigPatches:
+- |-
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:${reg_port}"]
+    endpoint = ["http://${reg_name}:5000"]
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true"
+  extraPortMappings:
+  - containerPort: 80
+    hostPort: 80
+    protocol: TCP
+  - containerPort: 443
+    hostPort: 443
+    protocol: TCP
+  - containerPort: 30300
+    hostPort: 30300
+    protocol: TCP
+  - containerPort: 30301
+    hostPort: 30301
+    protocol: TCP
+EOF
+    #Create kind cluster
+    createKindCluster
+
+    # connect the registry to the cluster network if not already connected
+    if [ "$(docker inspect -f='{{json .NetworkSettings.Networks.kind}}' "${reg_name}")" = 'null' ]; then
+    docker network connect "kind" "${reg_name}"
+    fi
+
+# -- necessary? --
+# Document the local registry
+# https://github.com/kubernetes/enhancements/tree/master/keps/sig-cluster-lifecycle/generic/1755-communicating-a-local-registry
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+name: local-registry-hosting
+namespace: kube-public
+data:
+localRegistryHosting.v1: |
+    host: "localhost:${reg_port}"
+    help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
+EOF
+
+else
+
+# Default Kind cluster definition
 cat > $CONFIG_FILEPATH <<EOF
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
@@ -215,18 +296,8 @@ nodes:
     hostPort: 30301
     protocol: TCP
 EOF
-
-#Create kind cluster
-echo -e "\n[*] Creating kind cluster"
-kind create cluster --config=$CONFIG_FILEPATH --name=oscar-test
-
-if [ ! `kubectl cluster-info --context kind-oscar-test` &> /dev/null ]; then
-    echo -e "$RED[*]$END_COLOR Kind cluster not found."
-    echo "Stopping execution ...."
-    if [ -f $CONFIG_FILEPATH ]; then 
-        rm $CONFIG_FILEPATH
-    fi
-    exit
+    #Create kind cluster
+    createKindCluster
 fi
 
 #Deploy nginx ingress
