@@ -15,11 +15,18 @@ access them.
 - [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) to
   deploy the local Kubernetes cluster.
 
+**Other prerequisites**
+
+- Although the use of local Docker images has yet to be implemented as a feature on OSCAR clusters, the local deployment for testing allows you to use a local Docker registry to use this kind of images. 
+The registry uses by default the port 5001, so each image you want to use must be tagged as `localhost:5001/[image_name]` and pushed to the repository through the `docker push localhost:5001/[image_name]` command.
+
+- Port 80 must be available to avoid errors during the deployment since OSCAR-UI uses it. Check [Frequently Asked Questions (FAQ)](faq.md) for more info.
+
 ## Automated local testing
 
 To set up the enviroment for the platform testing you can run the following
 command. This script automatically executes all the necessary steps to deploy
-the local cluster and the OSCAR platform along with all the required tools.
+the local cluster and the OSCAR platform along with all the required tools. 
 
 ``` sh
 curl -sSL http://go.oscar.grycap.net | bash
