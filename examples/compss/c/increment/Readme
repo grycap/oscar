@@ -1,0 +1,31 @@
+This is the Readme for:
+Increment
+
+[Name]: Increment
+[Contact Person]: support-compss@bsc.es
+[Access Level]: public
+[License Agreement]: Apache2
+[Platform]: COMPSs
+
+[Body]
+== Description ==
+Increment is an application that takes three different values and increases them a number of given times. The purpose of this application is to show parallelism between the different increments. 
+
+== Execution instructions ==
+Usage:
+runcompss --lang=c /home/compss/tutorial_apps/c/increment/master/increment <N> <initValue1> <initValue2> <initValue3>
+
+where:
+		 * - N: Number of times to increase the counters
+		 * - initValue1: Initial value for counter 1
+                 * - initValue2: Initial value for counter 2
+                 * - initValue3: Initial value for counter 3
+
+
+== Execution Example ==
+runcompss --lang=c /home/compss/tutorial_apps/c/increment/master/increment 10 1 2 3
+
+
+== Build ==
+compss_build_app increment
+

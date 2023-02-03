@@ -1,0 +1,15 @@
+functions:
+  oscar:
+    - oscar-remotee:
+        name: increment-compss-c
+        memory: 3Gi
+        cpu: '3.0'
+        image: ghcr.io/grycap/increment-compss-c
+        script: script.sh
+        log_level: INFO
+        input:
+          - path: increment/in
+            storage_provider: minio
+        output:
+          - path: increment/out
+            storage_provider: minio

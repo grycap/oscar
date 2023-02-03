@@ -1,0 +1,183 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<!-- GENERAL INFORMATION -->
+	<artifactId>increment</artifactId>
+	<packaging>pom</packaging>
+	<parent>
+                <groupId>es.bsc.compss.tutorial-apps.c</groupId>
+		<artifactId>compss-tutorial-apps-c</artifactId>
+		<version>3.1.rc2301</version>
+		<relativePath>..</relativePath>
+	</parent>
+
+	<!-- PROJECT INFORMATION -->
+	<name>increment</name>
+	<description>Increment application</description>
+	<licenses>
+		<license>
+			<name>Apache License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0.html</url>
+		</license>
+	</licenses>
+	<organization>
+		<name>BSC</name>
+		<url>http://www.bsc.es</url>
+	</organization>
+
+	<!-- DEPENDENCIES -->
+
+
+        <!-- BUILD SETTINGS -->
+        <build>
+                <plugins>
+                        <!-- Copy XML templates -->
+                        <plugin>
+                                <artifactId>maven-resources-plugin</artifactId>
+				<version>${maven-resources-plugin.version}</version>
+                                <executions>
+                                        <execution>
+                                                <id>copy-resources</id>
+                                                <phase>validate</phase>
+                                                <goals>
+                                                        <goal>copy-resources</goal>
+                                                </goals>
+                                                <configuration>
+                                                        <outputDirectory>${project.basedir}/xml/</outputDirectory>
+                                                        <resources>
+                                                                <resource>
+                                                                        <directory>${project.basedir}/xml/templates/</directory>
+                                                                        <filtering>true</filtering>
+                                                                        <includes>
+                                                                                <include>project.xml</include>
+                                                                                <include>resources.xml</include>
+                                                                        </includes>
+                                                                </resource>
+                                                        </resources>
+                                                </configuration>
+                                        </execution>
+                                </executions>
+                        </plugin>
+
+                        <!-- Execution plugin to compile, deploy, and execute C applications -->
+                        <plugin>
+                                <groupId>org.codehaus.mojo</groupId>
+                                <artifactId>exec-maven-plugin</artifactId>
+                                <executions>
+                                        <execution>
+                                                <id>application-execution</id>
+                                                <goals>
+                                                        <goal>exec</goal>
+                                                </goals>
+                                        </execution>
+                                        <!-- CLEAN -->
+                                        <execution>
+                                                <id>application-execution-clean</id>
+                                                <phase>clean</phase>
+                                                <goals>
+                                                        <goal>exec</goal>
+                                                </goals>
+                                                <configuration>
+                                                        <executable>bash</executable>
+                                                        <workingDirectory>${basedir}/</workingDirectory>
+                                                        <arguments>
+                                                                <argument>-c</argument>
+                                                                <argument>rm -rf file?.txt compss-serialized-obj* master worker lib src/*.o xml/*.xml</argument>
+                                                        </arguments>
+                                                        <skip>false</skip>
+                                                </configuration>
+                                        </execution>
+                                        <!-- BUILD -->
+                                        <execution>
+                                                <id>application-build</id>
+                                                <phase>compile</phase>
+                                                <goals>
+                                                        <goal>exec</goal>
+                                                </goals>
+                                                <configuration>
+                                                        <executable>compss_build_app</executable>
+                                                        <workingDirectory>${basedir}/</workingDirectory>
+                                                        <arguments>
+                                                                <argument>increment</argument>
+                                                        </arguments>
+                                                        <skip>false</skip>
+                                                </configuration>
+                                        </execution>
+                                        <!-- SED XML files -->
+                                        <execution>
+                                                <id>application-xml-generation</id>
+                                                <phase>compile</phase>
+                                                <goals>
+                                                        <goal>exec</goal>
+                                                </goals>
+                                                <configuration>
+                                                        <executable>${basedir}/xml/templates/replace.sh</executable>
+                                                        <workingDirectory>${basedir}/xml/templates/</workingDirectory>
+                                                        <arguments>
+                                                                <argument>${basedir}</argument>
+                                                        </arguments>
+                                                        <skip>false</skip>
+                                                </configuration>
+                                        </execution>
+                                </executions>
+                                <configuration>
+                                        <!-- APLICATION EXECUTION -->
+                                        <executable>runcompss</executable>
+                                        <workingDirectory>${basedir}/</workingDirectory>
+                                        <arguments>
+                                                <argument>--lang=c</argument>
+                                                <argument>--project=${basedir}/xml/project.xml</argument>
+                                                <argument>--resources=${basedir}/xml/resources.xml</argument>
+						<argument>${basedir}/master/increment</argument>
+						<argument>5</argument>
+						<argument>1</argument>
+						<argument>2</argument>
+						<argument>3</argument>
+					</arguments>
+					<skip>false</skip>
+				</configuration>
+			</plugin>
+		</plugins>
+
+		<pluginManagement>
+			<plugins>
+				<!--This plugin's configuration is used to store Eclipse m2e settings 
+					only. It has no influence on the Maven build itself. -->
+				<plugin>
+					<groupId>org.eclipse.m2e</groupId>
+					<artifactId>lifecycle-mapping</artifactId>
+					<version>1.0.0</version>
+					<configuration>
+						<lifecycleMappingMetadata>
+							<pluginExecutions>
+								<pluginExecution>
+									<pluginExecutionFilter>
+										<groupId>
+											org.apache.maven.plugins
+										</groupId>
+										<artifactId>
+											maven-dependency-plugin
+										</artifactId>
+										<versionRange>
+											[2.1,)
+										</versionRange>
+										<goals>
+											<goal>
+												copy-dependencies
+											</goal>
+										</goals>
+									</pluginExecutionFilter>
+									<action>
+										<ignore></ignore>
+									</action>
+								</pluginExecution>
+							</pluginExecutions>
+						</lifecycleMappingMetadata>
+					</configuration>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+	</build>
+</project>
+
