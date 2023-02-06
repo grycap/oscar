@@ -7,8 +7,8 @@ info:
     url: 'https://www.apache.org/licenses/LICENSE-2.0'
   description: OSCAR API documentation
   contact:
-    name: Sebastián Risco
-    email: srisco@i3m.upv.es
+    name: GRyCAP
+    email: products@grycap.upv.es
 externalDocs:
   description: More documentation available on GitHub
   url: 'https://github.com/grycap/oscar'

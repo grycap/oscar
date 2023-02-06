@@ -15,7 +15,7 @@
         <link rel="next" href="../fdl/">
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.0.8">
+      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.0.11">
     
     
       
@@ -545,6 +545,21 @@
   
   
     <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        Frequently Asked Questions (FAQ)
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../license/" class="md-nav__link">
         License
       </a>
@@ -754,24 +769,8 @@ decoded as well. Save output in the expected format of the use-case.</p>
  -d @- https://&lt;CLUSTER_ENDPOINT&gt;/run/&lt;OSCAR_SERVICE&gt; | base64 -d &gt; result.png
 </code></pre>
 <h3 id="limitations">Limitations</h3>
-<p>Using synchronous invocations couldn't be the best way to run long-running
-resource-demanding applications, like deep learning inference or video
-processing. This is due to the fact that Kubernetes Serverless Backends do not
-handle elasticity in the same way as their counterparts in public clouds, such
-as AWS Lambda. When multiple requests come to the cluster, the function pod
-itself, with its resource specification (i.e. memory and CPU limits and
-requests), tries to process them simultaneously, which can cause an overload.
-Therefore, we consider Kubernetes job generation as the optimal approach to
-handle event-driven file processing through asynchronous invocations in OSCAR,
-being the execution of synchronous services a convenient way to support
-general lightweight container-based applications.</p>
-<p>Otherwise, OSCAR allows the configuration of the OpenFaaS Watchdog to limit
-the number of events to be processed by a function pod simultaneously. This
-can be done through the <code>max_inflight</code> option of the watchdog, which can be
-configured globally in the OSCAR deployment through the
-<code>WATCHDOG_MAX_INFLIGHT</code> environment variable and the
-<a href="https://github.com/grycap/helm-charts/tree/master/oscar">helm chart parameter</a>
-<code>openfaas.watchdog.maxInflight</code>.</p>
+<p>Although the use of the Knative Serverless Backend for synchronous invocations provides elasticity similar to the one provided by their counterparts in public clouds, such as AWS Lambda, synchronous invocations are not still the best option to run long-running resource-demanding applications, like deep learning inference or video processing. </p>
+<p>The synchronous invocation of long-running resource-demanding applications may lead to timeouts on Knative pods. Therefore, we consider Kubernetes job generation as the optimal approach to handle event-driven file processing through asynchronous invocations in OSCAR, being the execution of synchronous services a convenient way to support general lightweight container-based applications.</p>
 
 
 
@@ -816,7 +815,7 @@ configured globally in the OSCAR deployment through the
     <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.db81ec45.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.a00a7c5e.min.js"></script>
+      <script src="../assets/javascripts/bundle.6df46069.min.js"></script>
       
     
   </body>
