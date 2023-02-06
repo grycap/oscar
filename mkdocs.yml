@@ -17,6 +17,7 @@ nav:
 - OIDC Authorization: oidc-auth.md
 - OpenAPI Specification: api.md
 - MinIO bucket replication: minio-bucket-replication.md
+- Frequently Asked Questions (FAQ): faq.md
 - license.md
 - about.md
 theme:
