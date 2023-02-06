@@ -57,12 +57,29 @@ These are the steps:
     In this panel you can specify the number of Working Nodes (WNs) of the
     cluster together with the computational requirements for each node. We
     leave the default values.
+    - Number of WNs in the oscar cluster: Number of working nodes.
+    - Number of CPUs for the front-end node: Number of CPUs in the primary node.
+    - Amount of Memory for the front-end node: RAM in the primary node.
+    - Flavor name of the front-end node. Only required in case of special flavors i.e. with GPUs: Type of instance that will be selected in the front node.
+    - Number of CPUs for the WNs: number of CPUs per working node.
+    - Amount of Memory for the WNs: RAM per working node.
+    - Flavor name of the WNs. Only required in case of special flavors i.e. with GPUs: Type of instance that will be selected in the working nodes.
+    - Size of the extra HD added to the instance: Extra memory in the primary node.
     ![template-hw](images/im-dashboard/im-dashboard-02.png)
 
     In this panel, specify the passwords to be employed to access the
     Kubernetes Web UI (Dashboard), to access the OSCAR web UI and to access
     the MinIO dashboard. These tokens can also be used for programmatic access
     to the respective services.
+
+    - Access Token for the Kubernetes admin user: It is the token to connect to the Dashboard of Kubernetes.
+    - OSCAR password: password to OSCAR.
+    - MinIO password 8 characters min.: password to MinIO.
+    - Email to be used in the Lets Encrypt issuer: It is an Email linked with the certificates in case the user has any questions.
+    - ID of the user that creates the infrastructure: unique identifier. Do not touch.
+    - VO to support: It supports OIDC logging. If there is nothing, only can connect the user who deploys, in case there is a VO, it can be the user who deploys and all people in the VO.
+    - Flag to add NVIDIA support: if you want to use NVIDIA.
+    - Flag to install Apache YuniKorn: if you are going to use YuniKorn.
     ![template-param](images/im-dashboard/im-dashboard-03.png)
 
     Now, choose the Cloud provider. The ID specified when creating the Cloud
