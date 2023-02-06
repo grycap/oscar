@@ -125,22 +125,6 @@ base64 input.png | curl -X POST -H "Authorization: Bearer <TOKEN>" \
 
 ### Limitations
 
-Using synchronous invocations couldn't be the best way to run long-running
-resource-demanding applications, like deep learning inference or video
-processing. This is due to the fact that Kubernetes Serverless Backends do not
-handle elasticity in the same way as their counterparts in public clouds, such
-as AWS Lambda. When multiple requests come to the cluster, the function pod
-itself, with its resource specification (i.e. memory and CPU limits and
-requests), tries to process them simultaneously, which can cause an overload.
-Therefore, we consider Kubernetes job generation as the optimal approach to
-handle event-driven file processing through asynchronous invocations in OSCAR,
-being the execution of synchronous services a convenient way to support
-general lightweight container-based applications.
+Although the use of the Knative Serverless Backend for synchronous invocations provides elasticity similar to the one provided by their counterparts in public clouds, such as AWS Lambda, synchronous invocations are not still the best option to run long-running resource-demanding applications, like deep learning inference or video processing. 
 
-Otherwise, OSCAR allows the configuration of the OpenFaaS Watchdog to limit
-the number of events to be processed by a function pod simultaneously. This
-can be done through the `max_inflight` option of the watchdog, which can be
-configured globally in the OSCAR deployment through the
-`WATCHDOG_MAX_INFLIGHT` environment variable and the
-[helm chart parameter](https://github.com/grycap/helm-charts/tree/master/oscar)
-`openfaas.watchdog.maxInflight`.
+The synchronous invocation of long-running resource-demanding applications may lead to timeouts on Knative pods. Therefore, we consider Kubernetes job generation as the optimal approach to handle event-driven file processing through asynchronous invocations in OSCAR, being the execution of synchronous services a convenient way to support general lightweight container-based applications.
