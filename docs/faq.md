@@ -17,9 +17,9 @@ and set a new default cluster with the following command:
 
 `oscar-cli cluster default -s CLUSTER_ID`
 
-- **How Do I use a secret image?**
+- **How do I use a secret image?**
 
-In case it is required, the use of secret images. It should create a [secret with the docker login configuration](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#registry-secret-existing-credentials) with a structure like this:
+In case it is required the use of secret images, you should create a [secret with the docker login configuration](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#registry-secret-existing-credentials) with a structure like this:
 
 ```
 apiVersion: v1

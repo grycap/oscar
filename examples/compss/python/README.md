@@ -5,7 +5,7 @@ This example works by introducing a folder name, and it will read the files insi
 
 The input file that will be put in a MinIO bucket is a `tar` file that contains all the files.
 
-A has been created a folder inside the docker `/opt/folder`
+A has been created a folder inside the Docker `/opt/folder`
 In this auxiliary folder will be extracted all the input files
 and it will be an argument to run COMPSs.
 

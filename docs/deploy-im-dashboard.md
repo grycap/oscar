@@ -77,7 +77,7 @@ These are the steps:
     - MinIO password 8 characters min.: password to MinIO.
     - Email to be used in the Lets Encrypt issuer: It is an Email linked with the certificates in case the user has any questions.
     - ID of the user that creates the infrastructure: unique identifier. Do not touch.
-    - VO to support: It supports OIDC logging. If there is nothing, only can connect the user who deploys, in case there is a VO, it can be the user who deploys and all people in the VO.
+    - VO to support: It supports OIDC log in. If there is nothing, only can connect the user who deploys, in case there is a VO, it can be the user who deploys and all people in the VO.
     - Flag to add NVIDIA support: if you want to use NVIDIA.
     - Flag to install Apache YuniKorn: if you are going to use YuniKorn.
     ![template-param](images/im-dashboard/im-dashboard-03.png)

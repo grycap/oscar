@@ -2,15 +2,15 @@
 
 ## Dockerfile
 
-The first step is the creation of the docker image
-The docker image has to start from an image allocated in the [compss profile at dockerhub](https://hub.docker.com/u/compss)
+The first step is the creation of the Docker image
+The Docker image has to start from an image allocated in the [compss profile at dockerhub](https://hub.docker.com/u/compss)
 with all the dependencies
 
-``` docker
+``` Docker
 FROM compss/compss:{version}
 ```
 
-Copy the program inside the docker container:
+Copy the program inside the Docker container:
 
 - C/C++ Applications should be the entire project folder (the compilation will create the binary in execution time) compss_build_app
 - Java Application, the `.jar` file should be copy

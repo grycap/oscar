@@ -1,6 +1,6 @@
 functions:
   oscar:
-    - oscar-remotee:
+    - oscar-cluster:
         name: wordcount-compss-python
         memory: 3Gi
         cpu: '3.0'
