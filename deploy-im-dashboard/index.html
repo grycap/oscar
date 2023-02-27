@@ -15,7 +15,7 @@
         <link rel="next" href="../deploy-ec3/">
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.0.13">
+      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.0.15">
     
     
       
@@ -23,7 +23,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ffa9267a.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.113286f1.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.a0c5b2b5.min.css">
@@ -598,12 +598,30 @@ deploy Virtual Machines in <a href="https://aws.amazon.com/ec2">Amazon EC2</a>.<
 <p>In this panel you can specify the number of Working Nodes (WNs) of the
 cluster together with the computational requirements for each node. We
 leave the default values.
+- Number of WNs in the oscar cluster: Number of working nodes.
+- Number of CPUs for the front-end node: Number of CPUs in the primary node.
+- Amount of Memory for the front-end node: RAM in the primary node.
+- Flavor name of the front-end node. Only required in case of special flavors i.e. with GPUs: Type of instance that will be selected in the front node.
+- Number of CPUs for the WNs: number of CPUs per working node.
+- Amount of Memory for the WNs: RAM per working node.
+- Flavor name of the WNs. Only required in case of special flavors i.e. with GPUs: Type of instance that will be selected in the working nodes.
+- Size of the extra HD added to the instance: Extra memory in the primary node.
 <img alt="template-hw" src="../images/im-dashboard/im-dashboard-02.png" /></p>
 <p>In this panel, specify the passwords to be employed to access the
 Kubernetes Web UI (Dashboard), to access the OSCAR web UI and to access
 the MinIO dashboard. These tokens can also be used for programmatic access
-to the respective services.
-<img alt="template-param" src="../images/im-dashboard/im-dashboard-03.png" /></p>
+to the respective services.</p>
+<ul>
+<li>Access Token for the Kubernetes admin user: It is the token to connect to the Dashboard of Kubernetes.</li>
+<li>OSCAR password: password to OSCAR.</li>
+<li>MinIO password 8 characters min.: password to MinIO.</li>
+<li>Email to be used in the Lets Encrypt issuer: It is an Email linked with the certificates in case the user has any questions.</li>
+<li>ID of the user that creates the infrastructure: unique identifier. Do not touch.</li>
+<li>VO to support: It supports OIDC log in. If there is nothing, only can connect the user who deploys, in case there is a VO, it can be the user who deploys and all people in the VO.</li>
+<li>Flag to add NVIDIA support: if you want to use NVIDIA.</li>
+<li>Flag to install Apache YuniKorn: if you are going to use YuniKorn.
+<img alt="template-param" src="../images/im-dashboard/im-dashboard-03.png" /></li>
+</ul>
 <p>Now, choose the Cloud provider. The ID specified when creating the Cloud
 credentials will be shown.
 You will also need to specify the

@@ -15,7 +15,7 @@
         <link rel="next" href="../license/">
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.0.13">
+      <meta name="generator" content="mkdocs-1.4.2, mkdocs-material-9.0.15">
     
     
       
@@ -23,7 +23,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ffa9267a.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.113286f1.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.a0c5b2b5.min.css">
@@ -606,6 +606,20 @@ You can check if you are using the correct default cluster with the following co
 <p><code>oscar-cli cluster default</code></p>
 <p>and set a new default cluster with the following command:</p>
 <p><code>oscar-cli cluster default -s CLUSTER_ID</code></p>
+<ul>
+<li><strong>How do I use a secret image?</strong></li>
+</ul>
+<p>In case it is required the use of secret images, you should create a <a href="https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#registry-secret-existing-credentials">secret with the docker login configuration</a> with a structure like this:</p>
+<pre><code>apiVersion: v1
+kind: Secret
+metadata:
+  name: dockersecret
+  namespace: oscar-svc
+data:
+  .dockerconfigjson: {base64 .docker/config.json}
+type: kubernetes.io/dockerconfigjson
+</code></pre>
+<p>Apply the file through kubectl into the Kubernetes OSCAR cluster to create the secret. To use it in OSCAR services, you must add the secret name (<code>dockersecret</code> in this example) in the definition of the service, using the API or a FDL, under the <code>image_pull_secrets</code> parameter, or through the "Docker secret" field in OSCAR-UI.</p>
 
 
 
