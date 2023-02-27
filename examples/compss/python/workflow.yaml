@@ -1,0 +1,15 @@
+functions:
+  oscar:
+    - oscar-cluster:
+        name: wordcount-compss-python
+        memory: 3Gi
+        cpu: '3.0'
+        image: ghcr.io/grycap/wordcount-compss-python
+        script: script.sh
+        log_level: INFO
+        input:
+          - path: wordcount-python/in
+            storage_provider: minio
+        output:
+          - path: wordcount-python/out
+            storage_provider: minio
