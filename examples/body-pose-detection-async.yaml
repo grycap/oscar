@@ -5,7 +5,7 @@ functions:
      memory: 2Gi
      cpu: '1.0'
      image: deephdc/deep-oc-posenet-tf
-     script: deepaas.sh
+     script: script.sh
      input:
      - storage_provider: minio.default
        path: posenet/input
