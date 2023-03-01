@@ -1,14 +1,14 @@
 functions:
   oscar:
   - oscar-cluster:
-     name: posenet
+     name: body-pose-detection
      memory: 2Gi
      cpu: '1.0'
      image: deephdc/deep-oc-posenet-tf
      script: script.sh
      input:
      - storage_provider: minio.default
-       path: posenet/input
+       path: body-pose-detection/input
      output:
      - storage_provider: minio.default
-        path: posenet/output
+        path: body-pose-detection/output
