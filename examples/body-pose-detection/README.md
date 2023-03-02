@@ -6,7 +6,7 @@ and is prepared to be used with asynchronous invocations.
 
 
 In order to invoke the function, first you have to do is create a service,
-either by the OSCAR UI or by using the FLD within the following command.
+either by the OSCAR UI or by using the FDL within the following command.
 
 ``` sh
 oscar-cli apply body-pose-detection-async.yaml
