@@ -232,6 +232,7 @@ log_level: ""
 image: testimage
 alpine: false
 token: ""
+file_stage_in: false
 input: []
 output: []
 script: testscript
