@@ -40,7 +40,7 @@ const (
 	defaultLogLevel = "INFO"
 )
 
-var errNoMinIOInput = errors.New("only MinIO input allowed")
+var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache)")
 
 // MakeCreateHandler makes a handler for creating services
 func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
@@ -74,7 +74,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Create buckets/folders based on the Input and Output and enable notifications
 		if err := createBuckets(&service, cfg); err != nil {
-			if err == errNoMinIOInput {
+			if err == errInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {
 				c.String(http.StatusInternalServerError, err.Error())
@@ -165,9 +165,14 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 			provID = provSlice[1]
 		}
 
-		// Only allow input from MinIO
-		if provName != types.MinIOName {
-			return errNoMinIOInput
+		// Only allow input from MinIO and dCache
+		if provName != types.MinIOName && provName != types.WebDavName {
+			return errInput
+		}
+
+		// If the provider is WebDav (dCache) skip bucket creation
+		if provName == types.WebDavName {
+			continue
 		}
 
 		// Check if the provider identifier is defined in StorageProviders
