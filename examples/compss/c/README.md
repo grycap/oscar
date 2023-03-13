@@ -1,6 +1,6 @@
 # Increment in C with COMPSS and OSCAR
 
-The source code can be found in [github](https://github.com/bsc-wdc/tutorial_apps/tree/stable/c/increment)
+The source code can be found in [GitHub](https://github.com/bsc-wdc/tutorial_apps/tree/stable/c/increment).
 This example works by introducing four numbers: the first is the number of times to increase the counters the other three are the counters.
 The return will be the three counters incremented by the first number.
 
@@ -22,7 +22,7 @@ compss_build_app increment
 ```
 
 The compilation process will create a folder with the name `master`.
-This folder contains binary program:
+This folder contains the binary program:
 
 ``` bash
 runcompss --lang=c --project=./xml/templates/project.xml  master/increment $incrementNumber $counter1 $counter2  $counter3 > $OUTPUT_FILE
