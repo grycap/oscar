@@ -1,0 +1,15 @@
+functions:
+  oscar:
+    - oscar-cluster:
+        name: simple-compss-java
+        memory: 3Gi
+        cpu: '3.0'
+        image: ghcr.io/grycap/simple-compss-java
+        script: script.sh
+        log_level: INFO
+        input:
+          - path: simple-java/in
+            storage_provider: minio
+        output:
+          - path: simple-java/out
+            storage_provider: minio

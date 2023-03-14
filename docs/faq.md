@@ -16,3 +16,20 @@ You can check if you are using the correct default cluster with the following co
 and set a new default cluster with the following command:
 
 `oscar-cli cluster default -s CLUSTER_ID`
+
+- **How do I use a secret image?**
+
+In case it is required the use of secret images, you should create a [secret with the docker login configuration](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#registry-secret-existing-credentials) with a structure like this:
+
+```
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dockersecret
+  namespace: oscar-svc
+data:
+  .dockerconfigjson: {base64 .docker/config.json}
+type: kubernetes.io/dockerconfigjson
+```
+
+Apply the file through kubectl into the Kubernetes OSCAR cluster to create the secret. To use it in OSCAR services, you must add the secret name (`dockersecret` in this example) in the definition of the service, using the API or a FDL, under the `image_pull_secrets` parameter, or through the "Docker secret" field in OSCAR-UI.
