@@ -66,7 +66,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Update buckets
 		if err := updateBuckets(&newService, oldService, cfg); err != nil {
-			if err == errNoMinIOInput {
+			if err == errInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {
 				c.String(http.StatusInternalServerError, err.Error())
