@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v2/pkg/types"
@@ -30,6 +31,7 @@ import (
 // MakeUpdateHandler makes a handler for updating services
 func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var provName string
 		var newService types.Service
 		if err := c.ShouldBindJSON(&newService); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
@@ -57,23 +59,34 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
-		// Register minio webhook and restart the server
-		if err := registerMinIOWebhook(newService.Name, newService.Token, newService.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
-			back.UpdateService(*oldService)
-			c.String(http.StatusInternalServerError, err.Error())
-			return
-		}
-
-		// Update buckets
-		if err := updateBuckets(&newService, oldService, cfg); err != nil {
-			if err == errInput {
-				c.String(http.StatusBadRequest, err.Error())
+		for _, in := range oldService.Input {
+			// Split input provider
+			provSlice := strings.SplitN(strings.TrimSpace(in.Provider), types.ProviderSeparator, 2)
+			if len(provSlice) == 1 {
+				provName = strings.ToLower(provSlice[0])
 			} else {
-				c.String(http.StatusInternalServerError, err.Error())
+				provName = strings.ToLower(provSlice[0])
 			}
-			// If updateBuckets fails restore the oldService
-			back.UpdateService(*oldService)
-			return
+			if provName == types.MinIOName {
+				// Register minio webhook and restart the server
+				if err := registerMinIOWebhook(newService.Name, newService.Token, newService.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
+					back.UpdateService(*oldService)
+					c.String(http.StatusInternalServerError, err.Error())
+					return
+				}
+
+				// Update buckets
+				if err := updateBuckets(&newService, oldService, cfg); err != nil {
+					if err == errInput {
+						c.String(http.StatusBadRequest, err.Error())
+					} else {
+						c.String(http.StatusInternalServerError, err.Error())
+					}
+					// If updateBuckets fails restore the oldService
+					back.UpdateService(*oldService)
+					return
+				}
+			}
 		}
 
 		// Add Yunikorn queue if enabled
