@@ -12,12 +12,11 @@
 
 ## Introduction
 
-OSCAR is an open-source platform to support the Functions as a Service (FaaS)
-computing model for file-processing applications. It can be automatically
-deployed on multi-Clouds in order to create highly-parallel event-driven
-file-processing serverless applications that execute on customized runtime
-environments provided by Docker containers than run on an elastic Kubernetes
-cluster.
+OSCAR is an open-source platform to support the event-driven serverless
+computing model for data-processing applications. It can be automatically
+deployed on multi-Clouds, and even on low-powered devices, to create highly-parallel event-driven
+data-processing serverless applications along the computing continuum. These applications execute on customized runtime
+environments provided by Docker containers that run on elastic Kubernetes clusters.
 
 [**Deploy**](https://grycap.github.io/oscar/deploy-im-dashboard/) &nbsp; |
 &nbsp; [**Documentation**](https://grycap.github.io/oscar/) &nbsp;
@@ -42,7 +41,7 @@ applications in existing open-source FaaS frameworks.
 To this aim, OSCAR supports the
 [High Throughput Computing Programming Model](https://scar.readthedocs.io/en/latest/prog_model.html)
 initially introduced by the [SCAR framework](https://github.com/grycap/scar),
-to create highly-parallel event-driven file-processing serverless applications
+to create highly-parallel event-driven data-processing serverless applications
 that execute on customized runtime environments provided by Docker containers
 run on AWS Lambda.
 
@@ -50,10 +49,11 @@ With OSCAR, users upload files to a data storage back-end and this automatically
 triggers the execution of parallel invocations to a service responsible for
 processing each file. Output files are delivered into a data storage back-end
 for the convenience of the user. The user only specifies the Docker image and
-the script to be executed, inside a container created out of that image, in
-order to process a file that will be automatically made available to the
+the script to be executed, inside a container created out of that image, 
+to process a file that will be automatically made available to the
 container. The deployment of the computing infrastructure and its scalability
-is abstracted away from the user.
+is abstracted away from the user. Synchronous invocations are also supported to create 
+scalable HTTP-based endpoints for triggering containerised applications.
 
 ### Components
 
@@ -61,43 +61,38 @@ is abstracted away from the user.
 
 OSCAR runs on an elastic Kubernetes cluster that is deployed using:
 
-- [EC3](http://www.grycap.upv.es/ec3), an open-source tool to deploy compute
-    clusters that can horizontally scale in terms of number of nodes with
-    multiple plugins.
 - [IM](http://www.grycap.upv.es/im), an open-source virtual infrastructure
     provisioning tool for multi-Clouds.
+
+The following components are deployed inside the Kubernetes cluster to support the enactment of the OSCAR platform:
+
+
 - [CLUES](http://github.com/grycap/clues), an elasticity manager that
     horizontally scales in and out the number of nodes of the Kubernetes cluster
     according to the workload.
-
-The following components are deployed inside the Kubernetes cluster in order
-to support the OSCAR platform:
-
-- [MinIO](http://minio.io), a high performance distributed object storage
+- [MinIO](http://minio.io), a high-performance distributed object storage
     server that provides an API compatible with S3.
-- [OpenFaaS](https://www.openfaas.com/), a FaaS platform that allows creating
-    functions executed via HTTP requests.
-- [Knative](https://knative.dev), a Serverless framework to serve
+- [Knative](https://knative.dev), a serverless framework to serve
     container-based applications for synchronous invocations (default Serverless
     Backend).
-- OSCAR, the main application, responsible for the management of the services
-    and the integration of the different components to support event-driven
-    serverless computing for file processing. It includes a web-based GUI aimed at
-    end users to facilitate interaction with OSCAR.
+- [OSCAR Manager](https://docs.oscar.grycap.net/api/), the main API, responsible for the management of the services and the integration of the different components. 
+- [OSCAR UI](https://github.com/grycap/oscar-ui), an easy-to-use web-based graphical user interface aimed at end users.
+
 
 As external storage providers, the following services can be used:
 
 - External [MinIO](https://min.io) servers, which may be in clusters other than
     the platform.
-- [Amazon S3](https://aws.amazon.com/s3/), the Amazon's  object storage service
+- [Amazon S3](https://aws.amazon.com/s3/), an object storage service
     that offers industry-leading scalability, data availability, security, and
-    performance in the public Cloud.
-- [Onedata](https://onedata.org/), the global data access solution for science
+    performance in the AWS public Cloud.
+- [Onedata](https://onedata.org/), the global data access solution for science,
     used in the [EGI Federated Cloud](https://datahub.egi.eu/).
+- [dCache](http://dcache.org//), a system for storing and retrieving huge amounts of data, distributed among a large number of heterogeneous server nodes, under a single virtual filesystem tree with a variety of standard access methods.
 
-OSCAR has also been integrated with the [EC3 Portal](https://servproject.i3m.upv.es/ec3-ltos/index.php)
-available in the [EGI Applications on Demand](https://www.egi.eu/services/applications-on-demand/)
-service to deploy the platform on the EGI Federated Cloud resources.
+
+An OSCAR cluster can be easily deployed via the [IM Dashboard](http://im.egi.eu)
+on any major public and on-premises Cloud provider, including the EGI Federated Cloud.
 
 Further information is available in the [documentation](https://grycap.github.io/oscar).
 
@@ -122,10 +117,13 @@ Also, Grant PDC2021-120844-I00 funded by Ministerio de Ciencia e Innovación/Age
 </a>
 
 This software has received a silver badge according to the [Software Quality Baseline criteria](https://www.eosc-synergy.eu/for-developers/) defined by the [EOSC-Synergy](https://www.eosc-synergy.eu) project. Please acknowledge the use of OSCAR by citing the following scientific
-publication ([preprint available](https://www.grycap.upv.es/gmolto/publications/preprints/Perez2019osc.pdf)):
+publications ([preprints available](https://www.grycap.upv.es/gmolto/publications)):
 
 ```
-A. Pérez, S. Risco, D. M. Naranjo, M. Caballer, and G. Moltó,
+Sebastián Risco, Germán Moltó, Diana M. Naranjo and Ignacio Blanquer. (2021). Serverless Workflows for Containerised Applications in the Cloud Continuum. Journal of Grid Computing, 19(3), 30. https://doi.org/10.1007/s10723-021-09570-2
+```
+```
+Alfonso Pérez, Sebastián Risco, Diana M. Naranjo, Miguel Caballer, and Germán Moltó,
 “Serverless Computing for Event-Driven Data Processing Applications,”
-in 2019 IEEE International Conference on Cloud Computing (CLOUD 2019), 2019.
+in 2019 IEEE International Conference on Cloud Computing (CLOUD 2019), 2019. https://ieeexplore.ieee.org/document/8814513/
 ```
