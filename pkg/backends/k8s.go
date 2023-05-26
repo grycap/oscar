@@ -22,6 +22,7 @@ import (
 	"log"
 
 	"github.com/goccy/go-yaml"
+	"github.com/grycap/oscar/v2/pkg/imagepuller"
 	"github.com/grycap/oscar/v2/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,6 +110,12 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 		if delErr := deleteServiceConfigMap(service.Name, k.namespace, k.kubeClientset); delErr != nil {
 			log.Println(delErr.Error())
 		}
+		return err
+	}
+
+	//Create deaemonset to cache the service image on all the nodes
+	err = imagepuller.CreateDaemonset(k.config, service, k.kubeClientset)
+	if err != nil {
 		return err
 	}
 
