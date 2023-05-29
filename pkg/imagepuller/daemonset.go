@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
 	"sync"
 	"time"
 
@@ -37,6 +38,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 )
+
+var DaemonSetLoggerInfo = log.New(os.Stdout, "[DAEMONSET-INFO] ", log.Flags())
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const lengthStr = 5
@@ -68,9 +71,10 @@ func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kub
 	//Create daemonset
 	_, err := kubeClientset.AppsV1().DaemonSets(cfg.Namespace).Create(context.TODO(), daemon, metav1.CreateOptions{})
 	if err != nil {
+		DaemonSetLoggerInfo.Println(err)
 		return fmt.Errorf("failed to create daemonset: %s", err.Error())
 	} else {
-		log.Printf("Created daemonset")
+		DaemonSetLoggerInfo.Println("Created daemonset for service: ", service.Name)
 	}
 
 	//Set watcher informer
@@ -146,9 +150,11 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 	//Delete daemonset when all pods are in state "Running"
 	err := kubeClientset.AppsV1().DaemonSets(cfg.Namespace).Delete(context.TODO(), daemonsetName, metav1.DeleteOptions{})
 	if err != nil {
+		DaemonSetLoggerInfo.Println(err)
 		log.Fatalf("Failed to delete daemonset: %s", err.Error())
 	} else {
 		log.Printf("Daemonset deleted")
+		DaemonSetLoggerInfo.Println("Deleted daemonset")
 	}
 }
 

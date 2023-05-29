@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/grycap/oscar/v2/pkg/imagepuller"
 	"github.com/grycap/oscar/v2/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -115,6 +116,12 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		if delErr := deleteServiceConfigMap(service.Name, kn.namespace, kn.kubeClientset); delErr != nil {
 			log.Println(delErr.Error())
 		}
+		return err
+	}
+
+	//Create deaemonset to cache the service image on all the nodes
+	err = imagepuller.CreateDaemonset(kn.config, service, kn.kubeClientset)
+	if err != nil {
 		return err
 	}
 
