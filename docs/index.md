@@ -2,12 +2,13 @@
 
 ![OSCAR-logo](images/oscar3.png)
 
-OSCAR is a framework to efficiently support on-premises FaaS (Functions as a
-Service)for general-purpose file-processing computing applications.
+OSCAR is an open-source platform to support the event-driven serverless
+computing model for data-processing applications.
+It can be automatically deployed on multi-Clouds, and even on low-powered devices.
 It represents the porting to an on-premises scenario of the
 [SCAR framework](https://github.com/grycap/scar), which supports a
 [High Throughput Computing Programming Model](https://scar.readthedocs.io/en/latest/prog_model.html)
-to create highly-parallel event-driven file-processing serverless applications
+to create highly-parallel event-driven data-processing serverless applications
 that execute on customized runtime environments provided by Docker containers
 run on AWS Lambda.
 
@@ -28,28 +29,24 @@ right execution environment for the application.
 OSCAR runs on an elastic [Kubernetes](http://kubernetes.io) cluster that is
 deployed using:
 
-- [EC3](http://www.grycap.upv.es/ec3), an open-source tool to deploy compute
-    clusters that can horizontally scale in terms of the number of nodes with multiple
-    plugins.
 - [IM](http://www.grycap.upv.es/im), an open-source virtual infrastructure
     provisioning tool for multi-Clouds.
-- [CLUES](http://github.com/grycap/clues), an elasticity manager that
-    horizontally scales in and out the number of nodes of the Kubernetes
-    cluster according to the workload.
 
 The following components are deployed inside the Kubernetes cluster in order
 to support the OSCAR platform:
+
+- [CLUES](http://github.com/grycap/clues), an elasticity manager that
+    horizontally scales in and out the number of nodes of the Kubernetes
+    cluster according to the workload.
 - [MinIO](https://min.io), a high-performance distributed object storage
     server that provides an API compatible with S3.
-- [Knative](https://knative.dev), a Serverless framework to serve
+- [Knative](https://knative.dev), a serverless framework to serve
     container-based applications for synchronous invocations (default
     Serverless Backend).
 - [OpenFaaS](https://www.openfaas.com/), a FaaS platform that allows creating
     functions executed via HTTP requests.
-- OSCAR, the main application, responsible for the management of the services
-    and the integration of the different components to support event-driven
-    serverless computing for file processing. It includes a web-based GUI aimed
-    at end users to facilitate interaction with OSCAR.
+- [OSCAR Manager](https://docs.oscar.grycap.net/api/), the main API, responsible for the management of the services and the integration of the different components. 
+- [OSCAR UI](https://github.com/grycap/oscar-ui), an easy-to-use web-based graphical user interface aimed at end users.
 
 As external storage providers, the following services can be used:
 
