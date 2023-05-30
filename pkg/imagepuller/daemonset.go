@@ -88,7 +88,7 @@ func getDaemonset(cfg *types.Config, service types.Service) *appsv1.DaemonSet {
 	return &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      daemonsetName,
-			Namespace: cfg.Namespace,
+			Namespace: cfg.ServicesNamespace,
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
