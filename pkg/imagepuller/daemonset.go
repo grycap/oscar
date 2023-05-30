@@ -69,7 +69,7 @@ func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kub
 	daemon := getDaemonset(cfg, service)
 
 	//Create daemonset
-	_, err := kubeClientset.AppsV1().DaemonSets(cfg.Namespace).Create(context.TODO(), daemon, metav1.CreateOptions{})
+	_, err := kubeClientset.AppsV1().DaemonSets(cfg.ServicesNamespace).Create(context.TODO(), daemon, metav1.CreateOptions{})
 	if err != nil {
 		DaemonSetLoggerInfo.Println(err)
 		return fmt.Errorf("failed to create daemonset: %s", err.Error())
@@ -137,7 +137,7 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 
 	sharedInformerOp := informers.WithTweakListOptions(optionsFunc)
 
-	factory := informers.NewSharedInformerFactoryWithOptions(kubeClientset, 10*time.Second, informers.WithNamespace(cfg.Namespace), sharedInformerOp)
+	factory := informers.NewSharedInformerFactoryWithOptions(kubeClientset, 10*time.Second, informers.WithNamespace(cfg.ServicesNamespace), sharedInformerOp)
 	podInformer := factory.Core().V1().Pods().Informer()
 	factory.Start(stopper)
 
@@ -148,7 +148,7 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 	})
 
 	//Delete daemonset when all pods are in state "Running"
-	err := kubeClientset.AppsV1().DaemonSets(cfg.Namespace).Delete(context.TODO(), daemonsetName, metav1.DeleteOptions{})
+	err := kubeClientset.AppsV1().DaemonSets(cfg.ServicesNamespace).Delete(context.TODO(), daemonsetName, metav1.DeleteOptions{})
 	if err != nil {
 		DaemonSetLoggerInfo.Println(err)
 		log.Fatalf("Failed to delete daemonset: %s", err.Error())
