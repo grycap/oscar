@@ -41,7 +41,7 @@ import (
 
 var DaemonSetLoggerInfo = log.New(os.Stdout, "[DAEMONSET-INFO] ", log.Flags())
 
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const letterBytes = "abcdefghijklmnopqrstuvwxyz"
 const lengthStr = 5
 
 var podGroup string
@@ -63,7 +63,7 @@ func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kub
 	//Set needed variables
 	setWorkingNodes(kubeClientset)
 	podGroup = generatePodGroupName()
-	daemonsetName = "image-puller-" + service.Image
+	daemonsetName = "image-puller-" + service.Name
 
 	//Get daemonset definition
 	daemon := getDaemonset(cfg, service)
@@ -109,7 +109,7 @@ func getDaemonset(cfg *types.Config, service types.Service) *appsv1.DaemonSet {
 					ImagePullSecrets: types.SetImagePullSecrets(service.ImagePullSecrets),
 					Containers: []corev1.Container{
 						{
-							Name:    "imagePuller",
+							Name:    "image-puller",
 							Image:   service.Image,
 							Command: []string{"/bin/sh", "-c", "echo 'Image puller succeed'"},
 						},
@@ -130,7 +130,7 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 	var optionsFunc internalinterfaces.TweakListOptionsFunc = func(options *metav1.ListOptions) {
 		labelSelector := labels.Set{
 			"oscar-resoure": "daemonset",
-			"podGroup":      podGroup,
+			"pod-group":     podGroup,
 		}.AsSelector()
 		options.LabelSelector = labelSelector.String()
 	}
