@@ -123,7 +123,7 @@ func getDaemonset(cfg *types.Config, service types.Service) *appsv1.DaemonSet {
 //Watch pods with a Kubernetes Informer
 func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 
-	defer close(stopper)
+	//defer close(stopper)
 
 	pc = PodCounter{wnCount: 0}
 
