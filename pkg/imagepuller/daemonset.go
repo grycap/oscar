@@ -172,6 +172,7 @@ func handlePodEvent(oldObj interface{}, newObj interface{}) {
 		//Check the running pods count and stop the informer
 		if pc.wnCount >= workingNodes {
 			DaemonSetLoggerInfo.Println("Closing channel")
+			stopper <- struct{}{}
 		}
 	}
 }
