@@ -55,7 +55,7 @@ type PodCounter struct {
 }
 
 var pc PodCounter
-var stopper = make(chan struct{})
+var stopper chan struct{}
 
 //Create daemonset
 func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kubernetes.Interface) error {
@@ -123,7 +123,8 @@ func getDaemonset(cfg *types.Config, service types.Service) *appsv1.DaemonSet {
 //Watch pods with a Kubernetes Informer
 func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 
-	//defer close(stopper)
+	stopper = make(chan struct{})
+	defer close(stopper)
 
 	pc = PodCounter{wnCount: 0}
 
@@ -141,11 +142,15 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 	podInformer := factory.Core().V1().Pods().Informer()
 	factory.Start(stopper)
 
+	//Wait for all the selected resources to be added to the cache
 	cache.WaitForCacheSync(stopper, podInformer.HasSynced)
+
 	//Add event handler that gets all the pods status
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: handlePodEvent,
 	})
+
+	<-stopper
 
 	//Delete daemonset when all pods are in state "Running"
 	err := kubeClientset.AppsV1().DaemonSets(cfg.ServicesNamespace).Delete(context.TODO(), daemonsetName, metav1.DeleteOptions{})
@@ -166,7 +171,7 @@ func handlePodEvent(oldObj interface{}, newObj interface{}) {
 		pc.wnCount++
 		//Check the running pods count and stop the informer
 		if pc.wnCount >= workingNodes {
-			<-stopper
+			DaemonSetLoggerInfo.Println("Closing channel")
 		}
 	}
 }
