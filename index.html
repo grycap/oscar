@@ -13,7 +13,7 @@
         <link rel="next" href="local-testing/">
       
       <link rel="icon" href="images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.14">
+      <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.15">
     
     
       
@@ -21,10 +21,10 @@
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.85bb2934.min.css">
+      <link rel="stylesheet" href="assets/stylesheets/main.26e3688c.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.a6bdf11c.min.css">
+        <link rel="stylesheet" href="assets/stylesheets/palette.ecc896b0.min.css">
       
       
 
@@ -610,12 +610,13 @@
 
 <h1 id="introduction">Introduction</h1>
 <p><img alt="OSCAR-logo" src="images/oscar3.png" /></p>
-<p>OSCAR is a framework to efficiently support on-premises FaaS (Functions as a
-Service)for general-purpose file-processing computing applications.
+<p>OSCAR is an open-source platform to support the event-driven serverless
+computing model for data-processing applications.
+It can be automatically deployed on multi-Clouds, and even on low-powered devices.
 It represents the porting to an on-premises scenario of the
 <a href="https://github.com/grycap/scar">SCAR framework</a>, which supports a
 <a href="https://scar.readthedocs.io/en/latest/prog_model.html">High Throughput Computing Programming Model</a>
-to create highly-parallel event-driven file-processing serverless applications
+to create highly-parallel event-driven data-processing serverless applications
 that execute on customized runtime environments provided by Docker containers
 run on AWS Lambda.</p>
 <h2 id="goal">Goal</h2>
@@ -631,28 +632,25 @@ right execution environment for the application.</p>
 <p>OSCAR runs on an elastic <a href="http://kubernetes.io">Kubernetes</a> cluster that is
 deployed using:</p>
 <ul>
-<li><a href="http://www.grycap.upv.es/ec3">EC3</a>, an open-source tool to deploy compute
-    clusters that can horizontally scale in terms of the number of nodes with multiple
-    plugins.</li>
 <li><a href="http://www.grycap.upv.es/im">IM</a>, an open-source virtual infrastructure
     provisioning tool for multi-Clouds.</li>
+</ul>
+<p>The following components are deployed inside the Kubernetes cluster in order
+to support the OSCAR platform:</p>
+<ul>
 <li><a href="http://github.com/grycap/clues">CLUES</a>, an elasticity manager that
     horizontally scales in and out the number of nodes of the Kubernetes
     cluster according to the workload.</li>
-</ul>
-<p>The following components are deployed inside the Kubernetes cluster in order
-to support the OSCAR platform:
-- <a href="https://min.io">MinIO</a>, a high-performance distributed object storage
-    server that provides an API compatible with S3.
-- <a href="https://knative.dev">Knative</a>, a Serverless framework to serve
+<li><a href="https://min.io">MinIO</a>, a high-performance distributed object storage
+    server that provides an API compatible with S3.</li>
+<li><a href="https://knative.dev">Knative</a>, a serverless framework to serve
     container-based applications for synchronous invocations (default
-    Serverless Backend).
-- <a href="https://www.openfaas.com/">OpenFaaS</a>, a FaaS platform that allows creating
-    functions executed via HTTP requests.
-- OSCAR, the main application, responsible for the management of the services
-    and the integration of the different components to support event-driven
-    serverless computing for file processing. It includes a web-based GUI aimed
-    at end users to facilitate interaction with OSCAR.</p>
+    Serverless Backend).</li>
+<li><a href="https://www.openfaas.com/">OpenFaaS</a>, a FaaS platform that allows creating
+    functions executed via HTTP requests.</li>
+<li><a href="https://docs.oscar.grycap.net/api/">OSCAR Manager</a>, the main API, responsible for the management of the services and the integration of the different components. </li>
+<li><a href="https://github.com/grycap/oscar-ui">OSCAR UI</a>, an easy-to-use web-based graphical user interface aimed at end users.</li>
+</ul>
 <p>As external storage providers, the following services can be used:</p>
 <ul>
 <li>External <a href="https://min.io">MinIO</a> servers, which may be in clusters other
