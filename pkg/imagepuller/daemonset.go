@@ -111,7 +111,7 @@ func getDaemonset(cfg *types.Config, service types.Service) *appsv1.DaemonSet {
 						{
 							Name:    "image-puller",
 							Image:   service.Image,
-							Command: []string{"/bin/sh", "-c", "echo 'Image puller succeed'"},
+							Command: []string{"/bin/sh", "-c", "sleep 1h"},
 						},
 					},
 				},
@@ -166,6 +166,7 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 func handlePodEvent(oldObj interface{}, newObj interface{}) {
 	newPod := newObj.(*corev1.Pod)
 	if newPod.Status.Phase == corev1.PodRunning {
+		DaemonSetLoggerInfo.Println("Pod status running")
 		pc.mutex.Lock()
 		defer pc.mutex.Unlock()
 		pc.wnCount++
