@@ -74,7 +74,7 @@ func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kub
 		DaemonSetLoggerInfo.Println(err)
 		return fmt.Errorf("failed to create daemonset: %s", err.Error())
 	} else {
-		DaemonSetLoggerInfo.Println("Created daemonset for service: ", service.Name)
+		DaemonSetLoggerInfo.Println("Created daemonset for service:", service.Name)
 	}
 
 	//Set watcher informer
@@ -122,7 +122,7 @@ func getDaemonset(cfg *types.Config, service types.Service) *appsv1.DaemonSet {
 
 //Watch pods with a Kubernetes Informer
 func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
-
+	DaemonSetLoggerInfo.Println("Started pod watching")
 	stopper = make(chan struct{})
 	defer close(stopper)
 
@@ -138,21 +138,27 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 
 	sharedInformerOp := informers.WithTweakListOptions(optionsFunc)
 
-	factory := informers.NewSharedInformerFactoryWithOptions(kubeClientset, 10*time.Second, informers.WithNamespace(cfg.ServicesNamespace), sharedInformerOp)
+	factory := informers.NewSharedInformerFactoryWithOptions(kubeClientset, 2*time.Second, informers.WithNamespace(cfg.ServicesNamespace), sharedInformerOp)
 	podInformer := factory.Core().V1().Pods().Informer()
 	factory.Start(stopper)
 
-	//Wait for all the selected resources to be added to the cache
-	cache.WaitForCacheSync(stopper, podInformer.HasSynced)
+	DaemonSetLoggerInfo.Println("Started factory")
 
+	//Wait for all the selected resources to be added to the cache
+	state := cache.WaitForCacheSync(stopper, podInformer.HasSynced)
+	if !state {
+		log.Fatalf("Failed to sync informer cache")
+	}
+	DaemonSetLoggerInfo.Println("Cache synced")
 	//Add event handler that gets all the pods status
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    handleAddPodEvent,
 		UpdateFunc: handleUpdatePodEvent,
 	})
-
+	DaemonSetLoggerInfo.Println("Added handlers")
 	<-stopper
 
+	DaemonSetLoggerInfo.Println("Channel stopped")
 	//Delete daemonset when all pods are in state "Running"
 	err := kubeClientset.AppsV1().DaemonSets(cfg.ServicesNamespace).Delete(context.TODO(), daemonsetName, metav1.DeleteOptions{})
 	if err != nil {
