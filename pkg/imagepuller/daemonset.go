@@ -147,7 +147,8 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 
 	//Add event handler that gets all the pods status
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		UpdateFunc: handlePodEvent,
+		AddFunc:    handleAddPodEvent,
+		UpdateFunc: handleUpdatePodEvent,
 	})
 
 	<-stopper
@@ -158,14 +159,30 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 		DaemonSetLoggerInfo.Println(err)
 		log.Fatalf("Failed to delete daemonset: %s", err.Error())
 	} else {
-		log.Printf("Daemonset deleted")
 		DaemonSetLoggerInfo.Println("Deleted daemonset")
 	}
 }
 
-func handlePodEvent(oldObj interface{}, newObj interface{}) {
+func handleUpdatePodEvent(oldObj interface{}, newObj interface{}) {
+	DaemonSetLoggerInfo.Println("UPDATE EVENT FOUND")
 	newPod := newObj.(*corev1.Pod)
 	if newPod.Status.Phase == corev1.PodRunning {
+		DaemonSetLoggerInfo.Println("Pod status running")
+		pc.mutex.Lock()
+		defer pc.mutex.Unlock()
+		pc.wnCount++
+		//Check the running pods count and stop the informer
+		if pc.wnCount >= workingNodes {
+			DaemonSetLoggerInfo.Println("Closing channel")
+			stopper <- struct{}{}
+		}
+	}
+}
+
+func handleAddPodEvent(pod interface{}) {
+	DaemonSetLoggerInfo.Println("ADD EVENT FOUND")
+	p := pod.(*corev1.Pod)
+	if p.Status.Phase == corev1.PodRunning {
 		DaemonSetLoggerInfo.Println("Pod status running")
 		pc.mutex.Lock()
 		defer pc.mutex.Unlock()
