@@ -140,22 +140,23 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 
 	factory := informers.NewSharedInformerFactoryWithOptions(kubeClientset, 2*time.Second, informers.WithNamespace(cfg.ServicesNamespace), sharedInformerOp)
 	podInformer := factory.Core().V1().Pods().Informer()
-	factory.Start(stopper)
-
-	DaemonSetLoggerInfo.Println("Started factory")
 
 	//Wait for all the selected resources to be added to the cache
 	state := cache.WaitForCacheSync(stopper, podInformer.HasSynced)
 	if !state {
 		log.Fatalf("Failed to sync informer cache")
 	}
+
 	DaemonSetLoggerInfo.Println("Cache synced")
+
 	//Add event handler that gets all the pods status
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    handleAddPodEvent,
 		UpdateFunc: handleUpdatePodEvent,
 	})
 	DaemonSetLoggerInfo.Println("Added handlers")
+	factory.Start(stopper)
+	DaemonSetLoggerInfo.Println("Started informer")
 	<-stopper
 
 	DaemonSetLoggerInfo.Println("Channel stopped")
