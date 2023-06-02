@@ -52,7 +52,7 @@ As external storage providers, the following services can be used:
 
 - External [MinIO](https://min.io) servers, which may be in clusters other
     than the platform.
-- [Amazon [S3](https://aws.amazon.com/s3/), AWS's object storage
+- Amazon [S3](https://aws.amazon.com/s3/), AWS's object storage
     service that offers industry-leading scalability, data availability,
     security, and performance in the public Cloud.
 - [Onedata](https://onedata.org/), the global data access solution for science
