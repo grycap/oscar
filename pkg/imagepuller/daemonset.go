@@ -122,7 +122,6 @@ func getDaemonset(cfg *types.Config, service types.Service) *appsv1.DaemonSet {
 
 //Watch pods with a Kubernetes Informer
 func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
-	DaemonSetLoggerInfo.Println("Started pod watching")
 	stopper = make(chan struct{})
 	defer close(stopper)
 
@@ -130,8 +129,7 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 
 	var optionsFunc internalinterfaces.TweakListOptionsFunc = func(options *metav1.ListOptions) {
 		labelSelector := labels.Set{
-			"oscar-resoure": "daemonset",
-			"pod-group":     podGroup,
+			"pod-group": podGroup,
 		}.AsSelector()
 		options.LabelSelector = labelSelector.String()
 	}
@@ -139,7 +137,10 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 	sharedInformerOp := informers.WithTweakListOptions(optionsFunc)
 
 	factory := informers.NewSharedInformerFactoryWithOptions(kubeClientset, 2*time.Second, informers.WithNamespace(cfg.ServicesNamespace), sharedInformerOp)
+	//factory := informers.NewSharedInformerFactory(kubeClientset, 2*time.Second)
+
 	podInformer := factory.Core().V1().Pods().Informer()
+	factory.Start(stopper)
 
 	//Wait for all the selected resources to be added to the cache
 	state := cache.WaitForCacheSync(stopper, podInformer.HasSynced)
@@ -147,20 +148,15 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 		log.Fatalf("Failed to sync informer cache")
 	}
 
-	DaemonSetLoggerInfo.Println("Cache synced")
-
 	//Add event handler that gets all the pods status
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    handleAddPodEvent,
 		UpdateFunc: handleUpdatePodEvent,
 	})
-	DaemonSetLoggerInfo.Println("Added handlers")
-	factory.Start(stopper)
-	DaemonSetLoggerInfo.Println("Started informer")
+
 	<-stopper
 
-	DaemonSetLoggerInfo.Println("Channel stopped")
 	//Delete daemonset when all pods are in state "Running"
+	DaemonSetLoggerInfo.Println("Deleting daemonset...")
 	err := kubeClientset.AppsV1().DaemonSets(cfg.ServicesNamespace).Delete(context.TODO(), daemonsetName, metav1.DeleteOptions{})
 	if err != nil {
 		DaemonSetLoggerInfo.Println(err)
@@ -171,32 +167,13 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 }
 
 func handleUpdatePodEvent(oldObj interface{}, newObj interface{}) {
-	DaemonSetLoggerInfo.Println("UPDATE EVENT FOUND")
 	newPod := newObj.(*corev1.Pod)
 	if newPod.Status.Phase == corev1.PodRunning {
-		DaemonSetLoggerInfo.Println("Pod status running")
 		pc.mutex.Lock()
 		defer pc.mutex.Unlock()
 		pc.wnCount++
 		//Check the running pods count and stop the informer
 		if pc.wnCount >= workingNodes {
-			DaemonSetLoggerInfo.Println("Closing channel")
-			stopper <- struct{}{}
-		}
-	}
-}
-
-func handleAddPodEvent(pod interface{}) {
-	DaemonSetLoggerInfo.Println("ADD EVENT FOUND")
-	p := pod.(*corev1.Pod)
-	if p.Status.Phase == corev1.PodRunning {
-		DaemonSetLoggerInfo.Println("Pod status running")
-		pc.mutex.Lock()
-		defer pc.mutex.Unlock()
-		pc.wnCount++
-		//Check the running pods count and stop the informer
-		if pc.wnCount >= workingNodes {
-			DaemonSetLoggerInfo.Println("Closing channel")
 			stopper <- struct{}{}
 		}
 	}
