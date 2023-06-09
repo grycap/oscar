@@ -5,28 +5,32 @@ The easiest way to test the OSCAR platform locally is using
 clusters inside Docker containers and automatically configures `kubectl` to
 access them.
 
-## Prerequisites
+The following programs are used by OSCAR in order to deploy the cluster :
 
-- [Docker](https://docs.docker.com/get-docker/), required by kind to launch
+- [Docker](https://www.docker.com/), required by kind to launch
   the Kubernetes nodes on containers.
-- [Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/) to
+- [Kubectl](https://kubernetes.io/), the command-line tool to
   communicate with the Kubernetes cluster.
-- [Helm](https://helm.sh/docs/intro/install/) to easily deploy applications on Kubernetes.
-- [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) to
+- [Helm](https://helm.sh/) the package manager for Kubernetes to easily deploy applications on there.
+- [Kind](https://kind.sigs.k8s.io) to
   deploy the local Kubernetes cluster.
 
-**Other prerequisites**
+**Aspects to be considered**
 
 - Although the use of local Docker images has yet to be implemented as a feature on OSCAR clusters, the local deployment for testing allows you to use a local Docker registry to use this kind of images. 
 The registry uses by default the port 5001, so each image you want to use must be tagged as `localhost:5001/[image_name]` and pushed to the repository through the `docker push localhost:5001/[image_name]` command.
 
-- Port 80 must be available to avoid errors during the deployment since OSCAR-UI uses it. Check [Frequently Asked Questions (FAQ)](faq.md) for more info.
+- Port 80 must be available to avoid errors during the deployment since OSCAR-UI uses it.
+
+- It is recommended to install the above programs in case the automated local testing script fails in order to be able to deploy the cluster manually.
+
+Check [Frequently Asked Questions (FAQ)](faq.md) for more info.
 
 ## Automated local testing
 
 To set up the enviroment for the platform testing you can run the following
 command. This script automatically executes all the necessary steps to deploy
-the local cluster and the OSCAR platform along with all the required tools. 
+the local cluster with a single node and the OSCAR platform along with all the required tools. 
 
 ``` sh
 curl -sSL http://go.oscar.grycap.net | bash
@@ -34,7 +38,7 @@ curl -sSL http://go.oscar.grycap.net | bash
 
 ## Steps for manual local testing
 
-If you want to do it manualy you can follow the listed steps.
+If you want to deploy the local cluster and OSCAR manually, you can follow the listed steps.
 
 ### Create the cluster
 
@@ -99,19 +103,17 @@ environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 \
 *Note that the deployment has been configured to use the rootUser `minio` and
 the specified password as rootPassword. The NodePort service type has been
 used in order to allow access from `http://localhost:30300` (API) and
-`http://localhost:30301` (Console).*
+`http://localhost:30301` (console).*
 
 ### Deploy NFS server provisioner
 
-NFS server provisioner is required for the creation of `ReadWriteMany`
+A NFS server provisioner is required for the creation of `ReadWriteMany`
 PersistentVolumes in the kind cluster. This is needed by the OSCAR services
 to mount the volume with the
 [FaaS Supervisor](https://github.com/grycap/faas-supervisor) inside the job
 containers.
 
-To deploy it you can use
-[this chart](https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner/tree/master/deploy/helm)
-executing:
+To deploy it you can run the following commands:
 
 ```sh
 helm repo add nfs-ganesha-server-and-external-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
@@ -130,7 +132,7 @@ OSCAR supports [Knative Serving](https://knative.dev/docs/serving/) as
 Serverless Backend to process
 [synchronous invocations](invoking.md#synchronous-invocations). If you want
 to deploy it in the kind cluster, first you must deploy the
-[Knative Operator](https://knative.dev/docs/install/operator/knative-with-operators/)
+[Knative Operator](https://knative.dev/docs/install/operator/knative-with-operators/):
 
 ```
 kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.3.1/operator.yaml
@@ -172,14 +174,14 @@ EOF
 
 ### Deploy OSCAR
 
-First, create the `oscar` and `oscar-svc` namespaces by executing:
+To deploy the OSCAR platform, first create the `oscar` and `oscar-svc` namespaces by executing:
 
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/yaml/oscar-namespaces.yaml
 ```
 
-Then, add the [grycap helm repo](https://github.com/grycap/helm-charts) and
-deploy by running the following commands replacing `<OSCAR_PASSWORD>` with a
+Then, add the [GRyCAP helm repo](https://github.com/grycap/helm-charts) and
+deploy it by running the following commands replacing `<OSCAR_PASSWORD>` with a
 password of your choice and `<MINIO_PASSWORD>` with the MinIO rootPassword,
 and remember to add the flag `--set serverlessBackend=knative` if you deployed
 it in the previous step:
@@ -211,11 +213,11 @@ kind delete cluster
 ```
 
 *Remember that if you have more than one cluster created, it may be required
-to set the `--name` flag to specify the name of the cluster to be deleted.*
+to set the `--name` flag to specify the name of the cluster to be deleted. The default name when using the script is `oscar-test`*
 
 ### Using OSCAR-CLI
 
-To use OSCAR-CLI in a local deployment, you should set the `--disable-ssl`
+To use [OSCAR-CLI](https://docs.oscar.grycap.net/oscar-cli/) in a local deployment, you should set the `--disable-ssl`
 flag to disable verification of the self-signed certificates:
 
 ```sh

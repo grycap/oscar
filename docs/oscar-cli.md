@@ -1,21 +1,13 @@
 # OSCAR-CLI
 
-OSCAR-CLI provides a command line interface to interact with
-[OSCAR](https://github.com/grycap/oscar) clusters in a simple way. It supports
-service management, workflows definition from FDL (Functions Definition
-Language) files and the ability to manage files from OSCAR's compatible
-storage providers (MinIO, AWS S3 and Onedata). The folder
-[`example-workflow`](https://github.com/grycap/oscar-cli/tree/main/example-workflow)
+OSCAR-CLI is a tool created to manage [OSCAR](https://github.com/grycap/oscar) clusters in a very simple way through a command line interface. It supports service management, workflows definition from FDL ([Functions Definition Language](https://docs.oscar.grycap.net/fdl/)) files and the ability to manage files from OSCAR's compatible storage providers (MinIO, AWS S3 and Onedata). The folder [`example-workflow`](https://github.com/grycap/oscar-cli/tree/main/example-workflow)
 contains all the necessary files to create a simple workflow to test the tool.
 
 ## Download
 
 ### Releases
 
-The easy way to download OSCAR-CLI is through the github
-[releases page](https://github.com/grycap/oscar-cli/releases). There are
-binaries for multiple platforms and OS. If you need a binary for another
-platform, please open an [issue](https://github.com/grycap/oscar-cli/issues).
+The easy way to download OSCAR-CLI is through the github [releases page](https://github.com/grycap/oscar-cli/releases). There are binaries for multiple platforms and OS. If you need a binary for another platform, please open an [issue](https://github.com/grycap/oscar-cli/issues).
 
 ### Install from source
 
