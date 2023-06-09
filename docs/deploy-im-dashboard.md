@@ -22,55 +22,45 @@ by the IM.
 
 These are the steps:
 
-1. Access the [IM Dashboard](https://appsgrycap.i3m.upv.es:31443/im-dashboard/login)
+### 1. Access the [IM Dashboard](https://appsgrycap.i3m.upv.es:31443/im-dashboard/login)
+![login](images/im-dashboard/im-dashboard-00.png)
 
-    ![login](images/im-dashboard/im-dashboard-00.png)
+You will need to authenticate via [EGI Check-In](https://www.egi.eu/services/check-in/), which supports mutiple Identity Providers (IdP).
 
-    You will need to authenticate via
-    [EGI Check-In](https://www.egi.eu/services/check-in/), which supports
-    mutiple Identity Providers (IdP).
+### 2. Configure the Cloud Credentials
 
-1. Configure the Cloud Credentials
+Once logged in, you need to define the access credentials to the Cloud on which the OSCAR cluster will be deployed. These should be temporary credentials under the [principle of least privilege (PoLP)](https://searchsecurity.techtarget.com/definition/principle-of-least-privilege-POLP).
 
-    Once logged in, you need to define the access credentials to the Cloud on
-    which the OSCAR cluster will be deployed. These should be temporary
-    credentials under the
-    [principle of least privilege (PoLP)](https://searchsecurity.techtarget.com/definition/principle-of-least-privilege-POLP).
+![credentials](images/im-dashboard/im-dashboard-00-2.png)
 
-    ![credentials](images/im-dashboard/im-dashboard-00-2.png)
+![credentials](images/im-dashboard/im-dashboard-00-3.png)
 
-    ![credentials](images/im-dashboard/im-dashboard-00-3.png)
+![credentials](images/im-dashboard/im-dashboard-00-4.png)
 
-    ![credentials](images/im-dashboard/im-dashboard-00-4.png)
-
-    In our case we indicate an identifier for the set of credentials,
+In our case we indicate an identifier for the set of credentials,
     [the Access Key ID and the Secret Access Key](https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html)
     for an [IAM](https://aws.amazon.com/iam/) user that has privileges to
     deploy Virtual Machines in [Amazon EC2](https://aws.amazon.com/ec2).
 
-1. Select the OSCAR template
+### 3. Select the OSCAR template
 
-    ![template](images/im-dashboard/im-dashboard-01.png)
+![template](images/im-dashboard/im-dashboard-01.png)
 
-1. Customize and deploy the OSCAR cluster
+### 4. Customize and deploy the OSCAR cluster
 
-    In this panel you can specify the number of Working Nodes (WNs) of the
-    cluster together with the computational requirements for each node. We
-    leave the default values.
-    - Number of WNs in the oscar cluster: Number of working nodes.
-    - Number of CPUs for the front-end node: Number of CPUs in the primary node.
-    - Amount of Memory for the front-end node: RAM in the primary node.
-    - Flavor name of the front-end node. Only required in case of special flavors i.e. with GPUs: Type of instance that will be selected in the front node.
-    - Number of CPUs for the WNs: number of CPUs per working node.
-    - Amount of Memory for the WNs: RAM per working node.
-    - Flavor name of the WNs. Only required in case of special flavors i.e. with GPUs: Type of instance that will be selected in the working nodes.
-    - Size of the extra HD added to the instance: Extra memory in the primary node.
-    ![template-hw](images/im-dashboard/im-dashboard-02.png)
+In this panel you can specify the number of Working Nodes (WNs) of the cluster together with the computational requirements for each node. We leave the default values.
+- `Number of WNs in the oscar cluster`: Number of working nodes.
+- `Number of CPUs for the front-end node`: Number of CPUs in the primary node.
+- `Amount of Memory for the front-end node`: RAM in the primary node.
+- `Flavor name of the front-end node` (only required in case of special flavors i.e. with GPUs): Type of instance that will be selected in the front node.
+- `Number of CPUs for the WNs`: number of CPUs per working node.
+- `Amount of Memory for the WNs`: RAM per working node.
+- `Flavor name of the WNs` (only required in case of special flavors i.e. with GPUs): Type of instance that will be selected in the working nodes.
+- `Size of the extra HD added to the instance`: Extra memory in the primary node.
 
-    In this panel, specify the passwords to be employed to access the
-    Kubernetes Web UI (Dashboard), to access the OSCAR web UI and to access
-    the MinIO dashboard. These tokens can also be used for programmatic access
-    to the respective services.
+![template-hw](images/im-dashboard/im-dashboard-02.png)
+
+In this panel, specify the passwords to be employed to access the Kubernetes Web UI (Dashboard), to access the OSCAR web UI and to access the MinIO dashboard. These tokens can also be used for programmatic access to the respective services.
 
     - Access Token for the Kubernetes admin user: It is the token to connect to the Dashboard of Kubernetes.
     - OSCAR password: password to OSCAR.
