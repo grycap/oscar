@@ -68,5 +68,5 @@ only MinIO can be used as input.*
 
 An OSCAR cluster can be accessed via its
 [REST API](https://grycap.github.io/oscar/api/), the
-[web-based [UI](https://github.com/grycap/oscar/tree/master/ui) and the command-line interface provided by
+[web-based [UI](https://github.com/grycap/oscar-ui) and the command-line interface provided by
 [oscar-cli](https://github.com/grycap/oscar-cli).
