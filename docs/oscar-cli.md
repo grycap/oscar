@@ -44,7 +44,7 @@ go install github.com/grycap/oscar-cli@latest
 
 ### apply
 
-Apply a FDL file to create or edit services in clusters.
+Applies a FDL file to create or edit services in clusters.
 
 ```
 Usage:
@@ -66,11 +66,11 @@ Manages the configuration of clusters.
 
 ##### add
 
-Add a new existing cluster to oscar-cli.
+Adds an existing cluster to the OSCAR-CLI tool (modifies the configuration file).
 
 ```
 Usage:
-  oscar-cli cluster add IDENTIFIER ENDPOINT {USERNAME {PASSWORD | \
+  oscar-cli cluster add NAME_IDENTIFIER ENDPOINT {USERNAME {PASSWORD | \
   --password-stdin} | --oidc-account-name ACCOUNT} [flags]
 
 Aliases:
@@ -92,7 +92,7 @@ Global Flags:
 
 ##### default
 
-Show or set the default cluster.
+Shows or sets the default cluster.
 
 ```
 Usage:
@@ -103,7 +103,7 @@ Aliases:
 
 Flags:
   -h, --help         help for default
-  -s, --set string   set a default cluster by passing its IDENTIFIER
+  -s, --set string   set a default cluster by passing its NAME_IDENTIFIER
 
 Global Flags:
       --config string   set the location of the config file (YAML or JSON)
@@ -111,7 +111,7 @@ Global Flags:
 
 ##### info
 
-Show information of an OSCAR cluster.
+Shows information of an OSCAR cluster.
 
 ```
 Usage:
@@ -130,7 +130,7 @@ Global Flags:
 
 ##### list
 
-List the configured OSCAR clusters.
+Lists the configured OSCAR clusters.
 
 ```
 Usage:
@@ -148,11 +148,11 @@ Global Flags:
 
 ##### remove
 
-Remove a cluster from the configuration file.
+Removes a cluster from the OSCAR-CLI tool (modifies the configuration file).
 
 ```
 Usage:
-  oscar-cli cluster remove IDENTIFIER [flags]
+  oscar-cli cluster remove NAME_IDENTIFIER [flags]
 
 Aliases:
   remove, rm
