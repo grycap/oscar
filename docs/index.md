@@ -43,8 +43,6 @@ to support the OSCAR platform:
 - [Knative](https://knative.dev), a serverless framework to serve
     container-based applications for synchronous invocations (default
     Serverless Backend).
-- [OpenFaaS](https://www.openfaas.com/), a FaaS platform that allows creating
-    functions executed via HTTP requests.
 - [OSCAR Manager](https://docs.oscar.grycap.net/api/), the main API, responsible for the management of the services and the integration of the different components. 
 - [OSCAR UI](https://github.com/grycap/oscar-ui), an easy-to-use web-based graphical user interface aimed at end users.
 
@@ -65,6 +63,10 @@ As external storage providers, the following services can be used:
 
 ***Note**: All of the mentioned storage providers can be used as output, but
 only MinIO can be used as input.*
+
+
+An OSCAR cluster can be easily deployed via the [IM Dashboard](http://im.egi.eu)
+on any major public and on-premises Cloud provider, including the EGI Federated Cloud.
 
 An OSCAR cluster can be accessed via its
 [REST API](https://grycap.github.io/oscar/api/), the
