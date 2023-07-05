@@ -120,9 +120,11 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 	}
 
 	//Create deaemonset to cache the service image on all the nodes
-	err = imagepuller.CreateDaemonset(kn.config, service, kn.kubeClientset)
-	if err != nil {
-		return err
+	if service.EnableCache {
+		err = imagepuller.CreateDaemonset(kn.config, service, kn.kubeClientset)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

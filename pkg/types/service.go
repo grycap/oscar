@@ -139,9 +139,13 @@ type Service struct {
 	// Optional. (default: "")
 	TotalCPU string `json:"total_cpu"`
 
-	// GPU parameter to request gpu usage in service's executions (synchronous and asynchronous)
+	// EnableGPU parameter to request gpu usage in service's executions (synchronous and asynchronous)
 	// Optional. (default: false)
 	EnableGPU bool `json:"enable_gpu"`
+
+	// EnableCache parameter to enable the image cache functionality
+	// Optional. (default: false)
+	EnableCache bool `json:"enable_cache"`
 
 	// Synchronous struct to configure specific sync parameters
 	// Only Knative ServerlessBackend applies this settings
