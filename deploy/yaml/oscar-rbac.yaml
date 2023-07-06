@@ -18,6 +18,7 @@ rules:
   - pods/log
   - podtemplates
   - configmaps
+  - daemonsets
   verbs:
   - get
   - list
