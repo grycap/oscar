@@ -18,7 +18,6 @@ rules:
   - pods/log
   - podtemplates
   - configmaps
-  - daemonsets
   verbs:
   - get
   - list
@@ -26,6 +25,17 @@ rules:
   - create
   - delete
   - update
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update 
 - apiGroups:
   - batch
   resources:
