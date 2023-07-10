@@ -201,7 +201,7 @@ func TestSetImagePullSecrets(t *testing.T) {
 		{Name: "testcred1"},
 	}
 
-	result := setImagePullSecrets(secrets)
+	result := SetImagePullSecrets(secrets)
 	if result[0].Name != expected[0].Name {
 		t.Errorf("invalid conversion of local object. Expected: %v, got %v", expected, result)
 	}
@@ -215,6 +215,7 @@ cpu: "1.0"
 total_memory: ""
 total_cpu: ""
 enable_gpu: false
+image_prefetch: false
 synchronous:
   min_scale: 0
   max_scale: 0

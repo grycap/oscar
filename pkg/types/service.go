@@ -139,9 +139,13 @@ type Service struct {
 	// Optional. (default: "")
 	TotalCPU string `json:"total_cpu"`
 
-	// GPU parameter to request gpu usage in service's executions (synchronous and asynchronous)
+	// EnableGPU parameter to request gpu usage in service's executions (synchronous and asynchronous)
 	// Optional. (default: false)
 	EnableGPU bool `json:"enable_gpu"`
+
+	// ImagePrefetch parameter to enable the image cache functionality
+	// Optional. (default: false)
+	ImagePrefetch bool `json:"image_prefetch"`
 
 	// Synchronous struct to configure specific sync parameters
 	// Only Knative ServerlessBackend applies this settings
@@ -231,7 +235,7 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 	}
 
 	podSpec := &v1.PodSpec{
-		ImagePullSecrets: setImagePullSecrets(service.ImagePullSecrets),
+		ImagePullSecrets: SetImagePullSecrets(service.ImagePullSecrets),
 		Containers: []v1.Container{
 			{
 				Name:  ContainerName,
@@ -306,7 +310,7 @@ func convertEnvVars(vars map[string]string) []v1.EnvVar {
 	return envVars
 }
 
-func setImagePullSecrets(secrets []string) []v1.LocalObjectReference {
+func SetImagePullSecrets(secrets []string) []v1.LocalObjectReference {
 	objects := []v1.LocalObjectReference{}
 	for _, s := range secrets {
 		objects = append(objects, v1.LocalObjectReference{
