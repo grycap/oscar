@@ -143,9 +143,9 @@ type Service struct {
 	// Optional. (default: false)
 	EnableGPU bool `json:"enable_gpu"`
 
-	// EnableCache parameter to enable the image cache functionality
+	// ImagePrefetch parameter to enable the image cache functionality
 	// Optional. (default: false)
-	EnableCache bool `json:"enable_cache"`
+	ImagePrefetch bool `json:"image_prefetch"`
 
 	// Synchronous struct to configure specific sync parameters
 	// Only Knative ServerlessBackend applies this settings
