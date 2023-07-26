@@ -216,6 +216,10 @@ total_memory: ""
 total_cpu: ""
 enable_gpu: false
 image_prefetch: false
+expose_options:
+  max_replicas: 0
+  port: 0
+  top_cpu: 0
 synchronous:
   min_scale: 0
   max_scale: 0
@@ -233,10 +237,6 @@ log_level: ""
 image: testimage
 alpine: false
 token: ""
-expose_options:
-  max_replicas: 0
-  port: 0
-  top_cpu: 0
 file_stage_in: false
 input: []
 output: []
@@ -349,7 +349,7 @@ func checkEnvVars(cfg *Config, podSpec *v1.PodSpec) error {
 		case "max_inflight":
 			expected = strconv.Itoa(cfg.WatchdogMaxInflight)
 			if envVar.Value != expected {
-				return fmt.Errorf("the max_inflight environment variable has not the correct value. Expected: %s, got: %s", expected, envVar.Value)
+				return fmt.Errorf("componenteax_inflight environment variable has not the correct value. Expected: %s, got: %s", expected, envVar.Value)
 			}
 		case "write_debug":
 			expected = strconv.FormatBool(cfg.WatchdogWriteDebug)

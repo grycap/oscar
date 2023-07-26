@@ -42,7 +42,7 @@ type Expose struct {
 	TopCPU      int32 `json:"top_cpu" default:"80"`
 }
 
-// / Main function that creates all the kubernetes componente
+// / Main function that creates all the kubernetes components
 func CreateExpose(expose Expose, kubeClientset kubernetes.Interface, cfg types.Config) error {
 
 	err := createDeployment(expose, kubeClientset)
@@ -63,7 +63,7 @@ func CreateExpose(expose Expose, kubeClientset kubernetes.Interface, cfg types.C
 	return nil
 }
 
-// /Main function that deletes all the kubernetes componente
+// /Main function that deletes all the kubernetes components
 func DeleteExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 	err := deleteDeployment(expose, kubeClientset)
 	if err != nil {
@@ -83,7 +83,7 @@ func DeleteExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 	return nil
 }
 
-// /Main function that updates all the kubernetes componente
+// /Main function that updates all the kubernetes components
 func UpdateExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 	err := updateDeployment(expose, kubeClientset)
 	if err != nil {
@@ -98,7 +98,7 @@ func UpdateExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 	return nil
 }
 
-// /Main function that list all the kubernetes componente
+// /Main function that list all the kubernetes components
 
 func ListExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 	deploy, hpa, err := listDeployments(expose, kubeClientset)
