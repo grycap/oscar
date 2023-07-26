@@ -42,6 +42,7 @@ type Expose struct {
 	TopCPU      int32 `json:"top_cpu" default:"80"`
 }
 
+// / Main function that creates all the kubernetes componente
 func CreateExpose(expose Expose, kubeClientset kubernetes.Interface, cfg types.Config) error {
 
 	err := createDeployment(expose, kubeClientset)
@@ -62,6 +63,7 @@ func CreateExpose(expose Expose, kubeClientset kubernetes.Interface, cfg types.C
 	return nil
 }
 
+// /Main function that deletes all the kubernetes componente
 func DeleteExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 	err := deleteDeployment(expose, kubeClientset)
 	if err != nil {
@@ -81,6 +83,7 @@ func DeleteExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 	return nil
 }
 
+// /Main function that updates all the kubernetes componente
 func UpdateExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 	err := updateDeployment(expose, kubeClientset)
 	if err != nil {
@@ -94,6 +97,8 @@ func UpdateExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 	}
 	return nil
 }
+
+// /Main function that list all the kubernetes componente
 
 func ListExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 	deploy, hpa, err := listDeployments(expose, kubeClientset)
@@ -119,7 +124,7 @@ func ListExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 
 //////////// Deployment
 
-/// Create
+/// Create deployment and horizontal autoscale
 
 func createDeployment(e Expose, client kubernetes.Interface) error {
 	deployment := getDeployment(e)
@@ -136,6 +141,7 @@ func createDeployment(e Expose, client kubernetes.Interface) error {
 	return nil
 }
 
+// Return the component deployment, ready to create or update
 func getDeployment(e Expose) *apps.Deployment {
 	name_deployment := getNameDeployment(e.Name)
 	var replicas int32 = 1
@@ -158,6 +164,7 @@ func getDeployment(e Expose) *apps.Deployment {
 	return deployment
 }
 
+// Return the component HorizontalAutoScale, ready to create or update
 func getHortizontalAutoScale(e Expose) *autos.HorizontalPodAutoscaler {
 	name_hpa := getNameHPA(e.Name)
 	name_deployment := getNameDeployment(e.Name)
@@ -182,11 +189,12 @@ func getHortizontalAutoScale(e Expose) *autos.HorizontalPodAutoscaler {
 	return hpa
 }
 
+// Return the Pod spec inside of deployment, ready to create or update
+
 func getPodTemplateSpec(e Expose) v1.PodTemplateSpec {
 	var ports v1.ContainerPort = v1.ContainerPort{
 		Name:          "port",
 		ContainerPort: int32(e.Port),
-		HostPort:      int32(e.Port),
 	}
 	cores := resource.NewMilliQuantity(500, resource.DecimalSI)
 	var container v1.Container = v1.Container{
@@ -216,7 +224,7 @@ func getPodTemplateSpec(e Expose) v1.PodTemplateSpec {
 	return template
 }
 
-// / List
+// / List deployment and the horizontal auto scale
 func listDeployments(e Expose, client kubernetes.Interface) (*apps.DeploymentList, *autos.HorizontalPodAutoscalerList, error) {
 	deployment, err := client.AppsV1().Deployments(e.NameSpace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -230,7 +238,7 @@ func listDeployments(e Expose, client kubernetes.Interface) (*apps.DeploymentLis
 	return deployment, hpa, nil
 }
 
-// Delete
+// Delete Deployment and HPA
 func deleteDeployment(e Expose, client kubernetes.Interface) error {
 	name_hpa := getNameHPA(e.Name)
 	err := client.AutoscalingV1().HorizontalPodAutoscalers(e.NameSpace).Delete(context.TODO(), name_hpa, metav1.DeleteOptions{})
@@ -245,7 +253,7 @@ func deleteDeployment(e Expose, client kubernetes.Interface) error {
 	return nil
 }
 
-///Update
+///Update Deployment and HPA
 
 func updateDeployment(e Expose, client kubernetes.Interface) error {
 	_, err := client.AppsV1().Deployments(e.NameSpace).Get(context.TODO(), getNameDeployment(e.Name), metav1.GetOptions{})
@@ -270,7 +278,7 @@ func updateDeployment(e Expose, client kubernetes.Interface) error {
 
 /////////// Service
 
-// Create
+// Create a kubernetes service component
 func createService(e Expose, client kubernetes.Interface) error {
 	service := getService(e)
 	_, err := client.CoreV1().Services(e.NameSpace).Create(context.TODO(), service, metav1.CreateOptions{})
@@ -280,6 +288,7 @@ func createService(e Expose, client kubernetes.Interface) error {
 	return nil
 }
 
+// Return a kubernetes service component, ready to deploy or update
 func getService(e Expose) *v1.Service {
 	name_service := getNameService(e.Name)
 	var port v1.ServicePort = v1.ServicePort{
@@ -306,7 +315,7 @@ func getService(e Expose) *v1.Service {
 	return service
 }
 
-/// List
+/// List services in a certain namespace
 
 func listServices(e Expose, client kubernetes.Interface) (*v1.ServiceList, error) {
 	services, err := client.CoreV1().Services(e.NameSpace).List(context.TODO(), metav1.ListOptions{})
@@ -316,7 +325,7 @@ func listServices(e Expose, client kubernetes.Interface) (*v1.ServiceList, error
 	return services, nil
 }
 
-// / Update
+// / Update a kubernete service
 func updateService(e Expose, client kubernetes.Interface) error {
 	service := getService(e)
 	_, err := client.CoreV1().Services(e.NameSpace).Update(context.TODO(), service, metav1.UpdateOptions{})
@@ -326,7 +335,7 @@ func updateService(e Expose, client kubernetes.Interface) error {
 	return nil
 }
 
-/// Delete
+/// Delete kubernetes service
 
 func deleteService(e Expose, client kubernetes.Interface) error {
 	service := getNameService(e.Name)
@@ -339,7 +348,7 @@ func deleteService(e Expose, client kubernetes.Interface) error {
 
 /////////// Ingress
 
-// / Created
+// / Create an ingress component
 func createIngress(e Expose, client kubernetes.Interface, cfg types.Config) error {
 
 	ingress := getIngress(e, client, cfg)
@@ -349,6 +358,8 @@ func createIngress(e Expose, client kubernetes.Interface, cfg types.Config) erro
 	}
 	return nil
 }
+
+// Return a kubernetes ingress component, ready to deploy or update
 func getIngress(e Expose, client kubernetes.Interface, cfg types.Config) *net.Ingress {
 	name_ingress := getNameIngress(e.Name)
 	pathofapi := getPathAPI(e.Name)
@@ -415,7 +426,7 @@ func getIngress(e Expose, client kubernetes.Interface, cfg types.Config) *net.In
 	return ingress
 }
 
-/// List
+/// List the kuberntes ingress
 
 func listIngress(e Expose, client kubernetes.Interface) (*net.IngressList, error) {
 	ingress, err := client.NetworkingV1().Ingresses(e.NameSpace).List(context.TODO(), metav1.ListOptions{})
@@ -425,7 +436,7 @@ func listIngress(e Expose, client kubernetes.Interface) (*net.IngressList, error
 	return ingress, nil
 }
 
-// Delete
+// Delete a kubernetes ingress
 func deleteIngress(e Expose, client kubernetes.Interface) error {
 	ingress := getNameIngress(e.Name)
 	err := client.NetworkingV1().Ingresses(e.NameSpace).Delete(context.TODO(), ingress, metav1.DeleteOptions{})
@@ -434,6 +445,8 @@ func deleteIngress(e Expose, client kubernetes.Interface) error {
 	}
 	return nil
 }
+
+/// These are auxiliary functions
 
 func getNameService(name_container string) string {
 	return name_container + "-svc"
