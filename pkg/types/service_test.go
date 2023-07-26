@@ -233,6 +233,10 @@ log_level: ""
 image: testimage
 alpine: false
 token: ""
+expose_options:
+	max_replicas: 0
+	port: 0
+	top_cpu: 0
 file_stage_in: false
 input: []
 output: []
