@@ -187,7 +187,7 @@ func TestConvertEnvVars(t *testing.T) {
 		{Name: "TEST", Value: "test"},
 	}
 
-	res := convertEnvVars(vars)
+	res := ConvertEnvVars(vars)
 
 	if res[0].Name != expected[0].Name && res[0].Value != expected[0].Value {
 		t.Errorf("invalid conversion of environment variables. Expected: %v, got %v", expected, res)
@@ -240,6 +240,10 @@ script: testscript
 image_pull_secrets:
 - testcred1
 - testcred2
+expose_options:
+  max_replicas: 0
+  port: 0
+  top_cpu: 0
 environment:
   Variables:
     TEST_VAR: testvalue
@@ -345,7 +349,7 @@ func checkEnvVars(cfg *Config, podSpec *v1.PodSpec) error {
 		case "max_inflight":
 			expected = strconv.Itoa(cfg.WatchdogMaxInflight)
 			if envVar.Value != expected {
-				return fmt.Errorf("the max_inflight environment variable has not the correct value. Expected: %s, got: %s", expected, envVar.Value)
+				return fmt.Errorf("componenteax_inflight environment variable has not the correct value. Expected: %s, got: %s", expected, envVar.Value)
 			}
 		case "write_debug":
 			expected = strconv.FormatBool(cfg.WatchdogWriteDebug)
