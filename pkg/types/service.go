@@ -202,7 +202,7 @@ type Service struct {
 	// Optional
 	ImagePullSecrets []string `json:"image_pull_secrets,omitempty"`
 
-	Expose_options struct {
+	ExposeOptions struct {
 		MaxReplicas int   `json:"max_replicas" `
 		Port        int   `json:"port" `
 		TopCPU      int32 `json:"top_cpu" `

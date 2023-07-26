@@ -42,7 +42,7 @@ type Expose struct {
 	TopCPU      int32 `json:"top_cpu" default:"80"`
 }
 
-func CreateExpose(expose Expose, kubeClientset kubernetes.Interface) error {
+func CreateExpose(expose Expose, kubeClientset kubernetes.Interface, cfg types.Config) error {
 
 	err := createDeployment(expose, kubeClientset)
 	if err != nil {
@@ -54,7 +54,7 @@ func CreateExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 		log.Printf("WARNING: %v\n", err)
 		return err
 	}
-	err = createIngress(expose, kubeClientset)
+	err = createIngress(expose, kubeClientset, cfg)
 	if err != nil {
 		log.Printf("WARNING: %v\n", err)
 		return err
@@ -86,6 +86,11 @@ func UpdateExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 	if err != nil {
 		log.Printf("WARNING: %v\n", err)
 		return err
+	}
+	err2 := updateService(expose, kubeClientset)
+	if err2 != nil {
+		log.Printf("WARNING: %v\n", err2)
+		return err2
 	}
 	return nil
 }
@@ -181,7 +186,7 @@ func getPodTemplateSpec(e Expose) v1.PodTemplateSpec {
 	var ports v1.ContainerPort = v1.ContainerPort{
 		Name:          "port",
 		ContainerPort: int32(e.Port),
-		HostPort:      5000,
+		HostPort:      int32(e.Port),
 	}
 	cores := resource.NewMilliQuantity(500, resource.DecimalSI)
 	var container v1.Container = v1.Container{
@@ -204,7 +209,6 @@ func getPodTemplateSpec(e Expose) v1.PodTemplateSpec {
 			},
 		},
 		Spec: v1.PodSpec{
-			//deephdc/deep-oc-posenet-tf
 			InitContainers: []v1.Container{},
 			Containers:     []v1.Container{container},
 		},
@@ -214,8 +218,6 @@ func getPodTemplateSpec(e Expose) v1.PodTemplateSpec {
 
 // / List
 func listDeployments(e Expose, client kubernetes.Interface) (*apps.DeploymentList, *autos.HorizontalPodAutoscalerList, error) {
-	//name_container string, image_container string, namespace string,
-
 	deployment, err := client.AppsV1().Deployments(e.NameSpace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, nil, err
@@ -230,7 +232,6 @@ func listDeployments(e Expose, client kubernetes.Interface) (*apps.DeploymentLis
 
 // Delete
 func deleteDeployment(e Expose, client kubernetes.Interface) error {
-	//  name_container string, namespace string,
 	name_hpa := getNameHPA(e.Name)
 	err := client.AutoscalingV1().HorizontalPodAutoscalers(e.NameSpace).Delete(context.TODO(), name_hpa, metav1.DeleteOptions{})
 	if err != nil {
@@ -247,7 +248,6 @@ func deleteDeployment(e Expose, client kubernetes.Interface) error {
 ///Update
 
 func updateDeployment(e Expose, client kubernetes.Interface) error {
-	//name_container string, image_container string, namespace string,
 	_, err := client.AppsV1().Deployments(e.NameSpace).Get(context.TODO(), getNameDeployment(e.Name), metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -287,7 +287,7 @@ func getService(e Expose) *v1.Service {
 		Port: 80,
 		TargetPort: intstr.IntOrString{
 			Type:   0,
-			IntVal: 5000,
+			IntVal: int32(e.Port),
 		},
 	}
 	service := &v1.Service{
@@ -316,6 +316,16 @@ func listServices(e Expose, client kubernetes.Interface) (*v1.ServiceList, error
 	return services, nil
 }
 
+// / Update
+func updateService(e Expose, client kubernetes.Interface) error {
+	service := getService(e)
+	_, err := client.CoreV1().Services(e.NameSpace).Update(context.TODO(), service, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 /// Delete
 
 func deleteService(e Expose, client kubernetes.Interface) error {
@@ -330,17 +340,16 @@ func deleteService(e Expose, client kubernetes.Interface) error {
 /////////// Ingress
 
 // / Created
-func createIngress(e Expose, client kubernetes.Interface) error {
+func createIngress(e Expose, client kubernetes.Interface, cfg types.Config) error {
 
-	ingress := getIngress(e, client)
+	ingress := getIngress(e, client, cfg)
 	_, err := client.NetworkingV1().Ingresses(e.NameSpace).Create(context.TODO(), ingress, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func getIngress(e Expose, client kubernetes.Interface) *net.Ingress {
-	//name_ingress string, pathofapi string, name_service string, namespace string
+func getIngress(e Expose, client kubernetes.Interface, cfg types.Config) *net.Ingress {
 	name_ingress := getNameIngress(e.Name)
 	pathofapi := getPathAPI(e.Name)
 	name_service := getNameService(e.Name)
@@ -363,11 +372,7 @@ func getIngress(e Expose, client kubernetes.Interface) *net.Ingress {
 	var rule net.IngressRule
 	var tls net.IngressTLS
 	var specification net.IngressSpec
-	// ///////////
-	cfg, err := types.ReadConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
+
 	var host string = cfg.IngressHost
 
 	if host == "" {

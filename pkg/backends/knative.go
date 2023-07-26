@@ -120,30 +120,30 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		return err
 	}
 
+	//Create an expose service
+	if service.ExposeOptions.MaxReplicas != 0 {
+		exposeConf := utils.Expose{
+			Name:        service.Name,
+			NameSpace:   kn.namespace,
+			Variables:   service.Environment.Vars,
+			Image:       service.Image,
+			MaxReplicas: service.ExposeOptions.MaxReplicas,
+		}
+		if service.ExposeOptions.Port != 0 {
+			exposeConf.Port = service.ExposeOptions.Port
+		}
+		if service.ExposeOptions.TopCPU != 0 {
+			exposeConf.TopCPU = service.ExposeOptions.TopCPU
+		}
+		utils.CreateExpose(exposeConf, kn.kubeClientset, *kn.config)
+
+	}
 	//Create deaemonset to cache the service image on all the nodes
 	if service.ImagePrefetch {
 		err = imagepuller.CreateDaemonset(kn.config, service, kn.kubeClientset)
 		if err != nil {
 			return err
 		}
-	}
-
-	//Create an expose service
-	if service.Expose_options.MaxReplicas != 0 {
-		exposeConf := utils.Expose{
-			Name:        service.Name,
-			NameSpace:   kn.namespace,
-			Variables:   service.Environment.Vars,
-			Image:       service.Image,
-			MaxReplicas: service.Expose_options.MaxReplicas,
-		}
-		if service.Expose_options.Port != 0 {
-			exposeConf.Port = service.Expose_options.Port
-		}
-		if service.Expose_options.TopCPU != 0 {
-			exposeConf.TopCPU = service.Expose_options.TopCPU
-		}
-		utils.CreateExpose(exposeConf, kn.kubeClientset)
 	}
 
 	return nil
@@ -215,19 +215,19 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	}
 
 	//Update an expose service
-	if service.Expose_options.MaxReplicas != 0 {
+	if service.ExposeOptions.MaxReplicas != 0 {
 		exposeConf := utils.Expose{
 			Name:        service.Name,
 			NameSpace:   kn.namespace,
 			Variables:   service.Environment.Vars,
 			Image:       service.Image,
-			MaxReplicas: service.Expose_options.MaxReplicas,
+			MaxReplicas: service.ExposeOptions.MaxReplicas,
 		}
-		if service.Expose_options.Port != 0 {
-			exposeConf.Port = service.Expose_options.Port
+		if service.ExposeOptions.Port != 0 {
+			exposeConf.Port = service.ExposeOptions.Port
 		}
-		if service.Expose_options.TopCPU != 0 {
-			exposeConf.TopCPU = service.Expose_options.TopCPU
+		if service.ExposeOptions.TopCPU != 0 {
+			exposeConf.TopCPU = service.ExposeOptions.TopCPU
 		}
 		utils.UpdateExpose(exposeConf, kn.kubeClientset)
 	}
@@ -256,7 +256,7 @@ func (kn *KnativeBackend) DeleteService(name string) error {
 		Image:     "service.Image",
 	}
 	if err2 := utils.DeleteExpose(exposeConf, kn.kubeClientset); err2 != nil {
-		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err2)
+		log.Printf("Error deleting all associated kubernetes component of an exposed service \"%s\": %v\n", name, err2)
 	}
 
 	return nil
