@@ -216,10 +216,6 @@ total_memory: ""
 total_cpu: ""
 enable_gpu: false
 image_prefetch: false
-expose_options:
-  max_replicas: 0
-  port: 0
-  top_cpu: 0
 synchronous:
   min_scale: 0
   max_scale: 0
@@ -244,6 +240,10 @@ script: testscript
 image_pull_secrets:
 - testcred1
 - testcred2
+expose_options:
+  max_replicas: 0
+  port: 0
+  top_cpu: 0
 environment:
   Variables:
     TEST_VAR: testvalue
