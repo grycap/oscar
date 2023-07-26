@@ -202,6 +202,12 @@ type Service struct {
 	// Optional
 	ImagePullSecrets []string `json:"image_pull_secrets,omitempty"`
 
+	Expose_options struct {
+		MaxReplicas int   `json:"max_replicas" `
+		Port        int   `json:"port" `
+		TopCPU      int32 `json:"top_cpu" `
+	} `json:"expose_options"`
+
 	// The user-defined environment variables assigned to the service
 	// Optional
 	Environment struct {
@@ -240,7 +246,7 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 			{
 				Name:  ContainerName,
 				Image: service.Image,
-				Env:   convertEnvVars(service.Environment.Vars),
+				Env:   ConvertEnvVars(service.Environment.Vars),
 				VolumeMounts: []v1.VolumeMount{
 					{
 						Name:      VolumeName,
@@ -299,7 +305,7 @@ func (service *Service) GetMinIOWebhookARN() string {
 	return fmt.Sprintf("arn:minio:sqs:%s:%s:webhook", service.StorageProviders.MinIO[DefaultProvider].Region, service.Name)
 }
 
-func convertEnvVars(vars map[string]string) []v1.EnvVar {
+func ConvertEnvVars(vars map[string]string) []v1.EnvVar {
 	envVars := []v1.EnvVar{}
 	for k, v := range vars {
 		envVars = append(envVars, v1.EnvVar{

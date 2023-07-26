@@ -175,6 +175,9 @@ type Config struct {
 	// Groups defined in the "eduperson_entitlement" OIDC scope,
 	// as described here: https://docs.egi.eu/providers/check-in/sp/#10-groups
 	OIDCGroups []string `json:"-"`
+
+	//
+	IngressHost string `json:"-"`
 }
 
 var configVars = []configVar{
@@ -219,6 +222,7 @@ var configVars = []configVar{
 	{"OIDCIssuer", "OIDC_ISSUER", false, stringType, "https://aai.egi.eu/oidc/"},
 	{"OIDCSubject", "OIDC_SUBJECT", false, stringType, ""},
 	{"OIDCGroups", "OIDC_GROUPS", false, stringSliceType, ""},
+	{"IngressHost", "INGRESS_HOST", false, stringType, ""},
 }
 
 func readConfigVar(cfgVar configVar) (string, error) {

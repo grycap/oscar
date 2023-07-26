@@ -187,7 +187,7 @@ func TestConvertEnvVars(t *testing.T) {
 		{Name: "TEST", Value: "test"},
 	}
 
-	res := convertEnvVars(vars)
+	res := ConvertEnvVars(vars)
 
 	if res[0].Name != expected[0].Name && res[0].Value != expected[0].Value {
 		t.Errorf("invalid conversion of environment variables. Expected: %v, got %v", expected, res)

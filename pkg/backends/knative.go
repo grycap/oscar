@@ -25,6 +25,7 @@ import (
 
 	"github.com/grycap/oscar/v2/pkg/imagepuller"
 	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -127,6 +128,24 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		}
 	}
 
+	//Create an expose service
+	if service.Expose_options.MaxReplicas != 0 {
+		exposeConf := utils.Expose{
+			Name:        service.Name,
+			NameSpace:   kn.namespace,
+			Variables:   service.Environment.Vars,
+			Image:       service.Image,
+			MaxReplicas: service.Expose_options.MaxReplicas,
+		}
+		if service.Expose_options.Port != 0 {
+			exposeConf.Port = service.Expose_options.Port
+		}
+		if service.Expose_options.TopCPU != 0 {
+			exposeConf.TopCPU = service.Expose_options.TopCPU
+		}
+		utils.CreateExpose(exposeConf, kn.kubeClientset)
+	}
+
 	return nil
 }
 
@@ -195,6 +214,24 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		return err
 	}
 
+	//Update an expose service
+	if service.Expose_options.MaxReplicas != 0 {
+		exposeConf := utils.Expose{
+			Name:        service.Name,
+			NameSpace:   kn.namespace,
+			Variables:   service.Environment.Vars,
+			Image:       service.Image,
+			MaxReplicas: service.Expose_options.MaxReplicas,
+		}
+		if service.Expose_options.Port != 0 {
+			exposeConf.Port = service.Expose_options.Port
+		}
+		if service.Expose_options.TopCPU != 0 {
+			exposeConf.TopCPU = service.Expose_options.TopCPU
+		}
+		utils.UpdateExpose(exposeConf, kn.kubeClientset)
+	}
+
 	return nil
 }
 
@@ -212,6 +249,14 @@ func (kn *KnativeBackend) DeleteService(name string) error {
 	// Delete all the service's jobs
 	if err := deleteServiceJobs(name, kn.namespace, kn.kubeClientset); err != nil {
 		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
+	}
+	exposeConf := utils.Expose{
+		Name:      name,
+		NameSpace: kn.namespace,
+		Image:     "service.Image",
+	}
+	if err2 := utils.DeleteExpose(exposeConf, kn.kubeClientset); err2 != nil {
+		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err2)
 	}
 
 	return nil

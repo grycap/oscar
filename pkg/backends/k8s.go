@@ -24,6 +24,7 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/grycap/oscar/v2/pkg/imagepuller"
 	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/utils"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -120,6 +121,23 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 			return err
 		}
 	}
+	//Create an expose service
+	if service.Expose_options.MaxReplicas != 0 {
+		exposeConf := utils.Expose{
+			Name:        service.Name,
+			NameSpace:   k.namespace,
+			Variables:   service.Environment.Vars,
+			Image:       service.Image,
+			MaxReplicas: service.Expose_options.MaxReplicas,
+		}
+		if service.Expose_options.Port != 0 {
+			exposeConf.Port = service.Expose_options.Port
+		}
+		if service.Expose_options.TopCPU != 0 {
+			exposeConf.TopCPU = service.Expose_options.TopCPU
+		}
+		utils.CreateExpose(exposeConf, k.kubeClientset)
+	}
 
 	return nil
 }
@@ -187,6 +205,24 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 		return err
 	}
 
+	//Update an expose service
+	if service.Expose_options.MaxReplicas != 0 {
+		exposeConf := utils.Expose{
+			Name:        service.Name,
+			NameSpace:   k.namespace,
+			Variables:   service.Environment.Vars,
+			Image:       service.Image,
+			MaxReplicas: service.Expose_options.MaxReplicas,
+		}
+		if service.Expose_options.Port != 0 {
+			exposeConf.Port = service.Expose_options.Port
+		}
+		if service.Expose_options.TopCPU != 0 {
+			exposeConf.TopCPU = service.Expose_options.TopCPU
+		}
+		utils.UpdateExpose(exposeConf, k.kubeClientset)
+	}
+
 	return nil
 }
 
@@ -205,7 +241,13 @@ func (k *KubeBackend) DeleteService(name string) error {
 	if err := deleteServiceJobs(name, k.namespace, k.kubeClientset); err != nil {
 		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
 	}
-
+	exposeConf := utils.Expose{
+		Name:      name,
+		NameSpace: k.namespace,
+	}
+	if err2 := utils.DeleteExpose(exposeConf, k.kubeClientset); err2 != nil {
+		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err2)
+	}
 	return nil
 }
 
