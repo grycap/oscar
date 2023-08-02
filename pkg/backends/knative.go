@@ -94,6 +94,7 @@ func (kn *KnativeBackend) ListServices() ([]*types.Service, error) {
 
 // CreateService creates a new service as a Knative service
 func (kn *KnativeBackend) CreateService(service types.Service) error {
+	service = utils.ValidateService(service)
 	// Create the configMap with FDL and user-script
 	err := createServiceConfigMap(&service, kn.namespace, kn.kubeClientset)
 	if err != nil {
@@ -121,19 +122,16 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 	}
 
 	//Create an expose service
-	if service.ExposeOptions.MaxReplicas != 0 {
+	if service.Expose.Port != 0 {
 		exposeConf := utils.Expose{
-			Name:        service.Name,
-			NameSpace:   kn.namespace,
-			Variables:   service.Environment.Vars,
-			Image:       service.Image,
-			MaxReplicas: service.ExposeOptions.MaxReplicas,
-		}
-		if service.ExposeOptions.Port != 0 {
-			exposeConf.Port = service.ExposeOptions.Port
-		}
-		if service.ExposeOptions.TopCPU != 0 {
-			exposeConf.TopCPU = service.ExposeOptions.TopCPU
+			Name:         service.Name,
+			NameSpace:    kn.namespace,
+			Variables:    service.Environment.Vars,
+			Image:        service.Image,
+			Port:         service.Expose.Port,
+			MaxScale:     service.Expose.MaxScale,
+			MinScale:     service.Expose.MinScale,
+			CpuThreshold: service.Expose.CpuThreshold,
 		}
 		utils.CreateExpose(exposeConf, kn.kubeClientset, *kn.config)
 
@@ -172,7 +170,7 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	if err != nil {
 		return err
 	}
-
+	service = utils.ValidateService(service)
 	// Get the old service's configMap
 	oldCm, err := kn.kubeClientset.CoreV1().ConfigMaps(kn.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
@@ -215,19 +213,16 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	}
 
 	//Update an expose service
-	if service.ExposeOptions.MaxReplicas != 0 {
+	if service.Expose.Port != 0 {
 		exposeConf := utils.Expose{
-			Name:        service.Name,
-			NameSpace:   kn.namespace,
-			Variables:   service.Environment.Vars,
-			Image:       service.Image,
-			MaxReplicas: service.ExposeOptions.MaxReplicas,
-		}
-		if service.ExposeOptions.Port != 0 {
-			exposeConf.Port = service.ExposeOptions.Port
-		}
-		if service.ExposeOptions.TopCPU != 0 {
-			exposeConf.TopCPU = service.ExposeOptions.TopCPU
+			Name:         service.Name,
+			NameSpace:    kn.namespace,
+			Variables:    service.Environment.Vars,
+			Image:        service.Image,
+			Port:         service.Expose.Port,
+			MaxScale:     service.Expose.MaxScale,
+			MinScale:     service.Expose.MinScale,
+			CpuThreshold: service.Expose.CpuThreshold,
 		}
 		utils.UpdateExpose(exposeConf, kn.kubeClientset)
 	}
@@ -253,7 +248,7 @@ func (kn *KnativeBackend) DeleteService(name string) error {
 	exposeConf := utils.Expose{
 		Name:      name,
 		NameSpace: kn.namespace,
-		Image:     "service.Image",
+		Port:      80,
 	}
 	if err2 := utils.DeleteExpose(exposeConf, kn.kubeClientset); err2 != nil {
 		log.Printf("Error deleting all associated kubernetes component of an exposed service \"%s\": %v\n", name, err2)

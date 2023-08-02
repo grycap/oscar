@@ -33,18 +33,18 @@ import (
 )
 
 type Expose struct {
-	Name        string `json:"name" binding:"required"`
-	NameSpace   string `json:"namespace" binding:"required"`
-	Image       string `json:"image" `
-	Variables   map[string]string
-	MaxReplicas int   `json:"maxreplicas" default:"10"`
-	Port        int   `json:"port" default:"80"`
-	TopCPU      int32 `json:"top_cpu" default:"80"`
+	Name         string ` binding:"required"`
+	NameSpace    string ` binding:"required"`
+	Image        string ` `
+	Variables    map[string]string
+	MaxScale     int32 `default:"10"`
+	MinScale     int32 `default:"1"`
+	Port         int   ` binding:"required" default:"80"`
+	CpuThreshold int32 `default:"80"`
 }
 
 // / Main function that creates all the kubernetes components
 func CreateExpose(expose Expose, kubeClientset kubernetes.Interface, cfg types.Config) error {
-
 	err := createDeployment(expose, kubeClientset)
 	if err != nil {
 		log.Printf("WARNING: %v\n", err)
@@ -144,14 +144,13 @@ func createDeployment(e Expose, client kubernetes.Interface) error {
 // Return the component deployment, ready to create or update
 func getDeployment(e Expose) *apps.Deployment {
 	name_deployment := getNameDeployment(e.Name)
-	var replicas int32 = 1
 	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name_deployment,
 			Namespace: e.NameSpace,
 		},
 		Spec: apps.DeploymentSpec{
-			Replicas: &replicas,
+			Replicas: &e.MinScale,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "oscar-svc-exp-" + e.Name,
@@ -168,7 +167,6 @@ func getDeployment(e Expose) *apps.Deployment {
 func getHortizontalAutoScale(e Expose) *autos.HorizontalPodAutoscaler {
 	name_hpa := getNameHPA(e.Name)
 	name_deployment := getNameDeployment(e.Name)
-	var minReplicas int32 = 1
 	hpa := &autos.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name_hpa,
@@ -180,9 +178,9 @@ func getHortizontalAutoScale(e Expose) *autos.HorizontalPodAutoscaler {
 				Name:       name_deployment,
 				APIVersion: "apps/v1",
 			},
-			MinReplicas:                    &minReplicas,
-			MaxReplicas:                    int32(e.MaxReplicas),
-			TargetCPUUtilizationPercentage: &e.TopCPU,
+			MinReplicas:                    &e.MinScale,
+			MaxReplicas:                    e.MaxScale,
+			TargetCPUUtilizationPercentage: &e.CpuThreshold,
 		},
 		Status: autos.HorizontalPodAutoscalerStatus{},
 	}

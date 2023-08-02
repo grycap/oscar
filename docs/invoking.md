@@ -128,3 +128,102 @@ base64 input.png | curl -X POST -H "Authorization: Bearer <TOKEN>" \
 Although the use of the Knative Serverless Backend for synchronous invocations provides elasticity similar to the one provided by their counterparts in public clouds, such as AWS Lambda, synchronous invocations are not still the best option to run long-running resource-demanding applications, like deep learning inference or video processing. 
 
 The synchronous invocation of long-running resource-demanding applications may lead to timeouts on Knative pods. Therefore, we consider Kubernetes job generation as the optimal approach to handle event-driven file processing through asynchronous invocations in OSCAR, being the execution of synchronous services a convenient way to support general lightweight container-based applications.
+
+## Expose services
+
+OSCAR allows permanently exposing services. This solution is not based on serverless.
+This option has been added for use cases where a heavy container requires too much time in the initialization, and they do not require a state.
+For example, in a use case where we have a grand AI model that needs real-time processing with high throughput.
+In a serverless conventional solution. The model is loaded in memory in each service invocation.
+
+A service exposed loads the heights' models in the creation time. An exposed service is an excellent combination with another service that is not exposed.
+The regular service gets invoked by an event and interacts with an HTTP call to the exposed service.
+This workflow reduces the invocation time of the service. It gets a higher throughput because the model does not need to be loaded for every inference.
+
+In case the number of request increase. It also will increase the CPU demand.
+Transparently for the user, the resources of the infrastructure will grow and shrink.
+
+### Prerequisites in the image
+
+It is necessary to create inside the container an active API. Python can use [FastAPI](https://fastapi.tiangolo.com/) or [Flask](https://flask.palletsprojects.com/en/2.3.x/) to create an API. In GO can use [Gin](https://gin-gonic.com/) or [Sinatra](https://sinatrarb.com/) in Ruby. If you only make HTTP calls is not a big problem. If the API contains a kind of UI ensure that the resources are getting dynamic.
+
+### How to deploy
+
+The minimum definition to expose a service is by selecting the port inside the image where the API is running:
+
+``` yaml
+expose:
+  port: 5000
+```
+
+It can define more options inside the "expose" section, such as the minimum pod's actives, where if it is not specified, it gets the value 1.
+The maximum pods' actives, where if it is not defined, it gets the value 10 or the CPU threshold that by default is 80%.
+Here is a specification with more details where there will be between 5 to 15 active pods which each expose an API in port 4578. The number of active pods will grow when the use of CPU increases by more than 50%.
+The active pods will decrease when the use of CPU start decreasing.
+
+``` yaml
+expose:
+  min_scale: 5 
+  max_scale: 15 
+  port: 4578  
+  cpu_threshold: 50
+```
+
+Here there is an example of a recipe to expose a service from [Deepaas](https://marketplace.deep-hybrid-datacloud.eu/)
+
+``` yaml
+functions:
+  oscar:
+  - oscar-cluster:
+     name: body-pose-detection-async
+     memory: 2Gi
+     cpu: '1.0'
+     image: deephdc/deep-oc-posenet-tf
+     script: script.sh
+     environment:
+        Variables:
+          INPUT_TYPE: json  
+     expose:
+      min_scale: 1 
+      max_scale: 10 
+      port: 5000  
+      cpu_threshold: 20 
+     input:
+     - storage_provider: minio.default
+       path: body-pose-detection-async/input
+     output:
+     - storage_provider: minio.default
+       path: body-pose-detection-async/output
+```
+
+nginx
+
+``` yaml
+functions:
+  oscar:
+  - oscar-cluster:
+     name: nginx
+     memory: 2Gi
+     cpu: '1.0'
+     image: nginx
+     script: script.sh
+     expose:
+      min_scale: 2 
+      max_scale: 10 
+      port: 80  
+      cpu_threshold: 50 
+```
+
+The service will be listening in a URL that follows the next pattern:
+
+``` text
+https://{oscar_endpoint}/system/service/{name of service}/exposed/
+```
+
+In case you use the nginx example above in your [local cluster of Kubernetes](https://docs.oscar.grycap.net/local-testing/) , you will see the nginx welcome page in: `http://localhost/system/services/nginx/exposed/`.
+And two pods of the deployment actives with the command `kubectl get pods -n oscar-svc`
+
+``` text
+oscar-svc            nginx-dlp-6b9ddddbd7-cm6c9                         1/1     Running     0             2m1s
+oscar-svc            nginx-dlp-6b9ddddbd7-f4ml6                         1/1     Running     0             2m1s
+```
