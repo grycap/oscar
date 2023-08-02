@@ -242,8 +242,8 @@ image_pull_secrets:
 - testcred2
 expose:
   min_scale: 0
-  max_scale: 0 
-  port: 0  
+  max_scale: 0
+  port: 0
   cpu_threshold: 0
 environment:
   Variables:
