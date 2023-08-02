@@ -137,7 +137,6 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 	sharedInformerOp := informers.WithTweakListOptions(optionsFunc)
 
 	factory := informers.NewSharedInformerFactoryWithOptions(kubeClientset, 2*time.Second, informers.WithNamespace(cfg.ServicesNamespace), sharedInformerOp)
-	//factory := informers.NewSharedInformerFactory(kubeClientset, 2*time.Second)
 
 	podInformer := factory.Core().V1().Pods().Informer()
 	factory.Start(stopper)
