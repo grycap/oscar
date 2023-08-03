@@ -205,19 +205,17 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 	}
 
 	//Update an expose service
-	if service.Expose.Port != 0 {
-		exposeConf := utils.Expose{
-			Name:         service.Name,
-			NameSpace:    k.namespace,
-			Variables:    service.Environment.Vars,
-			Image:        service.Image,
-			Port:         service.Expose.Port,
-			MaxScale:     service.Expose.MaxScale,
-			MinScale:     service.Expose.MinScale,
-			CpuThreshold: service.Expose.CpuThreshold,
-		}
-		utils.UpdateExpose(exposeConf, k.kubeClientset)
+	exposeConf := utils.Expose{
+		Name:         service.Name,
+		NameSpace:    k.namespace,
+		Variables:    service.Environment.Vars,
+		Image:        service.Image,
+		Port:         service.Expose.Port,
+		MaxScale:     service.Expose.MaxScale,
+		MinScale:     service.Expose.MinScale,
+		CpuThreshold: service.Expose.CpuThreshold,
 	}
+	utils.UpdateExpose(exposeConf, k.kubeClientset, *k.config)
 
 	return nil
 }

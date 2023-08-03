@@ -149,7 +149,8 @@ It is necessary to create inside the container an active API. Python can use [Fa
 
 ### How to deploy
 
-The minimum definition to expose a service is by selecting the port inside the image where the API is running:
+The minimum definition to expose a service is selecting the port inside the image where the API is running.
+Once the service is deployed, if you call the API and it returns a `502 Bad Gateway` error, the port is wrong:
 
 ``` yaml
 expose:

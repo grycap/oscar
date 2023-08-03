@@ -213,19 +213,17 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	}
 
 	//Update an expose service
-	if service.Expose.Port != 0 {
-		exposeConf := utils.Expose{
-			Name:         service.Name,
-			NameSpace:    kn.namespace,
-			Variables:    service.Environment.Vars,
-			Image:        service.Image,
-			Port:         service.Expose.Port,
-			MaxScale:     service.Expose.MaxScale,
-			MinScale:     service.Expose.MinScale,
-			CpuThreshold: service.Expose.CpuThreshold,
-		}
-		utils.UpdateExpose(exposeConf, kn.kubeClientset)
+	exposeConf := utils.Expose{
+		Name:         service.Name,
+		NameSpace:    kn.namespace,
+		Variables:    service.Environment.Vars,
+		Image:        service.Image,
+		Port:         service.Expose.Port,
+		MaxScale:     service.Expose.MaxScale,
+		MinScale:     service.Expose.MinScale,
+		CpuThreshold: service.Expose.CpuThreshold,
 	}
+	utils.UpdateExpose(exposeConf, kn.kubeClientset, *kn.config)
 
 	return nil
 }

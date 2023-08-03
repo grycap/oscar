@@ -84,7 +84,21 @@ func DeleteExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 }
 
 // /Main function that updates all the kubernetes components
-func UpdateExpose(expose Expose, kubeClientset kubernetes.Interface) error {
+func UpdateExpose(expose Expose, kubeClientset kubernetes.Interface, cfg types.Config) error {
+	deployment := getNameDeployment(expose.Name)
+	_, error := kubeClientset.AppsV1().Deployments(expose.NameSpace).Get(context.TODO(), deployment, metav1.GetOptions{})
+
+	log.Printf("%v", error)
+	log.Printf("%d", expose.Port)
+
+	if error != nil && expose.Port != 0 {
+		CreateExpose(expose, kubeClientset, cfg)
+		return nil
+	}
+	if expose.Port == 0 {
+		DeleteExpose(expose, kubeClientset)
+		return nil
+	}
 	err := updateDeployment(expose, kubeClientset)
 	if err != nil {
 		log.Printf("WARNING: %v\n", err)
