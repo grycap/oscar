@@ -15,7 +15,7 @@
         <link rel="next" href="../fdl/">
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.19">
+      <meta name="generator" content="mkdocs-1.5.2, mkdocs-material-9.1.21">
     
     
       
@@ -428,6 +428,33 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#expose-services" class="md-nav__link">
+    Expose services
+  </a>
+  
+    <nav class="md-nav" aria-label="Expose services">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites-in-the-image" class="md-nav__link">
+    Prerequisites in the image
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-deploy" class="md-nav__link">
+    How to deploy
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -660,6 +687,33 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#expose-services" class="md-nav__link">
+    Expose services
+  </a>
+  
+    <nav class="md-nav" aria-label="Expose services">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites-in-the-image" class="md-nav__link">
+    Prerequisites in the image
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-deploy" class="md-nav__link">
+    How to deploy
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -774,6 +828,81 @@ decoded as well. Save output in the expected format of the use-case.</p>
 <h3 id="limitations">Limitations</h3>
 <p>Although the use of the Knative Serverless Backend for synchronous invocations provides elasticity similar to the one provided by their counterparts in public clouds, such as AWS Lambda, synchronous invocations are not still the best option to run long-running resource-demanding applications, like deep learning inference or video processing. </p>
 <p>The synchronous invocation of long-running resource-demanding applications may lead to timeouts on Knative pods. Therefore, we consider Kubernetes job generation as the optimal approach to handle event-driven file processing through asynchronous invocations in OSCAR, being the execution of synchronous services a convenient way to support general lightweight container-based applications.</p>
+<h2 id="expose-services">Expose services</h2>
+<p>OSCAR allows permanently exposing services. This solution is not based on serverless.
+This option has been added for use cases where a heavy container requires too much time in the initialization, and they do not require a state.
+For example, in a use case where we have a grand AI model that needs real-time processing with high throughput.
+In a serverless conventional solution. The model is loaded in memory in each service invocation.</p>
+<p>A service exposed loads the heights' models in the creation time. An exposed service is an excellent combination with another service that is not exposed.
+The regular service gets invoked by an event and interacts with an HTTP call to the exposed service.
+This workflow reduces the invocation time of the service. It gets a higher throughput because the model does not need to be loaded for every inference.</p>
+<p>In case the number of request increase. It also will increase the CPU demand.
+Transparently for the user, the resources of the infrastructure will grow and shrink.</p>
+<h3 id="prerequisites-in-the-image">Prerequisites in the image</h3>
+<p>It is necessary to create inside the container an active API. Python can use <a href="https://fastapi.tiangolo.com/">FastAPI</a> or <a href="https://flask.palletsprojects.com/en/2.3.x/">Flask</a> to create an API. In GO can use <a href="https://gin-gonic.com/">Gin</a> or <a href="https://sinatrarb.com/">Sinatra</a> in Ruby. If you only make HTTP calls is not a big problem. If the API contains a kind of UI ensure that the resources are getting dynamic.</p>
+<h3 id="how-to-deploy">How to deploy</h3>
+<p>The minimum definition to expose a service is selecting the port inside the image where the API is running.
+Once the service is deployed, if you call the API and it returns a <code>502 Bad Gateway</code> error, the port is wrong:</p>
+<pre><code class="language-yaml">expose:
+  port: 5000
+</code></pre>
+<p>It can define more options inside the "expose" section, such as the minimum pod's actives, where if it is not specified, it gets the value 1.
+The maximum pods' actives, where if it is not defined, it gets the value 10 or the CPU threshold that by default is 80%.
+Here is a specification with more details where there will be between 5 to 15 active pods which each expose an API in port 4578. The number of active pods will grow when the use of CPU increases by more than 50%.
+The active pods will decrease when the use of CPU start decreasing.</p>
+<pre><code class="language-yaml">expose:
+  min_scale: 5 
+  max_scale: 15 
+  port: 4578  
+  cpu_threshold: 50
+</code></pre>
+<p>Here there is an example of a recipe to expose a service from <a href="https://marketplace.deep-hybrid-datacloud.eu/">Deepaas</a></p>
+<pre><code class="language-yaml">functions:
+  oscar:
+  - oscar-cluster:
+     name: body-pose-detection-async
+     memory: 2Gi
+     cpu: '1.0'
+     image: deephdc/deep-oc-posenet-tf
+     script: script.sh
+     environment:
+        Variables:
+          INPUT_TYPE: json  
+     expose:
+      min_scale: 1 
+      max_scale: 10 
+      port: 5000  
+      cpu_threshold: 20 
+     input:
+     - storage_provider: minio.default
+       path: body-pose-detection-async/input
+     output:
+     - storage_provider: minio.default
+       path: body-pose-detection-async/output
+</code></pre>
+<p>nginx</p>
+<pre><code class="language-yaml">functions:
+  oscar:
+  - oscar-cluster:
+     name: nginx
+     memory: 2Gi
+     cpu: '1.0'
+     image: nginx
+     script: script.sh
+     expose:
+      min_scale: 2 
+      max_scale: 10 
+      port: 80  
+      cpu_threshold: 50 
+</code></pre>
+<p>The service will be listening in a URL that follows the next pattern:</p>
+<pre><code class="language-text">https://{oscar_endpoint}/system/service/{name of service}/exposed/
+</code></pre>
+<p>In case you use the nginx example above in your <a href="https://docs.oscar.grycap.net/local-testing/">local cluster of Kubernetes</a> , you will see the nginx welcome page in: <code>http://localhost/system/services/nginx/exposed/</code>.
+And two pods of the deployment actives with the command <code>kubectl get pods -n oscar-svc</code></p>
+<pre><code class="language-text">oscar-svc            nginx-dlp-6b9ddddbd7-cm6c9                         1/1     Running     0             2m1s
+oscar-svc            nginx-dlp-6b9ddddbd7-f4ml6                         1/1     Running     0             2m1s
+</code></pre>
 
 
 

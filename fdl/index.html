@@ -15,7 +15,7 @@
         <link rel="next" href="../fdl-composer/">
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.19">
+      <meta name="generator" content="mkdocs-1.5.2, mkdocs-material-9.1.21">
     
     
       
@@ -424,6 +424,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#exposesettings" class="md-nav__link">
+    ExposeSettings
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#replica" class="md-nav__link">
     Replica
   </a>
@@ -684,6 +691,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#exposesettings" class="md-nav__link">
+    ExposeSettings
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#replica" class="md-nav__link">
     Replica
   </a>
@@ -786,6 +800,11 @@
       cpu: '1.0'
       image: grycap/imagemagick
       script: grayify.sh
+      expose:
+        min_scale: 3 
+        max_scale: 7 
+        port: 5000  
+        cpu_threshold: 70 
       input:
       - storage_provider: minio.default
         path: example-workflow/med
@@ -909,6 +928,10 @@ storage_providers:
 <td>Struct to configure specific sync parameters. This settings are only applied on Knative ServerlessBackend. Optional.</td>
 </tr>
 <tr>
+<td><code>expose</code> </br> <em><a href="#exposesettings">ExposeSettings</a></em></td>
+<td>Struct to expose services. Optional.</td>
+</tr>
+<tr>
 <td><code>replicas</code> </br> <em><a href="#replica">Replica</a> array</em></td>
 <td>List of replicas to delegate jobs. Optional.</td>
 </tr>
@@ -958,6 +981,33 @@ storage_providers:
 <tr>
 <td><code>max_scale</code> </br> <em>integer</em></td>
 <td>Maximum number of active replicas (pods) for the service. Optional. (default: 0 (Unlimited))</td>
+</tr>
+</tbody>
+</table>
+<h2 id="exposesettings">ExposeSettings</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>min_scale</code> </br> <em>integer</em></td>
+<td>Minimum number of active replicas (pods) for the service. Optional. (default: 1)</td>
+</tr>
+<tr>
+<td><code>max_scale</code> </br> <em>integer</em></td>
+<td>Maximum number of active replicas (pods) for the service. Optional. (default: 10 (Unlimited))</td>
+</tr>
+<tr>
+<td><code>port</code> </br> <em>integer</em></td>
+<td>Port inside the container where the API is exposed. (value: 0 , the service wont be exposed.)</td>
+</tr>
+<tr>
+<td><code>cpu_threshold</code> </br> <em>integer</em></td>
+<td>Percent of use of CPU before creating other pod (default: 80 max:100)</td>
 </tr>
 </tbody>
 </table>
