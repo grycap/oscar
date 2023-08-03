@@ -77,6 +77,8 @@ func (k *KubeBackend) ListServices() ([]*types.Service, error) {
 
 // CreateService creates a new service as a k8s podTemplate
 func (k *KubeBackend) CreateService(service types.Service) error {
+	// Validate the input variables of the service
+	service = utils.ValidateService(service)
 	// Create the configMap with FDL and user-script
 	err := createServiceConfigMap(&service, k.namespace, k.kubeClientset)
 	if err != nil {
@@ -113,20 +115,18 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 		}
 		return err
 	}
+
 	//Create an expose service
-	if service.ExposeOptions.MaxReplicas != 0 {
+	if service.Expose.Port != 0 {
 		exposeConf := utils.Expose{
-			Name:        service.Name,
-			NameSpace:   k.namespace,
-			Variables:   service.Environment.Vars,
-			Image:       service.Image,
-			MaxReplicas: service.ExposeOptions.MaxReplicas,
-		}
-		if service.ExposeOptions.Port != 0 {
-			exposeConf.Port = service.ExposeOptions.Port
-		}
-		if service.ExposeOptions.TopCPU != 0 {
-			exposeConf.TopCPU = service.ExposeOptions.TopCPU
+			Name:         service.Name,
+			NameSpace:    k.namespace,
+			Variables:    service.Environment.Vars,
+			Image:        service.Image,
+			Port:         service.Expose.Port,
+			MaxScale:     service.Expose.MaxScale,
+			MinScale:     service.Expose.MinScale,
+			CpuThreshold: service.Expose.CpuThreshold,
 		}
 		utils.CreateExpose(exposeConf, k.kubeClientset, *k.config)
 	}
@@ -159,6 +159,8 @@ func (k *KubeBackend) ReadService(name string) (*types.Service, error) {
 
 // UpdateService updates an existent service
 func (k *KubeBackend) UpdateService(service types.Service) error {
+	// Validate the input variables of the service
+	service = utils.ValidateService(service)
 	// Get the old service's configMap
 	oldCm, err := k.kubeClientset.CoreV1().ConfigMaps(k.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
@@ -205,22 +207,17 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 	}
 
 	//Update an expose service
-	if service.ExposeOptions.MaxReplicas != 0 {
-		exposeConf := utils.Expose{
-			Name:        service.Name,
-			NameSpace:   k.namespace,
-			Variables:   service.Environment.Vars,
-			Image:       service.Image,
-			MaxReplicas: service.ExposeOptions.MaxReplicas,
-		}
-		if service.ExposeOptions.Port != 0 {
-			exposeConf.Port = service.ExposeOptions.Port
-		}
-		if service.ExposeOptions.TopCPU != 0 {
-			exposeConf.TopCPU = service.ExposeOptions.TopCPU
-		}
-		utils.UpdateExpose(exposeConf, k.kubeClientset)
+	exposeConf := utils.Expose{
+		Name:         service.Name,
+		NameSpace:    k.namespace,
+		Variables:    service.Environment.Vars,
+		Image:        service.Image,
+		Port:         service.Expose.Port,
+		MaxScale:     service.Expose.MaxScale,
+		MinScale:     service.Expose.MinScale,
+		CpuThreshold: service.Expose.CpuThreshold,
 	}
+	utils.UpdateExpose(exposeConf, k.kubeClientset, *k.config)
 
 	return nil
 }
@@ -243,6 +240,7 @@ func (k *KubeBackend) DeleteService(name string) error {
 	exposeConf := utils.Expose{
 		Name:      name,
 		NameSpace: k.namespace,
+		Port:      80,
 	}
 	if err2 := utils.DeleteExpose(exposeConf, k.kubeClientset); err2 != nil {
 		log.Printf("Error deleting all associated kubernetes component of an exposed service \"%s\": %v\n", name, err2)

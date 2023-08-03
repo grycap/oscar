@@ -202,11 +202,12 @@ type Service struct {
 	// Optional
 	ImagePullSecrets []string `json:"image_pull_secrets,omitempty"`
 
-	ExposeOptions struct {
-		MaxReplicas int   `json:"max_replicas" `
-		Port        int   `json:"port" `
-		TopCPU      int32 `json:"top_cpu" `
-	} `json:"expose_options"`
+	Expose struct {
+		MinScale     int32 `json:"min_scale" default:"1"`
+		MaxScale     int32 `json:"max_scale" default:"10"`
+		Port         int   `json:"port" `
+		CpuThreshold int32 `json:"cpu_threshold" default:"80" `
+	} `json:"expose"`
 
 	// The user-defined environment variables assigned to the service
 	// Optional

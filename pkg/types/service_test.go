@@ -240,10 +240,11 @@ script: testscript
 image_pull_secrets:
 - testcred1
 - testcred2
-expose_options:
-  max_replicas: 0
+expose:
+  min_scale: 0
+  max_scale: 0
   port: 0
-  top_cpu: 0
+  cpu_threshold: 0
 environment:
   Variables:
     TEST_VAR: testvalue
