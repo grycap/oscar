@@ -20,11 +20,16 @@ import (
 	"github.com/grycap/oscar/v2/pkg/types"
 )
 
+// Validate the input variables of the service
+// Change the values if it is necesary
 func ValidateService(serv types.Service) types.Service {
 	serv = checkExposeInput(serv)
 	return serv
 }
 
+// GO initialize all values to 0
+// It initialize all the values if it gets teh default value.
+// value 0 in port means, there is no service expose
 func checkExposeInput(serv types.Service) types.Service {
 	if serv.Expose.MaxScale == 0 {
 		serv.Expose.MaxScale = 10

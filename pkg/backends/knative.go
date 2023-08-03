@@ -94,6 +94,7 @@ func (kn *KnativeBackend) ListServices() ([]*types.Service, error) {
 
 // CreateService creates a new service as a Knative service
 func (kn *KnativeBackend) CreateService(service types.Service) error {
+	// Validate the input variables of the service
 	service = utils.ValidateService(service)
 	// Create the configMap with FDL and user-script
 	err := createServiceConfigMap(&service, kn.namespace, kn.kubeClientset)
@@ -170,6 +171,7 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	if err != nil {
 		return err
 	}
+	// Validate the input variables of the service
 	service = utils.ValidateService(service)
 	// Get the old service's configMap
 	oldCm, err := kn.kubeClientset.CoreV1().ConfigMaps(kn.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})

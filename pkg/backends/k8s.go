@@ -77,6 +77,7 @@ func (k *KubeBackend) ListServices() ([]*types.Service, error) {
 
 // CreateService creates a new service as a k8s podTemplate
 func (k *KubeBackend) CreateService(service types.Service) error {
+	// Validate the input variables of the service
 	service = utils.ValidateService(service)
 	// Create the configMap with FDL and user-script
 	err := createServiceConfigMap(&service, k.namespace, k.kubeClientset)
@@ -158,6 +159,7 @@ func (k *KubeBackend) ReadService(name string) (*types.Service, error) {
 
 // UpdateService updates an existent service
 func (k *KubeBackend) UpdateService(service types.Service) error {
+	// Validate the input variables of the service
 	service = utils.ValidateService(service)
 	// Get the old service's configMap
 	oldCm, err := k.kubeClientset.CoreV1().ConfigMaps(k.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})

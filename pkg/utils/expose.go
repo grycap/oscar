@@ -85,16 +85,15 @@ func DeleteExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 
 // /Main function that updates all the kubernetes components
 func UpdateExpose(expose Expose, kubeClientset kubernetes.Interface, cfg types.Config) error {
+
 	deployment := getNameDeployment(expose.Name)
 	_, error := kubeClientset.AppsV1().Deployments(expose.NameSpace).Get(context.TODO(), deployment, metav1.GetOptions{})
-
-	log.Printf("%v", error)
-	log.Printf("%d", expose.Port)
-
+	//If the deployment does not exist the function above will return a error and it will create the hold process
 	if error != nil && expose.Port != 0 {
 		CreateExpose(expose, kubeClientset, cfg)
 		return nil
 	}
+	// If the deployment exist and we select the port 0, it will delete all expose components
 	if expose.Port == 0 {
 		DeleteExpose(expose, kubeClientset)
 		return nil
@@ -113,7 +112,7 @@ func UpdateExpose(expose Expose, kubeClientset kubernetes.Interface, cfg types.C
 }
 
 // /Main function that list all the kubernetes components
-
+// This function is not used, in the future could be usefull
 func ListExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 	deploy, hpa, err := listDeployments(expose, kubeClientset)
 
