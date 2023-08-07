@@ -220,8 +220,8 @@ functions:
       cpu_threshold: 50 
 ```
 
-In case you use the nginx example above in your [local cluster of Kubernetes](https://docs.oscar.grycap.net/local-testing/) , you will see the nginx welcome page in: `http://localhost/system/services/nginx/exposed/`.
-And two pods of the deployment actives with the command `kubectl get pods -n oscar-svc`
+In case you use the NGINX example above in your [local OSCAR cluster](https://docs.oscar.grycap.net/local-testing/), you will see the nginx welcome page in: `http://localhost/system/services/nginx/exposed/`.
+Two active pods of the deployment will be shown with the command `kubectl get pods -n oscar-svc`
 
 ``` text
 oscar-svc            nginx-dlp-6b9ddddbd7-cm6c9                         1/1     Running     0             2m1s
