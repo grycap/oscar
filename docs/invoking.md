@@ -129,38 +129,35 @@ Although the use of the Knative Serverless Backend for synchronous invocations p
 
 The synchronous invocation of long-running resource-demanding applications may lead to timeouts on Knative pods. Therefore, we consider Kubernetes job generation as the optimal approach to handle event-driven file processing through asynchronous invocations in OSCAR, being the execution of synchronous services a convenient way to support general lightweight container-based applications.
 
-## Expose services
+## Exposed services
 
-OSCAR allows permanently exposing services. This solution is not based on serverless.
-This option has been added for use cases where a heavy container requires too much time in the initialization, and they do not require a state.
-For example, in a use case where we have a grand AI model that needs real-time processing with high throughput.
-In a serverless conventional solution. The model is loaded in memory in each service invocation.
+OSCAR also supports the deployment and elasticity management of long-running services that need to be directly reachable from outside the cluster (i.e. exposed services). This is useful when stateless services created out of large containers require too much time to be started to process a service invocation. This is the case when supporting the fast inference of pre-trained AI models that require close to real-time processing with high throughput. In a traditional serverless approach, the AI model weights would be loaded in memory for each service invocation (thus creating a new container). 
 
-A service exposed loads the heights' models in the creation time. An exposed service is an excellent combination with another service that is not exposed.
-The regular service gets invoked by an event and interacts with an HTTP call to the exposed service.
-This workflow reduces the invocation time of the service. It gets a higher throughput because the model does not need to be loaded for every inference.
+Instead, by exposing an OSCAR service, the AI model weights could be loaded just once and the service would perform the AI model inference for each subsequent request. An auto-scaled load-balanced approach for these stateless services is supported. When the average CPU exceeds a certain user-defined threshold, additional service instances (i.e. pods) will be dynamically created (and removed when no longer necessary), within the user-defined boundaries (see the parameters `min_scale` and `max_scale` in [ExposeSettings](https://docs.oscar.grycap.net/fdl/#exposesettings)).
 
-In case the number of request increase. It also will increase the CPU demand.
-Transparently for the user, the resources of the infrastructure will grow and shrink.
 
-### Prerequisites in the image
+### Prerequisites in the container image
+The container image needs to have an HTTP server that binds to a certain port (see the parameter `port` in [ExposeSettings](https://docs.oscar.grycap.net/fdl/#exposesettings)`). If developing a service from scratch, in Python you can use [FastAPI](https://fastapi.tiangolo.com/) or [Flask](https://flask.palletsprojects.com/en/2.3.x/) to create an API. In Go you can use [Gin](https://gin-gonic.com/) or [Sinatra](https://sinatrarb.com/) in Ruby. 
 
-It is necessary to create inside the container an active API. Python can use [FastAPI](https://fastapi.tiangolo.com/) or [Flask](https://flask.palletsprojects.com/en/2.3.x/) to create an API. In GO can use [Gin](https://gin-gonic.com/) or [Sinatra](https://sinatrarb.com/) in Ruby. If you only make HTTP calls is not a big problem. If the API contains a kind of UI ensure that the resources are getting dynamic.
+Notice that if the service exposes a web-based UI you must ensure that the content cannot only be served from the root document ('/'), since the service will be exposed in a certain subpath.
 
-### How to deploy
+### How to define an exposed OSCAR service
 
-The minimum definition to expose a service is selecting the port inside the image where the API is running.
-Once the service is deployed, if you call the API and it returns a `502 Bad Gateway` error, the port is wrong:
+The minimum definition to expose an OSCAR service is to indicate in the corresponding [FDL](https://docs.oscar.grycap.net/fdl/) file the port inside the container where the service will be listening.
 
 ``` yaml
 expose:
   port: 5000
 ```
 
-It can define more options inside the "expose" section, such as the minimum pod's actives, where if it is not specified, it gets the value 1.
-The maximum pods' actives, where if it is not defined, it gets the value 10 or the CPU threshold that by default is 80%.
-Here is a specification with more details where there will be between 5 to 15 active pods which each expose an API in port 4578. The number of active pods will grow when the use of CPU increases by more than 50%.
-The active pods will decrease when the use of CPU start decreasing.
+Once the service is deployed, if you invoke the service and it returns a `502 Bad Gateway` error, the port is wrong.
+
+
+Additional options can be defined in the "expose" section, such as the minimum number of active pods (default: 1).
+The maximum number of active pods (default: 10) or the CPU threshold which, once exceeded, will triger the creation of additional pods (default: 80%).
+
+Below is a specification with more details where there will be between 5 to 15 active pods and the service exposes an API in port 4578. The number of active pods will grow when the use of CPU increases by more than 50%.
+The active pods will decrease when the use of CPU decreases.
 
 ``` yaml
 expose:
@@ -170,7 +167,7 @@ expose:
   cpu_threshold: 50
 ```
 
-Here there is an example of a recipe to expose a service from [Deepaas](https://marketplace.deep-hybrid-datacloud.eu/)
+Below there is an example of a recipe to expose a service from the [AI4EOSC/DEEP Open Catalog](https://marketplace.deep-hybrid-datacloud.eu/)
 
 ``` yaml
 functions:
@@ -197,7 +194,15 @@ functions:
        path: body-pose-detection-async/output
 ```
 
-nginx
+
+The service will be listening in a URL that follows the next pattern:
+
+``` text
+https://{oscar_endpoint}/system/service/{name of service}/exposed/
+```
+
+The following FDL example shows how to expose a simple NGINX server as an OSCAR service:
+
 
 ``` yaml
 functions:
@@ -213,12 +218,6 @@ functions:
       max_scale: 10 
       port: 80  
       cpu_threshold: 50 
-```
-
-The service will be listening in a URL that follows the next pattern:
-
-``` text
-https://{oscar_endpoint}/system/service/{name of service}/exposed/
 ```
 
 In case you use the nginx example above in your [local cluster of Kubernetes](https://docs.oscar.grycap.net/local-testing/) , you will see the nginx welcome page in: `http://localhost/system/services/nginx/exposed/`.
