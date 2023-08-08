@@ -198,7 +198,7 @@ functions:
 The service will be listening in a URL that follows the next pattern:
 
 ``` text
-https://{oscar_endpoint}/system/service/{name of service}/exposed/
+https://{oscar_endpoint}/system/services/{name of service}/exposed/
 ```
 
 The following FDL example shows how to expose a simple NGINX server as an OSCAR service:
