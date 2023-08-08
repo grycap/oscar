@@ -429,23 +429,23 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#expose-services" class="md-nav__link">
-    Expose services
+  <a href="#exposed-services" class="md-nav__link">
+    Exposed services
   </a>
   
-    <nav class="md-nav" aria-label="Expose services">
+    <nav class="md-nav" aria-label="Exposed services">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#prerequisites-in-the-image" class="md-nav__link">
-    Prerequisites in the image
+  <a href="#prerequisites-in-the-container-image" class="md-nav__link">
+    Prerequisites in the container image
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#how-to-deploy" class="md-nav__link">
-    How to deploy
+  <a href="#how-to-define-an-exposed-oscar-service" class="md-nav__link">
+    How to define an exposed OSCAR service
   </a>
   
 </li>
@@ -688,23 +688,23 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#expose-services" class="md-nav__link">
-    Expose services
+  <a href="#exposed-services" class="md-nav__link">
+    Exposed services
   </a>
   
-    <nav class="md-nav" aria-label="Expose services">
+    <nav class="md-nav" aria-label="Exposed services">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#prerequisites-in-the-image" class="md-nav__link">
-    Prerequisites in the image
+  <a href="#prerequisites-in-the-container-image" class="md-nav__link">
+    Prerequisites in the container image
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#how-to-deploy" class="md-nav__link">
-    How to deploy
+  <a href="#how-to-define-an-exposed-oscar-service" class="md-nav__link">
+    How to define an exposed OSCAR service
   </a>
   
 </li>
@@ -828,35 +828,29 @@ decoded as well. Save output in the expected format of the use-case.</p>
 <h3 id="limitations">Limitations</h3>
 <p>Although the use of the Knative Serverless Backend for synchronous invocations provides elasticity similar to the one provided by their counterparts in public clouds, such as AWS Lambda, synchronous invocations are not still the best option to run long-running resource-demanding applications, like deep learning inference or video processing. </p>
 <p>The synchronous invocation of long-running resource-demanding applications may lead to timeouts on Knative pods. Therefore, we consider Kubernetes job generation as the optimal approach to handle event-driven file processing through asynchronous invocations in OSCAR, being the execution of synchronous services a convenient way to support general lightweight container-based applications.</p>
-<h2 id="expose-services">Expose services</h2>
-<p>OSCAR allows permanently exposing services. This solution is not based on serverless.
-This option has been added for use cases where a heavy container requires too much time in the initialization, and they do not require a state.
-For example, in a use case where we have a grand AI model that needs real-time processing with high throughput.
-In a serverless conventional solution. The model is loaded in memory in each service invocation.</p>
-<p>A service exposed loads the heights' models in the creation time. An exposed service is an excellent combination with another service that is not exposed.
-The regular service gets invoked by an event and interacts with an HTTP call to the exposed service.
-This workflow reduces the invocation time of the service. It gets a higher throughput because the model does not need to be loaded for every inference.</p>
-<p>In case the number of request increase. It also will increase the CPU demand.
-Transparently for the user, the resources of the infrastructure will grow and shrink.</p>
-<h3 id="prerequisites-in-the-image">Prerequisites in the image</h3>
-<p>It is necessary to create inside the container an active API. Python can use <a href="https://fastapi.tiangolo.com/">FastAPI</a> or <a href="https://flask.palletsprojects.com/en/2.3.x/">Flask</a> to create an API. In GO can use <a href="https://gin-gonic.com/">Gin</a> or <a href="https://sinatrarb.com/">Sinatra</a> in Ruby. If you only make HTTP calls is not a big problem. If the API contains a kind of UI ensure that the resources are getting dynamic.</p>
-<h3 id="how-to-deploy">How to deploy</h3>
-<p>The minimum definition to expose a service is selecting the port inside the image where the API is running.
-Once the service is deployed, if you call the API and it returns a <code>502 Bad Gateway</code> error, the port is wrong:</p>
+<h2 id="exposed-services">Exposed services</h2>
+<p>OSCAR also supports the deployment and elasticity management of long-running services that need to be directly reachable from outside the cluster (i.e. exposed services). This is useful when stateless services created out of large containers require too much time to be started to process a service invocation. This is the case when supporting the fast inference of pre-trained AI models that require close to real-time processing with high throughput. In a traditional serverless approach, the AI model weights would be loaded in memory for each service invocation (thus creating a new container). </p>
+<p>Instead, by exposing an OSCAR service, the AI model weights could be loaded just once and the service would perform the AI model inference for each subsequent request. An auto-scaled load-balanced approach for these stateless services is supported. When the average CPU exceeds a certain user-defined threshold, additional service instances (i.e. pods) will be dynamically created (and removed when no longer necessary), within the user-defined boundaries (see the parameters <code>min_scale</code> and <code>max_scale</code> in <a href="https://docs.oscar.grycap.net/fdl/#exposesettings">ExposeSettings</a>).</p>
+<h3 id="prerequisites-in-the-container-image">Prerequisites in the container image</h3>
+<p>The container image needs to have an HTTP server that binds to a certain port (see the parameter <code>port</code> in <a href="https://docs.oscar.grycap.net/fdl/#exposesettings">ExposeSettings</a>`). If developing a service from scratch, in Python you can use <a href="https://fastapi.tiangolo.com/">FastAPI</a> or <a href="https://flask.palletsprojects.com/en/2.3.x/">Flask</a> to create an API. In Go you can use <a href="https://gin-gonic.com/">Gin</a> or <a href="https://sinatrarb.com/">Sinatra</a> in Ruby. </p>
+<p>Notice that if the service exposes a web-based UI you must ensure that the content cannot only be served from the root document ('/'), since the service will be exposed in a certain subpath.</p>
+<h3 id="how-to-define-an-exposed-oscar-service">How to define an exposed OSCAR service</h3>
+<p>The minimum definition to expose an OSCAR service is to indicate in the corresponding <a href="https://docs.oscar.grycap.net/fdl/">FDL</a> file the port inside the container where the service will be listening.</p>
 <pre><code class="language-yaml">expose:
   port: 5000
 </code></pre>
-<p>It can define more options inside the "expose" section, such as the minimum pod's actives, where if it is not specified, it gets the value 1.
-The maximum pods' actives, where if it is not defined, it gets the value 10 or the CPU threshold that by default is 80%.
-Here is a specification with more details where there will be between 5 to 15 active pods which each expose an API in port 4578. The number of active pods will grow when the use of CPU increases by more than 50%.
-The active pods will decrease when the use of CPU start decreasing.</p>
+<p>Once the service is deployed, if you invoke the service and it returns a <code>502 Bad Gateway</code> error, the port is wrong.</p>
+<p>Additional options can be defined in the "expose" section, such as the minimum number of active pods (default: 1).
+The maximum number of active pods (default: 10) or the CPU threshold which, once exceeded, will triger the creation of additional pods (default: 80%).</p>
+<p>Below is a specification with more details where there will be between 5 to 15 active pods and the service exposes an API in port 4578. The number of active pods will grow when the use of CPU increases by more than 50%.
+The active pods will decrease when the use of CPU decreases.</p>
 <pre><code class="language-yaml">expose:
   min_scale: 5 
   max_scale: 15 
   port: 4578  
   cpu_threshold: 50
 </code></pre>
-<p>Here there is an example of a recipe to expose a service from <a href="https://marketplace.deep-hybrid-datacloud.eu/">Deepaas</a></p>
+<p>Below there is an example of a recipe to expose a service from the <a href="https://marketplace.deep-hybrid-datacloud.eu/">AI4EOSC/DEEP Open Catalog</a></p>
 <pre><code class="language-yaml">functions:
   oscar:
   - oscar-cluster:
@@ -880,7 +874,10 @@ The active pods will decrease when the use of CPU start decreasing.</p>
      - storage_provider: minio.default
        path: body-pose-detection-async/output
 </code></pre>
-<p>nginx</p>
+<p>The service will be listening in a URL that follows the next pattern:</p>
+<pre><code class="language-text">https://{oscar_endpoint}/system/service/{name of service}/exposed/
+</code></pre>
+<p>The following FDL example shows how to expose a simple NGINX server as an OSCAR service:</p>
 <pre><code class="language-yaml">functions:
   oscar:
   - oscar-cluster:
@@ -895,11 +892,8 @@ The active pods will decrease when the use of CPU start decreasing.</p>
       port: 80  
       cpu_threshold: 50 
 </code></pre>
-<p>The service will be listening in a URL that follows the next pattern:</p>
-<pre><code class="language-text">https://{oscar_endpoint}/system/service/{name of service}/exposed/
-</code></pre>
-<p>In case you use the nginx example above in your <a href="https://docs.oscar.grycap.net/local-testing/">local cluster of Kubernetes</a> , you will see the nginx welcome page in: <code>http://localhost/system/services/nginx/exposed/</code>.
-And two pods of the deployment actives with the command <code>kubectl get pods -n oscar-svc</code></p>
+<p>In case you use the NGINX example above in your <a href="https://docs.oscar.grycap.net/local-testing/">local OSCAR cluster</a>, you will see the nginx welcome page in: <code>http://localhost/system/services/nginx/exposed/</code>.
+Two active pods of the deployment will be shown with the command <code>kubectl get pods -n oscar-svc</code></p>
 <pre><code class="language-text">oscar-svc            nginx-dlp-6b9ddddbd7-cm6c9                         1/1     Running     0             2m1s
 oscar-svc            nginx-dlp-6b9ddddbd7-f4ml6                         1/1     Running     0             2m1s
 </code></pre>
