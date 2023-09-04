@@ -27,6 +27,25 @@ from source directly by executing:
 go install github.com/grycap/oscar-cli@latest
 ```
 
+### OpenID Connect
+
+Once the service is created, follow the next steps to use oscar_cli to interact with an OSCAR cluster using the OpenID Connect.
+
+- Install [oidc-agent](https://indigo-dc.gitbook.io/oidc-agent/intro)
+- Registry the [EGI client](https://indigo-dc.gitbook.io/oidc-agent/user/oidc-gen/provider/egi)
+- Add a cluster in oscar-cli with oidc credentians
+
+``` bash
+oscar-cli cluster add IDENTIFIER ENDPOINT --oidc-account-name SHORTNAME
+```
+
+- Run the service
+
+``` bash
+oscar-cli service run plant-classification -i <image-path> -c <cluster-identifier>
+```
+
+
 ## Available commands
 
 - [apply](#apply)
@@ -356,6 +375,8 @@ STORAGE_PROVIDER_TYPE.STORAGE_PROVIDER_NAME, being the STORAGE_PROVIDER_TYPE
 one of the three supported storage providers (MinIO, S3 or Onedata) and the
 STORAGE_PROVIDER_NAME is the identifier for the provider set in the service's
 definition.
+
+**_NOTE:_** This command can not be used in [local testing](https://docs.oscar.grycap.net/local-testing/)
 
 ```
 Usage:
