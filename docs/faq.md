@@ -33,3 +33,23 @@ type: kubernetes.io/dockerconfigjson
 ```
 
 Apply the file through kubectl into the Kubernetes OSCAR cluster to create the secret. To use it in OSCAR services, you must add the secret name (`dockersecret` in this example) in the definition of the service, using the API or a FDL, under the `image_pull_secrets` parameter, or through the "Docker secret" field in OSCAR-UI.
+
+- **The OSCAR cluster does not have TLS certificates (HTTPS). Why?**
+
+It could happen when an OSCAR cluster is deployed from an IM recipe that does not have certificates or the Let's Encrypt limit has been reached. Only [50 certificates per week can be issued](https://letsencrypt.org/docs/rate-limits/). Those certificates have a [90 days expiration lifetime](https://letsencrypt.org/2015/11/09/why-90-days.html). The certificates issued can be seen at https://crt.sh/?q=im.grycap.net.
+
+- **I do not have certificates. I can not see the buckets. What do I have to do?**
+
+If the OSCAR cluster has no certificate OSCAR UI will not show the buckets.
+
+![no-buckets.png](images/faq/certificates/02.-no-buckets.png)
+
+You can fix this by entering in the MinIO endpoint `minio.<OSCAR-endpoint>`. The browser will block the page because it is unsafe. Once you accept the risk, you will enter the MinIO page. It is not necessary to log in.
+
+![in-minio.png](images/faq/certificates/05.-in-minio.png)
+
+Return to OSCAR UI and, then,  you can see the buckets.
+The buckets will be shown only in the browser you do this process.
+The results may vary depending on the browser. For example, they will show up in Firefox but not in Chrome.
+
+![got-buckets.png](images/faq/certificates/06.-got-buckets.png)

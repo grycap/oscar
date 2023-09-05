@@ -113,9 +113,9 @@ An illustration of triggering a service synchronously through cURL can be
 found in the
 [cowsay example](https://github.com/grycap/oscar/tree/master/examples/cowsay#curl).
 
-To send an input file through cURL, you must encode it in base64. To avoid
+To send an input file through cURL, you must encode it in base64 or json. To avoid
 issues with the output in synchronous invocations remember to put the
-`log_level` as `CRITICAL`. Output, which is encoded in base64, should be
+`log_level` as `CRITICAL`. Output, which is encoded in base64 or in json, should be
 decoded as well. Save output in the expected format of the use-case.
 
 ``` sh
@@ -198,7 +198,7 @@ functions:
 The service will be listening in a URL that follows the next pattern:
 
 ``` text
-https://{oscar_endpoint}/system/service/{name of service}/exposed/
+https://{oscar_endpoint}/system/services/{name of service}/exposed/
 ```
 
 The following FDL example shows how to expose a simple NGINX server as an OSCAR service:
