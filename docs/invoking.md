@@ -201,8 +201,27 @@ The service will be listening in a URL that follows the next pattern:
 https://{oscar_endpoint}/system/services/{name of service}/exposed/
 ```
 
-The following FDL example shows how to expose a simple NGINX server as an OSCAR service:
+Now, let's show an example of executing the [Body pose detection](https://marketplace.deep-hybrid-datacloud.eu/modules/deep-oc-posenet-tf.html) ML model of [AI4EOSC/DEEP Open Catalog](https://marketplace.deep-hybrid-datacloud.eu/). We need to have in mind several factors:
 
+1. OSCAR endpoint. `localhost` or `https://{OSCAR_endpoint}`
+2. Path resource. In this case, it is `v2/models/posenetclas/predict/`. Please do not forget the final `/`
+3. Use `-k` or `--insecure` if the SSL is false.
+4. Input image with the name `people.jpeg`
+5. Output. It will create a `.zip` file that has the output
+
+The following code section represents a schema of the command:
+
+``` bash
+curl {-k} -X POST https://{oscar_endpoint}/system/services/body-pose-detection-async/exposed/{path resource} -H  "accept: */*" -H  "Content-Type: multipart/form-data" -F "data=@{input image};type=image/png" --output {output file}
+```
+
+Finally, the complete command that works in [Local Testing](https://docs.oscar.grycap.net/local-testing/) with an image called `people.jpeg` as input and `output_posenet.zip` as output.
+
+``` bash
+curl -X POST https://localhost/system/services/body-pose-detection-async/exposed/v2/models/posenetclas/predict/ -H  "accept: */*" -H  "Content-Type: multipart/form-data" -F "data=@people.jpeg;type=image/png" --output output_posenet.zip
+```
+
+Another FDL example shows how to expose a simple NGINX server as an OSCAR service:
 
 ``` yaml
 functions:
