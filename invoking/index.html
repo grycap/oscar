@@ -16,7 +16,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.5.2, mkdocs-material-9.2.8">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.3.2">
     
     
       
@@ -24,7 +24,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.046329b4.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.30068a00.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.85d0ee34.min.css">
@@ -981,7 +981,21 @@ The active pods will decrease when the use of CPU decreases.</p>
 <p>The service will be listening in a URL that follows the next pattern:</p>
 <pre><code class="language-text">https://{oscar_endpoint}/system/services/{name of service}/exposed/
 </code></pre>
-<p>The following FDL example shows how to expose a simple NGINX server as an OSCAR service:</p>
+<p>Now, let's show an example of executing the <a href="https://marketplace.deep-hybrid-datacloud.eu/modules/deep-oc-posenet-tf.html">Body pose detection</a> ML model of <a href="https://marketplace.deep-hybrid-datacloud.eu/">AI4EOSC/DEEP Open Catalog</a>. We need to have in mind several factors:</p>
+<ol>
+<li>OSCAR endpoint. <code>localhost</code> or <code>https://{OSCAR_endpoint}</code></li>
+<li>Path resource. In this case, it is <code>v2/models/posenetclas/predict/</code>. Please do not forget the final <code>/</code></li>
+<li>Use <code>-k</code> or <code>--insecure</code> if the SSL is false.</li>
+<li>Input image with the name <code>people.jpeg</code></li>
+<li>Output. It will create a <code>.zip</code> file that has the output</li>
+</ol>
+<p>The following code section represents a schema of the command:</p>
+<pre><code class="language-bash">curl {-k} -X POST https://{oscar_endpoint}/system/services/body-pose-detection-async/exposed/{path resource} -H  &quot;accept: */*&quot; -H  &quot;Content-Type: multipart/form-data&quot; -F &quot;data=@{input image};type=image/png&quot; --output {output file}
+</code></pre>
+<p>Finally, the complete command that works in <a href="https://docs.oscar.grycap.net/local-testing/">Local Testing</a> with an image called <code>people.jpeg</code> as input and <code>output_posenet.zip</code> as output.</p>
+<pre><code class="language-bash">curl -X POST https://localhost/system/services/body-pose-detection-async/exposed/v2/models/posenetclas/predict/ -H  &quot;accept: */*&quot; -H  &quot;Content-Type: multipart/form-data&quot; -F &quot;data=@people.jpeg;type=image/png&quot; --output output_posenet.zip
+</code></pre>
+<p>Another FDL example shows how to expose a simple NGINX server as an OSCAR service:</p>
 <pre><code class="language-yaml">functions:
   oscar:
   - oscar-cluster:
