@@ -218,7 +218,7 @@ curl {-k} -X POST https://{oscar_endpoint}/system/services/body-pose-detection-a
 Finally, the complete command that works in [Local Testing](https://docs.oscar.grycap.net/local-testing/) with an image called `people.jpeg` as input and `output_posenet.zip` as output.
 
 ``` bash
-curl -X POST localhost/system/services/body-pose-detection-async/exposed/v2/models/posenetclas/predict/ -H  "accept: */*" -H  "Content-Type: multipart/form-data" -F "data=@people.jpeg;type=image/png" --output output_posenet.zip
+curl -X POST https://localhost/system/services/body-pose-detection-async/exposed/v2/models/posenetclas/predict/ -H  "accept: */*" -H  "Content-Type: multipart/form-data" -F "data=@people.jpeg;type=image/png" --output output_posenet.zip
 ```
 
 Another FDL example shows how to expose a simple NGINX server as an OSCAR service:
