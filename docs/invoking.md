@@ -203,7 +203,7 @@ https://{oscar_endpoint}/system/services/{name of service}/exposed/
 
 Now, let's show an example of executing the [Body pose detection](https://marketplace.deep-hybrid-datacloud.eu/modules/deep-oc-posenet-tf.html) ML model of [AI4EOSC/DEEP Open Catalog](https://marketplace.deep-hybrid-datacloud.eu/). We need to have in mind several factors:
 
-1. Oscar endpoint. `localhost` or `https://{oscar_endpoint}`
+1. OSCAR endpoint. `localhost` or `https://{OSCAR_endpoint}`
 2. Path resource. In this case, it is `v2/models/posenetclas/predict/`. Please do not forget the final `/`
 3. Use `-k` or `--insecure` if the SSL is false.
 4. Input image with the name `people.jpeg`
