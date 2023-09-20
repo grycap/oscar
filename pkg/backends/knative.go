@@ -310,6 +310,11 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 		},
 	}
 
+	if service.EnableSGX {
+		knSvc.Spec.ConfigurationSpec.Template.ObjectMeta.Annotations["kubernetes.podspec-securitycontext"] = "enabled"
+		knSvc.Spec.ConfigurationSpec.Template.ObjectMeta.Annotations["kubernetes.containerspec-addcapabilities"] = "enabled"
+	}
+
 	return knSvc, nil
 }
 
