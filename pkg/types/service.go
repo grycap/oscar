@@ -143,6 +143,10 @@ type Service struct {
 	// Optional. (default: false)
 	EnableGPU bool `json:"enable_gpu"`
 
+	// EnableSGX parameter to use SGX plugin for security
+	// Optional. (default: false)
+	EnableSGX bool `json:"enable_sgx"`
+
 	// ImagePrefetch parameter to enable the image cache functionality
 	// Optional. (default: false)
 	ImagePrefetch bool `json:"image_prefetch"`
@@ -289,6 +293,10 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 	// Add the required environment variables for the watchdog
 	addWatchdogEnvVars(podSpec, cfg, service)
 
+	if service.EnableSGX {
+		setSecurityContext(*podSpec)
+	}
+
 	return podSpec, nil
 }
 
@@ -327,6 +335,16 @@ func SetImagePullSecrets(secrets []string) []v1.LocalObjectReference {
 	return objects
 }
 
+func setSecurityContext(podSpec v1.PodSpec) {
+	ctx := v1.SecurityContext{
+		Capabilities: &v1.Capabilities{
+			Add: []v1.Capability{"SYS_RAWIO"},
+		},
+	}
+
+	podSpec.Containers[0].SecurityContext = &ctx
+}
+
 func createResources(service *Service) (v1.ResourceRequirements, error) {
 	resources := v1.ResourceRequirements{
 		Limits: v1.ResourceList{},
@@ -354,6 +372,14 @@ func createResources(service *Service) (v1.ResourceRequirements, error) {
 			return resources, err
 		}
 		resources.Limits["nvidia.com/gpu"] = gpu
+	}
+
+	if service.EnableSGX {
+		sgx, err := resource.ParseQuantity("1")
+		if err != nil {
+			return resources, err
+		}
+		resources.Limits["sgx.intel.com/enclave"] = sgx
 	}
 
 	return resources, nil
