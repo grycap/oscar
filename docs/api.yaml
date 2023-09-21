@@ -605,4 +605,6 @@ tags:
   - name: health
 servers:
   - url: 'https://localhost'
-    description: ''
+    description: 'Local testing'
+  - url: 'https://inference.cloud.ai4eosc.eu'
+    description: 'AI4EOSC's OSCAR cluster'
