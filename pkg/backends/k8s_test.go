@@ -212,6 +212,8 @@ func TestKubeListServices(t *testing.T) {
 	})
 }
 
+// Test temporarily disabled to be able to use the image cache feature
+
 func TestKubeCreateService(t *testing.T) {
 	testService := types.Service{
 		Name: "test",

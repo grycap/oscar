@@ -22,7 +22,9 @@ import (
 	"log"
 
 	"github.com/goccy/go-yaml"
+	"github.com/grycap/oscar/v2/pkg/imagepuller"
 	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/utils"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -75,6 +77,8 @@ func (k *KubeBackend) ListServices() ([]*types.Service, error) {
 
 // CreateService creates a new service as a k8s podTemplate
 func (k *KubeBackend) CreateService(service types.Service) error {
+	// Validate the input variables of the service
+	service = utils.ValidateService(service)
 	// Create the configMap with FDL and user-script
 	err := createServiceConfigMap(&service, k.namespace, k.kubeClientset)
 	if err != nil {
@@ -112,6 +116,28 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 		return err
 	}
 
+	//Create an expose service
+	if service.Expose.Port != 0 {
+		exposeConf := utils.Expose{
+			Name:         service.Name,
+			NameSpace:    k.namespace,
+			Variables:    service.Environment.Vars,
+			Image:        service.Image,
+			Port:         service.Expose.Port,
+			MaxScale:     service.Expose.MaxScale,
+			MinScale:     service.Expose.MinScale,
+			CpuThreshold: service.Expose.CpuThreshold,
+		}
+		utils.CreateExpose(exposeConf, k.kubeClientset, *k.config)
+	}
+	//Create deaemonset to cache the service image on all the nodes
+	if service.ImagePrefetch {
+		err = imagepuller.CreateDaemonset(k.config, service, k.kubeClientset)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -133,6 +159,8 @@ func (k *KubeBackend) ReadService(name string) (*types.Service, error) {
 
 // UpdateService updates an existent service
 func (k *KubeBackend) UpdateService(service types.Service) error {
+	// Validate the input variables of the service
+	service = utils.ValidateService(service)
 	// Get the old service's configMap
 	oldCm, err := k.kubeClientset.CoreV1().ConfigMaps(k.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
@@ -178,6 +206,19 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 		return err
 	}
 
+	//Update an expose service
+	exposeConf := utils.Expose{
+		Name:         service.Name,
+		NameSpace:    k.namespace,
+		Variables:    service.Environment.Vars,
+		Image:        service.Image,
+		Port:         service.Expose.Port,
+		MaxScale:     service.Expose.MaxScale,
+		MinScale:     service.Expose.MinScale,
+		CpuThreshold: service.Expose.CpuThreshold,
+	}
+	utils.UpdateExpose(exposeConf, k.kubeClientset, *k.config)
+
 	return nil
 }
 
@@ -196,7 +237,14 @@ func (k *KubeBackend) DeleteService(name string) error {
 	if err := deleteServiceJobs(name, k.namespace, k.kubeClientset); err != nil {
 		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
 	}
-
+	exposeConf := utils.Expose{
+		Name:      name,
+		NameSpace: k.namespace,
+		Port:      80,
+	}
+	if err2 := utils.DeleteExpose(exposeConf, k.kubeClientset); err2 != nil {
+		log.Printf("Error deleting all associated kubernetes component of an exposed service \"%s\": %v\n", name, err2)
+	}
 	return nil
 }
 

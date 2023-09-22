@@ -187,7 +187,7 @@ func TestConvertEnvVars(t *testing.T) {
 		{Name: "TEST", Value: "test"},
 	}
 
-	res := convertEnvVars(vars)
+	res := ConvertEnvVars(vars)
 
 	if res[0].Name != expected[0].Name && res[0].Value != expected[0].Value {
 		t.Errorf("invalid conversion of environment variables. Expected: %v, got %v", expected, res)
@@ -201,7 +201,7 @@ func TestSetImagePullSecrets(t *testing.T) {
 		{Name: "testcred1"},
 	}
 
-	result := setImagePullSecrets(secrets)
+	result := SetImagePullSecrets(secrets)
 	if result[0].Name != expected[0].Name {
 		t.Errorf("invalid conversion of local object. Expected: %v, got %v", expected, result)
 	}
@@ -215,6 +215,7 @@ cpu: "1.0"
 total_memory: ""
 total_cpu: ""
 enable_gpu: false
+image_prefetch: false
 synchronous:
   min_scale: 0
   max_scale: 0
@@ -239,6 +240,11 @@ script: testscript
 image_pull_secrets:
 - testcred1
 - testcred2
+expose:
+  min_scale: 0
+  max_scale: 0
+  port: 0
+  cpu_threshold: 0
 environment:
   Variables:
     TEST_VAR: testvalue
@@ -344,7 +350,7 @@ func checkEnvVars(cfg *Config, podSpec *v1.PodSpec) error {
 		case "max_inflight":
 			expected = strconv.Itoa(cfg.WatchdogMaxInflight)
 			if envVar.Value != expected {
-				return fmt.Errorf("the max_inflight environment variable has not the correct value. Expected: %s, got: %s", expected, envVar.Value)
+				return fmt.Errorf("componenteax_inflight environment variable has not the correct value. Expected: %s, got: %s", expected, envVar.Value)
 			}
 		case "write_debug":
 			expected = strconv.FormatBool(cfg.WatchdogWriteDebug)

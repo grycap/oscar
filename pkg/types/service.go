@@ -139,9 +139,13 @@ type Service struct {
 	// Optional. (default: "")
 	TotalCPU string `json:"total_cpu"`
 
-	// GPU parameter to request gpu usage in service's executions (synchronous and asynchronous)
+	// EnableGPU parameter to request gpu usage in service's executions (synchronous and asynchronous)
 	// Optional. (default: false)
 	EnableGPU bool `json:"enable_gpu"`
+
+	// ImagePrefetch parameter to enable the image cache functionality
+	// Optional. (default: false)
+	ImagePrefetch bool `json:"image_prefetch"`
 
 	// Synchronous struct to configure specific sync parameters
 	// Only Knative ServerlessBackend applies this settings
@@ -198,6 +202,13 @@ type Service struct {
 	// Optional
 	ImagePullSecrets []string `json:"image_pull_secrets,omitempty"`
 
+	Expose struct {
+		MinScale     int32 `json:"min_scale" default:"1"`
+		MaxScale     int32 `json:"max_scale" default:"10"`
+		Port         int   `json:"port" `
+		CpuThreshold int32 `json:"cpu_threshold" default:"80" `
+	} `json:"expose"`
+
 	// The user-defined environment variables assigned to the service
 	// Optional
 	Environment struct {
@@ -231,12 +242,12 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 	}
 
 	podSpec := &v1.PodSpec{
-		ImagePullSecrets: setImagePullSecrets(service.ImagePullSecrets),
+		ImagePullSecrets: SetImagePullSecrets(service.ImagePullSecrets),
 		Containers: []v1.Container{
 			{
 				Name:  ContainerName,
 				Image: service.Image,
-				Env:   convertEnvVars(service.Environment.Vars),
+				Env:   ConvertEnvVars(service.Environment.Vars),
 				VolumeMounts: []v1.VolumeMount{
 					{
 						Name:      VolumeName,
@@ -295,7 +306,7 @@ func (service *Service) GetMinIOWebhookARN() string {
 	return fmt.Sprintf("arn:minio:sqs:%s:%s:webhook", service.StorageProviders.MinIO[DefaultProvider].Region, service.Name)
 }
 
-func convertEnvVars(vars map[string]string) []v1.EnvVar {
+func ConvertEnvVars(vars map[string]string) []v1.EnvVar {
 	envVars := []v1.EnvVar{}
 	for k, v := range vars {
 		envVars = append(envVars, v1.EnvVar{
@@ -306,7 +317,7 @@ func convertEnvVars(vars map[string]string) []v1.EnvVar {
 	return envVars
 }
 
-func setImagePullSecrets(secrets []string) []v1.LocalObjectReference {
+func SetImagePullSecrets(secrets []string) []v1.LocalObjectReference {
 	objects := []v1.LocalObjectReference{}
 	for _, s := range secrets {
 		objects = append(objects, v1.LocalObjectReference{

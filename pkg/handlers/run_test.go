@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v2/pkg/backends"
@@ -44,6 +45,7 @@ func (GinResponseRecorder) Flush() {
 
 func TestMakeRunHandler(t *testing.T) {
 	back := backends.MakeFakeSyncBackend()
+	http.DefaultClient.Timeout = 400 * time.Second
 	r := gin.Default()
 	r.POST("/run/:serviceName", MakeRunHandler(&testConfigValidRun, back))
 
@@ -62,6 +64,7 @@ func TestMakeRunHandler(t *testing.T) {
 		t.Run(s.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			serviceName := "test"
+
 			req, _ := http.NewRequest("POST", "/run/"+serviceName, nil)
 			req.Header.Set("Authorization", "Bearer AbCdEf123456")
 

@@ -23,6 +23,11 @@ functions:
       cpu: '1.0'
       image: grycap/imagemagick
       script: grayify.sh
+      expose:
+        min_scale: 3 
+        max_scale: 7 
+        port: 5000  
+        cpu_threshold: 70 
       input:
       - storage_provider: minio.default
         path: example-workflow/med
@@ -75,9 +80,11 @@ storage_providers:
 | `memory` </br> *string*                                           | Memory limit for the service following the [kubernetes format](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory). Optional (default: 256Mi)                                                           |
 | `cpu` </br> *string*                                              | CPU limit for the service following the [kubernetes format](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu). Optional (default: 0.2)                                                                   |
 | `enable_gpu` </br> *bool*                                         | Parameter to enable the use of GPU for the service. Requires a device plugin deployed on the cluster (More info: [Kubernetes device plugins](https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/#using-device-plugins)). Optional (default: false) |
+| `image_prefetch` </br> *bool*                                         | Parameter to enable the use of image caching. Optional (default: false) |
 | `total_memory` </br> *string*                                     | Limit for the memory used by all the service's jobs running simultaneously. Apache YuniKorn scheduler is required to work. Same format as Memory, but internally translated to MB (integer). Optional (default: "")                                          |
 | `total_cpu` </br> *string*                                        | Limit for the virtual CPUs used by all the service's jobs running simultaneously. Apache YuniKorn scheduler is required to work. Same format as CPU, but internally translated to millicores (integer). Optional (default: "")                               |
 | `synchronous` </br> *[SynchronousSettings](#synchronoussettings)* | Struct to configure specific sync parameters. This settings are only applied on Knative ServerlessBackend. Optional.                                                                                                                                         |
+| `expose` </br> *[ExposeSettings](#exposesettings)* | Struct to expose services. Optional.                                                                                                                                         |
 | `replicas` </br> *[Replica](#replica) array*                      | List of replicas to delegate jobs. Optional.                                                                                                                                                                                                                 |
 | `rescheduler_threshold` </br> *string*                            | Time (in seconds) that a job (with replicas) can be queued before delegating it. Optional.                                                                                                                                                                   |
 | `log_level` </br> *string*                                        | Log level for the FaaS Supervisor. Available levels: NOTSET, DEBUG, INFO, WARNING, ERROR and CRITICAL. Optional (default: INFO)                                                                                                                              |
@@ -93,6 +100,15 @@ storage_providers:
 |------------------------------| --------------------------------------------|
 | `min_scale` </br> *integer* | Minimum number of active replicas (pods) for the service. Optional. (default: 0)             |
 | `max_scale` </br> *integer* | Maximum number of active replicas (pods) for the service. Optional. (default: 0 (Unlimited)) |
+
+## ExposeSettings
+
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
+| `min_scale` </br> *integer*  | Minimum number of active replicas (pods) for the service. Optional. (default: 1)             |
+| `max_scale` </br> *integer*  | Maximum number of active replicas (pods) for the service. Optional. (default: 10 (Unlimited)) |
+| `port` </br> *integer*       | Port inside the container where the API is exposed. (value: 0 , the service wont be exposed.)             |
+| `cpu_threshold` </br> *integer* | Percent of use of CPU before creating other pod (default: 80 max:100) |
 
 ## Replica
 
