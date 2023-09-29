@@ -360,7 +360,7 @@ components:
         cpu:
           type: string
         enable_gpu:
-          type: bool
+          type: boolean
           default: false
         total_memory:
           type: string
@@ -568,7 +568,7 @@ components:
         namespace:
           type: string
         gpu_avaliable:
-          type: bool
+          type: boolean
         serverless_backend:
           type: string
         yunikorn_enable:
@@ -607,4 +607,4 @@ servers:
   - url: 'https://localhost'
     description: 'Local testing'
   - url: 'https://inference.cloud.ai4eosc.eu'
-    description: 'AI4EOSC's OSCAR cluster'
+    description: 'AI4EOSC OSCAR cluster'
