@@ -48,26 +48,33 @@ oscar-cli service run plant-classification -i <image-path> -c <cluster-identifie
 
 ## Available commands
 
-- [apply](#apply)
-- [cluster](#cluster)
-  - [add](#add)
-  - [default](#default)
-  - [info](#info)
-  - [list](#list)
-  - [remove](#remove)
-- [service](#service)
-  - [get](#get)
-  - [list](#list-1)
-  - [remove](#remove-1)
-  - [run](#run)
-  - [logs list](#logs-list)
-  - [logs get](#logs-get)
-  - [logs remove](#logs-remove)
-  - [get-file](#get-file)
-  - [put-file](#put-file)
-  - [list-files](#list-files)
-- [version](#version)
-- [help](#help)
+- [OSCAR-CLI](#oscar-cli)
+  - [Download](#download)
+    - [Releases](#releases)
+    - [Install from source](#install-from-source)
+  - [Available commands](#available-commands)
+    - [apply](#apply)
+    - [cluster](#cluster)
+      - [Subcommands](#subcommands)
+        - [add](#add)
+        - [default](#default)
+        - [info](#info)
+        - [list](#list)
+        - [remove](#remove)
+    - [service](#service)
+      - [Subcommands of services](#subcommands-of-services)
+        - [get](#get)
+        - [list services](#list-services)
+        - [remove services](#remove-services)
+        - [run](#run)
+        - [logs list](#logs-list)
+        - [logs get](#logs-get)
+        - [logs remove](#logs-remove)
+        - [get-file](#get-file)
+        - [put-file](#put-file)
+        - [list-files](#list-files)
+    - [version](#version)
+    - [help](#help)
 
 ### apply
 
@@ -339,6 +346,15 @@ Global Flags:
   -c, --cluster string   set the cluster
       --config string    set the location of the config file (YAML or JSON)
 ```
+> **Note**
+> The following subcommands will not work with MinIO if you use a local deployment due to DNS resolutions, so if you want to use a command line put/get/list files from your buckets, you can use the [MinIO client](https://min.io/docs/minio/linux/reference/minio-mc.html) command line. <br>
+> Once you have the client installed you can define the cluster with the `mc alias` command like it follows:
+> ```
+> mc alias set myminio https://localhost:30000 minioadminuser minioadminpassword
+> ```
+> So, instead of the next subcommands, you would use:
+> - [`mc cp`](https://min.io/docs/minio/linux/reference/minio-mc/mc-cp.html) to put/get files fron a bucket. <br>
+> - [`mc ls`](https://min.io/docs/minio/linux/reference/minio-mc/mc-ls.html) to list files from a bucket.
 
 ##### get-file
 
