@@ -607,4 +607,4 @@ servers:
   - url: 'https://localhost'
     description: 'Local testing'
   - url: 'https://inference.cloud.ai4eosc.eu'
-    description: 'AI4EOSCs OSCAR cluster'
+    description: 'AI4EOSC OSCAR cluster'
