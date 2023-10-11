@@ -143,7 +143,7 @@ type Service struct {
 	// Optional. (default: false)
 	EnableGPU bool `json:"enable_gpu"`
 
-	// EnableSGX parameter to use SGX plugin for security
+	// EnableSGX parameter to use the SCONE k8s plugin
 	// Optional. (default: false)
 	EnableSGX bool `json:"enable_sgx"`
 
@@ -288,6 +288,12 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 				},
 			},
 		},
+	}
+
+	if service.EnableSGX {
+		podSpec.Containers[0].SecurityContext.Capabilities = &v1.Capabilities{
+			Add: []v1.Capability{"SYS_RAWIO"},
+		}
 	}
 
 	// Add the required environment variables for the watchdog
