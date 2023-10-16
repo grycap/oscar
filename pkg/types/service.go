@@ -290,19 +290,11 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 		},
 	}
 
-	if service.EnableSGX {
-		podSpec.Containers[0].SecurityContext = &v1.SecurityContext{
-			Capabilities: &v1.Capabilities{
-				Add: []v1.Capability{"SYS_RAWIO"},
-			},
-		}
-	}
-
 	// Add the required environment variables for the watchdog
 	addWatchdogEnvVars(podSpec, cfg, service)
 
 	if service.EnableSGX {
-		setSecurityContext(*podSpec)
+		setSecurityContext(podSpec)
 	}
 
 	return podSpec, nil
@@ -343,7 +335,7 @@ func SetImagePullSecrets(secrets []string) []v1.LocalObjectReference {
 	return objects
 }
 
-func setSecurityContext(podSpec v1.PodSpec) {
+func setSecurityContext(podSpec *v1.PodSpec) {
 	ctx := v1.SecurityContext{
 		Capabilities: &v1.Capabilities{
 			Add: []v1.Capability{"SYS_RAWIO"},
