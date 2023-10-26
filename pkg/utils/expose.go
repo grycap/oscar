@@ -41,6 +41,8 @@ type Expose struct {
 	MinScale     int32 `default:"1"`
 	Port         int   ` binding:"required" default:"80"`
 	CpuThreshold int32 `default:"80"`
+	EnableSGX    bool
+	EnableGPU    bool
 }
 
 // / Main function that creates all the kubernetes components
@@ -173,6 +175,7 @@ func getDeployment(e Expose) *apps.Deployment {
 		},
 		Status: apps.DeploymentStatus{},
 	}
+
 	return deployment
 }
 
@@ -232,6 +235,18 @@ func getPodTemplateSpec(e Expose) v1.PodTemplateSpec {
 			Containers:     []v1.Container{container},
 		},
 	}
+
+	if e.EnableSGX {
+		types.SetSecurityContext(&template.Spec)
+		sgx, _ := resource.ParseQuantity("1")
+		container.Resources.Limits["sgx.intel.com/enclave"] = sgx
+	}
+
+	if e.EnableGPU {
+		gpu, _ := resource.ParseQuantity("1")
+		container.Resources.Limits["nvidia.com/gpu"] = gpu
+	}
+
 	return template
 }
 
