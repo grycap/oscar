@@ -211,17 +211,7 @@ func getPodTemplateSpec(e Expose) v1.PodTemplateSpec {
 		ContainerPort: int32(e.Port),
 	}
 	cores := resource.NewMilliQuantity(500, resource.DecimalSI)
-	var container v1.Container = v1.Container{
-		Name:  e.Name,
-		Image: e.Image,
-		Env:   types.ConvertEnvVars(e.Variables),
-		Ports: []v1.ContainerPort{ports},
-		Resources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				"cpu": *cores,
-			},
-		},
-	}
+
 	template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      e.Name,
@@ -232,19 +222,31 @@ func getPodTemplateSpec(e Expose) v1.PodTemplateSpec {
 		},
 		Spec: v1.PodSpec{
 			InitContainers: []v1.Container{},
-			Containers:     []v1.Container{container},
+			Containers: []v1.Container{
+				{
+					Name:  e.Name,
+					Image: e.Image,
+					Env:   types.ConvertEnvVars(e.Variables),
+					Ports: []v1.ContainerPort{ports},
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							"cpu": *cores,
+						},
+					},
+				},
+			},
 		},
 	}
 
 	if e.EnableSGX {
 		types.SetSecurityContext(&template.Spec)
 		sgx, _ := resource.ParseQuantity("1")
-		container.Resources.Limits["sgx.intel.com/enclave"] = sgx
+		template.Spec.Containers[0].Resources.Limits["sgx.intel.com/enclave"] = sgx
 	}
 
 	if e.EnableGPU {
 		gpu, _ := resource.ParseQuantity("1")
-		container.Resources.Limits["nvidia.com/gpu"] = gpu
+		template.Spec.Containers[0].Resources.Limits["nvidia.com/gpu"] = gpu
 	}
 
 	return template
