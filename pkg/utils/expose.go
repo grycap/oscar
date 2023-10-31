@@ -42,7 +42,6 @@ type Expose struct {
 	Port         int   ` binding:"required" default:"80"`
 	CpuThreshold int32 `default:"80"`
 	EnableSGX    bool
-	EnableGPU    bool
 }
 
 // / Main function that creates all the kubernetes components
@@ -232,6 +231,8 @@ func getPodTemplateSpec(e Expose) v1.PodTemplateSpec {
 						Requests: v1.ResourceList{
 							"cpu": *cores,
 						},
+						// Empty Limits list initialized in case enabling SGX is needed
+						Limits: v1.ResourceList{},
 					},
 				},
 			},
@@ -242,11 +243,6 @@ func getPodTemplateSpec(e Expose) v1.PodTemplateSpec {
 		types.SetSecurityContext(&template.Spec)
 		sgx, _ := resource.ParseQuantity("1")
 		template.Spec.Containers[0].Resources.Limits["sgx.intel.com/enclave"] = sgx
-	}
-
-	if e.EnableGPU {
-		gpu, _ := resource.ParseQuantity("1")
-		template.Spec.Containers[0].Resources.Limits["nvidia.com/gpu"] = gpu
 	}
 
 	return template
