@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/grycap/oscar/v2/pkg/types"
 	apps "k8s.io/api/apps/v1"
@@ -44,22 +45,25 @@ type Expose struct {
 	EnableSGX    bool
 }
 
+// Custom logger
+var ExposeLogger = log.New(os.Stdout, "[EXPOSED-SERVICE] ", log.Flags())
+
 // / Main function that creates all the kubernetes components
 func CreateExpose(expose Expose, kubeClientset kubernetes.Interface, cfg types.Config) error {
-	log.Printf("DEBUG: Creating exposed service: \n%v\n", expose)
+	ExposeLogger.Printf("DEBUG: Creating exposed service: \n%v\n", expose)
 	err := createDeployment(expose, kubeClientset)
 	if err != nil {
-		log.Printf("WARNING: %v\n", err)
+		ExposeLogger.Printf("WARNING: %v\n", err)
 		return err
 	}
 	err = createService(expose, kubeClientset)
 	if err != nil {
-		log.Printf("WARNING: %v\n", err)
+		ExposeLogger.Printf("WARNING: %v\n", err)
 		return err
 	}
 	err = createIngress(expose, kubeClientset, cfg)
 	if err != nil {
-		log.Printf("WARNING: %v\n", err)
+		ExposeLogger.Printf("WARNING: %v\n", err)
 		return err
 	}
 	return nil
@@ -69,17 +73,17 @@ func CreateExpose(expose Expose, kubeClientset kubernetes.Interface, cfg types.C
 func DeleteExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 	err := deleteDeployment(expose, kubeClientset)
 	if err != nil {
-		log.Printf("WARNING: %v\n", err)
+		ExposeLogger.Printf("WARNING: %v\n", err)
 		return err
 	}
 	err = deleteService(expose, kubeClientset)
 	if err != nil {
-		log.Printf("WARNING: %v\n", err)
+		ExposeLogger.Printf("WARNING: %v\n", err)
 		return err
 	}
 	err = deleteIngress(expose, kubeClientset)
 	if err != nil {
-		log.Printf("WARNING: %v\n", err)
+		ExposeLogger.Printf("WARNING: %v\n", err)
 		return err
 	}
 	return nil
@@ -102,12 +106,12 @@ func UpdateExpose(expose Expose, kubeClientset kubernetes.Interface, cfg types.C
 	}
 	err := updateDeployment(expose, kubeClientset)
 	if err != nil {
-		log.Printf("WARNING: %v\n", err)
+		ExposeLogger.Printf("WARNING: %v\n", err)
 		return err
 	}
 	err2 := updateService(expose, kubeClientset)
 	if err2 != nil {
-		log.Printf("WARNING: %v\n", err2)
+		ExposeLogger.Printf("WARNING: %v\n", err2)
 		return err2
 	}
 	return nil
@@ -121,15 +125,15 @@ func ListExpose(expose Expose, kubeClientset kubernetes.Interface) error {
 	services, err2 := listServices(expose, kubeClientset)
 	ingress, err3 := listIngress(expose, kubeClientset)
 	if err != nil {
-		log.Printf("WARNING: %v\n", err)
+		ExposeLogger.Printf("WARNING: %v\n", err)
 		return err
 	}
 	if err2 != nil {
-		log.Printf("WARNING: %v\n", err2)
+		ExposeLogger.Printf("WARNING: %v\n", err2)
 		return err
 	}
 	if err3 != nil {
-		log.Printf("WARNING: %v\n", err3)
+		ExposeLogger.Printf("WARNING: %v\n", err3)
 		return err
 	}
 	fmt.Println(deploy, hpa, services, ingress)
@@ -241,7 +245,7 @@ func getPodTemplateSpec(e Expose) v1.PodTemplateSpec {
 	}
 
 	if e.EnableSGX {
-		log.Printf("DEBUG: Enabling components to use SGX plugin\n")
+		ExposeLogger.Printf("DEBUG: Enabling components to use SGX plugin\n")
 		types.SetSecurityContext(&template.Spec)
 		sgx, _ := resource.ParseQuantity("1")
 		template.Spec.Containers[0].Resources.Limits["sgx.intel.com/enclave"] = sgx
