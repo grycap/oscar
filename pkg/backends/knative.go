@@ -133,6 +133,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 			MaxScale:     service.Expose.MaxScale,
 			MinScale:     service.Expose.MinScale,
 			CpuThreshold: service.Expose.CpuThreshold,
+			EnableSGX:    service.EnableSGX,
 		}
 		utils.CreateExpose(exposeConf, kn.kubeClientset, *kn.config)
 
@@ -224,6 +225,7 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		MaxScale:     service.Expose.MaxScale,
 		MinScale:     service.Expose.MinScale,
 		CpuThreshold: service.Expose.CpuThreshold,
+		EnableSGX:    service.EnableSGX,
 	}
 	utils.UpdateExpose(exposeConf, kn.kubeClientset, *kn.config)
 

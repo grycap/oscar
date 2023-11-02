@@ -217,6 +217,7 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 		MaxScale:     service.Expose.MaxScale,
 		MinScale:     service.Expose.MinScale,
 		CpuThreshold: service.Expose.CpuThreshold,
+		EnableSGX:    service.EnableSGX,
 	}
 	utils.UpdateExpose(exposeConf, k.kubeClientset, *k.config)
 

@@ -46,6 +46,7 @@ type Expose struct {
 
 // / Main function that creates all the kubernetes components
 func CreateExpose(expose Expose, kubeClientset kubernetes.Interface, cfg types.Config) error {
+	log.Printf("DEBUG: Creating exposed service: \n%v\n", expose)
 	err := createDeployment(expose, kubeClientset)
 	if err != nil {
 		log.Printf("WARNING: %v\n", err)
@@ -240,6 +241,7 @@ func getPodTemplateSpec(e Expose) v1.PodTemplateSpec {
 	}
 
 	if e.EnableSGX {
+		log.Printf("DEBUG: Enabling components to use SGX plugin\n")
 		types.SetSecurityContext(&template.Spec)
 		sgx, _ := resource.ParseQuantity("1")
 		template.Spec.Containers[0].Resources.Limits["sgx.intel.com/enclave"] = sgx
