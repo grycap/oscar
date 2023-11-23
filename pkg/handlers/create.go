@@ -31,6 +31,7 @@ import (
 	"github.com/grycap/cdmi-client-go"
 	"github.com/grycap/oscar/v2/pkg/types"
 	"github.com/grycap/oscar/v2/pkg/utils"
+	"github.com/grycap/oscar/v2/pkg/utils/auth"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -46,6 +47,22 @@ var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache
 func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var service types.Service
+		oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
+
+		authHeader := c.GetHeader("Authorization")
+		rawToken := strings.TrimPrefix(authHeader, "Bearer ")
+		hasVO, err2 := oidcManager.UserHasVO(rawToken, service.VO)
+
+		if err2 != nil {
+			c.String(http.StatusInternalServerError, err2.Error())
+			return
+		}
+
+		if !hasVO {
+			c.String(http.StatusBadRequest, fmt.Sprintf("This user isn't enrrolled on the vo: %v", service.VO))
+			return
+		}
+
 		if err := c.ShouldBindJSON(&service); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
@@ -119,6 +136,10 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	service.Labels[types.ServiceLabel] = service.Name
 	service.Labels[types.YunikornApplicationIDLabel] = service.Name
 	service.Labels[types.YunikornQueueLabel] = fmt.Sprintf("%s.%s.%s", types.YunikornRootQueue, types.YunikornOscarQueue, service.Name)
+
+	if service.VO != "" {
+		service.Labels["vo"] = service.VO
+	}
 
 	// Create default annotations map
 	if service.Annotations == nil {

@@ -102,6 +102,14 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		return err
 	}
 
+	if service.VO != "" {
+		for _, vo := range kn.config.OIDCGroups {
+			if vo == service.VO {
+				service.Labels["vo"] = service.VO
+			}
+		}
+	}
+
 	// Create the Knative service definition
 	knSvc, err := kn.createKNServiceDefinition(&service)
 	if err != nil {

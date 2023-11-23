@@ -45,7 +45,7 @@ type userInfo struct {
 }
 
 // newOIDCManager returns a new oidcManager or error if the oidc.Provider can't be created
-func newOIDCManager(issuer string, subject string, groups []string) (*oidcManager, error) {
+func NewOIDCManager(issuer string, subject string, groups []string) (*oidcManager, error) {
 	provider, err := oidc.NewProvider(context.TODO(), issuer)
 	if err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func newOIDCManager(issuer string, subject string, groups []string) (*oidcManage
 
 // getIODCMiddleware returns the Gin's handler middleware to validate OIDC-based auth
 func getOIDCMiddleware(issuer string, subject string, groups []string) gin.HandlerFunc {
-	oidcManager, err := newOIDCManager(issuer, subject, groups)
+	oidcManager, err := NewOIDCManager(issuer, subject, groups)
 	if err != nil {
 		return func(c *gin.Context) {
 			c.AbortWithStatus(http.StatusUnauthorized)
@@ -138,6 +138,19 @@ func getGroups(urns []string) []string {
 	}
 
 	return groups
+}
+
+func (om *oidcManager) UserHasVO(rawToken string, vo string) (bool, error) {
+	ui, err := om.getUserInfo(rawToken)
+	if err != nil {
+		return false, err
+	}
+	for _, gr := range ui.groups {
+		if vo == gr {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // isAuthorised checks if a token is authorised to access the API
