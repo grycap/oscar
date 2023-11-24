@@ -216,6 +216,7 @@ total_memory: ""
 total_cpu: ""
 enable_gpu: false
 enable_sgx: false
+vo: ""
 image_prefetch: false
 synchronous:
   min_scale: 0

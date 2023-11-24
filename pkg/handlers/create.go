@@ -47,21 +47,6 @@ var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache
 func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var service types.Service
-		oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
-
-		authHeader := c.GetHeader("Authorization")
-		rawToken := strings.TrimPrefix(authHeader, "Bearer ")
-		hasVO, err2 := oidcManager.UserHasVO(rawToken, service.VO)
-
-		if err2 != nil {
-			c.String(http.StatusInternalServerError, err2.Error())
-			return
-		}
-
-		if !hasVO {
-			c.String(http.StatusBadRequest, fmt.Sprintf("This user isn't enrrolled on the vo: %v", service.VO))
-			return
-		}
 
 		if err := c.ShouldBindJSON(&service); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
@@ -70,6 +55,24 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Check service values and set defaults
 		checkValues(&service, cfg)
+
+		if service.VO != "" {
+			oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
+
+			authHeader := c.GetHeader("Authorization")
+			rawToken := strings.TrimPrefix(authHeader, "Bearer ")
+			hasVO, err2 := oidcManager.UserHasVO(rawToken, service.VO)
+
+			if err2 != nil {
+				c.String(http.StatusInternalServerError, err2.Error())
+				return
+			}
+
+			if !hasVO {
+				c.String(http.StatusBadRequest, fmt.Sprintf("This user isn't enrrolled on the vo: %v", service.VO))
+				return
+			}
+		}
 
 		// Create the service
 		if err := back.CreateService(service); err != nil {
