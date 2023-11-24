@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/goccy/go-yaml"
 	"github.com/grycap/oscar/v2/pkg/imagepuller"
@@ -29,6 +30,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
+
+var K8sLoggerInfo = log.New(os.Stdout, "[BACKEND-INFO] ", log.Flags())
 
 // KubeBackend struct to represent a Kubernetes client to store services as podTemplates
 type KubeBackend struct {
@@ -77,6 +80,7 @@ func (k *KubeBackend) ListServices() ([]*types.Service, error) {
 
 // CreateService creates a new service as a k8s podTemplate
 func (k *KubeBackend) CreateService(service types.Service) error {
+	K8sLoggerInfo.Println("Creating service with K8s backend")
 	// Validate the input variables of the service
 	service = utils.ValidateService(service)
 	// Create the configMap with FDL and user-script
