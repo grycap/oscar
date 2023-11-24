@@ -102,14 +102,6 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		return err
 	}
 
-	if service.VO != "" {
-		for _, vo := range kn.config.OIDCGroups {
-			if vo == service.VO {
-				service.Labels["vo"] = service.VO
-			}
-		}
-	}
-
 	// Create the Knative service definition
 	knSvc, err := kn.createKNServiceDefinition(&service)
 	if err != nil {
@@ -285,6 +277,14 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 	// Add label "serving.knative.dev/visibility=cluster-local"
 	// https://knative.dev/docs/serving/services/private-services/
 	service.Labels[types.KnativeVisibilityLabel] = types.KnativeClusterLocalValue
+
+	if service.VO != "" {
+		for _, vo := range kn.config.OIDCGroups {
+			if vo == service.VO {
+				service.Labels["vo"] = service.VO
+			}
+		}
+	}
 
 	podSpec, err := service.ToPodSpec(kn.config)
 	if err != nil {
