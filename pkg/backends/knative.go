@@ -282,6 +282,7 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 	// https://knative.dev/docs/serving/services/private-services/
 	service.Labels[types.KnativeVisibilityLabel] = types.KnativeClusterLocalValue
 
+	// Add to the service labels the user VO for accounting on k8s pods
 	if service.VO != "" {
 		for _, vo := range kn.config.OIDCGroups {
 			if vo == service.VO {
@@ -322,6 +323,11 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 				},
 			},
 		},
+	}
+
+	// Add to the service labels the user VO for accounting on knative pods
+	if service.Labels["vo"] != "" {
+		knSvc.Spec.ConfigurationSpec.Template.ObjectMeta.Labels["vo"] = service.Labels["vo"]
 	}
 
 	if service.EnableSGX {
