@@ -315,6 +315,8 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 							types.KnativeMinScaleAnnotation: strconv.Itoa(service.Synchronous.MinScale),
 							types.KnativeMaxScaleAnnotation: strconv.Itoa(service.Synchronous.MaxScale),
 						},
+						//Empty labels map to avoid nil pointer errors
+						Labels: map[string]string{},
 					},
 					Spec: knv1.RevisionSpec{
 						ContainerConcurrency: &containerConcurrency,
