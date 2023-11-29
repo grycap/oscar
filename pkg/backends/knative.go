@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/grycap/oscar/v2/pkg/imagepuller"
@@ -33,8 +32,6 @@ import (
 	knv1 "knative.dev/serving/pkg/apis/serving/v1"
 	knclientset "knative.dev/serving/pkg/client/clientset/versioned"
 )
-
-var KnativeLoggerInfo = log.New(os.Stdout, "[BACKEND-INFO] ", log.Flags())
 
 // KnativeBackend struct to represent a Knative client
 type KnativeBackend struct {
@@ -97,7 +94,6 @@ func (kn *KnativeBackend) ListServices() ([]*types.Service, error) {
 
 // CreateService creates a new service as a Knative service
 func (kn *KnativeBackend) CreateService(service types.Service) error {
-	KnativeLoggerInfo.Println("Creating service with Knative backend")
 	// Validate the input variables of the service
 	service = utils.ValidateService(service)
 	// Create the configMap with FDL and user-script
