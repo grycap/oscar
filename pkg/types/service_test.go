@@ -251,6 +251,7 @@ environment:
     TEST_VAR: testvalue
 annotations:
   testannotation: testannotationvalue
+vo: ""
 labels:
   testlabel: testlabelvalue
 storage_providers:

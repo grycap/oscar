@@ -224,6 +224,10 @@ type Service struct {
 	// Optional
 	Annotations map[string]string `json:"annotations"`
 
+	// Parameter to specify the VO from the user creating the service
+	// Optional
+	VO string `json:"vo"`
+
 	// Labels user-defined Kubernetes labels to be set in job's definition
 	// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
 	// Optional

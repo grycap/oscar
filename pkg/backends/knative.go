@@ -278,6 +278,15 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 	// https://knative.dev/docs/serving/services/private-services/
 	service.Labels[types.KnativeVisibilityLabel] = types.KnativeClusterLocalValue
 
+	// Add to the service labels the user VO for accounting on k8s pods
+	if service.VO != "" {
+		for _, vo := range kn.config.OIDCGroups {
+			if vo == service.VO {
+				service.Labels["vo"] = service.VO
+			}
+		}
+	}
+
 	podSpec, err := service.ToPodSpec(kn.config)
 	if err != nil {
 		return nil, err
@@ -302,6 +311,8 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 							types.KnativeMinScaleAnnotation: strconv.Itoa(service.Synchronous.MinScale),
 							types.KnativeMaxScaleAnnotation: strconv.Itoa(service.Synchronous.MaxScale),
 						},
+						//Empty labels map to avoid nil pointer errors
+						Labels: map[string]string{},
 					},
 					Spec: knv1.RevisionSpec{
 						ContainerConcurrency: &containerConcurrency,
@@ -310,6 +321,11 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 				},
 			},
 		},
+	}
+
+	// Add to the service labels the user VO for accounting on knative pods
+	if service.Labels["vo"] != "" {
+		knSvc.Spec.ConfigurationSpec.Template.ObjectMeta.Labels["vo"] = service.Labels["vo"]
 	}
 
 	if service.EnableSGX {
