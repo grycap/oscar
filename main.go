@@ -53,6 +53,8 @@ func main() {
 	// Check if the cluster has available GPUs
 	cfg.CheckAvailableGPUs(kubeClientset)
 
+	cfg.CheckAvailableInterLink(kubeClientset)
+
 	// Create the ServerlessBackend
 	back := backends.MakeServerlessBackend(kubeClientset, kubeConfig, cfg)
 

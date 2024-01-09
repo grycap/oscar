@@ -77,6 +77,9 @@ type Config struct {
 	// Parameter used to check if the cluster have GPUs
 	GPUAvailable bool `json:"gpu_available"`
 
+	// Parameter used to check if the cluster have vega nodes
+	InterLinkAvailable bool `json:"interLink_available"`
+
 	// Port used for the ClusterIP k8s service (default: 8080)
 	ServicePort int `json:"-"`
 
@@ -353,4 +356,18 @@ func (cfg *Config) CheckAvailableGPUs(kubeClientset kubernetes.Interface) {
 			return
 		}
 	}
+}
+
+func (cfg *Config) CheckAvailableInterLink(kubeClientset kubernetes.Interface) {
+	nodes, err := kubeClientset.CoreV1().Nodes().List(context.TODO(),
+		metav1.ListOptions{LabelSelector: "!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master,type=virtual-kubelet"})
+	if err != nil {
+		log.Printf("Error getting list of nodes: %v\n", err)
+	}
+	if len(nodes.Items) > 0 {
+		cfg.InterLinkAvailable = true
+	} else {
+		cfg.InterLinkAvailable = false
+	}
+
 }

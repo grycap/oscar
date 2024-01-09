@@ -62,6 +62,9 @@ const (
 	// SupervisorName name of the FaaS Supervisor binary
 	SupervisorName = "supervisor"
 
+	//
+	SupervisorURL = "https://github.com/grycap/faas-supervisor/releases/download/1.5.8/supervisor"
+
 	// ServiceLabel label for deploying services in all backs
 	ServiceLabel = "oscar_service"
 
@@ -232,6 +235,8 @@ type Service struct {
 	// Clusters configuration for the OSCAR clusters that can be used as service's replicas
 	// Optional
 	Clusters map[string]Cluster `json:"clusters,omitempty"`
+
+	EnableInterLink bool `json:"enable_InterLink"`
 }
 
 // ToPodSpec returns a k8s podSpec from the Service
@@ -250,11 +255,6 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 				Env:   ConvertEnvVars(service.Environment.Vars),
 				VolumeMounts: []v1.VolumeMount{
 					{
-						Name:      VolumeName,
-						ReadOnly:  true,
-						MountPath: VolumePath,
-					},
-					{
 						Name:      ConfigVolumeName,
 						ReadOnly:  true,
 						MountPath: ConfigPath,
@@ -265,14 +265,6 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 			},
 		},
 		Volumes: []v1.Volume{
-			{
-				Name: VolumeName,
-				VolumeSource: v1.VolumeSource{
-					PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-						ClaimName: PVCName,
-					},
-				},
-			},
 			{
 				Name: ConfigVolumeName,
 				VolumeSource: v1.VolumeSource{
@@ -285,7 +277,28 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 			},
 		},
 	}
+	if cfg.InterLinkAvailable && service.EnableInterLink {
+		// Add specs of InterLink
+		podSpec.Containers[0].ImagePullPolicy = "Always"
+	} else {
+		// Add specs
+		volumeMount := v1.VolumeMount{
+			Name:      VolumeName,
+			ReadOnly:  true,
+			MountPath: VolumePath,
+		}
+		volume := v1.Volume{
 
+			Name: VolumeName,
+			VolumeSource: v1.VolumeSource{
+				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+					ClaimName: PVCName,
+				},
+			},
+		}
+		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, volumeMount)
+		podSpec.Volumes = append(podSpec.Volumes, volume)
+	}
 	// Add the required environment variables for the watchdog
 	addWatchdogEnvVars(podSpec, cfg, service)
 
@@ -407,6 +420,10 @@ func (service *Service) GetSupervisorPath() string {
 		return fmt.Sprintf("%s/%s/%s", VolumePath, AlpineDirectory, SupervisorName)
 	}
 	return fmt.Sprintf("%s/%s", VolumePath, SupervisorName)
+}
+
+func (service *Service) GetSupervisorURL() string {
+	return SupervisorURL
 }
 
 // HasReplicas checks if the service has replicas defined
