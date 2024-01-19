@@ -85,14 +85,6 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 		return err
 	}
 
-	if service.VO != "" {
-		for _, vo := range k.config.OIDCGroups {
-			if vo == service.VO {
-				service.Labels["vo"] = service.VO
-			}
-		}
-	}
-
 	// Create podSpec from the service
 	podSpec, err := service.ToPodSpec(k.config)
 	if err != nil {

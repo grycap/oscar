@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 
@@ -43,6 +44,9 @@ const (
 
 var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache)")
 
+// Custom logger
+var createLogger = log.New(os.Stdout, "[CREATE] ", log.Flags())
+
 // MakeCreateHandler makes a handler for creating services
 func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -56,19 +60,29 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// Check service values and set defaults
 		checkValues(&service, cfg)
 
+		uid_origin, uid_exists := c.Get("uid_origin")
+		if uid_exists {
+			uid := fmt.Sprintf("%v", uid_origin)
+			createLogger.Println("Creating service for user: ", uid)
+			service.Labels["uid"] = uid
+			service.AllowedUsers = append(service.AllowedUsers, uid)
+		}
+		createLogger.Println("Unknown user origin")
+
 		if service.VO != "" {
-			authHeader := c.GetHeader("Authorization")
-			err := checkVOIdentity(&service, cfg, authHeader)
-			if err != nil {
-				c.String(http.StatusBadRequest, fmt.Sprintf("%v"), err)
+			for _, vo := range cfg.OIDCGroups {
+				if vo == service.VO {
+					authHeader := c.GetHeader("Authorization")
+					err := checkVOIdentity(&service, cfg, authHeader)
+					if err != nil {
+						c.String(http.StatusBadRequest, fmt.Sprintln(err))
+					}
+					break
+				}
 			}
 		}
 
-		uid_origin, _ := c.Get("uid_origin")
-		uid := fmt.Sprintf("%v", uid_origin)
-		service.Labels["uid"] = uid
-		service.AllowedUsers = append(service.AllowedUsers, uid)
-
+		createLogger.Println("Service labels: ", service.Labels)
 		// Create the service
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
