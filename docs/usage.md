@@ -17,7 +17,7 @@ You can follow one of the
 [examples](https://github.com/grycap/oscar/tree/master/examples)
 in order to test the OSCAR framework for specific applications. We recommend
 you to start with the
-[plant classification example](https://github.com/grycap/oscar/tree/master/examples/imagemagick)
+[plant classification example](https://github.com/grycap/oscar/tree/master/examples/plant-classification-sync)
 detailed below.
 
 If you prefer to use the command-line interface rather than the web-based UI,
