@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="../sgx-integration/">
+        <link rel="prev" href="../oidc-auth/">
       
       
-        <link rel="next" href="../license/">
+        <link rel="next" href="../faq/">
       
       
       <link rel="icon" href="../images/logo.png">
@@ -20,7 +20,7 @@
     
     
       
-        <title>Frequently Asked Questions (FAQ) - OSCAR Documentation</title>
+        <title>Integration with SCONE - OSCAR Documentation</title>
       
     
     
@@ -70,7 +70,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#frequently-asked-questions-faq" class="md-skip">
+        <a href="#integration-with-scone" class="md-skip">
           Skip to content
         </a>
       
@@ -105,7 +105,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Frequently Asked Questions (FAQ)
+              Integration with SCONE
             
           </span>
         </div>
@@ -218,19 +218,21 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" checked>
         
           
           <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="0">
@@ -244,7 +246,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_1">
             <span class="md-nav__icon md-icon"></span>
             Third party integrations
@@ -297,10 +299,19 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../sgx-integration/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -309,6 +320,7 @@
   
 
       </a>
+      
     </li>
   
 
@@ -325,30 +337,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Frequently Asked Questions (FAQ)
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -357,35 +349,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      Troubleshooting
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -450,23 +413,6 @@
     
   
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      Troubleshooting
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
 </nav>
                   </div>
                 </div>
@@ -483,49 +429,19 @@
   
 
 
-<h1 id="frequently-asked-questions-faq">Frequently Asked Questions (FAQ)</h1>
-<h2 id="troubleshooting">Troubleshooting</h2>
-<ul>
-<li><strong>Sometimes, when trying to deploy the cluster locally, it tells </strong>me that the :80 port<strong> is already in use.</strong></li>
-</ul>
-<p>You may have a server running on the :80 port, such as Apache, while the deployment is trying to use it for the OSCAR UI. Restarting it would solve this problem.</p>
-<ul>
-<li><strong>I get the following error message: "Unable to communicate with the cluster. Please make sure that the endpoint is well-typed and accessible."</strong></li>
-</ul>
-<p>When using oscar-cli, you can get this error if you try to run a service that is not present on the cluster set as default.
-You can check if you are using the correct default cluster with the following command,</p>
-<p><code>oscar-cli cluster default</code></p>
-<p>and set a new default cluster with the following command:</p>
-<p><code>oscar-cli cluster default -s CLUSTER_ID</code></p>
-<ul>
-<li><strong>How do I use a secret image?</strong></li>
-</ul>
-<p>In case it is required the use of secret images, you should create a <a href="https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#registry-secret-existing-credentials">secret with the docker login configuration</a> with a structure like this:</p>
-<pre><code>apiVersion: v1
-kind: Secret
-metadata:
-  name: dockersecret
-  namespace: oscar-svc
-data:
-  .dockerconfigjson: {base64 .docker/config.json}
-type: kubernetes.io/dockerconfigjson
+<h1 id="integration-with-scone">Integration with SCONE</h1>
+<p>SCONE is a tool that allows confidential computing on the cloud thus protecting the data, code and application secrets on a Kubernetes cluster (More info about SCONE and Kubernetes <a href="https://sconedocs.github.io/k8s_concepts/">here</a>). </p>
+<p>To use SCONE on a Kubernetes cluster Intel SGX has to be enabled on the machines, and for these, the SGX Kubernetes plugin needs to be present on the cluster. Once the plugin is installed you only need to specify the parameter <code>enable_sgx</code> on the FDL of the services that are going to use a secured container image like in the following example.</p>
+<pre><code class="language-yaml">functions:
+  oscar:
+  - oscar-cluster:
+      name: sgx-service
+      memory: 1Gi
+      cpu: '0.6'
+      image: your_image
+      enable_sgx: true
+      script: script.sh
 </code></pre>
-<p>Apply the file through kubectl into the Kubernetes OSCAR cluster to create the secret. To use it in OSCAR services, you must add the secret name (<code>dockersecret</code> in this example) in the definition of the service, using the API or a FDL, under the <code>image_pull_secrets</code> parameter, or through the "Docker secret" field in OSCAR-UI.</p>
-<ul>
-<li><strong>The OSCAR cluster does not have TLS certificates (HTTPS). Why?</strong></li>
-</ul>
-<p>It could happen when an OSCAR cluster is deployed from an IM recipe that does not have certificates or the Let's Encrypt limit has been reached. Only <a href="https://letsencrypt.org/docs/rate-limits/">50 certificates per week can be issued</a>. Those certificates have a <a href="https://letsencrypt.org/2015/11/09/why-90-days.html">90 days expiration lifetime</a>. The certificates issued can be seen at https://crt.sh/?q=im.grycap.net.</p>
-<ul>
-<li><strong>I do not have certificates. I can not see the buckets. What do I have to do?</strong></li>
-</ul>
-<p>If the OSCAR cluster has no certificate OSCAR UI will not show the buckets.</p>
-<p><img alt="no-buckets.png" src="../images/faq/certificates/02.-no-buckets.png" /></p>
-<p>You can fix this by entering in the MinIO endpoint <code>minio.&lt;OSCAR-endpoint&gt;</code>. The browser will block the page because it is unsafe. Once you accept the risk, you will enter the MinIO page. It is not necessary to log in.</p>
-<p><img alt="in-minio.png" src="../images/faq/certificates/05.-in-minio.png" /></p>
-<p>Return to OSCAR UI and, then,  you can see the buckets.
-The buckets will be shown only in the browser you do this process.
-The results may vary depending on the browser. For example, they will show up in Firefox but not in Chrome.</p>
-<p><img alt="got-buckets.png" src="../images/faq/certificates/06.-got-buckets.png" /></p>
 
 
 

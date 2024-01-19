@@ -9,10 +9,6 @@
       
       
       
-        <link rel="prev" href="../deploy-helm/">
-      
-      
-        <link rel="next" href="../usage/">
       
       
       <link rel="icon" href="../images/logo.png">
@@ -20,7 +16,7 @@
     
     
       
-        <title>Deployment on K3s with Ansible - OSCAR Documentation</title>
+        <title>Ansible playbook to deploy K3s and the OSCAR platform - OSCAR Documentation</title>
       
     
     
@@ -105,7 +101,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Deployment on K3s with Ansible
+              Ansible playbook to deploy K3s and the OSCAR platform
             
           </span>
         </div>
@@ -220,391 +216,39 @@
   
   
   
-    <li class="md-nav__item">
-      <a href=".." class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Introduction
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-    
-  
-  
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" >
         
           
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="0">
             
   
   <span class="md-ellipsis">
-    Getting started
+    Third party integrations
   </span>
   
 
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_2">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1">
             <span class="md-nav__icon md-icon"></span>
-            Getting started
+            Third party integrations
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../local-testing/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Local testing
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../deploy-im-dashboard/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Deployment with IM Dashboard
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../deploy-ec3/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Deployment with EC3
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../deploy-helm/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Deployment with Helm
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Deployment on K3s with Ansible
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  <span class="md-ellipsis">
-    Deployment on K3s with Ansible
-  </span>
-  
-
-      </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
-    <span class="md-ellipsis">
-      Requirements
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#usage" class="md-nav__link">
-    <span class="md-ellipsis">
-      Usage
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Usage">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#clone-the-folder" class="md-nav__link">
-    <span class="md-ellipsis">
-      Clone the folder
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ssh-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      SSH configuration
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#configuration-of-the-inventory-file" class="md-nav__link">
-    <span class="md-ellipsis">
-      Configuration of the inventory file
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#setting-up-the-playbook-variables" class="md-nav__link">
-    <span class="md-ellipsis">
-      Setting up the playbook variables
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#installation-of-the-required-ansible-roles" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installation of the required ansible roles
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#running-the-playbook" class="md-nav__link">
-    <span class="md-ellipsis">
-      Running the playbook
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../usage/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Using OSCAR through the web-based UI
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../invoking/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Invoking services
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../fdl/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Functions Definition Language (FDL)
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../fdl-composer/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    FDL Composer
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../oscar-cli/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    OSCAR-CLI
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
   
   
   
@@ -622,9 +266,10 @@
     </li>
   
 
-    
-      
-      
+              
+            
+              
+                
   
   
   
@@ -642,19 +287,20 @@
     </li>
   
 
-    
-      
-      
+              
+            
+              
+                
   
   
   
   
     <li class="md-nav__item">
-      <a href="../api/" class="md-nav__link">
+      <a href="../sgx-integration/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    OpenAPI Specification
+    Integration with SCONE
   </span>
   
 
@@ -662,23 +308,11 @@
     </li>
   
 
-    
+              
+            
+          </ul>
+        </nav>
       
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../minio-bucket-replication/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    MinIO bucket replication
-  </span>
-  
-
-      </a>
     </li>
   
 
