@@ -57,22 +57,17 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		checkValues(&service, cfg)
 
 		if service.VO != "" {
-			oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
-
 			authHeader := c.GetHeader("Authorization")
-			rawToken := strings.TrimPrefix(authHeader, "Bearer ")
-			hasVO, err2 := oidcManager.UserHasVO(rawToken, service.VO)
-
-			if err2 != nil {
-				c.String(http.StatusInternalServerError, err2.Error())
-				return
-			}
-
-			if !hasVO {
-				c.String(http.StatusBadRequest, fmt.Sprintf("This user isn't enrrolled on the vo: %v", service.VO))
-				return
+			err := checkVOIdentity(&service, cfg, authHeader)
+			if err != nil {
+				c.String(http.StatusBadRequest, fmt.Sprintf("%v"), err)
 			}
 		}
+
+		uid_origin, _ := c.Get("uid_origin")
+		uid := fmt.Sprintf("%v", uid_origin)
+		service.Labels["uid"] = uid
+		service.AllowedUsers = append(service.AllowedUsers, uid)
 
 		// Create the service
 		if err := back.CreateService(service); err != nil {
@@ -93,7 +88,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Create buckets/folders based on the Input and Output and enable notifications
-		if err := createBuckets(&service, cfg); err != nil {
+		if err := createBuckets(&service, cfg, service.AllowedUsers); err != nil {
 			if err == errInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {
@@ -140,10 +135,6 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	service.Labels[types.YunikornApplicationIDLabel] = service.Name
 	service.Labels[types.YunikornQueueLabel] = fmt.Sprintf("%s.%s.%s", types.YunikornRootQueue, types.YunikornOscarQueue, service.Name)
 
-	if service.VO != "" {
-		service.Labels["vo"] = service.VO
-	}
-
 	// Create default annotations map
 	if service.Annotations == nil {
 		service.Annotations = make(map[string]string)
@@ -171,7 +162,7 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	service.Token = utils.GenerateToken()
 }
 
-func createBuckets(service *types.Service, cfg *types.Config) error {
+func createBuckets(service *types.Service, cfg *types.Config, allowed_users []string) error {
 	var s3Client *s3.S3
 	var cdmiClient *cdmi.Client
 	var provName, provID string
@@ -233,6 +224,14 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 				return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
 			}
 		}
+
+		// Create group for the service and add users
+		// TODO error control
+
+		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+		minIOAdminClient.CreateServiceGroup(splitPath[0])
+		minIOAdminClient.AddUserToGroup(allowed_users, splitPath[0])
+
 		// Create folder(s)
 		if len(splitPath) == 2 {
 			// Add "/" to the end of the key in order to create a folder
@@ -345,6 +344,24 @@ func isStorageProviderDefined(storageName string, storageID string, providers *t
 		_, ok = providers.WebDav[storageID]
 	}
 	return ok
+}
+
+func checkVOIdentity(service *types.Service, cfg *types.Config, authHeader string) error {
+	oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
+	rawToken := strings.TrimPrefix(authHeader, "Bearer ")
+	hasVO, err := oidcManager.UserHasVO(rawToken, service.VO)
+
+	if err != nil {
+		return err
+	}
+
+	if !hasVO {
+		return fmt.Errorf("This user isn't enrrolled on the vo: %v", service.VO)
+	}
+
+	service.Labels["vo"] = service.VO
+
+	return nil
 }
 
 func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider, cfg *types.Config) error {

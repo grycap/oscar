@@ -18,16 +18,24 @@ package auth
 
 import (
 	"context"
+
+	"crypto/rand"
+	"encoding/base64"
 	"net/http"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/v2/pkg/utils"
 	"golang.org/x/oauth2"
+	"k8s.io/client-go/kubernetes"
 )
 
-// EGIGroupsURNPrefix prefix to identify EGI group URNs
-const EGIGroupsURNPrefix = "urn:mace:egi.eu:group"
+const (
+	// EGIGroupsURNPrefix prefix to identify EGI group URNs
+	EGIGroupsURNPrefix = "urn:mace:egi.eu:group"
+	SecretKeyLength    = 10
+)
 
 // oidcManager struct to represent a OIDC manager, including a cache of tokens
 type oidcManager struct {
@@ -65,13 +73,15 @@ func NewOIDCManager(issuer string, subject string, groups []string) (*oidcManage
 }
 
 // getIODCMiddleware returns the Gin's handler middleware to validate OIDC-based auth
-func getOIDCMiddleware(issuer string, subject string, groups []string) gin.HandlerFunc {
+func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *utils.MinIOAdminClient, issuer string, subject string, groups []string) gin.HandlerFunc {
 	oidcManager, err := NewOIDCManager(issuer, subject, groups)
 	if err != nil {
 		return func(c *gin.Context) {
 			c.AbortWithStatus(http.StatusUnauthorized)
 		}
 	}
+
+	mc := NewMultitenancyConfig(kubeClientset, subject)
 
 	return func(c *gin.Context) {
 		// Get token from headers
@@ -86,6 +96,23 @@ func getOIDCMiddleware(issuer string, subject string, groups []string) gin.Handl
 		if !oidcManager.isAuthorised(rawToken) {
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
+		}
+
+		ui, _ := oidcManager.getUserInfo(rawToken)
+		uid := ui.subject
+
+		// Check if exist MinIO user in cached users list
+		exists := mc.UserExists(uid)
+		if !exists {
+			sk, err := generateRandomKey(SecretKeyLength)
+			if err != nil {
+				//TODO manage errr
+			}
+			// Create MinIO user and k8s secret with credentials
+			mc.CreateSecretForOIDC(uid, sk)
+			minIOAdminClient.CreateMinIOUser(uid, sk)
+
+			c.Set("uid_origin", uid)
 		}
 	}
 }
@@ -193,4 +220,13 @@ func (om *oidcManager) isAuthorised(rawToken string) bool {
 	}
 
 	return false
+}
+
+func generateRandomKey(length int) (string, error) {
+	key := make([]byte, length)
+	_, err := rand.Read(key)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(key), nil
 }

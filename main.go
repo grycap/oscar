@@ -77,7 +77,7 @@ func main() {
 	r := gin.Default()
 
 	// Define system group with basic auth middleware
-	system := r.Group("/system", auth.GetAuthMiddleware(cfg))
+	system := r.Group("/system", auth.GetAuthMiddleware(cfg, kubeClientset))
 
 	// Config path
 	system.GET("/config", handlers.MakeConfigHandler(cfg))

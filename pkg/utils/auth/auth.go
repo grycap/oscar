@@ -21,28 +21,37 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/utils"
+	"k8s.io/client-go/kubernetes"
 )
 
 // GetAuthMiddleware returns the appropriate gin auth middleware
-func GetAuthMiddleware(cfg *types.Config) gin.HandlerFunc {
+func GetAuthMiddleware(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.HandlerFunc {
 	if !cfg.OIDCEnable {
 		return gin.BasicAuth(gin.Accounts{
 			// Use the config's username and password for basic auth
 			cfg.Username: cfg.Password,
 		})
 	}
-	return CustomAuth(cfg)
+	return CustomAuth(cfg, kubeClientset)
 }
 
 // CustomAuth returns a custom auth handler (gin middleware)
-func CustomAuth(cfg *types.Config) gin.HandlerFunc {
+func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.HandlerFunc {
 	basicAuthHandler := gin.BasicAuth(gin.Accounts{
 		// Use the config's username and password for basic auth
 		cfg.Username: cfg.Password,
 	})
 
-	oidcHandler := getOIDCMiddleware(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
+	//TODO Initialize MinIO client and create all_users_group
+	minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
+	if err != nil {
+		// TODO manage error
+	}
 
+	minIOAdminClient.CreateAllUsersGroup()
+
+	oidcHandler := getOIDCMiddleware(kubeClientset, minIOAdminClient, cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {

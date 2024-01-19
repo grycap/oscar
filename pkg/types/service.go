@@ -240,6 +240,10 @@ type Service struct {
 	// Clusters configuration for the OSCAR clusters that can be used as service's replicas
 	// Optional
 	Clusters map[string]Cluster `json:"clusters,omitempty"`
+
+	// List of EGI UID's identifying the users that will have visibility of the service and its MinIO storage provider
+	// Optional (If the list is empty we asume the visibility is public for all cluster users)
+	AllowedUsers []string `json:"allowed_users"`
 }
 
 // ToPodSpec returns a k8s podSpec from the Service

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
+// TODO comprobar VO como en createService
 // MakeUpdateHandler makes a handler for updating services
 func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -53,6 +54,14 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
+		if newService.VO != "" && newService.VO != oldService.VO {
+			authHeader := c.GetHeader("Authorization")
+			err := checkVOIdentity(&newService, cfg, authHeader)
+			if err != nil {
+				c.String(http.StatusBadRequest, fmt.Sprintf("%v"), err)
+			}
+		}
+
 		// Update the service
 		if err := back.UpdateService(newService); err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
@@ -68,6 +77,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				provName = strings.ToLower(provSlice[0])
 			}
 			if provName == types.MinIOName {
+
 				// Register minio webhook and restart the server
 				if err := registerMinIOWebhook(newService.Name, newService.Token, newService.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
 					back.UpdateService(*oldService)
@@ -107,5 +117,6 @@ func updateBuckets(newService, oldService *types.Service, cfg *types.Config) err
 	}
 
 	// Create the input and output buckets/folders from newService
-	return createBuckets(newService, cfg)
+	// TODO fix
+	return createBuckets(newService, cfg, newService.AllowedUsers)
 }
