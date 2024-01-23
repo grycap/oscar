@@ -234,8 +234,14 @@ func createBuckets(service *types.Service, cfg *types.Config, allowed_users []st
 		// TODO error control
 
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-		minIOAdminClient.CreateServiceGroup(splitPath[0])
-		minIOAdminClient.AddUserToGroup(allowed_users, splitPath[0])
+		err = minIOAdminClient.CreateServiceGroup(splitPath[0])
+		if err != nil {
+			return fmt.Errorf("error creating service group for bucket %s: %v", splitPath[0], err)
+		}
+		err = minIOAdminClient.AddUserToGroup(allowed_users, splitPath[0])
+		if err != nil {
+			return err
+		}
 
 		// Create folder(s)
 		if len(splitPath) == 2 {

@@ -18,6 +18,8 @@ package auth
 
 import (
 	"context"
+	"log"
+	"os"
 
 	"crypto/rand"
 	"encoding/base64"
@@ -36,6 +38,8 @@ const (
 	EGIGroupsURNPrefix = "urn:mace:egi.eu:group"
 	SecretKeyLength    = 10
 )
+
+var oidcLogger = log.New(os.Stdout, "[OIDC-AUTH] ", log.Flags())
 
 // oidcManager struct to represent a OIDC manager, including a cache of tokens
 type oidcManager struct {
@@ -100,6 +104,7 @@ func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *ut
 
 		ui, _ := oidcManager.getUserInfo(rawToken)
 		uid := ui.subject
+		oidcLogger.Println("Request user: ", uid)
 
 		// Check if exist MinIO user in cached users list
 		exists := mc.UserExists(uid)
@@ -180,6 +185,7 @@ func (om *oidcManager) UserHasVO(rawToken string, vo string) (bool, error) {
 
 func (om *oidcManager) GetUID(rawToken string) (string, error) {
 	ui, err := om.getUserInfo(rawToken)
+	oidcLogger.Println("received uid: ", ui.subject)
 	if err != nil {
 		return ui.subject, nil
 	}

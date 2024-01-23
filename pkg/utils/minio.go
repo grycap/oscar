@@ -103,11 +103,18 @@ func (minIOAdminClient *MinIOAdminClient) CreateAllUsersGroup() {
 	}
 }
 
-func (minIOAdminClient *MinIOAdminClient) CreateServiceGroup(bucketName string) {
+func (minIOAdminClient *MinIOAdminClient) CreateServiceGroup(bucketName string) error {
 	err := createGroup(minIOAdminClient.adminClient, bucketName)
 	if err != nil {
-		//TODO manage error
+		return err
 	}
+
+	err = createPolicy(minIOAdminClient.adminClient, bucketName)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (minIOAdminClient *MinIOAdminClient) AddUserToGroup(users []string, groupName string) error {
@@ -185,9 +192,9 @@ func createPolicy(adminClient *madmin.AdminClient, groupName string) error {
 		return fmt.Errorf("error creating MinIO policy for group %s: %v", groupName, err)
 	}
 
-	err2 := adminClient.SetPolicy(context.TODO(), groupName, groupName, true)
-	if err2 != nil {
-		return fmt.Errorf("error setting MinIO policy for group %s: %v", groupName, err2)
+	err = adminClient.SetPolicy(context.TODO(), groupName, groupName, true)
+	if err != nil {
+		return fmt.Errorf("error setting MinIO policy for group %s: %v", groupName, err)
 	}
 	return nil
 }
