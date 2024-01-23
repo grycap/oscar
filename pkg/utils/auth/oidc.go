@@ -111,8 +111,6 @@ func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *ut
 			// Create MinIO user and k8s secret with credentials
 			mc.CreateSecretForOIDC(uid, sk)
 			minIOAdminClient.CreateMinIOUser(uid, sk)
-
-			c.Set("uid_origin", uid)
 		}
 	}
 }
@@ -178,6 +176,14 @@ func (om *oidcManager) UserHasVO(rawToken string, vo string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func (om *oidcManager) GetUID(rawToken string) (string, error) {
+	ui, err := om.getUserInfo(rawToken)
+	if err != nil {
+		return ui.subject, nil
+	}
+	return "", err
 }
 
 // isAuthorised checks if a token is authorised to access the API

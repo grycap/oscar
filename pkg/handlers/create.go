@@ -60,20 +60,11 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// Check service values and set defaults
 		checkValues(&service, cfg)
 
-		uid_origin, uid_exists := c.Get("uid_origin")
-		if uid_exists {
-			uid := fmt.Sprintf("%v", uid_origin)
-			createLogger.Println("Creating service for user: ", uid)
-			service.Labels["uid"] = uid
-			service.AllowedUsers = append(service.AllowedUsers, uid)
-		}
-		createLogger.Println("Unknown user origin")
-
 		if service.VO != "" {
 			for _, vo := range cfg.OIDCGroups {
 				if vo == service.VO {
 					authHeader := c.GetHeader("Authorization")
-					err := checkVOIdentity(&service, cfg, authHeader)
+					err := checkIdentity(&service, cfg, authHeader)
 					if err != nil {
 						c.String(http.StatusBadRequest, fmt.Sprintln(err))
 					}
@@ -360,9 +351,16 @@ func isStorageProviderDefined(storageName string, storageID string, providers *t
 	return ok
 }
 
-func checkVOIdentity(service *types.Service, cfg *types.Config, authHeader string) error {
+func checkIdentity(service *types.Service, cfg *types.Config, authHeader string) error {
 	oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
 	rawToken := strings.TrimPrefix(authHeader, "Bearer ")
+	uid, err := oidcManager.GetUID(rawToken)
+
+	if err != nil {
+		createLogger.Println("Unknown user origin")
+		return err
+	}
+
 	hasVO, err := oidcManager.UserHasVO(rawToken, service.VO)
 
 	if err != nil {
@@ -374,6 +372,9 @@ func checkVOIdentity(service *types.Service, cfg *types.Config, authHeader strin
 	}
 
 	service.Labels["vo"] = service.VO
+	service.Labels["uid"] = uid
+	service.AllowedUsers = append(service.AllowedUsers, uid)
+	createLogger.Println("Creating service for user: ", uid)
 
 	return nil
 }
