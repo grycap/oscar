@@ -41,24 +41,15 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		mcUntyped, mcExists := c.Get("mc")
-		uidOrigin, uidExists := c.Get("uid_origin")
 
 		if !mcExists {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Missing multitenancy config"))
 		}
-		if !uidExists {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Missing EGI user uid"))
-		}
 
 		mc, mcParsed := mcUntyped.(*auth.MultitenancyConfig)
-		uid, uidParsed := uidOrigin.(string)
 
 		if !mcParsed {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing multitenancy config: %v", mcParsed))
-		}
-
-		if !uidParsed {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing uid origin: %v", uidParsed))
 		}
 
 		// Check if users in allowed_users have a MinIO associated user
