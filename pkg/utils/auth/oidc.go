@@ -120,11 +120,11 @@ func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *ut
 			if err != nil {
 				oidcLogger.Println("Error creating MinIO user: ", uid)
 			}
-			oidcLogger.Printf("User %s already exists", uid)
-			c.Set("multitenancyConfig", &mc)
-			c.Set("uidOrigin", &uid)
-			c.Next()
 		}
+		oidcLogger.Printf("User %s already exists", uid)
+		c.Set("multitenancyConfig", &mc)
+		c.Set("uidOrigin", &uid)
+		c.Next()
 	}
 }
 

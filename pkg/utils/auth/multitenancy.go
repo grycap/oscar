@@ -38,7 +38,7 @@ func NewMultitenancyConfig(kubeClientset *kubernetes.Clientset, uid string) *Mul
 	return &MultitenancyConfig{
 		kubeClientset: kubeClientset,
 		owner_uid:     uid,
-		usersCache:    []string{uid},
+		usersCache:    []string{},
 	}
 }
 
