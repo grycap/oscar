@@ -92,7 +92,6 @@ func (mc *MultitenancyConfig) CreateSecretForOIDC(uid string, sk string) error {
 			Name:      uid,
 			Namespace: ServicesNamespace,
 		},
-		Immutable: new(bool),
 		StringData: map[string]string{
 			"oidc_uid":  uid,
 			"accessKey": uid,

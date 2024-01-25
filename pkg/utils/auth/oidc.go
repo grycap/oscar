@@ -18,6 +18,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
@@ -114,11 +115,11 @@ func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *ut
 			// Create MinIO user and k8s secret with credentials
 			err = mc.CreateSecretForOIDC(uid, sk)
 			if err != nil {
-				oidcLogger.Println("Error creating secret for user: ", uid)
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating secret for user %s: %v", uid, err))
 			}
 			err = minIOAdminClient.CreateMinIOUser(uid, sk)
 			if err != nil {
-				oidcLogger.Println("Error creating MinIO user: ", uid)
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO user for uid %s: %v", uid, err))
 			}
 		}
 		oidcLogger.Printf("User %s already exists", uid)

@@ -88,7 +88,7 @@ func (minIOAdminClient *MinIOAdminClient) CreateMinIOUser(ak string, sk string) 
 		return fmt.Errorf("error creating MinIO user: %v", err)
 	}
 
-	users[0] = ak
+	users = append(users, ak)
 	err2 := minIOAdminClient.AddUserToGroup(users, ALL_USERS_GROUP)
 	if err2 != nil {
 		return err2
