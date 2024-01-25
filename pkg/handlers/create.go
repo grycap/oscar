@@ -52,6 +52,27 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 	return func(c *gin.Context) {
 		var service types.Service
 
+		mcUntyped, mcExists := c.Get("mc")
+		uidOrigin, uidExists := c.Get("uid_origin")
+
+		if !mcExists {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Missing multitenancy config"))
+		}
+		if !uidExists {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Missing EGI user uid"))
+		}
+
+		mc, mcParsed := mcUntyped.(*auth.MultitenancyConfig)
+		uid, uidParsed := uidOrigin.(string)
+
+		if !mcParsed {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing multitenancy config: %v", mcParsed))
+		}
+
+		if !uidParsed {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing uid origin: %v", uidParsed))
+		}
+
 		if err := c.ShouldBindJSON(&service); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
@@ -60,6 +81,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// Check service values and set defaults
 		checkValues(&service, cfg)
 
+		// Check if the service VO is present on the cluster VO's and if the user creating the service is enrrolled in such
 		if service.VO != "" {
 			for _, vo := range cfg.OIDCGroups {
 				if vo == service.VO {
@@ -68,8 +90,22 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					if err != nil {
 						c.String(http.StatusBadRequest, fmt.Sprintln(err))
 					}
+					service.Labels["uid"] = uid
+					service.AllowedUsers = append(service.AllowedUsers, uid)
+					createLogger.Println("Creating service for user: ", uid)
 					break
 				}
+			}
+		}
+
+		// Check if users in allowed_users have a MinIO associated user
+		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+		uids := mc.CheckUsersInCache(service.AllowedUsers)
+		if len(uids) == 0 {
+			for _, uid := range uids {
+				sk, _ := auth.GenerateRandomKey(8)
+				minIOAdminClient.CreateMinIOUser(uid, sk)
+				mc.CreateSecretForOIDC(uid, sk)
 			}
 		}
 
@@ -93,7 +129,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Create buckets/folders based on the Input and Output and enable notifications
-		if err := createBuckets(&service, cfg, service.AllowedUsers); err != nil {
+		if err := createBuckets(&service, cfg, minIOAdminClient, service.AllowedUsers); err != nil {
 			if err == errInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {
@@ -167,7 +203,7 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	service.Token = utils.GenerateToken()
 }
 
-func createBuckets(service *types.Service, cfg *types.Config, allowed_users []string) error {
+func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient, allowed_users []string) error {
 	var s3Client *s3.S3
 	var cdmiClient *cdmi.Client
 	var provName, provID string
@@ -232,8 +268,6 @@ func createBuckets(service *types.Service, cfg *types.Config, allowed_users []st
 
 		// Create group for the service and add users
 		// TODO error control
-
-		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 		err = minIOAdminClient.CreateServiceGroup(splitPath[0])
 		if err != nil {
 			return fmt.Errorf("error creating service group for bucket %s: %v", splitPath[0], err)
@@ -360,12 +394,6 @@ func isStorageProviderDefined(storageName string, storageID string, providers *t
 func checkIdentity(service *types.Service, cfg *types.Config, authHeader string) error {
 	oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
 	rawToken := strings.TrimPrefix(authHeader, "Bearer ")
-	uid, err := oidcManager.GetUID(rawToken)
-
-	if err != nil {
-		createLogger.Println("Unknown user origin")
-		return err
-	}
 
 	hasVO, err := oidcManager.UserHasVO(rawToken, service.VO)
 
@@ -378,9 +406,6 @@ func checkIdentity(service *types.Service, cfg *types.Config, authHeader string)
 	}
 
 	service.Labels["vo"] = service.VO
-	service.Labels["uid"] = uid
-	service.AllowedUsers = append(service.AllowedUsers, uid)
-	createLogger.Println("Creating service for user: ", uid)
 
 	return nil
 }

@@ -18,6 +18,8 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,14 +28,14 @@ import (
 
 const ServicesNamespace = "oscar-svc"
 
-type multitenancyConfig struct {
+type MultitenancyConfig struct {
 	kubeClientset *kubernetes.Clientset
 	owner_uid     string
 	usersCache    []string
 }
 
-func NewMultitenancyConfig(kubeClientset *kubernetes.Clientset, uid string) *multitenancyConfig {
-	return &multitenancyConfig{
+func NewMultitenancyConfig(kubeClientset *kubernetes.Clientset, uid string) *MultitenancyConfig {
+	return &MultitenancyConfig{
 		kubeClientset: kubeClientset,
 		owner_uid:     uid,
 		usersCache:    []string{uid},
@@ -41,22 +43,22 @@ func NewMultitenancyConfig(kubeClientset *kubernetes.Clientset, uid string) *mul
 }
 
 // TODO periodically check that the users stored on cache still exist on MinIO (cronjob)
-func (mc *multitenancyConfig) UpdateCacheStatus() {
+func (mc *MultitenancyConfig) UpdateCacheStatus() {
 	// 1. List users on MinIO
 	// 2. List secrets
 	// 3. Compare both lists and delete from secrets the missmatchs
 	// 4. updateCache
 }
 
-func (mc *multitenancyConfig) UpdateCache(uid string) {
+func (mc *MultitenancyConfig) UpdateCache(uid string) {
 	mc.usersCache = append(mc.usersCache, uid)
 }
 
-func (mc *multitenancyConfig) ClearCache() {
+func (mc *MultitenancyConfig) ClearCache() {
 	mc.usersCache = nil
 }
 
-func (mc *multitenancyConfig) UserExists(uid string) bool {
+func (mc *MultitenancyConfig) UserExists(uid string) bool {
 	for _, id := range mc.usersCache {
 		if id == uid {
 			return true
@@ -65,7 +67,25 @@ func (mc *multitenancyConfig) UserExists(uid string) bool {
 	return false
 }
 
-func (mc *multitenancyConfig) CreateSecretForOIDC(uid string, sk string) error {
+func (mc *MultitenancyConfig) CheckUsersInCache(uids []string) []string {
+	var notFoundUsers []string
+	var found bool
+	for _, uid := range uids {
+		found = false
+		for _, cacheUID := range mc.usersCache {
+			if uid == cacheUID {
+				found = true
+				break
+			}
+		}
+		if found == false {
+			notFoundUsers = append(notFoundUsers, uid)
+		}
+	}
+	return notFoundUsers
+}
+
+func (mc *MultitenancyConfig) CreateSecretForOIDC(uid string, sk string) error {
 
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -89,4 +109,13 @@ func (mc *multitenancyConfig) CreateSecretForOIDC(uid string, sk string) error {
 	mc.UpdateCache(uid)
 
 	return nil
+}
+
+func GenerateRandomKey(length int) (string, error) {
+	key := make([]byte, length)
+	_, err := rand.Read(key)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(key), nil
 }

@@ -21,8 +21,6 @@ import (
 	"log"
 	"os"
 
-	"crypto/rand"
-	"encoding/base64"
 	"net/http"
 	"strings"
 
@@ -109,13 +107,23 @@ func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *ut
 		// Check if exist MinIO user in cached users list
 		exists := mc.UserExists(uid)
 		if !exists {
-			sk, err := generateRandomKey(SecretKeyLength)
+			sk, err := GenerateRandomKey(SecretKeyLength)
 			if err != nil {
-				//TODO manage errr
+				oidcLogger.Println("Error generating random key for MinIO user")
 			}
 			// Create MinIO user and k8s secret with credentials
-			mc.CreateSecretForOIDC(uid, sk)
-			minIOAdminClient.CreateMinIOUser(uid, sk)
+			err = mc.CreateSecretForOIDC(uid, sk)
+			if err != nil {
+				oidcLogger.Println("Error creating secret for user: ", uid)
+			}
+			err = minIOAdminClient.CreateMinIOUser(uid, sk)
+			if err != nil {
+				oidcLogger.Println("Error creating MinIO user: ", uid)
+			}
+			oidcLogger.Printf("User %s already exists", uid)
+			c.Set("multitenancyConfig", &mc)
+			c.Set("uidOrigin", &uid)
+			c.Next()
 		}
 	}
 }
@@ -170,6 +178,7 @@ func getGroups(urns []string) []string {
 	return groups
 }
 
+// UserHasVO checks if the user contained on the request token is enrolled on a specific VO
 func (om *oidcManager) UserHasVO(rawToken string, vo string) (bool, error) {
 	ui, err := om.getUserInfo(rawToken)
 	if err != nil {
@@ -232,13 +241,4 @@ func (om *oidcManager) isAuthorised(rawToken string) bool {
 	}
 
 	return false
-}
-
-func generateRandomKey(length int) (string, error) {
-	key := make([]byte, length)
-	_, err := rand.Read(key)
-	if err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(key), nil
 }
