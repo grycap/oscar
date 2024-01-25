@@ -25,6 +25,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v2/pkg/types"
 	"github.com/grycap/oscar/v2/pkg/utils"
+	"github.com/grycap/oscar/v2/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -37,6 +38,38 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		if err := c.ShouldBindJSON(&newService); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
+		}
+
+		mcUntyped, mcExists := c.Get("mc")
+		uidOrigin, uidExists := c.Get("uid_origin")
+
+		if !mcExists {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Missing multitenancy config"))
+		}
+		if !uidExists {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Missing EGI user uid"))
+		}
+
+		mc, mcParsed := mcUntyped.(*auth.MultitenancyConfig)
+		uid, uidParsed := uidOrigin.(string)
+
+		if !mcParsed {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing multitenancy config: %v", mcParsed))
+		}
+
+		if !uidParsed {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing uid origin: %v", uidParsed))
+		}
+
+		// Check if users in allowed_users have a MinIO associated user
+		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+		uids := mc.CheckUsersInCache(newService.AllowedUsers)
+		if len(uids) == 0 {
+			for _, uid := range uids {
+				sk, _ := auth.GenerateRandomKey(8)
+				minIOAdminClient.CreateMinIOUser(uid, sk)
+				mc.CreateSecretForOIDC(uid, sk)
+			}
 		}
 
 		// Check service values and set defaults
@@ -91,7 +124,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 
 				// Update buckets
-				if err := updateBuckets(&newService, oldService, cfg); err != nil {
+				if err := updateBuckets(&newService, oldService, minIOAdminClient, cfg); err != nil {
 					if err == errInput {
 						c.String(http.StatusBadRequest, err.Error())
 					} else {
@@ -115,7 +148,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 	}
 }
 
-func updateBuckets(newService, oldService *types.Service, cfg *types.Config) error {
+func updateBuckets(newService, oldService *types.Service, minIOAdminClient *utils.MinIOAdminClient, cfg *types.Config) error {
 	// Disable notifications from oldService.Input
 	if err := disableInputNotifications(oldService.GetMinIOWebhookARN(), oldService.Input, oldService.StorageProviders.MinIO[types.DefaultProvider]); err != nil {
 		return fmt.Errorf("error disabling MinIO input notifications: %v", err)
@@ -123,5 +156,5 @@ func updateBuckets(newService, oldService *types.Service, cfg *types.Config) err
 
 	// Create the input and output buckets/folders from newService
 	// TODO fix
-	return createBuckets(newService, cfg, newService.AllowedUsers)
+	return createBuckets(newService, cfg, minIOAdminClient, newService.AllowedUsers)
 }
