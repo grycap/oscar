@@ -62,14 +62,14 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusInternalServerError, fmt.Sprintln("Missing EGI user uid"))
 		}
 
-		mc, mcParsed := mcUntyped.(*auth.MultitenancyConfig)
+		mc, mcParsed := mcUntyped.(auth.MultitenancyConfig)
 		uid, uidParsed := uidOrigin.(string)
 
 		if !mcParsed {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing multitenancy config: %v", mcParsed))
 		}
 
-		createLogger.Println("Multitenancy config: ", &mc)
+		createLogger.Println("Multitenancy config: ", mc)
 
 		if !uidParsed {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing uid origin: %v", uidParsed))
