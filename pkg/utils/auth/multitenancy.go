@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"regexp"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,9 +88,13 @@ func (mc *MultitenancyConfig) CheckUsersInCache(uids []string) []string {
 
 func (mc *MultitenancyConfig) CreateSecretForOIDC(uid string, sk string) error {
 
+	uidr, _ := regexp.Compile("[0-9a-z]+@")
+	idx := uidr.FindStringIndex(uid)
+	secret_name := uid[0 : idx[1]-1]
+
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      uid,
+			Name:      secret_name,
 			Namespace: ServicesNamespace,
 		},
 		StringData: map[string]string{
