@@ -52,8 +52,8 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 	return func(c *gin.Context) {
 		var service types.Service
 
-		mcUntyped, mcExists := c.Get("mc")
 		uidOrigin, uidExists := c.Get("uid_origin")
+		mcUntyped, mcExists := c.Get("mc")
 
 		if !mcExists {
 			c.String(http.StatusInternalServerError, fmt.Sprintln("Missing multitenancy config"))
@@ -62,7 +62,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusInternalServerError, fmt.Sprintln("Missing EGI user uid"))
 		}
 
-		mc, mcParsed := mcUntyped.(*auth.MultitenancyConfig)
+		mc, mcParsed := mcUntyped.(auth.MultitenancyConfig)
 		uid, uidParsed := uidOrigin.(string)
 
 		if !mcParsed {
