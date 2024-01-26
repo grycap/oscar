@@ -60,9 +60,19 @@ func (mc *MultitenancyConfig) ClearCache() {
 }
 
 func (mc *MultitenancyConfig) UserExists(uid string) bool {
-	for _, id := range mc.usersCache {
-		if id == uid {
-			return true
+	if len(mc.usersCache) < 1 {
+		// If the cache is empty check if a secret for the uid exists
+		secret_name := FormatUID(uid)
+		_, err := mc.kubeClientset.CoreV1().Secrets(ServicesNamespace).Get(context.TODO(), secret_name, metav1.GetOptions{})
+		if err != nil {
+			return false
+		}
+		return true
+	} else {
+		for _, id := range mc.usersCache {
+			if id == uid {
+				return true
+			}
 		}
 	}
 	return false
@@ -88,13 +98,9 @@ func (mc *MultitenancyConfig) CheckUsersInCache(uids []string) []string {
 
 func (mc *MultitenancyConfig) CreateSecretForOIDC(uid string, sk string) error {
 
-	uidr, _ := regexp.Compile("[0-9a-z]+@")
-	idx := uidr.FindStringIndex(uid)
-	secret_name := uid[0 : idx[1]-1]
-
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      secret_name,
+			Name:      FormatUID(uid),
 			Namespace: ServicesNamespace,
 		},
 		StringData: map[string]string{
@@ -122,4 +128,10 @@ func GenerateRandomKey(length int) (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(key), nil
+}
+
+func FormatUID(uid string) string {
+	uidr, _ := regexp.Compile("[0-9a-z]+@")
+	idx := uidr.FindStringIndex(uid)
+	return uid[0 : idx[1]-1]
 }

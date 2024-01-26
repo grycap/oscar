@@ -124,7 +124,7 @@ func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *ut
 		}
 		oidcLogger.Printf("User %s already exists", uid)
 		c.Set("uidOrigin", uid)
-		c.Set("multitenancyConfig", mc)
+		c.Set("multitenancyConfig", &mc)
 		c.Next()
 	}
 }
