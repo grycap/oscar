@@ -52,7 +52,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 	return func(c *gin.Context) {
 		var service types.Service
 
-		uidOrigin, uidExists := c.Get("uid_origin")
+		uidOrigin, uidExists := c.Get("uidOrigin")
 		mcUntyped, mcExists := c.Get("mc")
 
 		if !mcExists {
