@@ -40,13 +40,13 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
-		mcUntyped, mcExists := c.Get("mc")
+		mcUntyped, mcExists := c.Get("multitenancyConfig")
 
 		if !mcExists {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Missing multitenancy config"))
+			c.String(http.StatusInternalServerError, fmt.Sprintln("Missing multitenancy config"))
 		}
 
-		mc, mcParsed := mcUntyped.(*auth.MultitenancyConfig)
+		mc, mcParsed := mcUntyped.(auth.MultitenancyConfig)
 
 		if !mcParsed {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing multitenancy config: %v", mcParsed))

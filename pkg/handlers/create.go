@@ -53,7 +53,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		var service types.Service
 
 		uidOrigin, uidExists := c.Get("uidOrigin")
-		mcUntyped, mcExists := c.Get("mc")
+		mcUntyped, mcExists := c.Get("multitenancyConfig")
 
 		if !mcExists {
 			c.String(http.StatusInternalServerError, fmt.Sprintln("Missing multitenancy config"))
