@@ -8,6 +8,10 @@ nav:
   - Deployment with EC3: deploy-ec3.md
   - Deployment with Helm: deploy-helm.md
   - Deployment on K3s with Ansible: deploy-ansible.md
+- Third party integrations:
+  - Integration with EGI: egi-integration.md
+  - OIDC Authorization: oidc-auth.md
+  - Integration with SCONE: sgx-integration.md
 - usage.md
 - invoking.md
 - Functions Definition Language (FDL): fdl.md
@@ -15,11 +19,6 @@ nav:
 - oscar-cli.md
 - OpenAPI Specification: api.md
 - MinIO bucket replication: minio-bucket-replication.md
-nav:
-- Third party integrations:
-  - Integration with EGI: egi-integration.md
-  - OIDC Authorization: oidc-auth.md
-  - Integration with SCONE: sgx-integration.md
 - Frequently Asked Questions (FAQ): faq.md
 - license.md
 - about.md
