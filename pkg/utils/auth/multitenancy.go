@@ -28,6 +28,7 @@ import (
 )
 
 const ServicesNamespace = "oscar-svc"
+const ServiceLabelLength = 8
 
 type MultitenancyConfig struct {
 	kubeClientset *kubernetes.Clientset

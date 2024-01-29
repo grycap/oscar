@@ -82,7 +82,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Check service values and set defaults
 		checkValues(&service, cfg)
-
+		full_uid := auth.FormatUID(uid)
 		// Check if the service VO is present on the cluster VO's and if the user creating the service is enrrolled in such
 		if service.VO != "" {
 			for _, vo := range cfg.OIDCGroups {
@@ -92,7 +92,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					if err != nil {
 						c.String(http.StatusBadRequest, fmt.Sprintln(err))
 					}
-					service.Labels["uid"] = auth.FormatUID(uid)
+					service.Labels["uid"] = full_uid[0:8]
 					service.AllowedUsers = append(service.AllowedUsers, uid)
 					createLogger.Println("Creating service for user: ", uid)
 					break
