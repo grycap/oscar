@@ -105,7 +105,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// Check if users in allowed_users have a MinIO associated user
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 		uids := mc.CheckUsersInCache(service.AllowedUsers)
-		if len(uids) == 0 {
+		if len(uids) > 0 {
 			for _, uid := range uids {
 				sk, _ := auth.GenerateRandomKey(8)
 				minIOAdminClient.CreateMinIOUser(uid, sk)
