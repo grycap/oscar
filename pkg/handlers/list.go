@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -32,6 +33,28 @@ func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, services)
+		uidOrigin, uidExists := c.Get("uidOrigin")
+		if !uidExists {
+			c.String(http.StatusInternalServerError, fmt.Sprintln("Missing EGI user uid"))
+		}
+
+		uid, uidParsed := uidOrigin.(string)
+
+		if !uidParsed {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing uid origin: %v", uidParsed))
+			return
+		}
+
+		var allowedServicesForUser []*types.Service
+		for _, service := range services {
+			for _, id := range service.AllowedUsers {
+				if uid == id {
+					allowedServicesForUser = append(allowedServicesForUser, service)
+					break
+				}
+			}
+		}
+
+		c.JSON(http.StatusOK, allowedServicesForUser)
 	}
 }
