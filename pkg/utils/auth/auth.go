@@ -49,8 +49,7 @@ func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.Hand
 	}
 
 	// Slice to add default user to all users group on MinIO
-	var oscarUser []string
-	oscarUser[0] = "console"
+	var oscarUser = []string{"console"}
 
 	minIOAdminClient.CreateAllUsersGroup()
 	minIOAdminClient.AddUserToGroup(oscarUser, "all_users_group")
