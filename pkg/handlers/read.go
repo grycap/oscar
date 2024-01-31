@@ -42,7 +42,7 @@ func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 			}
 			return
 		}
-		if len(strings.Split(authHeader, "Bearer")) > 0 {
+		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			uidOrigin, uidExists := c.Get("uidOrigin")
 			if !uidExists {
 				c.String(http.StatusInternalServerError, fmt.Sprintln("Missing EGI user uid"))

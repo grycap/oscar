@@ -53,7 +53,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 	return func(c *gin.Context) {
 		var service types.Service
 		authHeader := c.GetHeader("Authorization")
-		if len(strings.Split(authHeader, "Bearer")) > 0 {
+		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
 		}
 
