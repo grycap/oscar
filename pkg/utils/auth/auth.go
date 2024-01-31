@@ -43,13 +43,17 @@ func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.Hand
 		cfg.Username: cfg.Password,
 	})
 
-	//TODO Initialize MinIO client and create all_users_group
 	minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
 	if err != nil {
 		// TODO manage error
 	}
 
+	// Slice to add default user to all users group on MinIO
+	var oscarUser []string
+	oscarUser[0] = "console"
+
 	minIOAdminClient.CreateAllUsersGroup()
+	minIOAdminClient.AddUserToGroup(oscarUser, "all_users_group")
 
 	oidcHandler := getOIDCMiddleware(kubeClientset, minIOAdminClient, cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
 	return func(c *gin.Context) {

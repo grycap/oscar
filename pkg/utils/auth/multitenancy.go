@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"regexp"
 
 	v1 "k8s.io/api/core/v1"
@@ -57,6 +58,7 @@ func (mc *MultitenancyConfig) UpdateCache(uid string) {
 }
 
 func (mc *MultitenancyConfig) ClearCache() {
+	// TODO delete associated secrets
 	mc.usersCache = nil
 }
 
@@ -120,6 +122,23 @@ func (mc *MultitenancyConfig) CreateSecretForOIDC(uid string, sk string) error {
 	mc.UpdateCache(uid)
 
 	return nil
+}
+
+func (mc *MultitenancyConfig) GetUserCredentials(uid string) (string, string, error) {
+	secretName := FormatUID((uid))
+	secret, err := mc.kubeClientset.CoreV1().Secrets(ServicesNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	if err != nil {
+		return "", "", err
+	}
+
+	encodedData := secret.Data
+	access_key := string(encodedData["accessKey"])
+	secret_key := string(encodedData["secretKey"])
+
+	if access_key != "" && secret_key != "" {
+		return access_key, secret_key, nil
+	}
+	return "", "", fmt.Errorf("Error decoding secret data")
 }
 
 func GenerateRandomKey(length int) (string, error) {

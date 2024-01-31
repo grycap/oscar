@@ -46,70 +46,90 @@ var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache
 
 // Custom logger
 var createLogger = log.New(os.Stdout, "[CREATE] ", log.Flags())
+var isAdminUser = false
 
 // MakeCreateHandler makes a handler for creating services
 func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var service types.Service
-
-		uidOrigin, uidExists := c.Get("uidOrigin")
-		mcUntyped, mcExists := c.Get("multitenancyConfig")
-
-		if !mcExists {
-			c.String(http.StatusInternalServerError, fmt.Sprintln("Missing multitenancy config"))
-		}
-		if !uidExists {
-			c.String(http.StatusInternalServerError, fmt.Sprintln("Missing EGI user uid"))
-		}
-
-		mc, mcParsed := mcUntyped.(*auth.MultitenancyConfig)
-		uid, uidParsed := uidOrigin.(string)
-
-		if !mcParsed {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing multitenancy config: %v", mcParsed))
-			return
-		}
-
-		createLogger.Println("Multitenancy config: ", mc)
-
-		if !uidParsed {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing uid origin: %v", uidParsed))
-			return
-		}
-
-		if err := c.ShouldBindJSON(&service); err != nil {
-			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
-			return
+		authHeader := c.GetHeader("Authorization")
+		if len(strings.Split(authHeader, "Bearer")) > 0 {
+			isAdminUser = true
 		}
 
 		// Check service values and set defaults
 		checkValues(&service, cfg)
-		full_uid := auth.FormatUID(uid)
-		// Check if the service VO is present on the cluster VO's and if the user creating the service is enrrolled in such
-		if service.VO != "" {
-			for _, vo := range cfg.OIDCGroups {
-				if vo == service.VO {
-					authHeader := c.GetHeader("Authorization")
-					err := checkIdentity(&service, cfg, authHeader)
-					if err != nil {
-						c.String(http.StatusBadRequest, fmt.Sprintln(err))
-					}
-					service.Labels["uid"] = full_uid[0:8]
-					service.AllowedUsers = append(service.AllowedUsers, uid)
-					createLogger.Println("Creating service for user: ", uid)
-					break
-				}
-			}
-		}
 
+		///////////////////////////////////
+		////////////// here ///////////////
+		///////////////////////////////////
 		// Check if users in allowed_users have a MinIO associated user
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-		uids := mc.CheckUsersInCache(service.AllowedUsers)
-		if len(uids) > 0 {
-			for _, uid := range uids {
-				sk, _ := auth.GenerateRandomKey(8)
-				minIOAdminClient.CreateMinIOUser(uid, sk)
-				mc.CreateSecretForOIDC(uid, sk)
+
+		// Service is created by an EGI user
+		if !isAdminUser {
+
+			uidOrigin, uidExists := c.Get("uidOrigin")
+			mcUntyped, mcExists := c.Get("multitenancyConfig")
+
+			if !mcExists {
+				c.String(http.StatusInternalServerError, "Missing multitenancy config")
+			}
+
+			if !uidExists {
+				c.String(http.StatusInternalServerError, "Missing EGI user uid")
+			}
+
+			mc, mcParsed := mcUntyped.(*auth.MultitenancyConfig)
+			uid, uidParsed := uidOrigin.(string)
+
+			if !mcParsed {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing multitenancy config: %v", mcParsed))
+				return
+			}
+
+			createLogger.Println("Multitenancy config: ", mc)
+
+			if !uidParsed {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing uid origin: %v", uidParsed))
+				return
+			}
+
+			if err := c.ShouldBindJSON(&service); err != nil {
+				c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+				return
+			}
+
+			full_uid := auth.FormatUID(uid)
+			// Check if the service VO is present on the cluster VO's and if the user creating the service is enrrolled in such
+			if service.VO != "" {
+				for _, vo := range cfg.OIDCGroups {
+					if vo == service.VO {
+						authHeader := c.GetHeader("Authorization")
+						err := checkIdentity(&service, cfg, authHeader)
+						if err != nil {
+							c.String(http.StatusBadRequest, fmt.Sprintln(err))
+						}
+
+						// If AllowedUsers is empty don't add uid
+						if len(service.AllowedUsers) == 0 {
+							service.Labels["uid"] = full_uid[0:8]
+							service.AllowedUsers = append(service.AllowedUsers, uid)
+							createLogger.Println("Creating service for user: ", uid)
+						}
+						break
+					}
+				}
+			}
+			if len(service.AllowedUsers) == 0 {
+				uids := mc.CheckUsersInCache(service.AllowedUsers)
+				if len(uids) > 0 {
+					for _, uid := range uids {
+						sk, _ := auth.GenerateRandomKey(8)
+						minIOAdminClient.CreateMinIOUser(uid, sk)
+						mc.CreateSecretForOIDC(uid, sk)
+					}
+				}
 			}
 		}
 
@@ -271,16 +291,20 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		}
 
 		// Create group for the service and add users
-		// TODO error control
-		err = minIOAdminClient.CreateServiceGroup(splitPath[0])
-		if err != nil {
-			return fmt.Errorf("error creating service group for bucket %s: %v", splitPath[0], err)
+		if !isAdminUser {
+			if len(allowed_users) < 1 {
+				err = minIOAdminClient.AddServiceToAllUsersGroup(splitPath[0])
+			} else {
+				err = minIOAdminClient.CreateServiceGroup(splitPath[0])
+				if err != nil {
+					return fmt.Errorf("error creating service group for bucket %s: %v", splitPath[0], err)
+				}
+				err = minIOAdminClient.AddUserToGroup(allowed_users, splitPath[0])
+				if err != nil {
+					return err
+				}
+			}
 		}
-		err = minIOAdminClient.AddUserToGroup(allowed_users, splitPath[0])
-		if err != nil {
-			return err
-		}
-
 		// Create folder(s)
 		if len(splitPath) == 2 {
 			// Add "/" to the end of the key in order to create a folder
@@ -298,7 +322,6 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		if err := enableInputNotification(s3Client, service.GetMinIOWebhookARN(), in); err != nil {
 			return err
 		}
-
 	}
 
 	// Create output buckets

@@ -19,6 +19,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v2/pkg/types"
@@ -27,34 +28,42 @@ import (
 // MakeListHandler makes a handler for listing services
 func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
+
+		authHeader := c.GetHeader("Authorization")
+
 		services, err := back.ListServices()
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
 
-		uidOrigin, uidExists := c.Get("uidOrigin")
-		if !uidExists {
-			c.String(http.StatusInternalServerError, fmt.Sprintln("Missing EGI user uid"))
-		}
+		if len(strings.Split(authHeader, "Bearer")) > 0 {
+			uidOrigin, uidExists := c.Get("uidOrigin")
+			if !uidExists {
+				c.String(http.StatusInternalServerError, fmt.Sprintln("Missing EGI user uid"))
+			}
 
-		uid, uidParsed := uidOrigin.(string)
+			uid, uidParsed := uidOrigin.(string)
 
-		if !uidParsed {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing uid origin: %v", uidParsed))
-			return
-		}
+			if !uidParsed {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing uid origin: %v", uidParsed))
+				return
+			}
 
-		var allowedServicesForUser []*types.Service
-		for _, service := range services {
-			for _, id := range service.AllowedUsers {
-				if uid == id {
-					allowedServicesForUser = append(allowedServicesForUser, service)
-					break
+			var allowedServicesForUser []*types.Service
+			for _, service := range services {
+				for _, id := range service.AllowedUsers {
+					if uid == id {
+						allowedServicesForUser = append(allowedServicesForUser, service)
+						break
+					}
 				}
 			}
+
+			c.JSON(http.StatusOK, allowedServicesForUser)
+		} else {
+			c.JSON(http.StatusOK, services)
 		}
 
-		c.JSON(http.StatusOK, allowedServicesForUser)
 	}
 }

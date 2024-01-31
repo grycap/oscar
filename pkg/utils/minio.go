@@ -116,6 +116,14 @@ func (minIOAdminClient *MinIOAdminClient) CreateServiceGroup(bucketName string) 
 
 	return nil
 }
+func (minIOAdminClient *MinIOAdminClient) AddServiceToAllUsersGroup(bucketName string) error {
+	err := createPolicy(minIOAdminClient.adminClient, bucketName)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func (minIOAdminClient *MinIOAdminClient) AddUserToGroup(users []string, groupName string) error {
 	group := madmin.GroupAddRemove{

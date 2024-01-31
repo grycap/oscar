@@ -40,29 +40,6 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
-		mcUntyped, mcExists := c.Get("multitenancyConfig")
-
-		if !mcExists {
-			c.String(http.StatusInternalServerError, fmt.Sprintln("Missing multitenancy config"))
-		}
-
-		mc, mcParsed := mcUntyped.(auth.MultitenancyConfig)
-
-		if !mcParsed {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing multitenancy config: %v", mcParsed))
-		}
-
-		// Check if users in allowed_users have a MinIO associated user
-		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-		uids := mc.CheckUsersInCache(newService.AllowedUsers)
-		if len(uids) == 0 {
-			for _, uid := range uids {
-				sk, _ := auth.GenerateRandomKey(8)
-				minIOAdminClient.CreateMinIOUser(uid, sk)
-				mc.CreateSecretForOIDC(uid, sk)
-			}
-		}
-
 		// Check service values and set defaults
 		checkValues(&newService, cfg)
 
@@ -87,6 +64,33 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						c.String(http.StatusBadRequest, fmt.Sprintln(err))
 					}
 					break
+				}
+			}
+		}
+
+		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+		if !isAdminUser {
+			mcUntyped, mcExists := c.Get("multitenancyConfig")
+
+			if !mcExists {
+				c.String(http.StatusInternalServerError, fmt.Sprintln("Missing multitenancy config"))
+			}
+
+			mc, mcParsed := mcUntyped.(auth.MultitenancyConfig)
+
+			if !mcParsed {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing multitenancy config: %v", mcParsed))
+			}
+
+			// Check if users in allowed_users have a MinIO associated user
+			if len(newService.AllowedUsers) == 0 {
+				uids := mc.CheckUsersInCache(newService.AllowedUsers)
+				if len(uids) == 0 {
+					for _, uid := range uids {
+						sk, _ := auth.GenerateRandomKey(8)
+						minIOAdminClient.CreateMinIOUser(uid, sk)
+						mc.CreateSecretForOIDC(uid, sk)
+					}
 				}
 			}
 		}
