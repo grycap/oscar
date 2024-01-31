@@ -38,7 +38,7 @@ func MakeConfigHandler(cfg *types.Config) gin.HandlerFunc {
 		var conf configForUser
 		minIOProvider := cfg.MinIOProvider
 		authHeader := c.GetHeader("Authorization")
-		if len(strings.Split(authHeader, "Bearer")) > 0 {
+		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			conf = configForUser{cfg, minIOProvider}
 		} else {
 
