@@ -81,6 +81,7 @@ func MakeMinIOAdminClient(cfg *types.Config) (*MinIOAdminClient, error) {
 	return minIOAdminClient, nil
 }
 
+// CreateMinIOUser creates a new user for multitenancy
 func (minIOAdminClient *MinIOAdminClient) CreateMinIOUser(ak string, sk string) error {
 	var users []string
 	err := minIOAdminClient.adminClient.AddUser(context.TODO(), ak, sk)
@@ -96,13 +97,16 @@ func (minIOAdminClient *MinIOAdminClient) CreateMinIOUser(ak string, sk string) 
 	return nil
 }
 
-func (minIOAdminClient *MinIOAdminClient) CreateAllUsersGroup() {
+// CreateAllUsersGroup creates a group used for public services
+func (minIOAdminClient *MinIOAdminClient) CreateAllUsersGroup() error {
 	err := createGroup(minIOAdminClient.adminClient, ALL_USERS_GROUP)
 	if err != nil {
-		//TODO manage error
+		return err
 	}
+	return nil
 }
 
+// CreateServiceGroup creates a MinIO group and its associated policy for a service
 func (minIOAdminClient *MinIOAdminClient) CreateServiceGroup(bucketName string) error {
 	err := createGroup(minIOAdminClient.adminClient, bucketName)
 	if err != nil {
@@ -116,6 +120,8 @@ func (minIOAdminClient *MinIOAdminClient) CreateServiceGroup(bucketName string) 
 
 	return nil
 }
+
+// AddServiceToAllUsersGroup associates policy of all users to a service
 func (minIOAdminClient *MinIOAdminClient) AddServiceToAllUsersGroup(bucketName string) error {
 	err := createPolicy(minIOAdminClient.adminClient, bucketName)
 	if err != nil {
@@ -125,6 +131,7 @@ func (minIOAdminClient *MinIOAdminClient) AddServiceToAllUsersGroup(bucketName s
 	return nil
 }
 
+// AddUserToGroup adds  user/users to a group
 func (minIOAdminClient *MinIOAdminClient) AddUserToGroup(users []string, groupName string) error {
 	group := madmin.GroupAddRemove{
 		Group:    groupName,
@@ -138,6 +145,47 @@ func (minIOAdminClient *MinIOAdminClient) AddUserToGroup(users []string, groupNa
 		return fmt.Errorf("error adding users to group: %v", err)
 	}
 
+	return nil
+}
+
+// UpdateServiceGroupMembers updates the members of a service group
+func (minIOAdminClient *MinIOAdminClient) UpdateServiceGroupMembers(groupName string, newMembers []string) error {
+	group := madmin.GroupAddRemove{
+		Group:    groupName,
+		Members:  newMembers,
+		Status:   "enable",
+		IsRemove: false,
+	}
+
+	err := minIOAdminClient.adminClient.UpdateGroupMembers(context.Background(), group)
+	if err != nil {
+		return fmt.Errorf("Error updating members of group: %v", err)
+	}
+	return nil
+}
+
+// DeleteServiceGroup delete the service group and policy
+func (minIOAdminClient *MinIOAdminClient) DeleteServiceGroup(groupName string) error {
+	description, err := minIOAdminClient.adminClient.GetGroupDescription(context.Background(), groupName)
+	if err != nil {
+		return err
+	}
+	group := madmin.GroupAddRemove{
+		Group:    groupName,
+		Members:  description.Members,
+		Status:   "enable",
+		IsRemove: true,
+	}
+
+	err = minIOAdminClient.adminClient.UpdateGroupMembers(context.Background(), group)
+	if err != nil {
+		return fmt.Errorf("Error removing group: %v", err)
+	}
+
+	err = minIOAdminClient.adminClient.RemoveCannedPolicy(context.TODO(), groupName)
+	if err != nil {
+		return fmt.Errorf("Error removing group's policy: %v", err)
+	}
 	return nil
 }
 
