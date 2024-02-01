@@ -76,8 +76,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
-			createLogger.Println("Multitenancy config: ", mc)
-
 			if err := c.ShouldBindJSON(&service); err != nil {
 				c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 				return
@@ -115,7 +113,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 
-		createLogger.Println("Service labels: ", service.Labels)
 		// Create the service
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists

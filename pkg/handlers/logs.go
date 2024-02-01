@@ -32,35 +32,15 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// TODO Try using cookies to avoid excesive calls to the k8s API //
+
 // MakeJobsInfoHandler makes a handler for listing all existing jobs from a service and show their JobInfo
 func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		jobsInfo := make(map[string]*types.JobInfo)
-		authHeader := c.GetHeader("Authorization")
-
 		// Get serviceName
 		serviceName := c.Param("serviceName")
-		// If is oidc auth get service and check on allowed users
-		if len(strings.Split(authHeader, "Bearer")) > 1 {
-			service, _ := back.ReadService(c.Param("serviceName"))
-			uid, err := auth.GetUIDFromContext(c)
-			if err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-			}
-
-			var isAllowed bool
-			for _, id := range service.AllowedUsers {
-				if uid == id {
-					isAllowed = true
-					break
-				}
-			}
-
-			if !isAllowed {
-				c.String(http.StatusForbidden, "User %s doesn't have permision to get this service", uid)
-				return
-			}
-		}
+		isOIDCAuthorised(c, back, serviceName)
 
 		// List jobs
 		listOpts := metav1.ListOptions{
@@ -124,10 +104,12 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset *kubernetes
 // TODO refactor
 // MakeDeleteJobsHandler makes a handler for deleting all jobs created by the provided service.
 // If 'all' querystring is set to 'true' pending, running and failed jobs will also be deleted
-func MakeDeleteJobsHandler(kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
+func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get serviceName and jobName
 		serviceName := c.Param("serviceName")
+		isOIDCAuthorised(c, back, serviceName)
+
 		// Get timestamps querystring (default to false)
 		all, err := strconv.ParseBool(c.DefaultQuery("all", "false"))
 		if err != nil {
@@ -167,10 +149,11 @@ func MakeDeleteJobsHandler(kubeClientset *kubernetes.Clientset, namespace string
 
 // TODO refactor
 // MakeGetLogsHandler makes a handler for getting logs from the 'oscar-container' inside the pod created by the specified job
-func MakeGetLogsHandler(kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
+func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get serviceName and jobName
 		serviceName := c.Param("serviceName")
+		isOIDCAuthorised(c, back, serviceName)
 		jobName := c.Param("jobName")
 		// Get timestamps querystring (default to false)
 		timestamps, err := strconv.ParseBool(c.DefaultQuery("timestamps", "false"))
@@ -220,10 +203,11 @@ func MakeGetLogsHandler(kubeClientset *kubernetes.Clientset, namespace string) g
 
 // TODO refactor
 // MakeDeleteJobHandler makes a handler for removing a job
-func MakeDeleteJobHandler(kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
+func MakeDeleteJobHandler(back types.ServerlessBackend, kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get serviceName and jobName
 		serviceName := c.Param("serviceName")
+		isOIDCAuthorised(c, back, serviceName)
 		jobName := c.Param("jobName")
 
 		// Get job in order to check if it is associated with the provided serviceName
@@ -263,5 +247,30 @@ func MakeDeleteJobHandler(kubeClientset *kubernetes.Clientset, namespace string)
 		}
 
 		c.Status(http.StatusNoContent)
+	}
+}
+
+func isOIDCAuthorised(c *gin.Context, back types.ServerlessBackend, serviceName string) {
+	// If is oidc auth get service and check on allowed users
+	authHeader := c.GetHeader("Authorization")
+	if len(strings.Split(authHeader, "Bearer")) > 1 {
+		service, _ := back.ReadService(c.Param("serviceName"))
+		uid, err := auth.GetUIDFromContext(c)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+		}
+
+		var isAllowed bool
+		for _, id := range service.AllowedUsers {
+			if uid == id {
+				isAllowed = true
+				break
+			}
+		}
+
+		if !isAllowed {
+			c.String(http.StatusForbidden, "User %s doesn't have permision to get this service", uid)
+			return
+		}
 	}
 }

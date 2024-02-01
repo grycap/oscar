@@ -30,10 +30,9 @@ import (
 // MakeReadHandler makes a handler for reading a service
 func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
+		service, err := back.ReadService(c.Param("serviceName"))
 		authHeader := c.GetHeader("Authorization")
 
-		service, err := back.ReadService(c.Param("serviceName"))
 		if err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {

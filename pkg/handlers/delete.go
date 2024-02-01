@@ -28,6 +28,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v2/pkg/types"
 	"github.com/grycap/oscar/v2/pkg/utils"
+	"github.com/grycap/oscar/v2/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -38,6 +39,27 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 	return func(c *gin.Context) {
 		// First get the Service
 		service, _ := back.ReadService(c.Param("serviceName"))
+		authHeader := c.GetHeader("Authorization")
+
+		if len(strings.Split(authHeader, "Bearer")) > 1 {
+			uid, err := auth.GetUIDFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+			}
+
+			var isAllowed bool
+			for _, id := range service.AllowedUsers {
+				if uid == id {
+					isAllowed = true
+					break
+				}
+			}
+
+			if !isAllowed {
+				c.String(http.StatusForbidden, "User %s doesn't have permision to get this service", uid)
+				return
+			}
+		}
 
 		if err := back.DeleteService(c.Param("serviceName")); err != nil {
 			// Check if error is caused because the service is not found
