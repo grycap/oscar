@@ -57,6 +57,11 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			isAdminUser = true
 		}
 
+		if err := c.ShouldBindJSON(&service); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+			return
+		}
+
 		// Check service values and set defaults
 		checkValues(&service, cfg)
 
@@ -74,11 +79,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			mc, err := auth.GetMultitenancyConfigFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-			}
-
-			if err := c.ShouldBindJSON(&service); err != nil {
-				c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
-				return
 			}
 
 			full_uid := auth.FormatUID(uid)
