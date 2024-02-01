@@ -59,10 +59,15 @@ func MakeConfigHandler(cfg *types.Config) gin.HandlerFunc {
 				c.String(http.StatusInternalServerError, "Error getting credentials for MinIO user: ", uid)
 			}
 
-			minIOProvider.AccessKey = ak
-			minIOProvider.SecretKey = sk
+			userMinIOProvider := &types.MinIOProvider{
+				Endpoint:  minIOProvider.Endpoint,
+				Verify:    minIOProvider.Verify,
+				AccessKey: ak,
+				SecretKey: sk,
+				Region:    minIOProvider.Region,
+			}
 
-			conf = configForUser{cfg, minIOProvider}
+			conf = configForUser{cfg, userMinIOProvider}
 		}
 
 		c.JSON(http.StatusOK, conf)
