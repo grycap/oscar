@@ -44,27 +44,14 @@ func MakeConfigHandler(cfg *types.Config) gin.HandlerFunc {
 
 			// Get MinIO credentials from k8s secret for user
 
-			uidOrigin, uidExists := c.Get("uidOrigin")
-			mcUntyped, mcExists := c.Get("multitenancyConfig")
-
-			if !mcExists {
-				c.String(http.StatusInternalServerError, "Missing multitenancy config")
-			}
-			if !uidExists {
-				c.String(http.StatusInternalServerError, "Missing EGI user uid")
+			uid, err := auth.GetUIDFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
-			mc, mcParsed := mcUntyped.(*auth.MultitenancyConfig)
-			uid, uidParsed := uidOrigin.(string)
-
-			if !mcParsed {
-				c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing multitenancy config: %v", mcParsed))
-				return
-			}
-
-			if !uidParsed {
-				c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing uid origin: %v", uidParsed))
-				return
+			mc, err := auth.GetMultitenancyConfigFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
 			ak, sk, err := mc.GetUserCredentials(uid)

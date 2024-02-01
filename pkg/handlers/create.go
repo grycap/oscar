@@ -60,40 +60,23 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// Check service values and set defaults
 		checkValues(&service, cfg)
 
-		///////////////////////////////////
-		////////////// here ///////////////
-		///////////////////////////////////
 		// Check if users in allowed_users have a MinIO associated user
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
 		// Service is created by an EGI user
 		if !isAdminUser {
 
-			uidOrigin, uidExists := c.Get("uidOrigin")
-			mcUntyped, mcExists := c.Get("multitenancyConfig")
-
-			if !mcExists {
-				c.String(http.StatusInternalServerError, "Missing multitenancy config")
+			uid, err := auth.GetUIDFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
-			if !uidExists {
-				c.String(http.StatusInternalServerError, "Missing EGI user uid")
-			}
-
-			mc, mcParsed := mcUntyped.(*auth.MultitenancyConfig)
-			uid, uidParsed := uidOrigin.(string)
-
-			if !mcParsed {
-				c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing multitenancy config: %v", mcParsed))
-				return
+			mc, err := auth.GetMultitenancyConfigFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
 			createLogger.Println("Multitenancy config: ", mc)
-
-			if !uidParsed {
-				c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing uid origin: %v", uidParsed))
-				return
-			}
 
 			if err := c.ShouldBindJSON(&service); err != nil {
 				c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
@@ -112,10 +95,9 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						}
 
 						// If AllowedUsers is empty don't add uid
-						if len(service.AllowedUsers) == 0 {
+						if len(service.AllowedUsers) > 0 {
 							service.Labels["uid"] = full_uid[0:8]
 							service.AllowedUsers = append(service.AllowedUsers, uid)
-							createLogger.Println("Creating service for user: ", uid)
 						}
 						break
 					}

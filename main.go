@@ -90,7 +90,7 @@ func main() {
 	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
 
 	// Logs paths
-	system.GET("/logs/:serviceName", handlers.MakeJobsInfoHandler(kubeClientset, cfg.ServicesNamespace))
+	system.GET("/logs/:serviceName", handlers.MakeJobsInfoHandler(back, kubeClientset, cfg.ServicesNamespace))
 	system.DELETE("/logs/:serviceName", handlers.MakeDeleteJobsHandler(kubeClientset, cfg.ServicesNamespace))
 	system.GET("/logs/:serviceName/:jobName", handlers.MakeGetLogsHandler(kubeClientset, cfg.ServicesNamespace))
 	system.DELETE("/logs/:serviceName/:jobName", handlers.MakeDeleteJobHandler(kubeClientset, cfg.ServicesNamespace))

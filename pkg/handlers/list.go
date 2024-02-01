@@ -23,6 +23,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/utils/auth"
 )
 
 // MakeListHandler makes a handler for listing services
@@ -37,17 +38,10 @@ func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 			return
 		}
 
-		if len(strings.Split(authHeader, "Bearer")) == 1 {
-			uidOrigin, uidExists := c.Get("uidOrigin")
-			if !uidExists {
-				c.String(http.StatusInternalServerError, fmt.Sprintln("Missing EGI user uid"))
-			}
-
-			uid, uidParsed := uidOrigin.(string)
-
-			if !uidParsed {
-				c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing uid origin: %v", uidParsed))
-				return
+		if len(strings.Split(authHeader, "Bearer")) > 1 {
+			uid, err := auth.GetUIDFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
 			var allowedServicesForUser []*types.Service

@@ -31,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
+// TODO REFACTOR
+
 // MakeDeleteHandler makes a handler for deleting services
 func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {

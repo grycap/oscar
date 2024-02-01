@@ -70,16 +70,9 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 		if !isAdminUser {
-			mcUntyped, mcExists := c.Get("multitenancyConfig")
-
-			if !mcExists {
-				c.String(http.StatusInternalServerError, fmt.Sprintln("Missing multitenancy config"))
-			}
-
-			mc, mcParsed := mcUntyped.(auth.MultitenancyConfig)
-
-			if !mcParsed {
-				c.String(http.StatusInternalServerError, fmt.Sprintf("Error parsing multitenancy config: %v", mcParsed))
+			mc, err := auth.GetMultitenancyConfigFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
 			// Check if users in allowed_users have a MinIO associated user
@@ -150,6 +143,5 @@ func updateBuckets(newService, oldService *types.Service, minIOAdminClient *util
 	}
 
 	// Create the input and output buckets/folders from newService
-	// TODO fix
 	return createBuckets(newService, cfg, minIOAdminClient, newService.AllowedUsers)
 }

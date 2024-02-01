@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -63,4 +64,28 @@ func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.Hand
 			basicAuthHandler(c)
 		}
 	}
+}
+
+func GetUIDFromContext(c *gin.Context) (string, error) {
+	uidOrigin, uidExists := c.Get("uidOrigin")
+	if !uidExists {
+		return "", fmt.Errorf("Missing EGI user uid")
+	}
+	uid, uidParsed := uidOrigin.(string)
+	if !uidParsed {
+		return "", fmt.Errorf("Error parsing uid origin: %v", uidParsed)
+	}
+	return uid, nil
+}
+
+func GetMultitenancyConfigFromContext(c *gin.Context) (*MultitenancyConfig, error) {
+	mcUntyped, mcExists := c.Get("multitenancyConfig")
+	if !mcExists {
+		return nil, fmt.Errorf("Missing multitenancy config")
+	}
+	mc, mcParsed := mcUntyped.(*MultitenancyConfig)
+	if !mcParsed {
+		return nil, fmt.Errorf("Error parsing multitenancy config")
+	}
+	return mc, nil
 }

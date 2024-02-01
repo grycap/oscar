@@ -21,9 +21,11 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/utils/auth"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,12 +33,34 @@ import (
 )
 
 // MakeJobsInfoHandler makes a handler for listing all existing jobs from a service and show their JobInfo
-func MakeJobsInfoHandler(kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
+func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		jobsInfo := make(map[string]*types.JobInfo)
+		authHeader := c.GetHeader("Authorization")
 
 		// Get serviceName
 		serviceName := c.Param("serviceName")
+		// If is oidc auth get service and check on allowed users
+		if len(strings.Split(authHeader, "Bearer")) > 1 {
+			service, _ := back.ReadService(c.Param("serviceName"))
+			uid, err := auth.GetUIDFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+			}
+
+			var isAllowed bool
+			for _, id := range service.AllowedUsers {
+				if uid == id {
+					isAllowed = true
+					break
+				}
+			}
+
+			if !isAllowed {
+				c.String(http.StatusForbidden, "User %s doesn't have permision to get this service", uid)
+				return
+			}
+		}
 
 		// List jobs
 		listOpts := metav1.ListOptions{
@@ -97,6 +121,7 @@ func MakeJobsInfoHandler(kubeClientset *kubernetes.Clientset, namespace string) 
 	}
 }
 
+// TODO refactor
 // MakeDeleteJobsHandler makes a handler for deleting all jobs created by the provided service.
 // If 'all' querystring is set to 'true' pending, running and failed jobs will also be deleted
 func MakeDeleteJobsHandler(kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
@@ -140,6 +165,7 @@ func MakeDeleteJobsHandler(kubeClientset *kubernetes.Clientset, namespace string
 	}
 }
 
+// TODO refactor
 // MakeGetLogsHandler makes a handler for getting logs from the 'oscar-container' inside the pod created by the specified job
 func MakeGetLogsHandler(kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -192,6 +218,7 @@ func MakeGetLogsHandler(kubeClientset *kubernetes.Clientset, namespace string) g
 	}
 }
 
+// TODO refactor
 // MakeDeleteJobHandler makes a handler for removing a job
 func MakeDeleteJobHandler(kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
