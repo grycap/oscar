@@ -70,11 +70,11 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Service is created by an EGI user
 		if !isAdminUser {
-
 			uid, err := auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
+			createLogger.Printf("Creating service for user %s", uid)
 
 			mc, err := auth.GetMultitenancyConfigFromContext(c)
 			if err != nil {
@@ -111,6 +111,8 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					}
 				}
 			}
+		} else {
+			createLogger.Printf("Creating service for OSCAR superuser")
 		}
 
 		// Create the service
