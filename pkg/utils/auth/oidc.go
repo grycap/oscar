@@ -101,10 +101,12 @@ func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *ut
 			return
 		}
 
-		ui, _ := oidcManager.getUserInfo(rawToken)
-		// TODO check error pointer
+		ui, err := oidcManager.getUserInfo(rawToken)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("%v", err))
+			return
+		}
 		uid := ui.subject
-		oidcLogger.Println("Request user: ", uid)
 
 		// Check if exist MinIO user in cached users list
 		exists := mc.UserExists(uid)
@@ -123,7 +125,6 @@ func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *ut
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO user for uid %s: %v", uid, err))
 			}
 		}
-		oidcLogger.Printf("Actual state of multienancy config: %v", mc)
 		c.Set("uidOrigin", uid)
 		c.Set("multitenancyConfig", mc)
 		c.Next()
