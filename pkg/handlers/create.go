@@ -86,7 +86,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			if service.VO != "" {
 				for _, vo := range cfg.OIDCGroups {
 					if vo == service.VO {
-						authHeader := c.GetHeader("Authorization")
 						err := checkIdentity(&service, cfg, authHeader)
 						if err != nil {
 							c.String(http.StatusBadRequest, fmt.Sprintln(err))
@@ -134,7 +133,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Create buckets/folders based on the Input and Output and enable notifications
-		if err := createBuckets(&service, cfg, minIOAdminClient, service.AllowedUsers); err != nil {
+		if err := createBuckets(&service, cfg, minIOAdminClient, service.AllowedUsers, false); err != nil {
 			if err == errInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {
@@ -208,7 +207,7 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	service.Token = utils.GenerateToken()
 }
 
-func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient, allowed_users []string) error {
+func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient, allowed_users []string, isUpdate bool) error {
 	var s3Client *s3.S3
 	var cdmiClient *cdmi.Client
 	var provName, provID string
@@ -272,14 +271,19 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		}
 
 		// Create group for the service and add users
+		createLogger.Print("Creating MinIO group and users")
 		if !isAdminUser {
 			if len(allowed_users) < 1 {
 				err = minIOAdminClient.AddServiceToAllUsersGroup(splitPath[0])
 			} else {
-				err = minIOAdminClient.CreateServiceGroup(splitPath[0])
-				if err != nil {
-					return fmt.Errorf("error creating service group for bucket %s: %v", splitPath[0], err)
+				if !isUpdate {
+					createLogger.Print("Creating group")
+					err = minIOAdminClient.CreateServiceGroup(splitPath[0])
+					if err != nil {
+						return fmt.Errorf("error creating service group for bucket %s: %v", splitPath[0], err)
+					}
 				}
+				createLogger.Print("Creating/Updating users")
 				err = minIOAdminClient.AddUserToGroup(allowed_users, splitPath[0])
 				if err != nil {
 					return err

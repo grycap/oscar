@@ -102,6 +102,7 @@ func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *ut
 		}
 
 		ui, _ := oidcManager.getUserInfo(rawToken)
+		// TODO check error pointer
 		uid := ui.subject
 		oidcLogger.Println("Request user: ", uid)
 
@@ -123,7 +124,6 @@ func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *ut
 			}
 		}
 		oidcLogger.Printf("Actual state of multienancy config: %v", mc)
-		oidcLogger.Printf("User %s already exists", uid)
 		c.Set("uidOrigin", uid)
 		c.Set("multitenancyConfig", mc)
 		c.Next()

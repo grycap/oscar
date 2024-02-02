@@ -86,6 +86,12 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					}
 				}
 			}
+
+			if len(newService.AllowedUsers) != len(oldService.AllowedUsers) {
+				//Update users group list
+				minIOAdminClient.AddUserToGroup(newService.AllowedUsers, "")
+
+			}
 		}
 
 		// Update the service
@@ -143,5 +149,5 @@ func updateBuckets(newService, oldService *types.Service, minIOAdminClient *util
 	}
 
 	// Create the input and output buckets/folders from newService
-	return createBuckets(newService, cfg, minIOAdminClient, newService.AllowedUsers)
+	return createBuckets(newService, cfg, minIOAdminClient, newService.AllowedUsers, true)
 }

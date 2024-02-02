@@ -148,23 +148,7 @@ func (minIOAdminClient *MinIOAdminClient) AddUserToGroup(users []string, groupNa
 	return nil
 }
 
-// UpdateServiceGroupMembers updates the members of a service group
-func (minIOAdminClient *MinIOAdminClient) UpdateServiceGroupMembers(groupName string, newMembers []string) error {
-	group := madmin.GroupAddRemove{
-		Group:    groupName,
-		Members:  newMembers,
-		Status:   "enable",
-		IsRemove: false,
-	}
-
-	err := minIOAdminClient.adminClient.UpdateGroupMembers(context.Background(), group)
-	if err != nil {
-		return fmt.Errorf("Error updating members of group: %v", err)
-	}
-	return nil
-}
-
-// DeleteServiceGroup delete the service group and policy
+// DeleteServiceGroup empty the service group and policy
 func (minIOAdminClient *MinIOAdminClient) DeleteServiceGroup(groupName string) error {
 	description, err := minIOAdminClient.adminClient.GetGroupDescription(context.Background(), groupName)
 	if err != nil {
@@ -179,7 +163,7 @@ func (minIOAdminClient *MinIOAdminClient) DeleteServiceGroup(groupName string) e
 
 	err = minIOAdminClient.adminClient.UpdateGroupMembers(context.Background(), group)
 	if err != nil {
-		return fmt.Errorf("Error removing group: %v", err)
+		return fmt.Errorf("Error emptying group: %v", err)
 	}
 
 	err = minIOAdminClient.adminClient.RemoveCannedPolicy(context.TODO(), groupName)
