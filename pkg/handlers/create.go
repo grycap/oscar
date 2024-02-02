@@ -90,17 +90,15 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						if err != nil {
 							c.String(http.StatusBadRequest, fmt.Sprintln(err))
 						}
-
-						// If AllowedUsers is empty don't add uid
-						if len(service.AllowedUsers) > 0 {
-							service.Labels["uid"] = full_uid[0:8]
-							service.AllowedUsers = append(service.AllowedUsers, uid)
-						}
 						break
 					}
 				}
 			}
-			if len(service.AllowedUsers) == 0 {
+
+			if len(service.AllowedUsers) > 0 {
+				// If AllowedUsers is empty don't add uid
+				service.Labels["uid"] = full_uid[0:8]
+				service.AllowedUsers = append(service.AllowedUsers, uid)
 				uids := mc.CheckUsersInCache(service.AllowedUsers)
 				if len(uids) > 0 {
 					for _, uid := range uids {
@@ -109,6 +107,8 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						mc.CreateSecretForOIDC(uid, sk)
 					}
 				}
+			} else {
+				createLogger.Printf("Creating public service")
 			}
 		} else {
 			createLogger.Printf("Creating service for OSCAR superuser")
@@ -273,7 +273,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		// Create group for the service and add users
 		createLogger.Print("Creating MinIO group and users")
 		if !isAdminUser {
-			if len(allowed_users) < 1 {
+			if len(allowed_users) == 0 {
 				err = minIOAdminClient.AddServiceToAllUsersGroup(splitPath[0])
 			} else {
 				if !isUpdate {
