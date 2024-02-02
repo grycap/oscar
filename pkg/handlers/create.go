@@ -281,6 +281,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 					if err != nil {
 						return fmt.Errorf("error creating service group for bucket %s: %v", splitPath[0], err)
 					}
+				} else {
 					minIOAdminClient.DeleteServiceGroup(splitPath[0])
 				}
 				createLogger.Print("Creating/Updating users")
