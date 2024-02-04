@@ -101,7 +101,6 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset *kubernetes
 	}
 }
 
-// TODO refactor
 // MakeDeleteJobsHandler makes a handler for deleting all jobs created by the provided service.
 // If 'all' querystring is set to 'true' pending, running and failed jobs will also be deleted
 func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
@@ -147,7 +146,6 @@ func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset *kubernet
 	}
 }
 
-// TODO refactor
 // MakeGetLogsHandler makes a handler for getting logs from the 'oscar-container' inside the pod created by the specified job
 func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -201,7 +199,6 @@ func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset *kubernetes.
 	}
 }
 
-// TODO refactor
 // MakeDeleteJobHandler makes a handler for removing a job
 func MakeDeleteJobHandler(back types.ServerlessBackend, kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {

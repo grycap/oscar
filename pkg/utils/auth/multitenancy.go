@@ -46,12 +46,12 @@ func NewMultitenancyConfig(kubeClientset *kubernetes.Clientset, uid string) *Mul
 }
 
 // TODO periodically check that the users stored on cache still exist on MinIO (cronjob)
-func (mc *MultitenancyConfig) UpdateCacheStatus() {
+/* func (mc *MultitenancyConfig) UpdateCacheStatus() {
 	// 1. List users on MinIO
 	// 2. List secrets
 	// 3. Compare both lists and delete from secrets the missmatchs
 	// 4. updateCache
-}
+} */
 
 func (mc *MultitenancyConfig) UpdateCache(uid string) {
 	mc.usersCache = append(mc.usersCache, uid)

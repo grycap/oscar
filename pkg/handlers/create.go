@@ -74,7 +74,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
-			createLogger.Printf("Creating service for user %s", uid)
 
 			mc, err := auth.GetMultitenancyConfigFromContext(c)
 			if err != nil {
@@ -107,11 +106,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						mc.CreateSecretForOIDC(uid, sk)
 					}
 				}
-			} else {
-				createLogger.Printf("Creating public service")
 			}
-		} else {
-			createLogger.Printf("Creating service for OSCAR superuser")
 		}
 
 		// Create the service
@@ -270,13 +265,11 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		}
 
 		// Create group for the service and add users
-		createLogger.Print("Creating MinIO group and users")
 		if !isAdminUser {
 			if len(allowed_users) == 0 {
 				err = minIOAdminClient.AddServiceToAllUsersGroup(splitPath[0])
 			} else {
 				if !isUpdate {
-					createLogger.Print("Creating group")
 					err = minIOAdminClient.CreateServiceGroup(splitPath[0])
 					if err != nil {
 						return fmt.Errorf("error creating service group for bucket %s: %v", splitPath[0], err)
@@ -284,7 +277,6 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				} else {
 					minIOAdminClient.DeleteServiceGroup(splitPath[0])
 				}
-				createLogger.Print("Creating/Updating users")
 				err = minIOAdminClient.AddUserToGroup(allowed_users, splitPath[0])
 				if err != nil {
 					return err

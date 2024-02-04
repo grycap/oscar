@@ -44,11 +44,7 @@ func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.Hand
 		cfg.Username: cfg.Password,
 	})
 
-	minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
-	if err != nil {
-		// TODO manage error
-	}
-
+	minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 	// Slice to add default user to all users group on MinIO
 	var oscarUser = []string{"console"}
 
