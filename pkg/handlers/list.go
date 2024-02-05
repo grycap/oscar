@@ -17,21 +17,47 @@ limitations under the License.
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/utils/auth"
 )
 
 // MakeListHandler makes a handler for listing services
 func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
+
+		authHeader := c.GetHeader("Authorization")
+
 		services, err := back.ListServices()
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
 
-		c.JSON(http.StatusOK, services)
+		if len(strings.Split(authHeader, "Bearer")) > 1 {
+			uid, err := auth.GetUIDFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+			}
+
+			var allowedServicesForUser []*types.Service
+			for _, service := range services {
+				for _, id := range service.AllowedUsers {
+					if uid == id {
+						allowedServicesForUser = append(allowedServicesForUser, service)
+						break
+					}
+				}
+			}
+
+			c.JSON(http.StatusOK, allowedServicesForUser)
+		} else {
+			c.JSON(http.StatusOK, services)
+		}
+
 	}
 }

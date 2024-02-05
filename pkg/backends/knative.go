@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/grycap/oscar/v2/pkg/imagepuller"
@@ -32,6 +33,9 @@ import (
 	knv1 "knative.dev/serving/pkg/apis/serving/v1"
 	knclientset "knative.dev/serving/pkg/client/clientset/versioned"
 )
+
+// Custom logger
+var knativeLogger = log.New(os.Stdout, "[KNATIVE] ", log.Flags())
 
 // KnativeBackend struct to represent a Knative client
 type KnativeBackend struct {
@@ -277,15 +281,6 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 	// Add label "serving.knative.dev/visibility=cluster-local"
 	// https://knative.dev/docs/serving/services/private-services/
 	service.Labels[types.KnativeVisibilityLabel] = types.KnativeClusterLocalValue
-
-	// Add to the service labels the user VO for accounting on k8s pods
-	if service.VO != "" {
-		for _, vo := range kn.config.OIDCGroups {
-			if vo == service.VO {
-				service.Labels["vo"] = service.VO
-			}
-		}
-	}
 
 	podSpec, err := service.ToPodSpec(kn.config)
 	if err != nil {

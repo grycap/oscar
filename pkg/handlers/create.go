@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 
@@ -43,10 +44,18 @@ const (
 
 var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache)")
 
+// Custom logger
+var createLogger = log.New(os.Stdout, "[CREATE] ", log.Flags())
+var isAdminUser = false
+
 // MakeCreateHandler makes a handler for creating services
 func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var service types.Service
+		authHeader := c.GetHeader("Authorization")
+		if len(strings.Split(authHeader, "Bearer")) == 1 {
+			isAdminUser = true
+		}
 
 		if err := c.ShouldBindJSON(&service); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
@@ -56,21 +65,47 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// Check service values and set defaults
 		checkValues(&service, cfg)
 
-		if service.VO != "" {
-			oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
+		// Check if users in allowed_users have a MinIO associated user
+		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
-			authHeader := c.GetHeader("Authorization")
-			rawToken := strings.TrimPrefix(authHeader, "Bearer ")
-			hasVO, err2 := oidcManager.UserHasVO(rawToken, service.VO)
-
-			if err2 != nil {
-				c.String(http.StatusInternalServerError, err2.Error())
-				return
+		// Service is created by an EGI user
+		if !isAdminUser {
+			uid, err := auth.GetUIDFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
-			if !hasVO {
-				c.String(http.StatusBadRequest, fmt.Sprintf("This user isn't enrrolled on the vo: %v", service.VO))
-				return
+			mc, err := auth.GetMultitenancyConfigFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+			}
+
+			full_uid := auth.FormatUID(uid)
+			// Check if the service VO is present on the cluster VO's and if the user creating the service is enrrolled in such
+			if service.VO != "" {
+				for _, vo := range cfg.OIDCGroups {
+					if vo == service.VO {
+						err := checkIdentity(&service, cfg, authHeader)
+						if err != nil {
+							c.String(http.StatusBadRequest, fmt.Sprintln(err))
+						}
+						break
+					}
+				}
+			}
+
+			if len(service.AllowedUsers) > 0 {
+				// If AllowedUsers is empty don't add uid
+				service.Labels["uid"] = full_uid[0:8]
+				service.AllowedUsers = append(service.AllowedUsers, uid)
+				uids := mc.CheckUsersInCache(service.AllowedUsers)
+				if len(uids) > 0 {
+					for _, uid := range uids {
+						sk, _ := auth.GenerateRandomKey(8)
+						minIOAdminClient.CreateMinIOUser(uid, sk)
+						mc.CreateSecretForOIDC(uid, sk)
+					}
+				}
 			}
 		}
 
@@ -93,7 +128,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Create buckets/folders based on the Input and Output and enable notifications
-		if err := createBuckets(&service, cfg); err != nil {
+		if err := createBuckets(&service, cfg, minIOAdminClient, service.AllowedUsers, false); err != nil {
 			if err == errInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {
@@ -140,10 +175,6 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	service.Labels[types.YunikornApplicationIDLabel] = service.Name
 	service.Labels[types.YunikornQueueLabel] = fmt.Sprintf("%s.%s.%s", types.YunikornRootQueue, types.YunikornOscarQueue, service.Name)
 
-	if service.VO != "" {
-		service.Labels["vo"] = service.VO
-	}
-
 	// Create default annotations map
 	if service.Annotations == nil {
 		service.Annotations = make(map[string]string)
@@ -157,7 +188,6 @@ func checkValues(service *types.Service, cfg *types.Config) {
 			service.StorageProviders.MinIO = map[string]*types.MinIOProvider{
 				types.DefaultProvider: cfg.MinIOProvider,
 			}
-
 		}
 	} else {
 		service.StorageProviders = &types.StorageProviders{
@@ -171,7 +201,7 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	service.Token = utils.GenerateToken()
 }
 
-func createBuckets(service *types.Service, cfg *types.Config) error {
+func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient, allowed_users []string, isUpdate bool) error {
 	var s3Client *s3.S3
 	var cdmiClient *cdmi.Client
 	var provName, provID string
@@ -233,6 +263,26 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 				return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
 			}
 		}
+
+		// Create group for the service and add users
+		if !isAdminUser {
+			if len(allowed_users) == 0 {
+				err = minIOAdminClient.AddServiceToAllUsersGroup(splitPath[0])
+			} else {
+				if !isUpdate {
+					err = minIOAdminClient.CreateServiceGroup(splitPath[0])
+					if err != nil {
+						return fmt.Errorf("error creating service group for bucket %s: %v", splitPath[0], err)
+					}
+				} else {
+					minIOAdminClient.DeleteServiceGroup(splitPath[0])
+				}
+				err = minIOAdminClient.AddUserToGroup(allowed_users, splitPath[0])
+				if err != nil {
+					return err
+				}
+			}
+		}
 		// Create folder(s)
 		if len(splitPath) == 2 {
 			// Add "/" to the end of the key in order to create a folder
@@ -250,7 +300,6 @@ func createBuckets(service *types.Service, cfg *types.Config) error {
 		if err := enableInputNotification(s3Client, service.GetMinIOWebhookARN(), in); err != nil {
 			return err
 		}
-
 	}
 
 	// Create output buckets
@@ -345,6 +394,25 @@ func isStorageProviderDefined(storageName string, storageID string, providers *t
 		_, ok = providers.WebDav[storageID]
 	}
 	return ok
+}
+
+func checkIdentity(service *types.Service, cfg *types.Config, authHeader string) error {
+	oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
+	rawToken := strings.TrimPrefix(authHeader, "Bearer ")
+
+	hasVO, err := oidcManager.UserHasVO(rawToken, service.VO)
+
+	if err != nil {
+		return err
+	}
+
+	if !hasVO {
+		return fmt.Errorf("This user isn't enrrolled on the vo: %v", service.VO)
+	}
+
+	service.Labels["vo"] = service.VO
+
+	return nil
 }
 
 func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider, cfg *types.Config) error {

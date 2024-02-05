@@ -268,6 +268,7 @@ clusters:
     auth_user: testuser
     auth_password: testpass
     ssl_verify: true
+allowed_users: []
 `
 
 	str, _ := testService.ToYAML()

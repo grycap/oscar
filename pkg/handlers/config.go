@@ -17,15 +17,59 @@ limitations under the License.
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v2/pkg/utils/auth"
 )
+
+type configForUser struct {
+	Cfg           *types.Config        `json:"config"`
+	MinIOProvider *types.MinIOProvider `json:"minio_provider"`
+}
 
 // MakeConfigHandler makes a handler for getting server's configuration
 func MakeConfigHandler(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, cfg)
+		// Return configForUser
+		var conf configForUser
+		minIOProvider := cfg.MinIOProvider
+		authHeader := c.GetHeader("Authorization")
+		if len(strings.Split(authHeader, "Bearer")) == 1 {
+			conf = configForUser{cfg, minIOProvider}
+		} else {
+
+			// Get MinIO credentials from k8s secret for user
+
+			uid, err := auth.GetUIDFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+			}
+
+			mc, err := auth.GetMultitenancyConfigFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+			}
+
+			ak, sk, err := mc.GetUserCredentials(uid)
+			if err != nil {
+				c.String(http.StatusInternalServerError, "Error getting credentials for MinIO user: ", uid)
+			}
+
+			userMinIOProvider := &types.MinIOProvider{
+				Endpoint:  minIOProvider.Endpoint,
+				Verify:    minIOProvider.Verify,
+				AccessKey: ak,
+				SecretKey: sk,
+				Region:    minIOProvider.Region,
+			}
+
+			conf = configForUser{cfg, userMinIOProvider}
+		}
+
+		c.JSON(http.StatusOK, conf)
 	}
 }
