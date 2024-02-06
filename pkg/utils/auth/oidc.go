@@ -27,7 +27,7 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v2/pkg/utils"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	"golang.org/x/oauth2"
 	"k8s.io/client-go/kubernetes"
 )

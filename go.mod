@@ -1,4 +1,4 @@
-module github.com/grycap/oscar/v2
+module github.com/grycap/oscar/v3
 
 go 1.18
 

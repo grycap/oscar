@@ -29,7 +29,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/types"
 )
 
 const (
