@@ -1117,7 +1117,7 @@ The active pods will decrease when the use of CPU decreases.</p>
 <pre><code class="language-bash">curl {-k} -X POST https://{oscar_endpoint}/system/services/body-pose-detection-async/exposed/{path resource} -H  &quot;accept: */*&quot; -H  &quot;Content-Type: multipart/form-data&quot; -F &quot;data=@{input image};type=image/png&quot; --output {output file}
 </code></pre>
 <p>Finally, the complete command that works in <a href="https://docs.oscar.grycap.net/local-testing/">Local Testing</a> with an image called <code>people.jpeg</code> as input and <code>output_posenet.zip</code> as output.</p>
-<pre><code class="language-bash">curl -X POST https://localhost/system/services/body-pose-detection-async/exposed/v2/models/posenetclas/predict/ -H  &quot;accept: */*&quot; -H  &quot;Content-Type: multipart/form-data&quot; -F &quot;data=@people.jpeg;type=image/png&quot; --output output_posenet.zip
+<pre><code class="language-bash">curl -X POST https://localhost/system/services/body-pose-detection-async/exposed/v3/models/posenetclas/predict/ -H  &quot;accept: */*&quot; -H  &quot;Content-Type: multipart/form-data&quot; -F &quot;data=@people.jpeg;type=image/png&quot; --output output_posenet.zip
 </code></pre>
 <p>Another FDL example shows how to expose a simple NGINX server as an OSCAR service:</p>
 <pre><code class="language-yaml">functions:
