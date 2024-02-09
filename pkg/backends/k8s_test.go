@@ -19,7 +19,7 @@ package backends
 import (
 	"testing"
 
-	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

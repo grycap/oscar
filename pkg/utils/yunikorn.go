@@ -23,7 +23,7 @@ import (
 
 	"github.com/apache/yunikorn-core/pkg/common/configs"
 	"github.com/goccy/go-yaml"
-	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )

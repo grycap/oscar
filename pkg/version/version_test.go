@@ -19,7 +19,7 @@ package version
 import (
 	"testing"
 
-	"github.com/grycap/oscar/v2/pkg/backends"
+	"github.com/grycap/oscar/v3/pkg/backends"
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
 

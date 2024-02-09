@@ -22,8 +22,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v2/pkg/types"
-	"github.com/grycap/oscar/v2/pkg/utils/auth"
+	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
 )
 
 // MakeListHandler makes a handler for listing services

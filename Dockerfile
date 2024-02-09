@@ -13,8 +13,8 @@ COPY main.go .
 COPY pkg pkg
 
 RUN GOOS=${GOOS} CGO_ENABLED=0 go build --ldflags "-s -w \
--X \"github.com/grycap/oscar/v2/pkg/version.Version=${VERSION}\" \
--X \"github.com/grycap/oscar/v2/pkg/version.GitCommit=${GIT_COMMIT}\"" \
+-X \"github.com/grycap/oscar/v3/pkg/version.Version=${VERSION}\" \
+-X \"github.com/grycap/oscar/v3/pkg/version.GitCommit=${GIT_COMMIT}\"" \
 -a -installsuffix cgo -o oscar .
 
 

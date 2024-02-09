@@ -20,8 +20,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v2/pkg/types"
-	"github.com/grycap/oscar/v2/pkg/version"
+	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/version"
 	"k8s.io/client-go/kubernetes"
 )
 

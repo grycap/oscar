@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/types"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 

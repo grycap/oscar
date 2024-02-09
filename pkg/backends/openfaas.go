@@ -24,8 +24,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/grycap/oscar/v2/pkg/types"
-	"github.com/grycap/oscar/v2/pkg/utils"
+	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	ofv1 "github.com/openfaas/faas-netes/pkg/apis/openfaas/v1"
 	ofclientset "github.com/openfaas/faas-netes/pkg/client/clientset/versioned"
 

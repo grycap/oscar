@@ -22,11 +22,11 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v2/pkg/backends"
-	"github.com/grycap/oscar/v2/pkg/handlers"
-	"github.com/grycap/oscar/v2/pkg/resourcemanager"
-	"github.com/grycap/oscar/v2/pkg/types"
-	"github.com/grycap/oscar/v2/pkg/utils/auth"
+	"github.com/grycap/oscar/v3/pkg/backends"
+	"github.com/grycap/oscar/v3/pkg/handlers"
+	"github.com/grycap/oscar/v3/pkg/resourcemanager"
+	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
