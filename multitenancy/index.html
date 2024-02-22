@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="../local-testing/">
+        <link rel="prev" href="../api/">
       
       
-        <link rel="next" href="../deploy-ec3/">
+        <link rel="next" href="../minio-bucket-replication/">
       
       
       <link rel="icon" href="../images/logo.png">
@@ -20,7 +20,7 @@
     
     
       
-        <title>Deployment with IM Dashboard - OSCAR Documentation</title>
+        <title>Multitenancy - OSCAR Documentation</title>
       
     
     
@@ -70,7 +70,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#deployment-with-the-im-dashboard" class="md-skip">
+        <a href="#multitenancy-support-in-oscar" class="md-skip">
           Skip to content
         </a>
       
@@ -105,7 +105,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Deployment with IM Dashboard
+              Multitenancy
             
           </span>
         </div>
@@ -238,19 +238,17 @@
       
   
   
-    
   
   
-  
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
@@ -264,7 +262,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             Getting started
@@ -296,19 +294,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../deploy-im-dashboard/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -317,7 +306,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -622,10 +610,19 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../multitenancy/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -634,6 +631,7 @@
   
 
       </a>
+      
     </li>
   
 
@@ -754,138 +752,43 @@
   
 
 
-<h1 id="deployment-with-the-im-dashboard">Deployment with the IM Dashboard</h1>
-<p>An OSCAR cluster can be easily deployed on multiple Cloud back-ends without
-requiring any installation by using the
-<a href="https://www.grycap.upv.es/im">Infrastructure Manager</a>'s
-Dashboard
-(<a href="https://appsgrycap.i3m.upv.es:31443/im-dashboard/login">IM Dashboard</a>). This
-is a managed service provided by the <a href="https://www.grycap.upv.es">GRyCAP</a>
-research group at the <a href="https://www.upv.es">Universitat Politècnica de València</a>
-to deploy customized virtual infrastructures across many Cloud providers.</p>
-<p>Using the IM Dashboard is the easiest and most convenient approach to deploy
-an OSCAR cluster. It also automatically allocates a DNS entry and TLS
-certificates to support HTTPS-based access to the OSCAR cluster and companion
-services (e.g. MinIO).</p>
-<p>This example shows how to deploy an OSCAR cluster on
-<a href="https://aws.amazon.com">Amazon Web Services (AWS)</a> with two nodes. Thanks to
-the IM, the very same procedure applies to deploy the OSCAR cluster in an
-on-premises Cloud (such as OpenStack) or any other Cloud provider supported
-by the IM.</p>
-<p>These are the steps:</p>
-<ol>
-<li>
-<p>Access the <a href="https://appsgrycap.i3m.upv.es:31443/im-dashboard/login">IM Dashboard</a></p>
-<p><img alt="login" src="../images/im-dashboard/im-dashboard-00.png" /></p>
-<p>You will need to authenticate via
-<a href="https://www.egi.eu/services/check-in/">EGI Check-In</a>, which supports
-mutiple Identity Providers (IdP).</p>
-</li>
-<li>
-<p>Configure the Cloud Credentials</p>
-<p>Once logged in, you need to define the access credentials to the Cloud on
-which the OSCAR cluster will be deployed. These should be temporary
-credentials under the
-<a href="https://searchsecurity.techtarget.com/definition/principle-of-least-privilege-POLP">principle of least privilege (PoLP)</a>.</p>
-<p><img alt="credentials" src="../images/im-dashboard/im-dashboard-00-2.png" /></p>
-<p><img alt="credentials" src="../images/im-dashboard/im-dashboard-00-3.png" /></p>
-<p><img alt="credentials" src="../images/im-dashboard/im-dashboard-00-4.png" /></p>
-<p>In our case we indicate an identifier for the set of credentials,
-<a href="https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html">the Access Key ID and the Secret Access Key</a>
-for an <a href="https://aws.amazon.com/iam/">IAM</a> user that has privileges to
-deploy Virtual Machines in <a href="https://aws.amazon.com/ec2">Amazon EC2</a>.</p>
-</li>
-<li>
-<p>Select the OSCAR template</p>
-<p><img alt="template" src="../images/im-dashboard/im-dashboard-01.png" /></p>
-</li>
-<li>
-<p>Customize and deploy the OSCAR cluster</p>
-<p>In this panel you can specify the number of Working Nodes (WNs) of the
-cluster together with the computational requirements for each node. We
-leave the default values.
-- Number of WNs in the oscar cluster: Number of working nodes.
-- Number of CPUs for the front-end node: Number of CPUs in the primary node.
-- Amount of Memory for the front-end node: RAM in the primary node.
-- Flavor name of the front-end node. Only required in case of special flavors i.e. with GPUs: Type of instance that will be selected in the front node.
-- Number of CPUs for the WNs: number of CPUs per working node.
-- Amount of Memory for the WNs: RAM per working node.
-- Flavor name of the WNs. Only required in case of special flavors i.e. with GPUs: Type of instance that will be selected in the working nodes.
-- Size of the extra HD added to the instance: Extra memory in the primary node.
-<img alt="template-hw" src="../images/im-dashboard/im-dashboard-02.png" /></p>
-<p>In this panel, specify the passwords to be employed to access the
-Kubernetes Web UI (Dashboard), to access the OSCAR web UI and to access
-the MinIO dashboard. These tokens can also be used for programmatic access
-to the respective services.</p>
+<h1 id="multitenancy-support-in-oscar">Multitenancy support in OSCAR</h1>
+<p>In the context of OSCAR, multi-tenancy support refers to the platform's ability to enable multiple users or organizations (tenants) to deploy and run their applications or functions on the same underlying infrastructure. Support for multitenancy in OSCAR has been available since version v3.0.0. To use this functionality, there are some requisites that the cluster and the users have to fulfill:</p>
 <ul>
-<li>Access Token for the Kubernetes admin user: It is the token to connect to the Dashboard of Kubernetes.</li>
-<li>OSCAR password: password to OSCAR.</li>
-<li>MinIO password 8 characters min.: password to MinIO.</li>
-<li>Email to be used in the Lets Encrypt issuer: It is an Email linked with the certificates in case the user has any questions.</li>
-<li>ID of the user that creates the infrastructure: unique identifier. Do not touch.</li>
-<li>VO to support: It supports OIDC log in. If there is nothing, only can connect the user who deploys, in case there is a VO, it can be the user who deploys and all people in the VO.</li>
-<li>Flag to add NVIDIA support: if you want to use NVIDIA.</li>
-<li>Flag to install Apache YuniKorn: if you are going to use YuniKorn.
-<img alt="template-param" src="../images/im-dashboard/im-dashboard-03.png" /></li>
+<li>
+<p><strong>The cluster needs to have enabled OIDC access.</strong></p>
+<p>This is because the implementation of this functionality uses directly the EGI UIDs to distinguish between users, therefore removing the need to manage a database.  </p>
+</li>
+<li>
+<p><strong>Users who want to create new services need to know the UID of the users who will have access to the service.</strong></p>
+<p>Each service has a list of "allowed users," so a service can be accessed not only by one but by multiple users chosen by the service creator. This way, users have the ability to decide who can operate over its services. It is important to note that at this moment, a user with access to a service has full access; this means he can edit/delete the service besides making executions. </p>
+<p>This allowed users list is defined on the FDL on the service creation (more info in link FDL doc). The following is an example of an FDL that creates a service that gives access to two EGI users. If the allowed_users field is empty, the service is treated as "public," so every user within the cluster will have access to it.</p>
+<p>At the moment of the creation, the UID of the user creating the service doesn't need to be present on the list; however, when a service is updated, if the user will still have access, its UID has to be on the list.</p>
+</li>
 </ul>
-<p>Now, choose the Cloud provider. The ID specified when creating the Cloud
-credentials will be shown.
-You will also need to specify the
-<a href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AMIs.html">Amazon Machine Image (AMI) identifier</a>.
-We chose an AMI based on Ubuntu 20.04 provided by Canonical whose
-identifier for the us-east-1 region is: ami-09e67e426f25ce0d7</p>
-<p>NOTE: You should obtain the AMI identifier for the latest version of the
-OS. This way, security patches will be already installed. You can obtain
-this AMI identifier from the AWS Marketplace or the Amazon EC2 service.</p>
-<p><img alt="template-param" src="../images/im-dashboard/im-dashboard-04.png" /></p>
-<p>Give the infrastructure a name and press "Submit".</p>
-</li>
-<li>
-<p>Check the status of the deployment OSCAR cluster</p>
-<p>You will see that the OSCAR cluster is being deployed and the
-infrastructure reaches the status "running". The process will not finish
-until it reaches the state "configured".</p>
-<p><img alt="status-general" src="../images/im-dashboard/im-dashboard-05.png" /></p>
-<p>If you are interested in understanding what is happening under the hood
-you can see the logs:</p>
-<p><img alt="status-log" src="../images/im-dashboard/im-dashboard-06.png" /></p>
-</li>
-<li>
-<p>Accessing the OSCAR cluster</p>
-<p>Once reached the "configured" state, see the "Outputs" to obtain the
-different endpoints:</p>
-<ul>
-<li>console_minio_endpoint: This endpoint brings access to the MinIO web
-    user interface.</li>
-<li>dashboard_endpoint: This endpoint redirects to the Kubernetes dashboard
-    where the OSCAR cluster is deployed.</li>
-<li>local_oscarui_endpoint: This endpoint is where the OSCAR backend is
-    listening. It supports authentication only via basic-auth.</li>
-<li>minio_endpoint: Endpoint where the MinIO API is listening. If you
-    access it through a web browser, you will be redirected to
-    "console_minio_endpoint".</li>
-<li>oscarui_endpoint: Public endpoint of the OSCAR web user interface. It
-    supports OIDC connections via EGI Check-in, as well as basic auth.</li>
-</ul>
-<p><img alt="outputs" src="../images/im-dashboard/im-dashboard-07.png" /></p>
-<p>The OSCAR UI can be accessed with the username <code>oscar</code> and the password
-you specified at deployment time.</p>
-<p><img alt="access-oscar" src="../images/im-dashboard/im-dashboard-08.png" /></p>
-<p>The MinIO UI can be accessed with the username <code>minio</code> and the password
-you specified at deployment time.</p>
-<p><img alt="access-minio" src="../images/im-dashboard/im-dashboard-09.png" /></p>
-<p>The Kubernetes Dashboard can be accessed with the token you specified at
-deployment time.
-<img alt="access-kubernetes" src="../images/im-dashboard/im-dashboard-10.png" /></p>
-<p>You can obtain statistics about the Kubernetes cluster:
-<img alt="access-kubernetes-2" src="../images/im-dashboard/im-dashboard-11.png" /></p>
-</li>
-<li>
-<p>Terminating the OSCAR cluster</p>
-<p>You can terminate the OSCAR cluster from the IM Dashboard:
-<img alt="terminate" src="../images/im-dashboard/im-dashboard-12.png" /></p>
-</li>
-</ol>
+<pre><code class="language-yaml">functions:
+  oscar:
+  - oscar-cluster:
+      name: grayify_multitenant
+      memory: 1Gi
+      cpu: '0.6'
+      image: ghcr.io/grycap/imagemagick
+      script: script.sh
+      vo: &quot;vo.example.eu&quot; # Needed to create services on OIDC enabled clusters
+      allowed_users: 
+      - &quot;62bb11b40398f73778b66f344d282242debb8ee3ebb106717a123ca213162926@egi.eu&quot;
+      - &quot;5e14d33ac4abc96272cc163da6a200c2e18591bfb3b0f32a4c9c867f5e938463@egi.eu&quot;
+      input:
+      - storage_provider: minio.default
+        path: grayify_multitenant/input
+      output:
+      - storage_provider: minio.default
+        path: grayify_multitenant/output
+</code></pre>
+<blockquote>
+<p><strong><em>NOTE:</em></strong> A user can obtain its EGI User Id by login into https://aai.egi.eu/ (for the production instance of EGI Check-In) or https://aai-demo.egi.eu (for the demo instance of EGI Check-In). </p>
+</blockquote>
+<p>Since OSCAR uses MinIO as the main storage provider, so that the users only have access to their designated bucket's service, MinIO users are created on the fly for each EGI UID. Consequently, each user accessing the cluster will have a MinIO user with its UID as AccessKey and an autogenerated SecretKey.</p>
 
 
 
