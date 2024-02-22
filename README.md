@@ -18,8 +18,11 @@ deployed on multi-Clouds, and even on low-powered devices, to create highly-para
 data-processing serverless applications along the computing continuum. These applications execute on customized runtime
 environments provided by Docker containers that run on elastic Kubernetes clusters.
 
-[**Deploy**](https://grycap.github.io/oscar/deploy-im-dashboard/) &nbsp; |
-&nbsp; [**Documentation**](https://grycap.github.io/oscar/) &nbsp;
+Information on how to deploy an OSCAR cluster using the Infrastucture Manager can be found at: https://grycap.github.io/oscar/deploy-im-dashboard/
+
+For more documentation visit https://grycap.github.io/oscar/
+
+> **_NOTE:_** If you detect inaccurate or unclear information on the documentation please report back to us either opening an issue or contacting us at products@grycap.upv.es
 
 ## Overview
 
@@ -93,8 +96,6 @@ As external storage providers, the following services can be used:
 
 An OSCAR cluster can be easily deployed via the [IM Dashboard](http://im.egi.eu)
 on any major public and on-premises Cloud provider, including the EGI Federated Cloud.
-
-Further information is available in the [documentation](https://grycap.github.io/oscar).
 
 ## Licensing
 
