@@ -113,7 +113,7 @@ func (minIOAdminClient *MinIOAdminClient) CreateServiceGroup(bucketName string) 
 		return err
 	}
 
-	err = createPolicy(minIOAdminClient.adminClient, bucketName)
+	err = createPolicy(minIOAdminClient.adminClient, bucketName, false)
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func (minIOAdminClient *MinIOAdminClient) CreateServiceGroup(bucketName string) 
 
 // AddServiceToAllUsersGroup associates policy of all users to a service
 func (minIOAdminClient *MinIOAdminClient) AddServiceToAllUsersGroup(bucketName string) error {
-	err := createPolicy(minIOAdminClient.adminClient, bucketName)
+	err := createPolicy(minIOAdminClient.adminClient, bucketName, true)
 	if err != nil {
 		return err
 	}
@@ -211,7 +211,15 @@ func (minIOAdminClient *MinIOAdminClient) RestartServer() error {
 	return nil
 }
 
-func createPolicy(adminClient *madmin.AdminClient, groupName string) error {
+func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers bool) error {
+
+	var groupName string
+	if allUsers {
+		groupName = ALL_USERS_GROUP
+	} else {
+		groupName = bucketName
+	}
+
 	policy := `{
 		"Version": "2012-10-17",
 		"Statement": [
@@ -221,7 +229,7 @@ func createPolicy(adminClient *madmin.AdminClient, groupName string) error {
 					"s3:*"
 				],
 				"Resource": [
-					"arn:aws:s3:::` + groupName + `*"
+					"arn:aws:s3:::` + bucketName + `*"
 				]
 			}
 		]

@@ -46,10 +46,15 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
-			for _, id := range service.AllowedUsers {
-				if uid == id {
-					isAllowed = true
-					break
+			var isAllowed bool
+			if len(service.AllowedUsers) == 0 {
+				isAllowed = true
+			} else {
+				for _, id := range service.AllowedUsers {
+					if uid == id {
+						isAllowed = true
+						break
+					}
 				}
 			}
 
