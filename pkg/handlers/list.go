@@ -48,7 +48,7 @@ func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 			for _, service := range services {
 				if len(service.AllowedUsers) == 0 {
 					allowedServicesForUser = append(allowedServicesForUser, service)
-					break
+					continue
 				}
 				for _, id := range service.AllowedUsers {
 					if uid == id {

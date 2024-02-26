@@ -19,6 +19,7 @@ package utils
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -107,13 +108,13 @@ func (minIOAdminClient *MinIOAdminClient) CreateAllUsersGroup() error {
 }
 
 // CreateServiceGroup creates a MinIO group and its associated policy for a service
-func (minIOAdminClient *MinIOAdminClient) CreateServiceGroup(bucketName string) error {
-	err := createGroup(minIOAdminClient.adminClient, bucketName)
+func (minIOAdminClient *MinIOAdminClient) CreateServiceGroup(bucket []string) error {
+	err := createGroup(minIOAdminClient.adminClient, bucket[0])
 	if err != nil {
 		return err
 	}
 
-	err = createPolicy(minIOAdminClient.adminClient, bucketName, false)
+	err = createPolicy(minIOAdminClient.adminClient, bucket, false)
 	if err != nil {
 		return err
 	}
@@ -122,8 +123,8 @@ func (minIOAdminClient *MinIOAdminClient) CreateServiceGroup(bucketName string) 
 }
 
 // AddServiceToAllUsersGroup associates policy of all users to a service
-func (minIOAdminClient *MinIOAdminClient) AddServiceToAllUsersGroup(bucketName string) error {
-	err := createPolicy(minIOAdminClient.adminClient, bucketName, true)
+func (minIOAdminClient *MinIOAdminClient) AddServiceToAllUsersGroup(buckets []string) error {
+	err := createPolicy(minIOAdminClient.adminClient, buckets, true)
 	if err != nil {
 		return err
 	}
@@ -163,12 +164,12 @@ func (minIOAdminClient *MinIOAdminClient) DeleteServiceGroup(groupName string) e
 
 	err = minIOAdminClient.adminClient.UpdateGroupMembers(context.Background(), group)
 	if err != nil {
-		return fmt.Errorf("Error emptying group: %v", err)
+		return fmt.Errorf("error emptying group: %v", err)
 	}
 
 	err = minIOAdminClient.adminClient.RemoveCannedPolicy(context.TODO(), groupName)
 	if err != nil {
-		return fmt.Errorf("Error removing group's policy: %v", err)
+		return fmt.Errorf("error removing group's policy: %v", err)
 	}
 	return nil
 }
@@ -211,31 +212,42 @@ func (minIOAdminClient *MinIOAdminClient) RestartServer() error {
 	return nil
 }
 
-func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers bool) error {
+func parseResources(resources []string) []string {
+	var arnStr = "arn:aws:s3:::"
+	if len(resources) > 1 {
+		for id, r := range resources {
+			resources[id] = arnStr + r
+		}
+	}
+	return resources
+}
+func createPolicy(adminClient *madmin.AdminClient, buckets []string, allUsers bool) error {
 
 	var groupName string
 	if allUsers {
 		groupName = ALL_USERS_GROUP
 	} else {
-		groupName = bucketName
+		groupName = buckets[0]
 	}
 
-	policy := `{
-		"Version": "2012-10-17",
-		"Statement": [
-			{
-				"Effect": "Allow",
-				"Action": [
-					"s3:*"
-				],
-				"Resource": [
-					"arn:aws:s3:::` + bucketName + `*"
-				]
-			}
-		]
-	}`
+	resources := parseResources(buckets)
 
-	err := adminClient.AddCannedPolicy(context.TODO(), groupName, []byte(policy))
+	policy := map[string]interface{}{
+		"Version": "2012-10-17",
+		"Statement": []map[string]interface{}{
+			{
+				"Effect":   "Allow",
+				"Action":   []string{"s3:*"},
+				"Resource": resources,
+			},
+		},
+	}
+	policyJSON, parseErr := json.Marshal(policy)
+	if parseErr != nil {
+		return fmt.Errorf("error marshalling policy: %s", parseErr)
+	}
+
+	err := adminClient.AddCannedPolicy(context.TODO(), groupName, policyJSON)
 	if err != nil {
 		return fmt.Errorf("error creating MinIO policy for group %s: %v", groupName, err)
 	}
