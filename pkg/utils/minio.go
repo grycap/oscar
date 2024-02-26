@@ -19,7 +19,6 @@ package utils
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -108,13 +107,13 @@ func (minIOAdminClient *MinIOAdminClient) CreateAllUsersGroup() error {
 }
 
 // CreateServiceGroup creates a MinIO group and its associated policy for a service
-func (minIOAdminClient *MinIOAdminClient) CreateServiceGroup(bucket []string) error {
-	err := createGroup(minIOAdminClient.adminClient, bucket[0])
+func (minIOAdminClient *MinIOAdminClient) CreateServiceGroup(bucketName string) error {
+	err := createGroup(minIOAdminClient.adminClient, bucketName)
 	if err != nil {
 		return err
 	}
 
-	err = createPolicy(minIOAdminClient.adminClient, bucket, false)
+	err = createPolicy(minIOAdminClient.adminClient, bucketName, false)
 	if err != nil {
 		return err
 	}
@@ -123,8 +122,8 @@ func (minIOAdminClient *MinIOAdminClient) CreateServiceGroup(bucket []string) er
 }
 
 // AddServiceToAllUsersGroup associates policy of all users to a service
-func (minIOAdminClient *MinIOAdminClient) AddServiceToAllUsersGroup(buckets []string) error {
-	err := createPolicy(minIOAdminClient.adminClient, buckets, true)
+func (minIOAdminClient *MinIOAdminClient) AddServiceToAllUsersGroup(bucketName string) error {
+	err := createPolicy(minIOAdminClient.adminClient, bucketName, true)
 	if err != nil {
 		return err
 	}
@@ -212,42 +211,36 @@ func (minIOAdminClient *MinIOAdminClient) RestartServer() error {
 	return nil
 }
 
-func parseResources(resources []string) []string {
-	var arnStr = "arn:aws:s3:::"
-	if len(resources) > 1 {
-		for id, r := range resources {
-			resources[id] = arnStr + r
-		}
-	}
-	return resources
-}
-func createPolicy(adminClient *madmin.AdminClient, buckets []string, allUsers bool) error {
-
+func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers bool) error {
 	var groupName string
+	policy := `{
+		"Version": "2012-10-17",
+		"Statement": [
+			{
+				"Effect": "Allow",
+				"Action": [
+					"s3:*"
+				],
+				"Resource": [
+					"arn:aws:s3:::` + bucketName + `*"
+				]
+			}
+		]
+	}`
+
 	if allUsers {
 		groupName = ALL_USERS_GROUP
+		groupDescription, errDescr := adminClient.GetGroupDescription(context.TODO(), ALL_USERS_GROUP)
+		if errDescr != nil {
+			return errDescr
+		}
+		policy = policy + groupDescription.Policy
+
 	} else {
-		groupName = buckets[0]
+		groupName = bucketName
 	}
 
-	resources := parseResources(buckets)
-
-	policy := map[string]interface{}{
-		"Version": "2012-10-17",
-		"Statement": []map[string]interface{}{
-			{
-				"Effect":   "Allow",
-				"Action":   []string{"s3:*"},
-				"Resource": resources,
-			},
-		},
-	}
-	policyJSON, parseErr := json.Marshal(policy)
-	if parseErr != nil {
-		return fmt.Errorf("error marshalling policy: %s", parseErr)
-	}
-
-	err := adminClient.AddCannedPolicy(context.TODO(), groupName, policyJSON)
+	err := adminClient.AddCannedPolicy(context.TODO(), groupName, []byte(policy))
 	if err != nil {
 		return fmt.Errorf("error creating MinIO policy for group %s: %v", groupName, err)
 	}
