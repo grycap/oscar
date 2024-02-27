@@ -243,11 +243,11 @@ func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers b
 			return errDescr
 		}
 
-		minioLogger.Println("ALL_USERS_GROUP status: ", &groupDescription)
+		minioLogger.Println("ALL_USERS_GROUP status: ", groupDescription)
 
 		actualPolicy := &Policy{}
 		json.Unmarshal([]byte(groupDescription.Policy), actualPolicy)
-		minioLogger.Println("Actual policy: ", &actualPolicy)
+		minioLogger.Println("Actual policy: ", actualPolicy)
 
 		// Add new resource and create policy
 		actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, rs)
