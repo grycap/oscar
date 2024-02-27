@@ -237,17 +237,13 @@ func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers b
 		rs := "arn:aws:s3:::" + bucketName
 		groupName = ALL_USERS_GROUP
 
-		// Get policy from group
-		groupDescription, errDescr := adminClient.GetGroupDescription(context.TODO(), ALL_USERS_GROUP)
-		if errDescr != nil {
-			return errDescr
+		policyInfo, errInfo := adminClient.InfoCannedPolicyV2(context.TODO(), ALL_USERS_GROUP)
+		if errInfo != nil {
+			return errInfo
 		}
 
-		minioLogger.Println("ALL_USERS_GROUP status: ", groupDescription)
-
 		actualPolicy := &Policy{}
-		json.Unmarshal([]byte(groupDescription.Policy), actualPolicy)
-		minioLogger.Println("Actual policy: ", actualPolicy)
+		json.Unmarshal(policyInfo.Policy, actualPolicy)
 
 		// Add new resource and create policy
 		actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, rs)
