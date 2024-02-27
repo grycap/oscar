@@ -19,6 +19,7 @@ package utils
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -34,6 +35,18 @@ const ALL_USERS_GROUP = "all_users_group"
 type MinIOAdminClient struct {
 	adminClient   *madmin.AdminClient
 	oscarEndpoint *url.URL
+}
+
+// Define the policy structure using Go structs
+type Statement struct {
+	Effect   string   `json:"Effect"`
+	Action   []string `json:"Action"`
+	Resource []string `json:"Resource"`
+}
+
+type Policy struct {
+	Version   string      `json:"Version"`
+	Statement []Statement `json:"Statement"`
 }
 
 // MakeMinIOAdminClient creates a new MinIO Admin client to configure webhook notifications
@@ -213,31 +226,47 @@ func (minIOAdminClient *MinIOAdminClient) RestartServer() error {
 
 func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers bool) error {
 	var groupName string
-	policy := `{
-		"Version": "2012-10-17",
-		"Statement": [
-			{
-				"Effect": "Allow",
-				"Action": [
-					"s3:*"
-				],
-				"Resource": [
-					"arn:aws:s3:::` + bucketName + `*"
-				]
-			}
-		]
-	}`
+	var policy []byte
+	var jsonErr error
 
 	if allUsers {
+		rs := "arn:aws:s3:::" + bucketName
 		groupName = ALL_USERS_GROUP
+
+		// Get policy from group
 		groupDescription, errDescr := adminClient.GetGroupDescription(context.TODO(), ALL_USERS_GROUP)
 		if errDescr != nil {
 			return errDescr
 		}
-		policy = policy + groupDescription.Policy
+
+		actualPolicy := &Policy{}
+		json.Unmarshal([]byte(groupDescription.Policy), actualPolicy)
+
+		// Add new resource and create policy
+		actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, rs)
+
+		policy, jsonErr = json.Marshal(actualPolicy)
+		if jsonErr != nil {
+			return jsonErr
+		}
 
 	} else {
 		groupName = bucketName
+		p := `{
+			"Version": "2012-10-17",
+			"Statement": [
+				{
+					"Effect": "Allow",
+					"Action": [
+						"s3:*"
+					],
+					"Resource": [
+						"arn:aws:s3:::` + bucketName + `"
+					]
+				}
+			]
+		}`
+		policy = []byte(p)
 	}
 
 	err := adminClient.AddCannedPolicy(context.TODO(), groupName, []byte(policy))
