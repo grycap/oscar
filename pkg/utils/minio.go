@@ -21,8 +21,10 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -30,6 +32,8 @@ import (
 )
 
 const ALL_USERS_GROUP = "all_users_group"
+
+var minioLogger = log.New(os.Stdout, "[MINIO] ", log.Flags())
 
 // MinIOAdminClient struct to represent a MinIO Admin client to configure webhook notifications
 type MinIOAdminClient struct {
@@ -239,8 +243,11 @@ func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers b
 			return errDescr
 		}
 
+		minioLogger.Println("ALL_USERS_GROUP status: ", &groupDescription)
+
 		actualPolicy := &Policy{}
 		json.Unmarshal([]byte(groupDescription.Policy), actualPolicy)
+		minioLogger.Println("Actual policy: ", &actualPolicy)
 
 		// Add new resource and create policy
 		actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, rs)
