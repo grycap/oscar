@@ -257,9 +257,10 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 		ImagePullSecrets: SetImagePullSecrets(service.ImagePullSecrets),
 		Containers: []v1.Container{
 			{
-				Name:  ContainerName,
-				Image: service.Image,
-				Env:   ConvertEnvVars(service.Environment.Vars),
+				Name:            ContainerName,
+				Image:           service.Image,
+				ImagePullPolicy: v1.PullAlways,
+				Env:             ConvertEnvVars(service.Environment.Vars),
 				VolumeMounts: []v1.VolumeMount{
 					{
 						Name:      VolumeName,
