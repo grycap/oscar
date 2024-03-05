@@ -29,6 +29,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	versioned "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
 func main() {
@@ -49,6 +50,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	//Create the metrics clientset
+	metricsClientset := versioned.NewForConfigOrDie(kubeConfig)
 
 	// Check if the cluster has available GPUs
 	cfg.CheckAvailableGPUs(kubeClientset)
