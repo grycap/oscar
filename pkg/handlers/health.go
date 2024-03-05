@@ -24,5 +24,6 @@ import (
 
 // HealthHandler health handler for kubernetes deployment
 func HealthHandler(c *gin.Context) {
+	// cambio
 	c.String(http.StatusOK, "Ok")
 }
