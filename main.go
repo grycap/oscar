@@ -120,7 +120,7 @@ func main() {
 	})
 
 	// Health path for k8s health checks
-	r.GET("/health", handlers.HealthHandler)
+	r.GET("/health", handlers.HealthHandler(kubeClientset,metricsClientset,back))
 
 	// Define and start HTTP server
 	s := &http.Server{
