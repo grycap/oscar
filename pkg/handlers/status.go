@@ -26,7 +26,7 @@ import (
 	"net/http"
 	"k8s.io/client-go/kubernetes"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-//    versioned "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
+    versioned "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
 type NodeInfo struct {
