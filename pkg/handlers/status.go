@@ -56,7 +56,7 @@ func StatusHandler(c *gin.Context, kubeClientset *kubernetes.Clientset, metricsC
 	}
     
 	var nodeInfoList []NodeInfo
-	// Parameters
+	// Parameters CPU and Memory
 	for id, node := range nodes.Items{
 		nodeName :=node.Name       
 		cpu_alloc :=node.Status.Allocatable.Cpu().MilliValue()
