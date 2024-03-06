@@ -37,7 +37,7 @@ type NodeInfo struct {
 }
 
 // HealthHandler health handler for kubernetes deployment
-func HealthHandler(c *gin.Context, kubeClientset, metricsClientset) {
+func HealthHandler(c *gin.Context, kubeClientset, metricsClientset, back) {
 	
 	// Get  nodes list
 	nodes, err := kubeClientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
