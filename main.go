@@ -109,7 +109,7 @@ func main() {
 	}
 
 	// System info path
-	system.GET("/info", handlers.MakeInfoHandler(kubeClientset, back))
+	system.GET("/info", handlers.MakeInfoHandler(kubeClientset))
 
 	// Serve OSCAR User Interface
 	r.Static("/ui", "./assets")

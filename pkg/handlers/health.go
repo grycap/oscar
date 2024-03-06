@@ -18,10 +18,10 @@ package handlers
 
 import (
     "net/http"
-    "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
 	"strconv"
 	"fmt"
-    "os"
+	"os"
 	"encoding/json"
 )
 
@@ -37,7 +37,7 @@ type NodeInfo struct {
 }
 
 // HealthHandler health handler for kubernetes deployment
-func HealthHandler(c *gin.Context, kubeClientset, metricsClientset, back) {
+func HealthHandler(c *gin.Context, kubeClientset, metricsClientset) {
 	
 	// Get  nodes list
 	nodes, err := kubeClientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
