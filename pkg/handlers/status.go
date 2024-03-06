@@ -24,7 +24,7 @@ import (
 	    "encoding/json"
 	"net/http"
 	"k8s.io/client-go/kubernetes"
-    versioned "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
+//    versioned "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
 type NodeInfo struct {
