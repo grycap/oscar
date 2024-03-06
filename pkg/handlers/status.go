@@ -37,7 +37,7 @@ type NodeInfo struct {
 }
 
 // StatusHandler Status handler for kubernetes deployment
-func StatusHandler(c *gin.Context, kubeClientset *kubernetes.Clientset, metricsClientset) {
+func StatusHandler(c *gin.Context, kubeClientset *kubernetes.Clientset, metricsClientset *versioned.MetricsV1beta1Interface) {
 	
 	// Get  nodes list
 	nodes, err := kubeClientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
