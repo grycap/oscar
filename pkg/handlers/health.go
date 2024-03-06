@@ -17,12 +17,12 @@ limitations under the License.
 package handlers
 
 import (
-    "net/http"
-	"github.com/gin-gonic/gin"
-	"strconv"
-	"fmt"
-	"os"
-	"encoding/json"
+    "github.com/gin-gonic/gin"
+	    "strconv"
+	    "fmt"
+	    "os"
+	    "encoding/json"
+	"net/http"
 )
 
 type NodeInfo struct {
