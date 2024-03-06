@@ -120,7 +120,10 @@ func main() {
 	})
 
 	// Health path for k8s health checks
-	r.GET("/health", handlers.HealthHandler(kubeClientset, metricsClientset, back))
+	r.GET("/health", handlers.HealthHandler)
+
+	// Status path for cluster status (Memory and CPU) checks
+	r.GET("/status", handlers.StatusHandler(kubeClientset, metricsClientset))
 
 	// Define and start HTTP server
 	s := &http.Server{
