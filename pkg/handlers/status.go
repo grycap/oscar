@@ -40,7 +40,7 @@ type NodeInfo struct {
 
 }
 
-// StatusHandler Status handler for kubernetes deployment
+// StatusHandler Status handler for kubernetes deployment.
 func StatusHandler(c *gin.Context, kubeClientset *kubernetes.Clientset, metricsClientset *versioned.MetricsV1beta1Client) {
 	
 	// Get  nodes list
@@ -58,7 +58,7 @@ func StatusHandler(c *gin.Context, kubeClientset *kubernetes.Clientset, metricsC
 	}
     
 	var nodeInfoList []NodeInfo
-	// Parameters CPU and Memory
+	// Parameters CPU and Memory.
 	for id, node := range nodes.Items{
 		nodeName :=node.Name       
 		cpu_alloc :=node.Status.Allocatable.Cpu().MilliValue()
@@ -81,7 +81,7 @@ func StatusHandler(c *gin.Context, kubeClientset *kubernetes.Clientset, metricsC
  
 				 nodeInfoList = append(nodeInfoList, nodeInfo)
 	   }
-     // Encode list of NodeInfo structures in json format
+    // Encode list of NodeInfo structures in json format.
 	jsonData, err := json.MarshalIndent(nodeInfoList, "", "  ")
 	 if err != nil {
 			 fmt.Fprintf(os.Stderr, "Error encoding json: %v\n", err)
