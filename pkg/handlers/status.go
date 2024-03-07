@@ -58,7 +58,7 @@ func MakeStatusHandler(kubeClientset *kubernetes.Clientset, metricsClientset *ve
 		}
 
 		var nodeInfoList []NodeInfo
-		// Parameters CPU and Memory.
+		// GET Parameters CPU and Memory.
 		for id, node := range nodes.Items {
 			nodeName := node.Name
 			cpu_alloc := node.Status.Allocatable.Cpu().MilliValue()
