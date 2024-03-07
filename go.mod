@@ -2,8 +2,6 @@ module github.com/grycap/oscar/v3
 
 go 1.21
 
-toolchain go1.22.1
-
 require (
 	github.com/aws/aws-sdk-go v1.44.189
 	github.com/gin-gonic/gin v1.9.1
