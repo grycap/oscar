@@ -17,14 +17,12 @@ limitations under the License.
 package handlers
 
 import (
-    "net/http"
-	
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 )
 
-
 // HealthHandler health handler for kubernetes deployment
 func HealthHandler(c *gin.Context) {
-	
 	c.String(http.StatusOK, "Ok")
 }

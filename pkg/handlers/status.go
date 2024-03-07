@@ -40,53 +40,54 @@ type NodeInfo struct {
 	MemoryPercentage string `json:"memoryPercentage"`
 }
 
-// StatusHandler Status handler for kubernetes deployment.
-func StatusHandler(c *gin.Context, kubeClientset kubernetes.Clientset, metricsClientset versioned.MetricsV1beta1Client) {
-
-	// Get  nodes list
-	nodes, err := kubeClientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting nodes list: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Get metrics nodes
-	nodeMetricsList, err := metricsClientset.NodeMetricses().List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting metrics nodes: %v\n", err)
-		os.Exit(1)
-	}
-
-	var nodeInfoList []NodeInfo
-	// Parameters CPU and Memory.
-	for id, node := range nodes.Items {
-		nodeName := node.Name
-		cpu_alloc := node.Status.Allocatable.Cpu().MilliValue()
-		cpu_usage := nodeMetricsList.Items[id].Usage["cpu"]
-		cpu_usage_percent := (float64(cpu_usage.MilliValue()) / float64(cpu_alloc)) * 100
-
-		memory_alloc := node.Status.Allocatable.Memory().Value()
-		memory_usage := nodeMetricsList.Items[id].Usage["memory"]
-		memory_usage_percent := (float64(memory_usage.Value()) / float64(memory_alloc)) * 100
-
-		nodeInfo := NodeInfo{
-			NodeName:         nodeName,
-			CPUCapacity:      strconv.Itoa(int(cpu_alloc)),
-			CPUUsage:         strconv.Itoa(int(cpu_usage.MilliValue())),
-			CPUPercentage:    fmt.Sprintf("%.2f", cpu_usage_percent),
-			MemoryCapacity:   strconv.Itoa(int(memory_alloc)),
-			MemoryUsage:      strconv.Itoa(int(memory_usage.Value())),
-			MemoryPercentage: fmt.Sprintf("%.2f", memory_usage_percent),
+// MakeStatusHandler Status handler for kubernetes deployment.
+func MakeStatusHandler(kubeClientset *kubernetes.Clientset, metricsClientset *versioned.MetricsV1beta1Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Get  nodes list
+		nodes, err := kubeClientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error getting nodes list: %v\n", err)
+			os.Exit(1)
 		}
 
-		nodeInfoList = append(nodeInfoList, nodeInfo)
+		// Get metrics nodes
+		nodeMetricsList, err := metricsClientset.NodeMetricses().List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error getting metrics nodes: %v\n", err)
+			os.Exit(1)
+		}
+
+		var nodeInfoList []NodeInfo
+		// Parameters CPU and Memory.
+		for id, node := range nodes.Items {
+			nodeName := node.Name
+			cpu_alloc := node.Status.Allocatable.Cpu().MilliValue()
+			cpu_usage := nodeMetricsList.Items[id].Usage["cpu"]
+			cpu_usage_percent := (float64(cpu_usage.MilliValue()) / float64(cpu_alloc)) * 100
+
+			memory_alloc := node.Status.Allocatable.Memory().Value()
+			memory_usage := nodeMetricsList.Items[id].Usage["memory"]
+			memory_usage_percent := (float64(memory_usage.Value()) / float64(memory_alloc)) * 100
+
+			nodeInfo := NodeInfo{
+				NodeName:         nodeName,
+				CPUCapacity:      strconv.Itoa(int(cpu_alloc)),
+				CPUUsage:         strconv.Itoa(int(cpu_usage.MilliValue())),
+				CPUPercentage:    fmt.Sprintf("%.2f", cpu_usage_percent),
+				MemoryCapacity:   strconv.Itoa(int(memory_alloc)),
+				MemoryUsage:      strconv.Itoa(int(memory_usage.Value())),
+				MemoryPercentage: fmt.Sprintf("%.2f", memory_usage_percent),
+			}
+
+			nodeInfoList = append(nodeInfoList, nodeInfo)
+		}
+		// Encode list of NodeInfo structures in json format.
+		jsonData, err := json.MarshalIndent(nodeInfoList, "", "  ")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error encoding json: %v\n", err)
+			os.Exit(1)
+		}
+		c.JSON(http.StatusOK, jsonData)
+		//c.String(http.StatusOK, "Ok")
 	}
-	// Encode list of NodeInfo structures in json format.
-	jsonData, err := json.MarshalIndent(nodeInfoList, "", "  ")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error encoding json: %v\n", err)
-		os.Exit(1)
-	}
-	c.JSON(http.StatusOK, jsonData)
-	//c.String(http.StatusOK, "Ok")
 }

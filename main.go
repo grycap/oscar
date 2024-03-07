@@ -99,6 +99,9 @@ func main() {
 	system.GET("/logs/:serviceName/:jobName", handlers.MakeGetLogsHandler(back, kubeClientset, cfg.ServicesNamespace))
 	system.DELETE("/logs/:serviceName/:jobName", handlers.MakeDeleteJobHandler(back, kubeClientset, cfg.ServicesNamespace))
 
+	// Status path for cluster status (Memory and CPU) checks
+	system.GET("/status", handlers.MakeStatusHandler(kubeClientset, metricsClientset))
+
 	// Job path for async invocations
 	r.POST("/job/:serviceName", handlers.MakeJobHandler(cfg, kubeClientset, back, resMan))
 
@@ -109,7 +112,7 @@ func main() {
 	}
 
 	// System info path
-	system.GET("/info", handlers.MakeInfoHandler(kubeClientset))
+	system.GET("/info", handlers.MakeInfoHandler(kubeClientset, back))
 
 	// Serve OSCAR User Interface
 	r.Static("/ui", "./assets")
@@ -121,9 +124,6 @@ func main() {
 
 	// Health path for k8s health checks
 	r.GET("/health", handlers.HealthHandler)
-
-	// Status path for cluster status (Memory and CPU) checks
-	r.GET("/status", handlers.StatusHandler(kubeClientset, metricsClientset))
 
 	// Define and start HTTP server
 	s := &http.Server{
