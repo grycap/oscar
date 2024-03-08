@@ -18,6 +18,7 @@ nav:
 - FDL Composer: fdl-composer.md
 - oscar-cli.md
 - OpenAPI Specification: api.md
+- Multitenancy: multitenancy.md
 - MinIO bucket replication: minio-bucket-replication.md
 - Frequently Asked Questions (FAQ): faq.md
 - license.md
