@@ -50,7 +50,7 @@ func MakeStatusHandler(kubeClientset *kubernetes.Clientset, metricsClientset *ve
 			os.Exit(1)
 		}
 
-		// Get metrics nodes
+		// Get metrics nodes.
 		nodeMetricsList, err := metricsClientset.NodeMetricses().List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error getting metrics nodes: %v\n", err)
