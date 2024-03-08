@@ -88,6 +88,6 @@ func MakeStatusHandler(kubeClientset *kubernetes.Clientset, metricsClientset *ve
 			os.Exit(1)
 		}
 		c.JSON(http.StatusOK, jsonData)
-		//c.String(http.StatusOK, "Ok")
+
 	}
 }
