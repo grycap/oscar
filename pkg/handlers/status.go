@@ -18,7 +18,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -82,12 +81,8 @@ func MakeStatusHandler(kubeClientset *kubernetes.Clientset, metricsClientset *ve
 			nodeInfoList = append(nodeInfoList, nodeInfo)
 		}
 		// Encode list of NodeInfo structures in json format.
-		jsonData, err := json.MarshalIndent(nodeInfoList, "", "  ")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error encoding json: %v\n", err)
-			os.Exit(1)
-		}
-		c.JSON(http.StatusOK, jsonData)
+
+		c.JSON(http.StatusOK, nodeInfoList)
 
 	}
 }
