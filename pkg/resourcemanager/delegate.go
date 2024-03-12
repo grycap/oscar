@@ -48,6 +48,9 @@ type DelegatedEvent struct {
 
 // DelegateJob sends the event to a service's replica
 func DelegateJob(service *types.Service, event string, logger *log.Logger) error {
+
+	getClusterStatus(service)
+
 	// Check if replicas are sorted by priority and sort it if needed
 	if !sort.IsSorted(service.Replicas) {
 		sort.Stable(service.Replicas)
@@ -275,4 +278,59 @@ func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, e
 	tokenCache[endpoint][replica.ServiceName] = svc.Token
 
 	return svc.Token, nil
+}
+
+func getClusterStatus(service *types.Service) {
+	for _, replica := range service.Replicas {
+		// Manage if replica.Type is "oscar"
+		if strings.ToLower(replica.Type) == oscarReplicaType {
+			// Check ClusterID is defined in 'Clusters'
+			cluster, ok := service.Clusters[replica.ClusterID]
+			if !ok {
+				fmt.Printf("Error checking to ClusterID \"%s\": Cluster not defined\n", replica.ClusterID)
+				continue
+			}
+			// Parse the cluster's endpoint URL and add the service's path
+			getJobURL, err := url.Parse(cluster.Endpoint)
+			if err != nil {
+				fmt.Printf("Error parsing the cluster's endpoint URL to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", replica.ClusterID, cluster.Endpoint, err)
+				continue
+			}
+			getJobURL.Path = path.Join(getJobURL.Path, "/system/status")
+
+			// Make request to get status from cluster
+			req, err := http.NewRequest(http.MethodGet, getJobURL.String(), nil)
+			if err != nil {
+				fmt.Printf("Error making request to ClusterID \"%s\": unable to make request: %v\n", replica.ClusterID, err)
+				continue
+			}
+			// Add cluster's basic auth credentials
+			req.SetBasicAuth(cluster.AuthUser, cluster.AuthPassword)
+
+			// Make HTTP client
+			var transport http.RoundTripper = &http.Transport{
+				// Enable/disable SSL verification
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
+			}
+			client := &http.Client{
+				Transport: transport,
+				Timeout:   time.Second * 20,
+			}
+
+			// Send the request
+			res, err := client.Do(req)
+			if err != nil {
+				fmt.Printf("Error getting cluster status to ClusterID \"%s\": unable to send request: %v\n", replica.ClusterID, err)
+				continue
+			}
+
+			// Check status code
+			if res.StatusCode == http.StatusCreated {
+				fmt.Printf("Successful get of cluster status to ClusterID\"%s\"\n", replica.ClusterID)
+				return
+			}
+			//Print request to cluster status
+			fmt.Println(res.Body)
+		}
+	}
 }
