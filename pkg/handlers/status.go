@@ -30,13 +30,12 @@ import (
 )
 
 type GeneralInfo struct {
-	ClusterName     string     `json:"clusterName"`
 	NumberNodes     int64      `json:"numberNodes"`
 	CPUFreeTotal    int64      `json:"cpuFreeTotal"`
 	CPUMaxFree      int64      `json:"cpuMaxFree"`
 	MemoryFreeTotal int64      `json:"memoryFreeTotal"`
 	MemoryMaxFree   int64      `json:"memoryMaxFree"`
-	Details         []NodeInfo `json:"detail"`
+	DetailsNodes    []NodeInfo `json:"detail"`
 }
 
 type NodeInfo struct {
@@ -121,7 +120,7 @@ func MakeStatusHandler(kubeClientset *kubernetes.Clientset, metricsClientset *ve
 				CPUMaxFree:      cpu_max_free,
 				MemoryFreeTotal: memory_free_total,
 				MemoryMaxFree:   memory_max_free,
-				Details:         nodeInfoList,
+				DetailsNodes:    nodeInfoList,
 			}
 		}
 		// Encode list of NodeInfo structures in json format.
