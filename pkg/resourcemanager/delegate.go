@@ -49,7 +49,7 @@ type DelegatedEvent struct {
 // DelegateJob sends the event to a service's replica
 func DelegateJob(service *types.Service, event string, logger *log.Logger) error {
 
-	getClusterStatus(service)
+	//getClusterStatus(service)
 
 	// Check if replicas are sorted by priority and sort it if needed
 	if !sort.IsSorted(service.Replicas) {
@@ -281,6 +281,7 @@ func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, e
 }
 
 func getClusterStatus(service *types.Service) {
+
 	for _, replica := range service.Replicas {
 		// Manage if replica.Type is "oscar"
 		if strings.ToLower(replica.Type) == oscarReplicaType {
@@ -296,7 +297,7 @@ func getClusterStatus(service *types.Service) {
 				fmt.Printf("Error parsing the cluster's endpoint URL to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", replica.ClusterID, cluster.Endpoint, err)
 				continue
 			}
-			getJobURL.Path = path.Join(getJobURL.Path, "/system/status")
+			getJobURL.Path = path.Join(getJobURL.Path, "system", "status")
 
 			// Make request to get status from cluster
 			req, err := http.NewRequest(http.MethodGet, getJobURL.String(), nil)
@@ -329,8 +330,14 @@ func getClusterStatus(service *types.Service) {
 				fmt.Printf("Successful get of cluster status to ClusterID\"%s\"\n", replica.ClusterID)
 				return
 			}
-			//Print request to cluster status
+
+			/*err = json.NewDecoder(res.Body).Decode(&cluster_status)
+			if err != nil {
+				fmt.Println("Error decoding the JSON of the response:", err)
+				continue
+			}*/
 			fmt.Println(res.Body)
+
 		}
 	}
 }
