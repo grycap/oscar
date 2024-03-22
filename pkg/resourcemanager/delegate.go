@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,10 +47,29 @@ type DelegatedEvent struct {
 	Event             string `json:"event"`
 }
 
+type GeneralInfo struct {
+	NumberNodes     int64      `json:"numberNodes"`
+	CPUFreeTotal    int64      `json:"cpuFreeTotal"`
+	CPUMaxFree      int64      `json:"cpuMaxFree"`
+	MemoryFreeTotal int64      `json:"memoryFreeTotal"`
+	MemoryMaxFree   int64      `json:"memoryMaxFree"`
+	DetailsNodes    []NodeInfo `json:"detail"`
+}
+
+type NodeInfo struct {
+	NodeName         string `json:"nodeName"`
+	CPUCapacity      string `json:"cpuCapacity"`
+	CPUUsage         string `json:"cpuUsage"`
+	CPUPercentage    string `json:"cpuPercentage"`
+	MemoryCapacity   string `json:"memoryCapacity"`
+	MemoryUsage      string `json:"memoryUsage"`
+	MemoryPercentage string `json:"memoryPercentage"`
+}
+
 // DelegateJob sends the event to a service's replica
 func DelegateJob(service *types.Service, event string, logger *log.Logger) error {
 
-	//getClusterStatus(service)
+	getClusterStatus(service)
 
 	// Check if replicas are sorted by priority and sort it if needed
 	if !sort.IsSorted(service.Replicas) {
@@ -64,7 +84,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 
 	for _, replica := range service.Replicas {
 		// Manage if replica.Type is "oscar"
-		if strings.ToLower(replica.Type) == oscarReplicaType {
+		if strings.ToLower(replica.Type) == oscarReplicaType && replica.Priority != 0 {
 			// Check ClusterID is defined in 'Clusters'
 			cluster, ok := service.Clusters[replica.ClusterID]
 			if !ok {
@@ -282,7 +302,7 @@ func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, e
 
 func getClusterStatus(service *types.Service) {
 
-	for _, replica := range service.Replicas {
+	for id, replica := range service.Replicas {
 		// Manage if replica.Type is "oscar"
 		if strings.ToLower(replica.Type) == oscarReplicaType {
 			// Check ClusterID is defined in 'Clusters'
@@ -331,12 +351,37 @@ func getClusterStatus(service *types.Service) {
 				return
 			}
 
-			/*err = json.NewDecoder(res.Body).Decode(&cluster_status)
+			//Convert cluster status response to JSON
+			var clusterStatus *GeneralInfo
+			err = json.NewDecoder(res.Body).Decode(&clusterStatus)
 			if err != nil {
 				fmt.Println("Error decoding the JSON of the response:", err)
 				continue
-			}*/
-			fmt.Println(res.Body)
+			}
+
+			// CPU has in miliCPU
+			// CPU required to deploy the service
+			serviceCPU, err := strconv.ParseInt(service.CPU, 10, 64)
+			if err != nil {
+				fmt.Println("Error to converter CPU of service to int: ", err)
+				continue
+			}
+
+			maxNodeCPU := clusterStatus.CPUMaxFree
+
+			totalClusterCPU := uint(clusterStatus.CPUFreeTotal)
+
+			//Calculate CPU difference to determine whether to delegate a replica to the cluster
+			dist := maxNodeCPU - (1000 * serviceCPU)
+
+			//The priority of delegating the service is set based on the free CPU of the cluster as long as it has free CPU on a node to delegate the service.
+			if dist >= 0 {
+				service.Replicas[id].Priority = totalClusterCPU
+			} else {
+				service.Replicas[id].Priority = 0
+			}
+
+			fmt.Println(clusterStatus)
 
 		}
 	}
