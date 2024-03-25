@@ -84,7 +84,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 
 	for _, replica := range service.Replicas {
 		// Manage if replica.Type is "oscar"
-		if strings.ToLower(replica.Type) == oscarReplicaType && replica.Priority != 0 {
+		if strings.ToLower(replica.Type) == oscarReplicaType && replica.Priority != 101 {
 			// Check ClusterID is defined in 'Clusters'
 			cluster, ok := service.Clusters[replica.ClusterID]
 			if !ok {
@@ -380,7 +380,7 @@ func getClusterStatus(service *types.Service) {
 				mappedCPU := mapToRange((totalClusterCPU / 1000), 0, 16, 100, 0)
 				service.Replicas[id].Priority = uint(mappedCPU)
 			} else {
-				service.Replicas[id].Priority = 100
+				service.Replicas[id].Priority = 101
 			}
 
 			fmt.Println(clusterStatus)
