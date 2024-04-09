@@ -369,16 +369,16 @@ func getClusterStatus(service *types.Service) {
 
 			maxNodeCPU := clusterStatus.CPUMaxFree
 
-			totalClusterCPU := clusterStatus.CPUFreeTotal
-
 			//Calculate CPU difference to determine whether to delegate a replica to the cluster
 			dist := maxNodeCPU - (1000 * serviceCPU)
 
 			//The priority of delegating the service is set based on the free CPU of the cluster as long as it has free CPU on a node to delegate the service.
 			if dist >= 0 {
 				//Map the totalClusterCPU range to a smaller range (input range 0 to 16 cpu to output range 100 to 0 priority)
-				mappedCPU := mapToRange((totalClusterCPU / 1000), 0, 16, 100, 0)
-				service.Replicas[id].Priority = uint(mappedCPU)
+				totalClusterCPU := clusterStatus.CPUFreeTotal
+				mappedCPUPriority := mapToRange((totalClusterCPU / 1000), 0, 16, 100, 0)
+
+				service.Replicas[id].Priority = uint(mappedCPUPriority)
 			} else {
 				service.Replicas[id].Priority = 101
 			}
