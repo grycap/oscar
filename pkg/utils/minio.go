@@ -264,7 +264,7 @@ func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers b
 						"s3:*"
 					],
 					"Resource": [
-						"arn:aws:s3:::` + bucketName + `"
+						"arn:aws:s3:::` + bucketName + `/*"
 					]
 				}
 			]
