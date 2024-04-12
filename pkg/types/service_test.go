@@ -269,7 +269,8 @@ clusters:
     auth_user: testuser
     auth_password: testpass
     ssl_verify: true
-enable_InterLink: false`
+enable_InterLink: false
+`
 
 	str, _ := testService.ToYAML()
 
