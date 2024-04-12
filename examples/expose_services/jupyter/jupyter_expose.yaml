@@ -1,0 +1,18 @@
+functions:
+  oscar:
+  - oscar-cluster:
+     name: jupyter
+     memory: 2Gi
+     cpu: '1.0'
+     image: jupyter/base-notebook
+     script: jupyterscript.sh
+     environment:
+       Variables:
+         JUPYTER_TOKEN: "root"
+         JHUB_BASE_URL: "/system/services/jupyter/exposed"
+     expose:
+      min_scale: 1
+      max_scale: 1
+      port: 8888
+      cpu_threshold: 90
+      rewrite_target: true
