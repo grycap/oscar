@@ -156,15 +156,10 @@ type Service struct {
 	Synchronous struct {
 		// MinScale minimum number of active replicas (pods) for the service
 		// Optional. (default: 0)
+		MinScale int `json:"min_scale"`
 		// MaxScale maximum number of active replicas (pods) for the service
 		// Optional. (default: 0 [Unlimited])
-		MinScale       int32 `json:"min_scale" default:"1"`
-		MaxScale       int32 `json:"max_scale" default:"10"`
-		Port           int   `json:"port" `
-		CpuThreshold   int32 `json:"cpu_threshold" default:"80" `
-		RewriteTarget  bool  `json:"rewrite_target" default:"false" `
-		NodePort       int32 `json:"nodePort" default:"0" `
-		DefaultCommand bool  `json:"default_command" `
+		MaxScale int `json:"max_scale"`
 	} `json:"synchronous"`
 
 	// Replicas list of replicas to delegate jobs
