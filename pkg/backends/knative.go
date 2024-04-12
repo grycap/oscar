@@ -124,18 +124,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 
 	//Create an expose service
 	if service.Expose.Port != 0 {
-		exposeConf := utils.Expose{
-			Name:         service.Name,
-			NameSpace:    kn.namespace,
-			Variables:    service.Environment.Vars,
-			Image:        service.Image,
-			Port:         service.Expose.Port,
-			MaxScale:     service.Expose.MaxScale,
-			MinScale:     service.Expose.MinScale,
-			CpuThreshold: service.Expose.CpuThreshold,
-		}
-		utils.CreateExpose(exposeConf, kn.kubeClientset, *kn.config)
-
+		utils.CreateExpose(service, kn.kubeClientset, kn.config)
 	}
 	//Create deaemonset to cache the service image on all the nodes
 	if service.ImagePrefetch {
@@ -215,17 +204,7 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	}
 
 	//Update an expose service
-	exposeConf := utils.Expose{
-		Name:         service.Name,
-		NameSpace:    kn.namespace,
-		Variables:    service.Environment.Vars,
-		Image:        service.Image,
-		Port:         service.Expose.Port,
-		MaxScale:     service.Expose.MaxScale,
-		MinScale:     service.Expose.MinScale,
-		CpuThreshold: service.Expose.CpuThreshold,
-	}
-	utils.UpdateExpose(exposeConf, kn.kubeClientset, *kn.config)
+	utils.UpdateExpose(service, kn.kubeClientset, kn.config)
 
 	return nil
 }
@@ -245,12 +224,7 @@ func (kn *KnativeBackend) DeleteService(name string) error {
 	if err := deleteServiceJobs(name, kn.namespace, kn.kubeClientset); err != nil {
 		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
 	}
-	exposeConf := utils.Expose{
-		Name:      name,
-		NameSpace: kn.namespace,
-		Port:      80,
-	}
-	if err2 := utils.DeleteExpose(exposeConf, kn.kubeClientset); err2 != nil {
+	if err2 := utils.DeleteExpose(name, kn.kubeClientset, kn.config); err2 != nil {
 		log.Printf("Error deleting all associated kubernetes component of an exposed service \"%s\": %v\n", name, err2)
 	}
 
