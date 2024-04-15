@@ -85,7 +85,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 
 	for _, replica := range service.Replicas {
 		// Manage if replica.Type is "oscar" and have the capacity to receive a service
-		if strings.ToLower(replica.Type) == oscarReplicaType && replica.Priority <= uint(100) {
+		if strings.ToLower(replica.Type) == oscarReplicaType {
 			// Check ClusterID is defined in 'Clusters'
 			cluster, ok := service.Clusters[replica.ClusterID]
 			if !ok {
