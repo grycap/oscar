@@ -234,7 +234,7 @@ func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers b
 	var jsonErr error
 
 	if allUsers {
-		rs := "arn:aws:s3:::" + bucketName
+		rs := "arn:aws:s3:::" + bucketName + "/*"
 		groupName = ALL_USERS_GROUP
 
 		policyInfo, errInfo := adminClient.InfoCannedPolicyV2(context.TODO(), ALL_USERS_GROUP)
