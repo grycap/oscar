@@ -246,6 +246,10 @@ expose:
   max_scale: 0
   port: 0
   cpu_threshold: 0
+  rewrite_target: false
+  nodePort: 0
+  default_command: false
+  enablesgx: false
 environment:
   Variables:
     TEST_VAR: testvalue
@@ -268,6 +272,7 @@ clusters:
     auth_user: testuser
     auth_password: testpass
     ssl_verify: true
+interLink: ""
 allowed_users: []
 `
 
