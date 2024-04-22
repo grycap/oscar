@@ -49,9 +49,10 @@ var (
 
 const (
 	//
+	SupervisorPath  = "./supervisor"
 	NodeSelectorKey = "kubernetes.io/hostname"
 
-	InterLinkNodeName           = "vega-new-vk"
+	//InterLinkNodeName           = "vega-new-vk"
 	InterLinkDNSPolicy          = "ClusterFirst"
 	InterLinkRestartPolicy      = "OnFailure"
 	InterLinkTolerationKey      = "virtual-node.interlink/no-schedule"
@@ -102,14 +103,14 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 
 		event := v1.EnvVar{}
 		var args string
-		if cfg.InterLinkAvailable && service.EnableInterLink {
+		if cfg.InterLinkAvailable && service.InterLink != "" {
 			event = v1.EnvVar{
 				Name:  types.EventVariable,
 				Value: base64.StdEncoding.EncodeToString([]byte(eventBytes)),
 			}
-			args = fmt.Sprintf("\"  wget %s && chmod 0755 supervisor  &&   echo \\$%s | base64 -d | ./supervisor  \"", service.GetSupervisorURL(), types.EventVariable)
+			args = fmt.Sprintf("\"  wget %s -O %s && chmod 0755 %s  &&   echo \\$%s | base64 -d | %s  \"", cfg.SupervisorURL, SupervisorPath, SupervisorPath, types.EventVariable, SupervisorPath)
 			podSpec.NodeSelector = map[string]string{
-				NodeSelectorKey: InterLinkNodeName,
+				NodeSelectorKey: service.InterLink,
 			}
 			podSpec.DNSPolicy = InterLinkDNSPolicy
 			podSpec.RestartPolicy = InterLinkRestartPolicy

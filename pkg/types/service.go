@@ -62,9 +62,6 @@ const (
 	// SupervisorName name of the FaaS Supervisor binary
 	SupervisorName = "supervisor"
 
-	//
-	SupervisorURL = "https://github.com/grycap/faas-supervisor/releases/download/1.5.8/supervisor"
-
 	// ServiceLabel label for deploying services in all backs
 	ServiceLabel = "oscar_service"
 
@@ -206,10 +203,13 @@ type Service struct {
 	ImagePullSecrets []string `json:"image_pull_secrets,omitempty"`
 
 	Expose struct {
-		MinScale     int32 `json:"min_scale" default:"1"`
-		MaxScale     int32 `json:"max_scale" default:"10"`
-		Port         int   `json:"port" `
-		CpuThreshold int32 `json:"cpu_threshold" default:"80" `
+		MinScale       int32 `json:"min_scale" default:"1"`
+		MaxScale       int32 `json:"max_scale" default:"10"`
+		Port           int   `json:"port" `
+		CpuThreshold   int32 `json:"cpu_threshold" default:"80" `
+		RewriteTarget  bool  `json:"rewrite_target" default:"false" `
+		NodePort       int32 `json:"nodePort" default:"0" `
+		DefaultCommand bool  `json:"default_command" `
 	} `json:"expose"`
 
 	// The user-defined environment variables assigned to the service
@@ -236,7 +236,7 @@ type Service struct {
 	// Optional
 	Clusters map[string]Cluster `json:"clusters,omitempty"`
 
-	EnableInterLink bool `json:"enable_InterLink"`
+	InterLink string `json:"interLink"`
 }
 
 // ToPodSpec returns a k8s podSpec from the Service
@@ -277,7 +277,7 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 			},
 		},
 	}
-	if cfg.InterLinkAvailable && service.EnableInterLink {
+	if cfg.InterLinkAvailable && service.InterLink != "" {
 		// Add specs of InterLink
 		podSpec.Containers[0].ImagePullPolicy = "Always"
 	} else {
@@ -420,10 +420,6 @@ func (service *Service) GetSupervisorPath() string {
 		return fmt.Sprintf("%s/%s/%s", VolumePath, AlpineDirectory, SupervisorName)
 	}
 	return fmt.Sprintf("%s/%s", VolumePath, SupervisorName)
-}
-
-func (service *Service) GetSupervisorURL() string {
-	return SupervisorURL
 }
 
 // HasReplicas checks if the service has replicas defined
