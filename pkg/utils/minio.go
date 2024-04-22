@@ -24,9 +24,11 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/minio/madmin-go"
 )
+
+const ALL_USERS_GROUP = "all_users_group"
 
 // MinIOAdminClient struct to represent a MinIO Admin client to configure webhook notifications
 type MinIOAdminClient struct {
@@ -79,6 +81,98 @@ func MakeMinIOAdminClient(cfg *types.Config) (*MinIOAdminClient, error) {
 	return minIOAdminClient, nil
 }
 
+// CreateMinIOUser creates a new user for multitenancy
+func (minIOAdminClient *MinIOAdminClient) CreateMinIOUser(ak string, sk string) error {
+	var users []string
+	err := minIOAdminClient.adminClient.AddUser(context.TODO(), ak, sk)
+	if err != nil {
+		return fmt.Errorf("error creating MinIO user: %v", err)
+	}
+
+	users = append(users, ak)
+	err2 := minIOAdminClient.AddUserToGroup(users, ALL_USERS_GROUP)
+	if err2 != nil {
+		return err2
+	}
+	return nil
+}
+
+// CreateAllUsersGroup creates a group used for public services
+func (minIOAdminClient *MinIOAdminClient) CreateAllUsersGroup() error {
+	err := createGroup(minIOAdminClient.adminClient, ALL_USERS_GROUP)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// CreateServiceGroup creates a MinIO group and its associated policy for a service
+func (minIOAdminClient *MinIOAdminClient) CreateServiceGroup(bucketName string) error {
+	err := createGroup(minIOAdminClient.adminClient, bucketName)
+	if err != nil {
+		return err
+	}
+
+	err = createPolicy(minIOAdminClient.adminClient, bucketName)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// AddServiceToAllUsersGroup associates policy of all users to a service
+func (minIOAdminClient *MinIOAdminClient) AddServiceToAllUsersGroup(bucketName string) error {
+	err := createPolicy(minIOAdminClient.adminClient, bucketName)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// AddUserToGroup adds  user/users to a group
+func (minIOAdminClient *MinIOAdminClient) AddUserToGroup(users []string, groupName string) error {
+	group := madmin.GroupAddRemove{
+		Group:    groupName,
+		Members:  users,
+		Status:   "enable",
+		IsRemove: false,
+	}
+
+	err := minIOAdminClient.adminClient.UpdateGroupMembers(context.TODO(), group)
+	if err != nil {
+		return fmt.Errorf("error adding users to group: %v", err)
+	}
+
+	return nil
+}
+
+// DeleteServiceGroup empty the service group and policy
+func (minIOAdminClient *MinIOAdminClient) DeleteServiceGroup(groupName string) error {
+	description, err := minIOAdminClient.adminClient.GetGroupDescription(context.Background(), groupName)
+	if err != nil {
+		return err
+	}
+	group := madmin.GroupAddRemove{
+		Group:    groupName,
+		Members:  description.Members,
+		Status:   "enable",
+		IsRemove: true,
+	}
+
+	err = minIOAdminClient.adminClient.UpdateGroupMembers(context.Background(), group)
+	if err != nil {
+		return fmt.Errorf("Error emptying group: %v", err)
+	}
+
+	err = minIOAdminClient.adminClient.RemoveCannedPolicy(context.TODO(), groupName)
+	if err != nil {
+		return fmt.Errorf("Error removing group's policy: %v", err)
+	}
+	return nil
+}
+
 // RegisterWebhook registers a new webhook in the MinIO configuration
 func (minIOAdminClient *MinIOAdminClient) RegisterWebhook(name string, token string) error {
 	_, err := minIOAdminClient.adminClient.SetConfigKV(context.TODO(), fmt.Sprintf("notify_webhook:%s endpoint=%s/job/%s auth_token=%s", name, minIOAdminClient.oscarEndpoint.String(), name, token))
@@ -112,6 +206,49 @@ func (minIOAdminClient *MinIOAdminClient) RestartServer() error {
 	_, err = minIOAdminClient.adminClient.ServerInfo(context.TODO())
 	if err != nil {
 		return fmt.Errorf("error restarting the MinIO server: %v", err)
+	}
+
+	return nil
+}
+
+func createPolicy(adminClient *madmin.AdminClient, groupName string) error {
+	policy := `{
+		"Version": "2012-10-17",
+		"Statement": [
+			{
+				"Effect": "Allow",
+				"Action": [
+					"s3:*"
+				],
+				"Resource": [
+					"arn:aws:s3:::` + groupName + `*"
+				]
+			}
+		]
+	}`
+
+	err := adminClient.AddCannedPolicy(context.TODO(), groupName, []byte(policy))
+	if err != nil {
+		return fmt.Errorf("error creating MinIO policy for group %s: %v", groupName, err)
+	}
+
+	err = adminClient.SetPolicy(context.TODO(), groupName, groupName, true)
+	if err != nil {
+		return fmt.Errorf("error setting MinIO policy for group %s: %v", groupName, err)
+	}
+	return nil
+}
+
+func createGroup(adminClient *madmin.AdminClient, groupName string) error {
+	group := madmin.GroupAddRemove{
+		Group:    groupName,
+		Members:  []string{},
+		Status:   "enable",
+		IsRemove: false,
+	}
+	err := adminClient.UpdateGroupMembers(context.TODO(), group)
+	if err != nil {
+		return fmt.Errorf("error creating MinIO group %s: %v", groupName, err)
 	}
 
 	return nil

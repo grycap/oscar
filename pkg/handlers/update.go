@@ -23,8 +23,9 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v2/pkg/types"
-	"github.com/grycap/oscar/v2/pkg/utils"
+	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -53,6 +54,45 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
+		if newService.VO != "" && newService.VO != oldService.VO {
+			for _, vo := range cfg.OIDCGroups {
+				if vo == newService.VO {
+					authHeader := c.GetHeader("Authorization")
+					err := checkIdentity(&newService, cfg, authHeader)
+					if err != nil {
+						c.String(http.StatusBadRequest, fmt.Sprintln(err))
+					}
+					break
+				}
+			}
+		}
+
+		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+		if !isAdminUser {
+			mc, err := auth.GetMultitenancyConfigFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+			}
+
+			// Check if users in allowed_users have a MinIO associated user
+			if len(newService.AllowedUsers) == 0 {
+				uids := mc.CheckUsersInCache(newService.AllowedUsers)
+				if len(uids) == 0 {
+					for _, uid := range uids {
+						sk, _ := auth.GenerateRandomKey(8)
+						minIOAdminClient.CreateMinIOUser(uid, sk)
+						mc.CreateSecretForOIDC(uid, sk)
+					}
+				}
+			}
+
+			if len(newService.AllowedUsers) != len(oldService.AllowedUsers) {
+				//Update users group list
+				minIOAdminClient.AddUserToGroup(newService.AllowedUsers, "")
+
+			}
+		}
+
 		// Update the service
 		if err := back.UpdateService(newService); err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
@@ -68,6 +108,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				provName = strings.ToLower(provSlice[0])
 			}
 			if provName == types.MinIOName {
+
 				// Register minio webhook and restart the server
 				if err := registerMinIOWebhook(newService.Name, newService.Token, newService.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
 					back.UpdateService(*oldService)
@@ -76,7 +117,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 
 				// Update buckets
-				if err := updateBuckets(&newService, oldService, cfg); err != nil {
+				if err := updateBuckets(&newService, oldService, minIOAdminClient, cfg); err != nil {
 					if err == errInput {
 						c.String(http.StatusBadRequest, err.Error())
 					} else {
@@ -100,12 +141,12 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 	}
 }
 
-func updateBuckets(newService, oldService *types.Service, cfg *types.Config) error {
+func updateBuckets(newService, oldService *types.Service, minIOAdminClient *utils.MinIOAdminClient, cfg *types.Config) error {
 	// Disable notifications from oldService.Input
 	if err := disableInputNotifications(oldService.GetMinIOWebhookARN(), oldService.Input, oldService.StorageProviders.MinIO[types.DefaultProvider]); err != nil {
 		return fmt.Errorf("error disabling MinIO input notifications: %v", err)
 	}
 
 	// Create the input and output buckets/folders from newService
-	return createBuckets(newService, cfg)
+	return createBuckets(newService, cfg, minIOAdminClient, newService.AllowedUsers, true)
 }

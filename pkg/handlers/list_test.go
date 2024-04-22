@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v2/pkg/backends"
+	"github.com/grycap/oscar/v3/pkg/backends"
 )
 
 func TestMakeListHandler(t *testing.T) {

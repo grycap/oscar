@@ -17,10 +17,13 @@ limitations under the License.
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -28,6 +31,8 @@ import (
 func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		service, err := back.ReadService(c.Param("serviceName"))
+		authHeader := c.GetHeader("Authorization")
+
 		if err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {
@@ -36,6 +41,25 @@ func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 				c.String(http.StatusInternalServerError, err.Error())
 			}
 			return
+		}
+		if len(strings.Split(authHeader, "Bearer")) > 1 {
+			uid, err := auth.GetUIDFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+			}
+
+			var isAllowed bool
+			for _, id := range service.AllowedUsers {
+				if uid == id {
+					isAllowed = true
+					break
+				}
+			}
+
+			if !isAllowed {
+				c.String(http.StatusForbidden, "User %s doesn't have permision to get this service", uid)
+				return
+			}
 		}
 
 		c.JSON(http.StatusOK, service)

@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/types"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,7 +57,7 @@ type PodCounter struct {
 var pc PodCounter
 var stopper chan struct{}
 
-//Create daemonset
+// Create daemonset
 func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kubernetes.Interface) error {
 
 	//Set needed variables
@@ -83,7 +83,7 @@ func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kub
 	return nil
 }
 
-//Get daemonset definition
+// Get daemonset definition
 func getDaemonset(cfg *types.Config, service types.Service) *appsv1.DaemonSet {
 	return &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -120,7 +120,7 @@ func getDaemonset(cfg *types.Config, service types.Service) *appsv1.DaemonSet {
 	}
 }
 
-//Watch pods with a Kubernetes Informer
+// Watch pods with a Kubernetes Informer
 func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 	stopper = make(chan struct{})
 	defer close(stopper)

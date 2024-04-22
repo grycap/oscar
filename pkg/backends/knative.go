@@ -21,17 +21,21 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 
-	"github.com/grycap/oscar/v2/pkg/imagepuller"
-	"github.com/grycap/oscar/v2/pkg/types"
-	"github.com/grycap/oscar/v2/pkg/utils"
+	"github.com/grycap/oscar/v3/pkg/imagepuller"
+	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	knv1 "knative.dev/serving/pkg/apis/serving/v1"
 	knclientset "knative.dev/serving/pkg/client/clientset/versioned"
 )
+
+// Custom logger
+var knativeLogger = log.New(os.Stdout, "[KNATIVE] ", log.Flags())
 
 // KnativeBackend struct to represent a Knative client
 type KnativeBackend struct {
@@ -124,7 +128,23 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 
 	//Create an expose service
 	if service.Expose.Port != 0 {
+<<<<<<< HEAD
 		utils.CreateExpose(service, kn.kubeClientset, kn.config)
+=======
+		exposeConf := utils.Expose{
+			Name:         service.Name,
+			NameSpace:    kn.namespace,
+			Variables:    service.Environment.Vars,
+			Image:        service.Image,
+			Port:         service.Expose.Port,
+			MaxScale:     service.Expose.MaxScale,
+			MinScale:     service.Expose.MinScale,
+			CpuThreshold: service.Expose.CpuThreshold,
+			EnableSGX:    service.EnableSGX,
+		}
+		utils.CreateExpose(exposeConf, kn.kubeClientset, *kn.config)
+
+>>>>>>> master
 	}
 	//Create deaemonset to cache the service image on all the nodes
 	if service.ImagePrefetch {
@@ -204,7 +224,22 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	}
 
 	//Update an expose service
+<<<<<<< HEAD
 	utils.UpdateExpose(service, kn.kubeClientset, kn.config)
+=======
+	exposeConf := utils.Expose{
+		Name:         service.Name,
+		NameSpace:    kn.namespace,
+		Variables:    service.Environment.Vars,
+		Image:        service.Image,
+		Port:         service.Expose.Port,
+		MaxScale:     service.Expose.MaxScale,
+		MinScale:     service.Expose.MinScale,
+		CpuThreshold: service.Expose.CpuThreshold,
+		EnableSGX:    service.EnableSGX,
+	}
+	utils.UpdateExpose(exposeConf, kn.kubeClientset, *kn.config)
+>>>>>>> master
 
 	return nil
 }
@@ -274,6 +309,8 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 							types.KnativeMinScaleAnnotation: strconv.Itoa(service.Synchronous.MinScale),
 							types.KnativeMaxScaleAnnotation: strconv.Itoa(service.Synchronous.MaxScale),
 						},
+						//Empty labels map to avoid nil pointer errors
+						Labels: map[string]string{},
 					},
 					Spec: knv1.RevisionSpec{
 						ContainerConcurrency: &containerConcurrency,
@@ -282,6 +319,16 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 				},
 			},
 		},
+	}
+
+	// Add to the service labels the user VO for accounting on knative pods
+	if service.Labels["vo"] != "" {
+		knSvc.Spec.ConfigurationSpec.Template.ObjectMeta.Labels["vo"] = service.Labels["vo"]
+	}
+
+	if service.EnableSGX {
+		knSvc.Spec.ConfigurationSpec.Template.ObjectMeta.Annotations["kubernetes.podspec-securitycontext"] = "enabled"
+		knSvc.Spec.ConfigurationSpec.Template.ObjectMeta.Annotations["kubernetes.containerspec-addcapabilities"] = "enabled"
 	}
 
 	return knSvc, nil

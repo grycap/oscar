@@ -143,6 +143,10 @@ type Service struct {
 	// Optional. (default: false)
 	EnableGPU bool `json:"enable_gpu"`
 
+	// EnableSGX parameter to use the SCONE k8s plugin
+	// Optional. (default: false)
+	EnableSGX bool `json:"enable_sgx"`
+
 	// ImagePrefetch parameter to enable the image cache functionality
 	// Optional. (default: false)
 	ImagePrefetch bool `json:"image_prefetch"`
@@ -210,6 +214,7 @@ type Service struct {
 		RewriteTarget  bool  `json:"rewrite_target" default:"false" `
 		NodePort       int32 `json:"nodePort" default:"0" `
 		DefaultCommand bool  `json:"default_command" `
+		EnableSGX      bool
 	} `json:"expose"`
 
 	// The user-defined environment variables assigned to the service
@@ -222,6 +227,10 @@ type Service struct {
 	// https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
 	// Optional
 	Annotations map[string]string `json:"annotations"`
+
+	// Parameter to specify the VO from the user creating the service
+	// Optional
+	VO string `json:"vo"`
 
 	// Labels user-defined Kubernetes labels to be set in job's definition
 	// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -237,6 +246,9 @@ type Service struct {
 	Clusters map[string]Cluster `json:"clusters,omitempty"`
 
 	InterLink string `json:"interLink"`
+	// List of EGI UID's identifying the users that will have visibility of the service and its MinIO storage provider
+	// Optional (If the list is empty we asume the visibility is public for all cluster users)
+	AllowedUsers []string `json:"allowed_users"`
 }
 
 // ToPodSpec returns a k8s podSpec from the Service
@@ -302,6 +314,10 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 	// Add the required environment variables for the watchdog
 	addWatchdogEnvVars(podSpec, cfg, service)
 
+	if service.EnableSGX {
+		SetSecurityContext(podSpec)
+	}
+
 	return podSpec, nil
 }
 
@@ -340,6 +356,16 @@ func SetImagePullSecrets(secrets []string) []v1.LocalObjectReference {
 	return objects
 }
 
+func SetSecurityContext(podSpec *v1.PodSpec) {
+	ctx := v1.SecurityContext{
+		Capabilities: &v1.Capabilities{
+			Add: []v1.Capability{"SYS_RAWIO"},
+		},
+	}
+
+	podSpec.Containers[0].SecurityContext = &ctx
+}
+
 func createResources(service *Service) (v1.ResourceRequirements, error) {
 	resources := v1.ResourceRequirements{
 		Limits: v1.ResourceList{},
@@ -367,6 +393,14 @@ func createResources(service *Service) (v1.ResourceRequirements, error) {
 			return resources, err
 		}
 		resources.Limits["nvidia.com/gpu"] = gpu
+	}
+
+	if service.EnableSGX {
+		sgx, err := resource.ParseQuantity("1")
+		if err != nil {
+			return resources, err
+		}
+		resources.Limits["sgx.intel.com/enclave"] = sgx
 	}
 
 	return resources, nil

@@ -17,32 +17,41 @@ limitations under the License.
 package auth
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
+	"k8s.io/client-go/kubernetes"
 )
 
 // GetAuthMiddleware returns the appropriate gin auth middleware
-func GetAuthMiddleware(cfg *types.Config) gin.HandlerFunc {
+func GetAuthMiddleware(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.HandlerFunc {
 	if !cfg.OIDCEnable {
 		return gin.BasicAuth(gin.Accounts{
 			// Use the config's username and password for basic auth
 			cfg.Username: cfg.Password,
 		})
 	}
-	return CustomAuth(cfg)
+	return CustomAuth(cfg, kubeClientset)
 }
 
 // CustomAuth returns a custom auth handler (gin middleware)
-func CustomAuth(cfg *types.Config) gin.HandlerFunc {
+func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.HandlerFunc {
 	basicAuthHandler := gin.BasicAuth(gin.Accounts{
 		// Use the config's username and password for basic auth
 		cfg.Username: cfg.Password,
 	})
 
-	oidcHandler := getOIDCMiddleware(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
+	minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+	// Slice to add default user to all users group on MinIO
+	var oscarUser = []string{"console"}
 
+	minIOAdminClient.CreateAllUsersGroup()
+	minIOAdminClient.AddUserToGroup(oscarUser, "all_users_group")
+
+	oidcHandler := getOIDCMiddleware(kubeClientset, minIOAdminClient, cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
@@ -51,4 +60,28 @@ func CustomAuth(cfg *types.Config) gin.HandlerFunc {
 			basicAuthHandler(c)
 		}
 	}
+}
+
+func GetUIDFromContext(c *gin.Context) (string, error) {
+	uidOrigin, uidExists := c.Get("uidOrigin")
+	if !uidExists {
+		return "", fmt.Errorf("Missing EGI user uid")
+	}
+	uid, uidParsed := uidOrigin.(string)
+	if !uidParsed {
+		return "", fmt.Errorf("Error parsing uid origin: %v", uidParsed)
+	}
+	return uid, nil
+}
+
+func GetMultitenancyConfigFromContext(c *gin.Context) (*MultitenancyConfig, error) {
+	mcUntyped, mcExists := c.Get("multitenancyConfig")
+	if !mcExists {
+		return nil, fmt.Errorf("Missing multitenancy config")
+	}
+	mc, mcParsed := mcUntyped.(*MultitenancyConfig)
+	if !mcParsed {
+		return nil, fmt.Errorf("Error parsing multitenancy config")
+	}
+	return mc, nil
 }

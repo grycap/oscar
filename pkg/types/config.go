@@ -57,7 +57,7 @@ type configVar struct {
 // Config stores the configuration for the OSCAR server
 type Config struct {
 	// MinIOProvider access info
-	MinIOProvider *MinIOProvider `json:"minio_provider"`
+	MinIOProvider *MinIOProvider `json:"-"`
 
 	// Basic auth username
 	Username string `json:"-"`

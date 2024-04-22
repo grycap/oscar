@@ -17,7 +17,7 @@ limitations under the License.
 package utils
 
 import (
-	"github.com/grycap/oscar/v2/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/types"
 )
 
 // Validate the input variables of the service

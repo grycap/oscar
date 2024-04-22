@@ -18,16 +18,27 @@ package auth
 
 import (
 	"context"
+	"fmt"
+	"log"
+	"os"
+
 	"net/http"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	"golang.org/x/oauth2"
+	"k8s.io/client-go/kubernetes"
 )
 
-// EGIGroupsURNPrefix prefix to identify EGI group URNs
-const EGIGroupsURNPrefix = "urn:mace:egi.eu:group"
+const (
+	// EGIGroupsURNPrefix prefix to identify EGI group URNs
+	EGIGroupsURNPrefix = "urn:mace:egi.eu:group"
+	SecretKeyLength    = 10
+)
+
+var oidcLogger = log.New(os.Stdout, "[OIDC-AUTH] ", log.Flags())
 
 // oidcManager struct to represent a OIDC manager, including a cache of tokens
 type oidcManager struct {
@@ -45,7 +56,7 @@ type userInfo struct {
 }
 
 // newOIDCManager returns a new oidcManager or error if the oidc.Provider can't be created
-func newOIDCManager(issuer string, subject string, groups []string) (*oidcManager, error) {
+func NewOIDCManager(issuer string, subject string, groups []string) (*oidcManager, error) {
 	provider, err := oidc.NewProvider(context.TODO(), issuer)
 	if err != nil {
 		return nil, err
@@ -65,13 +76,15 @@ func newOIDCManager(issuer string, subject string, groups []string) (*oidcManage
 }
 
 // getIODCMiddleware returns the Gin's handler middleware to validate OIDC-based auth
-func getOIDCMiddleware(issuer string, subject string, groups []string) gin.HandlerFunc {
-	oidcManager, err := newOIDCManager(issuer, subject, groups)
+func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *utils.MinIOAdminClient, issuer string, subject string, groups []string) gin.HandlerFunc {
+	oidcManager, err := NewOIDCManager(issuer, subject, groups)
 	if err != nil {
 		return func(c *gin.Context) {
 			c.AbortWithStatus(http.StatusUnauthorized)
 		}
 	}
+
+	mc := NewMultitenancyConfig(kubeClientset, subject)
 
 	return func(c *gin.Context) {
 		// Get token from headers
@@ -87,6 +100,34 @@ func getOIDCMiddleware(issuer string, subject string, groups []string) gin.Handl
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
+
+		ui, err := oidcManager.getUserInfo(rawToken)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("%v", err))
+			return
+		}
+		uid := ui.subject
+
+		// Check if exist MinIO user in cached users list
+		exists := mc.UserExists(uid)
+		if !exists {
+			sk, err := GenerateRandomKey(SecretKeyLength)
+			if err != nil {
+				oidcLogger.Println("Error generating random key for MinIO user")
+			}
+			// Create MinIO user and k8s secret with credentials
+			err = mc.CreateSecretForOIDC(uid, sk)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating secret for user %s: %v", uid, err))
+			}
+			err = minIOAdminClient.CreateMinIOUser(uid, sk)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO user for uid %s: %v", uid, err))
+			}
+		}
+		c.Set("uidOrigin", uid)
+		c.Set("multitenancyConfig", mc)
+		c.Next()
 	}
 }
 
@@ -138,6 +179,29 @@ func getGroups(urns []string) []string {
 	}
 
 	return groups
+}
+
+// UserHasVO checks if the user contained on the request token is enrolled on a specific VO
+func (om *oidcManager) UserHasVO(rawToken string, vo string) (bool, error) {
+	ui, err := om.getUserInfo(rawToken)
+	if err != nil {
+		return false, err
+	}
+	for _, gr := range ui.groups {
+		if vo == gr {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (om *oidcManager) GetUID(rawToken string) (string, error) {
+	ui, err := om.getUserInfo(rawToken)
+	oidcLogger.Println("received uid: ", ui.subject)
+	if err != nil {
+		return ui.subject, nil
+	}
+	return "", err
 }
 
 // isAuthorised checks if a token is authorised to access the API

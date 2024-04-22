@@ -215,6 +215,7 @@ cpu: "1.0"
 total_memory: ""
 total_cpu: ""
 enable_gpu: false
+enable_sgx: false
 image_prefetch: false
 synchronous:
   min_scale: 0
@@ -250,6 +251,7 @@ environment:
     TEST_VAR: testvalue
 annotations:
   testannotation: testannotationvalue
+vo: ""
 labels:
   testlabel: testlabelvalue
 storage_providers:
@@ -266,6 +268,7 @@ clusters:
     auth_user: testuser
     auth_password: testpass
     ssl_verify: true
+allowed_users: []
 `
 
 	str, _ := testService.ToYAML()

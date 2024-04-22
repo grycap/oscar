@@ -22,9 +22,9 @@ import (
 	"log"
 
 	"github.com/goccy/go-yaml"
-	"github.com/grycap/oscar/v2/pkg/imagepuller"
-	"github.com/grycap/oscar/v2/pkg/types"
-	"github.com/grycap/oscar/v2/pkg/utils"
+	"github.com/grycap/oscar/v3/pkg/imagepuller"
+	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"

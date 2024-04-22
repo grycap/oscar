@@ -26,8 +26,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v2/pkg/types"
-	"github.com/grycap/oscar/v2/pkg/utils"
+	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -36,6 +37,27 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 	return func(c *gin.Context) {
 		// First get the Service
 		service, _ := back.ReadService(c.Param("serviceName"))
+		authHeader := c.GetHeader("Authorization")
+
+		var isAllowed bool
+		if len(strings.Split(authHeader, "Bearer")) > 1 {
+			uid, err := auth.GetUIDFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+			}
+
+			for _, id := range service.AllowedUsers {
+				if uid == id {
+					isAllowed = true
+					break
+				}
+			}
+
+			if !isAllowed {
+				c.String(http.StatusForbidden, "User %s doesn't have permision to get this service", uid)
+				return
+			}
+		}
 
 		if err := back.DeleteService(c.Param("serviceName")); err != nil {
 			// Check if error is caused because the service is not found
@@ -46,6 +68,21 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			return
 		}
+		minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
+		if err != nil {
+			log.Printf("the provided MinIO configuration is not valid: %v", err)
+		}
+
+		if isAllowed {
+			// Delete the group and policy
+			for _, in := range service.Input {
+				path := strings.Trim(in.Path, " /")
+				// Split buckets and folders from path
+				bucket := strings.SplitN(path, "/", 2)
+				minIOAdminClient.DeleteServiceGroup(bucket[0])
+			}
+
+		}
 
 		// Disable input notifications
 		if err := disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, service.StorageProviders.MinIO[types.DefaultProvider]); err != nil {
@@ -53,7 +90,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Remove the service's webhook in MinIO config and restart the server
-		if err := removeMinIOWebhook(service.Name, cfg); err != nil {
+		if err := removeMinIOWebhook(service.Name, minIOAdminClient); err != nil {
 			log.Printf("Error removing MinIO webhook for service \"%s\": %v\n", service.Name, err)
 		}
 
@@ -68,11 +105,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 	}
 }
 
-func removeMinIOWebhook(name string, cfg *types.Config) error {
-	minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
-	if err != nil {
-		return fmt.Errorf("the provided MinIO configuration is not valid: %v", err)
-	}
+func removeMinIOWebhook(name string, minIOAdminClient *utils.MinIOAdminClient) error {
 
 	if err := minIOAdminClient.RemoveWebhook(name); err != nil {
 		return fmt.Errorf("error removing the service's webhook: %v", err)
