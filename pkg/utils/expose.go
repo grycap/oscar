@@ -294,7 +294,7 @@ func getPodTemplateSpec(service types.Service, cfg *types.Config) v1.PodTemplate
 		Spec: *podSpec,
 	}
 
-	if service.expose.EnableSGX {
+	if service.Expose.EnableSGX {
 		ExposeLogger.Printf("DEBUG: Enabling components to use SGX plugin\n")
 		types.SetSecurityContext(&template.Spec)
 		sgx, _ := resource.ParseQuantity("1")
