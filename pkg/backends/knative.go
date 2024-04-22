@@ -128,23 +128,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 
 	//Create an expose service
 	if service.Expose.Port != 0 {
-<<<<<<< HEAD
 		utils.CreateExpose(service, kn.kubeClientset, kn.config)
-=======
-		exposeConf := utils.Expose{
-			Name:         service.Name,
-			NameSpace:    kn.namespace,
-			Variables:    service.Environment.Vars,
-			Image:        service.Image,
-			Port:         service.Expose.Port,
-			MaxScale:     service.Expose.MaxScale,
-			MinScale:     service.Expose.MinScale,
-			CpuThreshold: service.Expose.CpuThreshold,
-			EnableSGX:    service.EnableSGX,
-		}
-		utils.CreateExpose(exposeConf, kn.kubeClientset, *kn.config)
-
->>>>>>> master
 	}
 	//Create deaemonset to cache the service image on all the nodes
 	if service.ImagePrefetch {
@@ -222,24 +206,8 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		}
 		return err
 	}
-
 	//Update an expose service
-<<<<<<< HEAD
 	utils.UpdateExpose(service, kn.kubeClientset, kn.config)
-=======
-	exposeConf := utils.Expose{
-		Name:         service.Name,
-		NameSpace:    kn.namespace,
-		Variables:    service.Environment.Vars,
-		Image:        service.Image,
-		Port:         service.Expose.Port,
-		MaxScale:     service.Expose.MaxScale,
-		MinScale:     service.Expose.MinScale,
-		CpuThreshold: service.Expose.CpuThreshold,
-		EnableSGX:    service.EnableSGX,
-	}
-	utils.UpdateExpose(exposeConf, kn.kubeClientset, *kn.config)
->>>>>>> master
 
 	return nil
 }
