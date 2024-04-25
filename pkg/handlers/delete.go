@@ -39,26 +39,13 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		service, _ := back.ReadService(c.Param("serviceName"))
 		authHeader := c.GetHeader("Authorization")
 
-		var isAllowed bool
 		if len(strings.Split(authHeader, "Bearer")) > 1 {
 			uid, err := auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
-			var isAllowed bool
-			if len(service.AllowedUsers) == 0 {
-				isAllowed = true
-			} else {
-				for _, id := range service.AllowedUsers {
-					if uid == id {
-						isAllowed = true
-						break
-					}
-				}
-			}
-
-			if !isAllowed {
+			if service.Owner != uid {
 				c.String(http.StatusForbidden, "User %s doesn't have permision to get this service", uid)
 				return
 			}
@@ -78,15 +65,12 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			log.Printf("the provided MinIO configuration is not valid: %v", err)
 		}
 
-		if isAllowed {
-			// Delete the group and policy
-			for _, in := range service.Input {
-				path := strings.Trim(in.Path, " /")
-				// Split buckets and folders from path
-				bucket := strings.SplitN(path, "/", 2)
-				minIOAdminClient.DeleteServiceGroup(bucket[0])
-			}
-
+		// Delete the group and policy
+		for _, in := range service.Input {
+			path := strings.Trim(in.Path, " /")
+			// Split buckets and folders from path
+			bucket := strings.SplitN(path, "/", 2)
+			minIOAdminClient.DeleteServiceGroup(bucket[0])
 		}
 
 		// Disable input notifications

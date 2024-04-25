@@ -241,6 +241,10 @@ type Service struct {
 	// Optional
 	Clusters map[string]Cluster `json:"clusters,omitempty"`
 
+	// EGI UID of the user that created the service
+	// If the service is created through basic auth the default owner is "cluster_admin"
+	Owner string `json:"owner" default:"cluster_admin"`
+
 	// List of EGI UID's identifying the users that will have visibility of the service and its MinIO storage provider
 	// Optional (If the list is empty we asume the visibility is public for all cluster users)
 	AllowedUsers []string `json:"allowed_users"`

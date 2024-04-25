@@ -75,6 +75,9 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
+			// Set UID from owner
+			service.Owner = uid
+
 			mc, err := auth.GetMultitenancyConfigFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
@@ -97,7 +100,20 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			if len(service.AllowedUsers) > 0 {
 				// If AllowedUsers is empty don't add uid
 				service.Labels["uid"] = full_uid[0:8]
-				service.AllowedUsers = append(service.AllowedUsers, uid)
+
+				// If the uid of the owner is not on the allowed_users list append it
+				ownerOnList := false
+				for _, user := range service.AllowedUsers {
+					if user == service.Owner {
+						ownerOnList = true
+						break
+					}
+				}
+				if !ownerOnList {
+					service.AllowedUsers = append(service.AllowedUsers, uid)
+				}
+				// Check if the uid's from allowed_users have and asociated MinIO user
+				// and create it if not
 				uids := mc.CheckUsersInCache(service.AllowedUsers)
 				if len(uids) > 0 {
 					for _, uid := range uids {
@@ -144,7 +160,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				log.Println(err.Error())
 			}
 		}
-
+		createLogger.Println("Service created with name: ", service.Name)
 		c.Status(http.StatusCreated)
 	}
 }
@@ -268,6 +284,9 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		if !isAdminUser {
 			if len(allowed_users) == 0 {
 				err = minIOAdminClient.AddServiceToAllUsersGroup(splitPath[0])
+				if err != nil {
+					return fmt.Errorf("error adding service %s to all users group: %v", splitPath[0], err)
+				}
 			} else {
 				if !isUpdate {
 					err = minIOAdminClient.CreateServiceGroup(splitPath[0])

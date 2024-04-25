@@ -49,7 +49,7 @@ func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 			}
 
 			var isAllowed bool
-			if len(service.AllowedUsers) == 0 {
+			if len(service.AllowedUsers) == 0 || service.Owner == uid {
 				isAllowed = true
 			} else {
 				for _, id := range service.AllowedUsers {

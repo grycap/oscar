@@ -62,15 +62,21 @@ func (mc *MultitenancyConfig) ClearCache() {
 	mc.usersCache = nil
 }
 
+// UserExists checks if a MinIO user has been created and stored on cache.
 func (mc *MultitenancyConfig) UserExists(uid string) bool {
 	if len(mc.usersCache) < 1 {
 		// If the cache is empty check if a secret for the uid exists
-		secret_name := FormatUID(uid)
-		_, err := mc.kubeClientset.CoreV1().Secrets(ServicesNamespace).Get(context.TODO(), secret_name, metav1.GetOptions{})
+		secretName := FormatUID(uid)
+		secret, err := mc.kubeClientset.CoreV1().Secrets(ServicesNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 		if err != nil {
 			return false
 		}
-		return true
+		// If the container has been restarted a user can exist
+		// but not be on the cache due to lack of persistence
+		if secret != nil {
+			mc.UpdateCache(uid)
+			return true
+		}
 	} else {
 		for _, id := range mc.usersCache {
 			if id == uid {
@@ -92,7 +98,7 @@ func (mc *MultitenancyConfig) CheckUsersInCache(uids []string) []string {
 				break
 			}
 		}
-		if found == false {
+		if !found {
 			notFoundUsers = append(notFoundUsers, uid)
 		}
 	}
@@ -138,7 +144,7 @@ func (mc *MultitenancyConfig) GetUserCredentials(uid string) (string, string, er
 	if access_key != "" && secret_key != "" {
 		return access_key, secret_key, nil
 	}
-	return "", "", fmt.Errorf("Error decoding secret data")
+	return "", "", fmt.Errorf("error decoding secret data")
 }
 
 func GenerateRandomKey(length int) (string, error) {

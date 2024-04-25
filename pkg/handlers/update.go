@@ -44,6 +44,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Read the current service
 		oldService, err := back.ReadService(newService.Name)
+
 		if err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {
@@ -54,6 +55,17 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
+		uid, err := auth.GetUIDFromContext(c)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintln("Couldn't get UID from context"))
+		}
+
+		if oldService.Owner != uid {
+			c.String(http.StatusForbidden, "User %s doesn't have permision to modify this service", uid)
+			return
+		}
+
+		// If the service has changed VO check permisions again
 		if newService.VO != "" && newService.VO != oldService.VO {
 			for _, vo := range cfg.OIDCGroups {
 				if vo == newService.VO {
@@ -69,27 +81,29 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 		if !isAdminUser {
-			mc, err := auth.GetMultitenancyConfigFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
 			// Check if users in allowed_users have a MinIO associated user
-			if len(newService.AllowedUsers) == 0 {
-				uids := mc.CheckUsersInCache(newService.AllowedUsers)
-				if len(uids) == 0 {
-					for _, uid := range uids {
-						sk, _ := auth.GenerateRandomKey(8)
-						minIOAdminClient.CreateMinIOUser(uid, sk)
-						mc.CreateSecretForOIDC(uid, sk)
-					}
+			// If new allowed users list is empty the service becames public
+			bucketName := newService.Input[0].Path
+			if len(newService.AllowedUsers) < 1 {
+				// Delete service policy and add bucket to all_users_group
+				err := minIOAdminClient.DeleteServiceGroup(bucketName)
+				if err != nil {
+					c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 				}
-			}
+				err = minIOAdminClient.AddServiceToAllUsersGroup(bucketName)
+				if err != nil {
+					c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+				}
 
-			if len(newService.AllowedUsers) != len(oldService.AllowedUsers) {
-				//Update users group list
-				minIOAdminClient.AddUserToGroup(newService.AllowedUsers, "")
-
+			} else {
+				if len(newService.AllowedUsers) != len(oldService.AllowedUsers) {
+					//Update users group list
+					minIOAdminClient.AddUserToGroup(newService.AllowedUsers, bucketName)
+				}
 			}
 		}
 
