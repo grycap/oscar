@@ -22,6 +22,7 @@ import (
 	"log"
 	"os"
 
+	htpasswd "github.com/foomo/htpasswd"
 	"github.com/grycap/oscar/v3/pkg/types"
 	apps "k8s.io/api/apps/v1"
 	autos "k8s.io/api/autoscaling/v1"
@@ -273,7 +274,7 @@ func getPodTemplateSpec(service types.Service, cfg *types.Config) v1.PodTemplate
 			},
 		}
 		podSpec.Containers[i].VolumeMounts[0].ReadOnly = false
-		if service.Expose.DefaultCommand == true {
+		if service.Expose.DefaultCommand {
 			podSpec.Containers[i].Command = nil
 			podSpec.Containers[i].Args = nil
 		} else {
@@ -443,6 +444,9 @@ func createIngress(service types.Service, client kubernetes.Interface, cfg *type
 	if err != nil {
 		return err
 	}
+	if service.Expose.SetAuth {
+		createSecret(service, client, cfg)
+	}
 	return nil
 }
 
@@ -455,6 +459,13 @@ func updateIngress(service types.Service, client kubernetes.Interface, cfg *type
 	_, err := client.NetworkingV1().Ingresses(cfg.ServicesNamespace).Update(context.TODO(), kube_ingress, metav1.UpdateOptions{})
 	if err != nil {
 		return err
+	}
+	if existSecret(service, client, cfg) && service.Expose.SetAuth {
+		updateSecret(service, client, cfg)
+	} else if !existSecret(service, client, cfg) && service.Expose.SetAuth {
+		createSecret(service, client, cfg)
+	} else if existSecret(service, client, cfg) && !service.Expose.SetAuth {
+		deleteSecret(service.Name, client, cfg)
 	}
 	return nil
 }
@@ -510,18 +521,24 @@ func getIngressSpec(service types.Service, client kubernetes.Interface, cfg *typ
 	}
 
 	rewriteOption := "/$1"
-	if service.Expose.RewriteTarget == true {
+	if service.Expose.RewriteTarget {
 		rewriteOption = pathofapi + "/$1"
+	}
+	annotation := map[string]string{
+		"nginx.ingress.kubernetes.io/rewrite-target": rewriteOption,
+		"kubernetes.io/ingress.class":                "nginx",
+		"nginx.ingress.kubernetes.io/use-regex":      "true",
+	}
+	if service.Expose.SetAuth {
+		annotation["nginx.ingress.kubernetes.io/auth-type"] = "basic"
+		annotation["nginx.ingress.kubernetes.io/auth-secret"] = getNameSecret(service.Name)
+		annotation["nginx.ingress.kubernetes.io/auth-realm"] = "Authentication Required"
 	}
 	ingress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name_ingress,
-			Namespace: cfg.ServicesNamespace,
-			Annotations: map[string]string{
-				"nginx.ingress.kubernetes.io/rewrite-target": rewriteOption,
-				"kubernetes.io/ingress.class":                "nginx",
-				"nginx.ingress.kubernetes.io/use-regex":      "true",
-			},
+			Name:        name_ingress,
+			Namespace:   cfg.ServicesNamespace,
+			Annotations: annotation,
 		},
 		Spec:   specification,
 		Status: net.IngressStatus{},
@@ -547,7 +564,74 @@ func deleteIngress(name string, client kubernetes.Interface, cfg *types.Config) 
 	if err != nil {
 		return err
 	}
+	deleteSecret(name, client, cfg)
 	return nil
+}
+
+// Secret
+
+func createSecret(service types.Service, client kubernetes.Interface, cfg *types.Config) error {
+	secret := getSecretSpec(service, client, cfg)
+	_, err := client.CoreV1().Secrets(cfg.ServicesNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func updateSecret(service types.Service, client kubernetes.Interface, cfg *types.Config) error {
+	secret := getSecretSpec(service, client, cfg)
+	_, err := client.CoreV1().Secrets(cfg.ServicesNamespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func deleteSecret(name string, client kubernetes.Interface, cfg *types.Config) error {
+	secret := getNameSecret(name)
+	err := client.CoreV1().Secrets(cfg.ServicesNamespace).Delete(context.TODO(), secret, metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func getSecretSpec(service types.Service, client kubernetes.Interface, cfg *types.Config) *v1.Secret {
+	//setPassword
+	hash := make(htpasswd.HashedPasswords)
+	err := hash.SetPassword(service.Name, service.Token, htpasswd.HashAPR1)
+	if err != nil {
+		ExposeLogger.Printf(err.Error())
+	}
+	//Create Secret
+	inmutable := false
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      getNameSecret(service.Name),
+			Namespace: cfg.ServicesNamespace,
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "v1",
+		},
+		Immutable: &inmutable,
+		StringData: map[string]string{
+			"auth": service.Name + ":" + hash[service.Name],
+		},
+		Type: "Opaque",
+	}
+	return secret
+}
+func existSecret(service types.Service, client kubernetes.Interface, cfg *types.Config) bool {
+	secret := getNameSecret(service.Name)
+	exist, err := client.CoreV1().Secrets(cfg.ServicesNamespace).Get(context.TODO(), secret, metav1.GetOptions{})
+	if err != nil {
+		return false
+	}
+	if exist != nil {
+		return true
+	}
+	return false
 }
 
 /// These are auxiliary functions
@@ -570,4 +654,8 @@ func getNameDeployment(name_container string) string {
 
 func getNameHPA(name_container string) string {
 	return name_container + "-hpa"
+}
+
+func getNameSecret(name_container string) string {
+	return name_container + "-secret-expose"
 }

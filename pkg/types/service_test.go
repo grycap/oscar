@@ -249,6 +249,7 @@ expose:
   rewrite_target: false
   nodePort: 0
   default_command: false
+  set_auth: false
   enablesgx: false
 environment:
   Variables:

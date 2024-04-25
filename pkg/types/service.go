@@ -214,6 +214,7 @@ type Service struct {
 		RewriteTarget  bool  `json:"rewrite_target" default:"false" `
 		NodePort       int32 `json:"nodePort" default:"0" `
 		DefaultCommand bool  `json:"default_command" `
+		SetAuth        bool  `json:"set_auth" `
 		EnableSGX      bool
 	} `json:"expose"`
 
