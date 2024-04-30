@@ -237,7 +237,8 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 }
 
 // DeleteService deletes a service
-func (kn *KnativeBackend) DeleteService(name string) error {
+func (kn *KnativeBackend) DeleteService(service types.Service) error {
+	name := service.Name
 	if err := kn.knClientset.ServingV1().Services(kn.namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		return err
 	}

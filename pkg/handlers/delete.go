@@ -59,7 +59,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 
-		if err := back.DeleteService(c.Param("serviceName")); err != nil {
+		if err := back.DeleteService(*service); err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {
 				c.Status(http.StatusNotFound)

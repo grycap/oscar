@@ -225,7 +225,8 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 }
 
 // DeleteService deletes a service
-func (k *KubeBackend) DeleteService(name string) error {
+func (k *KubeBackend) DeleteService(service types.Service) error {
+	name := service.Name
 	if err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		return err
 	}

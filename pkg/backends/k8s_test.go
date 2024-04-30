@@ -665,6 +665,9 @@ func TestKubeUpdateService(t *testing.T) {
 }
 
 func TestKubeDeleteService(t *testing.T) {
+	testService := types.Service{
+		Name: "test",
+	}
 	t.Run("valid", func(t *testing.T) {
 		clientset := fake.NewSimpleClientset()
 
@@ -680,7 +683,7 @@ func TestKubeDeleteService(t *testing.T) {
 		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete-collection", "jobs", validDeleteReaction)
 
 		// Call
-		err := back.DeleteService("test")
+		err := back.DeleteService(testService)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -695,7 +698,7 @@ func TestKubeDeleteService(t *testing.T) {
 		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", errorReaction)
 
 		// Call
-		err := back.DeleteService("test")
+		err := back.DeleteService(testService)
 		if err == nil {
 			t.Error("expecting error, got: nil")
 		}
@@ -713,7 +716,7 @@ func TestKubeDeleteService(t *testing.T) {
 		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", errorReaction)
 
 		// Call
-		err := back.DeleteService("test")
+		err := back.DeleteService(testService)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -734,7 +737,7 @@ func TestKubeDeleteService(t *testing.T) {
 		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete-collection", "jobs", errorReaction)
 
 		// Call
-		err := back.DeleteService("test")
+		err := back.DeleteService(testService)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
