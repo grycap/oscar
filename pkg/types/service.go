@@ -209,13 +209,12 @@ type Service struct {
 	Expose struct {
 		MinScale       int32 `json:"min_scale" default:"1"`
 		MaxScale       int32 `json:"max_scale" default:"10"`
-		Port           int   `json:"port" `
+		APIPort        int   `json:"api_port,omitempty" `
 		CpuThreshold   int32 `json:"cpu_threshold" default:"80" `
 		RewriteTarget  bool  `json:"rewrite_target" default:"false" `
 		NodePort       int32 `json:"nodePort" default:"0" `
 		DefaultCommand bool  `json:"default_command" `
 		SetAuth        bool  `json:"set_auth" `
-		EnableSGX      bool
 	} `json:"expose"`
 
 	// The user-defined environment variables assigned to the service
@@ -246,7 +245,7 @@ type Service struct {
 	// Optional
 	Clusters map[string]Cluster `json:"clusters,omitempty"`
 
-	InterLink string `json:"interLink"`
+	InterLinkNodeName string `json:"interlink_node_name"`
 	// List of EGI UID's identifying the users that will have visibility of the service and its MinIO storage provider
 	// Optional (If the list is empty we asume the visibility is public for all cluster users)
 	AllowedUsers []string `json:"allowed_users"`
@@ -290,7 +289,7 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 			},
 		},
 	}
-	if cfg.InterLinkAvailable && service.InterLink != "" {
+	if cfg.InterLinkAvailable && service.InterLinkNodeName != "" {
 		// Add specs of InterLink
 		podSpec.Containers[0].ImagePullPolicy = "Always"
 	} else {
