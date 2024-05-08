@@ -613,6 +613,9 @@ func TestKnativeUpdateService(t *testing.T) {
 }
 
 func TestKnativeDeleteService(t *testing.T) {
+	testService := types.Service{
+		Name: "test",
+	}
 	scenarios := []knativeBackendTestScenario{
 		{
 			"Error deleting knative service",
@@ -679,7 +682,7 @@ func TestKnativeDeleteService(t *testing.T) {
 			}
 
 			// Delete service
-			err := back.DeleteService("test")
+			err := back.DeleteService(testService)
 			if s.returnError {
 				if err == nil {
 					t.Error("expected error, got: nil")

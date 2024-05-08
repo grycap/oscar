@@ -249,7 +249,6 @@ expose:
   nodePort: 0
   default_command: false
   set_auth: false
-  enablesgx: false
 environment:
   Variables:
     TEST_VAR: testvalue
@@ -272,7 +271,7 @@ clusters:
     auth_user: testuser
     auth_password: testpass
     ssl_verify: true
-interLink: ""
+interlink_node_name: ""
 allowed_users: []
 `
 
