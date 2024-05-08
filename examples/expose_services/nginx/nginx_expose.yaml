@@ -9,6 +9,6 @@ functions:
      expose:
       min_scale: 2 
       max_scale: 10 
-      port: 80  
+      api_port: 80  
       cpu_threshold: 50 
       default_command: true

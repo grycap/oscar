@@ -10,6 +10,6 @@ functions:
       expose:
         min_scale: 1
         max_scale: 1
-        port: 5000
+        api_port: 5000
         cpu_threshold: 90
         nodePort: 30500

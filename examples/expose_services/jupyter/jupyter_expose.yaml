@@ -13,6 +13,6 @@ functions:
      expose:
       min_scale: 1
       max_scale: 1
-      port: 8888
+      api_port: 8888
       cpu_threshold: 90
       rewrite_target: true
