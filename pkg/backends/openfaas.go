@@ -292,7 +292,8 @@ func (of *OpenfaasBackend) UpdateService(service types.Service) error {
 }
 
 // DeleteService deletes a service
-func (of *OpenfaasBackend) DeleteService(name string) error {
+func (of *OpenfaasBackend) DeleteService(service types.Service) error {
+	name := service.Name
 	if err := of.ofClientset.OpenfaasV1().Functions(of.namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		return err
 	}

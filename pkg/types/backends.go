@@ -29,7 +29,7 @@ type ServerlessBackend interface {
 	CreateService(service Service) error
 	ReadService(name string) (*Service, error)
 	UpdateService(service Service) error
-	DeleteService(name string) error
+	DeleteService(service Service) error
 	GetKubeClientset() kubernetes.Interface
 }
 

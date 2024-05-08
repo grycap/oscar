@@ -38,6 +38,9 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// First get the Service
 		service, _ := back.ReadService(c.Param("serviceName"))
 		authHeader := c.GetHeader("Authorization")
+		if service.Expose.APIPort != 0 {
+			// Delete exposed service
+		}
 
 		var isAllowed bool
 		if len(strings.Split(authHeader, "Bearer")) > 1 {
@@ -59,7 +62,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 
-		if err := back.DeleteService(c.Param("serviceName")); err != nil {
+		if err := back.DeleteService(*service); err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {
 				c.Status(http.StatusNotFound)
