@@ -244,7 +244,6 @@ image_pull_secrets:
 expose:
   min_scale: 0
   max_scale: 0
-  port: 0
   cpu_threshold: 0
   rewrite_target: false
   nodePort: 0
