@@ -138,7 +138,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Register minio webhook and restart the server
 		if err := registerMinIOWebhook(service.Name, service.Token, service.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
-			back.DeleteService(service.Name)
+			back.DeleteService(service)
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -150,7 +150,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			} else {
 				c.String(http.StatusInternalServerError, err.Error())
 			}
-			back.DeleteService(service.Name)
+			back.DeleteService(service)
 			return
 		}
 

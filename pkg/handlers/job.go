@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
@@ -46,7 +47,18 @@ var (
 	command = []string{"/bin/sh"}
 )
 
-// MakeJobHandler makes a handler to manage async invocations
+const (
+	SupervisorPath  = "./supervisor"
+	NodeSelectorKey = "kubernetes.io/hostname"
+
+	// Annotations for InterLink nodes
+	InterLinkDNSPolicy          = "ClusterFirst"
+	InterLinkRestartPolicy      = "OnFailure"
+	InterLinkTolerationKey      = "virtual-node.interlink/no-schedule"
+	InterLinkTolerationOperator = "Exists"
+)
+
+// MakeJobHandler makes a han/home/slangarita/Escritorio/interlink-cluster/PodCern/PodCern.yamldler to manage async invocations
 func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back types.ServerlessBackend, rm resourcemanager.ResourceManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		service, err := back.ReadService(c.Param("serviceName"))
@@ -57,6 +69,13 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			} else {
 				c.String(http.StatusInternalServerError, err.Error())
 			}
+			return
+		}
+
+		// Get podSpec from the service
+		podSpec, err := service.ToPodSpec(cfg)
+		if err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
 
@@ -79,10 +98,34 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
+
 		// Make event envVar
-		event := v1.EnvVar{
-			Name:  types.EventVariable,
-			Value: string(eventBytes),
+		event := v1.EnvVar{}
+
+		var args string
+		if cfg.InterLinkAvailable && service.InterLinkNodeName != "" {
+			event = v1.EnvVar{
+				Name:  types.EventVariable,
+				Value: base64.StdEncoding.EncodeToString([]byte(eventBytes)),
+			}
+			args = fmt.Sprintf("\"  wget %s -O %s && chmod 0755 %s  &&   echo \\$%s | base64 -d | %s  \"", cfg.SupervisorURL, SupervisorPath, SupervisorPath, types.EventVariable, SupervisorPath)
+			podSpec.NodeSelector = map[string]string{
+				NodeSelectorKey: service.InterLinkNodeName,
+			}
+			podSpec.DNSPolicy = InterLinkDNSPolicy
+			podSpec.RestartPolicy = InterLinkRestartPolicy
+			podSpec.Tolerations = []v1.Toleration{
+				{
+					Key:      InterLinkTolerationKey,
+					Operator: InterLinkTolerationOperator,
+				},
+			}
+		} else {
+			event = v1.EnvVar{
+				Name:  types.EventVariable,
+				Value: string(eventBytes),
+			}
+			args = fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath())
 		}
 
 		// Make JOB_UUID envVar
@@ -102,18 +145,12 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			},
 		}
 
-		// Get podSpec from the service
-		podSpec, err := service.ToPodSpec(cfg)
-		if err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
-			return
-		}
 		// Add podSpec variables
 		podSpec.RestartPolicy = restartPolicy
 		for i, c := range podSpec.Containers {
 			if c.Name == types.ContainerName {
 				podSpec.Containers[i].Command = command
-				podSpec.Containers[i].Args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath())}
+				podSpec.Containers[i].Args = []string{"-c", args}
 				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, event)
 				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, jobUUIDVar)
 				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, resourceIDVar)

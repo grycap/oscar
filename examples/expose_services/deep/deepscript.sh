@@ -1,0 +1,1 @@
+deepaas-run --openwhisk-detect --listen-ip 0.0.0.0 --listen-port 5000
