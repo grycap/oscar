@@ -29,6 +29,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
+	"github.com/goccy/go-yaml"
 	"github.com/grycap/cdmi-client-go"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
@@ -64,6 +65,11 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Check service values and set defaults
 		checkValues(&service, cfg)
+
+		err := checkAdditionalConfig(&service, cfg)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+		}
 
 		// Check if users in allowed_users have a MinIO associated user
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
@@ -215,6 +221,28 @@ func checkValues(service *types.Service, cfg *types.Config) {
 
 	// Generate a new access token
 	service.Token = utils.GenerateToken()
+}
+
+func checkAdditionalConfig(service *types.Service, cfg *types.Config) error {
+
+	additionalConfig := &types.AdditionalConfig{}
+	configFile, err := os.ReadFile(cfg.AdditionalConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to read the YAML file of additional config: %v", err)
+	}
+	if err := yaml.Unmarshal(configFile, additionalConfig); err != nil {
+		return nil
+	}
+
+	if len(additionalConfig.Images.AllowedPrefixes) > 0 {
+		for _, prefix := range additionalConfig.Images.AllowedPrefixes {
+			if !strings.Contains(service.Image, prefix) {
+				return fmt.Errorf("image %s is not allowed for pull on the cluster. Check the additional configuration file on '%s'.", service.Image, cfg.AdditionalConfigPath)
+			}
+		}
+	}
+
+	return nil
 }
 
 func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient, allowed_users []string, isUpdate bool) error {

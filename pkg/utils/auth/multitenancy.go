@@ -64,26 +64,26 @@ func (mc *MultitenancyConfig) ClearCache() {
 
 // UserExists checks if a MinIO user has been created and stored on cache.
 func (mc *MultitenancyConfig) UserExists(uid string) bool {
-	if len(mc.usersCache) < 1 {
-		// If the cache is empty check if a secret for the uid exists
-		secretName := FormatUID(uid)
-		secret, err := mc.kubeClientset.CoreV1().Secrets(ServicesNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
-		if err != nil {
-			return false
-		}
-		// If the container has been restarted a user can exist
-		// but not be on the cache due to lack of persistence
-		if secret != nil {
-			mc.UpdateCache(uid)
-			return true
-		}
-	} else {
+	if len(mc.usersCache) > 1 {
+		// If the cache has users search for the uid
 		for _, id := range mc.usersCache {
 			if id == uid {
 				return true
 			}
 		}
 	}
+	// If the container has been restarted a user can exist
+	// but not be on the cache due to lack of persistence
+	secretName := FormatUID(uid)
+	secret, err := mc.kubeClientset.CoreV1().Secrets(ServicesNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	if err != nil {
+		return false
+	}
+	if secret != nil {
+		mc.UpdateCache(uid)
+		return true
+	}
+
 	return false
 }
 
