@@ -239,7 +239,7 @@ var configVars = []configVar{
 	{"OIDCGroups", "OIDC_GROUPS", false, stringSliceType, ""},
 	{"IngressHost", "INGRESS_HOST", false, stringType, ""},
 	{"SupervisorURL", "SUPERVISOR_URL", false, stringType, "https://github.com/grycap/faas-supervisor/releases/download/1.5.8/supervisor"},
-	{"AdditionalConfigPath", "ADDITIONAL_CONFIG_PATH", false, stringType, "/var/opt/oscar_config/config.yaml"},
+	{"AdditionalConfigPath", "ADDITIONAL_CONFIG_PATH", false, stringType, "config.yaml"},
 }
 
 func readConfigVar(cfgVar configVar) (string, error) {

@@ -42,6 +42,13 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// Check service values and set defaults
 		checkValues(&newService, cfg)
 
+		// Check if additional config matches
+		err := checkAdditionalConfig(&newService, cfg)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+			return
+		}
+
 		// Read the current service
 		oldService, err := back.ReadService(newService.Name)
 

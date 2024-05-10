@@ -66,9 +66,11 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// Check service values and set defaults
 		checkValues(&service, cfg)
 
+		// Check if additional config matches
 		err := checkAdditionalConfig(&service, cfg)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+			return
 		}
 
 		// Check if users in allowed_users have a MinIO associated user
@@ -237,7 +239,7 @@ func checkAdditionalConfig(service *types.Service, cfg *types.Config) error {
 	if len(additionalConfig.Images.AllowedPrefixes) > 0 {
 		for _, prefix := range additionalConfig.Images.AllowedPrefixes {
 			if !strings.Contains(service.Image, prefix) {
-				return fmt.Errorf("image %s is not allowed for pull on the cluster. Check the additional configuration file on '%s'.", service.Image, cfg.AdditionalConfigPath)
+				return fmt.Errorf("image %s is not allowed for pull on the cluster. Check the additional configuration file on '%s'", service.Image, cfg.AdditionalConfigPath)
 			}
 		}
 	}
