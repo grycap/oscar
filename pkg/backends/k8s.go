@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/goccy/go-yaml"
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
@@ -28,6 +29,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
+
+const ConfigMapNameOSCAR = "additional-oscar-config"
 
 // KubeBackend struct to represent a Kubernetes client to store services as podTemplates
 type KubeBackend struct {
@@ -76,8 +79,15 @@ func (k *KubeBackend) ListServices() ([]*types.Service, error) {
 
 // CreateService creates a new service as a k8s podTemplate
 func (k *KubeBackend) CreateService(service types.Service) error {
+
+	// Check if there is some user defined settings for OSCAR
+	err := checkAdditionalConfig(ConfigMapNameOSCAR, k.namespace, service, k.config, k.kubeClientset)
+	if err != nil {
+		return err
+	}
+
 	// Create the configMap with FDL and user-script
-	err := createServiceConfigMap(&service, k.namespace, k.kubeClientset)
+	err = createServiceConfigMap(&service, k.namespace, k.kubeClientset)
 	if err != nil {
 		return err
 	}
@@ -249,6 +259,30 @@ func getServiceFromFDL(name string, namespace string, kubeClientset kubernetes.I
 	service.Script = cm.Data[types.ScriptFileName]
 
 	return service, nil
+}
+
+func checkAdditionalConfig(configName string, configNamespace string, service types.Service, cfg *types.Config, kubeClientset kubernetes.Interface) error {
+	// Get the configMapwith the service additional settings
+	cm, err := kubeClientset.CoreV1().ConfigMaps(configNamespace).Get(context.TODO(), configName, metav1.GetOptions{})
+	if err != nil {
+		return nil
+	}
+
+	additionalConfig := &types.AdditionalConfig{}
+	// Unmarshal the FDL stored in the configMap
+	if err = yaml.Unmarshal([]byte(cm.Data[cfg.AdditionalConfigPath]), additionalConfig); err != nil {
+		return nil
+	}
+
+	if len(additionalConfig.Images.AllowedPrefixes) > 0 {
+		for _, prefix := range additionalConfig.Images.AllowedPrefixes {
+			if !strings.Contains(service.Image, prefix) {
+				return fmt.Errorf("image %s is not allowed for pull on the cluster. Check the additional configuration file on '%s'", service.Image, cfg.AdditionalConfigPath)
+			}
+		}
+	}
+
+	return nil
 }
 
 func createServiceConfigMap(service *types.Service, namespace string, kubeClientset kubernetes.Interface) error {
