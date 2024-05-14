@@ -55,6 +55,8 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
+			service.Owner = "cluster_admin"
+			createLogger.Printf("Creating service for user: %s", service.Owner)
 		}
 
 		if err := c.ShouldBindJSON(&service); err != nil {
@@ -77,6 +79,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 			// Set UID from owner
 			service.Owner = uid
+			createLogger.Printf("Creating service for user: %s", service.Owner)
 
 			mc, err := auth.GetMultitenancyConfigFromContext(c)
 			if err != nil {

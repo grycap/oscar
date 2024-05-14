@@ -247,7 +247,7 @@ type Service struct {
 
 	// EGI UID of the user that created the service
 	// If the service is created through basic auth the default owner is "cluster_admin"
-	Owner string `json:"owner" default:"cluster_admin"`
+	Owner string `json:"owner"`
 
 	InterLinkNodeName string `json:"interlink_node_name"`
 	// List of EGI UID's identifying the users that will have visibility of the service and its MinIO storage provider
