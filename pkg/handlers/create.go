@@ -45,7 +45,7 @@ const (
 var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache)")
 
 // Custom logger
-var createLogger = log.New(os.Stdout, "[CREATE] ", log.Flags())
+var createLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
 var isAdminUser = false
 
 // MakeCreateHandler makes a handler for creating services
@@ -284,6 +284,8 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		}
 
 		// Create group for the service and add users
+		// Check if users in allowed_users have a MinIO associated user
+		// If new allowed users list is empty the service becames public
 		if !isAdminUser {
 			if len(allowed_users) == 0 {
 				err = minIOAdminClient.AddServiceToAllUsersGroup(splitPath[0])

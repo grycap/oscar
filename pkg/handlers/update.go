@@ -80,33 +80,6 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-		if !isAdminUser {
-			if err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-			}
-
-			// Check if users in allowed_users have a MinIO associated user
-			// If new allowed users list is empty the service becames public
-			bucketName := newService.Input[0].Path
-			if len(newService.AllowedUsers) < 1 {
-				// Delete service policy and add bucket to all_users_group
-				err := minIOAdminClient.DeleteServiceGroup(bucketName)
-				if err != nil {
-					c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-				}
-				err = minIOAdminClient.AddServiceToAllUsersGroup(bucketName)
-				if err != nil {
-					c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-				}
-
-			} else {
-				if len(newService.AllowedUsers) != len(oldService.AllowedUsers) {
-					//Update users group list
-					minIOAdminClient.AddUserToGroup(newService.AllowedUsers, bucketName)
-				}
-			}
-		}
-
 		// Update the service
 		if err := back.UpdateService(newService); err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
@@ -161,6 +134,11 @@ func updateBuckets(newService, oldService *types.Service, minIOAdminClient *util
 		return fmt.Errorf("error disabling MinIO input notifications: %v", err)
 	}
 
+	updateMinIOUsers := false
+	if len(newService.AllowedUsers) != len(oldService.AllowedUsers) {
+		updateMinIOUsers = true
+	}
+
 	// Create the input and output buckets/folders from newService
-	return createBuckets(newService, cfg, minIOAdminClient, newService.AllowedUsers, true)
+	return createBuckets(newService, cfg, minIOAdminClient, newService.AllowedUsers, updateMinIOUsers)
 }
