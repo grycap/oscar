@@ -107,17 +107,29 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				newAllowedLength := len(newService.AllowedUsers)
 				if newAllowedLength > oldAllowedLength && oldAllowedLength != 0 {
 					// Update list of allowed users
-					minIOAdminClient.AddUserToGroup(newService.AllowedUsers, splitPath[0])
+					err = minIOAdminClient.AddUserToGroup(newService.AllowedUsers, splitPath[0])
+					if err != nil {
+						c.String(http.StatusInternalServerError, err.Error())
+						return
+					}
 				}
 
 				if newAllowedLength > oldAllowedLength && oldAllowedLength == 0 {
 					// Make bucket private
-					minIOAdminClient.PublicToPrivateBucket(splitPath[0], newService.AllowedUsers)
+					err = minIOAdminClient.PublicToPrivateBucket(splitPath[0], newService.AllowedUsers)
+					if err != nil {
+						c.String(http.StatusInternalServerError, err.Error())
+						return
+					}
 				}
 
 				if newAllowedLength < oldAllowedLength && newAllowedLength == 0 {
 					// Make bucket public
-					minIOAdminClient.PrivateToPublicBucket(splitPath[0])
+					err = minIOAdminClient.PrivateToPublicBucket(splitPath[0])
+					if err != nil {
+						c.String(http.StatusInternalServerError, err.Error())
+						return
+					}
 				}
 
 				// Register minio webhook and restart the server
