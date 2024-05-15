@@ -286,24 +286,23 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		// Create group for the service and add users
 		// Check if users in allowed_users have a MinIO associated user
 		// If new allowed users list is empty the service becames public
-		if !isAdminUser {
-			if len(allowed_users) == 0 {
-				err = minIOAdminClient.AddServiceToAllUsersGroup(splitPath[0])
-				if err != nil {
-					return fmt.Errorf("error adding service %s to all users group: %v", splitPath[0], err)
-				}
-			} else {
-				if !isUpdate {
+		if !isUpdate {
+			if !isAdminUser {
+				if len(allowed_users) == 0 {
+					err = minIOAdminClient.AddServiceToAllUsersGroup(splitPath[0])
+					if err != nil {
+						return fmt.Errorf("error adding service %s to all users group: %v", splitPath[0], err)
+					}
+				} else {
 					err = minIOAdminClient.CreateServiceGroup(splitPath[0])
 					if err != nil {
 						return fmt.Errorf("error creating service group for bucket %s: %v", splitPath[0], err)
 					}
-				} else {
-					minIOAdminClient.DeleteServiceGroup(splitPath[0])
-				}
-				err = minIOAdminClient.AddUserToGroup(allowed_users, splitPath[0])
-				if err != nil {
-					return err
+
+					err = minIOAdminClient.AddUserToGroup(allowed_users, splitPath[0])
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}

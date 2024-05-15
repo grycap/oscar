@@ -99,6 +99,27 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			if provName == types.MinIOName {
 
+				// Get bucket name
+				path := strings.Trim(in.Path, " /")
+				// Split buckets and folders from path
+				splitPath := strings.SplitN(path, "/", 2)
+				oldAllowedLength := len(oldService.AllowedUsers)
+				newAllowedLength := len(newService.AllowedUsers)
+				if newAllowedLength > oldAllowedLength && oldAllowedLength != 0 {
+					// Update list of allowed users
+					minIOAdminClient.AddUserToGroup(newService.AllowedUsers, splitPath[0])
+				}
+
+				if newAllowedLength > oldAllowedLength && oldAllowedLength == 0 {
+					// Make bucket private
+					minIOAdminClient.PublicToPrivateBucket(splitPath[0], newService.AllowedUsers)
+				}
+
+				if newAllowedLength < oldAllowedLength && newAllowedLength == 0 {
+					// Make bucket public
+					minIOAdminClient.PrivateToPublicBucket(splitPath[0])
+				}
+
 				// Register minio webhook and restart the server
 				if err := registerMinIOWebhook(newService.Name, newService.Token, newService.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
 					back.UpdateService(*oldService)
@@ -137,11 +158,6 @@ func updateBuckets(newService, oldService *types.Service, minIOAdminClient *util
 		return fmt.Errorf("error disabling MinIO input notifications: %v", err)
 	}
 
-	updateMinIOUsers := false
-	if len(newService.AllowedUsers) != len(oldService.AllowedUsers) {
-		updateMinIOUsers = true
-	}
-
 	// Create the input and output buckets/folders from newService
-	return createBuckets(newService, cfg, minIOAdminClient, newService.AllowedUsers, updateMinIOUsers)
+	return createBuckets(newService, cfg, minIOAdminClient, newService.AllowedUsers, true)
 }
