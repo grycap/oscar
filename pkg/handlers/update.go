@@ -105,29 +105,30 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				splitPath := strings.SplitN(path, "/", 2)
 				oldAllowedLength := len(oldService.AllowedUsers)
 				newAllowedLength := len(newService.AllowedUsers)
-
-				if newAllowedLength < oldAllowedLength && newAllowedLength == 0 {
-					// If the new allowed users is empty make service public
-					err = minIOAdminClient.PrivateToPublicBucket(splitPath[0])
-					if err != nil {
-						c.String(http.StatusInternalServerError, err.Error())
-						return
-					}
-				}
-				// If allowed users list changed update policies on bucket
-				if oldAllowedLength != 0 && newAllowedLength > oldAllowedLength || newAllowedLength < oldAllowedLength {
-					err = minIOAdminClient.AddUserToGroup(newService.AllowedUsers, splitPath[0])
-					if err != nil {
-						c.String(http.StatusInternalServerError, err.Error())
-						return
-					}
-				}
-				// If the service was public and now has a list of allowed users make its buckets private
-				if newAllowedLength > oldAllowedLength && oldAllowedLength == 0 {
-					err = minIOAdminClient.PublicToPrivateBucket(splitPath[0], newService.AllowedUsers)
-					if err != nil {
-						c.String(http.StatusInternalServerError, err.Error())
-						return
+				if newAllowedLength != oldAllowedLength {
+					if newAllowedLength == 0 {
+						// If the new allowed users is empty make service public
+						err = minIOAdminClient.PrivateToPublicBucket(splitPath[0])
+						if err != nil {
+							c.String(http.StatusInternalServerError, err.Error())
+							return
+						}
+					} else {
+						// If the service was public and now has a list of allowed users make its buckets private
+						if oldAllowedLength == 0 {
+							err = minIOAdminClient.PublicToPrivateBucket(splitPath[0], newService.AllowedUsers)
+							if err != nil {
+								c.String(http.StatusInternalServerError, err.Error())
+								return
+							}
+						} else {
+							// If allowed users list changed update policies on bucket
+							err = minIOAdminClient.AddUserToGroup(newService.AllowedUsers, splitPath[0])
+							if err != nil {
+								c.String(http.StatusInternalServerError, err.Error())
+								return
+							}
+						}
 					}
 				}
 
