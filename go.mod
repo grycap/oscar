@@ -23,7 +23,7 @@ require (
 	github.com/tinylib/msgp v1.1.8 // indirect
 	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/net v0.23.0 // indirect
-	golang.org/x/oauth2 v0.8.0
+	golang.org/x/oauth2 v0.10.0
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	k8s.io/api v0.29.2
 	k8s.io/apimachinery v0.29.2
