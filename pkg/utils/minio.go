@@ -259,10 +259,11 @@ func (minIOAdminClient *MinIOAdminClient) DeleteServiceGroup(groupName string) e
 		return fmt.Errorf("error emptying group: %v", err)
 	}
 
-	err = minIOAdminClient.adminClient.RemoveCannedPolicy(context.TODO(), groupName)
-	if err != nil {
-		return fmt.Errorf("error removing group's policy: %v", err)
-	}
+	// FIX Group updates but doesn't get deleted so delete policy doesn't work
+	// err = minIOAdminClient.adminClient.RemoveCannedPolicy(context.TODO(), groupName)
+	// if err != nil {
+	// 	return fmt.Errorf("error removing group's policy: %v", err)
+	// }
 	return nil
 }
 

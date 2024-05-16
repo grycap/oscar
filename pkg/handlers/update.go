@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -28,6 +29,9 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
+
+// Custom logger
+var updateLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
 
 // MakeUpdateHandler makes a handler for updating services
 func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
@@ -107,6 +111,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				newAllowedLength := len(newService.AllowedUsers)
 				if newAllowedLength != oldAllowedLength {
 					if newAllowedLength == 0 {
+						updateLogger.Printf("Updating service with public policies")
 						// If the new allowed users is empty make service public
 						err = minIOAdminClient.PrivateToPublicBucket(splitPath[0])
 						if err != nil {
@@ -116,6 +121,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					} else {
 						// If the service was public and now has a list of allowed users make its buckets private
 						if oldAllowedLength == 0 {
+							updateLogger.Printf("Updating service with private policies")
 							err = minIOAdminClient.PublicToPrivateBucket(splitPath[0], newService.AllowedUsers)
 							if err != nil {
 								c.String(http.StatusInternalServerError, err.Error())
@@ -123,6 +129,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 							}
 						} else {
 							// If allowed users list changed update policies on bucket
+							updateLogger.Printf("Updating service policies")
 							err = minIOAdminClient.AddUserToGroup(newService.AllowedUsers, splitPath[0])
 							if err != nil {
 								c.String(http.StatusInternalServerError, err.Error())
