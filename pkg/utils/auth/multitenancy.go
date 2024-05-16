@@ -66,8 +66,8 @@ func (mc *MultitenancyConfig) ClearCache() {
 func (mc *MultitenancyConfig) UserExists(uid string) bool {
 	if len(mc.usersCache) > 1 {
 		// If the cache has users search for the uid
-		for _, id := range mc.usersCache {
-			if id == uid {
+		for _, cacheUID := range mc.usersCache {
+			if cacheUID == uid {
 				return true
 			}
 		}
@@ -90,6 +90,16 @@ func (mc *MultitenancyConfig) UserExists(uid string) bool {
 func (mc *MultitenancyConfig) CheckUsersInCache(uids []string) []string {
 	var notFoundUsers []string
 	var found bool
+
+	if len(mc.usersCache) == 0 {
+		secrets, _ := mc.kubeClientset.CoreV1().Secrets(ServicesNamespace).List(context.TODO(), metav1.ListOptions{})
+		if secrets != nil {
+			for _, s := range secrets.Items {
+				mc.UpdateCache(s.Name)
+			}
+		}
+	}
+
 	for _, uid := range uids {
 		found = false
 		for _, cacheUID := range mc.usersCache {
