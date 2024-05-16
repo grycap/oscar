@@ -130,7 +130,11 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						} else {
 							// If allowed users list changed update policies on bucket
 							updateLogger.Printf("Updating service policies")
-							err = minIOAdminClient.AddUserToGroup(newService.AllowedUsers, splitPath[0])
+							if oldAllowedLength < newAllowedLength {
+								err = minIOAdminClient.UpdateUsersInGroup(newService.AllowedUsers, splitPath[0], false)
+							} else {
+								err = minIOAdminClient.UpdateUsersInGroup(newService.AllowedUsers, splitPath[0], true)
+							}
 							if err != nil {
 								c.String(http.StatusInternalServerError, err.Error())
 								return

@@ -73,7 +73,8 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			path := strings.Trim(in.Path, " /")
 			// Split buckets and folders from path
 			bucket := strings.SplitN(path, "/", 2)
-			minIOAdminClient.DeleteServiceGroup(bucket[0])
+			var users []string
+			minIOAdminClient.UpdateUsersInGroup(users, bucket[0], true)
 		}
 
 		// Disable input notifications

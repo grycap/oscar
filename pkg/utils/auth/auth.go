@@ -49,7 +49,7 @@ func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.Hand
 	var oscarUser = []string{"console"}
 
 	minIOAdminClient.CreateAllUsersGroup()
-	minIOAdminClient.AddUserToGroup(oscarUser, "all_users_group")
+	minIOAdminClient.UpdateUsersInGroup(oscarUser, "all_users_group", false)
 
 	oidcHandler := getOIDCMiddleware(kubeClientset, minIOAdminClient, cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
 	return func(c *gin.Context) {

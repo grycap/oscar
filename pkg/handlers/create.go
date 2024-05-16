@@ -299,7 +299,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 						return fmt.Errorf("error creating service group for bucket %s: %v", splitPath[0], err)
 					}
 
-					err = minIOAdminClient.AddUserToGroup(allowed_users, splitPath[0])
+					err = minIOAdminClient.UpdateUsersInGroup(allowed_users, splitPath[0], false)
 					if err != nil {
 						return err
 					}
