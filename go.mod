@@ -46,6 +46,7 @@ require (
 	github.com/apache/yunikorn-core v1.1.0
 	github.com/barkimedes/go-deepcopy v0.0.0-20220514131651-17c30cfc62df
 	github.com/coreos/go-oidc/v3 v3.5.0
+	github.com/foomo/htpasswd v0.0.0-20200116085101-e3a90e78da9c
 	k8s.io/metrics v0.29.2
 	knative.dev/serving v0.36.0
 )
@@ -60,7 +61,6 @@ require (
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
-	github.com/foomo/htpasswd v0.0.0-20200116085101-e3a90e78da9c // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.1 // indirect
