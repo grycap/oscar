@@ -534,8 +534,7 @@ func listIngress(kubeClientset kubernetes.Interface, cfg *Config) (*net.IngressL
 // Delete a kubernetes ingress
 func deleteIngress(name string, kubeClientset kubernetes.Interface, cfg *Config) error {
 	// if secret exist, delete
-	ingress := getIngressName(name)
-	err := kubeClientset.NetworkingV1().Ingresses(cfg.ServicesNamespace).Delete(context.TODO(), ingress, metav1.DeleteOptions{})
+	err := kubeClientset.NetworkingV1().Ingresses(cfg.ServicesNamespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		return err
 	}

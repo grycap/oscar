@@ -38,9 +38,6 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// First get the Service
 		service, _ := back.ReadService(c.Param("serviceName"))
 		authHeader := c.GetHeader("Authorization")
-		if service.Expose.APIPort != 0 {
-			// Delete exposed service
-		}
 
 		if len(strings.Split(authHeader, "Bearer")) > 1 {
 			uid, err := auth.GetUIDFromContext(c)
@@ -49,7 +46,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 
 			if service.Owner != uid {
-				c.String(http.StatusForbidden, "User %s doesn't have permision to get this service", uid)
+				c.String(http.StatusForbidden, "User %s doesn't have permision to delete this service", uid)
 				return
 			}
 		}
