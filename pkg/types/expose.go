@@ -117,12 +117,12 @@ func UpdateExpose(service Service, kubeClientset kubernetes.Interface, cfg *Conf
 			if err != nil {
 				log.Printf("error deleting ingress service: %v\n", err)
 				return err
-			} else {
-				err = updateIngress(service, kubeClientset, cfg)
-				if err != nil {
-					log.Printf("error updating ingress service: %v\n", err)
-					return err
-				}
+			}
+		} else {
+			err = updateIngress(service, kubeClientset, cfg)
+			if err != nil {
+				log.Printf("error updating ingress service: %v\n", err)
+				return err
 			}
 		}
 	} else {
