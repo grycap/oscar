@@ -54,6 +54,12 @@ type configVar struct {
 	defaultValue string
 }
 
+type AdditionalConfig struct {
+	Images struct {
+		AllowedPrefixes []string `yaml:"allowed_prefixes"`
+	} `yaml:"images"`
+}
+
 // Config stores the configuration for the OSCAR server
 type Config struct {
 	// MinIOProvider access info
@@ -184,6 +190,9 @@ type Config struct {
 
 	// Github path of FaaS Supervisor (needed for Interlink config)
 	SupervisorURL string `json:"-"`
+
+	//Path to additional OSCAR configuration setted by users
+	AdditionalConfigPath string `json:"-"`
 }
 
 var configVars = []configVar{
@@ -230,6 +239,7 @@ var configVars = []configVar{
 	{"OIDCGroups", "OIDC_GROUPS", false, stringSliceType, ""},
 	{"IngressHost", "INGRESS_HOST", false, stringType, ""},
 	{"SupervisorURL", "SUPERVISOR_URL", false, stringType, "https://github.com/grycap/faas-supervisor/releases/download/1.5.8/supervisor"},
+	{"AdditionalConfigPath", "ADDITIONAL_CONFIG_PATH", false, stringType, "config.yaml"},
 }
 
 func readConfigVar(cfgVar configVar) (string, error) {

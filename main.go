@@ -29,6 +29,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	versioned "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
 func main() {
@@ -49,6 +50,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	//Create the metrics clientset
+	metricsClientset := versioned.NewForConfigOrDie(kubeConfig)
 
 	// Check if the cluster has available GPUs
 	cfg.CheckAvailableGPUs(kubeClientset)
@@ -96,6 +100,9 @@ func main() {
 	system.DELETE("/logs/:serviceName", handlers.MakeDeleteJobsHandler(back, kubeClientset, cfg.ServicesNamespace))
 	system.GET("/logs/:serviceName/:jobName", handlers.MakeGetLogsHandler(back, kubeClientset, cfg.ServicesNamespace))
 	system.DELETE("/logs/:serviceName/:jobName", handlers.MakeDeleteJobHandler(back, kubeClientset, cfg.ServicesNamespace))
+
+	// Status path for cluster status (Memory and CPU) checks
+	system.GET("/status", handlers.MakeStatusHandler(kubeClientset, metricsClientset))
 
 	// Job path for async invocations
 	r.POST("/job/:serviceName", handlers.MakeJobHandler(cfg, kubeClientset, back, resMan))

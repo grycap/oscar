@@ -245,6 +245,10 @@ type Service struct {
 	// Optional
 	Clusters map[string]Cluster `json:"clusters,omitempty"`
 
+	// EGI UID of the user that created the service
+	// If the service is created through basic auth the default owner is "cluster_admin"
+	Owner string `json:"owner"`
+
 	InterLinkNodeName string `json:"interlink_node_name"`
 	// List of EGI UID's identifying the users that will have visibility of the service and its MinIO storage provider
 	// Optional (If the list is empty we asume the visibility is public for all cluster users)
@@ -262,9 +266,10 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 		ImagePullSecrets: SetImagePullSecrets(service.ImagePullSecrets),
 		Containers: []v1.Container{
 			{
-				Name:  ContainerName,
-				Image: service.Image,
-				Env:   ConvertEnvVars(service.Environment.Vars),
+				Name:            ContainerName,
+				Image:           service.Image,
+				ImagePullPolicy: v1.PullAlways,
+				Env:             ConvertEnvVars(service.Environment.Vars),
 				VolumeMounts: []v1.VolumeMount{
 					{
 						Name:      ConfigVolumeName,

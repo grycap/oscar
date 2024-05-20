@@ -271,6 +271,7 @@ clusters:
     auth_user: testuser
     auth_password: testpass
     ssl_verify: true
+owner: ""
 interlink_node_name: ""
 allowed_users: []
 `
