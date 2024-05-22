@@ -268,6 +268,7 @@ func getPodTemplateSpec(service Service, cfg *Config) v1.PodTemplateSpec {
 		},
 		Spec: *podSpec,
 	}
+	SetMount(podSpec, service, cfg)
 	return template
 }
 

@@ -10,6 +10,7 @@ functions:
        Variables:
          JUPYTER_TOKEN: "root"
          JHUB_BASE_URL: "/system/services/jupyter/exposed"
+         JUPYTER_DIRECTORY: "/mnt/data"
      expose:
       min_scale: 1
       max_scale: 1

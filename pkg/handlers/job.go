@@ -156,6 +156,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, resourceIDVar)
 			}
 		}
+		types.SetMount(podSpec, *service, cfg)
 
 		// Delegate job if can't be scheduled and has defined replicas
 		if rm != nil && service.HasReplicas() {
