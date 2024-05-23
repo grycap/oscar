@@ -12,7 +12,7 @@
         <link rel="prev" href="../api/">
       
       
-        <link rel="next" href="../minio-bucket-replication/">
+        <link rel="next" href="../expose_services/">
       
       
       <link rel="icon" href="../images/logo.png">
@@ -479,6 +479,27 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interlink_integration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Interlink
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -643,6 +664,26 @@
   
   
     <li class="md-nav__item">
+      <a href="../expose_services/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Expose services
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../minio-bucket-replication/" class="md-nav__link">
         
   
@@ -761,8 +802,8 @@
 </li>
 <li>
 <p><strong>Users who want to create new services need to know the UID of the users who will have access to the service.</strong></p>
-<p>Each service has a list of "allowed users," so a service can be accessed not only by one but by multiple users chosen by the service creator. This way, users have the ability to decide who can operate over its services. It is important to note that at this moment, a user with access to a service has full access; this means he can edit/delete the service besides making executions. </p>
-<p>This allowed users list is defined on the FDL on the service creation (more info in link FDL doc). The following is an example of an FDL that creates a service that gives access to two EGI users. If the allowed_users field is empty, the service is treated as "public," so every user within the cluster will have access to it.</p>
+<p>Each service has a list of "allowed users," so a service can be accessed not only by one but by multiple users chosen by the service creator. This way, users have the ability to decide who can operate over its services. It is important to note that only the service creator or "owner" can update it; this means that allowed users will only be able to see the service (and its buckets) and make invocations.</p>
+<p>This allowed users list is defined on the FDL on the service creation (more info in <a href="../fdl/">FDL docs</a>). The following is an example of an FDL that creates a service that gives access to two EGI users. If the allowed_users field is empty, the service is treated as "public," so every user within the cluster will have access to it.</p>
 <p>At the moment of the creation, the UID of the user creating the service doesn't need to be present on the list; however, when a service is updated, if the user will still have access, its UID has to be on the list.</p>
 </li>
 </ul>
