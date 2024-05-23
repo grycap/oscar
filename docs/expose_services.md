@@ -1,4 +1,3 @@
-## Exposed services
 
 OSCAR supports the deployment and elasticity management of long-running services that must be directly reachable outside the cluster. This functionality answers the need to support the fast inference of pre-trained AI models that require close to real-time processing with high throughput. In a traditional serverless approach, the AI model weights would be loaded in memory for each service invocation. Exposed services are also helpful when stateless services created out of large containers require too much time to start processing a service invocation.
 
@@ -29,6 +28,7 @@ https://{oscar_endpoint}/system/services/{service_name}/exposed/{path_resource}
 Notice that if you get a `502 Bad Gateway` error, it is most likely because the specified port on the service doesn't match the API port.
 
 Additional options can be defined in the "expose" section of the FDL (some previously mentioned), such as:
+
 - `min_scale`: The minimum number of active pods (default: 1).
 - `max_scale`: The maximum number of active pods (default: 10) or the CPU threshold, which, once exceeded, will trigger the creation of additional pods (default: 80%).
 - `rewrite_target`: Target the URI where the traffic is redirected. (default: false)

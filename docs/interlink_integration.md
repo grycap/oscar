@@ -1,10 +1,10 @@
-# Interlink
+# InterLink integration
 
 InterLink aims to provide an abstraction for executing a Kubernetes pod on any remote resource capable of managing a Container execution lifecycle.
 
 OSCAR uses the Kubernetes Virtual Node to translate a job request from the Kubernetes pod into a remote call. We have been using Interlink to interact with an HPC cluster. For more infomation check the [Interlink landing page](https://intertwin-eu.github.io/interLink).
 
-![Diagram](just_interlink2.png)
+![Diagram](images/interlink.png)
 
 ## Installation and use of Interlink Node in OSCAR cluster
 
