@@ -1,8 +1,8 @@
 ## Exposed services
 
-OSCAR also supports the deployment and elasticity management of long-running services that must be directly reachable outside the cluster (i.e. exposed services). Expose services are helpful when stateless services created out of large containers require too much time to start to process a service invocation. Expose services are the case when supporting the fast inference of pre-trained AI models that require close to real-time processing with high throughput. In a traditional serverless approach, the AI model weights would be loaded in memory for each service invocation (thus creating a new container). 
+OSCAR supports the deployment and elasticity management of long-running services that must be directly reachable outside the cluster. This functionality answers the need to support the fast inference of pre-trained AI models that require close to real-time processing with high throughput. In a traditional serverless approach, the AI model weights would be loaded in memory for each service invocation. Exposed services are also helpful when stateless services created out of large containers require too much time to start processing a service invocation.
 
-Instead, by exposing an OSCAR service, the AI model weights could be loaded just once, and the service would perform the AI model inference for each subsequent request. An auto-scaled load-balanced approach for these stateless services is supported. When the average CPU exceeds a certain user-defined threshold, additional service instances (i.e. pods) will be dynamically created (and removed when no longer necessary) within the user-defined boundaries (see the parameters `min_scale` and `max_scale` in [ExposeSettings](https://docs.oscar.grycap.net/fdl/#exposesettings)).
+Instead, by exposing an OSCAR service, the AI model weights could be loaded just once, and the service would perform the AI model inference for each subsequent request. An auto-scaled load-balanced approach for these stateless services is supported. When the average CPU exceeds a certain user-defined threshold, additional service instances (i.e. pods) will be dynamically created (and removed when no longer necessary) within the user-defined boundaries As mentioned previously, this kind of service provides elasticity management with a load-balanced approach. When the average CPU exceeds a certain user-defined threshold, additional service instances will be dynamically created (and removed when no longer necessary). The user can also define the minimum and maximum instances of the service to be present on the cluster (see the parameters `min_scale` and `max_scale` in [ExposeSettings](https://docs.oscar.grycap.net/fdl/#exposesettings)).
 
 
 ### Prerequisites in the container image
@@ -19,18 +19,25 @@ expose:
   api_port: 5000
 ```
 
-Once the service is deployed, the port is wrong if you invoke it, and it returns a `502 Bad Gateway` error.
-Additional options can be defined in the "expose" section, such as:
-- The minimum number of active pods (default: 1).
-- The maximum number of active pods (default: 10) or the CPU threshold, which, once exceeded, will trigger the creation of additional pods (default: 80%).
-- Target the URI where the traffic is redirected with `rewrite_target`. (default: false)
-- The access method from the domain name to the public ip <cluster_ip>:<NodePort> with the option `NodePort`.
-- The `default_command` argument selects between executing the container's default command and executing the script inside the container. (default: false, it executes the script)
-- Authentication can be set with `set_auth`. The credentials are composed of the service name as the user and the service token as the password. Turn off this field if the container has an authentication itself. It does not work with `NodePort`.(default: false, it has no authentication)
+Once the service is deployed, you can check if it was created correctly by making an HTTP request to the exposed endpoint, which would look like the following. 
+
+``` bash
+https://{oscar_endpoint}/system/services/{service_name}/exposed/{path_resource} 
+
+```
+
+Notice that if you get a `502 Bad Gateway` error, it is most likely because the specified port on the service doesn't match the API port.
+
+Additional options can be defined in the "expose" section of the FDL (some previously mentioned), such as:
+- `min_scale`: The minimum number of active pods (default: 1).
+- `max_scale`: The maximum number of active pods (default: 10) or the CPU threshold, which, once exceeded, will trigger the creation of additional pods (default: 80%).
+- `rewrite_target`: Target the URI where the traffic is redirected. (default: false)
+- `NodePort`: The access method from the domain name to the public ip <cluster_ip>:<NodePort>.
+- `default_command`: Selects between executing the container's default command and executing the script inside the container. (default: false, it executes the script)
+- `set_auth`: The credentials are composed of the service name as the user and the service token as the password. Turn off this field if the container has an authentication itself. It does not work with `NodePort`.(default: false, it has no authentication)
 
 
-Below is a specification with more details, showing that there will be between 5 to 15 active pods and that the service will expose an API in port 4578. The number of active pods will grow when the use of CPU increases by more than 50%.
-The active pods will decrease when the CPU use decreases.
+Below is an example of the expose setion of the FDL, showing that there will be between 5 to 15 active pods and that the service will expose an API in port 4578. The number of active pods will grow when the use of CPU increases by more than 50% and the active pods will decrease when the CPU use decreases.
 
 ``` yaml
 expose:
@@ -43,13 +50,13 @@ expose:
   default_command: true
 ```
 
-Below is an example of a recipe to expose a service from the [AI4EOSC/DEEP Open Catalog](https://marketplace.deep-hybrid-datacloud.eu/)
+In addition, you can see there a full example of a recipe to expose a service from the [AI4EOSC/DEEP Open Catalog](https://marketplace.deep-hybrid-datacloud.eu/)
 
 ``` yaml
 functions:
   oscar:
   - oscar-cluster:
-     name: body-pose-detection-async
+     name: body-pose-detection
      memory: 2Gi
      cpu: '1.0'
      image: deephdc/deep-oc-posenet-tf
@@ -65,28 +72,21 @@ functions:
       set_auth: true
      input:
      - storage_provider: minio.default
-       path: body-pose-detection-async/input
+       path: body-pose-detection/input
      output:
      - storage_provider: minio.default
-       path: body-pose-detection-async/output
+       path: body-pose-detection/output
 ```
 
-
-The service will be listening in a URL that follows the next pattern:
-
-``` text
-https://{oscar_endpoint}/system/services/{name of service}/exposed/
-```
-
-Now, let's show an example of executing the [Body pose detection](https://marketplace.deep-hybrid-datacloud.eu/modules/deep-oc-posenet-tf.html) ML model of [AI4EOSC/DEEP Open Catalog](https://marketplace.deep-hybrid-datacloud.eu/). We need to have in mind several factors:
+So, to invoke the API of this example the request will need the following information,
 
 1. OSCAR endpoint. `localhost` or `https://{OSCAR_endpoint}`
 2. Path resource. In this case, it is `v2/models/posenetclas/predict/`. Please do not forget the final `/`
 3. Use `-k` or `--insecure` if the SSL is false.
 4. Input image with the name `people.jpeg`
-5. Output. It will create a `.zip` file that has the output
+5. Output. It will create a `.zip` file that has the outputs
 
-The following code section represents a schema of the command:
+and will end up looking like this:
 
 ``` bash
 curl {-k} -X POST https://{oscar_endpoint}/system/services/body-pose-detection-async/exposed/{path resource} -H  "accept: */*" -H  "Content-Type: multipart/form-data" -F "data=@{input image};type=image/png" --output {output file}
