@@ -70,7 +70,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#exposed-services" class="md-skip">
+        <a href="#prerequisites-in-the-container-image" class="md-skip">
           Skip to content
         </a>
       
@@ -696,16 +696,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#exposed-services" class="md-nav__link">
-    <span class="md-ellipsis">
-      Exposed services
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Exposed services">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
   <a href="#prerequisites-in-the-container-image" class="md-nav__link">
     <span class="md-ellipsis">
       Prerequisites in the container image
@@ -713,18 +703,13 @@
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
+      
+        <li class="md-nav__item">
   <a href="#how-to-define-an-exposed-oscar-service" class="md-nav__link">
     <span class="md-ellipsis">
       How to define an exposed OSCAR service
     </span>
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -841,16 +826,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#exposed-services" class="md-nav__link">
-    <span class="md-ellipsis">
-      Exposed services
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Exposed services">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
   <a href="#prerequisites-in-the-container-image" class="md-nav__link">
     <span class="md-ellipsis">
       Prerequisites in the container image
@@ -858,18 +833,13 @@
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
+      
+        <li class="md-nav__item">
   <a href="#how-to-define-an-exposed-oscar-service" class="md-nav__link">
     <span class="md-ellipsis">
       How to define an exposed OSCAR service
     </span>
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -893,7 +863,6 @@
 
   <h1>Expose services</h1>
 
-<h2 id="exposed-services">Exposed services</h2>
 <p>OSCAR supports the deployment and elasticity management of long-running services that must be directly reachable outside the cluster. This functionality answers the need to support the fast inference of pre-trained AI models that require close to real-time processing with high throughput. In a traditional serverless approach, the AI model weights would be loaded in memory for each service invocation. Exposed services are also helpful when stateless services created out of large containers require too much time to start processing a service invocation.</p>
 <p>Instead, by exposing an OSCAR service, the AI model weights could be loaded just once, and the service would perform the AI model inference for each subsequent request. An auto-scaled load-balanced approach for these stateless services is supported. When the average CPU exceeds a certain user-defined threshold, additional service instances (i.e. pods) will be dynamically created (and removed when no longer necessary) within the user-defined boundaries As mentioned previously, this kind of service provides elasticity management with a load-balanced approach. When the average CPU exceeds a certain user-defined threshold, additional service instances will be dynamically created (and removed when no longer necessary). The user can also define the minimum and maximum instances of the service to be present on the cluster (see the parameters <code>min_scale</code> and <code>max_scale</code> in <a href="https://docs.oscar.grycap.net/fdl/#exposesettings">ExposeSettings</a>).</p>
 <h3 id="prerequisites-in-the-container-image">Prerequisites in the container image</h3>
@@ -909,13 +878,15 @@
 
 </code></pre>
 <p>Notice that if you get a <code>502 Bad Gateway</code> error, it is most likely because the specified port on the service doesn't match the API port.</p>
-<p>Additional options can be defined in the "expose" section of the FDL (some previously mentioned), such as:
-- <code>min_scale</code>: The minimum number of active pods (default: 1).
-- <code>max_scale</code>: The maximum number of active pods (default: 10) or the CPU threshold, which, once exceeded, will trigger the creation of additional pods (default: 80%).
-- <code>rewrite_target</code>: Target the URI where the traffic is redirected. (default: false)
-- <code>NodePort</code>: The access method from the domain name to the public ip <cluster_ip>:<NodePort>.
-- <code>default_command</code>: Selects between executing the container's default command and executing the script inside the container. (default: false, it executes the script)
-- <code>set_auth</code>: The credentials are composed of the service name as the user and the service token as the password. Turn off this field if the container has an authentication itself. It does not work with <code>NodePort</code>.(default: false, it has no authentication)</p>
+<p>Additional options can be defined in the "expose" section of the FDL (some previously mentioned), such as:</p>
+<ul>
+<li><code>min_scale</code>: The minimum number of active pods (default: 1).</li>
+<li><code>max_scale</code>: The maximum number of active pods (default: 10) or the CPU threshold, which, once exceeded, will trigger the creation of additional pods (default: 80%).</li>
+<li><code>rewrite_target</code>: Target the URI where the traffic is redirected. (default: false)</li>
+<li><code>NodePort</code>: The access method from the domain name to the public ip <cluster_ip>:<NodePort>.</li>
+<li><code>default_command</code>: Selects between executing the container's default command and executing the script inside the container. (default: false, it executes the script)</li>
+<li><code>set_auth</code>: The credentials are composed of the service name as the user and the service token as the password. Turn off this field if the container has an authentication itself. It does not work with <code>NodePort</code>.(default: false, it has no authentication)</li>
+</ul>
 <p>Below is an example of the expose setion of the FDL, showing that there will be between 5 to 15 active pods and that the service will expose an API in port 4578. The number of active pods will grow when the use of CPU increases by more than 50% and the active pods will decrease when the CPU use decreases.</p>
 <pre><code class="language-yaml">expose:
   min_scale: 5 

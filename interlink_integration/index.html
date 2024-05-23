@@ -70,7 +70,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#interlink" class="md-skip">
+        <a href="#interlink-integration" class="md-skip">
           Skip to content
         </a>
       
@@ -881,10 +881,10 @@
   
 
 
-<h1 id="interlink">Interlink</h1>
+<h1 id="interlink-integration">InterLink integration</h1>
 <p>InterLink aims to provide an abstraction for executing a Kubernetes pod on any remote resource capable of managing a Container execution lifecycle.</p>
 <p>OSCAR uses the Kubernetes Virtual Node to translate a job request from the Kubernetes pod into a remote call. We have been using Interlink to interact with an HPC cluster. For more infomation check the <a href="https://intertwin-eu.github.io/interLink">Interlink landing page</a>.</p>
-<p><img alt="Diagram" src="just_interlink2.png" /></p>
+<p><img alt="Diagram" src="../images/interlink.png" /></p>
 <h2 id="installation-and-use-of-interlink-node-in-oscar-cluster">Installation and use of Interlink Node in OSCAR cluster</h2>
 <p>The cluster Kubernetes must have at least one virtual kubelet node. Those nodes will have tagged as <code>type=virtual-kubelet</code>. So, follow these steps to <a href="https://intertwin-eu.github.io/interLink/docs/tutorial-admins/deploy-interlink">add the Virtual node</a> to the Kubernetes cluster. OSCAR detects these nodes by itself.</p>
 <p>Once the Virtual node and OSCAR are installed correctly, you use this node by adding the name of the virtual node in the <code>InterLinkNodeName</code> variable.
