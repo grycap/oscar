@@ -253,6 +253,10 @@ type Service struct {
 	// List of EGI UID's identifying the users that will have visibility of the service and its MinIO storage provider
 	// Optional (If the list is empty we asume the visibility is public for all cluster users)
 	AllowedUsers []string `json:"allowed_users"`
+
+	// Output StorageIOConfig slice with the output service configuration
+	// Optional
+	Mount StorageIOConfig `json:"mount"`
 }
 
 // ToPodSpec returns a k8s podSpec from the Service

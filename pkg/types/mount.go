@@ -22,12 +22,19 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+// rclone config create minio3 s3 provider=Minio access_key_id=minio secret_access_key=minio123 endpoint=https://minio.admiring-black1.im.grycap.net acl=public-read-write
+// rclone mount minio2:/prueba /data/intento2 --dir-cache-time 10s
+// rclone/rclone
 const (
-	s3_fs_fuse_containerName  = "pocminiovolumek8s"
-	s3_fs_fuse_containerImage = "ghcr.io/esparig/pocminiovolumek8s:mys3fs"
-	s3_fs_fuse_commandImage   = "s3fs -d -f ${MINIO_BUCKET} ${MNT_POINT} -o use_path_request_style,no_check_certificate,ssl_verify_hostname=0,allow_other,umask=0007,uid=1000,gid=100,url=http://${MINIO_ENDPOINT}:9000"
-	s3_fs_fuse_folder_mount   = "/mnt/data"
-	s3_fs_fuse_volume_name    = "shared-data"
+	rclone_containerName = "rclone-container"
+	//rclone_containerImage = "ghcr.io/esparig/pocminiovolumek8s:mys3fs"
+	rclone_containerImage = "rclone/rclone"
+	//rclone_commandImage   = "s3fs -d -f ${MINIO_BUCKET} ${MNT_POINT} -o use_path_request_style,no_check_certificate,ssl_verify_hostname=0,allow_other,umask=0007,uid=1000,gid=100,url=http://${MINIO_ENDPOINT}:9000"
+	rclone_commandImage = "mkdir -p $MNT_POINT/$MINIO_BUCKET && rclone config create minio s3  provider=Minio access_key_id=$AWS_ACCESS_KEY_ID secret_access_key=$AWS_SECRET_ACCESS_KEY endpoint=$MINIO_ENDPOINT acl=public-read-write && rclone mount minio:/$MINIO_BUCKET $MNT_POINT/$MINIO_BUCKET --dir-cache-time 10s --allow-other --allow-non-empty --umask 0007 --uid 1000 --gid 100 --allow-other  --no-checksum"
+	//rclone config create minio s3  provider=Minio access_key_id=$AWS_SECRET_ACCESS_KEY secret_access_key=$AWS_ACCESS_KEY_ID endpoint=$MINIO_ENDPOINT acl=public-read-write && rclone mount minio:${MINIO_BUCKET} " + rclone_folder_mount + " --dir-cache-time 10s --allow-other --allow-non-empty --umask 0007 --uid 1000 --gid 100 --allow-other  --no-checksum"
+	//use_path_request_style,ssl_verify_hostname=0"
+	rclone_folder_mount = "/mnt"
+	rclone_volume_name  = "shared-data"
 	//MINIO_ENDPOINT
 	//MINIO_ACCESS_KEY
 	//MINIO_SECRET_KEY
@@ -35,18 +42,18 @@ const (
 
 func SetMount(podSpec *v1.PodSpec, service Service, cfg *Config) {
 	podSpec.Containers = append(podSpec.Containers, secondPodSpec(service, cfg))
-	addVolume(podSpec)
+	addVolume(podSpec, service, cfg)
 }
 
-func addVolume(podSpec *v1.PodSpec) {
+func addVolume(podSpec *v1.PodSpec, service Service, cfg *Config) {
 	hostToContainer := v1.MountPropagationHostToContainer
 	volumeMountShare := v1.VolumeMount{
-		Name:             s3_fs_fuse_volume_name,
-		MountPath:        s3_fs_fuse_folder_mount,
+		Name:             rclone_volume_name,
+		MountPath:        rclone_folder_mount,
 		MountPropagation: &hostToContainer,
 	}
 	volumeshare := v1.Volume{
-		Name: s3_fs_fuse_volume_name,
+		Name: rclone_volume_name,
 		VolumeSource: v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		},
@@ -62,10 +69,10 @@ func secondPodSpec(service Service, cfg *Config) v1.Container {
 	value := true
 	ptr = &value
 	container := v1.Container{
-		Name:    s3_fs_fuse_containerName,
-		Image:   s3_fs_fuse_containerImage,
+		Name:    rclone_containerName,
+		Image:   rclone_containerImage,
 		Command: []string{"/bin/sh"},
-		Args:    []string{"-c", s3_fs_fuse_commandImage},
+		Args:    []string{"-c", rclone_commandImage},
 		Ports: []v1.ContainerPort{
 			{
 				Name:          "",
@@ -75,68 +82,49 @@ func secondPodSpec(service Service, cfg *Config) v1.Container {
 		SecurityContext: &v1.SecurityContext{Privileged: ptr},
 		Env: []v1.EnvVar{
 			{
-				Name:  "MINIO_BUCKET",
-				Value: "jupyter-bucket",
-			},
-			{
-				Name:  "MINIO_ENDPOINT",
-				Value: "minio.minio.svc.cluster.local",
-			},
-			{
 				Name:  "MNT_POINT",
-				Value: s3_fs_fuse_folder_mount,
+				Value: rclone_folder_mount,
 			},
 		},
 		VolumeMounts: []v1.VolumeMount{
 			{
-				Name:             s3_fs_fuse_volume_name,
-				MountPath:        s3_fs_fuse_folder_mount,
+				Name:             rclone_volume_name,
+				MountPath:        rclone_folder_mount,
 				MountPropagation: &bidirectional,
 			},
 		},
 	}
 
-	credentialsValue := setCredentials(service, cfg)
-	container.Env = append(container.Env, credentialsValue[0])
-	container.Env = append(container.Env, credentialsValue[1])
+	provider := strings.Split(service.Mount.Provider, ".")
+	if provider[0] == MinIOName {
+		credentialsValue := setCredentialsMinIO(service, cfg, provider[1])
+		for index := 0; index < len(credentialsValue); index++ {
+			container.Env = append(container.Env, credentialsValue[index])
+		}
+	}
 	return container
 
 }
 
-func setCredentials(service Service, cfg *Config) []v1.EnvVar {
-	if service.Owner == "" {
-		credentials := []v1.EnvVar{
-			{
-				Name:  "AWS_ACCESS_KEY_ID",
-				Value: cfg.MinIOProvider.AccessKey,
-			},
-			{
-				Name:  "AWS_SECRET_ACCESS_KEY",
-				Value: cfg.MinIOProvider.SecretKey,
-			},
-		}
-		return credentials
-	} else {
-		credentials := []v1.EnvVar{
-			{
-				Name: "AWS_ACCESS_KEY_ID",
-				ValueFrom: &v1.EnvVarSource{
-					SecretKeyRef: &v1.SecretKeySelector{
-						LocalObjectReference: v1.LocalObjectReference{Name: strings.Trim(service.Owner, "@egi.eu")},
-						Key:                  "accessKey",
-					},
-				},
-			},
-			{
-				Name: "AWS_SECRET_ACCESS_KEY",
-				ValueFrom: &v1.EnvVarSource{
-					SecretKeyRef: &v1.SecretKeySelector{
-						LocalObjectReference: v1.LocalObjectReference{Name: strings.Trim(service.Owner, "@egi.eu")},
-						Key:                  "secretKey",
-					},
-				},
-			},
-		}
-		return credentials
+func setCredentialsMinIO(service Service, cfg *Config, providerId string) []v1.EnvVar {
+	//service.Mount.Provider
+	credentials := []v1.EnvVar{
+		{
+			Name:  "MINIO_BUCKET",
+			Value: service.Mount.Path,
+		},
+		{
+			Name:  "AWS_ACCESS_KEY_ID",
+			Value: service.StorageProviders.MinIO[providerId].AccessKey,
+		},
+		{
+			Name:  "AWS_SECRET_ACCESS_KEY",
+			Value: service.StorageProviders.MinIO[providerId].SecretKey,
+		},
+		{
+			Name:  "MINIO_ENDPOINT",
+			Value: service.StorageProviders.MinIO[providerId].Endpoint,
+		},
 	}
+	return credentials
 }

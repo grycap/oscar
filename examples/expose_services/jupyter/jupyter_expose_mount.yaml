@@ -5,11 +5,15 @@ functions:
      memory: 2Gi
      cpu: '1.0'
      image: jupyter/base-notebook
-     script: jupyterscript.sh
+     script: jupyterscript2.sh
      environment:
        Variables:
          JUPYTER_TOKEN: "root"
          JHUB_BASE_URL: "/system/services/jupyter/exposed"
+         JUPYTER_DIRECTORY: "/mnt"
+     mount:
+       storage_provider: minio.default
+       path: /prueba
      expose:
       min_scale: 1
       max_scale: 1

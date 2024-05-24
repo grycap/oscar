@@ -258,6 +258,7 @@ func getPodTemplateSpec(service Service, cfg *Config) v1.PodTemplateSpec {
 	}
 	var num int32 = 0777
 	podSpec.Volumes[0].VolumeSource.ConfigMap.DefaultMode = &num
+	SetMount(podSpec, service, cfg)
 	template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      service.Name,
@@ -268,7 +269,6 @@ func getPodTemplateSpec(service Service, cfg *Config) v1.PodTemplateSpec {
 		},
 		Spec: *podSpec,
 	}
-	SetMount(podSpec, service, cfg)
 	return template
 }
 
