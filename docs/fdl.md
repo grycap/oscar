@@ -23,11 +23,16 @@ functions:
       cpu: '1.0'
       image: grycap/imagemagick
       script: grayify.sh
+      interlink_node_name: vega-new-vk
       expose:
         min_scale: 3 
         max_scale: 7 
         port: 5000  
         cpu_threshold: 70 
+        nodePort: 30500
+        set_auth: true
+        rewrite_target: true
+        default_command: true
       input:
       - storage_provider: minio.default
         path: example-workflow/med
@@ -96,6 +101,7 @@ storage_providers:
 | `environment` </br> *[EnvVarsMap](#envvarsmap)*                   | The user-defined environment variables assigned to the service. Optional                                                                                                                                                                                     |
 | `annotations` </br> *map[string]string*                           | User-defined Kubernetes [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/) to be set in job's definition. Optional                                                                                                |
 | `labels` </br> *map[string]string*                                | User-defined Kubernetes [labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) to be set in job's definition. Optional                                                                                                          |
+| `interlink_node_name` </br> *string*                              | Name of the virtual kubelet node (if you are using InterLink nodes) Optional 
 
 ## SynchronousSettings
 
@@ -111,7 +117,11 @@ storage_providers:
 | `min_scale` </br> *integer*  | Minimum number of active replicas (pods) for the service. Optional. (default: 1)             |
 | `max_scale` </br> *integer*  | Maximum number of active replicas (pods) for the service. Optional. (default: 10 (Unlimited)) |
 | `port` </br> *integer*       | Port inside the container where the API is exposed. (value: 0 , the service wont be exposed.)             |
-| `cpu_threshold` </br> *integer* | Percent of use of CPU before creating other pod (default: 80 max:100) |
+| `cpu_threshold` </br> *integer* | Percent of use of CPU before creating other pod (default: 80 max:100). Optional.  |
+| `nodePort` </br> *integer* | Change the access method from the domain name to the public ip. Optional.   |
+| `set_auth` </br> *bool* | Create credentials for the service, composed of the service name as the user and the service token as the password. (default: false). Optional.  |
+| `rewrite_target` </br> *bool* | Target the URI where the traffic is redirected. (default: false). Optional.  |
+| `default_command` </br> *bool* | Select between executing the container's default command and executing the script inside the container. (default: false). Optional.  |
 
 ## Replica
 
