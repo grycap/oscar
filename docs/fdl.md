@@ -96,6 +96,7 @@ storage_providers:
 | `environment` </br> *[EnvVarsMap](#envvarsmap)*                   | The user-defined environment variables assigned to the service. Optional                                                                                                                                                                                     |
 | `annotations` </br> *map[string]string*                           | User-defined Kubernetes [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/) to be set in job's definition. Optional                                                                                                |
 | `labels` </br> *map[string]string*                                | User-defined Kubernetes [labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) to be set in job's definition. Optional                                                                                                          |
+| `interlink_node_name` </br> *string*                              | Name of the virtual kubelet node (if you are using InterLink nodes) Optional 
 
 ## SynchronousSettings
 
@@ -112,6 +113,12 @@ storage_providers:
 | `max_scale` </br> *integer*  | Maximum number of active replicas (pods) for the service. Optional. (default: 10 (Unlimited)) |
 | `port` </br> *integer*       | Port inside the container where the API is exposed. (value: 0 , the service wont be exposed.)             |
 | `cpu_threshold` </br> *integer* | Percent of use of CPU before creating other pod (default: 80 max:100) |
+| `nodePort` </br> *integer* | Change the access method from the domain name to the public ip. Optional.   |
+| `set_auth` </br> *bool* | Create credentials for the service, composed of the service name as the user and the service token as the password. (default: false). Optional.  |
+| `rewrite_target` </br> *bool* | Target the URI where the traffic is redirected. (default: false). Optional.  |
+| `default_command` </br> *bool* | Select between executing the container's default command and executing the script inside the container. (default: false). Optional.  |
+
+
 
 ## Replica
 
