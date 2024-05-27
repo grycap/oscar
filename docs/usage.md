@@ -44,6 +44,7 @@ processing of files. This script must use the environment variables
 `INPUT_FILE_PATH` and `TMP_OUTPUT_DIR` to refer to the input file and the
 folder where to save the results respectively:
 
+
 ```
 #!/bin/bash
 

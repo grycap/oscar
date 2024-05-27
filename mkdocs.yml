@@ -12,6 +12,7 @@ nav:
   - Integration with EGI: egi-integration.md
   - OIDC Authorization: oidc-auth.md
   - Integration with SCONE: sgx-integration.md
+  - Interlink: interlink_integration.md
 - usage.md
 - invoking.md
 - Functions Definition Language (FDL): fdl.md
@@ -19,6 +20,7 @@ nav:
 - oscar-cli.md
 - OpenAPI Specification: api.md
 - Multitenancy: multitenancy.md
+- Expose services: expose_services.md
 - MinIO bucket replication: minio-bucket-replication.md
 - Frequently Asked Questions (FAQ): faq.md
 - license.md
