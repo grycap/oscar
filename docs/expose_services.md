@@ -22,7 +22,6 @@ Once the service is deployed, you can check if it was created correctly by makin
 
 ``` bash
 https://{oscar_endpoint}/system/services/{service_name}/exposed/{path_resource} 
-
 ```
 
 Notice that if you get a `502 Bad Gateway` error, it is most likely because the specified port on the service doesn't match the API port.
@@ -49,6 +48,46 @@ expose:
   rewrite_target: true
   default_command: true
 ```
+
+#### Authentication Problems
+
+The variable `set_auth` introduces an authentication at the ingress level. This option is unnecessary if the container has authentication at the application level. The service won't work because the application will be confused between the two authentication processes.
+
+For example, the Jupyter Notebook container has an authentication itself; this token can be changed and defined with the argument `--NotebookApp.token`
+
+
+#### Jupyter Example
+
+By default, the Jupyter Notebook container's command is `start-notebook.sh`. This command, without any argument, assigns a random token to access.
+
+The parameter `--NotebookApp.token` changes the access token. Introduce a new token as a variable of the services. So, by setting `default_command` and `set_auth` as false. The behavior of the service will change. Here is an example of Jupyter Notebook expose services:
+```
+functions:
+  oscar:
+  - oscar-cluster:
+     name: jupyter
+     memory: 2Gi
+     cpu: '1.0'
+     image: jupyter/base-notebook
+     script: jupyterscript.sh
+     environment:
+       Variables:
+         JUPYTER_TOKEN: "root"
+         JHUB_BASE_URL: "/system/services/jupyter/exposed"
+     expose:
+      min_scale: 1
+      max_scale: 1
+      api_port: 8888
+      cpu_threshold: 90
+      rewrite_target: true
+```
+
+Here is the script used to execute inside the container:
+```
+start-notebook.sh --NotebookApp.base_url=$JHUB_BASE_URL --NotebookApp.token=$JUPYTER_TOKEN 
+```
+
+#### DEEP Open Catalog Example
 
 In addition, you can see there a full example of a recipe to expose a service from the [AI4EOSC/DEEP Open Catalog](https://marketplace.deep-hybrid-datacloud.eu/)
 
