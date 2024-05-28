@@ -274,6 +274,9 @@ clusters:
 owner: ""
 interlink_node_name: ""
 allowed_users: []
+mount:
+  storage_provider: ""
+  path: ""
 `
 
 	str, _ := testService.ToYAML()
