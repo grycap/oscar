@@ -2,27 +2,37 @@ site_name: OSCAR Documentation
 repo_url: https://github.com/grycap/oscar
 nav:
 - Introduction: index.md
-- Getting started:
-  - Local testing: local-testing.md
-  - Deployment with IM Dashboard: deploy-im-dashboard.md
-  - Deployment with EC3: deploy-ec3.md
-  - Deployment with Helm: deploy-helm.md
-  - Deployment on K3s with Ansible: deploy-ansible.md
+- Deployment:
+  - local-testing.md
+  - deploy-im-dashboard.md
+  - deploy-ec3.md
+  - deploy-helm.md
+  - deploy-k3s-ansible.md
+- Service Definition:
+  - Functions Definition Language (FDL): fdl.md
+  - FDL Composer: fdl-composer.md
+- Service Execution: 
+  - invoking.md
+  - Exposed services: expose_services.md
+- Usage:
+  - usage-ui.md
+  - oscar-cli.md
+  - api.md
+- training.md
+
+- Advanced Features:   
+  - Multitenancy: multitenancy.md
+  - MinIO bucket replication: minio-bucket-replication.md
+
 - Third party integrations:
   - Integration with EGI: egi-integration.md
   - OIDC Authorization: oidc-auth.md
   - Integration with SCONE: sgx-integration.md
   - Interlink: interlink_integration.md
-- usage.md
-- invoking.md
-- Functions Definition Language (FDL): fdl.md
-- FDL Composer: fdl-composer.md
-- oscar-cli.md
-- OpenAPI Specification: api.md
-- Multitenancy: multitenancy.md
-- Expose services: expose_services.md
-- MinIO bucket replication: minio-bucket-replication.md
+
 - Frequently Asked Questions (FAQ): faq.md
+- Development:
+  - Documentation: devel-docs.md
 - license.md
 - about.md
 theme:
@@ -31,6 +41,10 @@ theme:
   name: material
   palette:
     primary: teal
+  features:
+    - instant
+    - toc.integrate
+    - content.code.copy
 plugins:
 - search
 - render_swagger

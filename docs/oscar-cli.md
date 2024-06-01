@@ -1,4 +1,4 @@
-# OSCAR-CLI
+# OSCAR CLI
 
 OSCAR-CLI provides a command line interface to interact with
 [OSCAR](https://github.com/grycap/oscar) clusters in a simple way. It supports

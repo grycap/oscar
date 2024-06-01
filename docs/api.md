@@ -1,4 +1,4 @@
-# OpenAPI Specification
+# OSCAR API 
 
 OSCAR exposes a secure REST API available at the Kubernetes master's node IP
 through an ingress. This API has been described following the

@@ -1,4 +1,7 @@
-# Functions Definition Language (OSCAR)
+# Functions Definition Language (FDL)
+
+OSCAR services are defined via the Functions Definition Language (FDL).
+
 
 Example:
 

@@ -1,4 +1,4 @@
-# Invoking services
+# Service Execution Types
 
 OSCAR services can be invoked synchronously and asynchronously sending an
 HTTP POST request to paths `/run/<SERVICE_NAME>` and `/job/<SERVICE_NAME>`

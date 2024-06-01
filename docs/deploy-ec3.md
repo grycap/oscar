@@ -1,8 +1,11 @@
 # Deployment with EC3
 
+> ❗️
+> The deployment of OSCAR with EC3 is deprecated. Please, consider using the [IM Dashboard](deploy-im-dashboard.md).
+
 In order to deploy an elastic Kubernetes cluster with the OSCAR platform, it
 is preferable to use the
-[IM Dashboard](https://appsgrycap.i3m.upv.es:31443/im-dashboard).
+[IM Dashboard](https://im.egi.eu). 
 Alternatively, you can also use [EC3](https://github.com/grycap/ec3), a tool
 that deploys elastic virtual clusters. EC3 uses the
 [Infrastructure Manager (IM)](https://www.grycap.upv.es/im) to deploy such
