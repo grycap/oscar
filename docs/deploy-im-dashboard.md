@@ -124,7 +124,7 @@ These are the steps:
 
     * console_minio_endpoint: To access the MinIO web UI.
     * dashboard_endpoint: To access the Kubernetes dashboard.
-    * local_oscarui_endpoint: To access the OSCAR UI. It supports username/password authentication (user: oscar, password: the one specified at deployment time)
+    * local_oscarui_endpoint: To access the OSCAR UI. It supports username/password authentication.
     * minio_endpoint: Endpoint where the MinIO API is listening. If you
         access it through a web browser, you will be redirected to
         "console_minio_endpoint".
