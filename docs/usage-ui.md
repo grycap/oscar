@@ -1,4 +1,4 @@
-# Using OSCAR through the web-based UI
+# OSCAR UI
 
 OSCAR allows the creation of serverless file-processing services based on
 container images. These services require a user-defined script with the
