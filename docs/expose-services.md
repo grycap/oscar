@@ -1,3 +1,5 @@
+# Exposed Services
+
 
 OSCAR supports the deployment and elasticity management of long-running services that must be directly reachable outside the cluster. This functionality answers the need to support the fast inference of pre-trained AI models that require close to real-time processing with high throughput. In a traditional serverless approach, the AI model weights would be loaded in memory for each service invocation. Exposed services are also helpful when stateless services created out of large containers require too much time to start processing a service invocation.
 
