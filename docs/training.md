@@ -1,8 +1,4 @@
-# Training & Dissemination
-
-
-
-## Presentations and Webinars
+# Presentations and Webinars
 
 
 ### Deploy your AI-based service for inference using OSCAR

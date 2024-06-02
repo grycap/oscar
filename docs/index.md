@@ -1,6 +1,6 @@
 # Introduction
 
-![OSCAR-logo](images/oscar3.png)
+![OSCAR logo](images/oscar3.png)
 
 OSCAR is an open-source platform to support the event-driven serverless computing model for data-processing applications. It can be automatically deployed on multi-Clouds, and even on low-powered devices, to create highly-parallel event-driven data-processing serverless applications along the computing continuum. These applications execute on customized runtime environments provided by Docker containers that run on elastic Kubernetes clusters. It is also integrated with the 
 [SCAR framework](https://github.com/grycap/scar), which supports a
@@ -35,7 +35,7 @@ An admin user can deploy an OSCAR cluster on a Cloud platform so that other user
 
 ## Architecture & Components
 
-![oscar arch](images/oscar-arch.png)
+![OSCAR architecture](images/oscar-arch.png)
 
 OSCAR runs on an elastic [Kubernetes](http://kubernetes.io) cluster that is
 deployed using:
@@ -78,6 +78,10 @@ only MinIO can be used as input.*
 
 An OSCAR cluster can be easily deployed via the [IM Dashboard](http://im.egi.eu)
 on any major public and on-premises Cloud provider, including the EGI Federated Cloud.
+
+A summary of the components used: 
+
+![OSCAR components](images/oscar-components.png)
 
 An OSCAR cluster can be accessed via its
 [REST API](https://grycap.github.io/oscar/api/), the web-based 

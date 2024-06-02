@@ -1,4 +1,4 @@
-# Functions Definition Language Composer
+# FDL Composer
 
 OSCAR Services can be aggregated into data-driven workflows where the output data of one service is stored in the object store that triggers another service, potentially in a different OSCAR cluster. This allows to execute the different phases of the workflow in disparate computing infrastructures.
 

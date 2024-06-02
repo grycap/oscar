@@ -1,34 +1,19 @@
 # OSCAR UI
 
-OSCAR allows the creation of serverless file-processing services based on
-container images. These services require a user-defined script with the
-commands responsible of the processing. The platform automatically mounts a
-volume on the containers with the
-[FaaS Supervisor](https://github.com/grycap/faas-supervisor) component, which
-is in charge of:
+> ❗️
+>
+> For simple OSCAR services you may use the UI, but its features may not be on par with the latest changes in the [FDL](fdl.md). 
+> Therefore, it is recommended to use [OSCAR CLI](oscar-cli.md) to deploy an OSCAR service.  
 
-- Downloading the file that invokes the service and make it accessible through
-    the `INPUT_FILE_PATH` environment variable.
-- Execute the user-defined script.
-- Upload the content of the output folder accessible via the `TMP_OUTPUT_DIR`
-    environment variable.
 
-You can follow one of the
-[examples](https://github.com/grycap/oscar/tree/master/examples)
-in order to test the OSCAR framework for specific applications. We recommend
-you to start with the
-[plant classification example](https://github.com/grycap/oscar/tree/master/examples/plant-classification-sync)
-detailed below.
-
-If you prefer to use the command-line interface rather than the web-based UI,
-there is an example in
-[oscar-cli's repository](https://github.com/grycap/oscar-cli/tree/main/example-workflow).
+This section details the usage of the OSCAR UI with the
+[plant classification](https://github.com/grycap/oscar/tree/master/examples/plant-classification-sync) example, from the 
+[OSCAR examples](https://github.com/grycap/oscar/tree/master/examples). 
 
 ## Login
 
-OSCAR is exposed via a Kubernetes ingress and it is accessible via the
-Kubernetes master node IP. If you deployed it using EC3 you can find the
-credentials [here](deploy-ec3.md#default-service-endpoints).
+OSCAR UI is exposed via a Kubernetes ingress and it is accessible via the
+Kubernetes master node IP. 
 
 ![login](images/usage/usage-01.png)
 
@@ -39,7 +24,7 @@ After a correct login, you should see the main view:
 ## Deploying services
 
 In order to create a new service, you must click on the "DEPLOY NEW SERVICE"
-button and follow the wizard. Remember that a script must be provided for the
+button and follow the wizard. For an [OSCAR Service](oscar-service.md) a script must be provided for the
 processing of files. This script must use the environment variables
 `INPUT_FILE_PATH` and `TMP_OUTPUT_DIR` to refer to the input file and the
 folder where to save the results respectively:

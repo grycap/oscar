@@ -1,39 +1,39 @@
 # OSCAR CLI
 
-OSCAR-CLI provides a command line interface to interact with
-[OSCAR](https://github.com/grycap/oscar) clusters in a simple way. It supports
-service management, workflows definition from FDL (Functions Definition
-Language) files and the ability to manage files from OSCAR's compatible
+OSCAR CLI provides a command line interface to interact with
+OSCAR. It supports cluster registrations,
+service management, workflows definition from [FDL](fdl.md) files and the ability to manage files from OSCAR's compatible
 storage providers (MinIO, AWS S3 and Onedata). The folder
 [`example-workflow`](https://github.com/grycap/oscar-cli/tree/main/example-workflow)
 contains all the necessary files to create a simple workflow to test the tool.
+
 
 ## Download
 
 ### Releases
 
-The easy way to download OSCAR-CLI is through the github
+The easy way to download OSCAR-CLI is through the GitHub
 [releases page](https://github.com/grycap/oscar-cli/releases). There are
 binaries for multiple platforms and OS. If you need a binary for another
 platform, please open an [issue](https://github.com/grycap/oscar-cli/issues).
 
 ### Install from source
 
-If you have [go](https://golang.org/doc/install) installed and
-[configured](https://github.com/golang/go/wiki/SettingGOPATH), you can get it
-from source directly by executing:
+If you have the [Go](https://golang.org/doc/install) programming language installed and
+[configured](https://github.com/golang/go/wiki/SettingGOPATH), you can get it directly
+from the source by executing:
 
 ```sh
 go install github.com/grycap/oscar-cli@latest
 ```
 
-### OpenID Connect
+### OIDC (OpenID Connect)
 
-Once the service is created, follow the next steps to use oscar_cli to interact with an OSCAR cluster using the OpenID Connect.
+Once the service is created, follow these steps to use `oscar-cli` to interact with an OSCAR cluster using the OpenID Connect.
 
 - Install [oidc-agent](https://indigo-dc.gitbook.io/oidc-agent/intro)
-- Registry the [EGI client](https://indigo-dc.gitbook.io/oidc-agent/user/oidc-gen/provider/egi)
-- Add a cluster in oscar-cli with oidc credentians
+- Register the [EGI client](https://indigo-dc.gitbook.io/oidc-agent/user/oidc-gen/provider/egi)
+- Add a cluster in `oscar-cli` with oidc credentians
 
 ``` bash
 oscar-cli cluster add IDENTIFIER ENDPOINT --oidc-account-name SHORTNAME
@@ -48,10 +48,7 @@ oscar-cli service run plant-classification -i <image-path> -c <cluster-identifie
 
 ## Available commands
 
-- [OSCAR-CLI](#oscar-cli)
-  - [Download](#download)
-    - [Releases](#releases)
-    - [Install from source](#install-from-source)
+
   - [Available commands](#available-commands)
     - [apply](#apply)
     - [cluster](#cluster)
