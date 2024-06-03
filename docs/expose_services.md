@@ -106,7 +106,7 @@ functions:
      expose:
       min_scale: 1 
       max_scale: 10 
-      port: 5000  
+      api_port: 5000  
       cpu_threshold: 20 
       set_auth: true
      input:
@@ -151,7 +151,7 @@ functions:
      expose:
       min_scale: 2 
       max_scale: 10 
-      port: 80  
+      api_port: 80  
       cpu_threshold: 50 
 ```
 
