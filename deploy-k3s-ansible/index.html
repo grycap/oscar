@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="../oscar-service/">
+        <link rel="prev" href="../deploy-helm/">
       
       
-        <link rel="next" href="../fdl-composer/">
+        <link rel="next" href="../oscar-service/">
       
       
       <link rel="icon" href="../images/logo.png">
@@ -20,7 +20,7 @@
     
     
       
-        <title>Functions Definition Language (FDL) - OSCAR Documentation</title>
+        <title>Deployment on K3s with Ansible - OSCAR Documentation</title>
       
     
     
@@ -70,7 +70,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#functions-definition-language-fdl" class="md-skip">
+        <a href="#deployment-on-k3s-with-ansible" class="md-skip">
           Skip to content
         </a>
       
@@ -105,7 +105,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Functions Definition Language (FDL)
+              Deployment on K3s with Ansible
             
           </span>
         </div>
@@ -304,17 +304,19 @@
       
   
   
+    
   
   
+  
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
@@ -328,7 +330,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             Deployment
@@ -423,10 +425,30 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../deploy-k3s-ansible/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Deployment on K3s with Ansible
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -435,6 +457,104 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      Requirements
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#clone-the-folder" class="md-nav__link">
+    <span class="md-ellipsis">
+      Clone the folder
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ssh-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      SSH configuration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-of-the-inventory-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration of the inventory file
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setting-up-the-playbook-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setting up the playbook variables
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installation-of-the-required-ansible-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      Installation of the required ansible roles
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-the-playbook" class="md-nav__link">
+    <span class="md-ellipsis">
+      Running the playbook
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -451,19 +571,17 @@
       
   
   
-    
   
   
-  
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
@@ -477,7 +595,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Service Definition
@@ -509,30 +627,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Functions Definition Language (FDL)
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../fdl/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -541,152 +639,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#top-level-parameters" class="md-nav__link">
-    <span class="md-ellipsis">
-      Top level parameters
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#functions" class="md-nav__link">
-    <span class="md-ellipsis">
-      Functions
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#service" class="md-nav__link">
-    <span class="md-ellipsis">
-      Service
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#synchronoussettings" class="md-nav__link">
-    <span class="md-ellipsis">
-      SynchronousSettings
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#exposesettings" class="md-nav__link">
-    <span class="md-ellipsis">
-      ExposeSettings
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#replica" class="md-nav__link">
-    <span class="md-ellipsis">
-      Replica
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#storageioconfig" class="md-nav__link">
-    <span class="md-ellipsis">
-      StorageIOConfig
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#envvarsmap" class="md-nav__link">
-    <span class="md-ellipsis">
-      EnvVarsMap
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#storageproviders" class="md-nav__link">
-    <span class="md-ellipsis">
-      StorageProviders
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cluster" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cluster
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#minioprovider" class="md-nav__link">
-    <span class="md-ellipsis">
-      MinIOProvider
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#s3provider" class="md-nav__link">
-    <span class="md-ellipsis">
-      S3Provider
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#onedataprovider" class="md-nav__link">
-    <span class="md-ellipsis">
-      OnedataProvider
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#webdavprovider" class="md-nav__link">
-    <span class="md-ellipsis">
-      WebDAVProvider
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1345,495 +1297,116 @@
   
 
 
-<h1 id="functions-definition-language-fdl">Functions Definition Language (FDL)</h1>
-<p>OSCAR services are typically defined via the Functions Definition Language (FDL) to be deployed via the <a href="../oscar-cli/">OSCAR CLI</a>. Alternative approaches are using the web-based wizard in the <a href="../usage-ui/">OSCAR UI</a> or, for a programmatic integration, via the <a href="../api/">OSCAR API</a>. </p>
-<blockquote>
-<p>ℹ️</p>
-<p>It is called <em>Functions Definition Language</em> instead of <em>Services Definition Language</em>, because the definition was initially designed for <a href="https://github.com/grycap/scar">SCAR</a>, which supports Lambda functions.</p>
-</blockquote>
-<p>Example:</p>
-<pre><code>functions:
-  oscar:
-  - oscar-test:
-      name: plants
-      memory: 2Gi
-      cpu: '1.0'
-      image: grycap/oscar-theano-plants
-      script: plants.sh
-      input:
-      - storage_provider: minio.default
-        path: example-workflow/in
-      output:
-      - storage_provider: minio.default
-        path: example-workflow/med
-  - oscar-test:
-      name: grayify
-      memory: 1Gi
-      cpu: '1.0'
-      image: grycap/imagemagick
-      script: grayify.sh
-      expose:
-        min_scale: 3 
-        max_scale: 7 
-        port: 5000  
-        cpu_threshold: 70 
-      input:
-      - storage_provider: minio.default
-        path: example-workflow/med
-      output:
-      - storage_provider: minio.default
-        path: example-workflow/res
-      - storage_provider: onedata.my_onedata
-        path: result-example-workflow
-      - storage_provider: webdav.dcache
-        path: example-workflow/res
-
-storage_providers:
-  onedata:
-    my_onedata:
-      oneprovider_host: my_provider.com
-      token: my_very_secret_token
-      space: my_onedata_space
-  webdav:
-    dcache:
-      hostname: my_dcache.com
-      login: my_username
-      password: my_password
+<h1 id="deployment-on-k3s-with-ansible">Deployment on K3s with Ansible</h1>
+<p>The folder
+<a href="https://github.com/grycap/oscar/tree/master/deploy/ansible"><code>deploy/ansible</code></a>
+contains all the necessary files to deploy a <a href="https://k3s.io/">K3s</a> cluster
+together with the OSCAR platform using <a href="https://www.ansible.com/">Ansible</a>.
+This way, a minified Kubernetes distribution can be used to configure OSCAR on
+IoT devices located at the Edge, such as
+<a href="https://www.raspberrypi.org/">Raspberry PIs</a>. Note that this
+<a href="https://docs.ansible.com/ansible/latest/user_guide/playbooks_intro.html">playbook</a>
+can also be applied to quickly spread the OSCAR platform on top of any machine
+or already started cloud instance since the playbook is compatible with
+GNU/Linux on ARM64 and AMD64 architectures.</p>
+<h2 id="requirements">Requirements</h2>
+<p>In order to use the playbook, you must install the following components:</p>
+<ul>
+<li>Ansible, following <a href="https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html">this guide</a>.</li>
+<li>The <a href="https://netaddr.readthedocs.io/en/latest/installation.html"><code>netaddr</code></a>
+  python library.</li>
+<li><a href="https://www.openssh.com/">OpenSSH</a>, to remotely access the hosts to be configured.</li>
+</ul>
+<h2 id="usage">Usage</h2>
+<h3 id="clone-the-folder">Clone the folder</h3>
+<p>First of all, you must clone the OSCAR repo:</p>
+<pre><code>git clone https://github.com/grycap/oscar.git
 </code></pre>
-<h2 id="top-level-parameters">Top level parameters</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>functions</code> </br> <em><a href="#functions">Functions</a></em></td>
-<td>Mandatory parameter to define a Functions Definition Language file. Note that "functions" instead of "services" has been used in order to keep compatibility with <a href="https://github.com/grycap/scar">SCAR</a></td>
-</tr>
-<tr>
-<td><code>storage_providers</code> </br> <em><a href="#storageproviders">StorageProviders</a></em></td>
-<td>Parameter to define the credentials for the storage providers to be used in the services</td>
-</tr>
-<tr>
-<td><code>clusters</code> </br> <em>map[string]<a href="#cluster">Cluster</a></em></td>
-<td>Configuration for the OSCAR clusters that can be used as service's replicas, being the key the user-defined identifier for the cluster. Optional</td>
-</tr>
-</tbody>
-</table>
-<h2 id="functions">Functions</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>oscar</code> </br> <em>map[string]<a href="#service">Service</a> array</em></td>
-<td>Main object with the definition of the OSCAR services to be deployed. The components of the array are Service maps, where the key of every service is the identifier of the cluster where the service (defined as the value of the entry on the map) will be deployed.</td>
-</tr>
-</tbody>
-</table>
-<h2 id="service">Service</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>name</code> </br> <em>string</em></td>
-<td>The name of the service</td>
-</tr>
-<tr>
-<td><code>cluster_id</code> </br> <em>string</em></td>
-<td>Identifier for the current cluster, used to specify the cluster's StorageProvider in job delegations. OSCAR-CLI sets it using the <em>cluster_id</em> from the FDL. Optional. (default: "")</td>
-</tr>
-<tr>
-<td><code>image</code> </br> <em>string</em></td>
-<td>Docker image for the service</td>
-</tr>
-<tr>
-<td><code>vo</code> </br> <em>string</em></td>
-<td>Virtual Organization (VO) in which the user creating the service is enrolled. Optional (default: "")</td>
-</tr>
-<tr>
-<td><code>allowed_users</code> </br> <em>string array</em></td>
-<td>Array of EGI UIDs to grant specific user permissions on the service. If empty, the service is considered as accesible to all the users with access to the OSCAR cluster. (Enabled since OSCAR version v3.0.0).</td>
-</tr>
-<tr>
-<td><code>alpine</code> </br> <em>boolean</em></td>
-<td>Set if the Docker image is based on Alpine. If <code>true</code>, a custom release of the <a href="https://github.com/grycap/faas-supervisor">faas-supervisor</a> will be used. Optional (default: false)</td>
-</tr>
-<tr>
-<td><code>script</code> </br> <em>string</em></td>
-<td>Local path to the user script to be executed inside the container created out of the service invocation</td>
-</tr>
-<tr>
-<td><code>file_stage_in</code> </br> <em>bool</em></td>
-<td>Skip the download of the input files by the <a href="https://github.com/grycap/faas-supervisor">faas-supervisor</a> (default: false)</td>
-</tr>
-<tr>
-<td><code>image_pull_secrets</code> </br> <em>string array</em></td>
-<td>Array of Kubernetes secrets. Only needed to use private images located on private registries.</td>
-</tr>
-<tr>
-<td><code>memory</code> </br> <em>string</em></td>
-<td>Memory limit for the service following the <a href="https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory">kubernetes format</a>. Optional (default: 256Mi)</td>
-</tr>
-<tr>
-<td><code>cpu</code> </br> <em>string</em></td>
-<td>CPU limit for the service following the <a href="https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu">kubernetes format</a>. Optional (default: 0.2)</td>
-</tr>
-<tr>
-<td><code>enable_gpu</code> </br> <em>bool</em></td>
-<td>Enable the use of GPU. Requires a device plugin deployed on the cluster (More info: <a href="https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/#using-device-plugins">Kubernetes device plugins</a>). Optional (default: false)</td>
-</tr>
-<tr>
-<td><code>enable_sgx</code> </br> <em>bool</em></td>
-<td>Enable the use of SGX plugin on the cluster containers. (More info: <a href="https://sconedocs.github.io/helm_sgxdevplugin/">SGX plugin documentation</a>). Optional (default: false)</td>
-</tr>
-<tr>
-<td><code>image_prefetch</code> </br> <em>bool</em></td>
-<td>Enable the use of image prefetching (retrieve the container image in the nodes when creating the service). Optional (default: false)</td>
-</tr>
-<tr>
-<td><code>total_memory</code> </br> <em>string</em></td>
-<td>Limit for the memory used by all the service's jobs running simultaneously. <a href="https://yunikorn.apache.org">Apache YuniKorn</a>'s' scheduler is required to work. Same format as Memory, but internally translated to MB (integer). Optional (default: "")</td>
-</tr>
-<tr>
-<td><code>total_cpu</code> </br> <em>string</em></td>
-<td>Limit for the virtual CPUs used by all the service's jobs running simultaneously. <a href="https://yunikorn.apache.org">Apache YuniKorn</a>'s' scheduler is required to work. Same format as CPU, but internally translated to millicores (integer). Optional (default: "")</td>
-</tr>
-<tr>
-<td><code>synchronous</code> </br> <em><a href="#synchronoussettings">SynchronousSettings</a></em></td>
-<td>Struct to configure specific sync parameters. This settings are only applied on Knative ServerlessBackend. Optional.</td>
-</tr>
-<tr>
-<td><code>expose</code> </br> <em><a href="#exposesettings">ExposeSettings</a></em></td>
-<td>Allows to expose the API or UI of the application run in the OSCAR service outside of the Kubernetes cluster. Optional.</td>
-</tr>
-<tr>
-<td><code>replicas</code> </br> <em><a href="#replica">Replica</a> array</em></td>
-<td>List of replicas to delegate jobs. Optional.</td>
-</tr>
-<tr>
-<td><code>rescheduler_threshold</code> </br> <em>string</em></td>
-<td>Time (in seconds) that a job (with replicas) can be queued before delegating it. Optional.</td>
-</tr>
-<tr>
-<td><code>log_level</code> </br> <em>string</em></td>
-<td>Log level for the <a href="https://github.com/grycap/faas-supervisor">faas-supervisor</a>. Available levels: NOTSET, DEBUG, INFO, WARNING, ERROR and CRITICAL. Optional (default: INFO)</td>
-</tr>
-<tr>
-<td><code>input</code> </br> <em><a href="#storageioconfig">StorageIOConfig</a> array</em></td>
-<td>Array with the input configuration for the service. Optional</td>
-</tr>
-<tr>
-<td><code>output</code> </br> <em><a href="#storageioconfig">StorageIOConfig</a> array</em></td>
-<td>Array with the output configuration for the service. Optional</td>
-</tr>
-<tr>
-<td><code>environment</code> </br> <em><a href="#envvarsmap">EnvVarsMap</a></em></td>
-<td>The user-defined environment variables assigned to the service. Optional</td>
-</tr>
-<tr>
-<td><code>annotations</code> </br> <em>map[string]string</em></td>
-<td>User-defined Kubernetes <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/">annotations</a> to be set in job's definition. Optional</td>
-</tr>
-<tr>
-<td><code>labels</code> </br> <em>map[string]string</em></td>
-<td>User-defined Kubernetes <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/">labels</a> to be set in job's definition. Optional</td>
-</tr>
-</tbody>
-</table>
-<h2 id="synchronoussettings">SynchronousSettings</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>min_scale</code> </br> <em>integer</em></td>
-<td>Minimum number of active replicas (pods) for the service. Optional. (default: 0)</td>
-</tr>
-<tr>
-<td><code>max_scale</code> </br> <em>integer</em></td>
-<td>Maximum number of active replicas (pods) for the service. Optional. (default: 0 (Unlimited))</td>
-</tr>
-</tbody>
-</table>
-<h2 id="exposesettings">ExposeSettings</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>min_scale</code> </br> <em>integer</em></td>
-<td>Minimum number of active replicas (pods) for the service. Optional. (default: 1)</td>
-</tr>
-<tr>
-<td><code>max_scale</code> </br> <em>integer</em></td>
-<td>Maximum number of active replicas (pods) for the service. Optional. (default: 10 (Unlimited))</td>
-</tr>
-<tr>
-<td><code>port</code> </br> <em>integer</em></td>
-<td>Port inside the container where the API is exposed. (value: 0 , the service wont be exposed.)</td>
-</tr>
-<tr>
-<td><code>cpu_threshold</code> </br> <em>integer</em></td>
-<td>Percent of use of CPU before creating other pod (default: 80 max:100)</td>
-</tr>
-</tbody>
-</table>
-<h2 id="replica">Replica</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>type</code> </br> <em>string</em></td>
-<td>Type of the replica to re-send events (can be <code>oscar</code> or <code>endpoint</code>)</td>
-</tr>
-<tr>
-<td><code>cluster_id</code> </br> <em>string</em></td>
-<td>Identifier of the cluster as defined in the "clusters" FDL field. Only used if Type is <code>oscar</code></td>
-</tr>
-<tr>
-<td><code>service_name</code> </br> <em>string</em></td>
-<td>Name of the service in the replica cluster. Only used if Type is <code>oscar</code></td>
-</tr>
-<tr>
-<td><code>url</code> </br> <em>string</em></td>
-<td>URL of the endpoint to re-send events (HTTP POST). Only used if Type is <code>endpoint</code></td>
-</tr>
-<tr>
-<td><code>ssl_verify</code> </br> <em>boolean</em></td>
-<td>Parameter to enable or disable the verification of SSL certificates. Only used if Type is <code>endpoint</code>. Optional. (default: true)</td>
-</tr>
-<tr>
-<td><code>priority</code> </br> <em>integer</em></td>
-<td>Priority value to define delegation priority. Highest priority is defined as 0. If a delegation fails, OSCAR will try to delegate to another replica with lower priority. Optional. (default: 0)</td>
-</tr>
-<tr>
-<td><code>headers</code> </br> <em>map[string]string</em></td>
-<td>Headers to send in delegation requests. Optional</td>
-</tr>
-</tbody>
-</table>
-<h2 id="storageioconfig">StorageIOConfig</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>storage_provider</code> </br> <em>string</em></td>
-<td>Reference to the storage provider defined in <a href="#storage_providers">storage_providers</a>. This string is composed by the provider's name (minio, s3, onedata) and the identifier (defined by the user), separated by a point (e.g. "minio.myidentifier")</td>
-</tr>
-<tr>
-<td><code>path</code> </br> <em>string</em></td>
-<td>Path in the storage provider. In MinIO and S3 the first directory of the specified path is translated into the bucket's name (e.g. "bucket/folder/subfolder")</td>
-</tr>
-<tr>
-<td><code>suffix</code> </br> <em>string array</em></td>
-<td>Array of suffixes for filtering the files to be uploaded. Only used in the <code>output</code> field. Optional</td>
-</tr>
-<tr>
-<td><code>prefix</code> </br> <em>string array</em></td>
-<td>Array of prefixes for filtering the files to be uploaded. Only used in the <code>output</code> field. Optional</td>
-</tr>
-</tbody>
-</table>
-<h2 id="envvarsmap">EnvVarsMap</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>Variables</code> </br> <em>map[string]string</em></td>
-<td>Map to define the environment variables that will be available in the service container</td>
-</tr>
-</tbody>
-</table>
-<h2 id="storageproviders">StorageProviders</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>minio</code> </br> <em>map[string]<a href="#minioprovider">MinIOProvider</a></em></td>
-<td>Map to define the credentials for a MinIO storage provider, being the key the user-defined identifier for the provider</td>
-</tr>
-<tr>
-<td><code>s3</code> </br> <em>map[string]<a href="#s3provider">S3Provider</a></em></td>
-<td>Map to define the credentials for an Amazon S3 storage provider, being the key the user-defined identifier for the provider</td>
-</tr>
-<tr>
-<td><code>onedata</code> </br> <em>map[string]<a href="#onedataprovider">OnedataProvider</a></em></td>
-<td>Map to define the credentials for a Onedata storage provider, being the key the user-defined identifier for the provider</td>
-</tr>
-<tr>
-<td><code>webdav</code> </br> <em>map[string]<a href="#webdavprovider">WebDavProvider</a></em></td>
-<td>Map to define the credentials for a storage provider accesible via WebDAV protocol, being the key the user-defined identifier for the provider</td>
-</tr>
-</tbody>
-</table>
-<h2 id="cluster">Cluster</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>endpoint</code></br><em>string</em></td>
-<td>Endpoint of the OSCAR cluster API</td>
-</tr>
-<tr>
-<td><code>auth_user</code></br><em>string</em></td>
-<td>Username to connect to the cluster (basic auth)</td>
-</tr>
-<tr>
-<td><code>auth_password</code></br><em>string</em></td>
-<td>Password to connect to the cluster (basic auth)</td>
-</tr>
-<tr>
-<td><code>ssl_verify</code></br><em>boolean</em></td>
-<td>Parameter to enable or disable the verification of SSL certificates</td>
-</tr>
-</tbody>
-</table>
-<h2 id="minioprovider">MinIOProvider</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>endpoint</code> </br> <em>string</em></td>
-<td>MinIO endpoint</td>
-</tr>
-<tr>
-<td><code>verify</code> </br> <em>bool</em></td>
-<td>Verify MinIO's TLS certificates for HTTPS connections</td>
-</tr>
-<tr>
-<td><code>access_key</code> </br> <em>string</em></td>
-<td>Access key of the MinIO server</td>
-</tr>
-<tr>
-<td><code>secret_key</code> </br> <em>string</em></td>
-<td>Secret key of the MinIO server</td>
-</tr>
-<tr>
-<td><code>region</code> </br> <em>string</em></td>
-<td>Region of the MinIO server</td>
-</tr>
-</tbody>
-</table>
-<h2 id="s3provider">S3Provider</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>access_key</code> </br> <em>string</em></td>
-<td>Access key of the AWS S3 service</td>
-</tr>
-<tr>
-<td><code>secret_key</code> </br> <em>string</em></td>
-<td>Secret key of the AWS S3 service</td>
-</tr>
-<tr>
-<td><code>region</code> </br> <em>string</em></td>
-<td>Region of the AWS S3 service</td>
-</tr>
-</tbody>
-</table>
-<h2 id="onedataprovider">OnedataProvider</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>oneprovider_host</code> </br> <em>string</em></td>
-<td>Endpoint of the Oneprovider</td>
-</tr>
-<tr>
-<td><code>token</code> </br> <em>string</em></td>
-<td>Onedata access token</td>
-</tr>
-<tr>
-<td><code>space</code> </br> <em>string</em></td>
-<td>Name of the Onedata space</td>
-</tr>
-</tbody>
-</table>
-<h2 id="webdavprovider">WebDAVProvider</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>hostname</code> </br> <em>string</em></td>
-<td>Provider hostname</td>
-</tr>
-<tr>
-<td><code>login</code> </br> <em>string</em></td>
-<td>Provider account username</td>
-</tr>
-<tr>
-<td><code>password</code> </br> <em>string</em></td>
-<td>Provider account password</td>
-</tr>
-</tbody>
-</table>
+<p>And place into the <code>ansible</code> directory:</p>
+<pre><code>cd oscar/deploy/ansible
+</code></pre>
+<h3 id="ssh-configuration">SSH configuration</h3>
+<p>As Ansible is an agentless automation tool, you must configure the
+<code>~/.ssh/config</code> file for granting access to the hosts to be configured via
+the SSH protocol. This playbook will use the <code>Host</code> field from SSH
+configuration to set the hostnames of the nodes, so please take care of naming
+them properly.</p>
+<p>Below you can find an example of a configuration file for four nodes, being
+the <code>front</code> the only one with a public IP, so it will be used as a proxy for
+the SSH connection to the working nodes
+(<a href="https://www.redhat.com/sysadmin/ssh-proxy-bastion-proxyjump"><code>ProxyJump</code></a>
+option) via its internal network.</p>
+<pre><code class="language-ssh-config">Host front
+  HostName &lt;PUBLIC_IP&gt;
+  User ubuntu
+  IdentityFile ~/.ssh/my_private_key
+
+Host wn1
+  HostName &lt;PRIVATE_IP&gt;
+  User ubuntu
+  IdentityFile ~/.ssh/my_private_key
+  ProxyJump front
+
+Host wn2
+  HostName &lt;PRIVATE_IP&gt;
+  User ubuntu
+  IdentityFile ~/.ssh/my_private_key
+  ProxyJump front
+
+Host wn3
+  HostName &lt;PRIVATE_IP&gt;
+  User ubuntu
+  IdentityFile ~/.ssh/my_private_key
+  ProxyJump front
+</code></pre>
+<h3 id="configuration-of-the-inventory-file">Configuration of the inventory file</h3>
+<p>Now, you have to edit the <code>hosts</code> file and add the hosts to be configured.
+Note that only one node must be set in the <code>[front]</code> section, while one or
+more nodes can be configured as working nodes of the cluster in the <code>[wn]</code>
+section. For example, for the <a href="#ssh-configuration">previous SSH configuration</a>
+the <code>hosts</code> inventory file should look like this:</p>
+<pre><code class="language-ini">[front]
+; Put here the frontend node as defined in .ssh/config (Host)
+front
+
+[wn]
+; Put here the working nodes (one per line) as defined in the .ssh/config (Host)
+wn1
+wn2
+wn3
+</code></pre>
+<h3 id="setting-up-the-playbook-variables">Setting up the playbook variables</h3>
+<p>You also need to set up some parameters for the configuration of the cluster
+and OSCAR components, like OSCAR and MinIO credentials and DNS endpoints to
+configure the Kubernetes Ingress and <a href="https://cert-manager.io/">cert-manager</a>
+to securely expose the services. To do it, please edit the <code>vars.yaml</code> file
+and update the variables:</p>
+<pre><code class="language-yaml">---
+# K3s version to be installed
+kube_version: v1.22.3+k3s1
+# Token to login in K3s and the Kubernetes Dashboard
+kube_admin_token: kube-token123
+# Password for OSCAR
+oscar_password: oscar123
+# DNS name for the OSCAR Ingress and Kubernetes Dashboard (path &quot;/dashboard/&quot;)
+dns_host: oscar-cluster.example.com
+# Password for MinIO
+minio_password: minio123
+# DNS name for the MinIO API Ingress
+minio_dns_host: minio.oscar-cluster.example.com
+# DNS name for the MinIO Console Ingress
+minio_dns_host_console: minio-console.oscar-cluster.example.com
+</code></pre>
+<h3 id="installation-of-the-required-ansible-roles">Installation of the required ansible roles</h3>
+<p>To install the required roles you only have to run:</p>
+<pre><code>ansible-galaxy install -r install_roles.yaml --force
+</code></pre>
+<p><em>The <code>--force</code> argument ensures you have the latest version of the roles.</em></p>
+<h3 id="running-the-playbook">Running the playbook</h3>
+<p>Finally, with the following command the ansible playbook will be executed,
+configuring the nodes set in the <code>hosts</code> inventory file:</p>
+<pre><code>ansible-playbook -i hosts oscar-k3s.yaml
+</code></pre>
 
 
 

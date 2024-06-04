@@ -12,11 +12,11 @@
         <link rel="prev" href="../deploy-ec3/">
       
       
-        <link rel="next" href="../deploy-ansible/">
+        <link rel="next" href="../deploy-k3s-ansible/">
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.24">
+      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.25">
     
     
       
@@ -70,7 +70,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#deployment-on-an-existing-kubernetes-cluster-using-helm" class="md-skip">
+        <a href="#deployment-with-helm" class="md-skip">
           Skip to content
         </a>
       
@@ -190,7 +190,9 @@
 
 
 
-<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
     <a href=".." title="OSCAR Documentation" class="md-nav__button md-logo" aria-label="OSCAR Documentation" data-md-component="logo">
       
@@ -220,6 +222,41 @@
   
   
   
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Introduction
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            Introduction
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
     <li class="md-nav__item">
       <a href=".." class="md-nav__link">
         
@@ -230,6 +267,35 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multitenancy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Multitenancy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -257,7 +323,7 @@
             
   
   <span class="md-ellipsis">
-    Getting started
+    Deployment
   </span>
   
 
@@ -267,7 +333,7 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
-            Getting started
+            Deployment
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -282,7 +348,7 @@
         
   
   <span class="md-ellipsis">
-    Local testing
+    Local Deployment
   </span>
   
 
@@ -303,7 +369,7 @@
         
   
   <span class="md-ellipsis">
-    Deployment with IM Dashboard
+    Deployment with IM
   </span>
   
 
@@ -372,7 +438,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../deploy-ansible/" class="md-nav__link">
+      <a href="../deploy-k3s-ansible/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -414,7 +480,7 @@
             
   
   <span class="md-ellipsis">
-    Third party integrations
+    Service Definition
   </span>
   
 
@@ -424,7 +490,7 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
-            Third party integrations
+            Service Definition
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -435,11 +501,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../egi-integration/" class="md-nav__link">
+      <a href="../oscar-service/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Integration with EGI
+    OSCAR Service
   </span>
   
 
@@ -456,11 +522,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../oidc-auth/" class="md-nav__link">
+      <a href="../fdl/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    OIDC Authorization
+    Functions Definition Language (FDL)
   </span>
   
 
@@ -477,32 +543,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../sgx-integration/" class="md-nav__link">
+      <a href="../fdl-composer/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Integration with SCONE
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../interlink_integration/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Interlink
+    FDL Composer
   </span>
   
 
@@ -525,82 +570,37 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../usage/" class="md-nav__link">
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
   
   <span class="md-ellipsis">
-    Using OSCAR through the web-based UI
+    Interfaces
   </span>
   
 
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../invoking/" class="md-nav__link">
+            <span class="md-nav__icon md-icon"></span>
+          </label>
         
-  
-  <span class="md-ellipsis">
-    Invoking services
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../fdl/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Functions Definition Language (FDL)
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../fdl-composer/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    FDL Composer
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Interfaces
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
   
   
   
@@ -610,7 +610,7 @@
         
   
   <span class="md-ellipsis">
-    OSCAR-CLI
+    OSCAR CLI
   </span>
   
 
@@ -618,9 +618,31 @@
     </li>
   
 
-    
-      
-      
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage-ui/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    OSCAR UI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
   
   
   
@@ -630,7 +652,7 @@
         
   
   <span class="md-ellipsis">
-    OpenAPI Specification
+    OSCAR API
   </span>
   
 
@@ -638,19 +660,62 @@
     </li>
   
 
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
     
       
       
+  
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Service Execution
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Service Execution
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
   
   
   
   
     <li class="md-nav__item">
-      <a href="../multitenancy/" class="md-nav__link">
+      <a href="../invoking/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Multitenancy
+    Service Execution Types
   </span>
   
 
@@ -658,19 +723,20 @@
     </li>
   
 
-    
-      
-      
+              
+            
+              
+                
   
   
   
   
     <li class="md-nav__item">
-      <a href="../expose_services/" class="md-nav__link">
+      <a href="../invoking-sync/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Expose services
+    Synchronous invocations
   </span>
   
 
@@ -678,9 +744,304 @@
     </li>
   
 
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../invoking-async/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Asynchronous invocations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exposed-services/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Exposed Services
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
     
       
       
+  
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Integrations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integration-egi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integration with EGI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integration-scone/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integration with SCONE
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integration-interlink/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integration with interLink
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integration-compss/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integration with COMPSs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Tutorials
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Tutorials
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../training/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Presentations and Webinars
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Frequently Asked Questions (FAQ)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Advanced Features
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Advanced Features
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
   
   
   
@@ -698,6 +1059,14 @@
     </li>
   
 
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
     
       
       
@@ -705,16 +1074,59 @@
   
   
   
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Development
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Development
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
     <li class="md-nav__item">
-      <a href="../faq/" class="md-nav__link">
+      <a href="../devel-docs/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Frequently Asked Questions (FAQ)
+    Documentation
   </span>
   
 
       </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -750,7 +1162,7 @@
         
   
   <span class="md-ellipsis">
-    About
+    Acknowledgements
   </span>
   
 
@@ -766,24 +1178,6 @@
               </div>
             
             
-              
-              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
-                <div class="md-sidebar__scrollwrap">
-                  <div class="md-sidebar__inner">
-                    
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-</nav>
-                  </div>
-                </div>
-              </div>
-            
           
           
             <div class="md-content" data-md-component="content">
@@ -795,7 +1189,7 @@
   
 
 
-<h1 id="deployment-on-an-existing-kubernetes-cluster-using-helm">Deployment on an existing Kubernetes cluster using Helm</h1>
+<h1 id="deployment-with-helm">Deployment with Helm</h1>
 <p>OSCAR can also be deployed on any existing Kubernetes cluster through its
 <a href="https://github.com/grycap/helm-charts/tree/master/oscar">helm chart</a>.
 However, to make the platform work properly, the following dependencies must
@@ -845,7 +1239,7 @@ be satisfied.</p>
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      &copy; 2022, GRyCAP - i3M - Universitat Politècnica de València, Spain.
+      &copy; GRyCAP - I3M - Universitat Politècnica de València, Spain.
     </div>
   
   
@@ -866,7 +1260,7 @@ be satisfied.</p>
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": ["instant", "toc.integrate", "content.code.copy"], "search": "../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
       <script src="../assets/javascripts/bundle.081f42fc.min.js"></script>
