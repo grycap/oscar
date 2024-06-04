@@ -11,7 +11,7 @@ run on AWS Lambda and AWS Batch.
 
 
 ## Concepts
-- **OSCAR Cluster**: A Kubernetes cluster (either fixed size or elastic) configured with the OSCAR services and components. The cluster must have at least one Front-End (FE) node, which executes the OSCAR control plane and, optionally, several Working Nodes (WNs), which execute the OSCAR services and replicated services from the control plane for enhanced fault-tolerance.
+- **OSCAR Cluster**: A Kubernetes cluster (either fixed size or elastic) configured with the OSCAR services and components. The cluster must have at least one front-end node, which executes the OSCAR control plane and one or several working nodes.
 - **OSCAR Service**: The execution unit in the OSCAR framework, typically defined in [FDL](fdl.md), by a:
     - Docker image, providing the customized runtime environment for an application.
     - Execution requirements.

@@ -29,26 +29,25 @@ go install github.com/grycap/oscar-cli@latest
 
 ### OIDC (OpenID Connect)
 
-Once the service is created, follow these steps to use `oscar-cli` to interact with an OSCAR cluster using the OpenID Connect.
+If your cluster has OIDC avaliable, follow these steps to use `oscar-cli` to interact with it using the OpenID Connect.
 
 - Install [oidc-agent](https://indigo-dc.gitbook.io/oidc-agent/intro)
 - Register the [EGI client](https://indigo-dc.gitbook.io/oidc-agent/user/oidc-gen/provider/egi)
-- Add a cluster in `oscar-cli` with oidc credentians
+- Add a cluster in `oscar-cli` with oidc credentians (More info about the usage of the `cluster add` command [here](#add))
 
 ``` bash
 oscar-cli cluster add IDENTIFIER ENDPOINT --oidc-account-name SHORTNAME
-```
-
-- Run the service
-
-``` bash
-oscar-cli service run plant-classification -i <image-path> -c <cluster-identifier>
 ```
 
 
 ## Available commands
 
 
+- [OSCAR CLI](#oscar-cli)
+  - [Download](#download)
+    - [Releases](#releases)
+    - [Install from source](#install-from-source)
+    - [OIDC (OpenID Connect)](#oidc-openid-connect)
   - [Available commands](#available-commands)
     - [apply](#apply)
     - [cluster](#cluster)

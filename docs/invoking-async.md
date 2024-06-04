@@ -9,8 +9,4 @@ processed.
 
 ![oscar-async.png](images/oscar-async.png)
 
-In addition, the service can be executed asynchronously sending an
-HTTP POST request to paths `/run/<SERVICE_NAME>` and `/job/<SERVICE_NAME>`
-respectively. 
-
 

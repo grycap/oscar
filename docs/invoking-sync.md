@@ -99,18 +99,5 @@ interface.
 
 Although the use of the Knative Serverless Backend for synchronous invocations provides elasticity similar to the one provided by their counterparts in public clouds, such as AWS Lambda, synchronous invocations are not still the best option for run long-running resource-demanding applications, like deep learning inference or video processing. 
 
-The synchronous invocation of long-running resource-demanding applications may lead to timeouts on Knative pods. Therefore, we consider asynchronous invocations (which generate Kubernetes jobs) as the optimal approach to handle event-driven file processing. 
-
-
-## Asynchronous invocations
-
-For file processing, OSCAR automatically manages the creation
-and [notification system](https://docs.min.io/minio/baremetal/monitoring/bucket-notifications/bucket-notifications.html#minio-bucket-notifications)
-of MinIO buckets in order to allow the event-driven invocation of services
-using asynchronous requests, generating a Kubernetes job for every file to be
-processed.
-
-In addition, the service can be executed asynchronously sending an
-HTTP POST request to paths `/run/<SERVICE_NAME>` and `/job/<SERVICE_NAME>`
-respectively. 
+The synchronous invocation of long-running resource-demanding applications may lead to timeouts on Knative pods. Therefore, we consider asynchronous invocations (which generate Kubernetes jobs) as the optimal approach to handle event-driven file processing.
 
