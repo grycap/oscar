@@ -8,7 +8,7 @@ Install the following dependencies:
 pip install mkdocs mkdocs-material mkdocs-render-swagger-plugin
 ```
 
-The from the `docs` folder run:
+The from the main folder `oscar` run:
 
 ```sh
 mkdocs serve
