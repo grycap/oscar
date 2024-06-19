@@ -1,0 +1,15 @@
+functions:
+  oscar:
+  - oscar-cluster:
+     name: plants-classification
+     memory: 2Gi
+     cpu: '1.0'
+     image: ai4oshub/plants-classification
+     script: script.sh
+     log_level: CRITICAL
+     input:
+     - storage_provider: minio.default
+       path: plants-classification/input
+     output:
+     - storage_provider: minio.default
+       path: plants-classification/output
