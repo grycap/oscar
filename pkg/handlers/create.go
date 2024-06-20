@@ -401,6 +401,81 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		}
 	}
 
+	if service.Mount.Provider != "" {
+		// Split input provider
+		provSlice := strings.SplitN(strings.TrimSpace(service.Mount.Provider), types.ProviderSeparator, 2)
+		if len(provSlice) == 1 {
+			provName = strings.ToLower(provSlice[0])
+			// Set "default" provider ID
+			provID = types.DefaultProvider
+		} else {
+			provName = strings.ToLower(provSlice[0])
+			provID = provSlice[1]
+		}
+
+		// Check if the provider identifier is defined in StorageProviders
+		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
+			disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
+			return fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
+		}
+
+		path := strings.Trim(service.Mount.Path, " /")
+		// Split buckets and folders from path
+		splitPath := strings.SplitN(path, "/", 2)
+
+		switch provName {
+		case types.MinIOName, types.S3Name:
+			// Use the appropriate client
+			if provName == types.MinIOName {
+				s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
+			} else {
+				s3Client = service.StorageProviders.S3[provID].GetS3Client()
+			}
+			// Create bucket
+			_, err := s3Client.CreateBucket(&s3.CreateBucketInput{
+				Bucket: aws.String(splitPath[0]),
+			})
+			if err != nil {
+				if aerr, ok := err.(awserr.Error); ok {
+					// Check if the error is caused because the bucket already exists
+					if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
+						log.Printf("The bucket \"%s\" already exists\n", splitPath[0])
+					} else {
+						disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
+						return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
+					}
+				} else {
+					disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
+					return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
+				}
+			}
+			// Create folder(s)
+			if len(splitPath) == 2 {
+				// Add "/" to the end of the key in order to create a folder
+				folderKey := fmt.Sprintf("%s/", splitPath[1])
+				_, err := s3Client.PutObject(&s3.PutObjectInput{
+					Bucket: aws.String(splitPath[0]),
+					Key:    aws.String(folderKey),
+				})
+				if err != nil {
+					disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
+					return fmt.Errorf("error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
+				}
+			}
+		case types.OnedataName:
+			cdmiClient = service.StorageProviders.Onedata[provID].GetCDMIClient()
+			err := cdmiClient.CreateContainer(fmt.Sprintf("%s/%s", service.StorageProviders.Onedata[provID].Space, path), true)
+			if err != nil {
+				if err == cdmi.ErrBadRequest {
+					log.Printf("Error creating \"%s\" folder in Onedata. Error: %v\n", path, err)
+				} else {
+					disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
+					return fmt.Errorf("error connecting to Onedata's Oneprovider \"%s\". Error: %v", service.StorageProviders.Onedata[provID].OneproviderHost, err)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 

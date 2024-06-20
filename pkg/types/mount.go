@@ -22,26 +22,29 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// rclone config create minio3 s3 provider=Minio access_key_id=minio secret_access_key=minio123 endpoint=https://minio.admiring-black1.im.grycap.net acl=public-read-write
-// rclone mount minio2:/prueba /data/intento2 --dir-cache-time 10s
-// rclone/rclone
 const (
-	rclone_containerName = "rclone-container"
-	//rclone_containerImage = "ghcr.io/esparig/pocminiovolumek8s:mys3fs"
+	Rclone_containerName  = "rclone-container"
 	rclone_containerImage = "rclone/rclone"
-	//rclone_commandImage   = "s3fs -d -f ${MINIO_BUCKET} ${MNT_POINT} -o use_path_request_style,no_check_certificate,ssl_verify_hostname=0,allow_other,umask=0007,uid=1000,gid=100,url=http://${MINIO_ENDPOINT}:9000"
-	rclone_commandImage = "mkdir -p $MNT_POINT/$MINIO_BUCKET && rclone config create minio s3  provider=Minio access_key_id=$AWS_ACCESS_KEY_ID secret_access_key=$AWS_SECRET_ACCESS_KEY endpoint=$MINIO_ENDPOINT acl=public-read-write && rclone mount minio:/$MINIO_BUCKET $MNT_POINT/$MINIO_BUCKET --dir-cache-time 10s --allow-other --allow-non-empty --umask 0007 --uid 1000 --gid 100 --allow-other  --no-checksum"
-	//rclone config create minio s3  provider=Minio access_key_id=$AWS_SECRET_ACCESS_KEY secret_access_key=$AWS_ACCESS_KEY_ID endpoint=$MINIO_ENDPOINT acl=public-read-write && rclone mount minio:${MINIO_BUCKET} " + rclone_folder_mount + " --dir-cache-time 10s --allow-other --allow-non-empty --umask 0007 --uid 1000 --gid 100 --allow-other  --no-checksum"
-	//use_path_request_style,ssl_verify_hostname=0"
-	rclone_folder_mount = "/mnt"
-	rclone_volume_name  = "shared-data"
-	//MINIO_ENDPOINT
-	//MINIO_ACCESS_KEY
-	//MINIO_SECRET_KEY
+	rclone_commandImage   = `mkdir -p $MNT_POINT/$MINIO_BUCKET
+rclone config create minio s3  provider=Minio access_key_id=$AWS_ACCESS_KEY_ID secret_access_key=$AWS_SECRET_ACCESS_KEY endpoint=$MINIO_ENDPOINT acl=public-read-write
+rclone mount minio:/$MINIO_BUCKET $MNT_POINT/$MINIO_BUCKET --dir-cache-time 10s --allow-other --allow-non-empty --umask 0007 --uid 1000 --gid 100 --allow-other  --no-checksum &
+while true; do
+	if [ -f /tmpfolder/finish-file ]; then
+		exit 0:
+	fi
+	sleep 5
+done
+`
+	rclone_folder_mount    = "/mnt"
+	rclone_volume_name     = "shared-data"
+	ephemeral_volume_name  = "ephemeral-data"
+	ephemeral_volume_mount = "/tmpfolder"
 )
 
 func SetMount(podSpec *v1.PodSpec, service Service, cfg *Config) {
 	podSpec.Containers = append(podSpec.Containers, secondPodSpec(service, cfg))
+	termination := int64(5)
+	podSpec.TerminationGracePeriodSeconds = &termination
 	addVolume(podSpec, service, cfg)
 }
 
@@ -58,18 +61,30 @@ func addVolume(podSpec *v1.PodSpec, service Service, cfg *Config) {
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		},
 	}
+	ephemeralvolumeMountShare := v1.VolumeMount{
+		Name:             ephemeral_volume_name,
+		MountPath:        ephemeral_volume_mount,
+		MountPropagation: &hostToContainer,
+	}
+	ephemeralvolumeshare := v1.Volume{
+		Name: ephemeral_volume_name,
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		},
+	}
 	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, volumeMountShare)
+	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, ephemeralvolumeMountShare)
 	podSpec.Volumes = append(podSpec.Volumes, volumeshare)
+	podSpec.Volumes = append(podSpec.Volumes, ephemeralvolumeshare)
 }
 
 func secondPodSpec(service Service, cfg *Config) v1.Container {
 	bidirectional := v1.MountPropagationBidirectional
-	//tr := true
 	var ptr *bool // Uninitialized pointer
 	value := true
 	ptr = &value
 	container := v1.Container{
-		Name:    rclone_containerName,
+		Name:    Rclone_containerName,
 		Image:   rclone_containerImage,
 		Command: []string{"/bin/sh"},
 		Args:    []string{"-c", rclone_commandImage},
@@ -90,6 +105,11 @@ func secondPodSpec(service Service, cfg *Config) v1.Container {
 			{
 				Name:             rclone_volume_name,
 				MountPath:        rclone_folder_mount,
+				MountPropagation: &bidirectional,
+			},
+			{
+				Name:             ephemeral_volume_name,
+				MountPath:        ephemeral_volume_mount,
 				MountPropagation: &bidirectional,
 			},
 		},
