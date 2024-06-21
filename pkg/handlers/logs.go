@@ -82,7 +82,7 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset *kubernetes
 		// Populate jobsInfo with status, start and finish times (from pods)
 		for _, pod := range pods.Items {
 			if jobName, ok := pod.Labels["job-name"]; ok {
-				jobsInfo[jobName].Status = string(pod.Status.Phase) // pod.containerStatuses.[0].state.terminated.exitCode
+				jobsInfo[jobName].Status = string(pod.Status.Phase)
 				// Loop through job.Status.ContainerStatuses to find oscar-container
 				for _, contStatus := range pod.Status.ContainerStatuses {
 					if contStatus.Name == types.ContainerName {
