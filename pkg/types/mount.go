@@ -28,9 +28,11 @@ const (
 	rclone_commandImage   = `mkdir -p $MNT_POINT/$MINIO_BUCKET
 rclone config create minio s3  provider=Minio access_key_id=$AWS_ACCESS_KEY_ID secret_access_key=$AWS_SECRET_ACCESS_KEY endpoint=$MINIO_ENDPOINT acl=public-read-write
 rclone mount minio:/$MINIO_BUCKET $MNT_POINT/$MINIO_BUCKET --dir-cache-time 10s --allow-other --allow-non-empty --umask 0007 --uid 1000 --gid 100 --allow-other  --no-checksum &
+pid=$!
 while true; do
 	if [ -f /tmpfolder/finish-file ]; then
-		exit 0:
+		kill $pid
+		exit 0
 	fi
 	sleep 5
 done`
