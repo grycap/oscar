@@ -254,7 +254,7 @@ type Service struct {
 	// Optional (If the list is empty we asume the visibility is public for all cluster users)
 	AllowedUsers []string `json:"allowed_users"`
 
-	// Output StorageIOConfig slice with the output service configuration
+	// Configuration to create a storage provider as a volume inside the service container
 	// Optional
 	Mount StorageIOConfig `json:"mount"`
 }

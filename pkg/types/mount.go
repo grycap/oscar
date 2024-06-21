@@ -23,9 +23,9 @@ import (
 )
 
 const (
-	Rclone_containerName  = "rclone-container"
-	rclone_containerImage = "rclone/rclone"
-	rclone_commandImage   = `mkdir -p $MNT_POINT/$MINIO_BUCKET
+	rcloneContainerName  = "rclone-container"
+	rcloneContainerImage = "rclone/rclone"
+	rcloneStartCommand   = `mkdir -p $MNT_POINT/$MINIO_BUCKET
 rclone config create minio s3  provider=Minio access_key_id=$AWS_ACCESS_KEY_ID secret_access_key=$AWS_SECRET_ACCESS_KEY endpoint=$MINIO_ENDPOINT acl=public-read-write
 rclone mount minio:/$MINIO_BUCKET $MNT_POINT/$MINIO_BUCKET --dir-cache-time 10s --allow-other --allow-non-empty --umask 0007 --uid 1000 --gid 100 --allow-other  --no-checksum &
 pid=$!
@@ -36,39 +36,39 @@ while true; do
 	fi
 	sleep 5
 done`
-	rclone_folder_mount    = "/mnt"
-	rclone_volume_name     = "shared-data"
-	ephemeral_volume_name  = "ephemeral-data"
-	ephemeral_volume_mount = "/tmpfolder"
+	rcloneFolderMount    = "/mnt"
+	rcloneVolumeName     = "shared-data"
+	ephemeralVolumeName  = "ephemeral-data"
+	ephemeralVolumeMount = "/tmpfolder"
 )
 
 func SetMount(podSpec *v1.PodSpec, service Service, cfg *Config) {
-	podSpec.Containers = append(podSpec.Containers, secondPodSpec(service, cfg))
+	podSpec.Containers = append(podSpec.Containers, sidecarPodSpec(service))
 	termination := int64(5)
 	podSpec.TerminationGracePeriodSeconds = &termination
-	addVolume(podSpec, service, cfg)
+	addVolume(podSpec)
 }
 
-func addVolume(podSpec *v1.PodSpec, service Service, cfg *Config) {
+func addVolume(podSpec *v1.PodSpec) {
 	hostToContainer := v1.MountPropagationHostToContainer
 	volumeMountShare := v1.VolumeMount{
-		Name:             rclone_volume_name,
-		MountPath:        rclone_folder_mount,
+		Name:             rcloneVolumeName,
+		MountPath:        rcloneFolderMount,
 		MountPropagation: &hostToContainer,
 	}
 	volumeshare := v1.Volume{
-		Name: rclone_volume_name,
+		Name: rcloneVolumeName,
 		VolumeSource: v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		},
 	}
 	ephemeralvolumeMountShare := v1.VolumeMount{
-		Name:             ephemeral_volume_name,
-		MountPath:        ephemeral_volume_mount,
+		Name:             ephemeralVolumeName,
+		MountPath:        ephemeralVolumeMount,
 		MountPropagation: &hostToContainer,
 	}
 	ephemeralvolumeshare := v1.Volume{
-		Name: ephemeral_volume_name,
+		Name: ephemeralVolumeName,
 		VolumeSource: v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		},
@@ -79,19 +79,18 @@ func addVolume(podSpec *v1.PodSpec, service Service, cfg *Config) {
 	podSpec.Volumes = append(podSpec.Volumes, ephemeralvolumeshare)
 }
 
-func secondPodSpec(service Service, cfg *Config) v1.Container {
+func sidecarPodSpec(service Service) v1.Container {
 	bidirectional := v1.MountPropagationBidirectional
 	var ptr *bool // Uninitialized pointer
 	value := true
 	ptr = &value
 	container := v1.Container{
-		Name:    Rclone_containerName,
-		Image:   rclone_containerImage,
+		Name:    rcloneContainerName,
+		Image:   rcloneContainerImage,
 		Command: []string{"/bin/sh"},
-		Args:    []string{"-c", rclone_commandImage},
+		Args:    []string{"-c", rcloneStartCommand},
 		Ports: []v1.ContainerPort{
 			{
-				Name:          "",
 				ContainerPort: 9000,
 			},
 		},
@@ -99,18 +98,18 @@ func secondPodSpec(service Service, cfg *Config) v1.Container {
 		Env: []v1.EnvVar{
 			{
 				Name:  "MNT_POINT",
-				Value: rclone_folder_mount,
+				Value: rcloneFolderMount,
 			},
 		},
 		VolumeMounts: []v1.VolumeMount{
 			{
-				Name:             rclone_volume_name,
-				MountPath:        rclone_folder_mount,
+				Name:             rcloneVolumeName,
+				MountPath:        rcloneFolderMount,
 				MountPropagation: &bidirectional,
 			},
 			{
-				Name:             ephemeral_volume_name,
-				MountPath:        ephemeral_volume_mount,
+				Name:             ephemeralVolumeName,
+				MountPath:        ephemeralVolumeMount,
 				MountPropagation: &bidirectional,
 			},
 		},
@@ -118,16 +117,14 @@ func secondPodSpec(service Service, cfg *Config) v1.Container {
 
 	provider := strings.Split(service.Mount.Provider, ".")
 	if provider[0] == MinIOName {
-		credentialsValue := setCredentialsMinIO(service, cfg, provider[1])
-		for index := 0; index < len(credentialsValue); index++ {
-			container.Env = append(container.Env, credentialsValue[index])
-		}
+		MinIOEnvVars := setMinIOEnvVars(service, provider[1])
+		container.Env = append(container.Env, MinIOEnvVars...)
 	}
 	return container
 
 }
 
-func setCredentialsMinIO(service Service, cfg *Config, providerId string) []v1.EnvVar {
+func setMinIOEnvVars(service Service, providerId string) []v1.EnvVar {
 	//service.Mount.Provider
 	credentials := []v1.EnvVar{
 		{

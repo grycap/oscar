@@ -100,7 +100,7 @@ func DeleteExpose(name string, kubeClientset kubernetes.Interface, cfg *Config) 
 	}
 	err = kubeClientset.CoreV1().Pods(cfg.ServicesNamespace).DeleteCollection(context.TODO(), delete, listOpts)
 	if err != nil {
-		return fmt.Errorf("error deleting pods of exposed service mount '%s': %v", name, err)
+		return fmt.Errorf("error deleting pods of exposed service '%s': %v", name, err)
 	}
 	return nil
 }
