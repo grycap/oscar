@@ -33,8 +33,7 @@ while true; do
 		exit 0:
 	fi
 	sleep 5
-done
-`
+done`
 	rclone_folder_mount    = "/mnt"
 	rclone_volume_name     = "shared-data"
 	ephemeral_volume_name  = "ephemeral-data"
