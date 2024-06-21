@@ -384,51 +384,53 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 
 	if service.Mount.Provider != "" {
 		provID, provName = getProviderInfo(service.Mount.Provider)
-
-		// Check if the provider identifier is defined in StorageProviders
-		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
-			return fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
-		}
-
-		path := strings.Trim(service.Mount.Path, " /")
-		// Split buckets and folders from path
-		splitPath := strings.SplitN(path, "/", 2)
-
-		// Currently only MinIO/S3 are supported
-		// Use the appropriate client
 		if provName == types.MinIOName {
-			s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
-		} else {
-			s3Client = service.StorageProviders.S3[provID].GetS3Client()
-		}
-		// Create bucket
-		_, err := s3Client.CreateBucket(&s3.CreateBucketInput{
-			Bucket: aws.String(splitPath[0]),
-		})
-		if err != nil {
-			if aerr, ok := err.(awserr.Error); ok {
-				// Check if the error is caused because the bucket already exists
-				if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
-					log.Printf("The bucket \"%s\" already exists\n", splitPath[0])
+			// Check if the provider identifier is defined in StorageProviders
+			if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
+				return fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
+			}
+
+			path := strings.Trim(service.Mount.Path, " /")
+			// Split buckets and folders from path
+			splitPath := strings.SplitN(path, "/", 2)
+
+			// Currently only MinIO/S3 are supported
+			// Use the appropriate client
+			if provName == types.MinIOName {
+				s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
+			} else {
+				s3Client = service.StorageProviders.S3[provID].GetS3Client()
+			}
+			// Create bucket
+			_, err := s3Client.CreateBucket(&s3.CreateBucketInput{
+				Bucket: aws.String(splitPath[0]),
+			})
+			if err != nil {
+				if aerr, ok := err.(awserr.Error); ok {
+					// Check if the error is caused because the bucket already exists
+					if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
+						log.Printf("The bucket \"%s\" already exists\n", splitPath[0])
+					} else {
+						return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
+					}
 				} else {
 					return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
 				}
-			} else {
-				return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
+			}
+			// Create folder(s)
+			if len(splitPath) == 2 {
+				// Add "/" to the end of the key in order to create a folder
+				folderKey := fmt.Sprintf("%s/", splitPath[1])
+				_, err := s3Client.PutObject(&s3.PutObjectInput{
+					Bucket: aws.String(splitPath[0]),
+					Key:    aws.String(folderKey),
+				})
+				if err != nil {
+					return fmt.Errorf("error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
+				}
 			}
 		}
-		// Create folder(s)
-		if len(splitPath) == 2 {
-			// Add "/" to the end of the key in order to create a folder
-			folderKey := fmt.Sprintf("%s/", splitPath[1])
-			_, err := s3Client.PutObject(&s3.PutObjectInput{
-				Bucket: aws.String(splitPath[0]),
-				Key:    aws.String(folderKey),
-			})
-			if err != nil {
-				return fmt.Errorf("error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
-			}
-		}
+
 	}
 
 	return nil
