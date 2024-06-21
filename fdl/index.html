@@ -1372,11 +1372,16 @@
       cpu: '1.0'
       image: grycap/imagemagick
       script: grayify.sh
+      interlink_node_name: vega-new-vk
       expose:
         min_scale: 3 
         max_scale: 7 
         port: 5000  
         cpu_threshold: 70 
+        nodePort: 30500
+        set_auth: true
+        rewrite_target: true
+        default_command: true
       input:
       - storage_provider: minio.default
         path: example-workflow/med
@@ -1551,6 +1556,10 @@ storage_providers:
 <td><code>labels</code> </br> <em>map[string]string</em></td>
 <td>User-defined Kubernetes <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/">labels</a> to be set in job's definition. Optional</td>
 </tr>
+<tr>
+<td><code>interlink_node_name</code> </br> <em>string</em></td>
+<td>Name of the virtual kubelet node (if you are using InterLink nodes) Optional</td>
+</tr>
 </tbody>
 </table>
 <h2 id="synchronoussettings">SynchronousSettings</h2>
@@ -1595,7 +1604,23 @@ storage_providers:
 </tr>
 <tr>
 <td><code>cpu_threshold</code> </br> <em>integer</em></td>
-<td>Percent of use of CPU before creating other pod (default: 80 max:100)</td>
+<td>Percent of use of CPU before creating other pod (default: 80 max:100). Optional.</td>
+</tr>
+<tr>
+<td><code>nodePort</code> </br> <em>integer</em></td>
+<td>Change the access method from the domain name to the public ip. Optional.</td>
+</tr>
+<tr>
+<td><code>set_auth</code> </br> <em>bool</em></td>
+<td>Create credentials for the service, composed of the service name as the user and the service token as the password. (default: false). Optional.</td>
+</tr>
+<tr>
+<td><code>rewrite_target</code> </br> <em>bool</em></td>
+<td>Target the URI where the traffic is redirected. (default: false). Optional.</td>
+</tr>
+<tr>
+<td><code>default_command</code> </br> <em>bool</em></td>
+<td>Select between executing the container's default command and executing the script inside the container. (default: false). Optional.</td>
 </tr>
 </tbody>
 </table>
