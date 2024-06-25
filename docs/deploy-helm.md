@@ -1,4 +1,4 @@
-# Deployment on an existing Kubernetes cluster using Helm
+# Deployment with Helm
 
 OSCAR can also be deployed on any existing Kubernetes cluster through its
 [helm chart](https://github.com/grycap/helm-charts/tree/master/oscar).

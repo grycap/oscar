@@ -1,4 +1,4 @@
-# Ansible playbook to deploy K3s and the OSCAR platform
+# Deployment on K3s with Ansible
 
 The folder
 [`deploy/ansible`](https://github.com/grycap/oscar/tree/master/deploy/ansible)

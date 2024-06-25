@@ -1,11 +1,10 @@
-# Deployment with the IM Dashboard
+# Deployment with IM
 
-An OSCAR cluster can be easily deployed on multiple Cloud back-ends without
-requiring any installation by using the
+An OSCAR cluster can be easily deployed on multiple Cloud platforms via the
 [Infrastructure Manager](https://www.grycap.upv.es/im)'s
 Dashboard
-([IM Dashboard](https://appsgrycap.i3m.upv.es:31443/im-dashboard/login)). This
-is a managed service provided by the [GRyCAP](https://www.grycap.upv.es)
+([IM Dashboard](https://im.egi.eu)). This
+is a managed service provided by [EGI](https://www.egi.eu) and operated by the [GRyCAP](https://www.grycap.upv.es)
 research group at the [Universitat Politècnica de València](https://www.upv.es)
 to deploy customized virtual infrastructures across many Cloud providers.
 
@@ -16,19 +15,19 @@ services (e.g. MinIO).
 
 This example shows how to deploy an OSCAR cluster on
 [Amazon Web Services (AWS)](https://aws.amazon.com) with two nodes. Thanks to
-the IM, the very same procedure applies to deploy the OSCAR cluster in an
+the IM, the very same procedure allows to deploy the OSCAR cluster in an
 on-premises Cloud (such as OpenStack) or any other Cloud provider supported
 by the IM.
 
 These are the steps:
 
-1. Access the [IM Dashboard](https://appsgrycap.i3m.upv.es:31443/im-dashboard/login)
+1. Access the [IM Dashboard](https://im.egi.eu)
 
     ![login](images/im-dashboard/im-dashboard-00.png)
 
     You will need to authenticate via
     [EGI Check-In](https://www.egi.eu/services/check-in/), which supports
-    mutiple Identity Providers (IdP).
+    mutiple Identity Providers (IdP). There is no need to register and the service is provided free of charge.
 
 1. Configure the Cloud Credentials
 
@@ -43,41 +42,49 @@ These are the steps:
 
     ![credentials](images/im-dashboard/im-dashboard-00-4.png)
 
-    In our case we indicate an identifier for the set of credentials,
+    In our case, we indicate an identifier for the set of credentials,
     [the Access Key ID and the Secret Access Key](https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html)
     for an [IAM](https://aws.amazon.com/iam/) user that has privileges to
-    deploy Virtual Machines in [Amazon EC2](https://aws.amazon.com/ec2).
+    deploy Virtual Machines in [Amazon EC2](https://aws.amazon.com/ec2). With the default values indicated in this tutorial, you will need privileges to deploy the following instance types: ```t3a.xlarge``` for the front-end node and ```t3a.medium``` for the working node.
 
 1. Select the OSCAR template
 
     ![template](images/im-dashboard/im-dashboard-01.png)
+    
+
+   There are optional features than can be included in the OSCAR cluster to fit particular user needs. We'll skip them.
+
+   ![template-config](images/im-dashboard/im-dashboard-01-2.png)
+
+    
 
 1. Customize and deploy the OSCAR cluster
 
     In this panel you can specify the number of Working Nodes (WNs) of the
     cluster together with the computational requirements for each node. We
     leave the default values.
-    - Number of WNs in the oscar cluster: Number of working nodes.
-    - Number of CPUs for the front-end node: Number of CPUs in the primary node.
-    - Amount of Memory for the front-end node: RAM in the primary node.
-    - Flavor name of the front-end node. Only required in case of special flavors i.e. with GPUs: Type of instance that will be selected in the front node.
-    - Number of CPUs for the WNs: number of CPUs per working node.
-    - Amount of Memory for the WNs: RAM per working node.
-    - Flavor name of the WNs. Only required in case of special flavors i.e. with GPUs: Type of instance that will be selected in the working nodes.
-    - Size of the extra HD added to the instance: Extra memory in the primary node.
+
+    - Number of WNs in the OSCAR cluster.
+    - Number of CPUs for the front-end node.
+    - Amount of Memory (RAM) for the front-end node
+    - Flavor name of the front-end node. This is only required in case of special flavors (i.e. with GPUs): Instance type that will be selected for the front-end node.
+    - Number of CPUs for the WNs (Working Nodes).
+    - Amount of Memory (RAM) for the WNs.
+    - Flavor name of the WNs. Again, this is only required in case of special flavors
+    - Size of the extra HD (Hard Disk) added to the node.
     ![template-hw](images/im-dashboard/im-dashboard-02.png)
 
-    In this panel, specify the passwords to be employed to access the
-    Kubernetes Web UI (Dashboard), to access the OSCAR web UI and to access
-    the MinIO dashboard. These tokens can also be used for programmatic access
+    In the following panel, specify the passwords to be employed to access the
+    Kubernetes Web UI (Dashboard), to access OSCAR and to access
+    the MinIO dashboard. These passwords/tokens can also be used for programmatic access
     to the respective services.
 
-    - Access Token for the Kubernetes admin user: It is the token to connect to the Dashboard of Kubernetes.
-    - OSCAR password: password to OSCAR.
-    - MinIO password 8 characters min.: password to MinIO.
-    - Email to be used in the Lets Encrypt issuer: It is an Email linked with the certificates in case the user has any questions.
-    - ID of the user that creates the infrastructure: unique identifier. Do not touch.
-    - VO to support: It supports OIDC log in. If there is nothing, only can connect the user who deploys, in case there is a VO, it can be the user who deploys and all people in the VO.
+    - Access Token for the Kubernetes admin user: Used to connect to the Kubernetes Dashboard.
+    - OSCAR password: To log in to the OSCAR cluster as an admin user.
+    - MinIO password (8 characters min.).
+    - Email to be used in the Let's Encrypt issuer.
+    - ID of the user that creates the infrastructure.
+    - VO (Virtual Organization) to support: It supports OIDC (OpenID Connect) log in. If empty, only the user who deploys the cluster can log in. If a VO is specified, all the members of the VO can log in the OSCAR cluster.
     - Flag to add NVIDIA support: if you want to use NVIDIA.
     - Flag to install Apache YuniKorn: if you are going to use YuniKorn.
     ![template-param](images/im-dashboard/im-dashboard-03.png)
@@ -100,8 +107,8 @@ These are the steps:
 1. Check the status of the deployment OSCAR cluster
 
     You will see that the OSCAR cluster is being deployed and the
-    infrastructure reaches the status "running". The process will not finish
-    until it reaches the state "configured".
+    infrastructure reaches the status "running". The process will finish
+    when it reaches the state "configured".
 
     ![status-general](images/im-dashboard/im-dashboard-05.png)
 
@@ -115,17 +122,13 @@ These are the steps:
     Once reached the "configured" state, see the "Outputs" to obtain the
     different endpoints:
 
-    * console_minio_endpoint: This endpoint brings access to the MinIO web
-        user interface.
-    * dashboard_endpoint: This endpoint redirects to the Kubernetes dashboard
-        where the OSCAR cluster is deployed.
-    * local_oscarui_endpoint: This endpoint is where the OSCAR backend is
-        listening. It supports authentication only via basic-auth.
+    * console_minio_endpoint: To access the MinIO web UI.
+    * dashboard_endpoint: To access the Kubernetes dashboard.
+    * local_oscarui_endpoint: To access the OSCAR UI. It supports username/password authentication.
     * minio_endpoint: Endpoint where the MinIO API is listening. If you
         access it through a web browser, you will be redirected to
         "console_minio_endpoint".
-    * oscarui_endpoint: Public endpoint of the OSCAR web user interface. It
-        supports OIDC connections via EGI Check-in, as well as basic auth.
+    * oscarui_endpoint: To access the OSCAR UI. This one supports both username/password authentication and authentication via EGI Check-In for the user who deployed the OSCAR cluster and the users belonging to the VO specified at deployment time, if any.  
 
     ![outputs](images/im-dashboard/im-dashboard-07.png)
 

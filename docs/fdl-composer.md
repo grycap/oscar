@@ -1,18 +1,23 @@
-# Functions Definition Language Composer
+# FDL Composer
 
-Writing an entire workflow in plain text could be a difficult task for many
-users. To simplify the process you can use
-[FDL Composer](http://composer.oscar.grycap.net), a web-based user interface
+OSCAR Services can be aggregated into data-driven workflows where the output data of one service is stored in the object store that triggers another service, potentially in a different OSCAR cluster. This allows to execute the different phases of the workflow in disparate computing infrastructures.
+
+
+However, writing an entire workflow in an [FDL](fdl.md) file can be a difficult task for some users.
+
+
+To simplify the process you can use
+[FDL Composer](http://composer.oscar.grycap.net), a web-based application
 to facilitate the definition of [FDL](https://docs.oscar.grycap.net/fdl/) YAML
 files for [OSCAR](https://oscar.grycap.net/) and
 [SCAR](https://scar.readthedocs.io).
 
 ![fdl-composer-workflow.png](images/fdl-composer/fdl-composer-workflow.png)
 
-## How to access FDl Composer
+## How to access FDL Composer
 
-It does not require to be installed. Just access
-[FDL Composer web](https://composer.oscar.grycap.net/). If you prefer to
+
+Just access [FDL Composer](https://composer.oscar.grycap.net/) which is a Single Page Application (SPA) running entirely in your browser. If you prefer to
 execute it on your computer instead of using the web, clone the git repository
 by using the following command:
 
@@ -67,7 +72,7 @@ services.**
 
 ### Download and load state
 
-The graphic workflow can be saved in a file using the "Download state" button.
+The defined workflow can be saved in a file using the "Download state" button.
 OSCAR services, Storage Providers, and Buckets are kept in the file. The
 graphic workflow can be edited later by loading it with the "Load state" button.
 
@@ -98,6 +103,6 @@ SCAR.
 
 ## Example
 
-There is an example of fdl-composer implementing the
+There is an example of FDL Composer implementing the
 [video-process](https://github.com/grycap/oscar/tree/master/examples/video-process)
 use case in our [blog](https://oscar.grycap.net/blog/post-oscar-fdl-composer/).

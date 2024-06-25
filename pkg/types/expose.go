@@ -84,12 +84,24 @@ func DeleteExpose(name string, kubeClientset kubernetes.Interface, cfg *Config) 
 
 	ingressType := existsIngress(name, cfg.ServicesNamespace, kubeClientset)
 	if ingressType {
-		err = deleteIngress(name, kubeClientset, cfg)
+		err = deleteIngress(getIngressName(name), kubeClientset, cfg)
 		if err != nil {
 			return fmt.Errorf("error deleting ingress for exposed service '%s': %v", name, err)
 		}
 	}
-
+	termination := int64(0)
+	back := metav1.DeletePropagationBackground
+	delete := metav1.DeleteOptions{
+		GracePeriodSeconds: &termination,
+		PropagationPolicy:  &back,
+	}
+	listOpts := metav1.ListOptions{
+		LabelSelector: "app=oscar-svc-exp-" + name,
+	}
+	err = kubeClientset.CoreV1().Pods(cfg.ServicesNamespace).DeleteCollection(context.TODO(), delete, listOpts)
+	if err != nil {
+		return fmt.Errorf("error deleting pods of exposed service '%s': %v", name, err)
+	}
 	return nil
 }
 
@@ -258,6 +270,9 @@ func getPodTemplateSpec(service Service, cfg *Config) v1.PodTemplateSpec {
 	}
 	var num int32 = 0777
 	podSpec.Volumes[0].VolumeSource.ConfigMap.DefaultMode = &num
+	if service.Mount.Provider != "" {
+		SetMount(podSpec, service, cfg)
+	}
 	template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      service.Name,

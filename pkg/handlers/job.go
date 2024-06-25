@@ -156,6 +156,10 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, resourceIDVar)
 			}
 		}
+		if service.Mount.Provider != "" {
+			types.SetMount(podSpec, *service, cfg)
+			podSpec.Containers[0].Args = []string{"-c", args + ";echo \"I finish\" > /tmpfolder/finish-file;"}
+		}
 
 		// Delegate job if can't be scheduled and has defined replicas
 		if rm != nil && service.HasReplicas() {
@@ -207,7 +211,6 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
-
 		c.Status(http.StatusCreated)
 	}
 }

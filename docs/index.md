@@ -1,30 +1,41 @@
 # Introduction
 
-![OSCAR-logo](images/oscar3.png)
+![OSCAR logo](images/oscar3.png)
 
-OSCAR is an open-source platform to support the event-driven serverless
-computing model for data-processing applications.
-It can be automatically deployed on multi-Clouds, and even on low-powered devices.
-It represents the porting to an on-premises scenario of the
+OSCAR is an open-source platform to support the event-driven serverless computing model for data-processing applications. It can be automatically deployed on multi-Clouds, and even on low-powered devices, to create highly-parallel event-driven data-processing serverless applications along the computing continuum. These applications execute on customized runtime environments provided by Docker containers that run on elastic Kubernetes clusters. It is also integrated with the 
 [SCAR framework](https://github.com/grycap/scar), which supports a
 [High Throughput Computing Programming Model](https://scar.readthedocs.io/en/latest/prog_model.html)
 to create highly-parallel event-driven data-processing serverless applications
 that execute on customized runtime environments provided by Docker containers
-run on AWS Lambda.
+run on AWS Lambda and AWS Batch.
 
-## Goal
 
-Users upload files to a bucket and this automatically triggers the execution
-of parallel invocations to a function responsible for processing each file.
-Output files are delivered into an output bucket for the convenience of the
-user. Highly scalable HTTP-based endpoints can also be offered to expose a generic
-application. A user-provided shell script is executed inside
-the container run from the user-defined Docker image to achieve the
-right execution environment for the application.
+## Concepts
+- **OSCAR Cluster**: A Kubernetes cluster (either fixed size or elastic) configured with the OSCAR services and components. The cluster must have at least one front-end node, which executes the OSCAR control plane and one or several working nodes.
+- **OSCAR Service**: The execution unit in the OSCAR framework, typically defined in [FDL](fdl.md), by a:
+    - Docker image, providing the customized runtime environment for an application.
+    - Execution requirements.
+    - User-defined shell script that will be executed in a dynamically-provisioned container.
+    - (Optional) The object storage that will trigger the execution of the OSCAR service upon a file upload. 
+    - (Optional) The object storage(s) on which the output results of the OSCAR service will be stored. 
+    - (Optional) Deployment strategy and additional configuration. 
 
-## Components
 
-![oscar arch](images/oscar-arch.png)
+## Rationale
+
+Users create OSCAR services to:
+
+  - Execute a containerized command-line application or web service in response to:
+      - a file upload to an object store (e.g. [MinIO](http://min.io)), thus supporting loosely-coupled High-Throughput Computing use cases where many files need to be processed in parallel in a distributed computing platform.
+      - a request to a load-balanced auto-scaled HTTP-based endpoints, thus allowing to exposed generic scientific applications as highly-scalable HTTP endpoints.
+  - Execute a pipeline of multiple OSCAR service where the output data of one triggers the execution of another OSCAR service, potentially running in different clusters, thus creating event-driven scalable pipelines along the computing continuum.
+
+An admin user can deploy an OSCAR cluster on a Cloud platform so that other users belonging to a Virtual Organization (VO) can create OSCAR services. A VO is a group of people (e.g. scientists, researchers) with common interests and requirements, who need to work collaboratively and/or share resources (e.g. data, software, expertise, CPU, storage space) regardless of geographical location. OSCAR supports the VOs defined in [EGI](https://egi.eu), which are listed in the ['Operations Portal'](https://operations-portal.egi.eu/vo/a/list). EGI is the European's largest federation of computing and storage resource providers united by a mission of delivering advanced computing and data analytics services for research and innovation.
+
+
+## Architecture & Components
+
+![OSCAR architecture](images/oscar-arch.png)
 
 OSCAR runs on an elastic [Kubernetes](http://kubernetes.io) cluster that is
 deployed using:
@@ -68,7 +79,11 @@ only MinIO can be used as input.*
 An OSCAR cluster can be easily deployed via the [IM Dashboard](http://im.egi.eu)
 on any major public and on-premises Cloud provider, including the EGI Federated Cloud.
 
+A summary of the components used: 
+
+![OSCAR components](images/oscar-components.png)
+
 An OSCAR cluster can be accessed via its
-[REST API](https://grycap.github.io/oscar/api/), the
-[web-based [UI](https://github.com/grycap/oscar-ui) and the command-line interface provided by
-[oscar-cli](https://github.com/grycap/oscar-cli).
+[REST API](https://grycap.github.io/oscar/api/), the web-based 
+[OSCAR UI](https://github.com/grycap/oscar-ui) and the command-line interface provided by
+[OSCAR CLI](https://github.com/grycap/oscar-cli).
