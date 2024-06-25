@@ -40,6 +40,7 @@ nav:
 
 - Advanced Features:   
   - MinIO bucket replication: minio-bucket-replication.md
+  - Mount: mount.md
 
 - Development:
   - Documentation: devel-docs.md
