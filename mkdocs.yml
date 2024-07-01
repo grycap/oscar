@@ -1,35 +1,64 @@
 site_name: OSCAR Documentation
 repo_url: https://github.com/grycap/oscar
 nav:
-- Introduction: index.md
-- Getting started:
-  - Local testing: local-testing.md
-  - Deployment with IM Dashboard: deploy-im-dashboard.md
-  - Deployment with EC3: deploy-ec3.md
-  - Deployment with Helm: deploy-helm.md
-  - Deployment on K3s with Ansible: deploy-ansible.md
-- Third party integrations:
-  - Integration with EGI: egi-integration.md
-  - OIDC Authorization: oidc-auth.md
-  - Integration with SCONE: sgx-integration.md
-- usage.md
-- invoking.md
-- Functions Definition Language (FDL): fdl.md
-- FDL Composer: fdl-composer.md
-- oscar-cli.md
-- OpenAPI Specification: api.md
-- Multitenancy: multitenancy.md
-- MinIO bucket replication: minio-bucket-replication.md
-- Frequently Asked Questions (FAQ): faq.md
+- Introduction: 
+   - index.md
+   - Multitenancy: multitenancy.md
+  
+- Deployment:
+  - local-testing.md
+  - deploy-im-dashboard.md
+  - deploy-ec3.md
+  - deploy-helm.md
+  - deploy-k3s-ansible.md
+  
+- Service Definition:
+  - oscar-service.md 
+  - fdl.md
+  - fdl-composer.md
+
+- Interfaces:
+  - oscar-cli.md
+  - usage-ui.md  
+  - api.md
+
+- Service Execution: 
+  - invoking.md
+  - invoking-sync.md
+  - invoking-async.md
+  - exposed-services.md
+
+- Integrations:
+  - integration-egi.md
+  - integration-scone.md
+  - integration-interlink.md
+  - integration-compss.md
+
+- Tutorials: 
+  - training.md
+  - faq.md
+
+- Advanced Features:   
+  - MinIO bucket replication: minio-bucket-replication.md
+
+- Development:
+  - Documentation: devel-docs.md
 - license.md
 - about.md
+
 theme:
   favicon: images/logo.png
   logo: images/logo.png
   name: material
   palette:
     primary: teal
+  features:
+    - instant
+    - toc.integrate
+    - content.code.copy
+
 plugins:
 - search
 - render_swagger
-copyright: "&copy; 2022, GRyCAP - i3M - Universitat Politècnica de València, Spain."
+
+copyright: "&copy; GRyCAP - I3M - Universitat Politècnica de València, Spain."

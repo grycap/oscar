@@ -20,15 +20,17 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/goccy/go-yaml"
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
 	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
+
+const ConfigMapNameOSCAR = "additional-oscar-config"
 
 // KubeBackend struct to represent a Kubernetes client to store services as podTemplates
 type KubeBackend struct {
@@ -77,10 +79,15 @@ func (k *KubeBackend) ListServices() ([]*types.Service, error) {
 
 // CreateService creates a new service as a k8s podTemplate
 func (k *KubeBackend) CreateService(service types.Service) error {
-	// Validate the input variables of the service
-	service = utils.ValidateService(service)
+
+	// Check if there is some user defined settings for OSCAR
+	err := checkAdditionalConfig(ConfigMapNameOSCAR, k.namespace, service, k.config, k.kubeClientset)
+	if err != nil {
+		return err
+	}
+
 	// Create the configMap with FDL and user-script
-	err := createServiceConfigMap(&service, k.namespace, k.kubeClientset)
+	err = createServiceConfigMap(&service, k.namespace, k.kubeClientset)
 	if err != nil {
 		return err
 	}
@@ -117,19 +124,11 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 	}
 
 	//Create an expose service
-	if service.Expose.Port != 0 {
-		exposeConf := utils.Expose{
-			Name:         service.Name,
-			NameSpace:    k.namespace,
-			Variables:    service.Environment.Vars,
-			Image:        service.Image,
-			Port:         service.Expose.Port,
-			MaxScale:     service.Expose.MaxScale,
-			MinScale:     service.Expose.MinScale,
-			CpuThreshold: service.Expose.CpuThreshold,
-			EnableSGX:    service.EnableSGX,
+	if service.Expose.APIPort != 0 {
+		err = types.CreateExpose(service, k.kubeClientset, k.config)
+		if err != nil {
+			return err
 		}
-		utils.CreateExpose(exposeConf, k.kubeClientset, *k.config)
 	}
 	//Create deaemonset to cache the service image on all the nodes
 	if service.ImagePrefetch {
@@ -160,8 +159,6 @@ func (k *KubeBackend) ReadService(name string) (*types.Service, error) {
 
 // UpdateService updates an existent service
 func (k *KubeBackend) UpdateService(service types.Service) error {
-	// Validate the input variables of the service
-	service = utils.ValidateService(service)
 	// Get the old service's configMap
 	oldCm, err := k.kubeClientset.CoreV1().ConfigMaps(k.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
@@ -207,19 +204,13 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 		return err
 	}
 
-	//Update an expose service
-	exposeConf := utils.Expose{
-		Name:         service.Name,
-		NameSpace:    k.namespace,
-		Variables:    service.Environment.Vars,
-		Image:        service.Image,
-		Port:         service.Expose.Port,
-		MaxScale:     service.Expose.MaxScale,
-		MinScale:     service.Expose.MinScale,
-		CpuThreshold: service.Expose.CpuThreshold,
-		EnableSGX:    service.EnableSGX,
+	// If the service is exposed update its configuration
+	if service.Expose.APIPort != 0 {
+		err = types.UpdateExpose(service, k.kubeClientset, k.config)
+		if err != nil {
+			return err
+		}
 	}
-	utils.UpdateExpose(exposeConf, k.kubeClientset, *k.config)
 
 	return nil
 }
@@ -240,14 +231,14 @@ func (k *KubeBackend) DeleteService(service types.Service) error {
 	if err := deleteServiceJobs(name, k.namespace, k.kubeClientset); err != nil {
 		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
 	}
-	exposeConf := utils.Expose{
-		Name:      name,
-		NameSpace: k.namespace,
-		Port:      80,
+
+	// If service is exposed delete the exposed k8s components
+	if service.Expose.APIPort != 0 {
+		if err := types.DeleteExpose(name, k.kubeClientset, k.config); err != nil {
+			log.Printf("Error deleting all associated kubernetes component of the expose config \"%s\": %v\n", name, err)
+		}
 	}
-	if err2 := utils.DeleteExpose(exposeConf, k.kubeClientset); err2 != nil {
-		log.Printf("Error deleting all associated kubernetes component of an exposed service \"%s\": %v\n", name, err2)
-	}
+
 	return nil
 }
 
@@ -268,6 +259,30 @@ func getServiceFromFDL(name string, namespace string, kubeClientset kubernetes.I
 	service.Script = cm.Data[types.ScriptFileName]
 
 	return service, nil
+}
+
+func checkAdditionalConfig(configName string, configNamespace string, service types.Service, cfg *types.Config, kubeClientset kubernetes.Interface) error {
+	// Get the configMapwith the service additional settings
+	cm, err := kubeClientset.CoreV1().ConfigMaps(configNamespace).Get(context.TODO(), configName, metav1.GetOptions{})
+	if err != nil {
+		return nil
+	}
+
+	additionalConfig := &types.AdditionalConfig{}
+	// Unmarshal the FDL stored in the configMap
+	if err = yaml.Unmarshal([]byte(cm.Data[cfg.AdditionalConfigPath]), additionalConfig); err != nil {
+		return nil
+	}
+
+	if len(additionalConfig.Images.AllowedPrefixes) > 0 {
+		for _, prefix := range additionalConfig.Images.AllowedPrefixes {
+			if !strings.Contains(service.Image, prefix) {
+				return fmt.Errorf("image %s is not allowed for pull on the cluster. Check the additional configuration file on '%s'", service.Image, cfg.AdditionalConfigPath)
+			}
+		}
+	}
+
+	return nil
 }
 
 func createServiceConfigMap(service *types.Service, namespace string, kubeClientset kubernetes.Interface) error {

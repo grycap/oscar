@@ -614,8 +614,7 @@ func TestKnativeUpdateService(t *testing.T) {
 
 func TestKnativeDeleteService(t *testing.T) {
 	testService := types.Service{
-		Name:   "test",
-		Labels: map[string]string{},
+		Name: "test",
 	}
 	scenarios := []knativeBackendTestScenario{
 		{

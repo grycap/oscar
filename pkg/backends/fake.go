@@ -90,7 +90,7 @@ func (f *FakeBackend) UpdateService(service types.Service) error {
 }
 
 // DeleteService deletes a service (fake)
-func (f *FakeBackend) DeleteService(name string) error {
+func (f *FakeBackend) DeleteService(service types.Service) error {
 	return f.returnError(getCurrentFuncName())
 }
 

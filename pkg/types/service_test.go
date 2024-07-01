@@ -244,8 +244,11 @@ image_pull_secrets:
 expose:
   min_scale: 0
   max_scale: 0
-  port: 0
   cpu_threshold: 0
+  rewrite_target: false
+  nodePort: 0
+  default_command: false
+  set_auth: false
 environment:
   Variables:
     TEST_VAR: testvalue
@@ -268,7 +271,12 @@ clusters:
     auth_user: testuser
     auth_password: testpass
     ssl_verify: true
+owner: ""
+interlink_node_name: ""
 allowed_users: []
+mount:
+  storage_provider: ""
+  path: ""
 `
 
 	str, _ := testService.ToYAML()

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -28,6 +29,9 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
+
+// Custom logger
+var updateLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
 
 // MakeUpdateHandler makes a handler for updating services
 func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
@@ -44,6 +48,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Read the current service
 		oldService, err := back.ReadService(newService.Name)
+
 		if err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {
@@ -54,6 +59,20 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
+		uid, err := auth.GetUIDFromContext(c)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintln("Couldn't get UID from context"))
+		}
+
+		if oldService.Owner != uid {
+			c.String(http.StatusForbidden, "User %s doesn't have permision to modify this service", uid)
+			return
+		}
+
+		// Set the owner on the new service definition
+		newService.Owner = oldService.Owner
+
+		// If the service has changed VO check permisions again
 		if newService.VO != "" && newService.VO != oldService.VO {
 			for _, vo := range cfg.OIDCGroups {
 				if vo == newService.VO {
@@ -68,31 +87,6 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-		if !isAdminUser {
-			mc, err := auth.GetMultitenancyConfigFromContext(c)
-			if err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-			}
-
-			// Check if users in allowed_users have a MinIO associated user
-			if len(newService.AllowedUsers) == 0 {
-				uids := mc.CheckUsersInCache(newService.AllowedUsers)
-				if len(uids) == 0 {
-					for _, uid := range uids {
-						sk, _ := auth.GenerateRandomKey(8)
-						minIOAdminClient.CreateMinIOUser(uid, sk)
-						mc.CreateSecretForOIDC(uid, sk)
-					}
-				}
-			}
-
-			if len(newService.AllowedUsers) != len(oldService.AllowedUsers) {
-				//Update users group list
-				minIOAdminClient.AddUserToGroup(newService.AllowedUsers, "")
-
-			}
-		}
-
 		// Update the service
 		if err := back.UpdateService(newService); err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
@@ -108,6 +102,47 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				provName = strings.ToLower(provSlice[0])
 			}
 			if provName == types.MinIOName {
+
+				// Get bucket name
+				path := strings.Trim(in.Path, " /")
+				// Split buckets and folders from path
+				splitPath := strings.SplitN(path, "/", 2)
+				oldAllowedLength := len(oldService.AllowedUsers)
+				newAllowedLength := len(newService.AllowedUsers)
+				if newAllowedLength != oldAllowedLength {
+					if newAllowedLength == 0 {
+						updateLogger.Printf("Updating service with public policies")
+						// If the new allowed users is empty make service public
+						err = minIOAdminClient.PrivateToPublicBucket(splitPath[0])
+						if err != nil {
+							c.String(http.StatusInternalServerError, err.Error())
+							return
+						}
+					} else {
+						// If the service was public and now has a list of allowed users make its buckets private
+						if oldAllowedLength == 0 {
+							updateLogger.Printf("Updating service with private policies")
+							err = minIOAdminClient.PublicToPrivateBucket(splitPath[0], newService.AllowedUsers)
+							if err != nil {
+								c.String(http.StatusInternalServerError, err.Error())
+								return
+							}
+						} else {
+							// If allowed users list changed update policies on bucket
+							updateLogger.Printf("Updating service policies")
+							err = minIOAdminClient.UpdateUsersInGroup(oldService.AllowedUsers, splitPath[0], true)
+							if err != nil {
+								c.String(http.StatusInternalServerError, err.Error())
+								return
+							}
+							err = minIOAdminClient.UpdateUsersInGroup(newService.AllowedUsers, splitPath[0], false)
+							if err != nil {
+								c.String(http.StatusInternalServerError, err.Error())
+								return
+							}
+						}
+					}
+				}
 
 				// Register minio webhook and restart the server
 				if err := registerMinIOWebhook(newService.Name, newService.Token, newService.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {

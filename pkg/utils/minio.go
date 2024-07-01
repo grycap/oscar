@@ -19,9 +19,12 @@ package utils
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -30,10 +33,24 @@ import (
 
 const ALL_USERS_GROUP = "all_users_group"
 
+var minioLogger = log.New(os.Stdout, "[MINIO] ", log.Flags())
+
 // MinIOAdminClient struct to represent a MinIO Admin client to configure webhook notifications
 type MinIOAdminClient struct {
 	adminClient   *madmin.AdminClient
 	oscarEndpoint *url.URL
+}
+
+// Define the policy structure using Go structs
+type Statement struct {
+	Effect   string   `json:"Effect"`
+	Action   []string `json:"Action"`
+	Resource []string `json:"Resource"`
+}
+
+type Policy struct {
+	Version   string      `json:"Version"`
+	Statement []Statement `json:"Statement"`
 }
 
 // MakeMinIOAdminClient creates a new MinIO Admin client to configure webhook notifications
@@ -90,9 +107,76 @@ func (minIOAdminClient *MinIOAdminClient) CreateMinIOUser(ak string, sk string) 
 	}
 
 	users = append(users, ak)
-	err2 := minIOAdminClient.AddUserToGroup(users, ALL_USERS_GROUP)
+	err2 := minIOAdminClient.UpdateUsersInGroup(users, ALL_USERS_GROUP, false)
 	if err2 != nil {
 		return err2
+	}
+	return nil
+}
+
+func (minIOAdminClient *MinIOAdminClient) PrivateToPublicBucket(bucketName string) error {
+	// Delete policy and group""
+	var users []string
+	err := minIOAdminClient.UpdateUsersInGroup(users, bucketName, true)
+	if err != nil {
+		return err
+	}
+	// Add bucket to all_users_group policy
+	err = minIOAdminClient.AddServiceToAllUsersGroup(bucketName)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// TODO refactor to delete duplicated code
+func (minIOAdminClient *MinIOAdminClient) PublicToPrivateBucket(bucketName string, allowedUsers []string) error {
+	// Delete bucket from all_users_group
+	rs := "arn:aws:s3:::" + bucketName + "/*"
+	groupName := ALL_USERS_GROUP
+
+	policyInfo, errInfo := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), ALL_USERS_GROUP)
+	if errInfo != nil {
+		return errInfo
+	}
+
+	actualPolicy := &Policy{}
+	json.Unmarshal(policyInfo.Policy, actualPolicy)
+	index := 0
+	// Search for the resource index
+	resources := actualPolicy.Statement[0].Resource
+	for i, resource := range resources {
+		if resource == rs {
+			index = i
+			break
+		}
+	}
+	// Add new resource and create policy
+	actualPolicy.Statement[0].Resource = append(resources[:index], resources[index+1:]...)
+
+	policy, jsonErr := json.Marshal(actualPolicy)
+	if jsonErr != nil {
+		return jsonErr
+	}
+
+	err := minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), groupName, []byte(policy))
+	if err != nil {
+		return fmt.Errorf("error creating MinIO policy for group %s: %v", groupName, err)
+	}
+
+	err = minIOAdminClient.adminClient.SetPolicy(context.TODO(), groupName, groupName, true)
+	if err != nil {
+		return fmt.Errorf("error setting MinIO policy for group %s: %v", groupName, err)
+	}
+
+	err = minIOAdminClient.CreateServiceGroup(bucketName)
+	if err != nil {
+		return err
+	}
+	// Add bucket to all_users_group policy
+	err = minIOAdminClient.UpdateUsersInGroup(allowedUsers, bucketName, false)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -113,7 +197,7 @@ func (minIOAdminClient *MinIOAdminClient) CreateServiceGroup(bucketName string) 
 		return err
 	}
 
-	err = createPolicy(minIOAdminClient.adminClient, bucketName)
+	err = createPolicy(minIOAdminClient.adminClient, bucketName, false)
 	if err != nil {
 		return err
 	}
@@ -123,7 +207,7 @@ func (minIOAdminClient *MinIOAdminClient) CreateServiceGroup(bucketName string) 
 
 // AddServiceToAllUsersGroup associates policy of all users to a service
 func (minIOAdminClient *MinIOAdminClient) AddServiceToAllUsersGroup(bucketName string) error {
-	err := createPolicy(minIOAdminClient.adminClient, bucketName)
+	err := createPolicy(minIOAdminClient.adminClient, bucketName, true)
 	if err != nil {
 		return err
 	}
@@ -131,44 +215,38 @@ func (minIOAdminClient *MinIOAdminClient) AddServiceToAllUsersGroup(bucketName s
 	return nil
 }
 
-// AddUserToGroup adds  user/users to a group
-func (minIOAdminClient *MinIOAdminClient) AddUserToGroup(users []string, groupName string) error {
+// AddServiceToAllUsersGroup associates policy of all users to a service
+func (minIOAdminClient *MinIOAdminClient) RemovedServiceFromAllUsersGroup(bucketName string) error {
+	err := createPolicy(minIOAdminClient.adminClient, bucketName, true)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// UpdateUsersGroup
+func (minIOAdminClient *MinIOAdminClient) UpdateUsersInGroup(users []string, groupName string, remove bool) error {
+	var members []string
+	if len(users) < 1 {
+		description, err := minIOAdminClient.adminClient.GetGroupDescription(context.Background(), groupName)
+		if err != nil {
+			return err
+		}
+		members = description.Members
+	} else {
+		members = users
+	}
 	group := madmin.GroupAddRemove{
 		Group:    groupName,
-		Members:  users,
+		Members:  members,
 		Status:   "enable",
-		IsRemove: false,
+		IsRemove: remove,
 	}
 
 	err := minIOAdminClient.adminClient.UpdateGroupMembers(context.TODO(), group)
 	if err != nil {
-		return fmt.Errorf("error adding users to group: %v", err)
-	}
-
-	return nil
-}
-
-// DeleteServiceGroup empty the service group and policy
-func (minIOAdminClient *MinIOAdminClient) DeleteServiceGroup(groupName string) error {
-	description, err := minIOAdminClient.adminClient.GetGroupDescription(context.Background(), groupName)
-	if err != nil {
-		return err
-	}
-	group := madmin.GroupAddRemove{
-		Group:    groupName,
-		Members:  description.Members,
-		Status:   "enable",
-		IsRemove: true,
-	}
-
-	err = minIOAdminClient.adminClient.UpdateGroupMembers(context.Background(), group)
-	if err != nil {
-		return fmt.Errorf("Error emptying group: %v", err)
-	}
-
-	err = minIOAdminClient.adminClient.RemoveCannedPolicy(context.TODO(), groupName)
-	if err != nil {
-		return fmt.Errorf("Error removing group's policy: %v", err)
+		return fmt.Errorf("error updating users on group: %v", err)
 	}
 	return nil
 }
@@ -211,21 +289,49 @@ func (minIOAdminClient *MinIOAdminClient) RestartServer() error {
 	return nil
 }
 
-func createPolicy(adminClient *madmin.AdminClient, groupName string) error {
-	policy := `{
-		"Version": "2012-10-17",
-		"Statement": [
-			{
-				"Effect": "Allow",
-				"Action": [
-					"s3:*"
-				],
-				"Resource": [
-					"arn:aws:s3:::` + groupName + `*"
-				]
-			}
-		]
-	}`
+func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers bool) error {
+	var groupName string
+	var policy []byte
+	var jsonErr error
+
+	if allUsers {
+		rs := "arn:aws:s3:::" + bucketName + "/*"
+		groupName = ALL_USERS_GROUP
+
+		policyInfo, errInfo := adminClient.InfoCannedPolicyV2(context.TODO(), ALL_USERS_GROUP)
+		if errInfo != nil {
+			return errInfo
+		}
+
+		actualPolicy := &Policy{}
+		json.Unmarshal(policyInfo.Policy, actualPolicy)
+
+		// Add new resource and create policy
+		actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, rs)
+
+		policy, jsonErr = json.Marshal(actualPolicy)
+		if jsonErr != nil {
+			return jsonErr
+		}
+
+	} else {
+		groupName = bucketName
+		p := `{
+			"Version": "2012-10-17",
+			"Statement": [
+				{
+					"Effect": "Allow",
+					"Action": [
+						"s3:*"
+					],
+					"Resource": [
+						"arn:aws:s3:::` + bucketName + `/*"
+					]
+				}
+			]
+		}`
+		policy = []byte(p)
+	}
 
 	err := adminClient.AddCannedPolicy(context.TODO(), groupName, []byte(policy))
 	if err != nil {
