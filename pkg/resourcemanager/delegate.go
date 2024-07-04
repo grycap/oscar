@@ -406,10 +406,13 @@ func getClusterStatus(service *types.Service) {
 
 func mapToRange(value, minInput, maxInput, maxOutput, minOutput int64) int {
 
-	mappedValue := maxOutput - ((value-minInput)/(maxInput-minInput))*(maxOutput-minOutput)
+	mappedValue := maxOutput - (maxOutput-minOutput)*(value-minInput)/(maxInput-minInput)
 	mappedInt := int(mappedValue)
 	if mappedInt > int(maxOutput) {
 		mappedInt = int(maxOutput)
+	}
+	if mappedInt < int(minOutput) {
+		mappedInt = int(minOutput)
 	}
 
 	return mappedInt
