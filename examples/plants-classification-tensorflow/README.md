@@ -1,11 +1,11 @@
-# Plants classification yolov8
+# Plants classification tensorflow
 
-This example uses the pre-trained classification model by DEEP-Hybrid-DataCloud
-[Plants species classifier](https://dashboard.cloud.ai4eosc.eu/marketplace/modules/plants-classification)
+This example uses the pre-trained classification model by DEEP-Hybrid-DataCloud 
+[Plants species classifier](https://dashboard.cloud.ai4eosc.eu/marketplace/modules/deep-oc-plants-classification-tf)
 and is prepared to be used with asynchronous invocations.
 
 
-In order to invoke the function, first you have to do is create a service,
+In order to invoke the function, first you have to create a service,
 either by the OSCAR UI or by using the FDL within the following command.
 
 ``` sh
