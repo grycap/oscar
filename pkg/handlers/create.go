@@ -417,6 +417,26 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 					return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
 				}
 			}
+			if !isUpdate {
+				if !isAdminUser {
+					if len(allowed_users) == 0 {
+						err = minIOAdminClient.AddServiceToAllUsersGroup(splitPath[0])
+						if err != nil {
+							return fmt.Errorf("error adding service %s to all users group: %v", splitPath[0], err)
+						}
+					} else {
+						err = minIOAdminClient.CreateServiceGroup(splitPath[0])
+						if err != nil {
+							return fmt.Errorf("error creating service group for bucket %s: %v", splitPath[0], err)
+						}
+
+						err = minIOAdminClient.UpdateUsersInGroup(allowed_users, splitPath[0], false)
+						if err != nil {
+							return err
+						}
+					}
+				}
+			}
 			// Create folder(s)
 			if len(splitPath) == 2 {
 				// Add "/" to the end of the key in order to create a folder
