@@ -55,6 +55,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		authHeader := c.GetHeader("Authorization")
 		createLogger.Printf("[*] POST header : %v", authHeader)
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
+			createLogger.Printf(">>> is admin")
 			isAdminUser = true
 			service.Owner = "cluster_admin"
 			createLogger.Printf("Creating service for user: %s", service.Owner)
@@ -67,12 +68,13 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Check service values and set defaults
 		checkValues(&service, cfg)
-
+		createLogger.Printf(">>> checked values")
 		// Check if users in allowed_users have a MinIO associated user
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
 		// Service is created by an EGI user
 		if !isAdminUser {
+			createLogger.Printf(">>> not admin")
 			uid, err := auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
@@ -98,6 +100,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						}
 						break
 					}
+				}
+			} else {
+				if len(cfg.OIDCGroups) != 0 {
+					c.String(http.StatusBadRequest, fmt.Sprintln("service must be part of one of the following VO: ", cfg.OIDCGroups))
 				}
 			}
 
@@ -130,6 +136,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Create the service
+		createLogger.Printf(">>> service uid: %s", service.Owner)
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
 			if k8sErrors.IsAlreadyExists(err) {
