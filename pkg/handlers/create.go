@@ -53,6 +53,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 	return func(c *gin.Context) {
 		var service types.Service
 		authHeader := c.GetHeader("Authorization")
+		createLogger.Printf("[*] POST header : %v", authHeader)
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
 			service.Owner = "cluster_admin"
