@@ -74,6 +74,14 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			minIOAdminClient.UpdateUsersInGroup(users, bucket[0], true)
 		}
 
+		if service.Mount.Path != "" {
+			path := strings.Trim(service.Mount.Path, " /")
+			// Split buckets and folders from path
+			bucket := strings.SplitN(path, "/", 2)
+			var users []string
+			minIOAdminClient.UpdateUsersInGroup(users, bucket[0], true)
+		}
+
 		// Disable input notifications
 		if err := disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, service.StorageProviders.MinIO[types.DefaultProvider]); err != nil {
 			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
