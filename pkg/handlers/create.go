@@ -66,7 +66,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Check service values and set defaults
 		checkValues(&service, cfg)
-
 		// Check if users in allowed_users have a MinIO associated user
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
@@ -97,6 +96,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						}
 						break
 					}
+				}
+			} else {
+				if len(cfg.OIDCGroups) != 0 {
+					c.String(http.StatusBadRequest, fmt.Sprintln("service must be part of one of the following VO: ", cfg.OIDCGroups))
 				}
 			}
 
@@ -415,6 +418,26 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 					}
 				} else {
 					return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
+				}
+			}
+			if !isUpdate {
+				if !isAdminUser {
+					if len(allowed_users) == 0 {
+						err = minIOAdminClient.AddServiceToAllUsersGroup(splitPath[0])
+						if err != nil {
+							return fmt.Errorf("error adding service %s to all users group: %v", splitPath[0], err)
+						}
+					} else {
+						err = minIOAdminClient.CreateServiceGroup(splitPath[0])
+						if err != nil {
+							return fmt.Errorf("error creating service group for bucket %s: %v", splitPath[0], err)
+						}
+
+						err = minIOAdminClient.UpdateUsersInGroup(allowed_users, splitPath[0], false)
+						if err != nil {
+							return err
+						}
+					}
 				}
 			}
 			// Create folder(s)
