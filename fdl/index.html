@@ -603,6 +603,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#mountsettings" class="md-nav__link">
+    <span class="md-ellipsis">
+      MountSettings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#replica" class="md-nav__link">
     <span class="md-ellipsis">
       Replica
@@ -1663,6 +1672,25 @@ storage_providers:
 <tr>
 <td><code>default_command</code> </br> <em>bool</em></td>
 <td>Select between executing the container's default command and executing the script inside the container. (default: false). Optional.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="mountsettings">MountSettings</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>storage_provider</code> </br> <em>string</em></td>
+<td>Identifier of the storage provider. Optional.</td>
+</tr>
+<tr>
+<td><code>path</code> </br> <em>string</em></td>
+<td>Path to the folder that will be mounted. Optional.</td>
 </tr>
 </tbody>
 </table>

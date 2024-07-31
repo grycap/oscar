@@ -1232,19 +1232,43 @@
 
 
 <h1 id="mounting-external-storage-on-service-volumes">Mounting external storage on service volumes</h1>
-<p>This feature enables the mounting of a folder from a storage provider, such as MinIO or dCache, into the service container. As illustrated in the following diagram, the folder is placed inside the /mnt directory on the container volume, thereby making it accessible to the service. This functionality can be utilized with exposed services, such as those using a Jupyter Notebook, to make the content of the storage bucket accessible directly within the Notebook.</p>
+<p>This feature enables the mounting of a folder from a storage provider, such as MinIO or dCache, into the service container. As illustrated in the following diagram, the folder is placed inside the /mnt directory on the container volume, thereby making it accessible to the service.</p>
 <p><img alt="mount-diagram" src="../images/mount.png" /></p>
+<p>This functionality can be useful with exposed services, such as those using a Jupyter Notebook, to make the content of the storage bucket accessible directly within the Notebook. For instance, if you have a MinIO bucket called <code>notebook</code> you want to access, you would need to add the following parameters to the service definition:</p>
+<pre><code class="language-yaml">mount:
+  storage_provider: minio.default
+  path: /notebook
+</code></pre>
+<p>The complete definition of this use case that integrates the expose of a Jupyter Notebook with the access to a mounted bucket would look like the following:</p>
+<pre><code class="language-yaml">functions:
+  oscar:
+  - oscar-cluster:
+     name: jupyter
+     memory: 2Gi
+     cpu: '1.0'
+     image: jupyter/base-notebook
+     script: jupyterscript2.sh
+     environment:
+       Variables:
+         JUPYTER_TOKEN: &quot;root&quot;
+         JHUB_BASE_URL: &quot;/system/services/jupyter/exposed&quot;
+         JUPYTER_DIRECTORY: &quot;/mnt&quot;
+     mount:
+       storage_provider: minio.default
+       path: /notebook
+     expose:
+      min_scale: 1
+      max_scale: 1
+      api_port: 8888
+      cpu_threshold: 90
+      rewrite_target: true
+</code></pre>
+<p><strong>Note</strong>: You can find the files of this example on <a href="https://github.com/grycap/oscar/tree/master/examples/expose_services/jupyter">OSCAR's repository examples</a></p>
 <p>As OSCAR has the credentials of the default MinIO instance internally, if you want to use a different one or a different storage provider, you need to set these credentials on the service <a href="/fdl">FDL</a>. Currently, the storage providers supported on this functionality are:</p>
 <ul>
 <li><a href="/fdl/#minioprovider">MinIO provider</a></li>
 <li><a href="/fdl/#webdavprovider">WebDav provider</a></li>
 </ul>
-<p>Let's explore these with an FDL example:</p>
-<pre><code>mount:
-  storage_provider: minio.default
-  path: /body-pose-detection-async
-</code></pre>
-<p>The example above means that OSCAR mounts the <code>body-pose-detection-async</code> bucket of the default MinIO inside the OSCAR services. So, the content of the <code>body-pose-detection-async</code> bucket will be found in <code>/mnt/body-pose-detection-async</code> folder inside the execution of OSCAR services.</p>
 
 
 
