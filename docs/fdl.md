@@ -131,6 +131,12 @@ storage_providers:
 | `rewrite_target` </br> *bool* | Target the URI where the traffic is redirected. (default: false). Optional.  |
 | `default_command` </br> *bool* | Select between executing the container's default command and executing the script inside the container. (default: false). Optional.  |
 
+## MountSettings
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
+| `storage_provider` </br> *string*  | Identifier of the storage provider. Optional.          |
+| `path` </br> *string*  | Path to the folder that will be mounted. Optional.          |
+
 ## Replica
 
 | Field                        | Description                                 |
