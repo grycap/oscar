@@ -13,7 +13,7 @@ functions:
          JUPYTER_DIRECTORY: "/mnt"
      mount:
        storage_provider: minio.default
-       path: /prueba
+       path: /notebook
      expose:
       min_scale: 1
       max_scale: 1
