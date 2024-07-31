@@ -1,8 +1,10 @@
-# Mount
+# Mounting external storage on service volumes
 
-This feature mounts a folder (in MinIO, called a bucket) of a storage service inside the OSCAR service. This mount feature can only be used in the OSCAR service execution type of asynchronous and exposed service. So, the invocation of an OSCAR service will see the content of the storage services under the folder `/mnt/`. OSCAR service can read and write inside the folder. In case the mounted folder is an input for another OSCAR service. Writing a file inside these mounted folders will trigger the second OSCAR service.
+This feature enables the mounting of a folder from a storage provider, such as MinIO or dCache, into the service container. As illustrated in the following diagram, the folder is placed inside the /mnt directory on the container volume, thereby making it accessible to the service. This functionality can be utilized with exposed services, such as those using a Jupyter Notebook, to make the content of the storage bucket accessible directly within the Notebook.
 
-If the storage provider is not the MinIO default `minio.default`, the credentials provider must be defined in [FDL](/fdl). These are the providers available for the mount feature:
+![mount-diagram](images/mount.png)
+
+As OSCAR has the credentials of the default MinIO instance internally, if you want to use a different one or a different storage provider, you need to set these credentials on the service [FDL](/fdl). Currently, the storage providers supported on this functionality are:
 
  - [MinIO provider](/fdl/#minioprovider)
  - [WebDav provider](/fdl/#webdavprovider)
