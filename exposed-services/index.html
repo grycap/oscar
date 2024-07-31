@@ -1109,6 +1109,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mount/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Mount external volumes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../additional-config/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Additional configuration
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1262,7 +1304,6 @@ By exposing an OSCAR service, the AI model weights could be loaded just once, an
 </code></pre>
 <p>Once the service is deployed, you can check if it was created correctly by making an HTTP request to the exposed endpoint: </p>
 <pre><code class="language-bash">https://{oscar_endpoint}/system/services/{service_name}/exposed/{path_resource} 
-
 </code></pre>
 <p>Notice that if you get a <code>502 Bad Gateway</code> error, it is most likely because the specified port on the service does not match the API port.</p>
 <p>Additional options can be defined in the "expose" section of the FDL (some previously mentioned), such as:</p>
@@ -1335,7 +1376,7 @@ By exposing an OSCAR service, the AI model weights could be loaded just once, an
      expose:
       min_scale: 2 
       max_scale: 10 
-      port: 80  
+      api_port: 80  
       cpu_threshold: 50 
 </code></pre>
 <p>In case you use the NGINX example above in your <a href="https://docs.oscar.grycap.net/local-testing/">local OSCAR cluster</a>, you will see the nginx welcome page in: <code>http://localhost/system/services/nginx/exposed/</code>.
