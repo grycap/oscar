@@ -276,10 +276,11 @@ func checkAdditionalConfig(configName string, configNamespace string, service ty
 
 	if len(additionalConfig.Images.AllowedPrefixes) > 0 {
 		for _, prefix := range additionalConfig.Images.AllowedPrefixes {
-			if !strings.Contains(service.Image, prefix) {
-				return fmt.Errorf("image %s is not allowed for pull on the cluster. Check the additional configuration file on '%s'", service.Image, cfg.AdditionalConfigPath)
+			if strings.Contains(service.Image, prefix) {
+				return nil
 			}
 		}
+		return fmt.Errorf("image %s is not allowed for pull on the cluster. Check the additional configuration file on '%s'", service.Image, cfg.AdditionalConfigPath)
 	}
 
 	return nil
