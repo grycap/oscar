@@ -212,6 +212,6 @@ storage_providers:
 
 | Field                     | Description               |
 | ------------------------- | ------------------------- |
-| `hostname` </br> *string* | Provider hostname         |
+| `hostname` </br> *string* | Provider hostname. It only works with `https` protocol. Skip the protocol.       |
 | `login` </br> *string*    | Provider account username |
 | `password` </br> *string* | Provider account password |

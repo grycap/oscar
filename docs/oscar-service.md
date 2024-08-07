@@ -43,3 +43,32 @@ You can follow one of the
 in order to test the OSCAR framework for specific applications. We recommend
 you to start with the
 [plant classification example](https://github.com/grycap/oscar/tree/master/examples/plant-classification-sync).
+
+
+### External Storage Providers
+
+[FaaS Supervisor](https://github.com/grycap/faas-supervisor), download the input file and upload the output file. There are multiple Storage available to interact with. Each [Storage](/fdl/#storageproviders) has parameters, an authentication process, and particularities.
+
+#### MinIO
+
+OSCAR installs a MinIO inside the cluster. This default MinIO can be referenced as `minio` or `minio.default` in the input and output parameters of the [OSCAR service](/fdl/#service). Suppose you define a new MinIO cluster in the [storage provider](/fdl/#minioprovider). You can use a MinIO outside the cluster. MinIO Storage works as input or output without any other third-party software. Also, MinIO can make a [bucket replication](/minio-bucket-replication/) between two buckets.
+
+
+#### dCache
+
+[dCache](https://dcache.org/) use [WebDAV protocol](/fdl/#webdavprovider). dCache works as an output storage without any other third-party software. However, [DCNiOS](https://intertwin-eu.github.io/dcnios/) is necessary for input storage.
+
+The EGI check-in authentication process is not available.
+
+
+#### S3
+
+You have to pass the AWS credentials to the FaaS Supervisor by defining them in the environment variables with the keys `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_DEFAULT_REGION`. S3 works as an output storage system without any third-party software. But [DCNiOS](https://intertwin-eu.github.io/dcnios/) is necessary as input storage.
+
+
+#### ONEDATA
+
+[ONEDATA](https://onedata.org) is a global data access solution for science that only works as an output storage provider.
+Check the [ONEDATA Storage provider](/fdl/#onedataprovider) for more information.
+
+![Storage](/images/storage.png)
