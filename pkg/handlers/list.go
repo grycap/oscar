@@ -19,6 +19,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -46,16 +47,19 @@ func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 
 			var allowedServicesForUser []*types.Service
 			for _, service := range services {
-				if len(service.AllowedUsers) == 0 {
+				/*if len(service.AllowedUsers) == 0 {
 					allowedServicesForUser = append(allowedServicesForUser, service)
 					continue
+				}*/
+				if len(service.AllowedUsers) == 0 || slices.Contains(service.AllowedUsers, uid) {
+					allowedServicesForUser = append(allowedServicesForUser, service)
 				}
-				for _, id := range service.AllowedUsers {
+				/*for _, id := range service.AllowedUsers {
 					if uid == id {
 						allowedServicesForUser = append(allowedServicesForUser, service)
 						break
 					}
-				}
+				}*/
 			}
 
 			c.JSON(http.StatusOK, allowedServicesForUser)

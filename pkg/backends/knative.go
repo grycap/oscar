@@ -24,6 +24,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/goccy/go-yaml"
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
 	"github.com/grycap/oscar/v3/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,6 +77,31 @@ func (kn *KnativeBackend) GetInfo() *types.ServerlessBackendInfo {
 // ListServices returns a slice with all services registered in the provided namespace
 func (kn *KnativeBackend) ListServices() ([]*types.Service, error) {
 	// Get the list with all Knative services
+	list, err := listServicesConfigMap(kn.namespace, kn.kubeClientset)
+	if err != nil {
+		log.Printf("WARNING: %v\n", err)
+	}
+	services := []*types.Service{}
+
+	for _, configMap := range list.Items {
+		serviceAux := &types.Service{}
+
+		// Unmarshal the FDL stored in the configMap
+		if err = yaml.Unmarshal([]byte(configMap.Data[types.FDLFileName]), serviceAux); err != nil {
+			return nil, fmt.Errorf("the FDL cannot be read Unmarshal error: \"%s\"", configMap.Data[types.FDLFileName])
+		}
+		if serviceAux.Name != "" {
+			// Add the script to the service from configmap's script value
+			serviceAux.Script = configMap.Data[types.ScriptFileName]
+			services = append(services, serviceAux)
+		}
+	}
+
+	/*return service, nil
+
+	if err != nil {
+		log.Printf("WARNING: %v\n", err)
+	}
 	knSvcs, err := kn.knClientset.ServingV1().Services(kn.namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -91,7 +117,7 @@ func (kn *KnativeBackend) ListServices() ([]*types.Service, error) {
 			services = append(services, svc)
 		}
 	}
-
+	*/
 	return services, nil
 }
 

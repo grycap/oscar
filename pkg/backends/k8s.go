@@ -364,6 +364,14 @@ func deleteServiceConfigMap(name string, namespace string, kubeClientset kuberne
 	return nil
 }
 
+func listServicesConfigMap(namespace string, kubeClientset kubernetes.Interface) (*v1.ConfigMapList, error) {
+	list, err := kubeClientset.CoreV1().ConfigMaps(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
 func deleteServiceJobs(name string, namespace string, kubeClientset kubernetes.Interface) error {
 	// ListOptions to select all the associated jobs with the specified service
 	listOpts := metav1.ListOptions{
