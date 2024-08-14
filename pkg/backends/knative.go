@@ -80,6 +80,7 @@ func (kn *KnativeBackend) ListServices() ([]*types.Service, error) {
 	list, err := listServicesConfigMap(kn.namespace, kn.kubeClientset)
 	if err != nil {
 		log.Printf("WARNING: %v\n", err)
+		return nil, err
 	}
 	services := []*types.Service{}
 
