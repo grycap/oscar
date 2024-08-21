@@ -70,7 +70,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
 		// Service is created by an EGI user
-		createLogger.Printf("Admin: %t", isAdminUser)
 
 		if !isAdminUser {
 			uid, err := auth.GetUIDFromContext(c)
