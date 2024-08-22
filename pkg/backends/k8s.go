@@ -57,28 +57,21 @@ func (k *KubeBackend) GetInfo() *types.ServerlessBackendInfo {
 
 // ListServices returns a slice with all services registered in the provided namespace
 func (k *KubeBackend) ListServices() ([]*types.Service, error) {
-	// Get the list with all podTemplates
-	podTemplates, err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).List(context.TODO(), metav1.ListOptions{})
+	// Get the list with all Knative services
+	configmaps, err := getAllServicesConfigMaps(k.namespace, k.kubeClientset)
 	if err != nil {
+		log.Printf("WARNING: %v\n", err)
 		return nil, err
 	}
-
 	services := []*types.Service{}
-	for _, podTemplate := range podTemplates.Items {
-		// Get service from configMap's FDL
-		// Get the configMap of the Service
-		cm, err := k.kubeClientset.CoreV1().ConfigMaps(k.namespace).Get(context.TODO(), podTemplate.Name, metav1.GetOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", &podTemplate.Name)
-		}
-		svc, err := getServiceFromConfigMap(cm)
-		if err != nil {
-			log.Printf("WARNING: %v\n", err)
-		} else {
-			services = append(services, svc)
-		}
-	}
 
+	for _, cm := range configmaps.Items {
+		service, err := getServiceFromConfigMap(&cm)
+		if err != nil {
+			return nil, err
+		}
+		services = append(services, service)
+	}
 	return services, nil
 }
 

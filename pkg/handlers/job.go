@@ -98,36 +98,22 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			return
 		}
 
-		// Make event envVar
+		// Initialize event envVar and args var
 		event := v1.EnvVar{}
-
 		var args []string
+
 		if cfg.InterLinkAvailable && service.InterLinkNodeName != "" {
-			command, event, args, _ = types.SetInterlinkJob(podSpec, service, cfg, eventBytes)
-			/*event = v1.EnvVar{
-				Name:  types.EventVariable,
-				Value: base64.StdEncoding.EncodeToString([]byte(eventBytes)),
-			}
-			args = fmt.Sprintf("\"  wget %s -O %s && chmod 0755 %s  &&   echo \\$%s | base64 -d | %s  \"", cfg.SupervisorURL, SupervisorPath, SupervisorPath, types.EventVariable, SupervisorPath)
-			podSpec.NodeSelector = map[string]string{
-				NodeSelectorKey: service.InterLinkNodeName,
-			}
-			podSpec.DNSPolicy = InterLinkDNSPolicy
-			podSpec.RestartPolicy = InterLinkRestartPolicy
-			podSpec.Tolerations = []v1.Toleration{
-				{
-					Key:      InterLinkTolerationKey,
-					Operator: InterLinkTolerationOperator,
-				},
-			}*/
+			command, event, args = types.SetInterlinkJob(podSpec, service, cfg, eventBytes)
 		} else {
-			event = v1.EnvVar{
-				Name:  types.EventVariable,
-				Value: string(eventBytes),
-			}
+
 			if service.Mount.Provider != "" {
 				args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath()) + ";echo \"I finish\" > /tmpfolder/finish-file;"}
+				types.SetMount(podSpec, *service, cfg)
 			} else {
+				event = v1.EnvVar{
+					Name:  types.EventVariable,
+					Value: string(eventBytes),
+				}
 				args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath())}
 			}
 		}
@@ -159,10 +145,6 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, jobUUIDVar)
 				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, resourceIDVar)
 			}
-		}
-		if service.Mount.Provider != "" {
-			types.SetMount(podSpec, *service, cfg)
-			//podSpec.Containers[0].Args = []string{"-c", args + ";echo \"I finish\" > /tmpfolder/finish-file;"}
 		}
 
 		// Delegate job if can't be scheduled and has defined replicas
