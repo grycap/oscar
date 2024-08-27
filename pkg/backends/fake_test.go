@@ -195,6 +195,9 @@ func TestFakeUpdateService(t *testing.T) {
 }
 
 func TestFakeDeleteService(t *testing.T) {
+	testService := types.Service{
+		Name: "test",
+	}
 	scenarios := []struct {
 		name        string
 		returnError bool
@@ -217,7 +220,7 @@ func TestFakeDeleteService(t *testing.T) {
 				back.AddError("DeleteService", errFake)
 			}
 
-			err := back.DeleteService("test")
+			err := back.DeleteService(testService)
 
 			if s.returnError {
 				if err == nil {

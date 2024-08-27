@@ -26,7 +26,6 @@ import (
 
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
 	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -98,10 +97,14 @@ func (kn *KnativeBackend) ListServices() ([]*types.Service, error) {
 
 // CreateService creates a new service as a Knative service
 func (kn *KnativeBackend) CreateService(service types.Service) error {
-	// Validate the input variables of the service
-	service = utils.ValidateService(service)
+
+	// Check if there is some user defined settings for OSCAR
+	err := checkAdditionalConfig(ConfigMapNameOSCAR, kn.namespace, service, kn.config, kn.kubeClientset)
+	if err != nil {
+		return err
+	}
 	// Create the configMap with FDL and user-script
-	err := createServiceConfigMap(&service, kn.namespace, kn.kubeClientset)
+	err = createServiceConfigMap(&service, kn.namespace, kn.kubeClientset)
 	if err != nil {
 		return err
 	}
@@ -127,20 +130,8 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 	}
 
 	//Create an expose service
-	if service.Expose.Port != 0 {
-		exposeConf := utils.Expose{
-			Name:         service.Name,
-			NameSpace:    kn.namespace,
-			Variables:    service.Environment.Vars,
-			Image:        service.Image,
-			Port:         service.Expose.Port,
-			MaxScale:     service.Expose.MaxScale,
-			MinScale:     service.Expose.MinScale,
-			CpuThreshold: service.Expose.CpuThreshold,
-			EnableSGX:    service.EnableSGX,
-		}
-		utils.CreateExpose(exposeConf, kn.kubeClientset, *kn.config)
-
+	if service.Expose.APIPort != 0 {
+		types.CreateExpose(service, kn.kubeClientset, kn.config)
 	}
 	//Create deaemonset to cache the service image on all the nodes
 	if service.ImagePrefetch {
@@ -171,13 +162,18 @@ func (kn *KnativeBackend) ReadService(name string) (*types.Service, error) {
 
 // UpdateService updates an existent service
 func (kn *KnativeBackend) UpdateService(service types.Service) error {
+
+	// Check if there is some user defined settings for OSCAR
+	err := checkAdditionalConfig(ConfigMapNameOSCAR, kn.namespace, service, kn.config, kn.kubeClientset)
+	if err != nil {
+		return err
+	}
+
 	// Get the old knative service
 	oldSvc, err := kn.knClientset.ServingV1().Services(kn.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	// Validate the input variables of the service
-	service = utils.ValidateService(service)
 	// Get the old service's configMap
 	oldCm, err := kn.kubeClientset.CoreV1().ConfigMaps(kn.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
@@ -219,29 +215,24 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		return err
 	}
 
-	//Update an expose service
-	exposeConf := utils.Expose{
-		Name:         service.Name,
-		NameSpace:    kn.namespace,
-		Variables:    service.Environment.Vars,
-		Image:        service.Image,
-		Port:         service.Expose.Port,
-		MaxScale:     service.Expose.MaxScale,
-		MinScale:     service.Expose.MinScale,
-		CpuThreshold: service.Expose.CpuThreshold,
-		EnableSGX:    service.EnableSGX,
+	// If the service is exposed update its configuration
+	if service.Expose.APIPort != 0 {
+		err = types.UpdateExpose(service, kn.kubeClientset, kn.config)
+		if err != nil {
+			return err
+		}
 	}
-	utils.UpdateExpose(exposeConf, kn.kubeClientset, *kn.config)
 
 	return nil
 }
 
 // DeleteService deletes a service
-func (kn *KnativeBackend) DeleteService(name string) error {
+func (kn *KnativeBackend) DeleteService(service types.Service) error {
+
+	name := service.Name
 	if err := kn.knClientset.ServingV1().Services(kn.namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		return err
 	}
-
 	// Delete the service's configMap
 	if delErr := deleteServiceConfigMap(name, kn.namespace, kn.kubeClientset); delErr != nil {
 		log.Println(delErr.Error())
@@ -251,13 +242,12 @@ func (kn *KnativeBackend) DeleteService(name string) error {
 	if err := deleteServiceJobs(name, kn.namespace, kn.kubeClientset); err != nil {
 		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
 	}
-	exposeConf := utils.Expose{
-		Name:      name,
-		NameSpace: kn.namespace,
-		Port:      80,
-	}
-	if err2 := utils.DeleteExpose(exposeConf, kn.kubeClientset); err2 != nil {
-		log.Printf("Error deleting all associated kubernetes component of an exposed service \"%s\": %v\n", name, err2)
+
+	// If service is exposed delete the exposed k8s components
+	if service.Expose.APIPort != 0 {
+		if err := types.DeleteExpose(name, kn.kubeClientset, kn.config); err != nil {
+			log.Printf("Error deleting all associated kubernetes component of an exposed service \"%s\": %v\n", name, err)
+		}
 	}
 
 	return nil

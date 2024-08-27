@@ -258,10 +258,14 @@ func isOIDCAuthorised(c *gin.Context, back types.ServerlessBackend, serviceName 
 		}
 
 		var isAllowed bool
-		for _, id := range service.AllowedUsers {
-			if uid == id {
-				isAllowed = true
-				break
+		if len(service.AllowedUsers) == 0 {
+			isAllowed = true
+		} else {
+			for _, id := range service.AllowedUsers {
+				if uid == id {
+					isAllowed = true
+					break
+				}
 			}
 		}
 

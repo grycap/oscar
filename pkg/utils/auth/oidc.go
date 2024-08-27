@@ -109,8 +109,9 @@ func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *ut
 		uid := ui.subject
 
 		// Check if exist MinIO user in cached users list
-		exists := mc.UserExists(uid)
-		if !exists {
+		minioUserExists := mc.UserExists(uid)
+
+		if !minioUserExists {
 			sk, err := GenerateRandomKey(SecretKeyLength)
 			if err != nil {
 				oidcLogger.Println("Error generating random key for MinIO user")

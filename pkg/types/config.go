@@ -54,6 +54,12 @@ type configVar struct {
 	defaultValue string
 }
 
+type AdditionalConfig struct {
+	Images struct {
+		AllowedPrefixes []string `yaml:"allowed_prefixes"`
+	} `yaml:"images"`
+}
+
 // Config stores the configuration for the OSCAR server
 type Config struct {
 	// MinIOProvider access info
@@ -76,6 +82,9 @@ type Config struct {
 
 	// Parameter used to check if the cluster have GPUs
 	GPUAvailable bool `json:"gpu_available"`
+
+	// Parameter used to check if the cluster have vega nodes
+	InterLinkAvailable bool `json:"interLink_available"`
 
 	// Port used for the ClusterIP k8s service (default: 8080)
 	ServicePort int `json:"-"`
@@ -178,6 +187,12 @@ type Config struct {
 
 	//
 	IngressHost string `json:"-"`
+
+	// Github path of FaaS Supervisor (needed for Interlink config)
+	SupervisorURL string `json:"-"`
+
+	//Path to additional OSCAR configuration setted by users
+	AdditionalConfigPath string `json:"-"`
 }
 
 var configVars = []configVar{
@@ -223,6 +238,8 @@ var configVars = []configVar{
 	{"OIDCSubject", "OIDC_SUBJECT", false, stringType, ""},
 	{"OIDCGroups", "OIDC_GROUPS", false, stringSliceType, ""},
 	{"IngressHost", "INGRESS_HOST", false, stringType, ""},
+	{"SupervisorURL", "SUPERVISOR_URL", false, stringType, "https://github.com/grycap/faas-supervisor/releases/download/1.5.8/supervisor"},
+	{"AdditionalConfigPath", "ADDITIONAL_CONFIG_PATH", false, stringType, "config.yaml"},
 }
 
 func readConfigVar(cfgVar configVar) (string, error) {
@@ -353,4 +370,21 @@ func (cfg *Config) CheckAvailableGPUs(kubeClientset kubernetes.Interface) {
 			return
 		}
 	}
+}
+
+// CheckAvailableInterLink checks if there is a node with the virtual kubelet annotation
+func (cfg *Config) CheckAvailableInterLink(kubeClientset kubernetes.Interface) {
+	nodes, err := kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: "!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master,type=virtual-kubelet"})
+	if err != nil {
+		log.Printf("Error getting list of nodes: %v\n", err)
+	}
+	if len(nodes.Items) > 0 {
+		cfg.InterLinkAvailable = true
+		log.Printf("INFO: InterLink Available")
+	} else {
+		cfg.InterLinkAvailable = false
+		log.Printf("INFO: InterLink Unavailable")
+	}
+	//cfg.InterLinkAvailable = true
+
 }
