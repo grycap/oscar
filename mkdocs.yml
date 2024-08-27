@@ -40,6 +40,8 @@ nav:
 
 - Advanced Features:   
   - MinIO bucket replication: minio-bucket-replication.md
+  - Mount external volumes: mount.md
+  - Additional configuration: additional-config.md
 
 - Development:
   - Documentation: devel-docs.md

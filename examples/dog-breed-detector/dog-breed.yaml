@@ -1,0 +1,17 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: dog-breed-detector
+      memory: 2Gi
+      cpu: '1.0'
+      image: ai4oshub/dogs-breed-detector
+      log_level: CRITICAL
+      vo: [vo of the cluster] # If you are using clusters with EGI authentication
+      script: script.sh
+      allowed_users: [] # Public service
+      input:
+      - storage_provider: minio.default
+        path: dogbreed/input
+      output:
+      - storage_provider: minio.default
+        path: dogbreed/output

@@ -27,7 +27,6 @@ import (
 	autos "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
@@ -53,7 +52,7 @@ An exposed service can be of to types:
 
 // CreateExpose creates all the kubernetes components
 func CreateExpose(service Service, kubeClientset kubernetes.Interface, cfg *Config) error {
-	ExposeLogger.Printf("Creating exposed service: \n%v\n", service)
+	//ExposeLogger.Printf("Creating exposed service: \n%v\n", service)
 	err := createDeployment(service, kubeClientset, cfg)
 	if err != nil {
 		return fmt.Errorf("error creating deployment for exposed service '%s': %v", service.Name, err)
@@ -252,11 +251,6 @@ func getPodTemplateSpec(service Service, cfg *Config) v1.PodTemplateSpec {
 			{
 				Name:          podPortName,
 				ContainerPort: int32(service.Expose.APIPort),
-			},
-		}
-		podSpec.Containers[i].Resources = v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				"cpu": *resource.NewMilliQuantity(500, resource.DecimalSI),
 			},
 		}
 		podSpec.Containers[i].VolumeMounts[0].ReadOnly = false
@@ -516,7 +510,7 @@ func getIngressSpec(service Service, kubeClientset kubernetes.Interface, cfg *Co
 	}
 	annotation := map[string]string{
 		"nginx.ingress.kubernetes.io/rewrite-target": rewriteOption,
-		"kubernetes.io/ingress.class":                "nginx",
+		"spec.ingressClassName":                      "nginx",
 		"nginx.ingress.kubernetes.io/use-regex":      "true",
 	}
 	if service.Expose.SetAuth {
