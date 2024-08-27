@@ -22,10 +22,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,8 +48,30 @@ type DelegatedEvent struct {
 	Event             string `json:"event"`
 }
 
+type GeneralInfo struct {
+	NumberNodes     int64      `json:"numberNodes"`
+	CPUFreeTotal    int64      `json:"cpuFreeTotal"`
+	CPUMaxFree      int64      `json:"cpuMaxFree"`
+	MemoryFreeTotal int64      `json:"memoryFreeTotal"`
+	MemoryMaxFree   int64      `json:"memoryMaxFree"`
+	DetailsNodes    []NodeInfo `json:"detail"`
+}
+
+type NodeInfo struct {
+	NodeName         string `json:"nodeName"`
+	CPUCapacity      string `json:"cpuCapacity"`
+	CPUUsage         string `json:"cpuUsage"`
+	CPUPercentage    string `json:"cpuPercentage"`
+	MemoryCapacity   string `json:"memoryCapacity"`
+	MemoryUsage      string `json:"memoryUsage"`
+	MemoryPercentage string `json:"memoryPercentage"`
+}
+
 // DelegateJob sends the event to a service's replica
 func DelegateJob(service *types.Service, event string, logger *log.Logger) error {
+	//Determine priority level of each replica to delegate
+	getClusterStatus(service)
+
 	// Check if replicas are sorted by priority and sort it if needed
 	if !sort.IsSorted(service.Replicas) {
 		sort.Stable(service.Replicas)
@@ -60,7 +84,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 	}
 
 	for _, replica := range service.Replicas {
-		// Manage if replica.Type is "oscar"
+		// Manage if replica.Type is "oscar" and have the capacity to receive a service
 		if strings.ToLower(replica.Type) == oscarReplicaType {
 			// Check ClusterID is defined in 'Clusters'
 			cluster, ok := service.Clusters[replica.ClusterID]
@@ -275,4 +299,120 @@ func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, e
 	tokenCache[endpoint][replica.ServiceName] = svc.Token
 
 	return svc.Token, nil
+}
+
+func getClusterStatus(service *types.Service) {
+
+	for id, replica := range service.Replicas {
+		// Manage if replica.Type is "oscar"
+		if strings.ToLower(replica.Type) == oscarReplicaType {
+			// Check ClusterID is defined in 'Clusters'
+			cluster, ok := service.Clusters[replica.ClusterID]
+			if !ok {
+				fmt.Printf("Error checking to ClusterID \"%s\": Cluster not defined\n", replica.ClusterID)
+				continue
+			}
+			// Parse the cluster's endpoint URL and add the service's path
+			getJobURL, err := url.Parse(cluster.Endpoint)
+			if err != nil {
+				fmt.Printf("Error parsing the cluster's endpoint URL to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", replica.ClusterID, cluster.Endpoint, err)
+				continue
+			}
+			getJobURL.Path = path.Join(getJobURL.Path, "system", "status")
+
+			// Make request to get status from cluster
+			req, err := http.NewRequest(http.MethodGet, getJobURL.String(), nil)
+			if err != nil {
+				fmt.Printf("Error making request to ClusterID \"%s\": unable to make request: %v\n", replica.ClusterID, err)
+				continue
+			}
+			// Add cluster's basic auth credentials
+			req.SetBasicAuth(cluster.AuthUser, cluster.AuthPassword)
+
+			// Make HTTP client
+			var transport http.RoundTripper = &http.Transport{
+				// Enable/disable SSL verification
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
+			}
+			client := &http.Client{
+				Transport: transport,
+				Timeout:   time.Second * 20,
+			}
+
+			// Send the request
+			res, err := client.Do(req)
+			if err != nil {
+				fmt.Printf("Error getting cluster status to ClusterID \"%s\": unable to send request: %v\n", replica.ClusterID, err)
+				continue
+			}
+
+			// Check status code
+			if res.StatusCode == http.StatusCreated {
+				fmt.Printf("Successful get of cluster status to ClusterID\"%s\"\n", replica.ClusterID)
+				return
+			}
+
+			//Convert cluster status response to JSON
+			var clusterStatus *GeneralInfo
+			err = json.NewDecoder(res.Body).Decode(&clusterStatus)
+			if err != nil {
+				fmt.Println("Error decoding the JSON of the response:", err)
+				continue
+			}
+
+			// CPU has in miliCPU
+			// CPU required to deploy the service
+			serviceCPU, err := strconv.ParseInt(service.CPU, 10, 64)
+			if err != nil {
+				fmt.Println("Error to converter CPU of service to int: ", err)
+				continue
+			}
+
+			maxNodeCPU := clusterStatus.CPUMaxFree
+
+			//Calculate CPU difference to determine whether to delegate a replica to the cluster
+			dist := maxNodeCPU - (1000 * serviceCPU)
+
+			//The priority of delegating the service is set based on the free CPU of the cluster as long as it has free CPU on a node to delegate the service.
+			if dist >= 0 {
+
+				if service.Delegation == "random" {
+					randPriority := rand.Intn(101)
+					service.Replicas[id].Priority = uint(randPriority)
+				} else if service.Delegation == "load-based" {
+					//Map the totalClusterCPU range to a smaller range (input range 0 to 16 cpu to output range 100 to 0 priority)
+					totalClusterCPU := clusterStatus.CPUFreeTotal
+					mappedCPUPriority := mapToRange(totalClusterCPU, 0, 16000, 100, 0)
+					service.Replicas[id].Priority = uint(mappedCPUPriority)
+				} else if service.Delegation == "static" {
+					if service.Replicas[id].Priority > 100 {
+						service.Replicas[id].Priority = 101
+					}
+				} else {
+					fmt.Println("Error when declaring the type of delegation")
+				}
+			} else {
+				if service.Delegation != "static" {
+					service.Replicas[id].Priority = 101
+				}
+
+			}
+
+			fmt.Println(clusterStatus)
+
+		}
+	}
+}
+
+func mapToRange(value, minInput, maxInput, maxOutput, minOutput int64) int {
+	mappedValue := maxOutput - (maxOutput-minOutput)*(value-minInput)/(maxInput-minInput)
+	mappedInt := int(mappedValue)
+	if mappedInt > int(maxOutput) {
+		mappedInt = int(maxOutput)
+	}
+	if mappedInt < int(minOutput) {
+		mappedInt = int(minOutput)
+	}
+
+	return mappedInt
 }

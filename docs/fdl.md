@@ -86,7 +86,7 @@ storage_providers:
 | `name` </br> *string*                                             | The name of the service                                                                                                                                                                                                                                      |
 | `cluster_id` </br> *string*                                       | Identifier for the current cluster, used to specify the cluster's StorageProvider in job delegations. OSCAR-CLI sets it using the _cluster_id_ from the FDL. Optional. (default: "")                                                                            |
 | `image` </br> *string*                                            | Docker image for the service                                                                                                    |
-| `vo` </br> *string*                                               | Virtual Organization (VO) in which the user creating the service is enrolled. Optional (default: "")                                                             |
+| `vo` </br> *string*                                               | Virtual Organization (VO) in which the user creating the service is enrolled. (Required for multitenancy)                                                             |
 | `allowed_users` </br> *string array*                    | Array of EGI UIDs to grant specific user permissions on the service. If empty, the service is considered as accesible to all the users with access to the OSCAR cluster. (Enabled since OSCAR version v3.0.0).                                                                                                                                                                |
 | `alpine` </br> *boolean*                                          | Set if the Docker image is based on Alpine. If `true`, a custom release of the [faas-supervisor](https://github.com/grycap/faas-supervisor) will be used. Optional (default: false)                                                                                                                   |
 | `script` </br> *string*                                           | Local path to the user script to be executed inside the container created out of the service invocation                                                                                                                                                                                        |
@@ -130,6 +130,12 @@ storage_providers:
 | `set_auth` </br> *bool* | Create credentials for the service, composed of the service name as the user and the service token as the password. (default: false). Optional.  |
 | `rewrite_target` </br> *bool* | Target the URI where the traffic is redirected. (default: false). Optional.  |
 | `default_command` </br> *bool* | Select between executing the container's default command and executing the script inside the container. (default: false). Optional.  |
+
+## MountSettings
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
+| `storage_provider` </br> *string*  | Identifier of the storage provider. Optional.          |
+| `path` </br> *string*  | Path to the folder that will be mounted. Optional.          |
 
 ## Replica
 
