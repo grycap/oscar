@@ -16,7 +16,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.30">
+      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.33">
     
     
       
@@ -540,6 +540,15 @@
   <a href="#inputoutput" class="md-nav__link">
     <span class="md-ellipsis">
       Input/Output
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#container-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      Container images
     </span>
   </a>
   
@@ -1303,6 +1312,9 @@ script through the <code>$INPUT_FILE_PATH</code> environment variable.</p>
     to <code>CRITICAL</code>.</strong></li>
 </ol>
 <p>This way users can adapt OSCAR's services to their own needs.</p>
+<h3 id="container-images">Container images</h3>
+<p>Container images on asynchronous services use the tag <code>imagePullPolicy: Always</code>, which means that Kubernetes will check for the image digest on the image registry and download it if it is not present.
+So, if you are using an image without a specific tag or with the latest tag, the service will automatically download and use the most recent version of the image on its executions, whenever the image is updated.</p>
 <p>You can follow one of the
 <a href="https://github.com/grycap/oscar/tree/master/examples">examples</a>
 in order to test the OSCAR framework for specific applications. We recommend
@@ -1361,7 +1373,7 @@ you to start with the
     <script id="__config" type="application/json">{"base": "..", "features": ["instant", "toc.integrate", "content.code.copy"], "search": "../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.fe8b6f2b.min.js"></script>
+      <script src="../assets/javascripts/bundle.af256bd8.min.js"></script>
       
     
   </body>
