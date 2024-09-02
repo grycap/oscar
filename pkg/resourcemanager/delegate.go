@@ -378,17 +378,17 @@ func getClusterStatus(service *types.Service) {
 						randPriority := rand.Intn(101)
 						service.Replicas[id].Priority = uint(randPriority)
 					} else if service.Delegation == "load-based" {
-						//Map the totalClusterCPU range to a smaller range (input range 0 to 16 cpu to output range 100 to 0 priority)
+						//Map the totalClusterCPU range to a smaller range (input range 0 to 32 cpu to output range 100 to 0 priority)
 						totalClusterCPU := clusterStatus.CPUFreeTotal
-						mappedCPUPriority := mapToRange(totalClusterCPU, 0, 16000, 100, 0)
+						mappedCPUPriority := mapToRange(totalClusterCPU, 0, 32000, 100, 0)
 						service.Replicas[id].Priority = uint(mappedCPUPriority)
 					} else if service.Delegation == "static" {
 						if service.Replicas[id].Priority > 100 {
 							service.Replicas[id].Priority = 101
 						}
 					} else {
-						fmt.Println("Error when declaring the type of delegation")
 						service.Replicas[id].Priority = 101
+						fmt.Println("Error when declaring the type of delegation")
 					}
 				} else {
 					if service.Delegation != "static" {
@@ -397,13 +397,15 @@ func getClusterStatus(service *types.Service) {
 
 				}
 				fmt.Println(clusterStatus)
+
 			} else {
-				fmt.Printf("Error to get of cluster status to ClusterID\"%s\"\n", replica.ClusterID)
 				service.Replicas[id].Priority = 101
+				fmt.Printf("Error to get of cluster status to ClusterID\"%s\"\n", replica.ClusterID)
 			}
 
 		}
 	}
+
 }
 
 func mapToRange(value, minInput, maxInput, maxOutput, minOutput int64) int {
