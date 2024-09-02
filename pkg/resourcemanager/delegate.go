@@ -83,9 +83,9 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 		return fmt.Errorf("error marshalling delegated event: %v", err)
 	}
 
-	for _, replica := range service.Replicas {
+	for i, replica := range service.Replicas {
 		// Manage if replica.Type is "oscar" and have the capacity to receive a service
-		if strings.ToLower(replica.Type) == oscarReplicaType {
+		if strings.ToLower(replica.Type) == oscarReplicaType && service.Replicas[i].Priority < 101 {
 			// Check ClusterID is defined in 'Clusters'
 			cluster, ok := service.Clusters[replica.ClusterID]
 			if !ok {
@@ -349,56 +349,58 @@ func getClusterStatus(service *types.Service) {
 			// Check status code
 			if res.StatusCode == http.StatusCreated {
 				fmt.Printf("Successful get of cluster status to ClusterID\"%s\"\n", replica.ClusterID)
-				return
-			}
 
-			//Convert cluster status response to JSON
-			var clusterStatus *GeneralInfo
-			err = json.NewDecoder(res.Body).Decode(&clusterStatus)
-			if err != nil {
-				fmt.Println("Error decoding the JSON of the response:", err)
-				continue
-			}
+				//Convert cluster status response to JSON
+				var clusterStatus *GeneralInfo
+				err = json.NewDecoder(res.Body).Decode(&clusterStatus)
+				if err != nil {
+					fmt.Println("Error decoding the JSON of the response:", err)
+					continue
+				}
 
-			// CPU has in miliCPU
-			// CPU required to deploy the service
-			serviceCPU, err := strconv.ParseInt(service.CPU, 10, 64)
-			if err != nil {
-				fmt.Println("Error to converter CPU of service to int: ", err)
-				continue
-			}
+				// CPU has in miliCPU
+				// CPU required to deploy the service
+				serviceCPU, err := strconv.ParseInt(service.CPU, 10, 64)
+				if err != nil {
+					fmt.Println("Error to converter CPU of service to int: ", err)
+					continue
+				}
 
-			maxNodeCPU := clusterStatus.CPUMaxFree
+				maxNodeCPU := clusterStatus.CPUMaxFree
 
-			//Calculate CPU difference to determine whether to delegate a replica to the cluster
-			dist := maxNodeCPU - (1000 * serviceCPU)
+				//Calculate CPU difference to determine whether to delegate a replica to the cluster
+				dist := maxNodeCPU - (1000 * serviceCPU)
 
-			//The priority of delegating the service is set based on the free CPU of the cluster as long as it has free CPU on a node to delegate the service.
-			if dist >= 0 {
+				//The priority of delegating the service is set based on the free CPU of the cluster as long as it has free CPU on a node to delegate the service.
+				if dist >= 0 {
 
-				if service.Delegation == "random" {
-					randPriority := rand.Intn(101)
-					service.Replicas[id].Priority = uint(randPriority)
-				} else if service.Delegation == "load-based" {
-					//Map the totalClusterCPU range to a smaller range (input range 0 to 16 cpu to output range 100 to 0 priority)
-					totalClusterCPU := clusterStatus.CPUFreeTotal
-					mappedCPUPriority := mapToRange(totalClusterCPU, 0, 16000, 100, 0)
-					service.Replicas[id].Priority = uint(mappedCPUPriority)
-				} else if service.Delegation == "static" {
-					if service.Replicas[id].Priority > 100 {
+					if service.Delegation == "random" {
+						randPriority := rand.Intn(101)
+						service.Replicas[id].Priority = uint(randPriority)
+					} else if service.Delegation == "load-based" {
+						//Map the totalClusterCPU range to a smaller range (input range 0 to 16 cpu to output range 100 to 0 priority)
+						totalClusterCPU := clusterStatus.CPUFreeTotal
+						mappedCPUPriority := mapToRange(totalClusterCPU, 0, 16000, 100, 0)
+						service.Replicas[id].Priority = uint(mappedCPUPriority)
+					} else if service.Delegation == "static" {
+						if service.Replicas[id].Priority > 100 {
+							service.Replicas[id].Priority = 101
+						}
+					} else {
+						fmt.Println("Error when declaring the type of delegation")
 						service.Replicas[id].Priority = 101
 					}
 				} else {
-					fmt.Println("Error when declaring the type of delegation")
+					if service.Delegation != "static" {
+						service.Replicas[id].Priority = 101
+					}
+
 				}
+				fmt.Println(clusterStatus)
 			} else {
-				if service.Delegation != "static" {
-					service.Replicas[id].Priority = 101
-				}
-
+				fmt.Printf("Error to get of cluster status to ClusterID\"%s\"\n", replica.ClusterID)
+				service.Replicas[id].Priority = 101
 			}
-
-			fmt.Println(clusterStatus)
 
 		}
 	}
