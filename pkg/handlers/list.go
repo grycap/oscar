@@ -43,23 +43,14 @@ func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 			uid, err := auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+				return
 			}
 
 			var allowedServicesForUser []*types.Service
 			for _, service := range services {
-				/*if len(service.AllowedUsers) == 0 {
-					allowedServicesForUser = append(allowedServicesForUser, service)
-					continue
-				}*/
 				if len(service.AllowedUsers) == 0 || slices.Contains(service.AllowedUsers, uid) {
 					allowedServicesForUser = append(allowedServicesForUser, service)
 				}
-				/*for _, id := range service.AllowedUsers {
-					if uid == id {
-						allowedServicesForUser = append(allowedServicesForUser, service)
-						break
-					}
-				}*/
 			}
 
 			c.JSON(http.StatusOK, allowedServicesForUser)

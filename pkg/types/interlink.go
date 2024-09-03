@@ -26,9 +26,8 @@ const (
 	ContainerSupervisorName = "supervisor-container"
 	SupervisorMountPath     = "/data"
 	SupervisorArg           = "cp -r /supervisor/* " + SupervisorMountPath
-	//SupervisorCommand       = [...]string{"/bin/sh", "-c"}
-	NameSupervisorVolume = "supervisor-share-data"
-	NodeSelectorKey      = "kubernetes.io/hostname"
+	NameSupervisorVolume    = "supervisor-share-data"
+	NodeSelectorKey         = "kubernetes.io/hostname"
 
 	// Annotations for InterLink nodes
 	InterLinkDNSPolicy          = "ClusterFirst"
@@ -40,8 +39,8 @@ const (
 var SupervisorCommand = []string{"/bin/sh", "-c"}
 var OscarContainerCommand = []string{"echo $EVENT | base64 -d | " + SupervisorMountPath + "/supervisor"}
 
-// // job
-func SetInterlinkJob(podSpec *v1.PodSpec, service *Service, cfg *Config, eventBytes []byte) ([]string, v1.EnvVar, []string, error) {
+// SetInterlinkJob Return interlink configuration for kubernetes job and add Interlink variables to podSpec
+func SetInterlinkJob(podSpec *v1.PodSpec, service *Service, cfg *Config, eventBytes []byte) ([]string, v1.EnvVar, []string) {
 	command := SupervisorCommand
 	event := v1.EnvVar{
 		Name:  EventVariable,
@@ -61,11 +60,11 @@ func SetInterlinkJob(podSpec *v1.PodSpec, service *Service, cfg *Config, eventBy
 	}
 
 	addInitContainer(podSpec, cfg)
-	return command, event, args, nil
+	return command, event, args
 }
 
-// / service
-func SetInterlinkService(podSpec *v1.PodSpec) error {
+// SetInterlinkService Add InterLink configuration to podSpec
+func SetInterlinkService(podSpec *v1.PodSpec) {
 	podSpec.Containers[0].ImagePullPolicy = "Always"
 	shareDataVolumeMount := v1.VolumeMount{
 		Name:      NameSupervisorVolume,
@@ -81,11 +80,10 @@ func SetInterlinkService(podSpec *v1.PodSpec) error {
 		},
 	}
 	podSpec.Volumes = append(podSpec.Volumes, shareDataVolume)
-	return nil
 
 }
 
-func addInitContainer(podSpec *v1.PodSpec, cfg *Config) error {
+func addInitContainer(podSpec *v1.PodSpec, cfg *Config) {
 	initContainer := v1.Container{
 		Name:            ContainerSupervisorName,
 		Command:         SupervisorCommand,
@@ -100,5 +98,4 @@ func addInitContainer(podSpec *v1.PodSpec, cfg *Config) error {
 		},
 	}
 	podSpec.InitContainers = []v1.Container{initContainer}
-	return nil
 }
