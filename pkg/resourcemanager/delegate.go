@@ -309,12 +309,14 @@ func getClusterStatus(service *types.Service) {
 			// Check ClusterID is defined in 'Clusters'
 			cluster, ok := service.Clusters[replica.ClusterID]
 			if !ok {
+				replica.Priority = 101
 				fmt.Printf("Error checking to ClusterID \"%s\": Cluster not defined\n", replica.ClusterID)
 				continue
 			}
 			// Parse the cluster's endpoint URL and add the service's path
 			getStatusURL, err := url.Parse(cluster.Endpoint)
 			if err != nil {
+				replica.Priority = 101
 				fmt.Printf("Error parsing the cluster's endpoint URL to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", replica.ClusterID, cluster.Endpoint, err)
 				continue
 			}
@@ -323,6 +325,7 @@ func getClusterStatus(service *types.Service) {
 			// Make request to get status from cluster
 			req, err := http.NewRequest(http.MethodGet, getStatusURL.String(), nil)
 			if err != nil {
+				replica.Priority = 101
 				fmt.Printf("Error making request to ClusterID \"%s\": unable to make request: %v\n", replica.ClusterID, err)
 				continue
 			}
@@ -342,6 +345,7 @@ func getClusterStatus(service *types.Service) {
 			// Send the request
 			res, err := client.Do(req)
 			if err != nil {
+				replica.Priority = 101
 				fmt.Printf("Error getting cluster status to ClusterID \"%s\": unable to send request: %v\n", replica.ClusterID, err)
 				continue
 			}
@@ -354,19 +358,21 @@ func getClusterStatus(service *types.Service) {
 				var clusterStatus *GeneralInfo
 				err = json.NewDecoder(res.Body).Decode(&clusterStatus)
 				if err != nil {
+					replica.Priority = 101
 					fmt.Println("Error decoding the JSON of the response:", err)
 					continue
 				}
 
 				// CPU is in miliCPU
 				// CPU required to deploy the service
-				serviceCPU, err := strconv.ParseInt(service.CPU, 10, 64)
+				serviceCPU, err := strconv.ParseFloat(service.CPU, 64)
 				if err != nil {
+					replica.Priority = 101
 					fmt.Println("Error to converter CPU of service to int: ", err)
 					continue
 				}
 
-				maxNodeCPU := clusterStatus.CPUMaxFree
+				maxNodeCPU := float64(clusterStatus.CPUMaxFree)
 
 				//Calculate CPU difference to determine whether to delegate a replica to the cluster
 				dist := maxNodeCPU - (1000 * serviceCPU)
@@ -388,13 +394,13 @@ func getClusterStatus(service *types.Service) {
 						}
 					} else {
 						replica.Priority = 101
-						fmt.Println("Error when declaring the type of delegation")
+						fmt.Println("Error when declaring the type of delegation in ClusterID ", replica.ClusterID)
+						continue
 					}
 				} else {
-					if service.Delegation != "static" {
-						replica.Priority = 101
-					}
-
+					fmt.Println("No CPU capacity to delegate job in ClusterID ", replica.ClusterID)
+					replica.Priority = 101
+					continue
 				}
 				fmt.Println(clusterStatus)
 
