@@ -307,7 +307,7 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 	}
 	if cfg.InterLinkAvailable && service.InterLinkNodeName != "" {
 		// Add specs of InterLink
-		podSpec.Containers[0].ImagePullPolicy = "Always"
+		SetInterlinkService(podSpec)
 	} else {
 		// Add specs
 		volumeMount := v1.VolumeMount{
