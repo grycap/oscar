@@ -48,8 +48,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
-			newService.Owner = "cluster_admin"
-			createLogger.Printf("Updating service for user: %s", newService.Owner)
+			createLogger.Printf("[*] Updating service as admin user")
 		}
 		// Read the current service
 		oldService, err := back.ReadService(newService.Name)
@@ -90,10 +89,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					}
 				}
 			}
-		} else {
-			newService.Owner = oldService.Owner
 		}
-
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 		// Update the service
 		if err := back.UpdateService(newService); err != nil {
