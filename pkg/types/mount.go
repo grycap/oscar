@@ -49,8 +49,6 @@ done`
 // SetMount Creates the sidecar container that mounts the source volume onto the pod volume
 func SetMount(podSpec *v1.PodSpec, service Service, cfg *Config) {
 	podSpec.Containers = append(podSpec.Containers, sidecarPodSpec(service))
-	termination := int64(5)
-	podSpec.TerminationGracePeriodSeconds = &termination
 	addVolume(podSpec)
 }
 

@@ -70,10 +70,12 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
 		// Service is created by an EGI user
+
 		if !isAdminUser {
 			uid, err := auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+				return
 			}
 
 			// Set UID from owner
@@ -83,6 +85,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			mc, err := auth.GetMultitenancyConfigFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+				return
 			}
 
 			full_uid := auth.FormatUID(uid)
@@ -93,6 +96,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						err := checkIdentity(&service, cfg, authHeader)
 						if err != nil {
 							c.String(http.StatusBadRequest, fmt.Sprintln(err))
+							return
 						}
 						break
 					}

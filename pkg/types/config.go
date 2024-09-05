@@ -189,7 +189,7 @@ type Config struct {
 	IngressHost string `json:"-"`
 
 	// Github path of FaaS Supervisor (needed for Interlink config)
-	SupervisorURL string `json:"-"`
+	SupervisorKitImage string `json:"-"`
 
 	//Path to additional OSCAR configuration setted by users
 	AdditionalConfigPath string `json:"-"`
@@ -238,7 +238,7 @@ var configVars = []configVar{
 	{"OIDCSubject", "OIDC_SUBJECT", false, stringType, ""},
 	{"OIDCGroups", "OIDC_GROUPS", false, stringSliceType, ""},
 	{"IngressHost", "INGRESS_HOST", false, stringType, ""},
-	{"SupervisorURL", "SUPERVISOR_URL", false, stringType, "https://github.com/grycap/faas-supervisor/releases/download/1.5.8/supervisor"},
+	{"SupervisorKitImage", "SUPERVISOR_KIT_IMAGE", false, stringType, ""},
 	{"AdditionalConfigPath", "ADDITIONAL_CONFIG_PATH", false, stringType, "config.yaml"},
 }
 
