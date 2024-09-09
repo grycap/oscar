@@ -37,6 +37,7 @@ import (
 const (
 	oscarReplicaType    = "oscar"
 	endpointReplicaType = "endpoint"
+	noDelegateCode      = 101
 )
 
 // tokenCache map to store tokens from services and endpoints -> [CLUSTER_ENDPOINT][SERVICE_NAME]
@@ -85,7 +86,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 
 	for _, replica := range service.Replicas {
 		// Manage if replica.Type is "oscar" and have the capacity to receive a service
-		if strings.ToLower(replica.Type) == oscarReplicaType && replica.Priority < 101 {
+		if strings.ToLower(replica.Type) == oscarReplicaType && replica.Priority < noDelegateCode {
 			// Check ClusterID is defined in 'Clusters'
 			cluster, ok := service.Clusters[replica.ClusterID]
 			if !ok {
@@ -309,14 +310,14 @@ func getClusterStatus(service *types.Service) {
 			// Check ClusterID is defined in 'Clusters'
 			cluster, ok := service.Clusters[replica.ClusterID]
 			if !ok {
-				replica.Priority = 101
+				replica.Priority = noDelegateCode
 				fmt.Printf("Error checking to ClusterID \"%s\": Cluster not defined\n", replica.ClusterID)
 				continue
 			}
 			// Parse the cluster's endpoint URL and add the service's path
 			getStatusURL, err := url.Parse(cluster.Endpoint)
 			if err != nil {
-				replica.Priority = 101
+				replica.Priority = noDelegateCode
 				fmt.Printf("Error parsing the cluster's endpoint URL to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", replica.ClusterID, cluster.Endpoint, err)
 				continue
 			}
@@ -325,7 +326,7 @@ func getClusterStatus(service *types.Service) {
 			// Make request to get status from cluster
 			req, err := http.NewRequest(http.MethodGet, getStatusURL.String(), nil)
 			if err != nil {
-				replica.Priority = 101
+				replica.Priority = noDelegateCode
 				fmt.Printf("Error making request to ClusterID \"%s\": unable to make request: %v\n", replica.ClusterID, err)
 				continue
 			}
@@ -345,7 +346,7 @@ func getClusterStatus(service *types.Service) {
 			// Send the request
 			res, err := client.Do(req)
 			if err != nil {
-				replica.Priority = 101
+				replica.Priority = noDelegateCode
 				fmt.Printf("Error getting cluster status to ClusterID \"%s\": unable to send request: %v\n", replica.ClusterID, err)
 				continue
 			}
@@ -358,7 +359,7 @@ func getClusterStatus(service *types.Service) {
 				var clusterStatus *GeneralInfo
 				err = json.NewDecoder(res.Body).Decode(&clusterStatus)
 				if err != nil {
-					replica.Priority = 101
+					replica.Priority = noDelegateCode
 					fmt.Println("Error decoding the JSON of the response:", err)
 					continue
 				}
@@ -367,7 +368,7 @@ func getClusterStatus(service *types.Service) {
 				// CPU required to deploy the service
 				serviceCPU, err := strconv.ParseFloat(service.CPU, 64)
 				if err != nil {
-					replica.Priority = 101
+					replica.Priority = noDelegateCode
 					fmt.Println("Error to converter CPU of service to int: ", err)
 					continue
 				}
@@ -381,31 +382,27 @@ func getClusterStatus(service *types.Service) {
 				if dist >= 0 {
 
 					if service.Delegation == "random" {
-						randPriority := rand.Intn(101)
+						randPriority := rand.Intn(noDelegateCode)
 						replica.Priority = uint(randPriority)
 					} else if service.Delegation == "load-based" {
 						//Map the totalClusterCPU range to a smaller range (input range 0 to 32 cpu to output range 100 to 0 priority)
 						totalClusterCPU := clusterStatus.CPUFreeTotal
 						mappedCPUPriority := mapToRange(totalClusterCPU, 0, 32000, 100, 0)
 						replica.Priority = uint(mappedCPUPriority)
-					} else if service.Delegation == "static" {
-						if replica.Priority > 100 {
-							replica.Priority = 101
-						}
 					} else {
-						replica.Priority = 101
+						replica.Priority = noDelegateCode
 						fmt.Println("Error when declaring the type of delegation in ClusterID ", replica.ClusterID)
 						continue
 					}
 				} else {
 					fmt.Println("No CPU capacity to delegate job in ClusterID ", replica.ClusterID)
-					replica.Priority = 101
+					replica.Priority = noDelegateCode
 					continue
 				}
 				fmt.Println(clusterStatus)
 
 			} else {
-				replica.Priority = 101
+				replica.Priority = noDelegateCode
 				fmt.Printf("Error to get of cluster status to ClusterID\"%s\"\n", replica.ClusterID)
 			}
 
