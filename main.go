@@ -99,11 +99,14 @@ func main() {
 		clientIP := c.ClientIP()
 		method := c.Request.Method
 		path := c.Request.URL.Path
-		user, _ := c.Get("uidOrigin")
-
+		uidOrigin, _ := c.Get("uidOrigin")
+		user, uidParsed := uidOrigin.(string)
+		if !uidParsed {
+			user = "nil"
+		}
 		// Example of logging custom information
-		log.Printf("[Custom Middleware] %v | %3d | %13v | %s | %-7s %#v\n | %s",
-			time.Now().Format(time.RFC3339), status, latency, clientIP, method, path, user.(string))
+		log.Printf("[Gin logger] %v | %3d | %13v | %s | %-7s %#v\n | %s",
+			time.Now().Format(time.RFC3339), status, latency, clientIP, method, path, user)
 	})
 
 	// Config path
