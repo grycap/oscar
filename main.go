@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/backends"
@@ -80,17 +81,29 @@ func main() {
 	}
 
 	// Create the router
-	r := gin.Default()
+	r := gin.New()
 
 	// Define system group with basic auth middleware
 	system := r.Group("/system", auth.GetAuthMiddleware(cfg, kubeClientset))
 
 	// Add default info onto the default Gin Logger
 	r.Use(func(c *gin.Context) {
-		user, _ := c.Get("uidOrigin")
-		log.Printf("User UID: %s", user)
+		start := time.Now()
 
+		// Process request
 		c.Next()
+
+		// Log custom information after the request is processed
+		latency := time.Since(start)
+		status := c.Writer.Status()
+		clientIP := c.ClientIP()
+		method := c.Request.Method
+		path := c.Request.URL.Path
+		user, _ := c.Get("uidOrigin")
+
+		// Example of logging custom information
+		log.Printf("[Custom Middleware] %v | %3d | %13v | %s | %-7s %#v\n | %s",
+			time.Now().Format(time.RFC3339), status, latency, clientIP, method, path, user.(string))
 	})
 
 	// Config path
