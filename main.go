@@ -85,6 +85,14 @@ func main() {
 	// Define system group with basic auth middleware
 	system := r.Group("/system", auth.GetAuthMiddleware(cfg, kubeClientset))
 
+	// Add default info onto the default Gin Logger
+	r.Use(func(c *gin.Context) {
+		user, _ := c.Get("uidOrigin")
+		log.Printf("User UID: %s", user)
+
+		c.Next()
+	})
+
 	// Config path
 	system.GET("/config", handlers.MakeConfigHandler(cfg))
 
