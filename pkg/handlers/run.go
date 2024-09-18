@@ -47,11 +47,13 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 			c.Status(http.StatusUnauthorized)
 			return
 		}
-		reqToken := strings.TrimSpace(splitToken[1])
-		if reqToken != service.Token {
-			c.Status(http.StatusUnauthorized)
-			return
-		}
+
+		// OLD: Using service token to authenticate
+		// reqToken := strings.TrimSpace(splitToken[1])
+		// if reqToken != service.Token {
+		// 	c.Status(http.StatusUnauthorized)
+		// 	return
+		// }
 
 		proxy := &httputil.ReverseProxy{
 			Director: back.GetProxyDirector(service.Name),

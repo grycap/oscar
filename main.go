@@ -90,9 +90,6 @@ func main() {
 	r.Use(func(c *gin.Context) {
 		start := time.Now()
 
-		// Process request
-		c.Next()
-
 		// Log custom information after the request is processed
 		latency := time.Since(start)
 		status := c.Writer.Status()
@@ -107,6 +104,9 @@ func main() {
 		// Example of logging custom information
 		log.Printf("[Gin logger] %v | %3d | %13v | %s | %-7s %#v\n | %s",
 			time.Now().Format(time.RFC3339), status, latency, clientIP, method, path, user)
+
+		// Process request
+		c.Next()
 	})
 
 	// Config path
