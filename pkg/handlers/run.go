@@ -53,9 +53,10 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 			return
 		}
 
+		// Check if reqToken is the service token
 		rawToken := strings.TrimSpace(splitToken[1])
 		if len(rawToken) == tokenLength {
-			// Check if reqToken is the service token
+
 			if rawToken != service.Token {
 				c.Status(http.StatusUnauthorized)
 				return

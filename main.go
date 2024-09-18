@@ -86,6 +86,10 @@ func main() {
 	// Define system group with basic auth middleware
 	system := r.Group("/system", auth.GetAuthMiddleware(cfg, kubeClientset))
 
+	r.Use(func(c *gin.Context) {
+		c.Set("testVar", "foo")
+	})
+
 	// Add default info onto the default Gin Logger
 	r.Use(func(c *gin.Context) {
 		start := time.Now()
@@ -104,9 +108,12 @@ func main() {
 		if !uidParsed {
 			user = "nil"
 		}
+
+		testVar, _ := c.Get("testVar")
+		foo := testVar.(string)
 		// Example of logging custom information
-		log.Printf("[Gin logger] %v | %3d | %13v | %s | %-7s %#v\n | %s",
-			time.Now().Format(time.RFC3339), status, latency, clientIP, method, path, user)
+		log.Printf("[Gin logger] %v | %3d | %13v | %s | %-7s %#v\n | %s | %s |",
+			time.Now().Format(time.RFC3339), status, latency, clientIP, method, path, user, foo)
 	})
 
 	// Config path
