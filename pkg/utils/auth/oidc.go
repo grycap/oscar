@@ -96,7 +96,7 @@ func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *ut
 		rawToken := strings.TrimPrefix(authHeader, "Bearer ")
 
 		// Check the token
-		if !oidcManager.isAuthorised(rawToken) {
+		if !oidcManager.IsAuthorised(rawToken) {
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
@@ -205,8 +205,8 @@ func (om *oidcManager) GetUID(rawToken string) (string, error) {
 	return "", err
 }
 
-// isAuthorised checks if a token is authorised to access the API
-func (om *oidcManager) isAuthorised(rawToken string) bool {
+// IsAuthorised checks if a token is authorised to access the API
+func (om *oidcManager) IsAuthorised(rawToken string) bool {
 	// Check if the token is valid
 	_, err := om.provider.Verifier(om.config).Verify(context.TODO(), rawToken)
 	if err != nil {
