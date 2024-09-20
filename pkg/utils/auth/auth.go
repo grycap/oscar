@@ -90,7 +90,8 @@ func GetMultitenancyConfigFromContext(c *gin.Context) (*MultitenancyConfig, erro
 func GetUID(cfg *types.Config, rawToken string) string {
 	oidcManager, _ := NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
 	ui, _ := oidcManager.getUserInfo(rawToken)
-
-	return ui.subject
-
+	if ui != nil {
+		return ui.subject
+	}
+	return ""
 }

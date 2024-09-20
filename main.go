@@ -98,6 +98,7 @@ func main() {
 		}
 		rawToken := strings.TrimPrefix(authHeader, "Bearer ")
 		uid := auth.GetUID(cfg, rawToken)
+		fmt.Sprintf("uid :%d", uid)
 		c.Set("uid", uid)
 	})
 
