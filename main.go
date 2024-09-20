@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -87,7 +88,15 @@ func main() {
 	system := r.Group("/system", auth.GetAuthMiddleware(cfg, kubeClientset))
 
 	r.Use(func(c *gin.Context) {
-		c.Set("testVar", "foo")
+		// Get token from headers
+		authHeader := c.GetHeader("Authorization")
+		if !strings.HasPrefix(authHeader, "Bearer ") {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		rawToken := strings.TrimPrefix(authHeader, "Bearer ")
+		uid := auth.GetUID(cfg, rawToken)
+		c.Set("uid", uid)
 	})
 
 	// Add default info onto the default Gin Logger
@@ -103,17 +112,15 @@ func main() {
 		clientIP := c.ClientIP()
 		method := c.Request.Method
 		path := c.Request.URL.Path
-		uidOrigin, _ := c.Get("uidOrigin")
-		user, uidParsed := uidOrigin.(string)
+		uid, _ := c.Get("uid")
+		user, uidParsed := uid.(string)
 		if !uidParsed {
 			user = "nil"
 		}
 
-		testVar, _ := c.Get("testVar")
-		foo := testVar.(string)
 		// Example of logging custom information
-		log.Printf("[Gin logger] %v | %3d | %13v | %s | %-7s %#v\n | %s | %s |",
-			time.Now().Format(time.RFC3339), status, latency, clientIP, method, path, user, foo)
+		log.Printf("[Gin logger] %v | %3d | %13v | %s | %-7s %#v\n | %s",
+			time.Now().Format(time.RFC3339), status, latency, clientIP, method, path, user)
 	})
 
 	// Config path
