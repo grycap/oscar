@@ -88,6 +88,8 @@ func main() {
 	system := r.Group("/system", auth.GetAuthMiddleware(cfg, kubeClientset))
 
 	r.Use(func(c *gin.Context) {
+		// Process request
+		c.Next()
 		// Get token from headers
 		authHeader := c.GetHeader("Authorization")
 		if !strings.HasPrefix(authHeader, "Bearer ") {
