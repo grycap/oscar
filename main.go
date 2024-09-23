@@ -110,7 +110,7 @@ func main() {
 	// Service path for sync invocations (only if ServerlessBackend is enabled)
 	syncBack, ok := back.(types.SyncBackend)
 	if cfg.ServerlessBackend != "" && ok {
-		r.POST("/run/:serviceName", auth.GetLoggerMiddleware(), handlers.MakeRunHandler(cfg, syncBack))
+		r.POST("/run/:serviceName", auth.GetAuthMiddleware(cfg, kubeClientset), auth.GetLoggerMiddleware(), handlers.MakeRunHandler(cfg, syncBack))
 	}
 
 	// System info path
