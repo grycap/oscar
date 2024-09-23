@@ -80,7 +80,7 @@ func main() {
 	}
 
 	// Create the router
-	r := gin.New()
+	r := gin.Default()
 
 	// Define system group with basic auth middleware
 	system := r.Group("/system", auth.GetAuthMiddleware(cfg, kubeClientset))

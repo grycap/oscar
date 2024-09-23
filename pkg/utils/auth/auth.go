@@ -77,7 +77,7 @@ func GetLoggerMiddleware() gin.HandlerFunc {
 		clientIP := c.ClientIP()
 		method := c.Request.Method
 		path := c.Request.URL.Path
-		uid, _ := c.Get("uidOrigni")
+		uid, _ := c.Get("uidOrign")
 		user, uidParsed := uid.(string)
 		if !uidParsed {
 			user = "nil"
