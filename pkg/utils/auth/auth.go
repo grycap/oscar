@@ -18,7 +18,9 @@ package auth
 
 import (
 	"fmt"
+	"log"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -62,6 +64,30 @@ func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.Hand
 	}
 }
 
+func GetLoggerMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+
+		// Process request
+		c.Next()
+
+		// Log custom information after the request is processed
+		latency := time.Since(start)
+		status := c.Writer.Status()
+		clientIP := c.ClientIP()
+		method := c.Request.Method
+		path := c.Request.URL.Path
+		uid, _ := c.Get("uidOrigni")
+		user, uidParsed := uid.(string)
+		if !uidParsed {
+			user = "nil"
+		}
+
+		log.Printf("[Gin logger] %v | %3d | %13v | %s | %-7s %#v\n | %s",
+			time.Now().Format(time.RFC3339), status, latency, clientIP, method, path, user)
+	}
+}
+
 func GetUIDFromContext(c *gin.Context) (string, error) {
 	uidOrigin, uidExists := c.Get("uidOrigin")
 	if !uidExists {
@@ -84,14 +110,4 @@ func GetMultitenancyConfigFromContext(c *gin.Context) (*MultitenancyConfig, erro
 		return nil, fmt.Errorf("Error parsing multitenancy config")
 	}
 	return mc, nil
-}
-
-// Testing: Function to get the uid from the token to use on Gin context
-func GetUID(cfg *types.Config, rawToken string) string {
-	oidcManager, _ := NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
-	ui, _ := oidcManager.getUserInfo(rawToken)
-	if ui != nil {
-		return ui.subject
-	}
-	return ""
 }
