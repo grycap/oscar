@@ -29,6 +29,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/grycap/oscar/v3/pkg/resourcemanager"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -85,10 +86,44 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			c.Status(http.StatusUnauthorized)
 			return
 		}
-		reqToken := strings.TrimSpace(splitToken[1])
-		if reqToken != service.Token {
-			c.Status(http.StatusUnauthorized)
-			return
+
+		// Check if reqToken is the service token
+		rawToken := strings.TrimSpace(splitToken[1])
+		if len(rawToken) == tokenLength {
+
+			if rawToken != service.Token {
+				c.Status(http.StatusUnauthorized)
+				return
+			}
+		} else {
+			oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
+
+			if !oidcManager.IsAuthorised(rawToken) {
+				c.Status(http.StatusUnauthorized)
+				return
+			}
+
+			hasVO, err := oidcManager.UserHasVO(rawToken, service.VO)
+
+			if err != nil {
+				c.String(http.StatusInternalServerError, err.Error())
+				return
+			}
+
+			if !hasVO {
+				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
+				return
+			}
+
+			ui, err := oidcManager.GetUserInfo(rawToken)
+			if err != nil {
+				c.String(http.StatusInternalServerError, err.Error())
+				return
+			}
+			uid := ui.Subject
+			c.Set("uidOrigin", uid)
+			c.Next()
+
 		}
 
 		// Get the event from request body

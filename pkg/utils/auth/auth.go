@@ -66,13 +66,16 @@ func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.Hand
 
 func GetLoggerMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		start := time.Now()
+		startTime := time.Now()
 
 		// Process request
 		c.Next()
 
+		endTime := time.Now()
+
 		// Log custom information after the request is processed
-		latency := time.Since(start)
+		logTime := endTime.Format("2006/01/02 - 15:04:05")
+		latency := time.Since(startTime)
 		status := c.Writer.Status()
 		clientIP := c.ClientIP()
 		method := c.Request.Method
@@ -83,8 +86,8 @@ func GetLoggerMiddleware() gin.HandlerFunc {
 			user = "nil"
 		}
 
-		log.Printf("[Gin logger] %v | %3d | %13v | %s | %-7s %#v\n | %s",
-			time.Now().Format(time.RFC3339), status, latency, clientIP, method, path, user)
+		log.Printf("[GIN] %s | %3d | %13v | %s | %-7s %s | %s",
+			logTime, status, latency, clientIP, method, path, user)
 	}
 }
 
