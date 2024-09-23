@@ -80,6 +80,16 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
 				return
 			}
+
+			ui, err := oidcManager.GetUserInfo(rawToken)
+			if err != nil {
+				c.String(http.StatusInternalServerError, err.Error())
+				return
+			}
+			uid := ui.Subject
+			c.Set("uidOrigin", uid)
+			c.Next()
+
 		}
 
 		proxy := &httputil.ReverseProxy{
