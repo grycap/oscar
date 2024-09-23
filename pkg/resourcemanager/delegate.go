@@ -79,9 +79,11 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 		sort.Stable(service.Replicas)
 		fmt.Println("Replicas Stable: ", service.Replicas)
 	}
-
+	fmt.Println("Event : ", event)
 	delegatedEvent := WrapEvent(service.ClusterID, event)
+	fmt.Println("delegateEvent : ", delegatedEvent)
 	eventJSON, err := json.Marshal(delegatedEvent)
+	fmt.Println("eventJSON : ", eventJSON)
 	if err != nil {
 		return fmt.Errorf("error marshalling delegated event: %v", err)
 	}
