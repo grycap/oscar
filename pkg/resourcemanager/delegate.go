@@ -82,7 +82,6 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 	fmt.Println("Event : ", event)
 
 	delegatedEvent := WrapEvent(service.ClusterID, event)
-	fmt.Println("delegateEvent : ", delegatedEvent)
 
 	eventJSON, err := json.Marshal(delegatedEvent)
 
