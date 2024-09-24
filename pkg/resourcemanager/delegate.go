@@ -80,10 +80,12 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 		fmt.Println("Replicas Stable: ", service.Replicas)
 	}
 	fmt.Println("Event : ", event)
+
 	delegatedEvent := WrapEvent(service.ClusterID, event)
 	fmt.Println("delegateEvent : ", delegatedEvent)
+
 	eventJSON, err := json.Marshal(delegatedEvent)
-	fmt.Println("eventJSON : ", eventJSON)
+
 	if err != nil {
 		return fmt.Errorf("error marshalling delegated event: %v", err)
 	}
@@ -131,10 +133,12 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			req.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
 
 			// Make HTTP client
+			fmt.Println("SSLVerify :", cluster.SSLVerify)
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
 			}
+			fmt.Println("Transport : ", transport)
 			client := &http.Client{
 				Transport: transport,
 				Timeout:   time.Second * 20,
