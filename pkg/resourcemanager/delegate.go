@@ -132,12 +132,12 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			req.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
 
 			// Make HTTP client
-			fmt.Println("SSLVerify :", cluster.SSLVerify)
+
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
 			}
-			fmt.Println("Transport : ", transport)
+
 			client := &http.Client{
 				Transport: transport,
 				Timeout:   time.Second * 20,
@@ -272,6 +272,7 @@ func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, e
 	req.SetBasicAuth(cluster.AuthUser, cluster.AuthPassword)
 
 	// Make HTTP client
+
 	var transport http.RoundTripper = &http.Transport{
 		// Enable/disable SSL verification
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
@@ -352,10 +353,12 @@ func getClusterStatus(service *types.Service) {
 			req.SetBasicAuth(cluster.AuthUser, cluster.AuthPassword)
 
 			// Make HTTP client
+			fmt.Println("SSLVerify :", cluster.SSLVerify)
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
 			}
+			fmt.Println("Transport : ", transport)
 			client := &http.Client{
 				Transport: transport,
 				Timeout:   time.Second * 20,
@@ -363,6 +366,7 @@ func getClusterStatus(service *types.Service) {
 
 			// Send the request
 			res, err := client.Do(req)
+			fmt.Println("StatusCode : ", res.StatusCode)
 			if err != nil {
 				if service.Delegation != "static" {
 					service.Replicas[id].Priority = noDelegateCode
