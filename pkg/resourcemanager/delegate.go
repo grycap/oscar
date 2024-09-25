@@ -29,6 +29,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -42,6 +43,8 @@ const (
 
 // tokenCache map to store tokens from services and endpoints -> [CLUSTER_ENDPOINT][SERVICE_NAME]
 var tokenCache = map[string]map[string]string{}
+
+var mutex sync.Mutex
 
 // DelegatedEvent wraps the original input event by adding the storage provider ID
 type DelegatedEvent struct {
@@ -70,6 +73,11 @@ type NodeInfo struct {
 
 // DelegateJob sends the event to a service's replica
 func DelegateJob(service *types.Service, event string, logger *log.Logger) error {
+
+	//Block access before executing the function
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	//Determine priority level of each replica to delegate
 	getClusterStatus(service)
 	fmt.Println("Replicas: ", service.Replicas)
@@ -79,8 +87,8 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 		sort.Stable(service.Replicas)
 		fmt.Println("Replicas Stable: ", service.Replicas)
 	}
-	fmt.Println("Event : ", event)
 
+	fmt.Println("Event : ", event)
 	delegatedEvent := WrapEvent(service.ClusterID, event)
 
 	eventJSON, err := json.Marshal(delegatedEvent)
