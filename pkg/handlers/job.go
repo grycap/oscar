@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -95,7 +96,16 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 				c.Status(http.StatusUnauthorized)
 				return
 			}
-		} else {
+		}
+
+		// Get the event from request body
+		eventBytes, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		if len(rawToken) != tokenLength {
 			oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
 
 			if !oidcManager.IsAuthorised(rawToken) {
@@ -115,22 +125,19 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 				return
 			}
 
-			ui, err := oidcManager.GetUserInfo(rawToken)
-			if err != nil {
+			// Extract user UID from MinIO event
+			// TODO check if is MinIO event
+			var decoded map[string]interface{}
+			if err := json.Unmarshal(eventBytes, &decoded); err != nil {
 				c.String(http.StatusInternalServerError, err.Error())
 				return
 			}
-			uid := ui.Subject
-			c.Set("uidOrigin", uid)
+			records := decoded["Records"].([]interface{})
+			r := records[0].(map[string]interface{})
+
+			eventInfo := r["requestParameters"].(map[string]interface{})
+			c.Set("uidOrigin", eventInfo["principalId"])
 			c.Next()
-
-		}
-
-		// Get the event from request body
-		eventBytes, err := io.ReadAll(c.Request.Body)
-		if err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
-			return
 		}
 
 		// Initialize event envVar and args var
