@@ -136,7 +136,9 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			r := records[0].(map[string]interface{})
 
 			eventInfo := r["requestParameters"].(map[string]interface{})
-			c.Set("uidOrigin", eventInfo["principalId"])
+			uid := eventInfo["principalId"]
+			log.Printf("[*] got uid: %s\n", uid)
+			c.Set("uidOrigin", uid)
 			c.Next()
 		}
 
