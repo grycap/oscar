@@ -86,7 +86,7 @@ func GetLoggerMiddleware() gin.HandlerFunc {
 			user = "nil"
 		}
 
-		log.Printf("[GIN] %s | %3d | %13v | %s | %-7s %s | %s",
+		log.Printf("[GIN-EXECUTIONS-LOGGER] %s | %3d | %13v | %s | %-7s %s | %s",
 			logTime, status, latency, clientIP, method, path, user)
 	}
 }

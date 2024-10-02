@@ -98,13 +98,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			}
 		}
 
-		// Get the event from request body
-		eventBytes, err := io.ReadAll(c.Request.Body)
-		if err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
-			return
-		}
-
+		//  If isn't service token check if it is an oidc token
 		if len(rawToken) != tokenLength {
 			oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
 
@@ -124,23 +118,33 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
 				return
 			}
+		}
 
-			// Extract user UID from MinIO event
-			// TODO check if is MinIO event
-			var decoded map[string]interface{}
-			if err := json.Unmarshal(eventBytes, &decoded); err != nil {
-				c.String(http.StatusInternalServerError, err.Error())
-				return
-			}
-			records := decoded["Records"].([]interface{})
+		// Get the event from request body
+		eventBytes, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		// Extract user UID from MinIO event
+		var decoded map[string]interface{}
+		if err := json.Unmarshal(eventBytes, &decoded); err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+		records := decoded["Records"].([]interface{})
+		// Check if it has the MinIO event format
+		if records != nil {
 			r := records[0].(map[string]interface{})
 
 			eventInfo := r["requestParameters"].(map[string]interface{})
 			uid := eventInfo["principalId"]
-			log.Printf("[*] got uid: %s\n", uid)
 			c.Set("uidOrigin", uid)
-			c.Next()
+		} else {
+			c.Set("uidOrigin", "nil")
 		}
+		c.Next()
 
 		// Initialize event envVar and args var
 		event := v1.EnvVar{}
