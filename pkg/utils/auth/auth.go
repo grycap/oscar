@@ -80,10 +80,21 @@ func GetLoggerMiddleware() gin.HandlerFunc {
 		clientIP := c.ClientIP()
 		method := c.Request.Method
 		path := c.Request.URL.Path
-		uid, _ := c.Get("uidOrigin")
-		user, uidParsed := uid.(string)
-		if !uidParsed {
-			user = "nil"
+
+		// Get EGI UID from context (if OIDC auth is used)
+		uid, uidExists := c.Get("uidOrigin")
+		var user string
+		if uidExists {
+			user, _ = uid.(string)
+		} else {
+			// Set OSCAR as default user when no UID is found
+			user = "oscar"
+		}
+
+		// Get source IP from context for jobs triggered through MinIO events
+		IPAddress, AddressExists := c.Get("IPAddress")
+		if AddressExists {
+			clientIP, _ = IPAddress.(string)
 		}
 
 		log.Printf("[GIN-EXECUTIONS-LOGGER] %s | %3d | %13v | %s | %-7s %s | %s",

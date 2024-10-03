@@ -140,6 +140,9 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 
 			eventInfo := r["requestParameters"].(map[string]interface{})
 			uid := eventInfo["principalId"]
+			sourceIPAddress := eventInfo["sourceIPAddress"]
+
+			c.Set("IPAddress", sourceIPAddress)
 			c.Set("uidOrigin", uid)
 		} else {
 			c.Set("uidOrigin", "nil")
