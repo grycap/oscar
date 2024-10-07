@@ -171,6 +171,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 
 		// Make JOB_UUID envVar
 		jobUUID := uuid.New().String()
+		jobUUID = service.Name + "-" + jobUUID
 		jobUUIDVar := v1.EnvVar{
 			Name:  types.JobUUIDVariable,
 			Value: jobUUID,
