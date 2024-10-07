@@ -19,6 +19,11 @@ package types
 import (
 	"testing"
 
+	v1 "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
 
@@ -34,7 +39,7 @@ func TestCreateExpose(t *testing.T) {
 			CpuThreshold: 80,
 		},
 	}
-	cfg := &Config{Namespace: "namespace"}
+	cfg := &Config{ServicesNamespace: "namespace"}
 
 	err := CreateExpose(service, kubeClientset, cfg)
 
@@ -61,6 +66,64 @@ func TestCreateExpose(t *testing.T) {
 
 	if actions[3].GetVerb() != "create" || actions[3].GetResource().Resource != "ingresses" {
 		t.Errorf("Expected create ingress action but got %v", actions[3])
+	}
+}
+
+func TestDeleteExpose(t *testing.T) {
+
+	K8sObjects := []runtime.Object{
+		&autoscalingv1.HorizontalPodAutoscaler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service-hpa",
+				Namespace: "namespace",
+			},
+		},
+		&v1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service-dlp",
+				Namespace: "namespace",
+			},
+		},
+		&corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service-svc",
+				Namespace: "namespace",
+			},
+		},
+	}
+
+	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
+	cfg := &Config{ServicesNamespace: "namespace"}
+
+	err := DeleteExpose("service", kubeClientset, cfg)
+
+	if err != nil {
+		t.Errorf("Error creating expose: %v", err)
+	}
+
+	actions := kubeClientset.Actions()
+	if len(actions) != 5 {
+		t.Errorf("Expected 2 actions but got %d", len(actions))
+	}
+
+	if actions[0].GetVerb() != "delete" || actions[0].GetResource().Resource != "horizontalpodautoscalers" {
+		t.Errorf("Expected delete horizontalpodautoscalers action but got %v", actions[0])
+	}
+
+	if actions[1].GetVerb() != "delete" || actions[1].GetResource().Resource != "deployments" {
+		t.Errorf("Expected delete deployment action but got %v", actions[1])
+	}
+
+	if actions[2].GetVerb() != "delete" || actions[2].GetResource().Resource != "services" {
+		t.Errorf("Expected delete services action but got %v", actions[2])
+	}
+
+	if actions[3].GetVerb() != "get" || actions[3].GetResource().Resource != "ingresses" {
+		t.Errorf("Expected get ingresses action but got %v", actions[3])
+	}
+
+	if actions[4].GetVerb() != "delete-collection" || actions[4].GetResource().Resource != "pods" {
+		t.Errorf("Expected delete-collection pods action but got %v", actions[4])
 	}
 }
 
