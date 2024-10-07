@@ -49,7 +49,7 @@ checkDocker(){
     else
         echo -e "$GREEN$CHECK$END_COLOR Docker installation found"
 
-        rep=$(docker info)
+        rep=$(curl -s --unix-socket /var/run/docker.sock http://ping > /dev/null)
         status=$?
 
         if [ "$status" == "7" ]; then
