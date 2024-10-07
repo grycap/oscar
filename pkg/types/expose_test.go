@@ -27,6 +27,12 @@ import (
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
 
+type Action struct {
+	Verb       string
+	Resource   string
+	ObjectName string
+}
+
 func TestCreateExpose(t *testing.T) {
 
 	kubeClientset := testclient.NewSimpleClientset()
@@ -48,24 +54,21 @@ func TestCreateExpose(t *testing.T) {
 	}
 
 	actions := kubeClientset.Actions()
-	if len(actions) != 4 {
-		t.Errorf("Expected 4 actions but got %d", len(actions))
+	expected_actions := []Action{
+		{Verb: "create", Resource: "deployments"},
+		{Verb: "create", Resource: "horizontalpodautoscalers"},
+		{Verb: "create", Resource: "services"},
+		{Verb: "create", Resource: "ingresses"},
 	}
 
-	if actions[0].GetVerb() != "create" || actions[0].GetResource().Resource != "deployments" {
-		t.Errorf("Expected create deployment action but got %v", actions[0])
+	if len(actions) != len(expected_actions) {
+		t.Errorf("Expected %d actions but got %d", (len(expected_actions)), len(actions))
 	}
 
-	if actions[1].GetVerb() != "create" || actions[1].GetResource().Resource != "horizontalpodautoscalers" {
-		t.Errorf("Expected create horizontalpodautoscalers action but got %v", actions[1])
-	}
-
-	if actions[2].GetVerb() != "create" || actions[2].GetResource().Resource != "services" {
-		t.Errorf("Expected create service action but got %v", actions[2])
-	}
-
-	if actions[3].GetVerb() != "create" || actions[3].GetResource().Resource != "ingresses" {
-		t.Errorf("Expected create ingress action but got %v", actions[3])
+	for i, action := range actions {
+		if action.GetVerb() != expected_actions[i].Verb || action.GetResource().Resource != expected_actions[i].Resource {
+			t.Errorf("Expected %v action but got %v", expected_actions[i], action)
+		}
 	}
 }
 
@@ -102,28 +105,23 @@ func TestDeleteExpose(t *testing.T) {
 	}
 
 	actions := kubeClientset.Actions()
-	if len(actions) != 5 {
-		t.Errorf("Expected 2 actions but got %d", len(actions))
+
+	expected_actions := []Action{
+		{Verb: "delete", Resource: "horizontalpodautoscalers", ObjectName: "service-hpa"},
+		{Verb: "delete", Resource: "deployments", ObjectName: "service-dlp"},
+		{Verb: "delete", Resource: "services", ObjectName: "service-svc"},
+		{Verb: "get", Resource: "ingresses", ObjectName: "service-ing"},
+		{Verb: "delete-collection", Resource: "pods", ObjectName: "service-pod"},
 	}
 
-	if actions[0].GetVerb() != "delete" || actions[0].GetResource().Resource != "horizontalpodautoscalers" {
-		t.Errorf("Expected delete horizontalpodautoscalers action but got %v", actions[0])
+	if len(actions) != len(expected_actions) {
+		t.Errorf("Expected %d actions but got %d", (len(expected_actions)), len(actions))
 	}
 
-	if actions[1].GetVerb() != "delete" || actions[1].GetResource().Resource != "deployments" {
-		t.Errorf("Expected delete deployment action but got %v", actions[1])
-	}
-
-	if actions[2].GetVerb() != "delete" || actions[2].GetResource().Resource != "services" {
-		t.Errorf("Expected delete services action but got %v", actions[2])
-	}
-
-	if actions[3].GetVerb() != "get" || actions[3].GetResource().Resource != "ingresses" {
-		t.Errorf("Expected get ingresses action but got %v", actions[3])
-	}
-
-	if actions[4].GetVerb() != "delete-collection" || actions[4].GetResource().Resource != "pods" {
-		t.Errorf("Expected delete-collection pods action but got %v", actions[4])
+	for i, action := range actions {
+		if action.GetVerb() != expected_actions[i].Verb || action.GetResource().Resource != expected_actions[i].Resource {
+			t.Errorf("Expected %v action but got %v", expected_actions[i], action)
+		}
 	}
 }
 
