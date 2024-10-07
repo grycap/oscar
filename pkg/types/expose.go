@@ -246,7 +246,7 @@ func getHortizontalAutoScaleSpec(service Service, cfg *Config) *autos.Horizontal
 func getPodTemplateSpec(service Service, cfg *Config) v1.PodTemplateSpec {
 	podSpec, _ := service.ToPodSpec(cfg)
 
-	for i, _ := range podSpec.Containers {
+	for i := range podSpec.Containers {
 		podSpec.Containers[i].Ports = []v1.ContainerPort{
 			{
 				Name:          podPortName,
@@ -414,7 +414,7 @@ func deleteService(name string, kubeClientset kubernetes.Interface, cfg *Config)
 func createIngress(service Service, kubeClientset kubernetes.Interface, cfg *Config) error {
 	// Create Secret
 
-	ingress := getIngressSpec(service, kubeClientset, cfg)
+	ingress := getIngressSpec(service, cfg)
 	_, err := kubeClientset.NetworkingV1().Ingresses(cfg.ServicesNamespace).Create(context.TODO(), ingress, metav1.CreateOptions{})
 	if err != nil {
 		return err
@@ -432,7 +432,7 @@ func updateIngress(service Service, kubeClientset kubernetes.Interface, cfg *Con
 	//if exist continue and need -> Update
 	//if exist and not need -> delete
 	//if not  exist create
-	kube_ingress := getIngressSpec(service, kubeClientset, cfg)
+	kube_ingress := getIngressSpec(service, cfg)
 	_, err := kubeClientset.NetworkingV1().Ingresses(cfg.ServicesNamespace).Update(context.TODO(), kube_ingress, metav1.UpdateOptions{})
 	if err != nil {
 		return err
@@ -455,7 +455,7 @@ func updateIngress(service Service, kubeClientset kubernetes.Interface, cfg *Con
 }
 
 // Return a kubernetes ingress component, ready to deploy or update
-func getIngressSpec(service Service, kubeClientset kubernetes.Interface, cfg *Config) *net.Ingress {
+func getIngressSpec(service Service, cfg *Config) *net.Ingress {
 	name_ingress := getIngressName(service.Name)
 	pathofapi := getAPIPath(service.Name)
 	name_service := getServiceName(service.Name)
@@ -554,7 +554,7 @@ func deleteIngress(name string, kubeClientset kubernetes.Interface, cfg *Config)
 // Secret
 
 func createSecret(service Service, kubeClientset kubernetes.Interface, cfg *Config) error {
-	secret := getSecretSpec(service, kubeClientset, cfg)
+	secret := getSecretSpec(service, cfg)
 	_, err := kubeClientset.CoreV1().Secrets(cfg.ServicesNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	if err != nil {
 		return err
@@ -563,7 +563,7 @@ func createSecret(service Service, kubeClientset kubernetes.Interface, cfg *Conf
 }
 
 func updateSecret(service Service, kubeClientset kubernetes.Interface, cfg *Config) error {
-	secret := getSecretSpec(service, kubeClientset, cfg)
+	secret := getSecretSpec(service, cfg)
 	_, err := kubeClientset.CoreV1().Secrets(cfg.ServicesNamespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
 	if err != nil {
 		return err
@@ -579,12 +579,12 @@ func deleteSecret(name string, kubeClientset kubernetes.Interface, cfg *Config) 
 	}
 	return nil
 }
-func getSecretSpec(service Service, kubeClientset kubernetes.Interface, cfg *Config) *v1.Secret {
+func getSecretSpec(service Service, cfg *Config) *v1.Secret {
 	//setPassword
 	hash := make(htpasswd.HashedPasswords)
 	err := hash.SetPassword(service.Name, service.Token, htpasswd.HashAPR1)
 	if err != nil {
-		ExposeLogger.Printf(err.Error())
+		ExposeLogger.Print(err.Error())
 	}
 	//Create Secret
 	inmutable := false
@@ -620,10 +620,7 @@ func existsSecret(serviceName string, kubeClientset kubernetes.Interface, cfg *C
 
 func existsIngress(serviceName string, namespace string, kubeClientset kubernetes.Interface) bool {
 	_, err := kubeClientset.NetworkingV1().Ingresses(namespace).Get(context.TODO(), getIngressName(serviceName), metav1.GetOptions{})
-	if err == nil {
-		return true
-	}
-	return false
+	return err == nil
 }
 
 /// These are auxiliary functions
