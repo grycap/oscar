@@ -56,6 +56,7 @@ func TestCreateExpose(t *testing.T) {
 			MinScale:     1,
 			MaxScale:     3,
 			CpuThreshold: 80,
+			SetAuth:      true,
 		},
 	}
 	cfg := &Config{ServicesNamespace: "namespace"}
@@ -72,6 +73,7 @@ func TestCreateExpose(t *testing.T) {
 		{Verb: "create", Resource: "horizontalpodautoscalers"},
 		{Verb: "create", Resource: "services"},
 		{Verb: "create", Resource: "ingresses"},
+		{Verb: "create", Resource: "secrets"},
 	}
 
 	if CompareActions(actions, expected_actions) == false {
@@ -158,6 +160,7 @@ func TestUpdateExpose(t *testing.T) {
 			MinScale:     1,
 			MaxScale:     3,
 			CpuThreshold: 80,
+			SetAuth:      true,
 		},
 	}
 
@@ -177,6 +180,7 @@ func TestUpdateExpose(t *testing.T) {
 		{Verb: "update", Resource: "services"},
 		{Verb: "get", Resource: "ingresses"},
 		{Verb: "create", Resource: "ingresses"},
+		{Verb: "create", Resource: "secrets"},
 	}
 
 	if CompareActions(actions, expected_actions) == false {
@@ -193,6 +197,7 @@ func TestServiceSpec(t *testing.T) {
 			MaxScale:     3,
 			CpuThreshold: 40,
 			APIPort:      8080,
+			SetAuth:      true,
 		},
 	}
 	cfg := &Config{Namespace: "namespace"}
