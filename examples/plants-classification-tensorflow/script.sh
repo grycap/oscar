@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IMAGE_NAME=`basename "$INPUT_FILE_PATH"`
+IMAGE_NAME=`basename "$INPUT_FILE_PATH" | cut -d. -f1`
 OUTPUT_FILE="$TMP_OUTPUT_DIR/output.json"
 
 deepaas-cli predict --files "$INPUT_FILE_PATH" 2>&1 | grep -Po '{.*}' > "$OUTPUT_FILE" 
