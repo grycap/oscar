@@ -19,7 +19,7 @@ package types
 import (
 	"testing"
 
-	v1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -88,7 +88,7 @@ func TestDeleteExpose(t *testing.T) {
 				Namespace: "namespace",
 			},
 		},
-		&v1.Deployment{
+		&appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "service-dlp",
 				Namespace: "namespace",
@@ -135,7 +135,7 @@ func TestUpdateExpose(t *testing.T) {
 				Namespace: "namespace",
 			},
 		},
-		&v1.Deployment{
+		&appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "service-dlp",
 				Namespace: "namespace",
