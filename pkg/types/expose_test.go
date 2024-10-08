@@ -25,12 +25,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	testclient "k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 type Action struct {
-	Verb       string
-	Resource   string
-	ObjectName string
+	Verb     string
+	Resource string
+}
+
+func CompareActions(actions []k8stesting.Action, expected_actions []Action) bool {
+	if len(actions) != len(expected_actions) {
+		return false
+	}
+
+	for i, action := range actions {
+		if action.GetVerb() != expected_actions[i].Verb || action.GetResource().Resource != expected_actions[i].Resource {
+			return false
+		}
+	}
+	return true
 }
 
 func TestCreateExpose(t *testing.T) {
@@ -61,14 +74,8 @@ func TestCreateExpose(t *testing.T) {
 		{Verb: "create", Resource: "ingresses"},
 	}
 
-	if len(actions) != len(expected_actions) {
-		t.Errorf("Expected %d actions but got %d", (len(expected_actions)), len(actions))
-	}
-
-	for i, action := range actions {
-		if action.GetVerb() != expected_actions[i].Verb || action.GetResource().Resource != expected_actions[i].Resource {
-			t.Errorf("Expected %v action but got %v", expected_actions[i], action)
-		}
+	if CompareActions(actions, expected_actions) == false {
+		t.Errorf("Expected %v actions but got %v", expected_actions, actions)
 	}
 }
 
@@ -107,21 +114,73 @@ func TestDeleteExpose(t *testing.T) {
 	actions := kubeClientset.Actions()
 
 	expected_actions := []Action{
-		{Verb: "delete", Resource: "horizontalpodautoscalers", ObjectName: "service-hpa"},
-		{Verb: "delete", Resource: "deployments", ObjectName: "service-dlp"},
-		{Verb: "delete", Resource: "services", ObjectName: "service-svc"},
-		{Verb: "get", Resource: "ingresses", ObjectName: "service-ing"},
-		{Verb: "delete-collection", Resource: "pods", ObjectName: "service-pod"},
+		{Verb: "delete", Resource: "horizontalpodautoscalers"},
+		{Verb: "delete", Resource: "deployments"},
+		{Verb: "delete", Resource: "services"},
+		{Verb: "get", Resource: "ingresses"},
+		{Verb: "delete-collection", Resource: "pods"},
 	}
 
-	if len(actions) != len(expected_actions) {
-		t.Errorf("Expected %d actions but got %d", (len(expected_actions)), len(actions))
+	if CompareActions(actions, expected_actions) == false {
+		t.Errorf("Expected %v actions but got %v", expected_actions, actions)
+	}
+}
+
+func TestUpdateExpose(t *testing.T) {
+
+	K8sObjects := []runtime.Object{
+		&autoscalingv1.HorizontalPodAutoscaler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service-hpa",
+				Namespace: "namespace",
+			},
+		},
+		&v1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service-dlp",
+				Namespace: "namespace",
+			},
+		},
+		&corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service-svc",
+				Namespace: "namespace",
+			},
+		},
 	}
 
-	for i, action := range actions {
-		if action.GetVerb() != expected_actions[i].Verb || action.GetResource().Resource != expected_actions[i].Resource {
-			t.Errorf("Expected %v action but got %v", expected_actions[i], action)
-		}
+	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
+	cfg := &Config{ServicesNamespace: "namespace"}
+
+	service := Service{
+		Name: "service",
+		Expose: Expose{
+			MinScale:     1,
+			MaxScale:     3,
+			CpuThreshold: 80,
+		},
+	}
+
+	err := UpdateExpose(service, kubeClientset, cfg)
+
+	if err != nil {
+		t.Errorf("Error creating expose: %v", err)
+	}
+
+	actions := kubeClientset.Actions()
+
+	expected_actions := []Action{
+		{Verb: "get", Resource: "deployments"},
+		{Verb: "update", Resource: "deployments"},
+		{Verb: "get", Resource: "horizontalpodautoscalers"},
+		{Verb: "update", Resource: "horizontalpodautoscalers"},
+		{Verb: "update", Resource: "services"},
+		{Verb: "get", Resource: "ingresses"},
+		{Verb: "create", Resource: "ingresses"},
+	}
+
+	if CompareActions(actions, expected_actions) == false {
+		t.Errorf("Expected %v actions but got %v", expected_actions, actions)
 	}
 }
 
