@@ -64,8 +64,13 @@ func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.Hand
 	}
 }
 
+// GetLoggerMiddleware returns a gin handler as middleware to log custom info about sync/async executions
 func GetLoggerMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+
+		// Disable default printf timestamp to avoid inconsistencies on logs
+		log.SetFlags(0)
+
 		startTime := time.Now()
 
 		// Process request

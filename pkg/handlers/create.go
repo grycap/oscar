@@ -69,13 +69,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// Check if users in allowed_users have a MinIO associated user
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
-		// === DEBUG code ===
-		loguid, _ := auth.GetUIDFromContext(c)
-		createLogger.Printf(">>> uid from context: %s", loguid)
-		// =============
-
 		// Service is created by an EGI user
-
 		if !isAdminUser {
 			uid, err := auth.GetUIDFromContext(c)
 			if err != nil {
