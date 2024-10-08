@@ -229,6 +229,7 @@ replicas:
   priority: 0
   headers:
     Authorization: Bearer testtoken
+delegation: ""
 rescheduler_threshold: 0
 log_level: ""
 image: testimage

@@ -1,6 +1,6 @@
 functions:
   oscar:
-  - oscar-cluster:
+  - oscar-replica:
       name: cowsay
       cpu: '1.0'
       memory: 1Gi

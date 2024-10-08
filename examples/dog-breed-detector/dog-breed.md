@@ -10,7 +10,7 @@ oscar-cli apply dog-breed-detector.yaml
 
 or through the graphical interface of your cluster.
 
-Usually, DeePaaS models need some given parameters to be defined alongside the input of the inference invocation. To solve this, the service receives a JSON type in the following format where you can define, on the one hand, the key of the JSON the name and value of the parameter to be used on the command line and the other hand, inside the array 'oscar-files' each of the files codified as a base64 string, and the extension of it.
+Usually, DeePaaS models need some given parameters to be defined alongside the input of the inference invocation. To solve this, the service receives a JSON type in the following format where you can define, on the one hand, the key of the JSON is the name of the parameter to be used on the command line and the other hand, inside the array 'oscar-files' each of the files codified as a base64 string, and the extension of it.
 
 ``` json
 {
