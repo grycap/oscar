@@ -83,7 +83,7 @@ func DeleteExpose(name string, kubeClientset kubernetes.Interface, cfg *Config) 
 
 	ingressType := existsIngress(name, cfg.ServicesNamespace, kubeClientset)
 	if ingressType {
-		err = deleteIngress(getIngressName(name), kubeClientset, cfg)
+		err = deleteIngress(name, kubeClientset, cfg)
 		if err != nil {
 			return fmt.Errorf("error deleting ingress for exposed service '%s': %v", name, err)
 		}
@@ -124,7 +124,7 @@ func UpdateExpose(service Service, kubeClientset kubernetes.Interface, cfg *Conf
 	if ingressType {
 		// New service config if NodePort
 		if service.Expose.NodePort != 0 {
-			err = deleteIngress(getIngressName(service.Name), kubeClientset, cfg)
+			err = deleteIngress(service.Name, kubeClientset, cfg)
 			if err != nil {
 				log.Printf("error deleting ingress service: %v\n", err)
 				return err
@@ -543,7 +543,7 @@ func listIngress(kubeClientset kubernetes.Interface, cfg *Config) (*net.IngressL
 // Delete a kubernetes ingress
 func deleteIngress(name string, kubeClientset kubernetes.Interface, cfg *Config) error {
 	// if secret exist, delete
-	err := kubeClientset.NetworkingV1().Ingresses(cfg.ServicesNamespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	err := kubeClientset.NetworkingV1().Ingresses(cfg.ServicesNamespace).Delete(context.TODO(), getIngressName(name), metav1.DeleteOptions{})
 	if err != nil {
 		return err
 	}
