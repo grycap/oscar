@@ -31,6 +31,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/resourcemanager"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	genericErrors "github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -127,21 +128,9 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			return
 		}
 
-		// Extract user UID from MinIO event
-		var decoded map[string]interface{}
-		if err := json.Unmarshal(eventBytes, &decoded); err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
-			return
-		}
-		records := decoded["Records"].([]interface{})
 		// Check if it has the MinIO event format
-		if records != nil {
-			r := records[0].(map[string]interface{})
-
-			eventInfo := r["requestParameters"].(map[string]interface{})
-			uid := eventInfo["principalId"]
-			sourceIPAddress := eventInfo["sourceIPAddress"]
-
+		uid, sourceIPAddress, err := decodeEventBytes(eventBytes)
+		if err != nil {
 			c.Set("IPAddress", sourceIPAddress)
 			c.Set("uidOrigin", uid)
 		} else {
@@ -251,4 +240,32 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 		}
 		c.Status(http.StatusCreated)
 	}
+}
+
+func decodeEventBytes(eventBytes []byte) (string, string, error) {
+
+	defer func() {
+		// recover from panic, if one occurs
+		if r := recover(); r != nil {
+			fmt.Println("Recovered from panic:", r)
+		}
+	}()
+	// Extract user UID from MinIO event
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(eventBytes, &decoded); err != nil {
+		return "", "", err
+	}
+
+	if records, panicErr := decoded["Records"].([]interface{}); panicErr {
+		r := records[0].(map[string]interface{})
+
+		eventInfo := r["requestParameters"].(map[string]interface{})
+		uid := eventInfo["principalId"]
+		sourceIPAddress := eventInfo["sourceIPAddress"]
+
+		return uid.(string), sourceIPAddress.(string), nil
+	} else {
+		return "", "", genericErrors.New("Failed to decode records")
+	}
+
 }
