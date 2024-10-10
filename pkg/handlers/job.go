@@ -150,11 +150,12 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 				args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath()) + ";echo \"I finish\" > /tmpfolder/finish-file;"}
 				types.SetMount(podSpec, *service, cfg)
 			} else {
-				event = v1.EnvVar{
-					Name:  types.EventVariable,
-					Value: string(eventBytes),
-				}
 				args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath())}
+			}
+
+			event = v1.EnvVar{
+				Name:  types.EventVariable,
+				Value: string(eventBytes),
 			}
 		}
 
