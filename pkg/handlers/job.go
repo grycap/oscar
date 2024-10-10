@@ -23,6 +23,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -46,7 +47,8 @@ var (
 	// Don't restart jobs in order to keep logs
 	restartPolicy = v1.RestartPolicyNever
 	// command used for passing the event to faas-supervisor
-	command = []string{"/bin/sh"}
+	command   = []string{"/bin/sh"}
+	jobLogger = log.New(os.Stdout, "[JOB-HANDLER] ", log.Flags())
 )
 
 const (
@@ -234,6 +236,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 		}
 
 		// Create job
+		jobLogger.Printf("job definition: ", job)
 		_, err = kubeClientset.BatchV1().Jobs(cfg.ServicesNamespace).Create(context.TODO(), job, metav1.CreateOptions{})
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
