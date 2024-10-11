@@ -136,6 +136,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			c.Set("IPAddress", sourceIPAddress)
 			c.Set("uidOrigin", uid)
 		} else {
+			jobLogger.Panicln("warning: ", err)
 			c.Set("uidOrigin", "nil")
 		}
 		c.Next()
@@ -200,7 +201,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 					c.Status(http.StatusCreated)
 					return
 				}
-				log.Printf("unable to delegate job. Error: %v\n", err)
+				jobLogger.Printf("unable to delegate job. Error: %v\n", err)
 			}
 		}
 
