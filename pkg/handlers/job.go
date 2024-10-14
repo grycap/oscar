@@ -133,10 +133,11 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 		// Check if it has the MinIO event format
 		uid, sourceIPAddress, err := decodeEventBytes(eventBytes)
 		if err != nil {
+			jobLogger.Println("received call from uid: ", uid)
 			c.Set("IPAddress", sourceIPAddress)
 			c.Set("uidOrigin", uid)
 		} else {
-			jobLogger.Panicln("warning: ", err)
+			jobLogger.Println("warning: ", err)
 			c.Set("uidOrigin", "nil")
 		}
 		c.Next()
@@ -250,10 +251,11 @@ func decodeEventBytes(eventBytes []byte) (string, string, error) {
 	defer func() {
 		// recover from panic, if one occurs
 		if r := recover(); r != nil {
-			fmt.Println("Recovered from panic:", r)
+			jobLogger.Println("Recovered from panic:", r)
 		}
 	}()
 	// Extract user UID from MinIO event
+	jobLogger.Println("[*] Decoding event info")
 	var decoded map[string]interface{}
 	if err := json.Unmarshal(eventBytes, &decoded); err != nil {
 		return "", "", err
