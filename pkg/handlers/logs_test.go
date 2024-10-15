@@ -18,7 +18,48 @@ import (
 
 func TestMakeJobsInfoHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
-	kubeClientset := testclient.NewSimpleClientset()
+
+	K8sObjects := []runtime.Object{
+		&batchv1.Job{
+			Status: batchv1.JobStatus{
+				StartTime: &metav1.Time{},
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "job",
+				Namespace: "namespace",
+				Labels: map[string]string{
+					types.ServiceLabel: "test",
+				},
+			},
+		},
+		&corev1.PodList{
+			Items: []corev1.Pod{
+				{
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: types.ContainerName,
+								State: corev1.ContainerState{
+									Running: &corev1.ContainerStateRunning{
+										StartedAt: metav1.Time{},
+									},
+								},
+							},
+						},
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod",
+						Namespace: "namespace",
+						Labels: map[string]string{
+							"oscar_service": "test",
+							"job-name":      "job"},
+					},
+				},
+			},
+		},
+	}
+	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
 
 	r := gin.Default()
 	r.GET("/system/logs/:serviceName", MakeJobsInfoHandler(back, kubeClientset, "namespace"))
