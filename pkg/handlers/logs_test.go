@@ -8,6 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/backends"
+	"github.com/grycap/oscar/v3/pkg/types"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -119,5 +121,52 @@ func TestMakeGetLogsHandler(t *testing.T) {
 	if actions[1].GetVerb() != "get" || actions[1].GetResource().Resource != "pods" {
 		t.Errorf("expecting get pods, got %s %s", actions[1].GetVerb(), actions[1].GetResource().Resource)
 	}
+}
+func TestMakeDeleteJobHandler(t *testing.T) {
+	back := backends.MakeFakeBackend()
 
+	K8sObjects := []runtime.Object{
+		&batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "job",
+				Namespace: "namespace",
+				Labels: map[string]string{
+					types.ServiceLabel: "test",
+				},
+			},
+		},
+	}
+	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
+
+	r := gin.Default()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "some-uid-value")
+		c.Next()
+	})
+	r.DELETE("/system/logs/:serviceName/:jobName", MakeDeleteJobHandler(back, kubeClientset, "namespace"))
+
+	w := httptest.NewRecorder()
+	serviceName := "test"
+	jobName := "job"
+	req, _ := http.NewRequest("DELETE", "/system/logs/"+serviceName+"/"+jobName, nil)
+	req.Header.Set("Authorization", "Bearer AbCdEf123456")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNoContent {
+		fmt.Println(w.Body)
+		t.Errorf("expecting code %d, got %d", http.StatusNoContent, w.Code)
+	}
+
+	actions := kubeClientset.Actions()
+	if len(actions) != 2 {
+		t.Errorf("expecting 2 actions, got %d", len(actions))
+	}
+
+	if actions[0].GetVerb() != "get" || actions[0].GetResource().Resource != "jobs" {
+		t.Errorf("expecting get jobs, got %s %s", actions[0].GetVerb(), actions[0].GetResource().Resource)
+	}
+
+	if actions[1].GetVerb() != "delete" || actions[1].GetResource().Resource != "jobs" {
+		t.Errorf("expecting delete jobs, got %s %s", actions[1].GetVerb(), actions[1].GetResource().Resource)
+	}
 }
