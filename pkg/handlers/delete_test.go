@@ -13,7 +13,7 @@ import (
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 )
 
-func TestMMakeDeleteHandler(t *testing.T) {
+func TestMakeDeleteHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
 
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
