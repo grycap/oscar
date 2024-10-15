@@ -144,7 +144,6 @@ func (om *oidcManager) clearExpired() {
 
 // GetUserInfo obtains UserInfo from the issuer
 func (om *oidcManager) GetUserInfo(rawToken string) (*userInfo, error) {
-	oidcLogger.Println("getting user info")
 	ot := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: rawToken})
 
 	// Get OIDC UserInfo
@@ -200,11 +199,9 @@ func (om *oidcManager) UserHasVO(rawToken string, vo string) (bool, error) {
 func (om *oidcManager) GetUID(rawToken string) (string, error) {
 	ui, err := om.GetUserInfo(rawToken)
 	if err != nil {
-		oidcLogger.Println("returning ui.subject", ui.Subject)
-		return ui.Subject, nil
+		return "", err
 	}
-	oidcLogger.Println("error GetUID", err)
-	return "", err
+	return ui.Subject, nil
 }
 
 // IsAuthorised checks if a token is authorised to access the API

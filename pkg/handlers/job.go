@@ -128,8 +128,6 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			uidFromToken, uidErr = oidcManager.GetUID(rawToken)
 			if uidErr != nil {
 				jobLogger.Println("WARNING:", uidErr)
-			} else {
-				jobLogger.Println("DEBUG: uid from token ->", uidFromToken)
 			}
 		}
 
