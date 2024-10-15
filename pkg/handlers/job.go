@@ -102,6 +102,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 		}
 
 		//  If isn't service token check if it is an oidc token
+		var uidFromToken string
 		if len(rawToken) != tokenLength {
 			oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
 
@@ -121,6 +122,13 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
 				return
 			}
+
+			// Get UID from token
+			var uidErr error
+			uidFromToken, uidErr = oidcManager.GetUID(rawToken)
+			if uidErr != nil {
+				jobLogger.Println("WARNING: ", uidErr)
+			}
 		}
 
 		// Get the event from request body
@@ -133,13 +141,19 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 		// Check if it has the MinIO event format
 		uid, sourceIPAddress, err := decodeEventBytes(eventBytes)
 		if err != nil {
-			jobLogger.Println("received call from uid: ", uid)
+			// Check if the request was made with OIDC token to get user UID
+			if uidFromToken != "" {
+				c.Set("uidOrigin", uidFromToken)
+			} else {
+				// Set as nil string if unable to get an UID
+				jobLogger.Println("WARNING: ", err)
+				c.Set("uidOrigin", "nil")
+			}
+		} else {
 			c.Set("IPAddress", sourceIPAddress)
 			c.Set("uidOrigin", uid)
-		} else {
-			jobLogger.Println("warning: ", err)
-			c.Set("uidOrigin", "nil")
 		}
+
 		c.Next()
 
 		// Initialize event envVar and args var
