@@ -198,7 +198,6 @@ func (om *oidcManager) UserHasVO(rawToken string, vo string) (bool, error) {
 
 func (om *oidcManager) GetUID(rawToken string) (string, error) {
 	ui, err := om.GetUserInfo(rawToken)
-	oidcLogger.Println("received uid: ", ui.Subject)
 	if err != nil {
 		return ui.Subject, nil
 	}

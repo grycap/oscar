@@ -127,7 +127,9 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			var uidErr error
 			uidFromToken, uidErr = oidcManager.GetUID(rawToken)
 			if uidErr != nil {
-				jobLogger.Println("WARNING: ", uidErr)
+				jobLogger.Println("WARNING:", uidErr)
+			} else {
+				jobLogger.Println("DEBUG: uid from token ->", uidFromToken)
 			}
 		}
 
@@ -146,7 +148,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 				c.Set("uidOrigin", uidFromToken)
 			} else {
 				// Set as nil string if unable to get an UID
-				jobLogger.Println("WARNING: ", err)
+				jobLogger.Println("WARNING:", err)
 				c.Set("uidOrigin", "nil")
 			}
 		} else {
