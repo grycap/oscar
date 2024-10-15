@@ -1,46 +1,24 @@
-/*
-Copyright (C) GRyCAP - I3M - UPV
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package handlers
 
 import (
 	"fmt"
-	"strings"
-	"testing"
-
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/backends"
 	"github.com/grycap/oscar/v3/pkg/types"
 )
 
-func TestMakeCreateHandler(t *testing.T) {
+func TestMakeUpdateHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
 
-	// Create a fake MinIO server
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
-
 		if hreq.URL.Path != "/input" && hreq.URL.Path != "/output" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
 			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
 		}
-
-		fmt.Println(hreq.URL.Path)
-
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
 			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
@@ -50,18 +28,36 @@ func TestMakeCreateHandler(t *testing.T) {
 		}
 	}))
 
+	svc := &types.Service{
+		Token: "AbCdEf123456",
+		Input: []types.StorageIOConfig{
+			{Provider: "minio." + types.DefaultProvider, Path: "/input"},
+		},
+		Output: []types.StorageIOConfig{
+			{Provider: "minio." + types.DefaultProvider, Path: "/output"},
+		},
+		StorageProviders: &types.StorageProviders{
+			MinIO: map[string]*types.MinIOProvider{types.DefaultProvider: {
+				Region:    "us-east-1",
+				Endpoint:  server.URL,
+				AccessKey: "ak",
+				SecretKey: "sk"}},
+		},
+		AllowedUsers: []string{"user1"}}
+	back.Service = svc
+
 	// and set the MinIO endpoint to the fake server
 	cfg := types.Config{
 		MinIOProvider: &types.MinIOProvider{
-			Endpoint:  server.URL,
 			Region:    "us-east-1",
-			AccessKey: "minioadmin",
-			SecretKey: "minioadmin",
-			Verify:    false,
+			Endpoint:  server.URL,
+			AccessKey: "ak",
+			SecretKey: "sk",
 		},
 	}
+
 	r := gin.Default()
-	r.POST("/system/services", MakeCreateHandler(&cfg, back))
+	r.PUT("/system/services", MakeUpdateHandler(&cfg, back))
 
 	w := httptest.NewRecorder()
 	body := strings.NewReader(`
@@ -98,15 +94,15 @@ func TestMakeCreateHandler(t *testing.T) {
 			"allowed_users": ["user1", "user2"]
 		}
 	`)
-
-	req, _ := http.NewRequest("POST", "/system/services", body)
+	req, _ := http.NewRequest("PUT", "/system/services", body)
 	r.ServeHTTP(w, req)
 
 	// Close the fake MinIO server
 	defer server.Close()
 
-	if w.Code != http.StatusCreated {
+	if w.Code != http.StatusNoContent {
 		fmt.Println(w.Body)
-		t.Errorf("expecting code %d, got %d", http.StatusCreated, w.Code)
+		t.Errorf("expecting code %d, got %d", http.StatusNoContent, w.Code)
 	}
+
 }
