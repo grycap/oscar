@@ -269,7 +269,6 @@ func decodeEventBytes(eventBytes []byte) (string, string, error) {
 		}
 	}()
 	// Extract user UID from MinIO event
-	jobLogger.Println("[*] Decoding event info")
 	var decoded map[string]interface{}
 	if err := json.Unmarshal(eventBytes, &decoded); err != nil {
 		return "", "", err
