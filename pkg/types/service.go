@@ -178,6 +178,13 @@ type Service struct {
 	// Optional
 	Replicas ReplicaList `json:"replicas,omitempty"`
 
+	//Delegation Mode of job delegation for replicas
+	// Opcional (default: manual)
+	//"static" The user select the priority to delegate jobs to the replicas.
+	//"random" The job delegation priority is generated randomly among the clusters of the available replicas.
+	//"load-based" The job delegation priority is generated depending on the CPU and Memory available in the replica clusters.
+	Delegation string `json:"delegation"`
+
 	// ReSchedulerThreshold time (in seconds) that a job (with replicas) can be queued before delegating it
 	// Optional
 	ReSchedulerThreshold int `json:"rescheduler_threshold"`

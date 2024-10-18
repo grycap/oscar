@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -29,6 +30,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/grycap/oscar/v3/pkg/resourcemanager"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -85,10 +87,37 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			c.Status(http.StatusUnauthorized)
 			return
 		}
-		reqToken := strings.TrimSpace(splitToken[1])
-		if reqToken != service.Token {
-			c.Status(http.StatusUnauthorized)
-			return
+
+		// Check if reqToken is the service token
+		rawToken := strings.TrimSpace(splitToken[1])
+		if len(rawToken) == tokenLength {
+
+			if rawToken != service.Token {
+				c.Status(http.StatusUnauthorized)
+				return
+			}
+		}
+
+		//  If isn't service token check if it is an oidc token
+		if len(rawToken) != tokenLength {
+			oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
+
+			if !oidcManager.IsAuthorised(rawToken) {
+				c.Status(http.StatusUnauthorized)
+				return
+			}
+
+			hasVO, err := oidcManager.UserHasVO(rawToken, service.VO)
+
+			if err != nil {
+				c.String(http.StatusInternalServerError, err.Error())
+				return
+			}
+
+			if !hasVO {
+				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
+				return
+			}
 		}
 
 		// Get the event from request body
@@ -97,6 +126,28 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
+
+		// Extract user UID from MinIO event
+		var decoded map[string]interface{}
+		if err := json.Unmarshal(eventBytes, &decoded); err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+		records := decoded["Records"].([]interface{})
+		// Check if it has the MinIO event format
+		if records != nil {
+			r := records[0].(map[string]interface{})
+
+			eventInfo := r["requestParameters"].(map[string]interface{})
+			uid := eventInfo["principalId"]
+			sourceIPAddress := eventInfo["sourceIPAddress"]
+
+			c.Set("IPAddress", sourceIPAddress)
+			c.Set("uidOrigin", uid)
+		} else {
+			c.Set("uidOrigin", "nil")
+		}
+		c.Next()
 
 		// Initialize event envVar and args var
 		event := v1.EnvVar{}
@@ -120,6 +171,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 
 		// Make JOB_UUID envVar
 		jobUUID := uuid.New().String()
+		jobUUID = service.Name + "-" + jobUUID
 		jobUUIDVar := v1.EnvVar{
 			Name:  types.JobUUIDVariable,
 			Value: jobUUID,
