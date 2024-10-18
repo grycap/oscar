@@ -34,7 +34,7 @@ func TestMakeDeleteHandler(t *testing.T) {
 	}
 
 	svc := &types.Service{
-		Token: "AbCdEf123456",
+		Token: "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf",
 		Input: []types.StorageIOConfig{
 			{Provider: "minio." + types.DefaultProvider, Path: "/input"},
 		},

@@ -76,7 +76,7 @@ func TestMakeRunHandler(t *testing.T) {
 					err := errors.New("Not found")
 					back.AddError("ReadService", k8serr.NewInternalError(err))
 				case "splitErr":
-					req.Header.Set("Authorization", "AbCdEf123456")
+					req.Header.Set("Authorization", "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf")
 				case "diffErr":
 					req.Header.Set("Authorization", "Bearer 11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513dfg")
 				}

@@ -26,7 +26,7 @@ func TestMakeJobHandler(t *testing.T) {
 	body := strings.NewReader(``)
 	serviceName := "testName"
 	req, _ := http.NewRequest("POST", "/job/services"+serviceName, body)
-	req.Header.Set("Authorization", "Bearer AbCdEf123456")
+	req.Header.Set("Authorization", "Bearer 11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf")
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusCreated {
