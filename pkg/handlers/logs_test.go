@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/backends"
@@ -18,11 +21,12 @@ import (
 
 func TestMakeJobsInfoHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
+	now := time.Now()
 
 	K8sObjects := []runtime.Object{
 		&batchv1.Job{
 			Status: batchv1.JobStatus{
-				StartTime: &metav1.Time{},
+				StartTime: &metav1.Time{Time: now},
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "job",
@@ -42,7 +46,7 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 								Name: types.ContainerName,
 								State: corev1.ContainerState{
 									Running: &corev1.ContainerStateRunning{
-										StartedAt: metav1.Time{},
+										StartedAt: metav1.Time{Time: now},
 									},
 								},
 							},
@@ -72,6 +76,23 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 	if w.Code != http.StatusOK {
 		fmt.Println(w.Body)
 		t.Errorf("expecting code %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Errorf("response is not valid JSON: %v", err)
+	}
+
+	expected := map[string]interface{}{
+		"job": map[string]interface{}{
+			"status":        "Running",
+			"creation_time": now.UTC().Format(time.RFC3339),
+			"start_time":    now.UTC().Format(time.RFC3339),
+		},
+	}
+
+	if !reflect.DeepEqual(response, expected) {
+		t.Errorf("expecting %v, got %v", expected, response)
 	}
 
 	actions := kubeClientset.Actions()
