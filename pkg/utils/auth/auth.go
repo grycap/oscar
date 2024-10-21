@@ -18,7 +18,9 @@ package auth
 
 import (
 	"fmt"
+	"log"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -59,6 +61,49 @@ func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.Hand
 		} else {
 			basicAuthHandler(c)
 		}
+	}
+}
+
+// GetLoggerMiddleware returns a gin handler as middleware to log custom info about sync/async executions
+func GetLoggerMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		// Disable default printf timestamp to avoid inconsistencies on logs
+		log.SetFlags(0)
+
+		startTime := time.Now()
+
+		// Process request
+		c.Next()
+
+		endTime := time.Now()
+
+		// Log custom information after the request is processed
+		logTime := endTime.Format("2006/01/02 - 15:04:05")
+		latency := time.Since(startTime)
+		status := c.Writer.Status()
+		clientIP := c.ClientIP()
+		method := c.Request.Method
+		path := c.Request.URL.Path
+
+		// Get EGI UID from context (if OIDC auth is used)
+		uid, uidExists := c.Get("uidOrigin")
+		var user string
+		if uidExists {
+			user, _ = uid.(string)
+		} else {
+			// Set OSCAR as default user when no UID is found
+			user = "oscar"
+		}
+
+		// Get source IP from context for jobs triggered through MinIO events
+		IPAddress, AddressExists := c.Get("IPAddress")
+		if AddressExists {
+			clientIP, _ = IPAddress.(string)
+		}
+
+		log.Printf("[GIN-EXECUTIONS-LOGGER] %s | %3d | %13v | %s | %-7s %s | %s",
+			logTime, status, latency, clientIP, method, path, user)
 	}
 }
 

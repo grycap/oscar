@@ -211,7 +211,7 @@ func TestMakeDeleteJobHandler(t *testing.T) {
 	serviceName := "test"
 	jobName := "job"
 	req, _ := http.NewRequest("DELETE", "/system/logs/"+serviceName+"/"+jobName, nil)
-	req.Header.Set("Authorization", "Bearer AbCdEf123456")
+	req.Header.Set("Authorization", "Bearer 11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf")
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusNoContent {

@@ -152,7 +152,7 @@ func UpdateExpose(service Service, kubeClientset kubernetes.Interface, cfg *Conf
 
 // TODO check and refactor
 // Main function that list all the kubernetes components
-// This function is not used, in the future could be usefull
+// This function is not used, in the future could be useful
 func ListExpose(kubeClientset kubernetes.Interface, cfg *Config) error {
 	deploy, hpa, err := listDeployments(kubeClientset, cfg)
 

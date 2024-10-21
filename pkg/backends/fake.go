@@ -83,7 +83,7 @@ func (f *FakeBackend) CreateService(service types.Service) error {
 // ReadService returns a Service (fake)
 func (f *FakeBackend) ReadService(name string) (*types.Service, error) {
 	// default service returned by the function
-	service := &types.Service{Token: "AbCdEf123456"}
+	service := &types.Service{Token: "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf"}
 	if f.Service != nil {
 		service = f.Service
 	}
