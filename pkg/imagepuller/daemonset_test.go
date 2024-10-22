@@ -36,7 +36,7 @@ func TestCreateDaemonset(t *testing.T) {
 	}
 	kubeClientset := fake.NewSimpleClientset()
 
-	// Patch the GetDataFromAPI function to return a mock result
+	// Patch the watchPods function to return a mock result
 	monkey.Patch(watchPods, func(kubernetes.Interface, *types.Config) {
 	})
 
