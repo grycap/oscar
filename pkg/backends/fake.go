@@ -81,7 +81,7 @@ func (f *FakeBackend) CreateService(service types.Service) error {
 
 // ReadService returns a Service (fake)
 func (f *FakeBackend) ReadService(name string) (*types.Service, error) {
-	return &types.Service{Token: "AbCdEf123456"}, f.returnError(getCurrentFuncName())
+	return &types.Service{Token: "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf"}, f.returnError(getCurrentFuncName())
 }
 
 // UpdateService updates an existent service (fake)

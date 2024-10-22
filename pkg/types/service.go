@@ -108,6 +108,17 @@ const (
 // YAMLMarshal package-level yaml marshal function
 var YAMLMarshal = yaml.Marshal
 
+type Expose struct {
+	MinScale       int32 `json:"min_scale" default:"1"`
+	MaxScale       int32 `json:"max_scale" default:"10"`
+	APIPort        int   `json:"api_port,omitempty" `
+	CpuThreshold   int32 `json:"cpu_threshold" default:"80" `
+	RewriteTarget  bool  `json:"rewrite_target" default:"false" `
+	NodePort       int32 `json:"nodePort" default:"0" `
+	DefaultCommand bool  `json:"default_command" `
+	SetAuth        bool  `json:"set_auth" `
+}
+
 // Service represents an OSCAR service following the SCAR Function Definition Language
 type Service struct {
 	// Name the name of the service
@@ -167,6 +178,13 @@ type Service struct {
 	// Optional
 	Replicas ReplicaList `json:"replicas,omitempty"`
 
+	//Delegation Mode of job delegation for replicas
+	// Opcional (default: manual)
+	//"static" The user select the priority to delegate jobs to the replicas.
+	//"random" The job delegation priority is generated randomly among the clusters of the available replicas.
+	//"load-based" The job delegation priority is generated depending on the CPU and Memory available in the replica clusters.
+	Delegation string `json:"delegation"`
+
 	// ReSchedulerThreshold time (in seconds) that a job (with replicas) can be queued before delegating it
 	// Optional
 	ReSchedulerThreshold int `json:"rescheduler_threshold"`
@@ -206,16 +224,7 @@ type Service struct {
 	// Optional
 	ImagePullSecrets []string `json:"image_pull_secrets,omitempty"`
 
-	Expose struct {
-		MinScale       int32 `json:"min_scale" default:"1"`
-		MaxScale       int32 `json:"max_scale" default:"10"`
-		APIPort        int   `json:"api_port,omitempty" `
-		CpuThreshold   int32 `json:"cpu_threshold" default:"80" `
-		RewriteTarget  bool  `json:"rewrite_target" default:"false" `
-		NodePort       int32 `json:"nodePort" default:"0" `
-		DefaultCommand bool  `json:"default_command" `
-		SetAuth        bool  `json:"set_auth" `
-	} `json:"expose"`
+	Expose Expose `json:"expose"`
 
 	// The user-defined environment variables assigned to the service
 	// Optional
