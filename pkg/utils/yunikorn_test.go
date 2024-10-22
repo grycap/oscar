@@ -45,7 +45,8 @@ func TestReadYunikornConfig(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error Reading Yunikorn config: %v", err)
 	}
-	if schedulerConfig == nil {
+
+	if schedulerConfig.Partitions[0].Name != "default" {
 		t.Errorf("Error Reading Yunikorn config. SchedulerConfig is nil")
 	}
 }
