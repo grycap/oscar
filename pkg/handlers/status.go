@@ -49,7 +49,7 @@ type NodeInfo struct {
 }
 
 // MakeStatusHandler Status handler for kubernetes deployment.
-func MakeStatusHandler(kubeClientset kubernetes.Interface, metricsClientset *versioned.MetricsV1beta1Client) gin.HandlerFunc {
+func MakeStatusHandler(kubeClientset kubernetes.Interface, metricsClientset versioned.MetricsV1beta1Interface) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get  nodes list
 		nodes, err := kubeClientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
