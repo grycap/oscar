@@ -43,7 +43,8 @@ func TestMakeUpdateHandler(t *testing.T) {
 				AccessKey: "ak",
 				SecretKey: "sk"}},
 		},
-		AllowedUsers: []string{"user1"}}
+		Owner:        "somelonguid@egi.eu",
+		AllowedUsers: []string{"somelonguid1@egi.eu"}}
 	back.Service = svc
 
 	// and set the MinIO endpoint to the fake server
@@ -57,6 +58,10 @@ func TestMakeUpdateHandler(t *testing.T) {
 	}
 
 	r := gin.Default()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "somelonguid@egi.eu")
+		c.Next()
+	})
 	r.PUT("/system/services", MakeUpdateHandler(&cfg, back))
 
 	w := httptest.NewRecorder()
@@ -95,6 +100,7 @@ func TestMakeUpdateHandler(t *testing.T) {
 		}
 	`)
 	req, _ := http.NewRequest("PUT", "/system/services", body)
+	req.Header.Set("Authorization", "Bearer token")
 	r.ServeHTTP(w, req)
 
 	// Close the fake MinIO server
