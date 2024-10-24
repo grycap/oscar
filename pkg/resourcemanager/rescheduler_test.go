@@ -17,11 +17,15 @@ limitations under the License.
 package resourcemanager
 
 import (
+	"bytes"
+	"log"
 	"testing"
 	"time"
 
+	"bou.ke/monkey"
 	"github.com/grycap/oscar/v3/pkg/backends"
 	"github.com/grycap/oscar/v3/pkg/types"
+	jobv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -127,4 +131,63 @@ func TestGetReScheduleInfos(t *testing.T) {
 		t.Fatalf("error getting reschedule infos")
 	}
 
+}
+
+func TestStartReScheduler(t *testing.T) {
+	// Define test namespace
+	namespace := "test-namespace"
+
+	// Create test pods
+	pods := &v1.PodList{
+		Items: []v1.Pod{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod1",
+					Namespace: namespace,
+					Labels: map[string]string{
+						types.ServiceLabel:        "service1",
+						types.ReSchedulerLabelKey: "10",
+						"job-name":                "job1",
+					},
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-15 * time.Second)},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodPending,
+				},
+			},
+		},
+	}
+	jobs := &jobv1.JobList{
+		Items: []jobv1.Job{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "job1",
+					Namespace: namespace,
+				},
+			},
+		},
+	}
+
+	// Create a fake Kubernetes client
+	kubeClientset := fake.NewSimpleClientset(pods, jobs)
+	back := backends.MakeFakeBackend()
+	cfg := &types.Config{
+		ReSchedulerInterval: 5,
+		ServicesNamespace:   namespace,
+	}
+
+	// Mock the Delegate function using monkey patching
+	monkey.Patch(DelegateJob, func(service *types.Service, event string, logger *log.Logger) error {
+		return nil
+	})
+	var buf bytes.Buffer
+	reSchedulerLogger = log.New(&buf, "[RE-SCHEDULER] ", log.Flags())
+	// Call the function to test
+	go StartReScheduler(cfg, back, kubeClientset)
+	time.Sleep(2 * time.Second)
+
+	defer monkey.Unpatch(DelegateJob)
+	if buf.String() != "" {
+		t.Fatalf("error starting rescheduler: %v", buf.String())
+	}
 }

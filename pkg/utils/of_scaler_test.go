@@ -16,7 +16,9 @@ limitations under the License.
 package utils
 
 import (
+	"bytes"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -168,7 +170,7 @@ func TestStart(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
 		fmt.Println(hreq.URL.Path)
 		if hreq.URL.Path == "/api/v1/query" {
-			rw.Write([]byte(`{"status":"success","data":{"resultType":"vector","result":[{"metric":{},"value":[1620810000,"0"]}]},"error":null}`))
+			rw.Write([]byte(`{"status":"success","data":{"resultType":"vector","result":[{"metric":{},"value":[1620810000,"1"]}]},"error":null}`))
 		}
 	}))
 
@@ -179,15 +181,20 @@ func TestStart(t *testing.T) {
 		OpenfaasBasicAuthSecret:          "basic-auth",
 		OpenfaasPrometheusPort:           9090,
 		OpenfaasScalerInactivityDuration: "5m",
-		OpenfaasScalerInterval:           "0.1s",
+		OpenfaasScalerInterval:           "0.5s",
 	}
 
 	scaler := NewOFScaler(kubeClientset, cfg)
 	scaler.gatewayEndpoint = server.URL
 	scaler.prometheusEndpoint = server.URL
 
-	go func() {
-		scaler.Start()
-	}()
-	time.Sleep(2 * time.Second)
+	var buf bytes.Buffer
+	scalerLogger = log.New(&buf, "[OF-SCALER] ", log.Flags())
+
+	go scaler.Start()
+	time.Sleep(1 * time.Second)
+
+	if buf.String() != "" {
+		t.Errorf("Unexpected log output: %s", buf.String())
+	}
 }
