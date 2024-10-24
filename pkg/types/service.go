@@ -260,7 +260,7 @@ type Service struct {
 
 	InterLinkNodeName string `json:"interlink_node_name"`
 	// List of EGI UID's identifying the users that will have visibility of the service and its MinIO storage provider
-	// Optional (If the list is empty we asume the visibility is public for all cluster users)
+	// Optional (If the list is empty we assume the visibility is public for all cluster users)
 	AllowedUsers []string `json:"allowed_users"`
 
 	// Configuration to create a storage provider as a volume inside the service container

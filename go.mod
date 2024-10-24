@@ -52,6 +52,7 @@ require (
 )
 
 require (
+	bou.ke/monkey v1.0.2
 	github.com/GehirnInc/crypt v0.0.0-20190301055215-6c0105aabd46 // indirect
 	github.com/apache/yunikorn-scheduler-interface v1.2.0 // indirect
 	github.com/blendle/zapdriver v1.3.1 // indirect
