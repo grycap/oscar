@@ -42,8 +42,6 @@ func TestMakeCreateHandler(t *testing.T) {
 			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
 		}
 
-		fmt.Println(hreq.URL.Path)
-
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
 			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))

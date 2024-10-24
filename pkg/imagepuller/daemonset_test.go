@@ -69,4 +69,6 @@ func TestCreateDaemonset(t *testing.T) {
 	if daemonset.Spec.Template.Spec.Containers[0].Image != service.Image {
 		t.Errorf("expected container image to be '%s', got %s", service.Image, daemonset.Spec.Template.Spec.Containers[0].Image)
 	}
+
+	defer monkey.Unpatch(watchPods)
 }

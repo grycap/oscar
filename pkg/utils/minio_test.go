@@ -17,7 +17,6 @@ limitations under the License.
 package utils
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -29,7 +28,6 @@ import (
 func createMinIOConfig() (types.Config, *httptest.Server) {
 	// Create a fake MinIO server
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
-		fmt.Println(hreq.URL.Path)
 		if !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
 			rw.WriteHeader(http.StatusNotFound)
 		}

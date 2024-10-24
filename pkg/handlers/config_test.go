@@ -132,6 +132,9 @@ func TestMakeConfigHandler(t *testing.T) {
 		if !reflect.DeepEqual(responseBody, expected_body) {
 			t.Fatalf("Unexpected response body: %s", w.Body.String())
 		}
+
+		defer monkey.Unpatch(auth.GetUIDFromContext)
+		defer monkey.Unpatch(auth.GetMultitenancyConfigFromContext)
 	})
 
 	t.Run("With Token Authorization Header", func(t *testing.T) {

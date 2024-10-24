@@ -17,7 +17,6 @@ package utils
 
 import (
 	"bytes"
-	"fmt"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -104,7 +103,6 @@ func TestGetScalableFunctions(t *testing.T) {
 func TestScaleToZero(t *testing.T) {
 	kubeClientset := fake.NewSimpleClientset()
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
-		fmt.Println(hreq.URL.Path)
 	}))
 
 	scaler := &OpenfaasScaler{
@@ -120,7 +118,6 @@ func TestScaleToZero(t *testing.T) {
 
 func TestIsIdle(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
-		fmt.Println(hreq.URL.Path)
 		if hreq.URL.Path == "/api/v1/query" {
 			rw.Write([]byte(`{"status":"success","data":{"resultType":"vector","result":[{"metric":{},"value":[1620810000,"0"]}]},"error":null}`))
 		}
@@ -168,7 +165,6 @@ func TestStart(t *testing.T) {
 	}
 	kubeClientset := fake.NewSimpleClientset(secret, deployment)
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
-		fmt.Println(hreq.URL.Path)
 		if hreq.URL.Path == "/api/v1/query" {
 			rw.Write([]byte(`{"status":"success","data":{"resultType":"vector","result":[{"metric":{},"value":[1620810000,"1"]}]},"error":null}`))
 		}
