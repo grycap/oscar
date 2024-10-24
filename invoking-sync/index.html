@@ -1360,8 +1360,8 @@ decoded as well. Save output in the expected format of the use-case.</p>
  -d @- https://&lt;CLUSTER_ENDPOINT&gt;/run/&lt;OSCAR_SERVICE&gt; | base64 -d &gt; result.png
 </code></pre>
 <h2 id="service-access-tokens">Service access tokens</h2>
-<p>As detailed in the <a href="../api/">API specification</a>, invocation paths require the
-service access token in the request header for authentication. Service access
+<p>As detailed in the <a href="../api/">API specification</a>, invocation paths require either the
+service access token or the Access Token of the user when the cluster is integrated with EGI Check-in, in the request header for authentication (any of them is valid). Service access
 tokens are auto-generated in service creation and update, and MinIO eventing
 system is automatically configured to use them for event-driven file
 processing. Tokens can be obtained through the API, using the
