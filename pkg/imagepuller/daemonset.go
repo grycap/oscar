@@ -59,7 +59,7 @@ var stopper chan struct{}
 
 // Create daemonset
 func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kubernetes.Interface) error {
-
+	DaemonSetLoggerInfo.Println("Creating daemonset for service:", service.Name)
 	//Set needed variables
 	setWorkingNodes(kubeClientset)
 	podGroup = generatePodGroupName()
