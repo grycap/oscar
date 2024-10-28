@@ -73,8 +73,6 @@ func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kub
 	if err != nil {
 		DaemonSetLoggerInfo.Println(err)
 		return fmt.Errorf("failed to create daemonset: %s", err.Error())
-	} else {
-		DaemonSetLoggerInfo.Println("Created daemonset for service:", service.Name)
 	}
 
 	//Set watcher informer

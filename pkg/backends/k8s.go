@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -32,8 +31,6 @@ import (
 )
 
 const ConfigMapNameOSCAR = "additional-oscar-config"
-
-var k8sLogger = log.New(os.Stdout, "[BACKEND-INFO] ", log.Flags())
 
 // KubeBackend struct to represent a Kubernetes client to store services as podTemplates
 type KubeBackend struct {
@@ -133,7 +130,6 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 	}
 	//Create deaemonset to cache the service image on all the nodes
 	if service.ImagePrefetch {
-		k8sLogger.Println("Updating service image on all working nodes")
 		err = imagepuller.CreateDaemonset(k.config, service, k.kubeClientset)
 		if err != nil {
 			return err
@@ -222,7 +218,6 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 
 	//Create deaemonset to cache the service image on all the nodes
 	if service.ImagePrefetch {
-
 		err = imagepuller.CreateDaemonset(k.config, service, k.kubeClientset)
 		if err != nil {
 			return err
