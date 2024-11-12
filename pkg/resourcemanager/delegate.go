@@ -21,7 +21,9 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"math"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -71,6 +73,187 @@ type NodeInfo struct {
 	MemoryPercentage string `json:"memoryPercentage"`
 }
 
+type Alternative struct {
+	Index      int     // Número de la alternativa
+	Preference float64 // Valor de la preferencia
+}
+
+type JobStatus struct {
+	Status       string `json:"status"`
+	CreationTime string `json:"creation_time"`
+	StartTime    string `json:"start_time"`
+	FinishTime   string `json:"finish_time"`
+}
+type JobStatuses map[string]JobStatus
+
+// Function to execute TOPSIS method
+// Normalizes a column by dividing each value by the square root of the sum of squares.
+func normalizeMatrix(matrix [][]float64) [][]float64 {
+	rows := len(matrix)
+	cols := len(matrix[0])
+	normalized := make([][]float64, rows)
+	for i := range normalized {
+		normalized[i] = make([]float64, cols)
+	}
+
+	for j := 0; j < cols; j++ {
+		// Calculate the norm (square root of the sum of squares of the column)
+		add := 0.0
+		for i := 0; i < rows; i++ {
+			add += matrix[i][j] * matrix[i][j]
+		}
+		norm := math.Sqrt(add)
+		// Normalize the values ​​of the column
+		for i := 0; i < rows; i++ {
+			normalized[i][j] = matrix[i][j] / norm
+		}
+	}
+	return normalized
+}
+
+// Multiply the normalized matrix by the weights.
+func weightMatrix(matrix [][]float64, weight []float64) [][]float64 {
+	rows := len(matrix)
+	cols := len(matrix[0])
+	weighted := make([][]float64, rows)
+	for i := range weighted {
+		weighted[i] = make([]float64, cols)
+		for j := 0; j < cols; j++ {
+			weighted[i][j] = matrix[i][j] * weight[j]
+		}
+	}
+	return weighted
+}
+
+// Calculate the ideal and anti-ideal solutions.
+func calculateSolutions(matrix [][]float64) (ideal []float64, antiIdeal []float64) {
+	rows := len(matrix)
+	cols := len(matrix[0])
+
+	ideal = make([]float64, cols)
+	antiIdeal = make([]float64, cols)
+
+	for j := 0; j < cols; j++ {
+		// If the criterion is minimization (let's assume that the first criterion is the one we want to minimize)
+
+		if j == 0 || j == 4 || j == 5 {
+			// For the ideal solution, we select the minimum value (instead of the maximum)
+			ideal[j] = matrix[0][j]
+			antiIdeal[j] = matrix[0][j]
+			for i := 0; i < rows; i++ {
+				if matrix[i][j] < ideal[j] {
+					ideal[j] = matrix[i][j]
+				}
+				if matrix[i][j] > antiIdeal[j] {
+					antiIdeal[j] = matrix[i][j]
+				}
+			}
+		} else {
+			// For maximization criteria, we normally use the maximum and minimum values
+			ideal[j] = matrix[0][j]
+			antiIdeal[j] = matrix[0][j]
+			for i := 0; i < rows; i++ {
+				if matrix[i][j] > ideal[j] {
+					ideal[j] = matrix[i][j]
+				}
+				if matrix[i][j] < antiIdeal[j] {
+					antiIdeal[j] = matrix[i][j]
+				}
+			}
+		}
+	}
+	return ideal, antiIdeal
+}
+
+// Calculate the Euclidean distance between an alternative and the ideal or anti-ideal solution
+func calculateDistance(alternative []float64, solution []float64) float64 {
+	add := 0.0
+	for i := 0; i < len(alternative); i++ {
+		add += (alternative[i] - solution[i]) * (alternative[i] - solution[i])
+	}
+	return math.Sqrt(add)
+}
+
+// Calculate the preference index for each alternative
+func calculatePreferences(matrix [][]float64, ideal []float64, antiIdeal []float64) []float64 {
+	rows := len(matrix)
+	preferences := make([]float64, rows)
+
+	for i := 0; i < rows; i++ {
+		distanceIdeal := calculateDistance(matrix[i], ideal)
+		distanceAntiIdeal := calculateDistance(matrix[i], antiIdeal)
+		preferences[i] = distanceAntiIdeal / (distanceIdeal + distanceAntiIdeal)
+	}
+	return preferences
+}
+
+// Order the alternatives from best to worst according to the preference index
+func sortAlternatives(preferences []float64) []Alternative {
+	alternatives := make([]Alternative, len(preferences))
+
+	// Create a list of alternatives with their preference indices
+	for i := 0; i < len(preferences); i++ {
+		alternatives[i] = Alternative{
+			Index:      i + 1, // Alternativa 1, 2, etc.
+			Preference: preferences[i],
+		}
+	}
+
+	// Sort the alternatives in descending order of preference
+	sort.Slice(alternatives, func(i, j int) bool {
+		return alternatives[i].Preference > alternatives[j].Preference
+	})
+
+	return alternatives
+}
+
+func distancesFromBetter(alternatives []Alternative) []float64 {
+	distances := make([]float64, len(alternatives)-1)
+
+	// Calculate distances with the first element
+	for i := 1; i < len(alternatives); i++ {
+		distances[i-1] = math.Abs(alternatives[0].Preference - alternatives[i].Preference)
+	}
+
+	return distances
+}
+
+// Function to randomly rearrange elements whose distance from the first is less than a threshold, including the first
+func reorganizeIfNearby(alternatives []Alternative, distances []float64, threshold float64) []Alternative {
+
+	// List of nearby elements (with distance less than the threshold, including the first element)
+	nearby := []Alternative{alternatives[0]}
+
+	// Identify the other nearby elements
+	for i := 0; i < len(distances); i++ {
+		if distances[i] < threshold {
+			nearby = append(nearby, alternatives[i+1])
+		}
+	}
+
+	// Randomly shuffle nearby items
+	//rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(nearby), func(i, j int) {
+		nearby[i], nearby[j] = nearby[j], nearby[i]
+	})
+
+	// Create a new reorganized alternative list
+	newAlternatives := []Alternative{}
+	j := 0
+
+	// Insert the rearranged or unarranged elements
+	for i := 0; i < len(alternatives); i++ {
+		if i == 0 || distances[i-1] < threshold {
+			newAlternatives = append(newAlternatives, nearby[j]) // Add the rearranged items
+			j++
+		} else {
+			newAlternatives = append(newAlternatives, alternatives[i]) // Keep non-close elements
+		}
+	}
+
+	return newAlternatives
+}
+
 // DelegateJob sends the event to a service's replica
 func DelegateJob(service *types.Service, event string, logger *log.Logger) error {
 
@@ -79,13 +262,171 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 	defer mutex.Unlock()
 
 	//Determine priority level of each replica to delegate
-	getClusterStatus(service)
-	fmt.Println("Replicas: ", service.Replicas)
+	if service.Delegation == "topsis" {
+		results := [][]float64{}
+		//ServiceCPU, err := strconv.ParseFloat(service.CPU, 64)
+		//if err != nil {
+		//	fmt.Println("Error to converter CPU of service to int: ", err)
+		//	continue
+		//}
+		for _, cred := range service.Replicas {
 
-	// Check if replicas are sorted by priority and sort it if needed
-	if !sort.IsSorted(service.Replicas) {
-		sort.Stable(service.Replicas)
-		fmt.Println("Replicas Stable: ", service.Replicas)
+			cluster, ok := service.Clusters[cred.ClusterID]
+			if !ok {
+				//logger.Printf("Error delegating service \"%s\" to ClusterID \"%s\": Cluster not defined\n", service.Name, replica.ClusterID)
+				continue
+			}
+
+			// Get token
+			token, err := getServiceToken(cred, cluster)
+			if err != nil {
+				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": %v\n", service.Name, replica.ClusterID, err)
+				continue
+			}
+
+			// Parse the cluster's endpoint URL and add the service's path
+			JobURL, err := url.Parse(cluster.Endpoint)
+			if err != nil {
+				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", service.Name, replica.ClusterID, cluster.Endpoint, err)
+				continue
+			}
+			JobURL.Path = path.Join(JobURL.Path, "/system/logs/", cred.ServiceName)
+
+			// Make request to get service's definition (including token) from cluster
+			req, err := http.NewRequest("GET", JobURL.String(), nil)
+			if err != nil {
+				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to make request: %v\n", service.Name, replica.ClusterID, err)
+				continue
+			}
+
+			// Add Headers
+			for k, v := range cred.Headers {
+				req.Header.Add(k, v)
+			}
+
+			// Add service token to the request
+			req.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
+
+			// Make HTTP client
+
+			var transport http.RoundTripper = &http.Transport{
+				// Enable/disable SSL verification
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
+			}
+
+			client := &http.Client{
+				Transport: transport,
+				Timeout:   time.Second * 20,
+			}
+
+			// Send the request
+			resp, err := client.Do(req)
+			if err != nil {
+				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
+				continue
+			}
+			defer resp.Body.Close()
+			body, err := io.ReadAll(resp.Body) // Utilizar io.ReadAll para leer el cuerpo
+			if err != nil {
+				fmt.Printf("Error al leer el cuerpo de la respuesta para %s: %v\n", cred.URL, err)
+				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
+				continue
+			}
+			var jobStatuses JobStatuses
+			err = json.Unmarshal(body, &jobStatuses)
+			if err != nil {
+				fmt.Println("Error decoding the JSON of the response:", err)
+				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
+				continue
+			}
+
+			// Show job statuses
+
+			// Count job statuses
+			averageExecutionTime, pendingCount := countJobs(jobStatuses)
+
+			JobURL, err = url.Parse(cluster.Endpoint)
+			if err != nil {
+				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", service.Name, replica.ClusterID, cluster.Endpoint, err)
+				continue
+			}
+			JobURL.Path = path.Join(JobURL.Path, "/system/status/")
+			req1, err := http.NewRequest("GET", JobURL.String(), nil)
+
+			if err != nil {
+				fmt.Printf("Error al crear la solicitud para %s: %v\n", cred.URL, err)
+				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
+				continue
+			}
+
+			// Add Headers
+			for k, v := range cred.Headers {
+				req.Header.Add(k, v)
+			}
+
+			// Add service token to the request
+			req.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
+
+			// Realizar la solicitud HTTP
+
+			start := time.Now()
+			resp1, err := client.Do(req1)
+			duration := time.Since(start)
+			if err != nil {
+				//fmt.Printf("Error al realizar la solicitud para %s: %v\n", cred.URL, err)
+				results = append(results, []float64{duration.Seconds(), 0, 0, 0, 1e6, 1e6})
+				continue
+			}
+
+			defer resp1.Body.Close()
+			var clusterStatus GeneralInfo
+			err = json.NewDecoder(resp1.Body).Decode(&clusterStatus)
+			if err != nil {
+				fmt.Println("Error decoding the JSON of the response:", err)
+				results = append(results, []float64{duration.Seconds(), 0, 0, 0, 1e6, 1e6})
+				continue
+			}
+
+			serviceCPU, err := strconv.ParseFloat(service.CPU, 64)
+
+			if err != nil {
+				fmt.Println("Error converting service CPU to float: ", err)
+				results = append(results, []float64{duration.Seconds(), 0, 0, 0, 1e6, 1e6})
+				continue
+			}
+
+			results = createParameters(results, duration, clusterStatus, serviceCPU, averageExecutionTime, float64(pendingCount))
+
+		}
+		// Print results as a matrix
+		fmt.Println("Results matrix:")
+		for _, row := range results {
+			fmt.Println(row)
+		}
+
+		// Criteria weights ()
+		weight := []float64{1, 8, 18, 65, 2, 6}
+		preferences := topsisMethod(results, weight)
+		newAlternatives := sortbyUmbral(preferences, 20)
+
+		// Print reordered alternatives
+		fmt.Println("\nAlternatives reordered by threshold:")
+		for _, alt := range newAlternatives {
+			fmt.Printf("Alternative %d: %f\n", alt.Index, alt.Preference)
+			service.Replicas[alt.Index].Priority = uint(alt.Preference)
+		}
+		fmt.Println("Replicas stable to topsis method: ", service.Replicas)
+
+		//fmt.Println("Priority ", service.Replicas[id].Priority, " with ", service.Delegation, " delegation")
+	} else {
+		getClusterStatus(service)
+		fmt.Println("Replicas: ", service.Replicas)
+
+		// Check if replicas are sorted by priority and sort it if needed
+		if !sort.IsSorted(service.Replicas) {
+			sort.Stable(service.Replicas)
+			fmt.Println("Replicas Stable: ", service.Replicas)
+		}
 	}
 
 	fmt.Println("Event : ", event)
@@ -433,12 +774,14 @@ func getClusterStatus(service *types.Service) {
 						service.Replicas[id].Priority = uint(mappedCPUPriority)
 						//replica.Priority = uint(mappedCPUPriority)
 						fmt.Println("Priority ", service.Replicas[id].Priority, " with ", service.Delegation, " delegation")
+
 					} else if service.Delegation != "static" {
 						service.Replicas[id].Priority = noDelegateCode
 						//replica.Priority = noDelegateCode
 						fmt.Println("Error when declaring the type of delegation in ClusterID ", replica.ClusterID)
 						continue
 					}
+
 				} else {
 					fmt.Println("No CPU capacity to delegate job in ClusterID ", replica.ClusterID)
 					if service.Delegation != "static" {
@@ -474,4 +817,117 @@ func mapToRange(value, minInput, maxInput, maxOutput, minOutput int64) int {
 	}
 
 	return mappedInt
+}
+
+func topsisMethod(results [][]float64, weight []float64) []float64 {
+
+	// Step 1: Normalize the matrix
+	matrixNormalized := normalizeMatrix(results)
+	//fmt.Println("//Normalized matrix: ")
+	//for _, row := range matrizNormalizada {
+	//	fmt.Println(row)
+	//}
+
+	// Step 2: Weight the matrix
+	matrixWeighted := weightMatrix(matrixNormalized, weight)
+	//fmt.Println("\n//Weighted Matrix:")
+	//for _, row := range matrizPonderada {
+	//	fmt.Println(row)
+	//}
+
+	// Step 3: Compute the ideal and anti-ideal solution
+	ideal, antiIdeal := calculateSolutions(matrixWeighted)
+	//fmt.Println("\nIdeal Solution:", ideal)
+	//fmt.Println("Anti-Ideal Solution:", antiIdeal)
+
+	// Step 4: Compute the distances and preference index
+	preferences := calculatePreferences(matrixWeighted, ideal, antiIdeal)
+	fmt.Println("\nPreference index:", preferences)
+
+	return preferences
+
+}
+
+func sortbyUmbral(preferences []float64, umbral int) []Alternative {
+	// Step 5: Order alternatives from best to worst
+	alternativesSort := sortAlternatives(preferences)
+
+	fmt.Println("\nAlternatives ordered from best to worst:")
+	for _, alt := range alternativesSort {
+		fmt.Printf("Alternative %d: %f\n", alt.Index, alt.Preference)
+
+		//mapped := mapToRange(int64(alt*100.0), 0, 100, 100, 0)
+		//fmt.Printf("Original Preference: %.4f -> Mapped %d\n", alt, mapped)
+	}
+
+	distancesFromBetter := distancesFromBetter(alternativesSort)
+
+	// Threshold to reorder nearby elements
+	f := float64(umbral) / 100.0
+	threshold := alternativesSort[0].Preference * f
+	fmt.Printf("The threshold is the %d %% of the best value: %f ", umbral, threshold)
+
+	// Randomly reorder elements whose distance is less than the threshold, including the first one
+	newAlternatives := reorganizeIfNearby(alternativesSort, distancesFromBetter, threshold)
+
+	var priority_map int
+	for id, alt := range newAlternatives {
+		//fmt.Printf("Alternative %d: %d\n", alt.Index, int(alt.Preference*100))
+		priority_map = mapToRange(int64(alt.Preference*100.0), 0, 100, 100, 0)
+		newAlternatives[id].Preference = float64(priority_map)
+		//fmt.Printf("Alternative %d: %f\n", alt.Index, newAlternatives[id].Preference)
+	}
+
+	return newAlternatives
+
+}
+
+func countJobs(jobStatuses map[string]JobStatus) (float64, int) {
+	totalJobs := 0
+	succeededCount := 0
+	failedCount := 0
+	pendingCount := 0
+	totalExecutionTime := 0.0
+	for _, status := range jobStatuses {
+		totalJobs++
+		switch status.Status {
+		case "Succeeded":
+			succeededCount++
+			creationTime, _ := time.Parse(time.RFC3339, status.CreationTime)
+			finishTime, _ := time.Parse(time.RFC3339, status.FinishTime)
+			duration := finishTime.Sub(creationTime).Seconds() // Duration in seconds
+			totalExecutionTime += duration
+		case "Failed":
+			failedCount++
+		case "Pending": // Pending jobs
+			pendingCount++
+		}
+	}
+
+	var averageExecutionTime float64 = 1e6
+	if succeededCount > 0 {
+		averageExecutionTime = totalExecutionTime / float64(succeededCount)
+	}
+	return averageExecutionTime, pendingCount
+
+}
+
+func createParameters(results [][]float64, duration time.Duration, clusterStatus GeneralInfo, serviceCPU float64, averageExecutionTime float64, pendingCount float64) [][]float64 {
+	maxNodeCPU := float64(clusterStatus.CPUMaxFree)
+	dist := maxNodeCPU - (1000 * serviceCPU)
+
+	if dist >= 0 {
+		results = append(results, []float64{
+			duration.Seconds(),                     // Latency (ms)
+			float64(clusterStatus.NumberNodes),     // Number of nodes
+			float64(clusterStatus.MemoryFreeTotal), // Total Memory Free
+			float64(clusterStatus.CPUFreeTotal),    // Total CPU Free
+			averageExecutionTime,                   // averageExecutionTime
+			pendingCount + 0.1,                     //pendingCount
+			// More criteria can be added here if needed
+		})
+	} else {
+		results = append(results, []float64{duration.Seconds(), 0, 0, 0, 1e6, 1e6})
+	}
+	return results
 }
