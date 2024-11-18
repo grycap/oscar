@@ -226,6 +226,14 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		}
 	}
 
+	//Create deaemonset to cache the service image on all the nodes
+	if service.ImagePrefetch {
+		err = imagepuller.CreateDaemonset(kn.config, service, kn.kubeClientset)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
