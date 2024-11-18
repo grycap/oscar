@@ -9,10 +9,6 @@
       
       
       
-        <link rel="prev" href="../integration-compss/">
-      
-      
-        <link rel="next" href="../faq/">
       
       
       <link rel="icon" href="../images/logo.png">
@@ -20,7 +16,7 @@
     
     
       
-        <title>Presentations and Webinars - OSCAR Documentation</title>
+        <title>Accessing and managing MinIO storage provider - OSCAR Documentation</title>
       
     
     
@@ -70,7 +66,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#presentations-and-webinars" class="md-skip">
+        <a href="#accessing-and-managing-minio-storage-provider" class="md-skip">
           Skip to content
         </a>
       
@@ -105,7 +101,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Presentations and Webinars
+              Accessing and managing MinIO storage provider
             
           </span>
         </div>
@@ -934,19 +930,17 @@
       
   
   
-    
   
   
-  
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
           <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
@@ -960,7 +954,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             Tutorials
@@ -971,30 +965,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Presentations and Webinars
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../training/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1003,35 +977,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#deploy-your-ai-based-service-for-inference-using-oscar" class="md-nav__link">
-    <span class="md-ellipsis">
-      Deploy your AI-based service for inference using OSCAR
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1291,10 +1236,44 @@
   
 
 
-<h1 id="presentations-and-webinars">Presentations and Webinars</h1>
-<h3 id="deploy-your-ai-based-service-for-inference-using-oscar">Deploy your AI-based service for inference using OSCAR</h3>
-<p>Delivered for the <a href="https://ai4eosc.eu">AI4EOSC</a> and <a href="https://imagine-ai.eu">iMagine</a> projects in March 2024.</p>
-<iframe src="https://docs.google.com/presentation/d/1YjUY29d4QGF_rhLoWCKws0dlpzkDQKln2P0G6poAMaQ/embed?start=false&loop=false&delayms=3000" frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true" webkitallowfullscreen="true"></iframe>
+<h1 id="accessing-and-managing-minio-storage-provider">Accessing and managing MinIO storage provider</h1>
+<p>Each OSCAR cluster includes a deployed MinIO instance, which is used to trigger service executions. When a service is configured to use MinIO as its storage provider, it monitors a specified input folder for new data. Whenever new data is added to this folder, it triggers the associated service to execute. </p>
+<h2 id="using-graphical-interfaces">Using graphical interfaces</h2>
+<p>These folders can be accessed via both the OSCAR UI and the MinIO console UI.</p>
+<ul>
+<li><strong>Using OSCAR-UI</strong>: The following image highlights the section where MinIO buckets are accessible. Users can view a list of available buckets and perform operations such as uploading and deleting files.</li>
+</ul>
+<p><img alt="minio-buckets" src="../images/bucket-list.png" /></p>
+<ul>
+<li><strong>Using the MinIO Console UI</strong>: Access details for this interface are available in the "Info" tab within the OSCAR UI. This tab provides the MinIO console endpoint and the necessary credentials to log in, where the <em>Access Key</em> serves as the username, and the <em>Secret Key</em> functions as the password.</li>
+</ul>
+<p><img alt="oscar-info" src="../images/oscar-info.png" /></p>
+<p>Finally, the following image provides an overview of the MinIO login panel and the "Object Browser" tab. Once logged in, the "Object Browser" tab allows users to navigate their available buckets, view stored objects, and perform various operations such as uploading, downloading, or deleting files.</p>
+<p><img alt="oscar-info" src="../images/minio-ui.png" /></p>
+<p>Further information about the MinIO Console avaliable on <a href="https://min.io/docs/minio/linux/administration/minio-console.html">MinIO Console documentation</a>.</p>
+<h2 id="using-command-line-interfaces">Using command-line interfaces</h2>
+<p>MinIO buckets can also be managed through <a href="https://github.com/grycap/oscar-cli">oscar-cli command-line</a> or the official <a href="https://min.io/docs/minio/linux/reference/minio-mc.html">MinIO client</a>. </p>
+<ul>
+<li><strong>oscar-cli</strong>: The OSCAR client provides a dedicated set of commands for accessing files within buckets. It is important to note that this interface does not support DELETE or UPDATE operations. Below is a brief overview of the available commands and their functionalities.</li>
+<li><a href="https://docs.oscar.grycap.net/oscar-cli/#get-file">get-file</a>: Get file from a service's storage provider.</li>
+<li><a href="https://docs.oscar.grycap.net/oscar-cli/#list-files">list-files</a>: List files from a service's storage provider path.</li>
+<li><a href="https://docs.oscar.grycap.net/oscar-cli/#put-file">put-file</a>: Upload a file on a service storage provider.</li>
+</ul>
+<p>An example of a put-file operation:
+  <code>sh
+  oscar-cli service put-file fish-detector.yaml minio .path/to/your/images ./fish-detector/input/</code></p>
+<ul>
+<li><strong>mc</strong>: If a user wants to use the MinIO client it needs to follow some previous steps.</li>
+<li><em>Install the client</em>: Detailed instructions for installing the MinIO client (mc) are available in <a href="https://min.io/docs/minio/linux/reference/minio-mc.html#install-mc">the official documentation</a>.</li>
+<li>
+<p><em>Configure the MinIO instance</em>: The client requires credentials to connect and interact with the MinIO instance. This configuration can be set with the following command:</p>
+<p><code>sh
+mc alias set myminio https://minio.gracious-varahamihira6.im.grycap.net YOUR-ACCESS-KEY YOUR-SECRET-KEY</code></p>
+</li>
+</ul>
+<p>Once the client is configured, users can perform various operations supported by the MinIO client. For a complete list of available commands and their usage, refer to the <a href="https://min.io/docs/minio/linux/reference/minio-mc.html#command-quick-reference">MinIO client reference</a>. The following example demonstrates a PUT operation, where a file is uploaded to a specific folder within a bucket.
+  <code>sh
+  mc cp /path/to/your/images/*.jpg myminio/fish-detector/input/</code></p>
 
 
 
