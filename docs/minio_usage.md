@@ -2,11 +2,11 @@
 
 Each OSCAR cluster includes a deployed MinIO instance, which is used to trigger service executions. When a service is configured to use MinIO as its storage provider, it monitors a specified input folder for new data. Whenever new data is added to this folder, it triggers the associated service to execute. 
 
-## Using graphic interfaces
+## Using graphical interfaces
 
 These folders can be accessed via both the OSCAR UI and the MinIO console UI.
 
-- **Using the OSCAR UI**: The following image highlights the section where MinIO buckets are accessible. Users can view a list of available buckets and perform operations such as uploading and deleting files.
+- **Using OSCAR-UI**: The following image highlights the section where MinIO buckets are accessible. Users can view a list of available buckets and perform operations such as uploading and deleting files.
   
 ![minio-buckets](images/bucket-list.png)
 
@@ -18,10 +18,11 @@ Finally, the following image provides an overview of the MinIO login panel and t
 
 ![oscar-info](images/minio-ui.png)
 
+Further information about the MinIO Console avaliable on [MinIO Console documentation](https://min.io/docs/minio/linux/administration/minio-console.html).
 
 ## Using command-line interfaces
 
-MinIO buckets can also be managed through oscar-cli command-line or the official [MinIO client](https://min.io/docs/minio/linux/reference/minio-mc.html). 
+MinIO buckets can also be managed through [oscar-cli command-line](https://github.com/grycap/oscar-cli) or the official [MinIO client](https://min.io/docs/minio/linux/reference/minio-mc.html). 
 
 - **oscar-cli**: The OSCAR client provides a dedicated set of commands for accessing files within buckets. It is important to note that this interface does not support DELETE or UPDATE operations. Below is a brief overview of the available commands and their functionalities.
   - [get-file](https://docs.oscar.grycap.net/oscar-cli/#get-file): Get file from a service's storage provider.
