@@ -1323,20 +1323,20 @@
 <li><a href="https://docs.oscar.grycap.net/oscar-cli/#list-files">list-files</a>: List files from a service's storage provider path.</li>
 <li><a href="https://docs.oscar.grycap.net/oscar-cli/#put-file">put-file</a>: Upload a file on a service storage provider.</li>
 </ul>
-<p>An example of a put-file operation:
-  <code>sh
+<p>An example of a put-file operation:</p>
+<p><code>bash
   oscar-cli service put-file fish-detector.yaml minio .path/to/your/images ./fish-detector/input/</code></p>
 <ul>
 <li><strong>mc</strong>: If a user wants to use the MinIO client it needs to follow some previous steps.</li>
 <li><em>Install the client</em>: Detailed instructions for installing the MinIO client (mc) are available in <a href="https://min.io/docs/minio/linux/reference/minio-mc.html#install-mc">the official documentation</a>.</li>
 <li>
 <p><em>Configure the MinIO instance</em>: The client requires credentials to connect and interact with the MinIO instance. This configuration can be set with the following command:</p>
-<p><code>sh
+<p><code>bash
 mc alias set myminio https://minio.gracious-varahamihira6.im.grycap.net YOUR-ACCESS-KEY YOUR-SECRET-KEY</code></p>
 </li>
 </ul>
-<p>Once the client is configured, users can perform various operations supported by the MinIO client. For a complete list of available commands and their usage, refer to the <a href="https://min.io/docs/minio/linux/reference/minio-mc.html#command-quick-reference">MinIO client reference</a>. The following example demonstrates a PUT operation, where a file is uploaded to a specific folder within a bucket.
-  <code>sh
+<p>Once the client is configured, users can perform various operations supported by the MinIO client. For a complete list of available commands and their usage, refer to the <a href="https://min.io/docs/minio/linux/reference/minio-mc.html#command-quick-reference">MinIO client reference</a>. The following example demonstrates a PUT operation, where a file is uploaded to a specific folder within a bucket.</p>
+<p><code>bash
   mc cp /path/to/your/images/*.jpg myminio/fish-detector/input/</code></p>
 
 
