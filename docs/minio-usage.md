@@ -1,4 +1,4 @@
-# Accessing and managing MinIO storage provider
+# Using the MinIO Storage Provider
 
 Each OSCAR cluster includes a deployed MinIO instance, which is used to trigger service executions. When a service is configured to use MinIO as its storage provider, it monitors a specified input folder for new data. Whenever new data is added to this folder, it triggers the associated service to execute. 
 
