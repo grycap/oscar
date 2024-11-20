@@ -43,7 +43,7 @@ func createExpectedBody(access_key string, secret_key string, cfg *types.Config)
 			"gpu_available":       false,
 			"interLink_available": false,
 			"yunikorn_enable":     false,
-			"oidc_groups":         "",
+			"oidc_groups":         nil,
 		},
 		"minio_provider": map[string]interface{}{
 			"endpoint":   cfg.MinIOProvider.Endpoint,
