@@ -23,7 +23,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
+)
+
+const (
+	tokenLength = 64
 )
 
 // MakeRunHandler makes a handler to manage sync invocations sending them to the gateway of the ServerlessBackend
@@ -47,10 +52,44 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 			c.Status(http.StatusUnauthorized)
 			return
 		}
-		reqToken := strings.TrimSpace(splitToken[1])
-		if reqToken != service.Token {
-			c.Status(http.StatusUnauthorized)
-			return
+
+		// Check if reqToken is the service token
+		rawToken := strings.TrimSpace(splitToken[1])
+		if len(rawToken) == tokenLength {
+
+			if rawToken != service.Token {
+				c.Status(http.StatusUnauthorized)
+				return
+			}
+		} else {
+			oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
+
+			if !oidcManager.IsAuthorised(rawToken) {
+				c.Status(http.StatusUnauthorized)
+				return
+			}
+
+			hasVO, err := oidcManager.UserHasVO(rawToken, service.VO)
+
+			if err != nil {
+				c.String(http.StatusInternalServerError, err.Error())
+				return
+			}
+
+			if !hasVO {
+				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
+				return
+			}
+
+			ui, err := oidcManager.GetUserInfo(rawToken)
+			if err != nil {
+				c.String(http.StatusInternalServerError, err.Error())
+				return
+			}
+			uid := ui.Subject
+			c.Set("uidOrigin", uid)
+			c.Next()
+
 		}
 
 		proxy := &httputil.ReverseProxy{

@@ -51,8 +51,8 @@ type oidcManager struct {
 
 // userInfo custom struct to store essential fields from UserInfo
 type userInfo struct {
-	subject string
-	groups  []string
+	Subject string
+	Groups  []string
 }
 
 // newOIDCManager returns a new oidcManager or error if the oidc.Provider can't be created
@@ -96,17 +96,17 @@ func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *ut
 		rawToken := strings.TrimPrefix(authHeader, "Bearer ")
 
 		// Check the token
-		if !oidcManager.isAuthorised(rawToken) {
+		if !oidcManager.IsAuthorised(rawToken) {
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 
-		ui, err := oidcManager.getUserInfo(rawToken)
+		ui, err := oidcManager.GetUserInfo(rawToken)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("%v", err))
 			return
 		}
-		uid := ui.subject
+		uid := ui.Subject
 
 		// Check if exist MinIO user in cached users list
 		minioUserExists := mc.UserExists(uid)
@@ -142,8 +142,8 @@ func (om *oidcManager) clearExpired() {
 	}
 }
 
-// getUserInfo obtains UserInfo from the issuer
-func (om *oidcManager) getUserInfo(rawToken string) (*userInfo, error) {
+// GetUserInfo obtains UserInfo from the issuer
+func (om *oidcManager) GetUserInfo(rawToken string) (*userInfo, error) {
 	ot := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: rawToken})
 
 	// Get OIDC UserInfo
@@ -160,8 +160,8 @@ func (om *oidcManager) getUserInfo(rawToken string) (*userInfo, error) {
 
 	// Create "userInfo" struct and add the groups
 	return &userInfo{
-		subject: ui.Subject,
-		groups:  getGroups(claims.EdupersonEntitlement),
+		Subject: ui.Subject,
+		Groups:  getGroups(claims.EdupersonEntitlement),
 	}, nil
 }
 
@@ -184,11 +184,11 @@ func getGroups(urns []string) []string {
 
 // UserHasVO checks if the user contained on the request token is enrolled on a specific VO
 func (om *oidcManager) UserHasVO(rawToken string, vo string) (bool, error) {
-	ui, err := om.getUserInfo(rawToken)
+	ui, err := om.GetUserInfo(rawToken)
 	if err != nil {
 		return false, err
 	}
-	for _, gr := range ui.groups {
+	for _, gr := range ui.Groups {
 		if vo == gr {
 			return true, nil
 		}
@@ -197,16 +197,15 @@ func (om *oidcManager) UserHasVO(rawToken string, vo string) (bool, error) {
 }
 
 func (om *oidcManager) GetUID(rawToken string) (string, error) {
-	ui, err := om.getUserInfo(rawToken)
-	oidcLogger.Println("received uid: ", ui.subject)
+	ui, err := om.GetUserInfo(rawToken)
 	if err != nil {
-		return ui.subject, nil
+		return "", err
 	}
-	return "", err
+	return ui.Subject, nil
 }
 
-// isAuthorised checks if a token is authorised to access the API
-func (om *oidcManager) isAuthorised(rawToken string) bool {
+// IsAuthorised checks if a token is authorised to access the API
+func (om *oidcManager) IsAuthorised(rawToken string) bool {
 	// Check if the token is valid
 	_, err := om.provider.Verifier(om.config).Verify(context.TODO(), rawToken)
 	if err != nil {
@@ -217,7 +216,7 @@ func (om *oidcManager) isAuthorised(rawToken string) bool {
 	ui, found := om.tokenCache[rawToken]
 	if !found {
 		// Get userInfo from the issuer
-		ui, err = om.getUserInfo(rawToken)
+		ui, err = om.GetUserInfo(rawToken)
 		if err != nil {
 			return false
 		}
@@ -231,12 +230,12 @@ func (om *oidcManager) isAuthorised(rawToken string) bool {
 
 	// Check if is authorised
 	// Same subject
-	if ui.subject == om.subject {
+	if ui.Subject == om.subject {
 		return true
 	}
 
 	// Groups
-	for _, tokenGroup := range ui.groups {
+	for _, tokenGroup := range ui.Groups {
 		for _, authGroup := range om.groups {
 			if tokenGroup == authGroup {
 				return true
