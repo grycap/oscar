@@ -18,6 +18,7 @@ package auth
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -98,5 +99,47 @@ func TestGetMultitenancyConfigFromContext(t *testing.T) {
 	}
 	if mcFromContext != mc {
 		t.Errorf("expected multitenancyConfig %v, got %v", mc, mcFromContext)
+	}
+}
+
+func TestCustomAuth(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		if !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
+			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
+		}
+		if hreq.URL.Path == "/minio/admin/v3/info" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+		} else {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"status": "success"}`))
+		}
+	}))
+
+	cfg := &types.Config{
+		OIDCEnable: false,
+		Username:   "testuser",
+		Password:   "testpass",
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			AccessKey: "minio",
+			SecretKey: "minio123",
+		},
+	}
+	kubeClientset := fake.NewSimpleClientset()
+
+	router := gin.New()
+	router.Use(CustomAuth(cfg, kubeClientset))
+	router.GET("/", func(c *gin.Context) {
+		c.JSON(http.StatusOK, "")
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.SetBasicAuth("testuser", "testpass")
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %v, got %v", http.StatusOK, w.Code)
 	}
 }
