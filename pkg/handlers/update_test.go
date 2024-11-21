@@ -96,7 +96,7 @@ func TestMakeUpdateHandler(t *testing.T) {
 					}
 				}
 			},
-			"allowed_users": ["user1", "user2"]
+			"allowed_users": ["somelonguid1@egi.eu", "somelonguid2@egi.eu"]
 		}
 	`)
 	req, _ := http.NewRequest("PUT", "/system/services", body)
