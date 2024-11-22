@@ -12,13 +12,13 @@ jobs:
     steps:
       - name: Add tox unit test step definition for a SQAaaS assessment
         uses: eosc-synergy/sqaaas-step-action@v1
-        id: tox_unit_test
+        id: go_unit_test
         with:
           container: "golang:1.21.4-alpine3.18"
           tool: commands
-          commands: go test ./... -v
+          commands: "go test ./... -v"
 
       - name: SQAaaS assessment step
         uses: eosc-synergy/sqaaas-assessment-action@v2
         with:
-          qc_uni_steps: tox_unit_test
+          qc_uni_steps: go_unit_test
