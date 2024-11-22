@@ -23,6 +23,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -31,6 +32,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/resourcemanager"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	genericErrors "github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -45,7 +47,8 @@ var (
 	// Don't restart jobs in order to keep logs
 	restartPolicy = v1.RestartPolicyNever
 	// command used for passing the event to faas-supervisor
-	command = []string{"/bin/sh"}
+	command   = []string{"/bin/sh"}
+	jobLogger = log.New(os.Stdout, "[JOB-HANDLER] ", log.Flags())
 )
 
 const (
@@ -99,6 +102,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		}
 
 		//  If isn't service token check if it is an oidc token
+		var uidFromToken string
 		if len(rawToken) != tokenLength {
 			oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
 
@@ -118,6 +122,13 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
 				return
 			}
+
+			// Get UID from token
+			var uidErr error
+			uidFromToken, uidErr = oidcManager.GetUID(rawToken)
+			if uidErr != nil {
+				jobLogger.Println("WARNING:", uidErr)
+			}
 		}
 
 		// Get the event from request body
@@ -127,26 +138,22 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			return
 		}
 
-		// Extract user UID from MinIO event
-		var decoded map[string]interface{}
-		if err := json.Unmarshal(eventBytes, &decoded); err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
-			return
-		}
-		records := decoded["Records"].([]interface{})
 		// Check if it has the MinIO event format
-		if records != nil {
-			r := records[0].(map[string]interface{})
-
-			eventInfo := r["requestParameters"].(map[string]interface{})
-			uid := eventInfo["principalId"]
-			sourceIPAddress := eventInfo["sourceIPAddress"]
-
+		uid, sourceIPAddress, err := decodeEventBytes(eventBytes)
+		if err != nil {
+			// Check if the request was made with OIDC token to get user UID
+			if uidFromToken != "" {
+				c.Set("uidOrigin", uidFromToken)
+			} else {
+				// Set as nil string if unable to get an UID
+				jobLogger.Println("WARNING:", err)
+				c.Set("uidOrigin", "nil")
+			}
+		} else {
 			c.Set("IPAddress", sourceIPAddress)
 			c.Set("uidOrigin", uid)
-		} else {
-			c.Set("uidOrigin", "nil")
 		}
+
 		c.Next()
 
 		// Initialize event envVar and args var
@@ -161,11 +168,12 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath()) + ";echo \"I finish\" > /tmpfolder/finish-file;"}
 				types.SetMount(podSpec, *service, cfg)
 			} else {
-				event = v1.EnvVar{
-					Name:  types.EventVariable,
-					Value: string(eventBytes),
-				}
 				args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath())}
+			}
+
+			event = v1.EnvVar{
+				Name:  types.EventVariable,
+				Value: string(eventBytes),
 			}
 		}
 
@@ -208,7 +216,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 					c.Status(http.StatusCreated)
 					return
 				}
-				log.Printf("unable to delegate job. Error: %v\n", err)
+				jobLogger.Printf("unable to delegate job. Error: %v\n", err)
 			}
 		}
 
@@ -243,7 +251,6 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			}
 		}
 
-		// Create job
 		_, err = kubeClientset.BatchV1().Jobs(cfg.ServicesNamespace).Create(context.TODO(), job, metav1.CreateOptions{})
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
@@ -251,4 +258,32 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		}
 		c.Status(http.StatusCreated)
 	}
+}
+
+func decodeEventBytes(eventBytes []byte) (string, string, error) {
+
+	defer func() {
+		// recover from panic, if one occurs
+		if r := recover(); r != nil {
+			jobLogger.Println("Recovered from panic:", r)
+		}
+	}()
+	// Extract user UID from MinIO event
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(eventBytes, &decoded); err != nil {
+		return "", "", err
+	}
+
+	if records, panicErr := decoded["Records"].([]interface{}); panicErr {
+		r := records[0].(map[string]interface{})
+
+		eventInfo := r["requestParameters"].(map[string]interface{})
+		uid := eventInfo["principalId"]
+		sourceIPAddress := eventInfo["sourceIPAddress"]
+
+		return uid.(string), sourceIPAddress.(string), nil
+	} else {
+		return "", "", genericErrors.New("Failed to decode records")
+	}
+
 }
