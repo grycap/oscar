@@ -24,8 +24,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -89,12 +91,12 @@ func TestIsAuthorised(t *testing.T) {
 		if hreq.URL.Path == "/.well-known/openid-configuration" {
 			rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `", "userinfo_endpoint": "http://` + hreq.Host + `/userinfo"}`))
 		} else if hreq.URL.Path == "/userinfo" {
-			rw.Write([]byte(`{"sub": "test-subject", "eduperson_entitlement": ["urn:mace:egi.eu:group:group1"]}`))
+			rw.Write([]byte(`{"sub": "user1@egi.eu", "eduperson_entitlement": ["urn:mace:egi.eu:group:group1"]}`))
 		}
 	}))
 
 	issuer := server.URL
-	subject := "test-subject"
+	subject := "user1@egi.eu"
 	groups := []string{"group1", "group2"}
 
 	oidcManager, err := NewOIDCManager(issuer, subject, groups)
@@ -102,6 +104,108 @@ func TestIsAuthorised(t *testing.T) {
 		t.Errorf("expected no error, got %v", err)
 	}
 
+	rawToken := GetToken(issuer, subject)
+	oidcManager.config.InsecureSkipSignatureCheck = true
+
+	if !oidcManager.IsAuthorised(rawToken) {
+		t.Errorf("expected token to be authorised")
+	}
+
+	resg1, err2 := oidcManager.UserHasVO(rawToken, "group1")
+	if err2 != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if !resg1 {
+		t.Errorf("expected user to have VO")
+	}
+	resg2, err3 := oidcManager.UserHasVO(rawToken, "group2")
+	if err3 != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if resg2 {
+		t.Errorf("expected user not to have VO")
+	}
+
+	uid, _ := oidcManager.GetUID(rawToken)
+	if uid != subject {
+		t.Errorf("expected uid to be %v, got %v", subject, uid)
+	}
+}
+
+func TestGetOIDCMiddleware(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		if hreq.URL.Path == "/.well-known/openid-configuration" {
+			rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `", "userinfo_endpoint": "http://` + hreq.Host + `/userinfo"}`))
+		} else if hreq.URL.Path == "/userinfo" {
+			rw.Write([]byte(`{"sub": "user@egi.eu", "eduperson_entitlement": ["urn:mace:egi.eu:group:group1"]}`))
+		} else if hreq.URL.Path == "/minio/admin/v3/info" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+		} else {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"status": "success"}`))
+		}
+	}))
+
+	kubeClientset := fake.NewSimpleClientset()
+	cfg := types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint: server.URL,
+			Verify:   false,
+		},
+	}
+	minIOAdminClient, _ := utils.MakeMinIOAdminClient(&cfg)
+	issuer := server.URL
+	subject := "user@egi.eu"
+	groups := []string{"group1", "group2"}
+
+	oidcConfig := &oidc.Config{
+		InsecureSkipSignatureCheck: true,
+		SkipClientIDCheck:          true,
+	}
+	middleware := getOIDCMiddleware(kubeClientset, minIOAdminClient, issuer, subject, groups, oidcConfig)
+	if middleware == nil {
+		t.Errorf("expected middleware to be non-nil")
+	}
+
+	scenarios := []struct {
+		token string
+		code  int
+		name  string
+	}{
+		{
+			name:  "invalid-token",
+			token: "invalid-token",
+			code:  http.StatusUnauthorized,
+		},
+		{
+			name:  "valid-token",
+			token: GetToken(issuer, subject),
+			code:  http.StatusOK,
+		},
+	}
+	for _, s := range scenarios {
+		t.Run(s.name, func(t *testing.T) {
+			// Create a new Gin context
+			gin.SetMode(gin.TestMode)
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
+			// Test the middleware with an invalid token
+			c.Request = &http.Request{
+				Header: http.Header{
+					"Authorization": []string{"Bearer " + s.token},
+				},
+			}
+			middleware(c)
+			if c.Writer.Status() != s.code {
+				t.Errorf("expected status to be %v, got %v", s.code, c.Writer.Status())
+			}
+		})
+	}
+}
+
+func GetToken(issuer string, subject string) string {
 	claims := jwt.MapClaims{
 		"iss": issuer,
 		"sub": subject,
@@ -111,38 +215,5 @@ func TestIsAuthorised(t *testing.T) {
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 1024)
 	rawToken, _ := token.SignedString(privateKey)
-	oidcManager.config.InsecureSkipSignatureCheck = true
-
-	if !oidcManager.IsAuthorised(rawToken) {
-		t.Errorf("expected token to be authorised")
-	}
-}
-
-func TestGetOIDCMiddleware(t *testing.T) {
-	kubeClientset := fake.NewSimpleClientset()
-	minIOAdminClient := &utils.MinIOAdminClient{}
-	issuer := "https://example.com"
-	subject := "test-subject"
-	groups := []string{"group1", "group2"}
-
-	middleware := getOIDCMiddleware(kubeClientset, minIOAdminClient, issuer, subject, groups)
-	if middleware == nil {
-		t.Errorf("expected middleware to be non-nil")
-	}
-
-	// Create a new Gin context
-	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-
-	// Test the middleware with an invalid token
-	c.Request = &http.Request{
-		Header: http.Header{
-			"Authorization": []string{"Bearer invalid-token"},
-		},
-	}
-	middleware(c)
-	if c.Writer.Status() != http.StatusUnauthorized {
-		t.Errorf("expected status to be %v, got %v", http.StatusUnauthorized, c.Writer.Status())
-	}
+	return rawToken
 }
