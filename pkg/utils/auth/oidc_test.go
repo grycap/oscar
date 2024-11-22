@@ -132,7 +132,8 @@ func TestGetOIDCMiddleware(t *testing.T) {
 
 	// Create a new Gin context
 	gin.SetMode(gin.TestMode)
-	c, _ := gin.CreateTestContext(nil)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
 
 	// Test the middleware with an invalid token
 	c.Request = &http.Request{
