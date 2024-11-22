@@ -29,7 +29,7 @@ import (
 )
 
 // GetAuthMiddleware returns the appropriate gin auth middleware
-func GetAuthMiddleware(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.HandlerFunc {
+func GetAuthMiddleware(cfg *types.Config, kubeClientset kubernetes.Interface) gin.HandlerFunc {
 	if !cfg.OIDCEnable {
 		return gin.BasicAuth(gin.Accounts{
 			// Use the config's username and password for basic auth
@@ -40,7 +40,7 @@ func GetAuthMiddleware(cfg *types.Config, kubeClientset *kubernetes.Clientset) g
 }
 
 // CustomAuth returns a custom auth handler (gin middleware)
-func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.HandlerFunc {
+func CustomAuth(cfg *types.Config, kubeClientset kubernetes.Interface) gin.HandlerFunc {
 	basicAuthHandler := gin.BasicAuth(gin.Accounts{
 		// Use the config's username and password for basic auth
 		cfg.Username: cfg.Password,
