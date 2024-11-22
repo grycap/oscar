@@ -1,0 +1,24 @@
+name: SQAaaS IM
+
+on:
+  push:
+    branches: ["sqa"]
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+jobs:
+
+  sqaaas_job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add tox unit test step definition for a SQAaaS assessment
+        uses: eosc-synergy/sqaaas-step-action@v1
+        id: tox_unit_test
+        with:
+          container: "golang:1.21.4-alpine3.18"
+          tool: commands
+          commands: go test ./... -v
+
+      - name: SQAaaS assessment step
+        uses: eosc-synergy/sqaaas-assessment-action@v2
+        with:
+          qc_uni_steps: tox_unit_test
