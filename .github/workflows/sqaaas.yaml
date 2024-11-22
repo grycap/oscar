@@ -14,6 +14,7 @@ jobs:
         uses: eosc-synergy/sqaaas-step-action@v1
         id: go_unit_test
         with:
+          name: go_unit_test
           container: "golang:1.21.4-alpine3.18"
           tool: commands
           commands: "go test ./... -v"
