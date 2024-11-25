@@ -63,10 +63,10 @@ func TestMakeRunHandler(t *testing.T) {
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
-			serviceName := "testName"
+			serviceName := "test"
 
 			req, _ := http.NewRequest("POST", "/run/"+serviceName, nil)
-			req.Header.Set("Authorization", "Bearer 11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf")
+			req.Header.Set("Authorization", "Bearer AbCdEf123456")
 
 			if s.returnError {
 				switch s.errType {
@@ -76,9 +76,9 @@ func TestMakeRunHandler(t *testing.T) {
 					err := errors.New("Not found")
 					back.AddError("ReadService", k8serr.NewInternalError(err))
 				case "splitErr":
-					req.Header.Set("Authorization", "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf")
+					req.Header.Set("Authorization", "AbCdEf123456")
 				case "diffErr":
-					req.Header.Set("Authorization", "Bearer 11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513dfg")
+					req.Header.Set("Authorization", "Bearer AbC123456")
 				}
 			}
 

@@ -31,8 +31,7 @@ var errFake = errors.New("fake error")
 
 // FakeBackend fake struct to mock the beahaviour of the ServerlessBackend interface
 type FakeBackend struct {
-	errors  map[string][]error
-	Service *types.Service // service to be returned by the ReadService function
+	errors map[string][]error
 }
 
 // MakeFakeBackend returns the pointer of a new FakeBackend struct
@@ -82,12 +81,7 @@ func (f *FakeBackend) CreateService(service types.Service) error {
 
 // ReadService returns a Service (fake)
 func (f *FakeBackend) ReadService(name string) (*types.Service, error) {
-	// default service returned by the function
-	service := &types.Service{Token: "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf"}
-	if f.Service != nil {
-		service = f.Service
-	}
-	return service, f.returnError(getCurrentFuncName())
+	return &types.Service{Token: "AbCdEf123456"}, f.returnError(getCurrentFuncName())
 }
 
 // UpdateService updates an existent service (fake)

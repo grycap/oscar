@@ -40,7 +40,6 @@ const (
 	defaultMemory   = "256Mi"
 	defaultCPU      = "0.2"
 	defaultLogLevel = "INFO"
-	createPath      = "/system/services"
 )
 
 var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache)")
@@ -57,7 +56,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
 			service.Owner = "cluster_admin"
-			createLogger.Printf("Creating service '%s' for user '%s'", service.Name, service.Owner)
+			createLogger.Printf("Creating service for user: %s", service.Owner)
 		}
 
 		if err := c.ShouldBindJSON(&service); err != nil {
@@ -70,22 +69,25 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// Check if users in allowed_users have a MinIO associated user
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
+		// === DEBUG code ===
+		loguid, _ := auth.GetUIDFromContext(c)
+		createLogger.Printf(">>> uid from context: %s", loguid)
+		// =============
+
 		// Service is created by an EGI user
 		if !isAdminUser {
 			uid, err := auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-				return
 			}
 
 			// Set UID from owner
 			service.Owner = uid
-			createLogger.Printf("Creating service '%s' for user '%s'", service.Name, service.Owner)
+			createLogger.Printf("Creating service for user: %s", service.Owner)
 
 			mc, err := auth.GetMultitenancyConfigFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-				return
 			}
 
 			full_uid := auth.FormatUID(uid)
@@ -96,7 +98,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						err := checkIdentity(&service, cfg, authHeader)
 						if err != nil {
 							c.String(http.StatusBadRequest, fmt.Sprintln(err))
-							return
 						}
 						break
 					}
@@ -122,7 +123,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				if !ownerOnList {
 					service.AllowedUsers = append(service.AllowedUsers, uid)
 				}
-				// Check if the uid's from allowed_users have and associated MinIO user
+				// Check if the uid's from allowed_users have and asociated MinIO user
 				// and create it if not
 				uids := mc.CheckUsersInCache(service.AllowedUsers)
 				if len(uids) > 0 {
@@ -170,11 +171,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				log.Println(err.Error())
 			}
 		}
-		uid := service.Owner
-		if service.Owner == "" {
-			uid = "nil"
-		}
-		createLogger.Printf("%s | %v | %s | %s | %s", "POST", 200, createPath, service.Name, uid)
+		createLogger.Println("Service created with name: ", service.Name)
 		c.Status(http.StatusCreated)
 	}
 }
@@ -287,7 +284,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 
 		// Create group for the service and add users
 		// Check if users in allowed_users have a MinIO associated user
-		// If new allowed users list is empty the service becomes public
+		// If new allowed users list is empty the service becames public
 		if !isUpdate {
 			if !isAdminUser {
 				if len(allowed_users) == 0 {

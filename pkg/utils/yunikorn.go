@@ -151,7 +151,7 @@ func DeleteYunikornQueue(cfg *types.Config, kubeClientset kubernetes.Interface, 
 
 // getOscarQueue returns a pointer to the OSCAR's Yunikorn queue (configs.QueueConfig)
 // If the Queue doesn't exists, create a new one in the SchedulerConfig
-// (the existence of the default partition and the root queue is assumed)
+// (the existance of the default partition and the root queue is assumed)
 func getOscarQueue(schedulerConfig *configs.SchedulerConfig) *configs.QueueConfig {
 	// First get a pointer to the root queue
 	root := &configs.QueueConfig{}

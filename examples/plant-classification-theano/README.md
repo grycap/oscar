@@ -63,5 +63,5 @@ To run this example you need:
 
 1. Once the function is executed, the output is automatically copied to the
   output bucket in minio, in this case `plant-classifier-out`. You can
-  download the output from here for further processing.
+  download the ouput from here for further processing.
   ![minio-out.png](img/Minio-OUT.png)

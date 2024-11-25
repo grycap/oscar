@@ -35,7 +35,7 @@ import (
 // TODO Try using cookies to avoid excesive calls to the k8s API //
 
 // MakeJobsInfoHandler makes a handler for listing all existing jobs from a service and show their JobInfo
-func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, namespace string) gin.HandlerFunc {
+func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		jobsInfo := make(map[string]*types.JobInfo)
 		// Get serviceName
@@ -103,7 +103,7 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.
 
 // MakeDeleteJobsHandler makes a handler for deleting all jobs created by the provided service.
 // If 'all' querystring is set to 'true' pending, running and failed jobs will also be deleted
-func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, namespace string) gin.HandlerFunc {
+func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get serviceName and jobName
 		serviceName := c.Param("serviceName")
@@ -147,7 +147,7 @@ func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset kubernete
 }
 
 // MakeGetLogsHandler makes a handler for getting logs from the 'oscar-container' inside the pod created by the specified job
-func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, namespace string) gin.HandlerFunc {
+func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get serviceName and jobName
 		serviceName := c.Param("serviceName")
@@ -200,7 +200,7 @@ func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset kubernetes.I
 }
 
 // MakeDeleteJobHandler makes a handler for removing a job
-func MakeDeleteJobHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, namespace string) gin.HandlerFunc {
+func MakeDeleteJobHandler(back types.ServerlessBackend, kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get serviceName and jobName
 		serviceName := c.Param("serviceName")
@@ -251,7 +251,7 @@ func isOIDCAuthorised(c *gin.Context, back types.ServerlessBackend, serviceName 
 	// If is oidc auth get service and check on allowed users
 	authHeader := c.GetHeader("Authorization")
 	if len(strings.Split(authHeader, "Bearer")) > 1 {
-		service, _ := back.ReadService(serviceName)
+		service, _ := back.ReadService(c.Param("serviceName"))
 		uid, err := auth.GetUIDFromContext(c)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintln(err))

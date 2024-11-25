@@ -33,7 +33,6 @@ paths:
       description: List all created services
       security:
         - basicAuth: []
-        - token: []
       tags:
         - services
     post:
@@ -51,7 +50,6 @@ paths:
       description: Create a service
       security:
         - basicAuth: []
-        - token: []
       requestBody:
         content:
           application/json:
@@ -76,7 +74,6 @@ paths:
       description: Update a service
       security:
         - basicAuth: []
-        - token: []
       requestBody:
         content:
           application/json:
@@ -111,7 +108,6 @@ paths:
       operationId: ReadService
       security:
         - basicAuth: []
-        - token: []
       description: Read a service
     delete:
       summary: Delete service
@@ -128,7 +124,6 @@ paths:
       description: Delete a service
       security:
         - basicAuth: []
-        - token: []
       tags:
         - services
   '/system/logs/{serviceName}':
@@ -162,7 +157,6 @@ paths:
       operationId: ListJobs
       security:
         - basicAuth: []
-        - token: []
       description: List all jobs with their status
     delete:
       summary: Delete jobs
@@ -179,7 +173,6 @@ paths:
       description: Delete all jobs from a service.
       security:
         - basicAuth: []
-        - token: []
       parameters:
         - schema:
             type: boolean
@@ -221,7 +214,6 @@ paths:
       description: Get the logs from a job
       security:
         - basicAuth: []
-        - token: []
       parameters:
         - schema:
             type: boolean
@@ -242,7 +234,6 @@ paths:
       description: Delete a job
       security:
         - basicAuth: []
-        - token: []
       tags:
         - logs
   /system/info:
@@ -265,7 +256,6 @@ paths:
       description: Get system info
       security:
         - basicAuth: []
-        - token: []
   /health:
     get:
       summary: Health
@@ -326,7 +316,6 @@ paths:
       description: Get system configuration
       security:
         - basicAuth: []
-        - token: []
   '/run/{serviceName}':
     parameters:
       - schema:
@@ -619,5 +608,3 @@ servers:
     description: 'Local testing'
   - url: 'https://inference.cloud.ai4eosc.eu'
     description: 'AI4EOSC OSCAR cluster'
-  - url: 'https://inference-walton.cloud.imagine-ai.eu'
-    description: 'iMagine OSCAR cluster'

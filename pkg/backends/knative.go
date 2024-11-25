@@ -76,20 +76,22 @@ func (kn *KnativeBackend) GetInfo() *types.ServerlessBackendInfo {
 // ListServices returns a slice with all services registered in the provided namespace
 func (kn *KnativeBackend) ListServices() ([]*types.Service, error) {
 	// Get the list with all Knative services
-	configmaps, err := getAllServicesConfigMaps(kn.namespace, kn.kubeClientset)
+	knSvcs, err := kn.knClientset.ServingV1().Services(kn.namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		log.Printf("WARNING: %v\n", err)
 		return nil, err
 	}
-	services := []*types.Service{}
 
-	for _, cm := range configmaps.Items {
-		service, err := getServiceFromConfigMap(&cm)
+	services := []*types.Service{}
+	for _, knSvc := range knSvcs.Items {
+		// Get service from configMap's FDL
+		svc, err := getServiceFromFDL(knSvc.Name, kn.namespace, kn.kubeClientset)
 		if err != nil {
-			return nil, err
+			log.Printf("WARNING: %v\n", err)
+		} else {
+			services = append(services, svc)
 		}
-		services = append(services, service)
 	}
+
 	return services, nil
 }
 
@@ -149,13 +151,8 @@ func (kn *KnativeBackend) ReadService(name string) (*types.Service, error) {
 		return nil, err
 	}
 
-	// Get the configMap of the Service
-	cm, err := kn.kubeClientset.CoreV1().ConfigMaps(kn.namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", name)
-	}
 	// Get service from configMap's FDL
-	svc, err := getServiceFromConfigMap(cm)
+	svc, err := getServiceFromFDL(name, kn.namespace, kn.kubeClientset)
 	if err != nil {
 		return nil, err
 	}
@@ -221,14 +218,6 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	// If the service is exposed update its configuration
 	if service.Expose.APIPort != 0 {
 		err = types.UpdateExpose(service, kn.kubeClientset, kn.config)
-		if err != nil {
-			return err
-		}
-	}
-
-	//Create deaemonset to cache the service image on all the nodes
-	if service.ImagePrefetch {
-		err = imagepuller.CreateDaemonset(kn.config, service, kn.kubeClientset)
 		if err != nil {
 			return err
 		}

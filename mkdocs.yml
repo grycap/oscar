@@ -21,7 +21,6 @@ nav:
   - oscar-cli.md
   - usage-ui.md  
   - api.md
-  - MinIO: minio-usage.md
 
 - Service Execution: 
   - invoking.md

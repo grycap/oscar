@@ -19,7 +19,6 @@ package handlers
 import (
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -43,13 +42,19 @@ func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 			uid, err := auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-				return
 			}
 
 			var allowedServicesForUser []*types.Service
 			for _, service := range services {
-				if len(service.AllowedUsers) == 0 || slices.Contains(service.AllowedUsers, uid) {
+				if len(service.AllowedUsers) == 0 {
 					allowedServicesForUser = append(allowedServicesForUser, service)
+					continue
+				}
+				for _, id := range service.AllowedUsers {
+					if uid == id {
+						allowedServicesForUser = append(allowedServicesForUser, service)
+						break
+					}
 				}
 			}
 
