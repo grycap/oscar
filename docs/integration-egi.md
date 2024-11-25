@@ -98,6 +98,7 @@ Once logged in via EGI Check-In you can obtain an Access Token with one of this 
     oidc-token <account-short-name>
     ```
     where `account-short-name` is the name of your account configuration.
+    
 * From the EGI Check-In Token Portal: [https://aai.egi.eu/token](https://aai.egi.eu/token)
 
 ![egi-checkin-token-portal.png](images/oidc/egi-checkin-token-portal.png)
