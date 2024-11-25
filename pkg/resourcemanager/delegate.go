@@ -18,11 +18,12 @@ package resourcemanager
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
+	"math/big"
 	"net/http"
 	"net/url"
 	"path"
@@ -131,7 +132,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			// Make HTTP client
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify}, // #nosec
 			}
 			client := &http.Client{
 				Transport: transport,
@@ -193,7 +194,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			// Make HTTP client
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: !replica.SSLVerify},
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !replica.SSLVerify}, // #nosec
 			}
 			client := &http.Client{
 				Transport: transport,
@@ -269,7 +270,7 @@ func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, e
 	// Make HTTP client
 	var transport http.RoundTripper = &http.Transport{
 		// Enable/disable SSL verification
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify}, // #nosec
 	}
 	client := &http.Client{
 		Transport: transport,
@@ -344,7 +345,7 @@ func getClusterStatus(service *types.Service) {
 			// Make HTTP client
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify}, // #nosec
 			}
 			client := &http.Client{
 				Transport: transport,
@@ -395,7 +396,9 @@ func getClusterStatus(service *types.Service) {
 				if dist >= 0 {
 					fmt.Println("Resources available in ClusterID", replica.ClusterID)
 					if service.Delegation == "random" {
-						randPriority := rand.Intn(noDelegateCode)
+						max := big.NewInt(int64(noDelegateCode))
+						randomNumber, _ := rand.Int(rand.Reader, max)
+						randPriority := randomNumber.Int64()
 						replica.Priority = uint(randPriority)
 						fmt.Println("Priority ", replica.Priority, " with ", service.Delegation, " delegation")
 					} else if service.Delegation == "load-based" {

@@ -80,7 +80,7 @@ func MakeMinIOAdminClient(cfg *types.Config) (*MinIOAdminClient, error) {
 	// Disable tls verification in client transport if verify == false
 	if !cfg.MinIOProvider.Verify {
 		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // #nosec
 		}
 		adminClient.SetCustomTransport(tr)
 	}

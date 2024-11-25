@@ -21,9 +21,10 @@ package imagepuller
 import (
 	//"k8s.io/apimachinery/pkg/watch"
 	"context"
+	"crypto/rand"
 	"fmt"
 	"log"
-	"math/rand"
+	"math/big"
 	"os"
 	"sync"
 	"time"
@@ -191,7 +192,9 @@ func setWorkingNodes(kubeClientset kubernetes.Interface) error {
 func generatePodGroupName() string {
 	b := make([]byte, lengthStr)
 	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+		max := big.NewInt(int64(len(letterBytes)))
+		randomNumber, _ := rand.Int(rand.Reader, max)
+		b[i] = letterBytes[randomNumber.Int64()]
 	}
 	return "pod-group-" + string(b)
 }
