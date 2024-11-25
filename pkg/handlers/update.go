@@ -45,7 +45,11 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Check service values and set defaults
 		checkValues(&newService, cfg)
-
+		authHeader := c.GetHeader("Authorization")
+		if len(strings.Split(authHeader, "Bearer")) == 1 {
+			isAdminUser = true
+			createLogger.Printf("[*] Updating service as admin user")
+		}
 		// Read the current service
 		oldService, err := back.ReadService(newService.Name)
 
@@ -58,34 +62,34 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			return
 		}
+		if !isAdminUser {
+			uid, err := auth.GetUIDFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln("Couldn't get UID from context"))
+			}
 
-		uid, err := auth.GetUIDFromContext(c)
-		if err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintln("Couldn't get UID from context"))
-		}
+			if oldService.Owner != uid {
+				c.String(http.StatusForbidden, "User %s doesn't have permision to modify this service", uid)
+				return
+			}
 
-		if oldService.Owner != uid {
-			c.String(http.StatusForbidden, "User %s doesn't have permision to modify this service", uid)
-			return
-		}
+			// Set the owner on the new service definition
+			newService.Owner = oldService.Owner
 
-		// Set the owner on the new service definition
-		newService.Owner = oldService.Owner
-
-		// If the service has changed VO check permisions again
-		if newService.VO != "" && newService.VO != oldService.VO {
-			for _, vo := range cfg.OIDCGroups {
-				if vo == newService.VO {
-					authHeader := c.GetHeader("Authorization")
-					err := checkIdentity(&newService, cfg, authHeader)
-					if err != nil {
-						c.String(http.StatusBadRequest, fmt.Sprintln(err))
+			// If the service has changed VO check permission again
+			if newService.VO != "" && newService.VO != oldService.VO {
+				for _, vo := range cfg.OIDCGroups {
+					if vo == newService.VO {
+						authHeader := c.GetHeader("Authorization")
+						err := checkIdentity(&newService, cfg, authHeader)
+						if err != nil {
+							c.String(http.StatusBadRequest, fmt.Sprintln(err))
+						}
+						break
 					}
-					break
 				}
 			}
 		}
-
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 		// Update the service
 		if err := back.UpdateService(newService); err != nil {

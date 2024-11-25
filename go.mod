@@ -34,6 +34,7 @@ require (
 
 require (
 	github.com/fatih/color v1.14.1 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.1 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/rs/xid v1.4.0 // indirect
@@ -52,6 +53,7 @@ require (
 )
 
 require (
+	bou.ke/monkey v1.0.2
 	github.com/GehirnInc/crypt v0.0.0-20190301055215-6c0105aabd46 // indirect
 	github.com/apache/yunikorn-scheduler-interface v1.2.0 // indirect
 	github.com/blendle/zapdriver v1.3.1 // indirect
