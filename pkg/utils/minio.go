@@ -21,10 +21,8 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"time"
 
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -33,7 +31,8 @@ import (
 
 const ALL_USERS_GROUP = "all_users_group"
 
-var minioLogger = log.New(os.Stdout, "[MINIO] ", log.Flags())
+// Custom logger - uncomment if needed
+// var minioLogger = log.New(os.Stdout, "[MINIO] ", log.Flags())
 
 // MinIOAdminClient struct to represent a MinIO Admin client to configure webhook notifications
 type MinIOAdminClient struct {

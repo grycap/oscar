@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
@@ -33,8 +32,8 @@ import (
 	knclientset "knative.dev/serving/pkg/client/clientset/versioned"
 )
 
-// Custom logger
-var knativeLogger = log.New(os.Stdout, "[KNATIVE] ", log.Flags())
+// Custom logger - uncomment if needed
+// var knativeLogger = log.New(os.Stdout, "[KNATIVE] ", log.Flags())
 
 // KnativeBackend struct to represent a Knative client
 type KnativeBackend struct {

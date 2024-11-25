@@ -110,11 +110,11 @@ func GetLoggerMiddleware() gin.HandlerFunc {
 func GetUIDFromContext(c *gin.Context) (string, error) {
 	uidOrigin, uidExists := c.Get("uidOrigin")
 	if !uidExists {
-		return "", fmt.Errorf("Missing EGI user uid")
+		return "", fmt.Errorf("missing EGI user uid")
 	}
 	uid, uidParsed := uidOrigin.(string)
 	if !uidParsed {
-		return "", fmt.Errorf("Error parsing uid origin: %v", uidParsed)
+		return "", fmt.Errorf("error parsing uid origin: %v", uidParsed)
 	}
 	return uid, nil
 }
@@ -122,11 +122,11 @@ func GetUIDFromContext(c *gin.Context) (string, error) {
 func GetMultitenancyConfigFromContext(c *gin.Context) (*MultitenancyConfig, error) {
 	mcUntyped, mcExists := c.Get("multitenancyConfig")
 	if !mcExists {
-		return nil, fmt.Errorf("Missing multitenancy config")
+		return nil, fmt.Errorf("missing multitenancy config")
 	}
 	mc, mcParsed := mcUntyped.(*MultitenancyConfig)
 	if !mcParsed {
-		return nil, fmt.Errorf("Error parsing multitenancy config")
+		return nil, fmt.Errorf("error parsing multitenancy config")
 	}
 	return mc, nil
 }
