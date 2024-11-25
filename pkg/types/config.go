@@ -183,7 +183,7 @@ type Config struct {
 	// OIDCGroups OpenID comma-separated group list to grant access in the cluster.
 	// Groups defined in the "eduperson_entitlement" OIDC scope,
 	// as described here: https://docs.egi.eu/providers/check-in/sp/#10-groups
-	OIDCGroups []string `json:"-"`
+	OIDCGroups []string `json:"oidc_groups"`
 
 	//
 	IngressHost string `json:"-"`

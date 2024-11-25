@@ -43,7 +43,7 @@ var errOpenfaasOperator = errors.New("the OpenFaaS Operator is not creating the 
 // OpenfaasBackend struct to represent an Openfaas client
 type OpenfaasBackend struct {
 	kubeClientset   kubernetes.Interface
-	ofClientset     *ofclientset.Clientset
+	ofClientset     ofclientset.Interface
 	namespace       string
 	gatewayEndpoint string
 	scaler          *utils.OpenfaasScaler
