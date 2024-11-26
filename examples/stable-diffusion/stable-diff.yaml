@@ -1,0 +1,17 @@
+functions:
+  oscar:
+  - oscar-intertwin:
+      name: stable-diffusion-tf
+      memory: 16Gi
+      cpu: '4'
+      image: ghcr.io/grycap/stable-diffusion-tf:latest
+      script: script.sh
+      log_level: DEBUG
+      vo: "vo.example.eu"
+      allowed_users: []
+      input:
+      - storage_provider: minio.default
+        path: stablediff/input
+      output:
+      - storage_provider: minio.default
+        path: stablediff/output
