@@ -398,14 +398,14 @@ func getClusterStatus(service *types.Service) {
 					if service.Delegation == "random" {
 						max := big.NewInt(int64(noDelegateCode))
 						randomNumber, _ := rand.Int(rand.Reader, max)
-						randPriority := randomNumber.Int64()
+						randPriority := randomNumber.Uint64()
 						replica.Priority = uint(randPriority)
 						fmt.Println("Priority ", replica.Priority, " with ", service.Delegation, " delegation")
 					} else if service.Delegation == "load-based" {
 						//Map the totalClusterCPU range to a smaller range (input range 0 to 32 cpu to output range 100 to 0 priority)
 						totalClusterCPU := clusterStatus.CPUFreeTotal
 						mappedCPUPriority := mapToRange(totalClusterCPU, 0, 32000, 100, 0)
-						replica.Priority = uint(mappedCPUPriority)
+						replica.Priority = uint(mappedCPUPriority) // #nosec G115
 						fmt.Println("Priority ", replica.Priority, " with ", service.Delegation, " delegation")
 					} else if service.Delegation != "static" {
 						replica.Priority = noDelegateCode

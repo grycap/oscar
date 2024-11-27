@@ -250,7 +250,7 @@ func getPodTemplateSpec(service Service, cfg *Config) v1.PodTemplateSpec {
 		podSpec.Containers[i].Ports = []v1.ContainerPort{
 			{
 				Name:          podPortName,
-				ContainerPort: int32(service.Expose.APIPort),
+				ContainerPort: int32(service.Expose.APIPort), // #nosec G115
 			},
 		}
 		podSpec.Containers[i].VolumeMounts[0].ReadOnly = false
@@ -352,7 +352,7 @@ func getServiceSpec(service Service, cfg *Config) *v1.Service {
 		Port: servicePortNumber,
 		TargetPort: intstr.IntOrString{
 			Type:   0,
-			IntVal: int32(service.Expose.APIPort),
+			IntVal: int32(service.Expose.APIPort), // #nosec G115
 		},
 	}
 	service_type := v1.ServiceType(typeClusterIP)

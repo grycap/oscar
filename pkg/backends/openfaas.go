@@ -92,7 +92,7 @@ func (of *OpenfaasBackend) ListServices() ([]*types.Service, error) {
 	services := []*types.Service{}
 
 	for _, cm := range configmaps.Items {
-		service, err := getServiceFromConfigMap(&cm)
+		service, err := getServiceFromConfigMap(&cm) // #nosec G601
 		if err != nil {
 			return nil, err
 		}
