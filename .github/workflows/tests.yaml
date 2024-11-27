@@ -18,6 +18,11 @@ jobs:
     - name: Run tests
       run: go test ./pkg/... -cover -coverprofile=profile.cov
 
+    - name: Run Gosec Security Scanner
+      uses: securego/gosec@master
+      with:
+        args: ./...
+
     - name: Report coverage
       uses: codacy/codacy-coverage-reporter-action@v1
       with:
