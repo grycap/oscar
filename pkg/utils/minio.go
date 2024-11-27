@@ -140,7 +140,10 @@ func (minIOAdminClient *MinIOAdminClient) PublicToPrivateBucket(bucketName strin
 	}
 
 	actualPolicy := &Policy{}
-	json.Unmarshal(policyInfo.Policy, actualPolicy)
+	errUm := json.Unmarshal(policyInfo.Policy, actualPolicy)
+	if errUm != nil {
+		return errUm
+	}
 	index := 0
 	// Search for the resource index
 	resources := actualPolicy.Statement[0].Resource
@@ -303,7 +306,10 @@ func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers b
 		}
 
 		actualPolicy := &Policy{}
-		json.Unmarshal(policyInfo.Policy, actualPolicy)
+		jsonErr = json.Unmarshal(policyInfo.Policy, actualPolicy)
+		if jsonErr != nil {
+			return jsonErr
+		}
 
 		// Add new resource and create policy
 		actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, rs)

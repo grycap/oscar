@@ -62,7 +62,11 @@ var stopper chan struct{}
 func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kubernetes.Interface) error {
 	DaemonSetLoggerInfo.Println("Creating daemonset for service:", service.Name)
 	//Set needed variables
-	setWorkingNodes(kubeClientset)
+	err := setWorkingNodes(kubeClientset)
+	if err != nil {
+		DaemonSetLoggerInfo.Println(err)
+		return fmt.Errorf("failed to set working nodes: %s", err.Error())
+	}
 	podGroup = generatePodGroupName()
 	daemonsetName = "image-puller-" + service.Name
 
@@ -70,7 +74,7 @@ func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kub
 	daemon := getDaemonset(cfg, service)
 
 	//Create daemonset
-	_, err := kubeClientset.AppsV1().DaemonSets(cfg.ServicesNamespace).Create(context.TODO(), daemon, metav1.CreateOptions{})
+	_, err = kubeClientset.AppsV1().DaemonSets(cfg.ServicesNamespace).Create(context.TODO(), daemon, metav1.CreateOptions{})
 	if err != nil {
 		DaemonSetLoggerInfo.Println(err)
 		return fmt.Errorf("failed to create daemonset: %s", err.Error())
@@ -147,15 +151,19 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 	}
 
 	//Add event handler that gets all the pods status
-	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: handleUpdatePodEvent,
 	})
+	if err != nil {
+		DaemonSetLoggerInfo.Println(err)
+		log.Fatalf("Failed to add event handler: %s", err.Error())
+	}
 
 	<-stopper
 
 	//Delete daemonset when all pods are in state "Running"
 	DaemonSetLoggerInfo.Println("Deleting daemonset...")
-	err := kubeClientset.AppsV1().DaemonSets(cfg.ServicesNamespace).Delete(context.TODO(), daemonsetName, metav1.DeleteOptions{})
+	err = kubeClientset.AppsV1().DaemonSets(cfg.ServicesNamespace).Delete(context.TODO(), daemonsetName, metav1.DeleteOptions{})
 	if err != nil {
 		DaemonSetLoggerInfo.Println(err)
 		log.Fatalf("Failed to delete daemonset: %s", err.Error())

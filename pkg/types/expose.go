@@ -323,7 +323,10 @@ func updateDeployment(service Service, kubeClientset kubernetes.Interface, cfg *
 		return err
 	}
 
-	kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(cfg.ServicesNamespace).Get(context.TODO(), getHPAName(service.Name), metav1.GetOptions{})
+	_, err = kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(cfg.ServicesNamespace).Get(context.TODO(), getHPAName(service.Name), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
 	hpa := getHortizontalAutoScaleSpec(service, cfg)
 	_, err = kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(cfg.ServicesNamespace).Update(context.TODO(), hpa, metav1.UpdateOptions{})
 	if err != nil {
@@ -420,7 +423,10 @@ func createIngress(service Service, kubeClientset kubernetes.Interface, cfg *Con
 		return err
 	}
 	if service.Expose.SetAuth {
-		createSecret(service, kubeClientset, cfg)
+		cerr := createSecret(service, kubeClientset, cfg)
+		if cerr != nil {
+			return cerr
+		}
 	}
 	return nil
 }
@@ -441,13 +447,22 @@ func updateIngress(service Service, kubeClientset kubernetes.Interface, cfg *Con
 	secret := existsSecret(serviceName, kubeClientset, cfg)
 	if secret {
 		if service.Expose.SetAuth {
-			updateSecret(service, kubeClientset, cfg)
+			uerr := updateSecret(service, kubeClientset, cfg)
+			if uerr != nil {
+				return uerr
+			}
 		} else {
-			deleteSecret(service.Name, kubeClientset, cfg)
+			derr := deleteSecret(service.Name, kubeClientset, cfg)
+			if derr != nil {
+				return derr
+			}
 		}
 	} else {
 		if service.Expose.SetAuth {
-			createSecret(service, kubeClientset, cfg)
+			cerr := createSecret(service, kubeClientset, cfg)
+			if cerr != nil {
+				return cerr
+			}
 		}
 	}
 
@@ -547,7 +562,10 @@ func deleteIngress(name string, kubeClientset kubernetes.Interface, cfg *Config)
 	if err != nil {
 		return err
 	}
-	deleteSecret(name, kubeClientset, cfg)
+	errd := deleteSecret(name, kubeClientset, cfg)
+	if errd != nil {
+		return errd
+	}
 	return nil
 }
 

@@ -128,7 +128,10 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 
 	//Create an expose service
 	if service.Expose.APIPort != 0 {
-		types.CreateExpose(service, kn.kubeClientset, kn.config)
+		err = types.CreateExpose(service, kn.kubeClientset, kn.config)
+		if err != nil {
+			return err
+		}
 	}
 	//Create deaemonset to cache the service image on all the nodes
 	if service.ImagePrefetch {
