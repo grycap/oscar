@@ -130,9 +130,10 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			req.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
 
 			// Make HTTP client
+			// #nosec
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify}, // #nosec
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
 			}
 			client := &http.Client{
 				Transport: transport,
@@ -192,9 +193,10 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			}
 
 			// Make HTTP client
+			// #nosec
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: !replica.SSLVerify}, // #nosec
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !replica.SSLVerify},
 			}
 			client := &http.Client{
 				Transport: transport,
@@ -268,9 +270,10 @@ func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, e
 	req.SetBasicAuth(cluster.AuthUser, cluster.AuthPassword)
 
 	// Make HTTP client
+	// #nosec
 	var transport http.RoundTripper = &http.Transport{
 		// Enable/disable SSL verification
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify}, // #nosec
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
 	}
 	client := &http.Client{
 		Transport: transport,
@@ -343,9 +346,10 @@ func getClusterStatus(service *types.Service) {
 			req.SetBasicAuth(cluster.AuthUser, cluster.AuthPassword)
 
 			// Make HTTP client
+			// #nosec
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify}, // #nosec
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
 			}
 			client := &http.Client{
 				Transport: transport,
