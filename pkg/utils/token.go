@@ -24,7 +24,7 @@ import (
 // GenerateToken generates a random hexadecimal token
 func GenerateToken() string {
 	b := make([]byte, 32)
-	rand.Read(b)
+	rand.Read(b) // #nosec G104
 
 	return hex.EncodeToString(b)
 }

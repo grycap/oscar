@@ -157,7 +157,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		c.Next()
 
 		// Initialize event envVar and args var
-		event := v1.EnvVar{}
+		var event v1.EnvVar
 		var args []string
 
 		if cfg.InterLinkAvailable && service.InterLinkNodeName != "" {

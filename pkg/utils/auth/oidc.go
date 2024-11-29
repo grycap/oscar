@@ -159,7 +159,10 @@ func (om *oidcManager) GetUserInfo(rawToken string) (*userInfo, error) {
 	var claims struct {
 		EdupersonEntitlement []string `json:"eduperson_entitlement"`
 	}
-	ui.Claims(&claims)
+	cerr := ui.Claims(&claims)
+	if cerr != nil {
+		return nil, err
+	}
 
 	// Create "userInfo" struct and add the groups
 	return &userInfo{

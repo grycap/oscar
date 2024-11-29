@@ -128,8 +128,14 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				if len(uids) > 0 {
 					for _, uid := range uids {
 						sk, _ := auth.GenerateRandomKey(8)
-						minIOAdminClient.CreateMinIOUser(uid, sk)
-						mc.CreateSecretForOIDC(uid, sk)
+						cmuErr := minIOAdminClient.CreateMinIOUser(uid, sk)
+						if cmuErr != nil {
+							log.Printf("Error creating MinIO user for user %s: %v", uid, cmuErr)
+						}
+						csErr := mc.CreateSecretForOIDC(uid, sk)
+						if csErr != nil {
+							log.Printf("Error creating secret for user %s: %v", uid, csErr)
+						}
 					}
 				}
 			}
@@ -148,7 +154,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Register minio webhook and restart the server
 		if err := registerMinIOWebhook(service.Name, service.Token, service.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
-			back.DeleteService(service)
+			derr := back.DeleteService(service)
+			if derr != nil {
+				log.Printf("Error deleting service: %v\n", derr)
+			}
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -160,7 +169,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			} else {
 				c.String(http.StatusInternalServerError, err.Error())
 			}
-			back.DeleteService(service)
+			derr := back.DeleteService(service)
+			if derr != nil {
+				log.Printf("Error deleting service: %v\n", derr)
+			}
 			return
 		}
 
@@ -332,7 +344,10 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		provID, provName = getProviderInfo(out.Provider)
 		// Check if the provider identifier is defined in StorageProviders
 		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
-			disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
+			dinErr := disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
+			if dinErr != nil {
+				log.Printf("Error disabling input notifications: %v\n", dinErr)
+			}
 			return fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
 		}
 
@@ -358,11 +373,17 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 					if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
 						log.Printf("The bucket \"%s\" already exists\n", splitPath[0])
 					} else {
-						disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
+						dinErr := disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
+						if dinErr != nil {
+							log.Printf("Error disabling input notifications: %v\n", dinErr)
+						}
 						return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
 					}
 				} else {
-					disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
+					dinErr := disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
+					if dinErr != nil {
+						log.Printf("Error disabling input notifications: %v\n", dinErr)
+					}
 					return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
 				}
 			}
@@ -375,7 +396,10 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 					Key:    aws.String(folderKey),
 				})
 				if err != nil {
-					disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
+					dinErr := disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
+					if dinErr != nil {
+						log.Printf("Error disabling input notifications: %v\n", dinErr)
+					}
 					return fmt.Errorf("error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
 				}
 			}
@@ -386,7 +410,10 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				if err == cdmi.ErrBadRequest {
 					log.Printf("Error creating \"%s\" folder in Onedata. Error: %v\n", path, err)
 				} else {
-					disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
+					dinErr := disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
+					if dinErr != nil {
+						log.Printf("Error disabling input notifications: %v\n", dinErr)
+					}
 					return fmt.Errorf("error connecting to Onedata's Oneprovider \"%s\". Error: %v", service.StorageProviders.Onedata[provID].OneproviderHost, err)
 				}
 			}

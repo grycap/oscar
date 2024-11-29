@@ -71,7 +71,10 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			// Split buckets and folders from path
 			bucket := strings.SplitN(path, "/", 2)
 			var users []string
-			minIOAdminClient.UpdateUsersInGroup(users, bucket[0], true)
+			err = minIOAdminClient.UpdateUsersInGroup(users, bucket[0], true)
+			if err != nil {
+				log.Printf("error updating MinIO users in group: %v", err)
+			}
 		}
 
 		if service.Mount.Path != "" {
@@ -79,7 +82,10 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			// Split buckets and folders from path
 			bucket := strings.SplitN(path, "/", 2)
 			var users []string
-			minIOAdminClient.UpdateUsersInGroup(users, bucket[0], true)
+			err = minIOAdminClient.UpdateUsersInGroup(users, bucket[0], true)
+			if err != nil {
+				log.Printf("error updating MinIO users in group: %v", err)
+			}
 		}
 
 		// Disable input notifications
