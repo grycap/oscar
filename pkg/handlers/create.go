@@ -53,6 +53,7 @@ var isAdminUser = false
 func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var service types.Service
+		isAdminUser = false
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
@@ -122,7 +123,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				if !ownerOnList {
 					service.AllowedUsers = append(service.AllowedUsers, uid)
 				}
-				// Check if the uid's from allowed_users have and asociated MinIO user
+				// Check if the uid's from allowed_users have and associated MinIO user
 				// and create it if not
 				uids := mc.CheckUsersInCache(service.AllowedUsers)
 				if len(uids) > 0 {
@@ -287,7 +288,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 
 		// Create group for the service and add users
 		// Check if users in allowed_users have a MinIO associated user
-		// If new allowed users list is empty the service becames public
+		// If new allowed users list is empty the service becomes public
 		if !isUpdate {
 			if !isAdminUser {
 				if len(allowed_users) == 0 {

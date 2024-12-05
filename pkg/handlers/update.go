@@ -76,7 +76,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			// Set the owner on the new service definition
 			newService.Owner = oldService.Owner
 
-			// If the service has changed VO check permisions again
+			// If the service has changed VO check permission again
 			if newService.VO != "" && newService.VO != oldService.VO {
 				for _, vo := range cfg.OIDCGroups {
 					if vo == newService.VO {
