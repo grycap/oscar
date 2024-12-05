@@ -178,8 +178,14 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		}
 
 		// Make JOB_UUID envVar
+		serviceNameLenght := len(service.Name)
+		serviceName := service.Name
 		jobUUID := uuid.New().String()
-		jobUUID = service.Name + "-" + jobUUID
+
+		if serviceNameLenght >= 25 {
+			serviceName = serviceName[:16]
+		}
+		jobUUID = serviceName + "-" + jobUUID
 		jobUUIDVar := v1.EnvVar{
 			Name:  types.JobUUIDVariable,
 			Value: jobUUID,
