@@ -939,7 +939,7 @@ func createParameters(results [][]float64, duration time.Duration, clusterStatus
 }
 
 func eventBuild(event, storage_provider string) []byte {
-
+	fmt.Println("eventBuild Function")
 	var eventMap map[string]interface{}
 	err := json.Unmarshal([]byte(event), &eventMap)
 	if err != nil {
