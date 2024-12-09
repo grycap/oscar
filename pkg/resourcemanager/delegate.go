@@ -407,7 +407,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 		// Criteria weights ()
 		weight := []float64{1, 8, 18, 65, 2, 6}
 		preferences := topsisMethod(results, weight)
-		newAlternatives := sortbyUmbral(preferences, 20)
+		newAlternatives := sortbyThreshold(preferences, 20)
 
 		// Print reordered alternatives
 		fmt.Println("\nAlternatives reordered by threshold:")
@@ -430,13 +430,13 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 	}
 
 	fmt.Println("Event : ", event)
+
 	/*delegatedEvent := WrapEvent(service.ClusterID, event)
 
 	eventJSON, err := json.Marshal(delegatedEvent)
 	if err != nil {
 		return fmt.Errorf("error marshalling delegated event: %v", err)
-	}
-	*/
+	}*/
 
 	storage_provider := service.ClusterID
 	//Create event depending on delegation level
@@ -854,7 +854,7 @@ func topsisMethod(results [][]float64, weight []float64) []float64 {
 
 }
 
-func sortbyUmbral(preferences []float64, umbral int) []Alternative {
+func sortbyThreshold(preferences []float64, umbral int) []Alternative {
 	// Step 5: Order alternatives from best to worst
 	alternativesSort := sortAlternatives(preferences)
 
