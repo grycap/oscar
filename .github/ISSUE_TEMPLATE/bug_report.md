@@ -23,5 +23,4 @@ about: Create a report to help us improve
 
 ### Possible Solution
 
-Any thoughts as to potential solutions or ideas to go about finding one.
-Please include links to any research.
+Any thoughts as to potential solutions or ideas to go about finding one. Please include links to any research.

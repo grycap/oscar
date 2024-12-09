@@ -32,12 +32,12 @@ const ServicesNamespace = "oscar-svc"
 const ServiceLabelLength = 8
 
 type MultitenancyConfig struct {
-	kubeClientset kubernetes.Interface
+	kubeClientset *kubernetes.Clientset
 	owner_uid     string
 	usersCache    []string
 }
 
-func NewMultitenancyConfig(kubeClientset kubernetes.Interface, uid string) *MultitenancyConfig {
+func NewMultitenancyConfig(kubeClientset *kubernetes.Clientset, uid string) *MultitenancyConfig {
 	return &MultitenancyConfig{
 		kubeClientset: kubeClientset,
 		owner_uid:     uid,

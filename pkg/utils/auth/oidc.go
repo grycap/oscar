@@ -51,8 +51,8 @@ type oidcManager struct {
 
 // userInfo custom struct to store essential fields from UserInfo
 type userInfo struct {
-	Subject string
-	Groups  []string
+	subject string
+	groups  []string
 }
 
 // newOIDCManager returns a new oidcManager or error if the oidc.Provider can't be created
@@ -76,11 +76,8 @@ func NewOIDCManager(issuer string, subject string, groups []string) (*oidcManage
 }
 
 // getIODCMiddleware returns the Gin's handler middleware to validate OIDC-based auth
-func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *utils.MinIOAdminClient, issuer string, subject string, groups []string, oidcConfig *oidc.Config) gin.HandlerFunc {
+func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *utils.MinIOAdminClient, issuer string, subject string, groups []string) gin.HandlerFunc {
 	oidcManager, err := NewOIDCManager(issuer, subject, groups)
-	if oidcConfig != nil {
-		oidcManager.config = oidcConfig
-	}
 	if err != nil {
 		return func(c *gin.Context) {
 			c.AbortWithStatus(http.StatusUnauthorized)
@@ -99,17 +96,17 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 		rawToken := strings.TrimPrefix(authHeader, "Bearer ")
 
 		// Check the token
-		if !oidcManager.IsAuthorised(rawToken) {
+		if !oidcManager.isAuthorised(rawToken) {
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 
-		ui, err := oidcManager.GetUserInfo(rawToken)
+		ui, err := oidcManager.getUserInfo(rawToken)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("%v", err))
 			return
 		}
-		uid := ui.Subject
+		uid := ui.subject
 
 		// Check if exist MinIO user in cached users list
 		minioUserExists := mc.UserExists(uid)
@@ -145,8 +142,8 @@ func (om *oidcManager) clearExpired() {
 	}
 }
 
-// GetUserInfo obtains UserInfo from the issuer
-func (om *oidcManager) GetUserInfo(rawToken string) (*userInfo, error) {
+// getUserInfo obtains UserInfo from the issuer
+func (om *oidcManager) getUserInfo(rawToken string) (*userInfo, error) {
 	ot := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: rawToken})
 
 	// Get OIDC UserInfo
@@ -163,8 +160,8 @@ func (om *oidcManager) GetUserInfo(rawToken string) (*userInfo, error) {
 
 	// Create "userInfo" struct and add the groups
 	return &userInfo{
-		Subject: ui.Subject,
-		Groups:  getGroups(claims.EdupersonEntitlement),
+		subject: ui.Subject,
+		groups:  getGroups(claims.EdupersonEntitlement),
 	}, nil
 }
 
@@ -187,11 +184,11 @@ func getGroups(urns []string) []string {
 
 // UserHasVO checks if the user contained on the request token is enrolled on a specific VO
 func (om *oidcManager) UserHasVO(rawToken string, vo string) (bool, error) {
-	ui, err := om.GetUserInfo(rawToken)
+	ui, err := om.getUserInfo(rawToken)
 	if err != nil {
 		return false, err
 	}
-	for _, gr := range ui.Groups {
+	for _, gr := range ui.groups {
 		if vo == gr {
 			return true, nil
 		}
@@ -200,15 +197,16 @@ func (om *oidcManager) UserHasVO(rawToken string, vo string) (bool, error) {
 }
 
 func (om *oidcManager) GetUID(rawToken string) (string, error) {
-	ui, err := om.GetUserInfo(rawToken)
+	ui, err := om.getUserInfo(rawToken)
+	oidcLogger.Println("received uid: ", ui.subject)
 	if err != nil {
-		return "", err
+		return ui.subject, nil
 	}
-	return ui.Subject, nil
+	return "", err
 }
 
-// IsAuthorised checks if a token is authorised to access the API
-func (om *oidcManager) IsAuthorised(rawToken string) bool {
+// isAuthorised checks if a token is authorised to access the API
+func (om *oidcManager) isAuthorised(rawToken string) bool {
 	// Check if the token is valid
 	_, err := om.provider.Verifier(om.config).Verify(context.TODO(), rawToken)
 	if err != nil {
@@ -219,7 +217,7 @@ func (om *oidcManager) IsAuthorised(rawToken string) bool {
 	ui, found := om.tokenCache[rawToken]
 	if !found {
 		// Get userInfo from the issuer
-		ui, err = om.GetUserInfo(rawToken)
+		ui, err = om.getUserInfo(rawToken)
 		if err != nil {
 			return false
 		}
@@ -233,12 +231,12 @@ func (om *oidcManager) IsAuthorised(rawToken string) bool {
 
 	// Check if is authorised
 	// Same subject
-	if ui.Subject == om.subject {
+	if ui.subject == om.subject {
 		return true
 	}
 
 	// Groups
-	for _, tokenGroup := range ui.Groups {
+	for _, tokenGroup := range ui.groups {
 		for _, authGroup := range om.groups {
 			if tokenGroup == authGroup {
 				return true
