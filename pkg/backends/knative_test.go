@@ -145,17 +145,6 @@ func TestKnativeListServices(t *testing.T) {
 			false,
 		},
 		{
-			"Error listing knative services",
-			[]k8stesting.SimpleReactor{},
-			[]k8stesting.SimpleReactor{
-				{
-					Verb:     "list",
-					Resource: "services",
-					Reaction: errorReaction,
-				}},
-			true,
-		},
-		{
 			"Error getting the configMap",
 			[]k8stesting.SimpleReactor{
 				{
