@@ -940,7 +940,7 @@ func createParameters(results [][]float64, duration time.Duration, clusterStatus
 }
 
 func eventBuild(event string, storage_provider string) []byte {
-	fmt.Println("eventBuild Function.")
+	fmt.Println("eventBuild Function...")
 	var eventMap map[string]interface{}
 	err := json.Unmarshal([]byte(event), &eventMap)
 	if err != nil {
@@ -952,9 +952,10 @@ func eventBuild(event string, storage_provider string) []byte {
 	if storage, exists := eventMap["storage_provider"]; exists {
 		fmt.Println("The 'storage_provider' field exists in the event ")
 		eventValue := eventMap["event"]
-		eventString, _ := json.Marshal(eventValue)
+		//eventString, _ := json.Marshal(eventValue)
 
-		delegatedEvent1 := WrapEvent(storage.(string), string(eventString))
+		//delegatedEvent1 := WrapEvent(storage.(string), string(eventString))
+		delegatedEvent1 := WrapEvent(storage.(string), eventValue.(string))
 		fmt.Println("New DelegatedEvent:", delegatedEvent1)
 
 		k, err1 := json.Marshal(delegatedEvent1)
