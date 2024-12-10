@@ -32,7 +32,7 @@ import (
 	"strconv"
 	"strings"
 
-	//"sync"
+	"sync"
 	"time"
 
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -47,7 +47,7 @@ const (
 // tokenCache map to store tokens from services and endpoints -> [CLUSTER_ENDPOINT][SERVICE_NAME]
 var tokenCache = map[string]map[string]string{}
 
-//var mutex sync.Mutex
+var mutex sync.Mutex
 
 // DelegatedEvent wraps the original input event by adding the storage provider ID
 type DelegatedEvent struct {
@@ -259,8 +259,8 @@ func reorganizeIfNearby(alternatives []Alternative, distances []float64, thresho
 func DelegateJob(service *types.Service, event string, logger *log.Logger) error {
 
 	//Block access before executing the function
-	//mutex.Lock()
-	//defer mutex.Unlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	//Determine priority level of each replica to delegate
 	if service.Delegation == "topsis" {
