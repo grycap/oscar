@@ -471,8 +471,9 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			postJobURL.Path = path.Join(postJobURL.Path, "job", replica.ServiceName)
 
 			// Make request to get service's definition (including token) from cluster
-			fmt.Println(eventJSON)
+			fmt.Println(string(eventJSON))
 			req, err := http.NewRequest(http.MethodPost, postJobURL.String(), bytes.NewBuffer(eventJSON))
+
 			if err != nil {
 				logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to make request: %v\n", service.Name, replica.ClusterID, err)
 				continue
