@@ -31,7 +31,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
+
+	//"sync"
 	"time"
 
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -46,7 +47,7 @@ const (
 // tokenCache map to store tokens from services and endpoints -> [CLUSTER_ENDPOINT][SERVICE_NAME]
 var tokenCache = map[string]map[string]string{}
 
-var mutex sync.Mutex
+//var mutex sync.Mutex
 
 // DelegatedEvent wraps the original input event by adding the storage provider ID
 type DelegatedEvent struct {
@@ -258,8 +259,8 @@ func reorganizeIfNearby(alternatives []Alternative, distances []float64, thresho
 func DelegateJob(service *types.Service, event string, logger *log.Logger) error {
 
 	//Block access before executing the function
-	mutex.Lock()
-	defer mutex.Unlock()
+	//mutex.Lock()
+	//defer mutex.Unlock()
 
 	//Determine priority level of each replica to delegate
 	if service.Delegation == "topsis" {
@@ -442,8 +443,6 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 	//Create event depending on delegation level
 	eventJSON := eventBuild(event, storage_provider)
 
-	fmt.Println(string(eventJSON))
-
 	for _, replica := range service.Replicas {
 		// Manage if replica.Type is "oscar" and have the capacity to receive a service
 		fmt.Println("Delegation job in ClusterID: ", replica.ClusterID, "with Priority ", replica.Priority)
@@ -472,6 +471,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			postJobURL.Path = path.Join(postJobURL.Path, "job", replica.ServiceName)
 
 			// Make request to get service's definition (including token) from cluster
+			fmt.Println(eventJSON)
 			req, err := http.NewRequest(http.MethodPost, postJobURL.String(), bytes.NewBuffer(eventJSON))
 			if err != nil {
 				logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to make request: %v\n", service.Name, replica.ClusterID, err)
@@ -938,7 +938,7 @@ func createParameters(results [][]float64, duration time.Duration, clusterStatus
 	return results
 }
 
-func eventBuild(event, storage_provider string) []byte {
+func eventBuild(event string, storage_provider string) []byte {
 	fmt.Println("eventBuild Function.")
 	var eventMap map[string]interface{}
 	err := json.Unmarshal([]byte(event), &eventMap)
