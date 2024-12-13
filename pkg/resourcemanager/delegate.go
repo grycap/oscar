@@ -440,10 +440,12 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 
 	storage_provider := service.ClusterID
 	//Create event depending on delegation level
-	fmt.Println("Storage_provider :  ", storage_provider)
-	if storage_provider != "" {
-		eventJSON := eventBuild(event, storage_provider)
-		fmt.Println(string(eventJSON))
+
+	eventJSON, provider := eventBuild(event, storage_provider)
+	fmt.Println("Storage_provider :  ", provider)
+	fmt.Println(string(eventJSON))
+
+	if provider != "" { //storatage _provider not empty in the delegation proccess.
 
 		for _, replica := range service.Replicas {
 			// Manage if replica.Type is "oscar" and have the capacity to receive a service
@@ -944,15 +946,16 @@ func createParameters(results [][]float64, duration time.Duration, clusterStatus
 	return results
 }
 
-func eventBuild(event string, storage_provider string) []byte {
+func eventBuild(event string, storage_provider string) ([]byte, string) {
 	fmt.Println("eventBuild Function...")
 	var eventMap map[string]interface{}
+	var cluster_storage string
 	err := json.Unmarshal([]byte(event), &eventMap)
 	if err != nil {
 		fmt.Println("Error to read the event:", err)
-		return nil
+		return nil, ""
 	}
-	fmt.Println(len(eventMap))
+	//fmt.Println(len(eventMap))
 	var eventJSON []byte
 	if storage, exists := eventMap["storage_provider"]; exists {
 		fmt.Println("The 'storage_provider' field exists in the event ")
@@ -968,28 +971,27 @@ func eventBuild(event string, storage_provider string) []byte {
 		//k, err1 := json.Marshal(event)
 		if err1 != nil {
 			fmt.Printf("error marshalling delegated event: %v ", err1)
-			return nil
+			return nil, ""
 		}
-		//k := []byte(event)
-		//k := bytes.NewBuffer(event)
+
 		eventJSON = k
+		cluster_storage = storage.(string)
 
 	} else {
 		fmt.Println("The 'storage_provider' field does NOT exist in the event")
-		//storage := "oscar_provider"
-		//eventValue, _ = eventMap["event"]
-		//fmt.Println(eventValue)
+
 		delegatedEvent := WrapEvent(storage_provider, event)
 		fmt.Println("New DelegatedEvent:", delegatedEvent)
 
 		z, err2 := json.Marshal(delegatedEvent)
 		if err2 != nil {
 			fmt.Printf("error marshalling delegated event: %v", err2)
-			return nil
+			return nil, ""
 		}
 		eventJSON = z
+		cluster_storage = storage_provider
 	}
 
 	//fmt.Println(string(eventJson))
-	return eventJSON
+	return eventJSON, cluster_storage
 }
