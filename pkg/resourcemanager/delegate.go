@@ -32,7 +32,6 @@ import (
 	"strconv"
 	"strings"
 
-	"sync"
 	"time"
 
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -47,7 +46,7 @@ const (
 // tokenCache map to store tokens from services and endpoints -> [CLUSTER_ENDPOINT][SERVICE_NAME]
 var tokenCache = map[string]map[string]string{}
 
-var mutex sync.Mutex
+//var mutex sync.Mutex
 
 // DelegatedEvent wraps the original input event by adding the storage provider ID
 type DelegatedEvent struct {
@@ -259,8 +258,8 @@ func reorganizeIfNearby(alternatives []Alternative, distances []float64, thresho
 func DelegateJob(service *types.Service, event string, logger *log.Logger) error {
 
 	//Block access before executing the function
-	mutex.Lock()
-	defer mutex.Unlock()
+	//mutex.Lock()
+	//defer mutex.Unlock()
 
 	//Determine priority level of each replica to delegate
 	if service.Delegation == "topsis" {
@@ -441,7 +440,9 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 
 	storage_provider := service.ClusterID
 	//Create event depending on delegation level
+	fmt.Println("Storage_provider :  ", storage_provider)
 	eventJSON := eventBuild(event, storage_provider)
+	fmt.Println(string(eventJSON))
 
 	for _, replica := range service.Replicas {
 		// Manage if replica.Type is "oscar" and have the capacity to receive a service
@@ -471,7 +472,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			postJobURL.Path = path.Join(postJobURL.Path, "job", replica.ServiceName)
 
 			// Make request to get service's definition (including token) from cluster
-			fmt.Println(string(eventJSON))
+			//fmt.Println(string(eventJSON))
 			req, err := http.NewRequest(http.MethodPost, postJobURL.String(), bytes.NewBuffer(eventJSON))
 
 			if err != nil {
