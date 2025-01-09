@@ -106,7 +106,7 @@ func TestMakeCreateHandler(t *testing.T) {
 				}
 			},
 			"isolation_level": "SERVICE",
-			"bucket_list": []
+			"bucket_list": [],
 			"allowed_users": ["somelonguid@egi.eu", "somelonguid2@egi.eu"]
 		}
 	`)
