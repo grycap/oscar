@@ -310,7 +310,11 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucketName string, pol
 		json.Unmarshal(policyInfo.Policy, actualPolicy)
 
 		// Add new resource and create policy
-		actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, rs)
+		actualPolicy.Statement = []Statement{
+			{
+				Resource: []string{rs},
+			},
+		}
 
 		policy, jsonErr = json.Marshal(actualPolicy)
 		if jsonErr != nil {

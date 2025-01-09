@@ -17,7 +17,6 @@ limitations under the License.
 package handlers
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -119,7 +118,6 @@ func TestMakeCreateHandler(t *testing.T) {
 	defer server.Close()
 
 	if w.Code != http.StatusCreated {
-		fmt.Println(w.Body)
 		t.Errorf("expecting code %d, got %d", http.StatusCreated, w.Code)
 	}
 }

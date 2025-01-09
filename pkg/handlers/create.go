@@ -44,6 +44,7 @@ const (
 )
 
 var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache)")
+var overlappingError = "An object key name filtering rule defined with overlapping prefixes"
 
 // Custom logger
 var createLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
@@ -654,7 +655,7 @@ func enableInputNotification(minIOClient *s3.S3, arnStr string, bucket string, p
 	// Enable the notification
 	_, err = minIOClient.PutBucketNotificationConfiguration(pbncInput)
 
-	if err != nil && !strings.Contains(err.Error(), "An object key name filtering rule defined with overlapping prefixes") {
+	if err != nil && !strings.Contains(err.Error(), overlappingError) {
 		return fmt.Errorf("error enabling bucket notification: %v", err)
 	}
 
