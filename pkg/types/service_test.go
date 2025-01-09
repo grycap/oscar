@@ -279,7 +279,8 @@ isolation_level: ""
 bucket_list: []
 mount:
   storage_provider: ""
-  path: ""`
+  path: ""
+`
 
 	str, _ := testService.ToYAML()
 
