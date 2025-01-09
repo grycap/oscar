@@ -618,10 +618,6 @@ func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider,
 
 // TODO pass the user UID string
 func enableInputNotification(minIOClient *s3.S3, arnStr string, bucket string, path string) error {
-	// path := strings.Trim(input.Path, " /")
-	// // Split buckets and folders from path
-	// splitPath := strings.SplitN(path, "/", 2)
-	// Get current BucketNotificationConfiguration
 	gbncRequest := &s3.GetBucketNotificationConfigurationRequest{
 		Bucket: aws.String(bucket),
 	}
