@@ -277,8 +277,7 @@ interlink_node_name: ""
 allowed_users: []
 mount:
   storage_provider: ""
-  path: ""
-`
+  path: ""`
 
 	str, _ := testService.ToYAML()
 
