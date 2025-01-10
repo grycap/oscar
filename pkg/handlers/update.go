@@ -129,8 +129,10 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					return
 				}
 
-				disableInputNotifications(s3Client, oldService.GetMinIOWebhookARN(), splitPath[0])
-
+				err = disableInputNotifications(s3Client, oldService.GetMinIOWebhookARN(), splitPath[0])
+				if err != nil {
+					return
+				}
 				// Register minio webhook and restart the server
 				if err := registerMinIOWebhook(newService.Name, newService.Token, newService.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
 					uerr := back.UpdateService(*oldService)

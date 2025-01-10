@@ -373,7 +373,10 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				}
 
 				if !isAdminUser {
-					minIOAdminClient.CreateAddPolicy(b, service.AllowedUsers[i], false)
+					err = minIOAdminClient.CreateAddPolicy(b, service.AllowedUsers[i], false)
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}

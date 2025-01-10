@@ -307,8 +307,10 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucketName string, pol
 		policy = []byte(p)
 	} else {
 		actualPolicy := &Policy{}
-		json.Unmarshal(policyInfo.Policy, actualPolicy)
-
+		err := json.Unmarshal(policyInfo.Policy, actualPolicy)
+		if err != nil {
+			return fmt.Errorf("error unmarshal, the policy is not in correct format")
+		}
 		// Add new resource and create policy
 		actualPolicy.Statement = []Statement{
 			{
@@ -402,7 +404,10 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 		return fmt.Errorf("policy '%s' does not exist: %v", policyName, errInfo)
 	}
 	actualPolicy := &Policy{}
-	json.Unmarshal(policyInfo.Policy, actualPolicy)
+	err := json.Unmarshal(policyInfo.Policy, actualPolicy)
+	if err != nil {
+		return fmt.Errorf("error unmarshal, the policy is not in correct format")
+	}
 	if len(actualPolicy.Statement[0].Resource) == 1 {
 		if err := minIOAdminClient.adminClient.RemoveCannedPolicy(context.TODO(), policyName); err != nil {
 			return fmt.Errorf("error removing canned policy: %v", err)
@@ -422,7 +427,7 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 		return jsonErr
 	}
 
-	err := minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), policyName, []byte(policy))
+	err = minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), policyName, []byte(policy))
 	if err != nil {
 		return fmt.Errorf("error creating MinIO policy for user %s: %v", policyName, err)
 	}

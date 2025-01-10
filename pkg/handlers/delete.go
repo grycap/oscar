@@ -178,7 +178,10 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			// Delete user's buckets if isolated spaces had been created
 			if strings.ToUpper(service.IsolationLevel) == "USER" && len(service.BucketList) > 0 {
 				// Delete all private buckets
-				deletePrivateBuckets(service, minIOAdminClient, s3Client)
+				err = deletePrivateBuckets(service, minIOAdminClient, s3Client)
+				if err != nil {
+					return fmt.Errorf("error while disable the input notification")
+				}
 			}
 		}
 
@@ -195,7 +198,10 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		// Check if the provider identifier is defined in StorageProviders
 		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
 			// TODO fix
-			disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), "")
+			err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), "")
+			if err != nil {
+				return fmt.Errorf("error while disable the input notification")
+			}
 			return fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
 		}
 
