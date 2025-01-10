@@ -107,7 +107,12 @@ license text.
 
 This development is partially funded by the [EGI Strategic and Innovation Fund](https://www.egi.eu/about/egi-council/egi-strategic-and-innovation-fund/).
 
-Partially funded by the project [AI-SPRINT](https://ai-sprint-project.eu) "AI in Secure Privacy-Preserving Computing Continuum" that has received funding from the European Union’s Horizon 2020 Research and Innovation Programme under Grant 101016577.
+Partially funded by the projects:
+
+- [AI-SPRINT](https://ai-sprint-project.eu) "AI in Secure Privacy-Preserving Computing Continuum" that has received funding from the European Union’s Horizon 2020 Research and Innovation Programme under Grant 101016577.
+- [interTwin](https://intertwin.eu) "An interdisciplinary Digital Twin Engine for science" that has received funding from the European Union’s Horizon Europe Programme under Grant 101058386.
+- [AI4EOSC](https://ai4eosc.eu) "Artificial Intelligence for the European Open Science Cloud" that has received funding from the European Union’s Horizon Europe Research and Innovation Programme under Grant 101058593."
+- [iMagine](http://imagine-ai.eu) "AI-based image data analysis tools for aquatic research" that has received funding from the European Union’s Horizon Europe Research and Innovation Programme under Grant 101058625.
 
 Also, Grant PDC2021-120844-I00 funded by Ministerio de Ciencia e Innovación/Agencia Estatal de Investigación/ 10.13039/501100011033 and by “European Union NextGenerationEU/PRTR” and Grant PID2020-113126RB-I00 funded by Ministerio de Ciencia e Innovación/Agencia Estatal de Investigación/ 10.13039/501100011033.
 
