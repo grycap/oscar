@@ -20,6 +20,28 @@ func TestMakeDeleteHandler(t *testing.T) {
 		if hreq.URL.Path != "/input" && hreq.URL.Path != "/output" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
 			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
 		}
+		if hreq.URL.Path == "/minio/admin/v3/info" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+		} else if hreq.URL.Path == "/minio/admin/v3/info-canned-policy" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{
+				"PolicyName": "input",
+				"Policy": {
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Effect": "Allow",
+							"Action": ["s3:GetObject"],
+							"Resource": ["arn:aws:s3:::example-bucket/*"]
+						}
+					]
+				}
+				}`))
+		} else {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"status": "success"}`))
+		}
 	}))
 
 	// and set the MinIO endpoint to the fake server
@@ -41,6 +63,8 @@ func TestMakeDeleteHandler(t *testing.T) {
 		Output: []types.StorageIOConfig{
 			{Provider: "minio." + types.DefaultProvider, Path: "/output"},
 		},
+		IsolationLevel: "USER",
+		AllowedUsers:   []string{"somelonguid1@egi.eu"},
 		StorageProviders: &types.StorageProviders{
 			MinIO: map[string]*types.MinIOProvider{types.DefaultProvider: {
 				Region:    "us-east-1",
