@@ -85,7 +85,7 @@ func DeleteExpose(name string, kubeClientset kubernetes.Interface, cfg *Config) 
 	if ingressType {
 		err = deleteIngress(getIngressName(name), kubeClientset, cfg)
 		if existsSecret(name, kubeClientset, cfg) {
-			deleteSecret(name, kubeClientset, cfg)
+			err = deleteSecret(name, kubeClientset, cfg)
 			if err != nil {
 				return err
 			}
