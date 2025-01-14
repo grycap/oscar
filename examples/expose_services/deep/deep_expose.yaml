@@ -6,7 +6,7 @@ functions:
       cpu: '2.0'
       image: ai4oshub/dogs-breed-detector
       log_level: CRITICAL
-      script: script.sh
+      script: deepscript.sh
       environment:
         Variables:
           basePath: /system/services/dogs-breed/exposed/main
