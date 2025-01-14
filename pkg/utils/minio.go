@@ -21,8 +21,10 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -34,8 +36,7 @@ import (
 
 const ALL_USERS_GROUP = "all_users_group"
 
-// Custom logger - uncomment if needed
-// var minioLogger = log.New(os.Stdout, "[MINIO] ", log.Flags())
+var minioLogger = log.New(os.Stdout, "[MINIO] ", log.Flags())
 
 // MinIOAdminClient struct to represent a MinIO Admin client to configure webhook notifications
 type MinIOAdminClient struct {
@@ -81,7 +82,6 @@ func MakeMinIOAdminClient(cfg *types.Config) (*MinIOAdminClient, error) {
 
 	// Disable tls verification in client transport if verify == false
 	if !cfg.MinIOProvider.Verify {
-		// #nosec
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
@@ -307,10 +307,8 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucketName string, pol
 		policy = []byte(p)
 	} else {
 		actualPolicy := &Policy{}
-		err := json.Unmarshal(policyInfo.Policy, actualPolicy)
-		if err != nil {
-			return fmt.Errorf("error unmarshal, the policy is not in correct format")
-		}
+		json.Unmarshal(policyInfo.Policy, actualPolicy)
+
 		// Add new resource and create policy
 		actualPolicy.Statement = []Statement{
 			{
@@ -354,10 +352,7 @@ func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers b
 		}
 
 		actualPolicy := &Policy{}
-		jsonErr = json.Unmarshal(policyInfo.Policy, actualPolicy)
-		if jsonErr != nil {
-			return jsonErr
-		}
+		json.Unmarshal(policyInfo.Policy, actualPolicy)
 
 		// Add new resource and create policy
 		actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, rs)
@@ -406,10 +401,7 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 		return fmt.Errorf("policy '%s' does not exist: %v", policyName, errInfo)
 	}
 	actualPolicy := &Policy{}
-	err := json.Unmarshal(policyInfo.Policy, actualPolicy)
-	if err != nil {
-		return fmt.Errorf("error unmarshal, the policy is not in correct format")
-	}
+	json.Unmarshal(policyInfo.Policy, actualPolicy)
 	if len(actualPolicy.Statement[0].Resource) == 1 {
 		if policyName == ALL_USERS_GROUP {
 			actualPolicy.Statement[0].Effect = "Deny"
@@ -434,7 +426,7 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 		return jsonErr
 	}
 
-	err = minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), policyName, []byte(policy))
+	err := minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), policyName, []byte(policy))
 	if err != nil {
 		return fmt.Errorf("error creating MinIO policy for user %s: %v", policyName, err)
 	}
