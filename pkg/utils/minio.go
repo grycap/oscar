@@ -307,8 +307,10 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucketName string, pol
 		policy = []byte(p)
 	} else {
 		actualPolicy := &Policy{}
-		json.Unmarshal(policyInfo.Policy, actualPolicy)
-
+		jsonErr = json.Unmarshal(policyInfo.Policy, actualPolicy)
+		if jsonErr != nil {
+			return jsonErr
+		}
 		// Add new resource and create policy
 		actualPolicy.Statement = []Statement{
 			{
@@ -352,8 +354,10 @@ func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers b
 		}
 
 		actualPolicy := &Policy{}
-		json.Unmarshal(policyInfo.Policy, actualPolicy)
-
+		jsonErr = json.Unmarshal(policyInfo.Policy, actualPolicy)
+		if jsonErr != nil {
+			return jsonErr
+		}
 		// Add new resource and create policy
 		actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, rs)
 
@@ -401,7 +405,10 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 		return fmt.Errorf("policy '%s' does not exist: %v", policyName, errInfo)
 	}
 	actualPolicy := &Policy{}
-	json.Unmarshal(policyInfo.Policy, actualPolicy)
+	jsonErr := json.Unmarshal(policyInfo.Policy, actualPolicy)
+	if jsonErr != nil {
+		return jsonErr
+	}
 	if len(actualPolicy.Statement[0].Resource) == 1 {
 		if policyName == ALL_USERS_GROUP {
 			actualPolicy.Statement[0].Effect = "Deny"
