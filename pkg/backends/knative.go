@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
@@ -33,8 +32,8 @@ import (
 	knclientset "knative.dev/serving/pkg/client/clientset/versioned"
 )
 
-// Custom logger
-var knativeLogger = log.New(os.Stdout, "[KNATIVE] ", log.Flags())
+// Custom logger - uncomment if needed
+// var knativeLogger = log.New(os.Stdout, "[KNATIVE] ", log.Flags())
 
 // KnativeBackend struct to represent a Knative client
 type KnativeBackend struct {
@@ -84,7 +83,7 @@ func (kn *KnativeBackend) ListServices() ([]*types.Service, error) {
 	services := []*types.Service{}
 
 	for _, cm := range configmaps.Items {
-		service, err := getServiceFromConfigMap(&cm)
+		service, err := getServiceFromConfigMap(&cm) // #nosec G601
 		if err != nil {
 			return nil, err
 		}
@@ -129,7 +128,10 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 
 	//Create an expose service
 	if service.Expose.APIPort != 0 {
-		types.CreateExpose(service, kn.kubeClientset, kn.config)
+		err = types.CreateExpose(service, kn.kubeClientset, kn.config)
+		if err != nil {
+			return err
+		}
 	}
 	//Create deaemonset to cache the service image on all the nodes
 	if service.ImagePrefetch {

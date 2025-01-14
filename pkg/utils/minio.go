@@ -83,6 +83,7 @@ func MakeMinIOAdminClient(cfg *types.Config) (*MinIOAdminClient, error) {
 	// Disable tls verification in client transport if verify == false
 	if !cfg.MinIOProvider.Verify {
 		tr := &http.Transport{
+			// #nosec
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
 		adminClient.SetCustomTransport(tr)
@@ -287,7 +288,7 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucketName string, pol
 
 	rs := "arn:aws:s3:::" + bucketName + "/*"
 
-	policyInfo, errInfo := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), policyName)
+	_, errInfo := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), policyName)
 	if errInfo != nil {
 		// If the policy does not exist create it
 		p := `{
@@ -306,18 +307,15 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucketName string, pol
 		}`
 		policy = []byte(p)
 	} else {
-		actualPolicy := &Policy{}
-		json.Unmarshal(policyInfo.Policy, actualPolicy)
-
-		// Add new resource and create policy
-		actualPolicy.Statement = []Statement{
-			{
-				Resource: []string{rs},
-				Action:   []string{"s3:*"},
-				Effect:   "Allow",
+		actualPolicy := &Policy{
+			Statement: []Statement{
+				{
+					Resource: []string{rs},
+					Action:   []string{"s3:*"},
+					Effect:   "Allow",
+				},
 			},
 		}
-
 		policy, jsonErr = json.Marshal(actualPolicy)
 		if jsonErr != nil {
 			return jsonErr
@@ -352,8 +350,11 @@ func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers b
 		}
 
 		actualPolicy := &Policy{}
-		json.Unmarshal(policyInfo.Policy, actualPolicy)
-
+		jsonErr = json.Unmarshal(policyInfo.Policy, actualPolicy)
+		if jsonErr != nil {
+			fmt.Println("here2")
+			return jsonErr
+		}
 		// Add new resource and create policy
 		actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, rs)
 
@@ -401,7 +402,12 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 		return fmt.Errorf("policy '%s' does not exist: %v", policyName, errInfo)
 	}
 	actualPolicy := &Policy{}
-	json.Unmarshal(policyInfo.Policy, actualPolicy)
+	jsonErr := json.Unmarshal(policyInfo.Policy, actualPolicy)
+	if jsonErr != nil {
+		fmt.Println("here3")
+
+		return jsonErr
+	}
 	if len(actualPolicy.Statement[0].Resource) == 1 {
 		if policyName == ALL_USERS_GROUP {
 			actualPolicy.Statement[0].Effect = "Deny"

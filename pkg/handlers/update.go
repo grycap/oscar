@@ -129,11 +129,16 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					return
 				}
 
-				disableInputNotifications(s3Client, oldService.GetMinIOWebhookARN(), splitPath[0])
-
+				err = disableInputNotifications(s3Client, oldService.GetMinIOWebhookARN(), splitPath[0])
+				if err != nil {
+					return
+				}
 				// Register minio webhook and restart the server
 				if err := registerMinIOWebhook(newService.Name, newService.Token, newService.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
-					back.UpdateService(*oldService)
+					uerr := back.UpdateService(*oldService)
+					if uerr != nil {
+						log.Println(uerr.Error())
+					}
 					c.String(http.StatusInternalServerError, err.Error())
 					return
 				}
@@ -152,7 +157,10 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						c.String(http.StatusInternalServerError, err.Error())
 					}
 					// If updateBuckets fails restore the oldService
-					back.UpdateService(*oldService)
+					uerr := back.UpdateService(*oldService)
+					if uerr != nil {
+						log.Println(uerr.Error())
+					}
 					return
 				}
 
