@@ -313,6 +313,8 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucketName string, pol
 		actualPolicy.Statement = []Statement{
 			{
 				Resource: []string{rs},
+				Action:   []string{"s3:*"},
+				Effect:   "Allow",
 			},
 		}
 
@@ -401,10 +403,15 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 	actualPolicy := &Policy{}
 	json.Unmarshal(policyInfo.Policy, actualPolicy)
 	if len(actualPolicy.Statement[0].Resource) == 1 {
-		if err := minIOAdminClient.adminClient.RemoveCannedPolicy(context.TODO(), policyName); err != nil {
-			return fmt.Errorf("error removing canned policy: %v", err)
+		if policyName == ALL_USERS_GROUP {
+			actualPolicy.Statement[0].Effect = "Deny"
+		} else {
+			if err := minIOAdminClient.adminClient.RemoveCannedPolicy(context.TODO(), policyName); err != nil {
+				return fmt.Errorf("error removing canned policy: %v", err)
+			}
+			return nil
 		}
-		return nil
+
 	} else {
 		for i, r := range actualPolicy.Statement[0].Resource {
 			if r == rs {
@@ -431,8 +438,8 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 	return nil
 }
 
-func (minIOAdminClient *MinIOAdminClient) EmptyPolicy(policyName string) error {
-	err := minIOAdminClient.adminClient.SetPolicy(context.TODO(), "", policyName, false)
+func (minIOAdminClient *MinIOAdminClient) EmptyPolicy(policyName string, group bool) error {
+	err := minIOAdminClient.adminClient.SetPolicy(context.TODO(), "", policyName, group)
 	if err != nil {
 		return fmt.Errorf("error setting MinIO policy for group %s: %v", policyName, err)
 	}

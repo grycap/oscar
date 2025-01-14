@@ -221,7 +221,7 @@ func deletePrivateBuckets(service *types.Service, minIOAdminClient *utils.MinIOA
 			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 		}
 		//Delete bucket and unset the associated policy
-		err := minIOAdminClient.EmptyPolicy(service.AllowedUsers[i])
+		err := minIOAdminClient.EmptyPolicy(service.AllowedUsers[i], false)
 		if err != nil {
 			fmt.Println(err)
 		}
