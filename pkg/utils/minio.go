@@ -308,6 +308,7 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucketName string, pol
 		policy = []byte(p)
 	} else {
 		actualPolicy := &Policy{
+			Version: "2012-10-17",
 			Statement: []Statement{
 				{
 					Resource: []string{rs},
