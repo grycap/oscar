@@ -22,6 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	testclient "k8s.io/client-go/kubernetes/fake"
@@ -227,5 +228,150 @@ func TestHortizontalAutoScaleSpec(t *testing.T) {
 	}
 	if *res.Spec.TargetCPUUtilizationPercentage != 40 {
 		t.Errorf("Expected target cpu 40 but got %d", res.Spec.TargetCPUUtilizationPercentage)
+	}
+}
+
+func TestListIngress(t *testing.T) {
+
+	K8sObjects := []runtime.Object{
+		&netv1.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service-ing",
+				Namespace: "namespace",
+			},
+		},
+	}
+
+	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
+	cfg := &Config{ServicesNamespace: "namespace"}
+
+	_, err := listIngress(kubeClientset, cfg)
+
+	if err != nil {
+		t.Errorf("Error listing ingresses: %v", err)
+	}
+}
+
+func TestUpdateIngress(t *testing.T) {
+
+	K8sObjects := []runtime.Object{
+		&netv1.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service-ing",
+				Namespace: "namespace",
+			},
+		},
+	}
+
+	service := Service{
+		Name: "service",
+	}
+
+	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
+	cfg := &Config{ServicesNamespace: "namespace"}
+
+	err := updateIngress(service, kubeClientset, cfg)
+
+	if err != nil {
+		t.Errorf("Error updating ingress: %v", err)
+	}
+}
+
+func TestDeleteIngress(t *testing.T) {
+
+	K8sObjects := []runtime.Object{
+		&netv1.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service-ing",
+				Namespace: "namespace",
+			},
+		},
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service-ing-auth-expose",
+				Namespace: "namespace",
+			},
+		},
+	}
+
+	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
+	cfg := &Config{ServicesNamespace: "namespace"}
+
+	err := deleteIngress("service-ing", kubeClientset, cfg)
+
+	if err != nil {
+		t.Errorf("Error deleting ingress: %v", err)
+	}
+}
+
+func TestUpdateSecret(t *testing.T) {
+
+	K8sObjects := []runtime.Object{
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service-auth-expose",
+				Namespace: "namespace",
+			},
+		},
+	}
+	service := Service{
+		Name: "service",
+	}
+
+	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
+	cfg := &Config{ServicesNamespace: "namespace"}
+
+	err := updateSecret(service, kubeClientset, cfg)
+
+	if err != nil {
+		t.Errorf("Error updating secret: %v", err)
+	}
+}
+
+func TestDeleteSecret(t *testing.T) {
+
+	K8sObjects := []runtime.Object{
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service-auth-expose",
+				Namespace: "namespace",
+			},
+		},
+	}
+
+	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
+	cfg := &Config{ServicesNamespace: "namespace"}
+
+	err := deleteSecret("service", kubeClientset, cfg)
+
+	if err != nil {
+		t.Errorf("Error deleting secret: %v", err)
+	}
+}
+
+func TestExistsSecret(t *testing.T) {
+
+	K8sObjects := []runtime.Object{
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service-auth-expose",
+				Namespace: "namespace",
+			},
+		},
+	}
+
+	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
+	cfg := &Config{ServicesNamespace: "namespace"}
+
+	exists := existsSecret("service", kubeClientset, cfg)
+
+	if exists != true {
+		t.Errorf("Expected secret to exist but got %v", exists)
+	}
+
+	notexists := existsSecret("service1", kubeClientset, cfg)
+
+	if notexists != false {
+		t.Errorf("Expected secret not to exist but got %v", notexists)
 	}
 }

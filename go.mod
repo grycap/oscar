@@ -34,6 +34,7 @@ require (
 
 require (
 	github.com/fatih/color v1.14.1 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.1 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/rs/xid v1.4.0 // indirect

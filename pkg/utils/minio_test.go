@@ -112,7 +112,7 @@ func TestPrivateToPublicBucket(t *testing.T) {
 	cfg, server := createMinIOConfig()
 
 	client, _ := MakeMinIOAdminClient(&cfg)
-	err := client.PrivateToPublicBucket("testbucket")
+	err := client.PrivateToPublicBucket([]string{}, "testbucket")
 
 	if err != nil {
 		t.Errorf("Error creating MinIO user: %v", err)

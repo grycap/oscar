@@ -17,7 +17,6 @@ limitations under the License.
 package handlers
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -38,7 +37,7 @@ func TestMakeCreateHandler(t *testing.T) {
 	// Create a fake MinIO server
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
 
-		if hreq.URL.Path != "/test" && hreq.URL.Path != "/test/input/" && hreq.URL.Path != "/output" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
+		if hreq.URL.Path != "/test" && hreq.URL.Path != "/test/input/" && hreq.URL.Path != "/test/output/" && hreq.URL.Path != "/test/mount/" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") && !strings.HasPrefix(hreq.URL.Path, "/test-somelongui") {
 			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
 		}
 
@@ -69,51 +68,67 @@ func TestMakeCreateHandler(t *testing.T) {
 	})
 	r.POST("/system/services", MakeCreateHandler(&cfg, back))
 
-	w := httptest.NewRecorder()
-	body := strings.NewReader(`
-		{
-			"name": "cowsay",
-			"cluster_id": "oscar",
-			"memory": "1Gi",
-			"cpu": "1.0",
-			"log_level": "CRITICAL",
-			"image": "ghcr.io/grycap/cowsay",
-			"alpine": false,
-			"script": "test",
-			"input": [
-				{
-				"storage_provider": "minio",
-				"path": "/test/input/"
-				}
-  			],
-			"output": [
-				{
-				"storage_provider": "webdav.id",
-				"path": "/output"
-				}
-  			],
-			"storage_providers": {
-				"webdav": {
-					"id": {
-						"hostname": "` + server.URL + `",
-						"login": "user",
-						"password": "pass"
-					}
-				}
-			},
-			"allowed_users": ["somelonguid@egi.eu", "somelonguid2@egi.eu"]
-		}
-	`)
+	scenarios := []struct {
+		name           string
+		isolationLevel string
+	}{
+		{"Service", "SERVICE"},
+		{"User", "USER"},
+	}
 
-	req, _ := http.NewRequest("POST", "/system/services", body)
-	req.Header.Add("Authorization", "Bearer token")
-	r.ServeHTTP(w, req)
+	for _, s := range scenarios {
+		t.Run(s.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			body := strings.NewReader(`
+				{
+					"name": "cowsay",
+					"cluster_id": "oscar",
+					"memory": "1Gi",
+					"cpu": "1.0",
+					"log_level": "CRITICAL",
+					"image": "ghcr.io/grycap/cowsay",
+					"alpine": false,
+					"script": "test",
+					"input": [
+						{
+						"storage_provider": "minio",
+						"path": "/test/input/"
+						}
+					],
+					"output": [
+						{
+						"storage_provider": "minio",
+						"path": "/test/output"
+						}
+					],
+					"mount": {
+						"storage_provider": "minio",
+						"path": "/test/mount"
+					},
+					"storage_providers": {
+						"webdav": {
+							"id": {
+								"hostname": "` + server.URL + `",
+								"login": "user",
+								"password": "pass"
+							}
+						}
+					},
+					"isolation_level": "` + s.isolationLevel + `",
+					"bucket_list": [],
+					"allowed_users": ["somelonguid@egi.eu", "somelonguid2@egi.eu"]
+				}`)
+
+			req, _ := http.NewRequest("POST", "/system/services", body)
+			req.Header.Add("Authorization", "Bearer token")
+			r.ServeHTTP(w, req)
+
+			if w.Code != http.StatusCreated {
+				t.Errorf("expecting code %d, got %d", http.StatusCreated, w.Code)
+			}
+		})
+	}
 
 	// Close the fake MinIO server
 	defer server.Close()
-
-	if w.Code != http.StatusCreated {
-		fmt.Println(w.Body)
-		t.Errorf("expecting code %d, got %d", http.StatusCreated, w.Code)
-	}
 }

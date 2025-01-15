@@ -275,6 +275,8 @@ clusters:
 owner: ""
 interlink_node_name: ""
 allowed_users: []
+isolation_level: ""
+bucket_list: []
 mount:
   storage_provider: ""
   path: ""
