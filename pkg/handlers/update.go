@@ -107,7 +107,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				splitPath := strings.SplitN(path, "/", 2)
 				// If isolation level was USER delete all private buckets
 				if oldService.IsolationLevel == "USER" {
-					err = deletePrivateBuckets(oldService, minIOAdminClient, s3Client)
+					err = updatePrivateBuckets(oldService, minIOAdminClient, s3Client)
 					if err != nil {
 						return
 					}
@@ -209,4 +209,26 @@ func updateBuckets(newService, oldService *types.Service, minIOAdminClient *util
 
 	// Create the input and output buckets/folders from newService
 	return createBuckets(newService, cfg, minIOAdminClient, true)
+}
+
+func updatePrivateBuckets(service *types.Service, minIOAdminClient *utils.MinIOAdminClient, s3Client *s3.S3) error {
+	for i, b := range service.BucketList {
+		// Disable input notifications for user bucket
+		if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), b); err != nil {
+			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
+		}
+		//Delete bucket and unset the associated policy
+		err := minIOAdminClient.EmptyPolicy(service.AllowedUsers[i], false)
+		if err != nil {
+			fmt.Println(err)
+		}
+		err = minIOAdminClient.RemoveFromPolicy(b, service.AllowedUsers[i], false)
+		if err != nil {
+			return fmt.Errorf("unable to remove bucket from policy %q, %v", b, err)
+		}
+		/*if err := minIOAdminClient.DeleteBucket(s3Client, b, service.AllowedUsers[i]); err != nil {
+			return fmt.Errorf("unable to delete bucket %q, %v", b, err)
+		}*/
+	}
+	return nil
 }

@@ -285,33 +285,41 @@ func (minIOAdminClient *MinIOAdminClient) RestartServer() error {
 func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucketName string, policyName string, isGroup bool) error {
 	var jsonErr error
 	var policy []byte
+	var action []string
 
 	rs := "arn:aws:s3:::" + bucketName + "/*"
-
-	_, errInfo := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), policyName)
+	getPolicy, errInfo := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), policyName)
 	if errInfo != nil {
 		// If the policy does not exist create it
-		p := `{
-			"Version": "2012-10-17",
-			"Statement": [
-				{
-					"Effect": "Allow",
-					"Action": [
-						"s3:*"
-					],
-					"Resource": [
-						"arn:aws:s3:::` + bucketName + `/*"
-					]
-				}
-			]
-		}`
-		policy = []byte(p)
-	} else {
 		actualPolicy := &Policy{
 			Version: "2012-10-17",
 			Statement: []Statement{
 				{
 					Resource: []string{rs},
+					Action:   []string{"s3:*"},
+					Effect:   "Allow",
+				},
+			},
+		}
+		policy, jsonErr = json.Marshal(actualPolicy)
+		if jsonErr != nil {
+			return jsonErr
+		}
+	} else {
+		jsonUnmarshal := &Policy{}
+
+		jsonErr = json.Unmarshal(getPolicy.Policy, jsonUnmarshal)
+
+		if len(jsonUnmarshal.Statement) > 0 && jsonErr == nil {
+			action = append(jsonUnmarshal.Statement[0].Resource, rs)
+		} else {
+			action = []string{rs}
+		}
+		actualPolicy := &Policy{
+			Version: "2012-10-17",
+			Statement: []Statement{
+				{
+					Resource: action,
 					Action:   []string{"s3:*"},
 					Effect:   "Allow",
 				},
@@ -405,8 +413,6 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 	actualPolicy := &Policy{}
 	jsonErr := json.Unmarshal(policyInfo.Policy, actualPolicy)
 	if jsonErr != nil {
-		fmt.Println("here3")
-
 		return jsonErr
 	}
 	if len(actualPolicy.Statement[0].Resource) == 1 {
