@@ -24,7 +24,8 @@ functions:
       cpu: '0.6'
       image: ghcr.io/grycap/imagemagick
       script: script.sh
-      vo: "vo.example.eu" # Needed to create services on OIDC enabled clusters
+      vo: "vo.example.eu"
+      isolation_level: USER
       allowed_users: 
       - "62bb11b40398f73778b66f344d282242debb8ee3ebb106717a123ca213162926@egi.eu"
       - "5e14d33ac4abc96272cc163da6a200c2e18591bfb3b0f32a4c9c867f5e938463@egi.eu"
@@ -36,6 +37,24 @@ functions:
         path: grayify_multitenant/output
 ```
 
+## ISOLATION LEVEL
+
+The isolation level variable has been added to the service definition for better privacy definition of the service. There are 2 modes available.
+
+
+### SERVICE
+
+The service isolation level is the default value. If you isolate the service at the service level and use MinIO as the event source, the buckets you selected in the input/output sections will be created. These buckets will only be visible to the users defined in allowed_users.
+
+
+### USER
+
+By isolating the service at the user level, in addition to creating the buckets specified in input/output, additional private buckets will be created. Each user defined in allowed_users will have access to one of the private buckets, which will also run the service if a file is uploaded to the /in folder located inside.
+
+
+> Managing Event: Currently, in version 3.3.2, uploading a file to the /in folder of any of the private buckets triggers the execution of the service, but the output is directed to the service’s private folder, as defined in the output. In future versions, it will be redirected to the private folders of the user.
+
+![multitenancy-diagram](images/multitenancy.png)
 
 > **_NOTE:_** A user can obtain its EGI User Id by login into https://aai.egi.eu/ (for the production instance of EGI Check-In) or https://aai-demo.egi.eu (for the demo instance of EGI Check-In). 
 
