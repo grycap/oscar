@@ -290,6 +290,17 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Multitenancy
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -299,6 +310,58 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#isolation-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      ISOLATION LEVEL
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ISOLATION LEVEL">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#service" class="md-nav__link">
+    <span class="md-ellipsis">
+      SERVICE
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#user" class="md-nav__link">
+    <span class="md-ellipsis">
+      USER
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -1274,7 +1337,8 @@
       cpu: '0.6'
       image: ghcr.io/grycap/imagemagick
       script: script.sh
-      vo: &quot;vo.example.eu&quot; # Needed to create services on OIDC enabled clusters
+      vo: &quot;vo.example.eu&quot;
+      isolation_level: USER
       allowed_users: 
       - &quot;62bb11b40398f73778b66f344d282242debb8ee3ebb106717a123ca213162926@egi.eu&quot;
       - &quot;5e14d33ac4abc96272cc163da6a200c2e18591bfb3b0f32a4c9c867f5e938463@egi.eu&quot;
@@ -1285,6 +1349,16 @@
       - storage_provider: minio.default
         path: grayify_multitenant/output
 </code></pre>
+<h2 id="isolation-level">ISOLATION LEVEL</h2>
+<p>The isolation level variable has been added to the service definition for better privacy definition of the service. There are 2 modes available.</p>
+<h3 id="service">SERVICE</h3>
+<p>The service isolation level is the default value. If you isolate the service at the service level and use MinIO as the event source, the buckets you selected in the input/output sections will be created. These buckets will only be visible to the users defined in allowed_users.</p>
+<h3 id="user">USER</h3>
+<p>By isolating the service at the user level, in addition to creating the buckets specified in input/output, additional private buckets will be created. Each user defined in allowed_users will have access to one of the private buckets, which will also run the service if a file is uploaded to the /in folder located inside.</p>
+<blockquote>
+<p>Managing Event: Currently, in version 3.3.2, uploading a file to the /in folder of any of the private buckets triggers the execution of the service, but the output is directed to the service’s private folder, as defined in the output. In future versions, it will be redirected to the private folders of the user.</p>
+</blockquote>
+<p><img alt="multitenancy-diagram" src="../images/multitenancy.png" /></p>
 <blockquote>
 <p><strong><em>NOTE:</em></strong> A user can obtain its EGI User Id by login into https://aai.egi.eu/ (for the production instance of EGI Check-In) or https://aai-demo.egi.eu (for the demo instance of EGI Check-In). </p>
 </blockquote>
