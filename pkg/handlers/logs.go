@@ -35,7 +35,7 @@ import (
 // TODO Try using cookies to avoid excesive calls to the k8s API //
 
 // MakeJobsInfoHandler makes a handler for listing all existing jobs from a service and show their JobInfo
-func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
+func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		jobsInfo := make(map[string]*types.JobInfo)
 		// Get serviceName
@@ -82,15 +82,20 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset *kubernetes
 		// Populate jobsInfo with status, start and finish times (from pods)
 		for _, pod := range pods.Items {
 			if jobName, ok := pod.Labels["job-name"]; ok {
+				fmt.Println(pod.Status)
+				//if pod.Status != nil && pod.Status.Phase != nil {
 				jobsInfo[jobName].Status = string(pod.Status.Phase)
+				//} else {
+				//	jobsInfo[jobName].Status = "unknown"
+				//}
 				// Loop through job.Status.ContainerStatuses to find oscar-container
 				for _, contStatus := range pod.Status.ContainerStatuses {
 					if contStatus.Name == types.ContainerName {
 						if contStatus.State.Running != nil {
-							jobsInfo[jobName].StartTime = &contStatus.State.Running.StartedAt
+							jobsInfo[jobName].StartTime = &(contStatus.State.Running.StartedAt)
 						} else if contStatus.State.Terminated != nil {
-							jobsInfo[jobName].StartTime = &contStatus.State.Terminated.StartedAt
-							jobsInfo[jobName].FinishTime = &contStatus.State.Terminated.FinishedAt
+							jobsInfo[jobName].StartTime = &(contStatus.State.Terminated.StartedAt)
+							jobsInfo[jobName].FinishTime = &(contStatus.State.Terminated.FinishedAt)
 						}
 					}
 				}
@@ -103,7 +108,7 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset *kubernetes
 
 // MakeDeleteJobsHandler makes a handler for deleting all jobs created by the provided service.
 // If 'all' querystring is set to 'true' pending, running and failed jobs will also be deleted
-func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
+func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get serviceName and jobName
 		serviceName := c.Param("serviceName")
@@ -147,7 +152,7 @@ func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset *kubernet
 }
 
 // MakeGetLogsHandler makes a handler for getting logs from the 'oscar-container' inside the pod created by the specified job
-func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
+func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get serviceName and jobName
 		serviceName := c.Param("serviceName")
@@ -200,7 +205,7 @@ func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset *kubernetes.
 }
 
 // MakeDeleteJobHandler makes a handler for removing a job
-func MakeDeleteJobHandler(back types.ServerlessBackend, kubeClientset *kubernetes.Clientset, namespace string) gin.HandlerFunc {
+func MakeDeleteJobHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, namespace string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get serviceName and jobName
 		serviceName := c.Param("serviceName")
@@ -251,7 +256,7 @@ func isOIDCAuthorised(c *gin.Context, back types.ServerlessBackend, serviceName 
 	// If is oidc auth get service and check on allowed users
 	authHeader := c.GetHeader("Authorization")
 	if len(strings.Split(authHeader, "Bearer")) > 1 {
-		service, _ := back.ReadService(c.Param("serviceName"))
+		service, _ := back.ReadService(serviceName)
 		uid, err := auth.GetUIDFromContext(c)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintln(err))

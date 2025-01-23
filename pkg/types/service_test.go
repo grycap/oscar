@@ -229,6 +229,7 @@ replicas:
   priority: 0
   headers:
     Authorization: Bearer testtoken
+delegation: ""
 rescheduler_threshold: 0
 log_level: ""
 image: testimage
@@ -274,6 +275,8 @@ clusters:
 owner: ""
 interlink_node_name: ""
 allowed_users: []
+isolation_level: ""
+bucket_list: []
 mount:
   storage_provider: ""
   path: ""
