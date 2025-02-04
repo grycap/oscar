@@ -51,8 +51,8 @@ The service isolation level is the default value. If you isolate the service at 
 
 By isolating the service at the user level, in addition to creating the buckets specified in input/output, additional private buckets will be created. Each user defined in allowed_users will have access to one of the private buckets, which will also run the service if a file is uploaded to the /in folder located inside.
 
+The services triggered by those private buckets will redirect the output into the same bucket with the key 'out'. For example, if we use 'gray' as the input bucket, we are the user '5e14d33a'. Our private bucket is 'car-5e14d33a'. Inside that private bucket, we have folders for 'in' and 'out'. Upload a file into the 'in' folder to trigger the service. The output is uploaded into the 'out' folder.
 
-> Managing Event: Currently, in version 3.3.2, uploading a file to the /in folder of any of the private buckets triggers the execution of the service, but the output is directed to the service’s private folder, as defined in the output. In future versions, it will be redirected to the private folders of the user.
 
 ![multitenancy-diagram](images/multitenancy.png)
 
