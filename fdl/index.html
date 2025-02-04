@@ -1473,6 +1473,10 @@
       cpu: '1.0'
       image: grycap/oscar-theano-plants
       script: plants.sh
+      isolation_level: USER
+      allowed_users: 
+      - &quot;62bb11b40398f7.......926@egi.eu&quot;
+      - &quot;5e14d33ac4abc9.......463@egi.eu&quot;
       input:
       - storage_provider: minio.default
         path: example-workflow/in
@@ -1672,6 +1676,10 @@ storage_providers:
 <tr>
 <td><code>interlink_node_name</code> </br> <em>string</em></td>
 <td>Name of the virtual kubelet node (if you are using InterLink nodes) Optional</td>
+</tr>
+<tr>
+<td><code>isolation_level</code> </br> <em>string</em></td>
+<td>Select the isolation level of the MinIO buckets: <code>SERVICE</code> or <code>USER</code> (<code>SERVICE</code> by default) Optional</td>
 </tr>
 </tbody>
 </table>
