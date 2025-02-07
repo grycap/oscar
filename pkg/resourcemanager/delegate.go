@@ -31,7 +31,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
+
+	//"sync"
 	"time"
 
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -46,7 +47,7 @@ const (
 // tokenCache map to store tokens from services and endpoints -> [CLUSTER_ENDPOINT][SERVICE_NAME]
 var tokenCache = map[string]map[string]string{}
 
-var mutex sync.Mutex
+//var mutex sync.Mutex
 
 // DelegatedEvent wraps the original input event by adding the storage provider ID
 type DelegatedEvent struct {
@@ -258,8 +259,8 @@ func reorganizeIfNearby(alternatives []Alternative, distances []float64, thresho
 func DelegateJob(service *types.Service, event string, logger *log.Logger) error {
 
 	//Block access before executing the function
-	mutex.Lock()
-	defer mutex.Unlock()
+	//mutex.Lock()
+	//defer mutex.Unlock()
 
 	//Determine priority level of each replica to delegate
 	if service.Delegation == "topsis" {
@@ -354,7 +355,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			req1, err := http.NewRequest("GET", JobURL.String(), nil)
 
 			if err != nil {
-				fmt.Printf("Error al crear la solicitud para %s: %v\n", cred.URL, err)
+				fmt.Printf("Error creating request for %s: %v\n", cred.URL, err)
 				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
 				continue
 			}
@@ -367,13 +368,12 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			// Add service token to the request
 			req.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
 
-			// Realizar la solicitud HTTP
-
+			// Make the HTTP request
 			start := time.Now()
 			resp1, err := client.Do(req1)
 			duration := time.Since(start)
 			if err != nil {
-				//fmt.Printf("Error al realizar la solicitud para %s: %v\n", cred.URL, err)
+				//fmt.Printf("Error making request for %s: %v\n", cred.URL, err)
 				results = append(results, []float64{duration.Seconds(), 0, 0, 0, 1e6, 1e6})
 				continue
 			}
