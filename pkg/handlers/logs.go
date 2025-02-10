@@ -83,9 +83,15 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.
 		for _, pod := range pods.Items {
 			if jobName, ok := pod.Labels["job-name"]; ok {
 				// JobInfo details the current status of a service's job
+				var creationtime *metav1.Time
+				if jobsInfo[jobName] != nil && jobsInfo[jobName].CreationTime != nil {
+					creationtime = jobsInfo[jobName].CreationTime
+				} else {
+					creationtime = pod.Status.StartTime
+				}
 				jobsInfo[jobName] = &types.JobInfo{
 					Status:       string(pod.Status.Phase),
-					CreationTime: pod.Status.StartTime,
+					CreationTime: creationtime,
 				}
 				// Loop through job.Status.ContainerStatuses to find oscar-container
 				for _, contStatus := range pod.Status.ContainerStatuses {
