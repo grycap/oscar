@@ -361,7 +361,6 @@ func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers b
 		actualPolicy := &Policy{}
 		jsonErr = json.Unmarshal(policyInfo.Policy, actualPolicy)
 		if jsonErr != nil {
-			fmt.Println("here2")
 			return jsonErr
 		}
 		// Add new resource and create policy
