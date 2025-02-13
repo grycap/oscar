@@ -334,7 +334,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 				continue
 			}
 			var jobStatuses JobStatuses
-			fmt.Println(cred.ServiceName)
+			fmt.Println(JobURL.String())
 			fmt.Println(resp.Body)
 			err = json.Unmarshal(body, &jobStatuses)
 			if err != nil {
