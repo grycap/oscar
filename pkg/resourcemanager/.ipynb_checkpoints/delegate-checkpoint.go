@@ -334,7 +334,6 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 				continue
 			}
 			var jobStatuses JobStatuses
-			fmt.Println(body)
 			err = json.Unmarshal(body, &jobStatuses)
 			if err != nil {
 				fmt.Println("Error decoding the JSON of the response:", err)
