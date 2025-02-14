@@ -275,6 +275,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			cluster, ok := service.Clusters[cred.ClusterID]
 			if !ok {
 				//logger.Printf("Error delegating service \"%s\" to ClusterID \"%s\": Cluster not defined\n", service.Name, replica.ClusterID)
+				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
 				continue
 			}
 
@@ -282,6 +283,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			token, err := getServiceToken(cred, cluster)
 			if err != nil {
 				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": %v\n", service.Name, replica.ClusterID, err)
+				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
 				continue
 			}
 
@@ -289,6 +291,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			JobURL, err := url.Parse(cluster.Endpoint)
 			if err != nil {
 				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", service.Name, replica.ClusterID, cluster.Endpoint, err)
+				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
 				continue
 			}
 			JobURL.Path = path.Join(JobURL.Path, "/system/logs/", cred.ServiceName)
@@ -297,6 +300,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			req, err := http.NewRequest("GET", JobURL.String(), nil)
 			if err != nil {
 				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to make request: %v\n", service.Name, replica.ClusterID, err)
+				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
 				continue
 			}
 
@@ -324,18 +328,17 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			resp, err := client.Do(req)
 			if err != nil {
 				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
+				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
 				continue
 			}
 			defer resp.Body.Close()
-			body, err := io.ReadAll(resp.Body) // Utilizar io.ReadAll para leer el cuerpo
+			body, err := io.ReadAll(resp.Body) //  io.ReadAll-> read body request
 			if err != nil {
-				fmt.Printf("Error al leer el cuerpo de la respuesta para %s: %v\n", cred.URL, err)
+				fmt.Printf("Error to read body request to %s: %v\n", cred.URL, err)
 				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
 				continue
 			}
 			var jobStatuses JobStatuses
-			fmt.Println(JobURL.String())
-			fmt.Println(resp.Body)
 			err = json.Unmarshal(body, &jobStatuses)
 			if err != nil {
 				fmt.Println("Error decoding the JSON of the response:", err)
@@ -351,6 +354,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			JobURL, err = url.Parse(cluster.Endpoint)
 			if err != nil {
 				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", service.Name, replica.ClusterID, cluster.Endpoint, err)
+				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
 				continue
 			}
 			JobURL.Path = path.Join(JobURL.Path, "/system/status/")
@@ -445,7 +449,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 
 	eventJSON, provider := eventBuild(event, storage_provider)
 	fmt.Println("Storage_provider :  ", provider)
-	fmt.Println(string(eventJSON))
+	//fmt.Println(string(eventJSON))
 
 	//if provider != "" { //storatage _provider not empty in the delegation proccess.
 
