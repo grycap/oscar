@@ -36,7 +36,7 @@ var updateLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
 // MakeUpdateHandler makes a handler for updating services
 func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var provName string
+		var provName, provID string
 		var newService types.Service
 		if err := c.ShouldBindJSON(&newService); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
@@ -62,6 +62,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			return
 		}
+
 		if !isAdminUser {
 			uid, err := auth.GetUIDFromContext(c)
 			if err != nil {
@@ -91,21 +92,13 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-		// Update the service
-		if err := back.UpdateService(newService); err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
-			return
-		}
 
 		for _, in := range oldService.Input {
-			// Split input provider
-			provSlice := strings.SplitN(strings.TrimSpace(in.Provider), types.ProviderSeparator, 2)
-			if len(provSlice) == 1 {
-				provName = strings.ToLower(provSlice[0])
-			} else {
-				provName = strings.ToLower(provSlice[0])
-			}
+
+			provID, provName = getProviderInfo(in.Provider)
+
 			if provName == types.MinIOName {
+				s3Client := oldService.StorageProviders.MinIO[provID].GetS3Client()
 
 				// Get bucket name
 				path := strings.Trim(in.Path, " /")
@@ -117,7 +110,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					if newAllowedLength == 0 {
 						updateLogger.Printf("Updating service with public policies")
 						// If the new allowed users is empty make service public
-						err = minIOAdminClient.PrivateToPublicBucket(splitPath[0])
+						err = minIOAdminClient.PrivateToPublicBucket(oldService.AllowedUsers, splitPath[0])
 						if err != nil {
 							c.String(http.StatusInternalServerError, err.Error())
 							return
@@ -134,10 +127,19 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						} else {
 							// If allowed users list changed update policies on bucket
 							updateLogger.Printf("Updating service policies")
-							err = minIOAdminClient.UpdateUsersInGroup(oldService.AllowedUsers, splitPath[0], true)
-							if err != nil {
-								c.String(http.StatusInternalServerError, err.Error())
-								return
+							// TODO check isolation level to update policies and buckets
+							if oldService.IsolationLevel == "USER" && newService.IsolationLevel == "USER" {
+								// Re-do bucket list to match allowed_users
+								var newBucketList []string
+								var userBucket string
+								for _, user := range newService.AllowedUsers {
+									userBucket = splitPath[0] + "-" + user[:10]
+									newBucketList = append(newBucketList, userBucket)
+								}
+
+								newService.BucketList = newBucketList
+								// Delete buckets if user not in newService.AllowedUsers ?????
+
 							}
 							err = minIOAdminClient.UpdateUsersInGroup(newService.AllowedUsers, splitPath[0], false)
 							if err != nil {
@@ -148,10 +150,18 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					}
 				}
 
+				disableInputNotifications(s3Client, oldService.GetMinIOWebhookARN(), splitPath[0])
+
 				// Register minio webhook and restart the server
 				if err := registerMinIOWebhook(newService.Name, newService.Token, newService.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
 					back.UpdateService(*oldService)
 					c.String(http.StatusInternalServerError, err.Error())
+					return
+				}
+
+				// Update the service
+				if err := back.UpdateService(newService); err != nil {
+					c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
 					return
 				}
 
@@ -182,10 +192,12 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 func updateBuckets(newService, oldService *types.Service, minIOAdminClient *utils.MinIOAdminClient, cfg *types.Config) error {
 	// Disable notifications from oldService.Input
-	if err := disableInputNotifications(oldService.GetMinIOWebhookARN(), oldService.Input, oldService.StorageProviders.MinIO[types.DefaultProvider]); err != nil {
-		return fmt.Errorf("error disabling MinIO input notifications: %v", err)
-	}
+
+	// TODO diable all old service notifications if needed
+	//if err := disableInputNotifications(oldService.GetMinIOWebhookARN(), oldService.Input); err != nil {
+	//	return fmt.Errorf("error disabling MinIO input notifications: %v", err)
+	//}
 
 	// Create the input and output buckets/folders from newService
-	return createBuckets(newService, cfg, minIOAdminClient, newService.AllowedUsers, true)
+	return createBuckets(newService, cfg, minIOAdminClient, true)
 }

@@ -79,7 +79,6 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 		sort.Stable(service.Replicas)
 		fmt.Println("Replicas Stable: ", service.Replicas)
 	}
-
 	delegatedEvent := WrapEvent(service.ClusterID, event)
 	eventJSON, err := json.Marshal(delegatedEvent)
 	if err != nil {
