@@ -16,7 +16,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.2">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.5">
     
     
       
@@ -24,7 +24,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.d7758b05.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.8608ea7d.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
@@ -1357,23 +1357,25 @@
 
 
 <h1 id="multitenancy-support-in-oscar">Multitenancy support in OSCAR</h1>
-<p>In the context of OSCAR, multi-tenancy support refers to the platform's ability to enable multiple users or organizations (tenants) to deploy and run their applications or functions on the same underlying infrastructure. Support for multitenancy in OSCAR has been available since version v3.0.0. To use this functionality, there are some requisites that the cluster and the users have to fulfill:</p>
+<p>In the context of OSCAR, multi-tenancy support refers to the platform's ability to enable multiple users or organizations (tenants) to deploy and run their applications or functions on the same underlying infrastructure. Support for multitenancy in OSCAR has been available since version v3.0.0. To use this functionality, there are some requisites that the cluster and the users have to fulfil:</p>
 <ul>
 <li>
 <p><strong>The cluster needs to have enabled OIDC access.</strong></p>
-<p>This is because the implementation of this functionality uses directly the EGI UIDs to distinguish between users, therefore removing the need to manage a database.  </p>
+<p>This is because the implementation of this functionality relies on the EGI ePUIDs to distinguish between users, therefore removing the need to manage a database.  </p>
 </li>
 <li>
-<p><strong>Users who want to create new services need to know the UID of the users who will have access to the service.</strong></p>
-<p>Each service has a list of "allowed users," so a service can be accessed not only by one but by multiple users chosen by the service creator. This way, users have the ability to decide who can operate over its services. It is important to note that only the service creator or "owner" can update it; this means that allowed users will only be able to see the service (and its buckets) and make invocations.</p>
-<p>This allowed users list is defined on the FDL on the service creation (more info in <a href="../fdl/">FDL docs</a>). The following is an example of an FDL that creates a service that gives access to two EGI users. If the allowed_users field is empty, the service is treated as "public," so every user within the cluster will have access to it.</p>
-<p>At the moment of the creation, the UID of the user creating the service doesn't need to be present on the list; however, when a service is updated, if the user will still have access, its UID has to be on the list.</p>
+<p><strong>Users who want to create new services need to know the ePUID of the users who will have access to the service.</strong></p>
+<p>Each service has a list of "allowed users," so a service can be accessed not only by one but multiple users chosen by the service creator. This way, users can decide who can operate over its services. It is important to note that only the service creator or "owner" can update it; this means that only allowed users can see the service (and its buckets) and perform service invocations. At creation time, the ePUID of the user creating the service doesn't need to be present on the list; however, when a service is updated, if the user who has created the service needs to access it, its ePUID must be on the list. This "allowed users" list is defined on the FDL at service creation time (more info in <a href="../fdl/">FDL docs</a>).</p>
 </li>
 </ul>
+<blockquote>
+<p><strong><em>NOTE:</em></strong> A user can obtain its EGI User ePUID by login into https://aai.egi.eu/ (for the production instance of EGI Check-In) or https://aai-demo.egi.eu (for the demo instance of EGI Check-In). </p>
+</blockquote>
+<p>The following is an example of an FDL that creates a service whose usage is limited to two different EGI users. Notice that, if the <em>allowed_users</em> field is <strong>empty</strong>, the service is treated as <strong>public</strong>, so every user within the cluster can use it and access the corresponding MinIO bucket and its content.</p>
 <pre><code class="language-yaml">functions:
   oscar:
   - oscar-cluster:
-      name: grayify_multitenant
+      name: grayify-multitenant
       memory: 1Gi
       cpu: '0.6'
       image: ghcr.io/grycap/imagemagick
@@ -1385,23 +1387,23 @@
       - &quot;5e14d33ac4abc96272cc163da6a200c2e18591bfb3b0f32a4c9c867f5e938463@egi.eu&quot;
       input:
       - storage_provider: minio.default
-        path: grayify_multitenant/input
+        path: grayify-multitenant/input
       output:
       - storage_provider: minio.default
-        path: grayify_multitenant/output
+        path: grayify-multitenant/output
 </code></pre>
-<h2 id="isolation-level">ISOLATION LEVEL</h2>
-<p>The isolation level variable has been added to the service definition for better privacy definition of the service. There are 2 modes available.</p>
-<h3 id="service">SERVICE</h3>
-<p>The service isolation level is the default value. If you isolate the service at the service level and use MinIO as the event source, the buckets you selected in the input/output sections will be created. These buckets will only be visible to the users defined in allowed_users.</p>
-<h3 id="user">USER</h3>
-<p>By isolating the service at the user level, in addition to creating the buckets specified in input/output, additional private buckets will be created. Each user defined in allowed_users will have access to one of the private buckets, which will also run the service if a file is uploaded to the /in folder located inside.</p>
-<p>The services triggered by those private buckets will redirect the output into the same bucket with the key 'out'. For example, if we use 'gray' as the input bucket, we are the user '5e14d33a'. Our private bucket is 'car-5e14d33a'. Inside that private bucket, we have folders for 'in' and 'out'. Upload a file into the 'in' folder to trigger the service. The output is uploaded into the 'out' folder.</p>
-<p><img alt="multitenancy-diagram" src="../images/multitenancy.png" /></p>
 <blockquote>
-<p><strong><em>NOTE:</em></strong> A user can obtain its EGI User Id by login into https://aai.egi.eu/ (for the production instance of EGI Check-In) or https://aai-demo.egi.eu (for the demo instance of EGI Check-In). </p>
+<p><strong><em>NOTE:</em></strong> To test the service in the FDL above, please use this script to execute the function: <a href="https://github.com/grycap/oscar/blob/master/examples/imagemagick/script.sh">ImageMagick example</a>.</p>
 </blockquote>
-<p>Since OSCAR uses MinIO as the main storage provider, so that the users only have access to their designated bucket's service, MinIO users are created on the fly for each EGI UID. Consequently, each user accessing the cluster will have a MinIO user with its UID as AccessKey and an autogenerated SecretKey.</p>
+<h2 id="isolation-level">ISOLATION LEVEL</h2>
+<p>The isolation level variable has been added to the FDL service definition to facilitate the configuration of the service's privacy. There are 2 configurations available, <em>SERVICE</em> and <em>USER</em>. Below we explain them in more detail.</p>
+<h3 id="service">SERVICE</h3>
+<p>The <em>SERVICE</em> isolation level is the default value. If you isolate the service at the service level and use MinIO as the storage provider (event source), the buckets indicated in the input/output sections of the service definition will be created. These buckets will only be visible to the users defined in the <em>allowed_users</em> list.</p>
+<h3 id="user">USER</h3>
+<p>By isolating the service at the <em>USER</em> level, in addition to creating the buckets specified in input/output, additional private buckets will be created. Each user defined in the <em>allowed_users</em> list will have access to its private bucket, which will also trigger the execution of the service if a file is uploaded to the /input folder located inside it. The executions triggered by those private buckets will redirect the output into the same private bucket, in the /output folder. </p>
+<p>Let's see how it works with an example. Let's suppose that we are the user '5e14d33a', and we create a service called 'gray', with a default bucket also called 'gray' and a list of two users (ourselves and user '62bb11b'). Our automatically created <strong>private bucket</strong> will be 'gray-5e14d33a'. Inside that private bucket, we will find two folders: one for 'input' files and another for 'output' files. When we, as user '5e14d33a' upload a file into the 'input' folder, this provokes an event in MinIO that triggers the service. The output of this execution will be uploaded into the 'output' folder of our private bucket, meaning that the other users of the service (in the example, user '62bb11b') cannot access the inputs/outputs of our execution. THe same happens for user '62bb11b' and its private bucket. However, if we use the default 'gray' bucket, the files stored on it will be accessible by both users.</p>
+<p><img alt="multitenancy-diagram" src="../images/multitenancy.png" /></p>
+<p>Since OSCAR uses MinIO as the main storage provider, so that users only have access to their designated bucket's service, MinIO users are created on-the-fly for each EGI ePUID. Consequently, each user accessing the cluster will have a MinIO user with its UID as AccessKey and an autogenerated SecretKey.</p>
 
 
 
@@ -1455,7 +1457,7 @@
     <script id="__config" type="application/json">{"base": "..", "features": ["instant", "toc.integrate", "content.code.copy"], "search": "../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.f13b1293.min.js"></script>
+      <script src="../assets/javascripts/bundle.f1b6f286.min.js"></script>
       
     
   </body>
