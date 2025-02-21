@@ -95,7 +95,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			if service.VO != "" {
 				for _, vo := range cfg.OIDCGroups {
 					if vo == service.VO {
-						err := checkIdentity(&service, cfg, authHeader)
+						err := checkIdentity(&service, authHeader)
 						if err != nil {
 							c.String(http.StatusBadRequest, fmt.Sprintln(err))
 							return
@@ -609,10 +609,16 @@ func getProviderInfo(rawInfo string) (string, string) {
 	return provID, provName
 }
 
-func checkIdentity(service *types.Service, cfg *types.Config, authHeader string) error {
-	oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
+func checkIdentity(service *types.Service, authHeader string) error {
 	rawToken := strings.TrimPrefix(authHeader, "Bearer ")
-
+	issuer, err := auth.GetIssuerFromToken(rawToken)
+	if err != nil {
+		return err
+	}
+	oidcManager := auth.ClusterOidcManagers[issuer]
+	if oidcManager == nil {
+		return err
+	}
 	hasVO, err := oidcManager.UserHasVO(rawToken, service.VO)
 
 	if err != nil {

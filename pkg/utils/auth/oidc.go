@@ -27,6 +27,8 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"golang.org/x/oauth2"
 	"k8s.io/client-go/kubernetes"
@@ -39,6 +41,7 @@ const (
 )
 
 var oidcLogger = log.New(os.Stdout, "[OIDC-AUTH] ", log.Flags())
+var ClusterOidcManagers = make(map[string]*oidcManager)
 
 // oidcManager struct to represent a OIDC manager, including a cache of tokens
 type oidcManager struct {
@@ -76,18 +79,25 @@ func NewOIDCManager(issuer string, subject string, groups []string) (*oidcManage
 }
 
 // getIODCMiddleware returns the Gin's handler middleware to validate OIDC-based auth
-func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *utils.MinIOAdminClient, issuer string, subject string, groups []string, oidcConfig *oidc.Config) gin.HandlerFunc {
-	oidcManager, err := NewOIDCManager(issuer, subject, groups)
-	if oidcConfig != nil {
-		oidcManager.config = oidcConfig
-	}
-	if err != nil {
-		return func(c *gin.Context) {
-			c.AbortWithStatus(http.StatusUnauthorized)
+func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *utils.MinIOAdminClient, cfg *types.Config, oidcConfig *oidc.Config) gin.HandlerFunc {
+
+	for _, iss := range cfg.OIDCValidIssuers {
+		issuerManager, err := NewOIDCManager(iss, cfg.OIDCSubject, cfg.OIDCGroups)
+		if oidcConfig != nil {
+			issuerManager.config = oidcConfig
 		}
+		if err != nil {
+			return func(c *gin.Context) {
+				c.AbortWithStatus(http.StatusUnauthorized)
+				return
+			}
+		}
+
+		ClusterOidcManagers[iss] = issuerManager
+
 	}
 
-	mc := NewMultitenancyConfig(kubeClientset, subject)
+	mc := NewMultitenancyConfig(kubeClientset, cfg.OIDCSubject)
 
 	return func(c *gin.Context) {
 		// Get token from headers
@@ -97,7 +107,16 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 			return
 		}
 		rawToken := strings.TrimPrefix(authHeader, "Bearer ")
-
+		iss, err := GetIssuerFromToken(rawToken)
+		if err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("%v", err))
+			return
+		}
+		oidcManager := ClusterOidcManagers[iss]
+		if oidcManager == nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("Error getting oidc manager for issuer '%s'", iss))
+			return
+		}
 		// Check the token
 		if !oidcManager.IsAuthorised(rawToken) {
 			c.AbortWithStatus(http.StatusUnauthorized)
@@ -186,6 +205,19 @@ func getGroups(urns []string) []string {
 	}
 
 	return groups
+}
+
+func GetIssuerFromToken(rawToken string) (string, error) {
+	token, _, err := new(jwt.Parser).ParseUnverified(rawToken, jwt.MapClaims{})
+	if err != nil {
+		return "", err
+	}
+	claims, _ := token.Claims.(jwt.MapClaims)
+	iss, err := claims.GetIssuer()
+	if err != nil {
+		return "", err
+	}
+	return iss, nil
 }
 
 // UserHasVO checks if the user contained on the request token is enrolled on a specific VO

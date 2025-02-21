@@ -153,17 +153,19 @@ func TestGetOIDCMiddleware(t *testing.T) {
 			Endpoint: server.URL,
 			Verify:   false,
 		},
+		OIDCEnable:       true,
+		OIDCSubject:      "user@egi.eu",
+		OIDCValidIssuers: []string{server.URL},
+		OIDCGroups:       []string{"group1", "group2"},
 	}
 	minIOAdminClient, _ := utils.MakeMinIOAdminClient(&cfg)
 	issuer := server.URL
-	subject := "user@egi.eu"
-	groups := []string{"group1", "group2"}
 
 	oidcConfig := &oidc.Config{
 		InsecureSkipSignatureCheck: true,
 		SkipClientIDCheck:          true,
 	}
-	middleware := getOIDCMiddleware(kubeClientset, minIOAdminClient, issuer, subject, groups, oidcConfig)
+	middleware := getOIDCMiddleware(kubeClientset, minIOAdminClient, &cfg, oidcConfig)
 	if middleware == nil {
 		t.Errorf("expected middleware to be non-nil")
 	}
@@ -176,11 +178,11 @@ func TestGetOIDCMiddleware(t *testing.T) {
 		{
 			name:  "invalid-token",
 			token: "invalid-token",
-			code:  http.StatusUnauthorized,
+			code:  http.StatusBadRequest,
 		},
 		{
 			name:  "valid-token",
-			token: GetToken(issuer, subject),
+			token: GetToken(issuer, cfg.OIDCSubject),
 			code:  http.StatusOK,
 		},
 	}

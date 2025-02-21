@@ -104,8 +104,15 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		//  If isn't service token check if it is an oidc token
 		var uidFromToken string
 		if len(rawToken) != tokenLength {
-			oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
-
+			issuer, err := auth.GetIssuerFromToken(rawToken)
+			if err != nil {
+				c.String(http.StatusBadGateway, fmt.Sprintf("%v", err))
+			}
+			oidcManager := auth.ClusterOidcManagers[issuer]
+			if oidcManager == nil {
+				c.String(http.StatusBadRequest, fmt.Sprintf("Error getting oidc manager for issuer '%s'", issuer))
+				return
+			}
 			if !oidcManager.IsAuthorised(rawToken) {
 				c.Status(http.StatusUnauthorized)
 				return

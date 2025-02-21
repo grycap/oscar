@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"strings"
@@ -62,8 +63,15 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 				return
 			}
 		} else {
-			oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
-
+			issuer, err := auth.GetIssuerFromToken(rawToken)
+			if err != nil {
+				c.String(http.StatusBadGateway, err.Error())
+			}
+			oidcManager := auth.ClusterOidcManagers[issuer]
+			if oidcManager == nil {
+				c.String(http.StatusBadRequest, fmt.Sprintf("Error getting oidc manager for issuer '%s'", issuer))
+				return
+			}
 			if !oidcManager.IsAuthorised(rawToken) {
 				c.Status(http.StatusUnauthorized)
 				return
