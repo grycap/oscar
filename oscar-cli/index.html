@@ -1701,6 +1701,9 @@ Flags:
                                   oidc-agent. Note that oidc-agent must be
                                   started and properly configured
                                   (See:https://indigo-dc.gitbook.io/oidc-agent/)
+  -t, --oidc-refresh-token string OIDC token to authenticate using oidc-token. 
+                                  Note that oidc-token must be started and 
+                                  properly configured
       --password-stdin            take the password from stdin
 
 Global Flags:
@@ -1815,17 +1818,19 @@ Global Flags:
 <h5 id="run">run</h5>
 <p>Invoke a service synchronously (a Serverless backend in the cluster is required).</p>
 <pre><code>Usage:
-  oscar-cli service run SERVICE_NAME {--input | --text-input} [flags]
+  oscar-cli service run SERVICE_NAME {--file-input | --text-input} [flags]
 
 Aliases:
   run, invoke, r
 
 Flags:
   -c, --cluster string      set the cluster
+  -e, --endpoint string     endpoint of a non registered cluster
+  -f, --file-input string   input file for the request
   -h, --help                help for run
-  -i, --input string        input file for the request
   -o, --output string       file path to store the output
-  -t, --text-input string   text input string for the request
+  -i, --text-input string   text input string for the request
+  -t, --token string        token of the service
 
 Global Flags:
       --config string   set the location of the config file (YAML or JSON)
