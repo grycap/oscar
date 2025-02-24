@@ -105,7 +105,25 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 			} else {
 				if len(cfg.OIDCGroups) != 0 {
-					c.String(http.StatusBadRequest, fmt.Sprintln("service must be part of one of the following VO: ", cfg.OIDCGroups))
+					var notFound bool = true
+					for _, vo := range cfg.OIDCGroups {
+						service.VO = vo
+						err := checkIdentity(&service, cfg, authHeader)
+						fmt.Println(vo)
+						if err != nil {
+							fmt.Println(err)
+							c.String(http.StatusBadRequest, fmt.Sprintln(err))
+							//return
+						} else {
+							notFound = false
+							break
+						}
+					}
+					if notFound {
+						c.String(http.StatusBadRequest, fmt.Sprintln("service must be part of one of the following VO: ", cfg.OIDCGroups))
+						return
+					}
+
 				}
 			}
 
