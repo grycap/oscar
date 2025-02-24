@@ -584,6 +584,10 @@ components:
           type: string
         yunikorn_enable:
           type: boolean
+        oidc_groups:
+          type: array
+          items: 
+            type: string
     MinIOProvider:
       title: MinIOProvider
       type: object
