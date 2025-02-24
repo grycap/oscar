@@ -426,6 +426,10 @@ components:
           default: false
         script:
           type: string
+        isolation_level:
+          type: string
+        mount:
+          $ref: '#/components/schemas/StorageIOConfig'
         image_pull_secrets: 
           type: array
           items: 
