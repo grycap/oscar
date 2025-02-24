@@ -62,8 +62,8 @@ const (
 	InterLinkTolerationOperator = "Exists"
 )
 
-// MakeJobHandler makes a han/home/slangarita/Escritorio/interlink-cluster/PodCern/PodCern.yamldler to manage async invocations
-func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back types.ServerlessBackend, rm resourcemanager.ResourceManager) gin.HandlerFunc {
+// MakeJobHandler makes a handler to manage async invocations
+func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back types.ServerlessBackend, rm resourcemanager.ResourceManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		service, err := back.ReadService(c.Param("serviceName"))
 		if err != nil {
@@ -157,7 +157,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 		c.Next()
 
 		// Initialize event envVar and args var
-		event := v1.EnvVar{}
+		var event v1.EnvVar
 		var args []string
 
 		if cfg.InterLinkAvailable && service.InterLinkNodeName != "" {

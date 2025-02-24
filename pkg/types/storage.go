@@ -121,6 +121,7 @@ func (minIOProvider MinIOProvider) GetS3Client() *s3.S3 {
 
 	// Disable tls verification in client transport if Verify == false
 	if !minIOProvider.Verify {
+		// #nosec
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}

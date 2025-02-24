@@ -76,8 +76,11 @@ func NewOIDCManager(issuer string, subject string, groups []string) (*oidcManage
 }
 
 // getIODCMiddleware returns the Gin's handler middleware to validate OIDC-based auth
-func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *utils.MinIOAdminClient, issuer string, subject string, groups []string) gin.HandlerFunc {
+func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *utils.MinIOAdminClient, issuer string, subject string, groups []string, oidcConfig *oidc.Config) gin.HandlerFunc {
 	oidcManager, err := NewOIDCManager(issuer, subject, groups)
+	if oidcConfig != nil {
+		oidcManager.config = oidcConfig
+	}
 	if err != nil {
 		return func(c *gin.Context) {
 			c.AbortWithStatus(http.StatusUnauthorized)
@@ -156,7 +159,10 @@ func (om *oidcManager) GetUserInfo(rawToken string) (*userInfo, error) {
 	var claims struct {
 		EdupersonEntitlement []string `json:"eduperson_entitlement"`
 	}
-	ui.Claims(&claims)
+	cerr := ui.Claims(&claims)
+	if cerr != nil {
+		return nil, err
+	}
 
 	// Create "userInfo" struct and add the groups
 	return &userInfo{

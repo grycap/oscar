@@ -83,6 +83,7 @@ func MakeMinIOAdminClient(cfg *types.Config) (*MinIOAdminClient, error) {
 	// Disable tls verification in client transport if verify == false
 	if !cfg.MinIOProvider.Verify {
 		tr := &http.Transport{
+			// #nosec
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
 		adminClient.SetCustomTransport(tr)
@@ -346,8 +347,11 @@ func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers b
 		}
 
 		actualPolicy := &Policy{}
-		json.Unmarshal(policyInfo.Policy, actualPolicy)
-
+		jsonErr = json.Unmarshal(policyInfo.Policy, actualPolicy)
+		if jsonErr != nil {
+			fmt.Println("here2")
+			return jsonErr
+		}
 		// Add new resource and create policy
 		actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, rs)
 

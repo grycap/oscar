@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
@@ -149,45 +150,81 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						}
 					}
 				}
+				if newService.IsolationLevel == "USER" {
+					var newBucketList []string
+					var userBucket string
+					for _, user := range newService.AllowedUsers {
+						userBucket = splitPath[0] + "-" + user[:10]
+						newBucketList = append(newBucketList, userBucket)
+					}
 
-				disableInputNotifications(s3Client, oldService.GetMinIOWebhookARN(), splitPath[0])
+					disableInputNotifications(s3Client, oldService.GetMinIOWebhookARN(), splitPath[0])
 
-				// Register minio webhook and restart the server
-				if err := registerMinIOWebhook(newService.Name, newService.Token, newService.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
-					back.UpdateService(*oldService)
-					c.String(http.StatusInternalServerError, err.Error())
-					return
+					// Register minio webhook and restart the server
+					if err := registerMinIOWebhook(newService.Name, newService.Token, newService.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
+						uerr := back.UpdateService(*oldService)
+						if uerr != nil {
+							log.Println(uerr.Error())
+						}
+						c.String(http.StatusInternalServerError, err.Error())
+						return
+					}
+
+					// Update the service
+					if err := back.UpdateService(newService); err != nil {
+						c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
+						return
+					}
+
+					// Update buckets
+					if err := updateBuckets(&newService, &newService, minIOAdminClient, cfg); err != nil {
+						if err == errInput {
+							c.String(http.StatusBadRequest, err.Error())
+						} else {
+							c.String(http.StatusInternalServerError, err.Error())
+						}
+						// If updateBuckets fails restore the oldService
+						uerr := back.UpdateService(*oldService)
+						if uerr != nil {
+							log.Println(uerr.Error())
+						}
+						return
+					}
+
 				}
 
-				// Update the service
+				// Add Yunikorn queue if enabled
+				if cfg.YunikornEnable {
+					if err := utils.AddYunikornQueue(cfg, back.GetKubeClientset(), &newService); err != nil {
+						log.Println(err.Error())
+					}
+				}
+
+				c.Status(http.StatusNoContent)
+			}
+			if len(oldService.Input) == 0 {
 				if err := back.UpdateService(newService); err != nil {
 					c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
 					return
 				}
-
-				// Update buckets
-				if err := updateBuckets(&newService, oldService, minIOAdminClient, cfg); err != nil {
-					if err == errInput {
-						c.String(http.StatusBadRequest, err.Error())
-					} else {
-						c.String(http.StatusInternalServerError, err.Error())
-					}
-					// If updateBuckets fails restore the oldService
-					back.UpdateService(*oldService)
-					return
-				}
 			}
-		}
 
-		// Add Yunikorn queue if enabled
-		if cfg.YunikornEnable {
-			if err := utils.AddYunikornQueue(cfg, back.GetKubeClientset(), &newService); err != nil {
-				log.Println(err.Error())
-			}
 		}
-
-		c.Status(http.StatusNoContent)
 	}
+}
+
+func updateGroup(group string, oldService *types.Service, newService *types.Service, minIOAdminClient *utils.MinIOAdminClient, s3Client *s3.S3) error {
+	//delete users in group
+	err := minIOAdminClient.UpdateUsersInGroup(oldService.AllowedUsers, group, true)
+	if err != nil {
+		return err
+	}
+	//add the new ones
+	err = minIOAdminClient.UpdateUsersInGroup(newService.AllowedUsers, group, false)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func updateBuckets(newService, oldService *types.Service, minIOAdminClient *utils.MinIOAdminClient, cfg *types.Config) error {
