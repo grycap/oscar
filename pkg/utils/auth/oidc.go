@@ -103,6 +103,7 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 		// Get token from headers
 		authHeader := c.GetHeader("Authorization")
 		if !strings.HasPrefix(authHeader, "Bearer ") {
+			oidcLogger.Println("Malformed ZZzzzzz")
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
@@ -112,6 +113,7 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 			c.String(http.StatusBadRequest, fmt.Sprintf("%v", err))
 			return
 		}
+		oidcLogger.Printf("Found issuer '%s' in token", iss)
 		oidcManager := ClusterOidcManagers[iss]
 		if oidcManager == nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("Error getting oidc manager for issuer '%s'", iss))
@@ -119,6 +121,7 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 		}
 		// Check the token
 		if !oidcManager.IsAuthorised(rawToken) {
+			oidcLogger.Println("Unauthorized oidc.go 123")
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
@@ -247,6 +250,7 @@ func (om *oidcManager) IsAuthorised(rawToken string) bool {
 	// Check if the token is valid
 	_, err := om.provider.Verifier(om.config).Verify(context.TODO(), rawToken)
 	if err != nil {
+		oidcLogger.Printf("Error oidc.go 252: %v", err)
 		return false
 	}
 
@@ -256,6 +260,7 @@ func (om *oidcManager) IsAuthorised(rawToken string) bool {
 		// Get userInfo from the issuer
 		ui, err = om.GetUserInfo(rawToken)
 		if err != nil {
+			oidcLogger.Printf("Error oidc.go 262: %v", err)
 			return false
 		}
 
