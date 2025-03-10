@@ -20,7 +20,7 @@ jobs:
     - name: Setup node
       uses: actions/setup-node@v1
       with:
-        node-version: '14'
+        node-version: '20'
 
     - name: Build OSCAR-UI
       run: npm install && npm run deploy_container
