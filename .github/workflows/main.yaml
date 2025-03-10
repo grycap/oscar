@@ -24,7 +24,7 @@ jobs:
 
     - name: Build OSCAR-UI
       run: npm install && npm run deploy_container
-      working-directory: ./ui
+      working-directory: ./dashboard
 
     - name: Prepare docker buildx
       id: prepare
