@@ -23,9 +23,9 @@ Otherwise, if the variable is not set, i.e., `""`, the job will be executed in a
 - The memory and CPU defined in the OSCAR services are not applied to the jobs that are offloaded via interLink. Those parameters are set employing the annotations, as specified by the provider.
 
 - When the offloading is set to a SLURM job, it's possible to request some resources employing [slurm flags](https://curc.readthedocs.io/en/latest/running-jobs/job-resources.html#slurm-resource-flags). For example: 
-  - To request CPU and memory, `slurm-job.vk.io/flags`( `--job-name`, `--time=02:30:00`, `--cpus-per-task`, `--nodes`, `--mem`) 
-  - To mount a system folder in an HPC cluster `job.vk.io/singularity-mounts` and value pattern `"--bind <outside-container>:<inside-container>"`. 
-  - To  execute a command before each run `job.vk.io/pre-exec`.
+    - To request CPU and memory, `slurm-job.vk.io/flags`( `--job-name`, `--time=02:30:00`, `--cpus-per-task`, `--nodes`, `--mem`) 
+    - To mount a system folder in an HPC cluster `job.vk.io/singularity-mounts` and value pattern `"--bind <outside-container>:<inside-container>"`. 
+    - To  execute a command before each run `job.vk.io/pre-exec`.
 
 - Any environment variable with a special character could create an error in the translation between the virtual node and the remote job. As a good practice, pass the environment variable encode in Base64 and decode it inside the execution of the script.
 
