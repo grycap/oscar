@@ -1374,11 +1374,13 @@ script through the <code>$INPUT_FILE_PATH</code> environment variable.</p>
     to <code>CRITICAL</code>.</strong></li>
 </ol>
 <p>This way users can adapt OSCAR's services to their own needs.</p>
-<p>The FaaS Supervisor supports the following storage back-ends:
-* <a href="https://min.io">MinIO</a>
-* <a href="https://aws.amazon.com/s3/">Amazon S3</a>
-* Webdav (and, therefore, <a href="https://dcache.org">dCache</a>)
-* Onedata (and, therefore, <a href="https://www.egi.eu/service/datahub/">EGI DataHub</a>)</p>
+<p>The FaaS Supervisor supports the following storage back-ends:</p>
+<ul>
+<li><a href="https://min.io">MinIO</a></li>
+<li><a href="https://aws.amazon.com/s3/">Amazon S3</a></li>
+<li>Webdav (and, therefore, <a href="https://dcache.org">dCache</a>)</li>
+<li>Onedata (and, therefore, <a href="https://www.egi.eu/service/datahub/">EGI DataHub</a>)</li>
+</ul>
 <h3 id="container-images">Container images</h3>
 <p>Container images on asynchronous services use the tag <code>imagePullPolicy: Always</code>, which means that Kubernetes will check for the image digest on the image registry and download it if it is not present.
 So, if you are using an image without a specific tag or with the latest tag, the service will automatically download and use the most recent version of the image on its executions, whenever the image is updated.</p>
