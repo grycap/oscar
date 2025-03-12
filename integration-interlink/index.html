@@ -16,7 +16,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.7">
     
     
       
@@ -966,7 +966,7 @@
         <li class="md-nav__item">
   <a href="#installation-and-use-of-interlink-node-in-oscar-cluster" class="md-nav__link">
     <span class="md-ellipsis">
-      Installation and use of Interlink Node in OSCAR cluster
+      Installation and use of interLink Node in OSCAR cluster
     </span>
   </a>
   
@@ -1342,35 +1342,43 @@
 
 
 <h1 id="integration-with-interlink">Integration with interLink</h1>
-<p><a href="https://intertwin-eu.github.io/interLink/">interLink</a> is an open-source development that aims to provide an abstraction for executing a Kubernetes pod on any remote resource capable of managing a Container execution lifecycle.</p>
-<p>OSCAR uses the Kubernetes Virtual Node to translate a job request from the Kubernetes pod into a remote call. We have been using Interlink to interact with an HPC cluster. For more infomation check the <a href="https://intertwin-eu.github.io/interLink">interLink landing page</a>.</p>
+<p>The project <a href="https://intertwin-eu.github.io/interLink/">interLink</a> is an open-source development that aims to provide an abstraction for executing a Kubernetes pod on any remote resource capable of managing a Container execution lifecycle.</p>
+<p>OSCAR uses the Kubernetes Virtual Node to translate a job request from the Kubernetes pod into a remote call. We have been using interLink to interact with an HPC cluster. For more infomation check this <a href="https://youtu.be/NoVCfSxwtX0?si=emLcwTiUR897jFOg">video demo</a>.</p>
 <p><img alt="Diagram" src="../images/interlink.png" /></p>
-<h2 id="installation-and-use-of-interlink-node-in-oscar-cluster">Installation and use of Interlink Node in OSCAR cluster</h2>
-<p>The cluster Kubernetes must have at least one virtual kubelet node. Those nodes will have tagged as <code>type=virtual-kubelet</code>. So, follow these steps to <a href="https://intertwin-eu.github.io/interLink/docs/tutorial-admins/deploy-interlink">add the Virtual node</a> to the Kubernetes cluster. OSCAR detects these nodes by itself.</p>
-<p>Once the Virtual node and OSCAR are installed correctly, you use this node by adding the name of the virtual node in the <code>InterLinkNodeName</code> variable.
-Otherwise, to use a normal node of the Kubernetes cluster, leave it blank <code>""</code></p>
+<h2 id="installation-and-use-of-interlink-node-in-oscar-cluster">Installation and use of interLink Node in OSCAR cluster</h2>
+<p>The cluster Kubernetes must have at least one virtual kubelet node. Those nodes will have tagged as <code>type=virtual-kubelet</code>. Follow the documentation in the <a href="https://intertwin-eu.github.io/interLink/">interLink homepage</a> to deploy an interLink virtual node to the Kubernetes cluster. OSCAR detects these nodes automatically.</p>
+<p>Once the Virtual node and OSCAR are installed correctly, you can use this node to offload your job to the configured remote host. To offload the jobs created by a service to an interLink node the name of the virtual node has to be set in the <code>interlink_node_name</code> variable of the <a href="https://docs.oscar.grycap.net/fdl/#service">service FDL</a>.</p>
+<p>Otherwise, if the variable is not set, i.e., <code>""</code>, the job will be executed in a normal Kubernetes node.</p>
 <h2 id="annotations-restrictions-and-other-things-to-keep-in-mind">Annotations, restrictions, and other things to keep in mind</h2>
 <ul>
 <li>
-<p>The <a href="https://docs.oscar.grycap.net/fdl/#service">OSCAR services annotations</a> persist in the virtual node and affect the behavior of the offloaded jobs.</p>
+<p>The <a href="https://docs.oscar.grycap.net/fdl/#service">OSCAR services annotations</a> would be applied to every job for that service. The annotations are used to apply some configuration to the remote host.</p>
 </li>
 <li>
-<p>The memory and CPU defined in the OSCAR services field do not affect the offloaded job. </p>
+<p>The memory and CPU defined in the OSCAR services are not applied to the jobs that are offloaded via interLink. Those parameters are set employing the annotations, as specified by the provider.</p>
 </li>
 <li>
-<p>To request resources in the offloaded job, use the <a href="https://curc.readthedocs.io/en/latest/running-jobs/job-resources.html#slurm-resource-flags">slurm flags</a> <code>slurm-job.vk.io/flags</code>( <code>--job-name</code>, <code>--time=02:30:00</code>, <code>--cpus-per-task</code>, <code>--nodes</code>, <code>--mem</code>). For example, you can mount a system folder in an HPC cluster with the key annotation <code>job.vk.io/singularity-mounts</code> and value pattern <code>"--bind &lt;outside-container&gt;:&lt;inside-container&gt;"</code>. The offload jobs are executed in a remote HPC cluster. So, a persistent volume claim cannot be mounted. Another example is the annotation <code>job.vk.io/pre-exec</code>, which will execute a command before each execution.</p>
+<p>When the offloading is set to a SLURM job, it's possible to request some resources employing <a href="https://curc.readthedocs.io/en/latest/running-jobs/job-resources.html#slurm-resource-flags">slurm flags</a>. For example: </p>
+</li>
+<li>To request CPU and memory, <code>slurm-job.vk.io/flags</code>( <code>--job-name</code>, <code>--time=02:30:00</code>, <code>--cpus-per-task</code>, <code>--nodes</code>, <code>--mem</code>) </li>
+<li>To mount a system folder in an HPC cluster <code>job.vk.io/singularity-mounts</code> and value pattern <code>"--bind &lt;outside-container&gt;:&lt;inside-container&gt;"</code>. </li>
+<li>
+<p>To  execute a command before each run <code>job.vk.io/pre-exec</code>.</p>
 </li>
 <li>
 <p>Any environment variable with a special character could create an error in the translation between the virtual node and the remote job. As a good practice, pass the environment variable encode in Base64 and decode it inside the execution of the script.</p>
 </li>
-</ul>
-<p>Please note that interLink uses singularity to run a container with these characteristics:</p>
+<li>
+<p>Please note when the remote host is a SLURM cluster a docker container will be translated into a singularity one. There are some points to consider:</p>
 <ul>
-<li>You must reference the image container as singularity pattern <code>docker://ghcr.io/intertwin-eu/itwinai:0.0.1-3dgan-0.2</code>. Once the image is pulled, the image can be referenced by path <code>&lt;path-of-container&gt;/itwinaiv6.sif</code>.</li>
-<li>Your script will not run as a privileged user in the container. Therefore, you cannot write in the regular file system. Use the <code>/tmp</code> folder.</li>
-<li>The working directory is not the same in the container. Therefore, use absolute paths.</li>
+<li>You must reference the image container indicating <code>docker://</code> at the beginning, e.g., <code>docker://ghcr.io/intertwin-eu/itwinai:0.0.1-3dgan-0.2</code>. </li>
+<li>Once the image is pulled in the remote host, the image can be referenced by path <code>&lt;path-of-container&gt;/&lt;image&gt;.sif</code>.</li>
+<li>Note that your script will not run as a privileged user in the container. Therefore, you cannot write in the regular file system. Use the <code>/tmp</code> folder if needed instead.</li>
+<li>There is no working directory in singularity. Therefore, absolute paths are recommended.</li>
 </ul>
-<p>The support for interLink was integrated in the context of the <a href="https://www.intertwin.eu">interTwin</a> project, with support from <a href="https://home.infn.it/it/">Istituto Nazionale di Fisica Nucleare - INFN</a>, who developed interLink, and <a href="https://home.cern">CERN</a>, who provided the development of <a href="https://github.com/interTwin-eu/itwinai">itwinai</a>, used as a platform for advanced AI/ML workflows in digital twin applications and a use case. Special thanks to the <a href="https://en-vegadocs.vega.izum.si">IZUM Center</a> in Slovenia for providing access to the <a href="https://en-vegadocs.vega.izum.si">HPC Vega</a> supercomputing facility to perform the testing.</p>
+</li>
+</ul>
+<p>The interLink integration was developed in the context of the <a href="https://www.intertwin.eu">interTwin</a> project, with support from <a href="https://home.infn.it/it/">Istituto Nazionale di Fisica Nucleare - INFN</a>, who developed interLink, and <a href="https://home.cern">CERN</a>, who provided the development of <a href="https://github.com/interTwin-eu/itwinai">itwinai</a>, used as a platform for advanced AI/ML workflows in digital twin applications and a use case. Special thanks to the <a href="https://izum.si">IZUM Center</a> in Slovenia for providing access to the <a href="https://en-vegadocs.vega.izum.si">HPC Vega</a> supercomputing facility to perform the testing.</p>
 
 
 
@@ -1424,7 +1432,7 @@ Otherwise, to use a normal node of the Kubernetes cluster, leave it blank <code>
     <script id="__config" type="application/json">{"base": "..", "features": ["instant", "toc.integrate", "content.code.copy"], "search": "../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.f1b6f286.min.js"></script>
+      <script src="../assets/javascripts/bundle.c8b220af.min.js"></script>
       
     
   </body>
