@@ -106,22 +106,17 @@ func TestIsAuthorised(t *testing.T) {
 
 	rawToken := GetToken(issuer, subject)
 	oidcManager.config.InsecureSkipSignatureCheck = true
+	ui, _ := oidcManager.GetUserInfo(rawToken)
 
 	if !oidcManager.IsAuthorised(rawToken) {
 		t.Errorf("expected token to be authorised")
 	}
 
-	resg1, err2 := oidcManager.UserHasVO(rawToken, "group1")
-	if err2 != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
+	resg1 := oidcManager.UserHasVO(ui, "group1")
 	if !resg1 {
 		t.Errorf("expected user to have VO")
 	}
-	resg2, err3 := oidcManager.UserHasVO(rawToken, "group2")
-	if err3 != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
+	resg2 := oidcManager.UserHasVO(ui, "group2")
 	if resg2 {
 		t.Errorf("expected user not to have VO")
 	}

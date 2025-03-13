@@ -21,6 +21,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"log"
+	"os"
 	"regexp"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,6 +32,8 @@ import (
 
 const ServicesNamespace = "oscar-svc"
 const ServiceLabelLength = 8
+
+var mcLogger = log.New(os.Stdout, "[OIDC-AUTH] ", log.Flags())
 
 type MultitenancyConfig struct {
 	kubeClientset kubernetes.Interface
@@ -169,5 +173,10 @@ func GenerateRandomKey(length int) (string, error) {
 func FormatUID(uid string) string {
 	uidr, _ := regexp.Compile("[0-9a-z]+@")
 	idx := uidr.FindStringIndex(uid)
+	// If the regex is not matched assume it is not an EGI uid
+	// and return the original string
+	if idx == nil {
+		return uid
+	}
 	return uid[0 : idx[1]-1]
 }

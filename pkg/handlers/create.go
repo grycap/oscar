@@ -619,11 +619,11 @@ func checkIdentity(service *types.Service, authHeader string) error {
 	if oidcManager == nil {
 		return err
 	}
-	hasVO, err := oidcManager.UserHasVO(rawToken, service.VO)
-
+	ui, err := oidcManager.GetUserInfo(rawToken)
 	if err != nil {
 		return err
 	}
+	hasVO := oidcManager.UserHasVO(ui, service.VO)
 
 	if !hasVO {
 		return fmt.Errorf("this user isn't enrrolled on the vo: %v", service.VO)

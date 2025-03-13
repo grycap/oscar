@@ -104,6 +104,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		//  If isn't service token check if it is an oidc token
 		var uidFromToken string
 		if len(rawToken) != tokenLength {
+
 			issuer, err := auth.GetIssuerFromToken(rawToken)
 			if err != nil {
 				c.String(http.StatusBadGateway, fmt.Sprintf("%v", err))
@@ -113,28 +114,22 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				c.String(http.StatusBadRequest, fmt.Sprintf("Error getting oidc manager for issuer '%s'", issuer))
 				return
 			}
+
+			ui, err := oidcManager.GetUserInfo(rawToken)
+			uidFromToken = ui.Subject
 			if !oidcManager.IsAuthorised(rawToken) {
 				c.Status(http.StatusUnauthorized)
 				return
 			}
-
-			hasVO, err := oidcManager.UserHasVO(rawToken, service.VO)
 
 			if err != nil {
 				c.String(http.StatusInternalServerError, err.Error())
 				return
 			}
 
-			if !hasVO {
+			if !oidcManager.UserHasVO(ui, service.VO) {
 				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
 				return
-			}
-
-			// Get UID from token
-			var uidErr error
-			uidFromToken, uidErr = oidcManager.GetUID(rawToken)
-			if uidErr != nil {
-				jobLogger.Println("WARNING:", uidErr)
 			}
 		}
 

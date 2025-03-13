@@ -72,28 +72,21 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 				c.String(http.StatusBadRequest, fmt.Sprintf("Error getting oidc manager for issuer '%s'", issuer))
 				return
 			}
+
+			ui, err := oidcManager.GetUserInfo(rawToken)
+
 			if !oidcManager.IsAuthorised(rawToken) {
 				c.Status(http.StatusUnauthorized)
 				return
 			}
 
-			hasVO, err := oidcManager.UserHasVO(rawToken, service.VO)
-
-			if err != nil {
-				c.String(http.StatusInternalServerError, err.Error())
-				return
-			}
+			hasVO := oidcManager.UserHasVO(ui, service.VO)
 
 			if !hasVO {
 				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
 				return
 			}
 
-			ui, err := oidcManager.GetUserInfo(rawToken)
-			if err != nil {
-				c.String(http.StatusInternalServerError, err.Error())
-				return
-			}
 			uid := ui.Subject
 			c.Set("uidOrigin", uid)
 			c.Next()
