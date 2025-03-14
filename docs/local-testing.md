@@ -26,7 +26,7 @@ access them.
 > Although the use of local Docker images has yet to be implemented as a feature on OSCAR clusters, the local deployment for testing allows you to use a local Docker registry to use this kind of images. 
 >The registry uses by default the port 5001, so each image you want to use must be tagged as `localhost:5001/[image_name]` and pushed to the repository through the `docker push localhost:5001/[image_name]` command.
 >
->Also, port 80 must be available to avoid errors during the deployment since OSCAR-UI uses it. Check [Frequently Asked Questions (FAQ)](faq.md) for more info.
+>Also, port 80 must be available to avoid errors during the deployment since OSCAR-UI uses it. Check the [Frequently Asked Questions (FAQ)](faq.md) for more info.
 
 ## Automated local testing
 
@@ -192,6 +192,7 @@ it in the previous step:
 
 ```sh
 helm repo add grycap https://grycap.github.io/helm-charts/
+helm repo update 
 helm install --namespace=oscar oscar grycap/oscar \
  --set authPass=<OSCAR_PASSWORD> --set service.type=ClusterIP \
  --set ingress.create=true --set volume.storageClassName=nfs \
