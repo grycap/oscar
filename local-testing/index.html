@@ -16,7 +16,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.9">
     
     
       
@@ -24,7 +24,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.8608ea7d.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.4af4bdda.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
@@ -1451,7 +1451,7 @@ access them.</p>
 <p>⚠️ </p>
 <p>Although the use of local Docker images has yet to be implemented as a feature on OSCAR clusters, the local deployment for testing allows you to use a local Docker registry to use this kind of images. 
 The registry uses by default the port 5001, so each image you want to use must be tagged as <code>localhost:5001/[image_name]</code> and pushed to the repository through the <code>docker push localhost:5001/[image_name]</code> command.</p>
-<p>Also, port 80 must be available to avoid errors during the deployment since OSCAR-UI uses it. Check <a href="../faq/">Frequently Asked Questions (FAQ)</a> for more info.</p>
+<p>Also, port 80 must be available to avoid errors during the deployment since OSCAR-UI uses it. Check the <a href="../faq/">Frequently Asked Questions (FAQ)</a> for more info.</p>
 </blockquote>
 <h2 id="automated-local-testing">Automated local testing</h2>
 <p>To set up the enviroment for the platform testing you can run the following
@@ -1578,6 +1578,7 @@ password of your choice and <code>&lt;MINIO_PASSWORD&gt;</code> with the MinIO r
 and remember to add the flag <code>--set serverlessBackend=knative</code> if you deployed
 it in the previous step:</p>
 <pre><code class="language-sh">helm repo add grycap https://grycap.github.io/helm-charts/
+helm repo update 
 helm install --namespace=oscar oscar grycap/oscar \
  --set authPass=&lt;OSCAR_PASSWORD&gt; --set service.type=ClusterIP \
  --set ingress.create=true --set volume.storageClassName=nfs \
