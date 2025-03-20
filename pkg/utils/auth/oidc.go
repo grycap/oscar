@@ -200,7 +200,7 @@ func (om *oidcManager) GetUserInfo(rawToken string) (*userInfo, error) {
 	}
 
 	if cerr != nil {
-		return nil, err
+		return nil, cerr
 	}
 
 	// Create "userInfo" struct and add the groups
