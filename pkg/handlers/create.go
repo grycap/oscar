@@ -492,7 +492,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				}
 			}
 
-			if service.IsolationLevel == "USER" && len(service.BucketList) > 0 {
+			if strings.ToUpper(service.IsolationLevel) == "USER" && len(service.BucketList) > 0 {
 				for _, b := range service.BucketList {
 					_, err := s3Client.PutObject(&s3.PutObjectInput{
 						Bucket: aws.String(b),
