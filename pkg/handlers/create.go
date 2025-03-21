@@ -95,7 +95,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			if service.VO != "" {
 				for _, vo := range cfg.OIDCGroups {
 					if vo == service.VO {
-						err := checkIdentity(&service, cfg, authHeader)
+						err := checkIdentity(&service, authHeader)
 						if err != nil {
 							c.String(http.StatusBadRequest, fmt.Sprintln(err))
 							return
@@ -108,7 +108,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					var notFound bool = true
 					for _, vo := range cfg.OIDCGroups {
 						service.VO = vo
-						err := checkIdentity(&service, cfg, authHeader)
+						err := checkIdentity(&service, authHeader)
 						fmt.Println(vo)
 						if err != nil {
 							fmt.Println(err)
@@ -627,15 +627,21 @@ func getProviderInfo(rawInfo string) (string, string) {
 	return provID, provName
 }
 
-func checkIdentity(service *types.Service, cfg *types.Config, authHeader string) error {
-	oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
+func checkIdentity(service *types.Service, authHeader string) error {
 	rawToken := strings.TrimPrefix(authHeader, "Bearer ")
-
-	hasVO, err := oidcManager.UserHasVO(rawToken, service.VO)
-
+	issuer, err := auth.GetIssuerFromToken(rawToken)
 	if err != nil {
 		return err
 	}
+	oidcManager := auth.ClusterOidcManagers[issuer]
+	if oidcManager == nil {
+		return err
+	}
+	ui, err := oidcManager.GetUserInfo(rawToken)
+	if err != nil {
+		return err
+	}
+	hasVO := oidcManager.UserHasVO(ui, service.VO)
 
 	if !hasVO {
 		return fmt.Errorf("this user isn't enrrolled on the vo: %v", service.VO)

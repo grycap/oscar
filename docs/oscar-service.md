@@ -38,10 +38,11 @@ The output of synchronous invocations will depend on the application itself:
 This way users can adapt OSCAR's services to their own needs.
 
 The FaaS Supervisor supports the following storage back-ends:
-* [MinIO](https://min.io)
-* [Amazon S3](https://aws.amazon.com/s3/)
-* Webdav (and, therefore, [dCache](https://dcache.org))
-* Onedata (and, therefore, [EGI DataHub](https://www.egi.eu/service/datahub/))
+
+  * [MinIO](https://min.io)
+  * [Amazon S3](https://aws.amazon.com/s3/)
+  * Webdav (and, therefore, [dCache](https://dcache.org))
+  * Onedata (and, therefore, [EGI DataHub](https://www.egi.eu/service/datahub/))
 
 ### Container images
 
