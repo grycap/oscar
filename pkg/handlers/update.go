@@ -106,7 +106,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				// Split buckets and folders from path
 				splitPath := strings.SplitN(path, "/", 2)
 				// If isolation level was USER delete all private buckets
-				if oldService.IsolationLevel == "USER" {
+				if strings.ToUpper(oldService.IsolationLevel) == "USER" {
 					err = updatePrivateBuckets(oldService, minIOAdminClient, s3Client)
 					if err != nil {
 						return
