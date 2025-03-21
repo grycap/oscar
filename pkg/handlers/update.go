@@ -112,7 +112,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						return
 					}
 				}
-				if newService.IsolationLevel == "USER" {
+				if strings.ToUpper(newService.IsolationLevel) == "USER" {
 					var newBucketList []string
 					var userBucket string
 					for _, user := range newService.AllowedUsers {

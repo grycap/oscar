@@ -285,7 +285,7 @@ func (minIOAdminClient *MinIOAdminClient) RestartServer() error {
 func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucketName string, policyName string, isGroup bool) error {
 	var jsonErr error
 	var policy []byte
-	var action []string
+	var resources []string
 
 	rs := "arn:aws:s3:::" + bucketName + "/*"
 	getPolicy, errInfo := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), policyName)
@@ -309,17 +309,19 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucketName string, pol
 		jsonUnmarshal := &Policy{}
 
 		jsonErr = json.Unmarshal(getPolicy.Policy, jsonUnmarshal)
-
-		if len(jsonUnmarshal.Statement) > 0 && jsonErr == nil {
-			action = append(jsonUnmarshal.Statement[0].Resource, rs)
+		if len(jsonUnmarshal.Statement) > 0 && jsonErr == nil &&
+			policyName == ALL_USERS_GROUP && jsonUnmarshal.Statement[0].Effect == "Deny" {
+			resources = []string{rs}
+		} else if len(jsonUnmarshal.Statement) > 0 && jsonErr == nil {
+			resources = append(jsonUnmarshal.Statement[0].Resource, rs)
 		} else {
-			action = []string{rs}
+			resources = []string{rs}
 		}
 		actualPolicy := &Policy{
 			Version: "2012-10-17",
 			Statement: []Statement{
 				{
-					Resource: action,
+					Resource: resources,
 					Action:   []string{"s3:*"},
 					Effect:   "Allow",
 				},
@@ -361,7 +363,6 @@ func createPolicy(adminClient *madmin.AdminClient, bucketName string, allUsers b
 		actualPolicy := &Policy{}
 		jsonErr = json.Unmarshal(policyInfo.Policy, actualPolicy)
 		if jsonErr != nil {
-			fmt.Println("here2")
 			return jsonErr
 		}
 		// Add new resource and create policy
