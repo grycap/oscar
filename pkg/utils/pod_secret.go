@@ -58,9 +58,15 @@ func UpdatePodSecrets(service *types.Service, cfg *types.Config, kubeClientset k
 			service.Environment.Secrets[key] = ""
 		}
 	} else if existsSecret(service.Name, cfg, kubeClientset) && service.Environment.Secrets == nil {
-		DeletePodSecrets(service, cfg, kubeClientset)
+		err := DeletePodSecrets(service, cfg, kubeClientset)
+		if err != nil {
+			return err
+		}
 	} else if !existsSecret(service.Name, cfg, kubeClientset) && service.Environment.Secrets != nil {
-		CreatePodSecrets(service, cfg, kubeClientset)
+		err := CreatePodSecrets(service, cfg, kubeClientset)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 
