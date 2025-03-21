@@ -83,7 +83,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				for _, vo := range cfg.OIDCGroups {
 					if vo == newService.VO {
 						authHeader := c.GetHeader("Authorization")
-						err := checkIdentity(&newService, cfg, authHeader)
+						err := checkIdentity(&newService, authHeader)
 						if err != nil {
 							c.String(http.StatusBadRequest, fmt.Sprintln(err))
 						}

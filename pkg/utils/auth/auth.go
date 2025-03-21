@@ -53,7 +53,7 @@ func CustomAuth(cfg *types.Config, kubeClientset kubernetes.Interface) gin.Handl
 	minIOAdminClient.CreateAllUsersGroup()                                   // #nosec G104
 	minIOAdminClient.UpdateUsersInGroup(oscarUser, "all_users_group", false) // #nosec G104
 
-	oidcHandler := getOIDCMiddleware(kubeClientset, minIOAdminClient, cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups, nil)
+	oidcHandler := getOIDCMiddleware(kubeClientset, minIOAdminClient, cfg, nil)
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
