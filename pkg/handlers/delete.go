@@ -56,7 +56,13 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				return
 			}
 		}
-
+		secretName := types.GenerateDeterministicString(service.Name)
+		if utils.SecretExists(secretName, cfg.ServicesNamespace, back.GetKubeClientset()) {
+			secretsErr := utils.DeleteSecret(secretName, cfg.ServicesNamespace, back.GetKubeClientset())
+			if secretsErr != nil {
+				c.String(http.StatusInternalServerError, "Error deleting asociated secret: %v", secretsErr)
+			}
+		}
 		if err := back.DeleteService(*service); err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {

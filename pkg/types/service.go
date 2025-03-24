@@ -17,6 +17,8 @@ limitations under the License.
 package types
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"strconv"
 
@@ -218,8 +220,8 @@ type Service struct {
 	// The user-defined environment variables assigned to the service
 	// Optional
 	Environment struct {
-		Vars    map[string]string `json:"Variables"`
-		Secrets map[string]string `json:"Secrets"`
+		Vars    map[string]string `json:"variables"`
+		Secrets map[string]string `json:"secrets"`
 	} `json:"environment"`
 
 	// Annotations user-defined Kubernetes annotations to be set in job's definition
@@ -291,7 +293,6 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 				Image:           service.Image,
 				ImagePullPolicy: v1.PullAlways,
 				Env:             ConvertEnvVars(service.Environment.Vars),
-				EnvFrom:         service.mountSecret(),
 				VolumeMounts: []v1.VolumeMount{
 					{
 						Name:      ConfigVolumeName,
@@ -338,6 +339,14 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, volumeMount)
 		podSpec.Volumes = append(podSpec.Volumes, volume)
 	}
+
+	// Add secrets as environment variables if defined
+	if len(service.Environment.Secrets) > 0 {
+		secretName := GenerateDeterministicString(service.Name)
+		secretMountSpec := ConvertSecretsEnvVars(secretName)
+		podSpec.Containers[0].EnvFrom = secretMountSpec
+	}
+
 	// Add the required environment variables for the watchdog
 	addWatchdogEnvVars(podSpec, cfg, service)
 
@@ -371,6 +380,18 @@ func ConvertEnvVars(vars map[string]string) []v1.EnvVar {
 		})
 	}
 	return envVars
+}
+
+func ConvertSecretsEnvVars(secretName string) []v1.EnvFromSource {
+	return []v1.EnvFromSource{
+		{
+			SecretRef: &v1.SecretEnvSource{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: secretName,
+				},
+			},
+		},
+	}
 }
 
 func SetImagePullSecrets(secrets []string) []v1.LocalObjectReference {
@@ -475,21 +496,6 @@ func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) {
 	}
 }
 
-func (service *Service) mountSecret() []v1.EnvFromSource {
-	if service.Environment.Secrets != nil && len(service.Environment.Secrets) > 0 {
-		return []v1.EnvFromSource{
-			{
-				SecretRef: &v1.SecretEnvSource{
-					LocalObjectReference: v1.LocalObjectReference{
-						Name: service.Name,
-					},
-				},
-			},
-		}
-	}
-	return nil
-}
-
 // GetSupervisorPath returns the appropriate supervisor path
 func (service *Service) GetSupervisorPath() string {
 	if service.Alpine {
@@ -501,4 +507,10 @@ func (service *Service) GetSupervisorPath() string {
 // HasReplicas checks if the service has replicas defined
 func (service *Service) HasReplicas() bool {
 	return len(service.Replicas) > 0
+}
+
+// GenerateDeterministicString creates a fixed "random" string based on input
+func GenerateDeterministicString(input string) string {
+	hash := sha256.Sum256([]byte(input))                   // Hash the input
+	return base64.URLEncoding.EncodeToString(hash[:])[:10] // Take first 10 chars
 }

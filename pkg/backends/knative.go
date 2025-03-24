@@ -25,7 +25,6 @@ import (
 
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
 	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -100,13 +99,6 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 	err := checkAdditionalConfig(ConfigMapNameOSCAR, kn.namespace, service, kn.config, kn.kubeClientset)
 	if err != nil {
 		return err
-	}
-
-	if service.Environment.Secrets != nil {
-		errSecret := utils.CreatePodSecrets(&service, kn.config, kn.kubeClientset)
-		if errSecret != nil {
-			return errSecret
-		}
 	}
 
 	// Create the configMap with FDL and user-script
@@ -194,11 +186,6 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		return fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", service.Name)
 	}
 
-	errSecret := utils.UpdatePodSecrets(&service, kn.config, kn.kubeClientset)
-	if errSecret != nil {
-		return errSecret
-	}
-
 	// Update the configMap with FDL and user-script
 	if err := updateServiceConfigMap(&service, kn.namespace, kn.kubeClientset); err != nil {
 		return err
@@ -259,11 +246,6 @@ func (kn *KnativeBackend) DeleteService(service types.Service) error {
 	name := service.Name
 	if err := kn.knClientset.ServingV1().Services(kn.namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		return err
-	}
-
-	errSecret := utils.DeletePodSecrets(&service, kn.config, kn.kubeClientset)
-	if errSecret != nil {
-		return errSecret
 	}
 
 	// Delete the service's configMap
