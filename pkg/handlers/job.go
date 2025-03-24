@@ -18,11 +18,12 @@ package handlers
 
 import (
 	"context"
-	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -30,6 +31,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/grycap/oscar/v3/pkg/resourcemanager"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	genericErrors "github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -44,7 +47,8 @@ var (
 	// Don't restart jobs in order to keep logs
 	restartPolicy = v1.RestartPolicyNever
 	// command used for passing the event to faas-supervisor
-	command = []string{"/bin/sh"}
+	command   = []string{"/bin/sh"}
+	jobLogger = log.New(os.Stdout, "[JOB-HANDLER] ", log.Flags())
 )
 
 const (
@@ -58,8 +62,8 @@ const (
 	InterLinkTolerationOperator = "Exists"
 )
 
-// MakeJobHandler makes a han/home/slangarita/Escritorio/interlink-cluster/PodCern/PodCern.yamldler to manage async invocations
-func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back types.ServerlessBackend, rm resourcemanager.ResourceManager) gin.HandlerFunc {
+// MakeJobHandler makes a handler to manage async invocations
+func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back types.ServerlessBackend, rm resourcemanager.ResourceManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		service, err := back.ReadService(c.Param("serviceName"))
 		if err != nil {
@@ -86,12 +90,6 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			c.Status(http.StatusUnauthorized)
 			return
 		}
-<<<<<<< HEAD
-		reqToken := strings.TrimSpace(splitToken[1])
-		if reqToken != service.Token {
-			c.Status(http.StatusUnauthorized)
-			return
-=======
 
 		// Check if reqToken is the service token
 		rawToken := strings.TrimSpace(splitToken[1])
@@ -133,7 +131,6 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
 				return
 			}
->>>>>>> f2db0db3d64e7fcc753e2cbcd3b76185840ca062
 		}
 
 		// Get the event from request body
@@ -143,10 +140,6 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			return
 		}
 
-<<<<<<< HEAD
-		// Make event envVar
-		event := v1.EnvVar{}
-=======
 		// Check if it has the MinIO event format
 		uid, sourceIPAddress, err := decodeEventBytes(eventBytes)
 		if err != nil {
@@ -168,46 +161,33 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 		// Initialize event envVar and args var
 		var event v1.EnvVar
 		var args []string
->>>>>>> f2db0db3d64e7fcc753e2cbcd3b76185840ca062
 
-		var args string
 		if cfg.InterLinkAvailable && service.InterLinkNodeName != "" {
-			event = v1.EnvVar{
-				Name:  types.EventVariable,
-				Value: base64.StdEncoding.EncodeToString([]byte(eventBytes)),
-			}
-			args = fmt.Sprintf("\"  wget %s -O %s && chmod 0755 %s  &&   echo \\$%s | base64 -d | %s  \"", cfg.SupervisorURL, SupervisorPath, SupervisorPath, types.EventVariable, SupervisorPath)
-			podSpec.NodeSelector = map[string]string{
-				NodeSelectorKey: service.InterLinkNodeName,
-			}
-			podSpec.DNSPolicy = InterLinkDNSPolicy
-			podSpec.RestartPolicy = InterLinkRestartPolicy
-			podSpec.Tolerations = []v1.Toleration{
-				{
-					Key:      InterLinkTolerationKey,
-					Operator: InterLinkTolerationOperator,
-				},
-			}
+			command, event, args = types.SetInterlinkJob(podSpec, service, cfg, eventBytes)
 		} else {
+
+			if service.Mount.Provider != "" {
+				args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath()) + ";echo \"I finish\" > /tmpfolder/finish-file;"}
+				types.SetMount(podSpec, *service, cfg)
+			} else {
+				args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath())}
+			}
+
 			event = v1.EnvVar{
 				Name:  types.EventVariable,
 				Value: string(eventBytes),
 			}
-			args = fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath())
 		}
 
 		// Make JOB_UUID envVar
 		serviceNameLenght := len(service.Name)
 		serviceName := service.Name
 		jobUUID := uuid.New().String()
-<<<<<<< HEAD
-=======
 
 		if serviceNameLenght >= 25 {
 			serviceName = serviceName[:16]
 		}
 		jobUUID = serviceName + "-" + jobUUID
->>>>>>> f2db0db3d64e7fcc753e2cbcd3b76185840ca062
 		jobUUIDVar := v1.EnvVar{
 			Name:  types.JobUUIDVariable,
 			Value: jobUUID,
@@ -228,15 +208,11 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 		for i, c := range podSpec.Containers {
 			if c.Name == types.ContainerName {
 				podSpec.Containers[i].Command = command
-				podSpec.Containers[i].Args = []string{"-c", args}
+				podSpec.Containers[i].Args = args
 				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, event)
 				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, jobUUIDVar)
 				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, resourceIDVar)
 			}
-		}
-		if service.Mount.Provider != "" {
-			types.SetMount(podSpec, *service, cfg)
-			podSpec.Containers[0].Args = []string{"-c", args + ";echo \"I finish\" > /tmpfolder/finish-file;"}
 		}
 
 		// Delegate job if can't be scheduled and has defined replicas
@@ -248,7 +224,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 					c.Status(http.StatusCreated)
 					return
 				}
-				log.Printf("unable to delegate job. Error: %v\n", err)
+				jobLogger.Printf("unable to delegate job. Error: %v\n", err)
 			}
 		}
 
@@ -283,7 +259,6 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			}
 		}
 
-		// Create job
 		_, err = kubeClientset.BatchV1().Jobs(cfg.ServicesNamespace).Create(context.TODO(), job, metav1.CreateOptions{})
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
@@ -291,4 +266,32 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 		}
 		c.Status(http.StatusCreated)
 	}
+}
+
+func decodeEventBytes(eventBytes []byte) (string, string, error) {
+
+	defer func() {
+		// recover from panic, if one occurs
+		if r := recover(); r != nil {
+			jobLogger.Println("Recovered from panic:", r)
+		}
+	}()
+	// Extract user UID from MinIO event
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(eventBytes, &decoded); err != nil {
+		return "", "", err
+	}
+
+	if records, panicErr := decoded["Records"].([]interface{}); panicErr {
+		r := records[0].(map[string]interface{})
+
+		eventInfo := r["requestParameters"].(map[string]interface{})
+		uid := eventInfo["principalId"]
+		sourceIPAddress := eventInfo["sourceIPAddress"]
+
+		return uid.(string), sourceIPAddress.(string), nil
+	} else {
+		return "", "", genericErrors.New("Failed to decode records")
+	}
+
 }

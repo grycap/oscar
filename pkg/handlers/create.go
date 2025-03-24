@@ -40,6 +40,7 @@ const (
 	defaultMemory   = "256Mi"
 	defaultCPU      = "0.2"
 	defaultLogLevel = "INFO"
+	createPath      = "/system/services"
 )
 
 var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache)")
@@ -58,7 +59,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
 			service.Owner = "cluster_admin"
-			createLogger.Printf("Creating service for user: %s", service.Owner)
+			createLogger.Printf("Creating service '%s' for user '%s'", service.Name, service.Owner)
 		}
 
 		if err := c.ShouldBindJSON(&service); err != nil {
@@ -71,25 +72,22 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// Check if users in allowed_users have a MinIO associated user
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
-		// === DEBUG code ===
-		loguid, _ := auth.GetUIDFromContext(c)
-		createLogger.Printf(">>> uid from context: %s", loguid)
-		// =============
-
 		// Service is created by an EGI user
 		if !isAdminUser {
 			uid, err := auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+				return
 			}
 
 			// Set UID from owner
 			service.Owner = uid
-			createLogger.Printf("Creating service for user: %s", service.Owner)
+			createLogger.Printf("Creating service '%s' for user '%s'", service.Name, service.Owner)
 
 			mc, err := auth.GetMultitenancyConfigFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+				return
 			}
 
 			full_uid := auth.FormatUID(uid)
@@ -100,6 +98,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						err := checkIdentity(&service, authHeader)
 						if err != nil {
 							c.String(http.StatusBadRequest, fmt.Sprintln(err))
+							return
 						}
 						break
 					}
@@ -224,7 +223,11 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				log.Println(err.Error())
 			}
 		}
-		createLogger.Println("Service created with name: ", service.Name)
+		uid := service.Owner
+		if service.Owner == "" {
+			uid = "nil"
+		}
+		createLogger.Printf("%s | %v | %s | %s | %s", "POST", 200, createPath, service.Name, uid)
 		c.Status(http.StatusCreated)
 	}
 }

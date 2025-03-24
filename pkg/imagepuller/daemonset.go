@@ -60,7 +60,7 @@ var stopper chan struct{}
 
 // Create daemonset
 func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kubernetes.Interface) error {
-
+	DaemonSetLoggerInfo.Println("Creating daemonset for service:", service.Name)
 	//Set needed variables
 	err := setWorkingNodes(kubeClientset)
 	if err != nil {
@@ -78,8 +78,6 @@ func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kub
 	if err != nil {
 		DaemonSetLoggerInfo.Println(err)
 		return fmt.Errorf("failed to create daemonset: %s", err.Error())
-	} else {
-		DaemonSetLoggerInfo.Println("Created daemonset for service:", service.Name)
 	}
 
 	//Set watcher informer

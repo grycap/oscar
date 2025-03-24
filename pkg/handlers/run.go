@@ -28,6 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
+const (
+	tokenLength = 64
+)
+
 // MakeRunHandler makes a handler to manage sync invocations sending them to the gateway of the ServerlessBackend
 func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {

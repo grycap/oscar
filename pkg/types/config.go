@@ -183,13 +183,13 @@ type Config struct {
 	// OIDCGroups OpenID comma-separated group list to grant access in the cluster.
 	// Groups defined in the "eduperson_entitlement" OIDC scope,
 	// as described here: https://docs.egi.eu/providers/check-in/sp/#10-groups
-	OIDCGroups []string `json:"-"`
+	OIDCGroups []string `json:"oidc_groups"`
 
 	//
 	IngressHost string `json:"-"`
 
 	// Github path of FaaS Supervisor (needed for Interlink config)
-	SupervisorURL string `json:"-"`
+	SupervisorKitImage string `json:"-"`
 
 	//Path to additional OSCAR configuration setted by users
 	AdditionalConfigPath string `json:"-"`
@@ -238,7 +238,7 @@ var configVars = []configVar{
 	{"OIDCSubject", "OIDC_SUBJECT", false, stringType, ""},
 	{"OIDCGroups", "OIDC_GROUPS", false, stringSliceType, ""},
 	{"IngressHost", "INGRESS_HOST", false, stringType, ""},
-	{"SupervisorURL", "SUPERVISOR_URL", false, stringType, "https://github.com/grycap/faas-supervisor/releases/download/1.5.8/supervisor"},
+	{"SupervisorKitImage", "SUPERVISOR_KIT_IMAGE", false, stringType, ""},
 	{"AdditionalConfigPath", "ADDITIONAL_CONFIG_PATH", false, stringType, "config.yaml"},
 }
 

@@ -43,7 +43,7 @@ var errOpenfaasOperator = errors.New("the OpenFaaS Operator is not creating the 
 // OpenfaasBackend struct to represent an Openfaas client
 type OpenfaasBackend struct {
 	kubeClientset   kubernetes.Interface
-	ofClientset     *ofclientset.Clientset
+	ofClientset     ofclientset.Interface
 	namespace       string
 	gatewayEndpoint string
 	scaler          *utils.OpenfaasScaler
@@ -83,26 +83,20 @@ func (of *OpenfaasBackend) GetInfo() *types.ServerlessBackendInfo {
 
 // ListServices returns a slice with all services registered in the provided namespace
 func (of *OpenfaasBackend) ListServices() ([]*types.Service, error) {
-	// Get the list with all deployments
-	deployments, err := of.kubeClientset.AppsV1().Deployments(of.namespace).List(context.TODO(), metav1.ListOptions{})
+	// Get the list with all Knative services
+	configmaps, err := getAllServicesConfigMaps(of.namespace, of.kubeClientset)
 	if err != nil {
+		log.Printf("WARNING: %v\n", err)
 		return nil, err
 	}
-
-<<<<<<< HEAD
 	services := []*types.Service{}
-	for _, deployment := range deployments.Items {
-		// Get service from configMap's FDL
-		svc, err := getServiceFromFDL(deployment.Name, of.namespace, of.kubeClientset)
-=======
+
 	for _, cm := range configmaps.Items {
 		service, err := getServiceFromConfigMap(&cm) // #nosec G601
->>>>>>> f2db0db3d64e7fcc753e2cbcd3b76185840ca062
 		if err != nil {
-			log.Printf("WARNING: %v\n", err)
-		} else {
-			services = append(services, svc)
+			return nil, err
 		}
+		services = append(services, service)
 	}
 
 	return services, nil
@@ -235,8 +229,13 @@ func (of *OpenfaasBackend) ReadService(name string) (*types.Service, error) {
 		return nil, err
 	}
 
+	// Get the configMap of the Service
+	cm, err := of.kubeClientset.CoreV1().ConfigMaps(of.namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", name)
+	}
 	// Get service from configMap's FDL
-	svc, err := getServiceFromFDL(name, of.namespace, of.kubeClientset)
+	svc, err := getServiceFromConfigMap(cm)
 	if err != nil {
 		return nil, err
 	}

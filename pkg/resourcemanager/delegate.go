@@ -18,15 +18,14 @@ package resourcemanager
 
 import (
 	"bytes"
-	"crypto/rand"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"math"
 
-	//"io"
+	"io"
 	"log"
-	"math/big"
+	"math"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"path"
@@ -81,14 +80,14 @@ type Alternative struct {
 	Preference float64 // Valor de la preferencia
 }
 
-/**type JobStatus struct {
+type JobStatus struct {
 	Status       string `json:"status"`
 	CreationTime string `json:"creation_time"`
 	StartTime    string `json:"start_time"`
 	FinishTime   string `json:"finish_time"`
 }
 type JobStatuses map[string]JobStatus
-**/
+
 // Function to execute TOPSIS method
 // Normalizes a column by dividing each value by the square root of the sum of squares.
 func normalizeMatrix(matrix [][]float64) [][]float64 {
@@ -300,7 +299,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			JobURL.Path = path.Join(JobURL.Path, "/system/logs/", cred.ServiceName)
 
 			// Make request to get service's definition (including token) from cluster
-			req, err := http.NewRequest("GET", JobURL.String(), nil)
+			req2, err := http.NewRequest("GET", JobURL.String(), nil)
 			if err != nil {
 				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to make request: %v\n", service.Name, replica.ClusterID, err)
 				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
@@ -309,11 +308,11 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 
 			// Add Headers
 			for k, v := range cred.Headers {
-				req.Header.Add(k, v)
+				req2.Header.Add(k, v)
 			}
 
 			// Add service token to the request
-			req.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
+			req2.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
 
 			// Make HTTP client
 
@@ -326,34 +325,34 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 				Transport: transport,
 				Timeout:   time.Second * 20,
 			}
-			/**
-						// Send the request
-						resp, err := client.Do(req)
-						if err != nil {
-							//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
-							results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
-							continue
-						}
-						defer resp.Body.Close()
-						body, err := io.ReadAll(resp.Body) //  io.ReadAll-> read body request
-						if err != nil {
-							fmt.Printf("Error to read body request to %s: %v\n", cred.URL, err)
-							results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
-							continue
-						}
-						var jobStatuses JobStatuses
-						err = json.Unmarshal(body, &jobStatuses)
-						if err != nil {
-							fmt.Println("Error decoding the JSON of the response:", err)
-							results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
-							continue
-						}
 
-						// Show job statuses
+			// Send the request
+			resp2, err := client.Do(req2)
+			if err != nil {
+				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
+				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
+				continue
+			}
+			defer resp2.Body.Close()
+			body, err := io.ReadAll(resp2.Body) //  io.ReadAll-> read body request
+			if err != nil {
+				fmt.Printf("Error to read body request to %s: %v\n", cred.URL, err)
+				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
+				continue
+			}
+			var jobStatuses JobStatuses
+			err = json.Unmarshal(body, &jobStatuses)
+			if err != nil {
+				fmt.Println("Error decoding the JSON of the response:", err)
+				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
+				continue
+			}
 
-						// Count job statuses
-						averageExecutionTime, pendingCount := countJobs(jobStatuses)
-			            **/
+			// Show job statuses
+
+			// Count job statuses
+			averageExecutionTime, pendingCount := countJobs(jobStatuses)
+
 			JobURL, err = url.Parse(cluster.Endpoint)
 			if err != nil {
 				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", service.Name, replica.ClusterID, cluster.Endpoint, err)
@@ -371,11 +370,11 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 
 			// Add Headers
 			for k, v := range cred.Headers {
-				req.Header.Add(k, v)
+				req1.Header.Add(k, v)
 			}
 
 			// Add service token to the request
-			req.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
+			req1.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
 
 			// Make the HTTP request
 			start := time.Now()
@@ -403,8 +402,8 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 				results = append(results, []float64{duration.Seconds(), 0, 0, 0, 1e6, 1e6})
 				continue
 			}
-			results = createParameters(results, duration, clusterStatus, serviceCPU, 1e6, 1e6)
-			//results = createParameters(results, duration, clusterStatus, serviceCPU, averageExecutionTime, float64(pendingCount))
+			//results = createParameters(results, duration, clusterStatus, serviceCPU, 1e6, 1e6)
+			results = createParameters(results, duration, clusterStatus, serviceCPU, averageExecutionTime, float64(pendingCount))
 
 		}
 		// Print results as a matrix
@@ -727,6 +726,7 @@ func getClusterStatus(service *types.Service) {
 
 			// Make HTTP client
 			// #nosec
+			fmt.Println("SSLVerify :", cluster.SSLVerify)
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
@@ -787,17 +787,17 @@ func getClusterStatus(service *types.Service) {
 				if dist >= 0 {
 					fmt.Println("Resources available in ClusterID", replica.ClusterID)
 					if service.Delegation == "random" {
-						max := big.NewInt(int64(noDelegateCode))
-						randomNumber, _ := rand.Int(rand.Reader, max)
-						randPriority := randomNumber.Uint64()
-						replica.Priority = uint(randPriority)
-						fmt.Println("Priority ", replica.Priority, " with ", service.Delegation, " delegation")
+						randPriority := rand.Intn(noDelegateCode)
+						service.Replicas[id].Priority = uint(randPriority)
+						//replica.Priority = uint(randPriority)
+						fmt.Println("Priority ", service.Replicas[id].Priority, " with ", service.Delegation, " delegation")
 					} else if service.Delegation == "load-based" {
 						//Map the totalClusterCPU range to a smaller range (input range 0 to 32 cpu to output range 100 to 0 priority)
 						totalClusterCPU := clusterStatus.CPUFreeTotal
 						mappedCPUPriority := mapToRange(totalClusterCPU, 0, 32000, 100, 0)
-						replica.Priority = uint(mappedCPUPriority) // #nosec G115
-						fmt.Println("Priority ", replica.Priority, " with ", service.Delegation, " delegation")
+						service.Replicas[id].Priority = uint(mappedCPUPriority) // #nosec G115
+						//replica.Priority = uint(mappedCPUPriority)
+						fmt.Println("Priority ", service.Replicas[id].Priority, " with ", service.Delegation, " delegation")
 					} else if service.Delegation != "static" {
 						service.Replicas[id].Priority = noDelegateCode
 						//replica.Priority = noDelegateCode
@@ -905,40 +905,36 @@ func sortbyThreshold(preferences []float64, umbral int) []Alternative {
 
 }
 
-/*
-*
-
-	func countJobs(jobStatuses map[string]JobStatus) (float64, int) {
-		totalJobs := 0
-		succeededCount := 0
-		failedCount := 0
-		pendingCount := 0
-		totalExecutionTime := 0.0
-		for _, status := range jobStatuses {
-			totalJobs++
-			switch status.Status {
-			case "Succeeded":
-				succeededCount++
-				creationTime, _ := time.Parse(time.RFC3339, status.CreationTime)
-				finishTime, _ := time.Parse(time.RFC3339, status.FinishTime)
-				duration := finishTime.Sub(creationTime).Seconds() // Duration in seconds
-				totalExecutionTime += duration
-			case "Failed":
-				failedCount++
-			case "Pending": // Pending jobs
-				pendingCount++
-			}
+func countJobs(jobStatuses map[string]JobStatus) (float64, int) {
+	totalJobs := 0
+	succeededCount := 0
+	failedCount := 0
+	pendingCount := 0
+	totalExecutionTime := 0.0
+	for _, status := range jobStatuses {
+		totalJobs++
+		switch status.Status {
+		case "Succeeded":
+			succeededCount++
+			creationTime, _ := time.Parse(time.RFC3339, status.CreationTime)
+			finishTime, _ := time.Parse(time.RFC3339, status.FinishTime)
+			duration := finishTime.Sub(creationTime).Seconds() // Duration in seconds
+			totalExecutionTime += duration
+		case "Failed":
+			failedCount++
+		case "Pending": // Pending jobs
+			pendingCount++
 		}
+	}
 
-		var averageExecutionTime float64 = 1e6
-		if succeededCount > 0 {
-			averageExecutionTime = totalExecutionTime / float64(succeededCount)
-		}
-		return averageExecutionTime, pendingCount
+	var averageExecutionTime float64 = 1e6
+	if succeededCount > 0 {
+		averageExecutionTime = totalExecutionTime / float64(succeededCount)
+	}
+	return averageExecutionTime, pendingCount
 
 }
-*
-*/
+
 func createParameters(results [][]float64, duration time.Duration, clusterStatus GeneralInfo, serviceCPU float64, averageExecutionTime float64, pendingCount float64) [][]float64 {
 	maxNodeCPU := float64(clusterStatus.CPUMaxFree)
 	dist := maxNodeCPU - (1000 * serviceCPU)
