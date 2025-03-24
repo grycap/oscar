@@ -15,7 +15,7 @@ is in charge of:
 
 
 
-### Input/Output
+### FaaS Supervisor
 
 [FaaS Supervisor](https://github.com/grycap/faas-supervisor), the component in
 charge of managing the input and output of services, allows JSON or base64
