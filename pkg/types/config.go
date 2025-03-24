@@ -174,8 +174,8 @@ type Config struct {
 	// OIDCEnable parameter to enable OIDC support
 	OIDCEnable bool `json:"-"`
 
-	// OIDCIssuer OpenID Connect issuer as returned in the "iss" field of the JWT payload
-	OIDCIssuer string `json:"-"`
+	// OIDCValidIssuers List of allowed providers to authenticate
+	OIDCValidIssuers []string `json:"-"`
 
 	// OIDCSubject OpenID Connect Subject (user identifier)
 	OIDCSubject string `json:"-"`
@@ -234,7 +234,7 @@ var configVars = []configVar{
 	{"ReSchedulerInterval", "RESCHEDULER_INTERVAL", false, intType, "15"},
 	{"ReSchedulerThreshold", "RESCHEDULER_THRESHOLD", false, intType, "30"},
 	{"OIDCEnable", "OIDC_ENABLE", false, boolType, "false"},
-	{"OIDCIssuer", "OIDC_ISSUER", false, stringType, "https://aai.egi.eu/oidc/"},
+	{"OIDCValidIssuers", "OIDC_ISSUERS", false, stringSliceType, ""},
 	{"OIDCSubject", "OIDC_SUBJECT", false, stringType, ""},
 	{"OIDCGroups", "OIDC_GROUPS", false, stringSliceType, ""},
 	{"IngressHost", "INGRESS_HOST", false, stringType, ""},

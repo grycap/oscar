@@ -89,10 +89,15 @@ func (of *OpenfaasBackend) ListServices() ([]*types.Service, error) {
 		return nil, err
 	}
 
+<<<<<<< HEAD
 	services := []*types.Service{}
 	for _, deployment := range deployments.Items {
 		// Get service from configMap's FDL
 		svc, err := getServiceFromFDL(deployment.Name, of.namespace, of.kubeClientset)
+=======
+	for _, cm := range configmaps.Items {
+		service, err := getServiceFromConfigMap(&cm) // #nosec G601
+>>>>>>> f2db0db3d64e7fcc753e2cbcd3b76185840ca062
 		if err != nil {
 			log.Printf("WARNING: %v\n", err)
 		} else {

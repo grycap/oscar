@@ -47,10 +47,14 @@ var (
 		ImagePullSecrets: []string{"testcred1", "testcred2"},
 		Script:           "testscript",
 		Environment: struct {
-			Vars map[string]string `json:"Variables"`
+			Vars    map[string]string `json:"Variables"`
+			Secrets map[string]string `json:"Secrets"`
 		}{
 			Vars: map[string]string{
 				"TEST_VAR": "testvalue",
+			},
+			Secrets: map[string]string{
+				"TEST_SECRET": "testsecret",
 			},
 		},
 		Annotations: map[string]string{
@@ -253,6 +257,8 @@ expose:
 environment:
   Variables:
     TEST_VAR: testvalue
+  Secrets:
+    TEST_SECRET: testsecret
 annotations:
   testannotation: testannotationvalue
 vo: ""
@@ -275,6 +281,8 @@ clusters:
 owner: ""
 interlink_node_name: ""
 allowed_users: []
+isolation_level: ""
+bucket_list: []
 mount:
   storage_provider: ""
   path: ""

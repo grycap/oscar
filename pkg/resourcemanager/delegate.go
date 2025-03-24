@@ -18,14 +18,15 @@ package resourcemanager
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"math"
 
 	"io"
 	"log"
-	"math"
-	"math/rand"
+	"math/big"
 	"net/http"
 	"net/url"
 	"path"
@@ -500,7 +501,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			req.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
 
 			// Make HTTP client
-
+			// #nosec
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
@@ -564,6 +565,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			}
 
 			// Make HTTP client
+			// #nosec
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: !replica.SSLVerify},
@@ -643,7 +645,7 @@ func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, e
 	req.SetBasicAuth(cluster.AuthUser, cluster.AuthPassword)
 
 	// Make HTTP client
-
+	// #nosec
 	var transport http.RoundTripper = &http.Transport{
 		// Enable/disable SSL verification
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
@@ -724,7 +726,7 @@ func getClusterStatus(service *types.Service) {
 			req.SetBasicAuth(cluster.AuthUser, cluster.AuthPassword)
 
 			// Make HTTP client
-			fmt.Println("SSLVerify :", cluster.SSLVerify)
+			// #nosec
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
@@ -785,18 +787,17 @@ func getClusterStatus(service *types.Service) {
 				if dist >= 0 {
 					fmt.Println("Resources available in ClusterID", replica.ClusterID)
 					if service.Delegation == "random" {
-						randPriority := rand.Intn(noDelegateCode)
-						service.Replicas[id].Priority = uint(randPriority)
-						//replica.Priority = uint(randPriority)
-						fmt.Println("Priority ", service.Replicas[id].Priority, " with ", service.Delegation, " delegation")
+						max := big.NewInt(int64(noDelegateCode))
+						randomNumber, _ := rand.Int(rand.Reader, max)
+						randPriority := randomNumber.Uint64()
+						replica.Priority = uint(randPriority)
+						fmt.Println("Priority ", replica.Priority, " with ", service.Delegation, " delegation")
 					} else if service.Delegation == "load-based" {
 						//Map the totalClusterCPU range to a smaller range (input range 0 to 32 cpu to output range 100 to 0 priority)
 						totalClusterCPU := clusterStatus.CPUFreeTotal
 						mappedCPUPriority := mapToRange(totalClusterCPU, 0, 32000, 100, 0)
-						service.Replicas[id].Priority = uint(mappedCPUPriority)
-						//replica.Priority = uint(mappedCPUPriority)
-						fmt.Println("Priority ", service.Replicas[id].Priority, " with ", service.Delegation, " delegation")
-
+						replica.Priority = uint(mappedCPUPriority) // #nosec G115
+						fmt.Println("Priority ", replica.Priority, " with ", service.Delegation, " delegation")
 					} else if service.Delegation != "static" {
 						service.Replicas[id].Priority = noDelegateCode
 						//replica.Priority = noDelegateCode

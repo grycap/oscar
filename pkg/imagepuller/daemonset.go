@@ -21,9 +21,10 @@ package imagepuller
 import (
 	//"k8s.io/apimachinery/pkg/watch"
 	"context"
+	"crypto/rand"
 	"fmt"
 	"log"
-	"math/rand"
+	"math/big"
 	"os"
 	"sync"
 	"time"
@@ -61,7 +62,11 @@ var stopper chan struct{}
 func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kubernetes.Interface) error {
 
 	//Set needed variables
-	setWorkingNodes(kubeClientset)
+	err := setWorkingNodes(kubeClientset)
+	if err != nil {
+		DaemonSetLoggerInfo.Println(err)
+		return fmt.Errorf("failed to set working nodes: %s", err.Error())
+	}
 	podGroup = generatePodGroupName()
 	daemonsetName = "image-puller-" + service.Name
 
@@ -69,7 +74,7 @@ func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kub
 	daemon := getDaemonset(cfg, service)
 
 	//Create daemonset
-	_, err := kubeClientset.AppsV1().DaemonSets(cfg.ServicesNamespace).Create(context.TODO(), daemon, metav1.CreateOptions{})
+	_, err = kubeClientset.AppsV1().DaemonSets(cfg.ServicesNamespace).Create(context.TODO(), daemon, metav1.CreateOptions{})
 	if err != nil {
 		DaemonSetLoggerInfo.Println(err)
 		return fmt.Errorf("failed to create daemonset: %s", err.Error())
@@ -148,15 +153,19 @@ func watchPods(kubeClientset kubernetes.Interface, cfg *types.Config) {
 	}
 
 	//Add event handler that gets all the pods status
-	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: handleUpdatePodEvent,
 	})
+	if err != nil {
+		DaemonSetLoggerInfo.Println(err)
+		log.Fatalf("Failed to add event handler: %s", err.Error())
+	}
 
 	<-stopper
 
 	//Delete daemonset when all pods are in state "Running"
 	DaemonSetLoggerInfo.Println("Deleting daemonset...")
-	err := kubeClientset.AppsV1().DaemonSets(cfg.ServicesNamespace).Delete(context.TODO(), daemonsetName, metav1.DeleteOptions{})
+	err = kubeClientset.AppsV1().DaemonSets(cfg.ServicesNamespace).Delete(context.TODO(), daemonsetName, metav1.DeleteOptions{})
 	if err != nil {
 		DaemonSetLoggerInfo.Println(err)
 		log.Fatalf("Failed to delete daemonset: %s", err.Error())
@@ -193,7 +202,9 @@ func setWorkingNodes(kubeClientset kubernetes.Interface) error {
 func generatePodGroupName() string {
 	b := make([]byte, lengthStr)
 	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+		max := big.NewInt(int64(len(letterBytes)))
+		randomNumber, _ := rand.Int(rand.Reader, max)
+		b[i] = letterBytes[randomNumber.Int64()]
 	}
 	return "pod-group-" + string(b)
 }

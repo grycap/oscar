@@ -48,10 +48,14 @@ func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.Hand
 	// Slice to add default user to all users group on MinIO
 	var oscarUser = []string{"console"}
 
-	minIOAdminClient.CreateAllUsersGroup()
-	minIOAdminClient.UpdateUsersInGroup(oscarUser, "all_users_group", false)
+	minIOAdminClient.CreateAllUsersGroup()                                   // #nosec G104
+	minIOAdminClient.UpdateUsersInGroup(oscarUser, "all_users_group", false) // #nosec G104
 
+<<<<<<< HEAD
 	oidcHandler := getOIDCMiddleware(kubeClientset, minIOAdminClient, cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
+=======
+	oidcHandler := getOIDCMiddleware(kubeClientset, minIOAdminClient, cfg, nil)
+>>>>>>> f2db0db3d64e7fcc753e2cbcd3b76185840ca062
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
@@ -65,11 +69,11 @@ func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.Hand
 func GetUIDFromContext(c *gin.Context) (string, error) {
 	uidOrigin, uidExists := c.Get("uidOrigin")
 	if !uidExists {
-		return "", fmt.Errorf("Missing EGI user uid")
+		return "", fmt.Errorf("missing EGI user uid")
 	}
 	uid, uidParsed := uidOrigin.(string)
 	if !uidParsed {
-		return "", fmt.Errorf("Error parsing uid origin: %v", uidParsed)
+		return "", fmt.Errorf("error parsing uid origin: %v", uidParsed)
 	}
 	return uid, nil
 }
@@ -77,11 +81,11 @@ func GetUIDFromContext(c *gin.Context) (string, error) {
 func GetMultitenancyConfigFromContext(c *gin.Context) (*MultitenancyConfig, error) {
 	mcUntyped, mcExists := c.Get("multitenancyConfig")
 	if !mcExists {
-		return nil, fmt.Errorf("Missing multitenancy config")
+		return nil, fmt.Errorf("missing multitenancy config")
 	}
 	mc, mcParsed := mcUntyped.(*MultitenancyConfig)
 	if !mcParsed {
-		return nil, fmt.Errorf("Error parsing multitenancy config")
+		return nil, fmt.Errorf("error parsing multitenancy config")
 	}
 	return mc, nil
 }

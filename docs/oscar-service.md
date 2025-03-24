@@ -37,6 +37,17 @@ The output of synchronous invocations will depend on the application itself:
 
 This way users can adapt OSCAR's services to their own needs.
 
+The FaaS Supervisor supports the following storage back-ends:
+
+  * [MinIO](https://min.io)
+  * [Amazon S3](https://aws.amazon.com/s3/)
+  * Webdav (and, therefore, [dCache](https://dcache.org))
+  * Onedata (and, therefore, [EGI DataHub](https://www.egi.eu/service/datahub/))
+
+### Container images
+
+Container images on asynchronous services use the tag `imagePullPolicy: Always`, which means that Kubernetes will check for the image digest on the image registry and download it if it is not present.
+So, if you are using an image without a specific tag or with the latest tag, the service will automatically download and use the most recent version of the image on its executions, whenever the image is updated.
 
 You can follow one of the
 [examples](https://github.com/grycap/oscar/tree/master/examples)

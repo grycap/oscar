@@ -25,6 +25,7 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -63,10 +64,15 @@ func (k *KubeBackend) ListServices() ([]*types.Service, error) {
 		return nil, err
 	}
 
+<<<<<<< HEAD
 	services := []*types.Service{}
 	for _, podTemplate := range podTemplates.Items {
 		// Get service from configMap's FDL
 		svc, err := getServiceFromFDL(podTemplate.Name, k.namespace, k.kubeClientset)
+=======
+	for _, cm := range configmaps.Items {
+		service, err := getServiceFromConfigMap(&cm) // #nosec G601
+>>>>>>> f2db0db3d64e7fcc753e2cbcd3b76185840ca062
 		if err != nil {
 			log.Printf("WARNING: %v\n", err)
 		} else {
@@ -84,6 +90,13 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 	err := checkAdditionalConfig(ConfigMapNameOSCAR, k.namespace, service, k.config, k.kubeClientset)
 	if err != nil {
 		return err
+	}
+
+	if service.Environment.Secrets != nil {
+		errSecret := utils.CreatePodSecrets(&service, k.config, k.kubeClientset)
+		if errSecret != nil {
+			return errSecret
+		}
 	}
 
 	// Create the configMap with FDL and user-script
@@ -165,6 +178,11 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 		return fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", service.Name)
 	}
 
+	errSecret := utils.UpdatePodSecrets(&service, k.config, k.kubeClientset)
+	if errSecret != nil {
+		return errSecret
+	}
+
 	// Update the configMap with FDL and user-script
 	if err := updateServiceConfigMap(&service, k.namespace, k.kubeClientset); err != nil {
 		return err
@@ -220,6 +238,11 @@ func (k *KubeBackend) DeleteService(service types.Service) error {
 	name := service.Name
 	if err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		return err
+	}
+
+	errSecret := utils.DeletePodSecrets(&service, k.config, k.kubeClientset)
+	if errSecret != nil {
+		return errSecret
 	}
 
 	// Delete the service's configMap

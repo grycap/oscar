@@ -17,12 +17,14 @@ limitations under the License.
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -47,10 +49,44 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 			c.Status(http.StatusUnauthorized)
 			return
 		}
-		reqToken := strings.TrimSpace(splitToken[1])
-		if reqToken != service.Token {
-			c.Status(http.StatusUnauthorized)
-			return
+
+		// Check if reqToken is the service token
+		rawToken := strings.TrimSpace(splitToken[1])
+		if len(rawToken) == tokenLength {
+
+			if rawToken != service.Token {
+				c.Status(http.StatusUnauthorized)
+				return
+			}
+		} else {
+			issuer, err := auth.GetIssuerFromToken(rawToken)
+			if err != nil {
+				c.String(http.StatusBadGateway, err.Error())
+			}
+			oidcManager := auth.ClusterOidcManagers[issuer]
+			if oidcManager == nil {
+				c.String(http.StatusBadRequest, fmt.Sprintf("Error getting oidc manager for issuer '%s'", issuer))
+				return
+			}
+
+			ui, err := oidcManager.GetUserInfo(rawToken)
+
+			if !oidcManager.IsAuthorised(rawToken) {
+				c.Status(http.StatusUnauthorized)
+				return
+			}
+
+			hasVO := oidcManager.UserHasVO(ui, service.VO)
+
+			if !hasVO {
+				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
+				return
+			}
+
+			uid := ui.Subject
+			c.Set("uidOrigin", uid)
+			c.Next()
+
 		}
 
 		proxy := &httputil.ReverseProxy{

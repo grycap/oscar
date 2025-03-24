@@ -86,10 +86,54 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			c.Status(http.StatusUnauthorized)
 			return
 		}
+<<<<<<< HEAD
 		reqToken := strings.TrimSpace(splitToken[1])
 		if reqToken != service.Token {
 			c.Status(http.StatusUnauthorized)
 			return
+=======
+
+		// Check if reqToken is the service token
+		rawToken := strings.TrimSpace(splitToken[1])
+		if len(rawToken) == tokenLength {
+
+			if rawToken != service.Token {
+				c.Status(http.StatusUnauthorized)
+				return
+			}
+		}
+
+		//  If isn't service token check if it is an oidc token
+		var uidFromToken string
+		if len(rawToken) != tokenLength {
+
+			issuer, err := auth.GetIssuerFromToken(rawToken)
+			if err != nil {
+				c.String(http.StatusBadGateway, fmt.Sprintf("%v", err))
+			}
+			oidcManager := auth.ClusterOidcManagers[issuer]
+			if oidcManager == nil {
+				c.String(http.StatusBadRequest, fmt.Sprintf("Error getting oidc manager for issuer '%s'", issuer))
+				return
+			}
+
+			ui, err := oidcManager.GetUserInfo(rawToken)
+			uidFromToken = ui.Subject
+			if !oidcManager.IsAuthorised(rawToken) {
+				c.Status(http.StatusUnauthorized)
+				return
+			}
+
+			if err != nil {
+				c.String(http.StatusInternalServerError, err.Error())
+				return
+			}
+
+			if !oidcManager.UserHasVO(ui, service.VO) {
+				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
+				return
+			}
+>>>>>>> f2db0db3d64e7fcc753e2cbcd3b76185840ca062
 		}
 
 		// Get the event from request body
@@ -99,8 +143,32 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 			return
 		}
 
+<<<<<<< HEAD
 		// Make event envVar
 		event := v1.EnvVar{}
+=======
+		// Check if it has the MinIO event format
+		uid, sourceIPAddress, err := decodeEventBytes(eventBytes)
+		if err != nil {
+			// Check if the request was made with OIDC token to get user UID
+			if uidFromToken != "" {
+				c.Set("uidOrigin", uidFromToken)
+			} else {
+				// Set as nil string if unable to get an UID
+				jobLogger.Println("WARNING:", err)
+				c.Set("uidOrigin", "nil")
+			}
+		} else {
+			c.Set("IPAddress", sourceIPAddress)
+			c.Set("uidOrigin", uid)
+		}
+
+		c.Next()
+
+		// Initialize event envVar and args var
+		var event v1.EnvVar
+		var args []string
+>>>>>>> f2db0db3d64e7fcc753e2cbcd3b76185840ca062
 
 		var args string
 		if cfg.InterLinkAvailable && service.InterLinkNodeName != "" {
@@ -129,7 +197,17 @@ func MakeJobHandler(cfg *types.Config, kubeClientset *kubernetes.Clientset, back
 		}
 
 		// Make JOB_UUID envVar
+		serviceNameLenght := len(service.Name)
+		serviceName := service.Name
 		jobUUID := uuid.New().String()
+<<<<<<< HEAD
+=======
+
+		if serviceNameLenght >= 25 {
+			serviceName = serviceName[:16]
+		}
+		jobUUID = serviceName + "-" + jobUUID
+>>>>>>> f2db0db3d64e7fcc753e2cbcd3b76185840ca062
 		jobUUIDVar := v1.EnvVar{
 			Name:  types.JobUUIDVariable,
 			Value: jobUUID,
