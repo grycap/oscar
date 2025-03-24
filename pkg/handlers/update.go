@@ -122,7 +122,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 					newService.BucketList = newBucketList
 				}
-				secretName := types.GenerateDeterministicString(newService.Name)
+				secretName := newService.Name + "-" + types.GenerateDeterministicString(newService.Name)
 				if utils.SecretExists(secretName, cfg.ServicesNamespace, back.GetKubeClientset()) {
 					secretsErr := utils.UpdateSecretData(secretName, cfg.ServicesNamespace, newService.Environment.Secrets, back.GetKubeClientset())
 					if secretsErr != nil {

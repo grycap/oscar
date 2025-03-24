@@ -56,7 +56,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				return
 			}
 		}
-		secretName := types.GenerateDeterministicString(service.Name)
+		secretName := service.Name + "-" + types.GenerateDeterministicString(service.Name)
 		if utils.SecretExists(secretName, cfg.ServicesNamespace, back.GetKubeClientset()) {
 			secretsErr := utils.DeleteSecret(secretName, cfg.ServicesNamespace, back.GetKubeClientset())
 			if secretsErr != nil {

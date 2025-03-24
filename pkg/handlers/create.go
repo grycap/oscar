@@ -180,7 +180,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 		if len(service.Environment.Secrets) > 0 {
-			secretName := types.GenerateDeterministicString(service.Name)
+			secretName := service.Name + "-" + types.GenerateDeterministicString(service.Name)
 			if utils.SecretExists(secretName, cfg.ServicesNamespace, back.GetKubeClientset()) {
 				c.String(http.StatusConflict, "A secret with the given name already exists")
 			}
