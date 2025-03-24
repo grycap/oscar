@@ -41,11 +41,6 @@ func CreatePodSecrets(service *types.Service, cfg *types.Config, kubeClientset k
 	return nil
 }
 
-func ReadPodSecrets(service types.Service, cfg types.Config) error {
-	return nil
-
-}
-
 func UpdatePodSecrets(service *types.Service, cfg *types.Config, kubeClientset kubernetes.Interface) error {
 	if existsSecret(service.Name, cfg, kubeClientset) && service.Environment.Secrets != nil {
 		secret := getPodSecretSpec(service, cfg)
