@@ -25,7 +25,7 @@ import (
 	"io"
 	"log"
 	"math"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"path"
@@ -315,7 +315,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			req2.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
 
 			// Make HTTP client
-
+			// #nosec
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
@@ -725,8 +725,8 @@ func getClusterStatus(service *types.Service) {
 			req.SetBasicAuth(cluster.AuthUser, cluster.AuthPassword)
 
 			// Make HTTP client
-			// #nosec
 			fmt.Println("SSLVerify :", cluster.SSLVerify)
+			// #nosec
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
@@ -787,7 +787,7 @@ func getClusterStatus(service *types.Service) {
 				if dist >= 0 {
 					fmt.Println("Resources available in ClusterID", replica.ClusterID)
 					if service.Delegation == "random" {
-						randPriority := rand.Intn(noDelegateCode)
+						randPriority := rand.IntN(noDelegateCode)
 						service.Replicas[id].Priority = uint(randPriority)
 						//replica.Priority = uint(randPriority)
 						fmt.Println("Priority ", service.Replicas[id].Priority, " with ", service.Delegation, " delegation")
