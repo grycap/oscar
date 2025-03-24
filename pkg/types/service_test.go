@@ -255,9 +255,9 @@ expose:
   default_command: false
   set_auth: false
 environment:
-  Variables:
+  variables:
     TEST_VAR: testvalue
-  Secrets:
+  secrets:
     TEST_SECRET: testsecret
 annotations:
   testannotation: testannotationvalue
