@@ -46,6 +46,8 @@ const (
 	// WebDavName string representing a storage provider accessed via webdav
 	WebDavName = "webdav"
 
+	RucioName = "rucio"
+
 	// ProviderSeparator separator character used to split provider's name and identifier
 	ProviderSeparator = "."
 )
@@ -66,6 +68,7 @@ type StorageProviders struct {
 	MinIO   map[string]*MinIOProvider   `json:"minio,omitempty"`
 	Onedata map[string]*OnedataProvider `json:"onedata,omitempty"`
 	WebDav  map[string]*WebDavProvider  `json:"webdav,omitempty"`
+	Rucio   map[string]*Rucio           `json:"rucio,omitempty"`
 }
 
 // S3Provider stores the credentials of the AWS S3 storage provider
@@ -96,6 +99,14 @@ type WebDavProvider struct {
 	Hostname string `json:"hostname"`
 	Login    string `json:"login"`
 	Password string `json:"password"`
+}
+
+// Rucio stores the credentials of the a storage provider that can be accessed via Rucio
+type Rucio struct {
+	Host     string `json:"host"`
+	Rse      string `json:"rse"`
+	Token    string `json:"token"`
+	AuthHost string `json:"auth_host"`
 }
 
 // GetS3Client creates a new S3 Client from a S3Provider

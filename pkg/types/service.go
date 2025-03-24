@@ -218,7 +218,8 @@ type Service struct {
 	// The user-defined environment variables assigned to the service
 	// Optional
 	Environment struct {
-		Vars map[string]string `json:"Variables"`
+		Vars    map[string]string `json:"Variables"`
+		Secrets map[string]string `json:"Secrets"`
 	} `json:"environment"`
 
 	// Annotations user-defined Kubernetes annotations to be set in job's definition
@@ -290,6 +291,7 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 				Image:           service.Image,
 				ImagePullPolicy: v1.PullAlways,
 				Env:             ConvertEnvVars(service.Environment.Vars),
+				EnvFrom:         service.mountSecret(),
 				VolumeMounts: []v1.VolumeMount{
 					{
 						Name:      ConfigVolumeName,
@@ -471,6 +473,21 @@ func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) {
 			p.Containers[i].Env = append(p.Containers[i].Env, requiredEnvVars...)
 		}
 	}
+}
+
+func (service *Service) mountSecret() []v1.EnvFromSource {
+	if service.Environment.Secrets != nil && len(service.Environment.Secrets) > 0 {
+		return []v1.EnvFromSource{
+			{
+				SecretRef: &v1.SecretEnvSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: service.Name,
+					},
+				},
+			},
+		}
+	}
+	return nil
 }
 
 // GetSupervisorPath returns the appropriate supervisor path
