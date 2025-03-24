@@ -21,6 +21,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/goccy/go-yaml"
 	v1 "k8s.io/api/core/v1"
@@ -511,6 +512,6 @@ func (service *Service) HasReplicas() bool {
 
 // GenerateDeterministicString creates a fixed "random" string based on input
 func GenerateDeterministicString(input string) string {
-	hash := sha256.Sum256([]byte(input))                   // Hash the input
-	return base64.URLEncoding.EncodeToString(hash[:])[:10] // Take first 10 chars
+	hash := sha256.Sum256([]byte(input))                                    // Hash the input
+	return strings.ToLower(base64.URLEncoding.EncodeToString(hash[:])[:10]) // Take first 10 chars
 }
