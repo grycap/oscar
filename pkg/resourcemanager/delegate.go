@@ -787,7 +787,7 @@ func getClusterStatus(service *types.Service) {
 				if dist >= 0 {
 					fmt.Println("Resources available in ClusterID", replica.ClusterID)
 					if service.Delegation == "random" {
-						randPriority := rand.Intn(noDelegateCode)
+						randPriority := rand.Intn(noDelegateCode)          // #nosec
 						service.Replicas[id].Priority = uint(randPriority) // #nosec G115
 						//replica.Priority = uint(randPriority)
 						fmt.Println("Priority ", service.Replicas[id].Priority, " with ", service.Delegation, " delegation")
