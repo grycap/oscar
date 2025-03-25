@@ -227,7 +227,20 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				jobLogger.Printf("unable to delegate job. Error: %v\n", err)
 			}
 		}
+		podSpec.Volumes = append(podSpec.Volumes, v1.Volume{
+			Name: "minio-user-credentials",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: auth.FormatUID(uid),
+				},
+			},
+		})
 
+		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
+			Name:      "minio-user-credentials",
+			ReadOnly:  true,
+			MountPath: "/opt/.credentials",
+		})
 		// Create job definition
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
