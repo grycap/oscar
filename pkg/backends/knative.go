@@ -100,6 +100,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 	if err != nil {
 		return err
 	}
+
 	// Create the configMap with FDL and user-script
 	err = createServiceConfigMap(&service, kn.namespace, kn.kubeClientset)
 	if err != nil {
@@ -246,6 +247,7 @@ func (kn *KnativeBackend) DeleteService(service types.Service) error {
 	if err := kn.knClientset.ServingV1().Services(kn.namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		return err
 	}
+
 	// Delete the service's configMap
 	if delErr := deleteServiceConfigMap(name, kn.namespace, kn.kubeClientset); delErr != nil {
 		log.Println(delErr.Error())

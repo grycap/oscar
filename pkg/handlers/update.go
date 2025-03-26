@@ -83,7 +83,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				for _, vo := range cfg.OIDCGroups {
 					if vo == newService.VO {
 						authHeader := c.GetHeader("Authorization")
-						err := checkIdentity(&newService, cfg, authHeader)
+						err := checkIdentity(&newService, authHeader)
 						if err != nil {
 							c.String(http.StatusBadRequest, fmt.Sprintln(err))
 						}
@@ -106,7 +106,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				// Split buckets and folders from path
 				splitPath := strings.SplitN(path, "/", 2)
 				// If isolation level was USER delete all private buckets
-				if oldService.IsolationLevel == "USER" {
+				if strings.ToUpper(oldService.IsolationLevel) == "USER" {
 					err = updatePrivateBuckets(oldService, minIOAdminClient, s3Client)
 					if err != nil {
 						return
@@ -122,7 +122,13 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 					newService.BucketList = newBucketList
 				}
-
+				secretName := newService.Name + "-" + types.GenerateDeterministicString(newService.Name)
+				if utils.SecretExists(secretName, cfg.ServicesNamespace, back.GetKubeClientset()) {
+					secretsErr := utils.UpdateSecretData(secretName, cfg.ServicesNamespace, newService.Environment.Secrets, back.GetKubeClientset())
+					if secretsErr != nil {
+						c.String(http.StatusInternalServerError, "Error updating asociated secret: %v", secretsErr)
+					}
+				}
 				// Update the group with allowe users, it empthy and add them again
 				err = updateGroup(splitPath[0], oldService, &newService, minIOAdminClient, s3Client)
 				if err != nil {

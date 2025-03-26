@@ -61,7 +61,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			service.Owner = "cluster_admin"
 			createLogger.Printf("Creating service '%s' for user '%s'", service.Name, service.Owner)
 		}
-
 		if err := c.ShouldBindJSON(&service); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
@@ -71,7 +70,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		checkValues(&service, cfg)
 		// Check if users in allowed_users have a MinIO associated user
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-
 		// Service is created by an EGI user
 		if !isAdminUser {
 			uid, err := auth.GetUIDFromContext(c)
@@ -95,7 +93,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			if service.VO != "" {
 				for _, vo := range cfg.OIDCGroups {
 					if vo == service.VO {
-						err := checkIdentity(&service, cfg, authHeader)
+						err := checkIdentity(&service, authHeader)
 						if err != nil {
 							c.String(http.StatusBadRequest, fmt.Sprintln(err))
 							return
@@ -108,7 +106,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					var notFound bool = true
 					for _, vo := range cfg.OIDCGroups {
 						service.VO = vo
-						err := checkIdentity(&service, cfg, authHeader)
+						err := checkIdentity(&service, authHeader)
 						fmt.Println(vo)
 						if err != nil {
 							fmt.Println(err)
@@ -180,6 +178,19 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 
 			}
+		}
+		if len(service.Environment.Secrets) > 0 {
+			secretName := service.Name + "-" + types.GenerateDeterministicString(service.Name)
+			if utils.SecretExists(secretName, cfg.ServicesNamespace, back.GetKubeClientset()) {
+				c.String(http.StatusConflict, "A secret with the given name already exists")
+			}
+			secretsErr := utils.CreateSecret(secretName, cfg.ServicesNamespace, service.Environment.Secrets, back.GetKubeClientset())
+			if secretsErr != nil {
+				c.String(http.StatusConflict, "Error creating secrets for service: %v", secretsErr)
+			}
+
+			// Empty the secrets content from the Configmap
+			service.Environment.Secrets = map[string]string{}
 		}
 
 		// Create the service
@@ -492,7 +503,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				}
 			}
 
-			if service.IsolationLevel == "USER" && len(service.BucketList) > 0 {
+			if strings.ToUpper(service.IsolationLevel) == "USER" && len(service.BucketList) > 0 {
 				for _, b := range service.BucketList {
 					_, err := s3Client.PutObject(&s3.PutObjectInput{
 						Bucket: aws.String(b),
@@ -627,15 +638,21 @@ func getProviderInfo(rawInfo string) (string, string) {
 	return provID, provName
 }
 
-func checkIdentity(service *types.Service, cfg *types.Config, authHeader string) error {
-	oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
+func checkIdentity(service *types.Service, authHeader string) error {
 	rawToken := strings.TrimPrefix(authHeader, "Bearer ")
-
-	hasVO, err := oidcManager.UserHasVO(rawToken, service.VO)
-
+	issuer, err := auth.GetIssuerFromToken(rawToken)
 	if err != nil {
 		return err
 	}
+	oidcManager := auth.ClusterOidcManagers[issuer]
+	if oidcManager == nil {
+		return err
+	}
+	ui, err := oidcManager.GetUserInfo(rawToken)
+	if err != nil {
+		return err
+	}
+	hasVO := oidcManager.UserHasVO(ui, service.VO)
 
 	if !hasVO {
 		return fmt.Errorf("this user isn't enrrolled on the vo: %v", service.VO)

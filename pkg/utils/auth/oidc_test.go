@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
 
@@ -52,36 +53,26 @@ func TestNewOIDCManager(t *testing.T) {
 	}
 }
 
-func TestGetUserInfo(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
-		fmt.Println(hreq.URL.Path)
-		rw.Header().Set("Content-Type", "application/json")
-		if hreq.URL.Path == "/.well-known/openid-configuration" {
-			rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `", "userinfo_endpoint": "http://` + hreq.Host + `/userinfo"}`))
-		} else if hreq.URL.Path == "/userinfo" {
-			rw.Write([]byte(`{"sub": "test-subject", "eduperson_entitlement": ["urn:mace:egi.eu:group:group1"]}`))
-		}
-	}))
-
-	issuer := server.URL
-	subject := "test-subject"
-	groups := []string{"group1", "group2"}
-
-	oidcManager, err := NewOIDCManager(issuer, subject, groups)
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
+func TestUserHasVO(t *testing.T) {
+	oidcManager := &oidcManager{
+		groups: []string{"group1", "group2"},
 	}
 
-	rawToken := "test-token"
-	ui, err := oidcManager.GetUserInfo(rawToken)
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
+	ui := &userInfo{
+		Subject: "test-subject",
+		Groups:  []string{"group1"},
 	}
-	if ui.Subject != "test-subject" {
-		t.Errorf("expected subject to be %v, got %v", "test-subject", ui.Subject)
+
+	// Test when the user has the VO
+	hasVO := oidcManager.UserHasVO(ui, "group1")
+	if !hasVO {
+		t.Errorf("expected user to have VO 'group1'")
 	}
-	if len(ui.Groups) != 1 || ui.Groups[0] != "group1" {
-		t.Errorf("expected groups to be %v, got %v", []string{"group1"}, ui.Groups)
+
+	// Test when the user does not have the VO
+	hasVO = oidcManager.UserHasVO(ui, "group3")
+	if hasVO {
+		t.Errorf("expected user to not have VO 'group3'")
 	}
 }
 
@@ -91,44 +82,139 @@ func TestIsAuthorised(t *testing.T) {
 		if hreq.URL.Path == "/.well-known/openid-configuration" {
 			rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `", "userinfo_endpoint": "http://` + hreq.Host + `/userinfo"}`))
 		} else if hreq.URL.Path == "/userinfo" {
-			rw.Write([]byte(`{"sub": "user1@egi.eu", "eduperson_entitlement": ["urn:mace:egi.eu:group:group1"]}`))
+			rw.Write([]byte(`{"sub": "123433g", "group_membership": ["/group/group1"]}`))
 		}
 	}))
 
 	issuer := server.URL
-	subject := "user1@egi.eu"
+	subject := "123433g"
+	groups := []string{"group1"}
+
+	oidcManager, err := NewOIDCManager(issuer, subject, groups)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	oidcManager.config.InsecureSkipSignatureCheck = true
+
+	claims1 := jwt.MapClaims{
+		"iss":              issuer,
+		"sub":              subject,
+		"exp":              time.Now().Add(1 * time.Hour).Unix(),
+		"iat":              time.Now().Unix(),
+		"group_membership": []string{"group1"},
+	}
+
+	token1 := GetToken(claims1)
+	fmt.Println(token1)
+	// Test when the token is authorised
+	if !oidcManager.IsAuthorised(token1) {
+		t.Errorf("expected token1 to be authorised")
+	}
+	claims2 := jwt.MapClaims{
+		"iss":              "asdfas2123",
+		"sub":              subject,
+		"exp":              time.Now().Add(1 * time.Hour).Unix(),
+		"iat":              time.Now().Unix(),
+		"group_membership": []string{"group2"},
+	}
+	// Test when the token is not authorised
+	token2 := GetToken(claims2)
+	fmt.Println(token2)
+	if oidcManager.IsAuthorised(token2) {
+		t.Errorf("expected token2 to not be authorised")
+	}
+}
+
+func TestGetGroupsEGI(t *testing.T) {
+	urns := []string{
+		"urn:mace:egi.eu:group:group1",
+		"urn:mace:egi.eu:group:group2",
+	}
+
+	groups := getGroupsEGI(urns)
+
+	if len(groups) != 2 {
+		t.Errorf("expected groups length to be 2, got %d", len(groups))
+	}
+
+	if groups[0] != "group1" || groups[1] != "group2" {
+		t.Errorf("expected groups to be [group1, group2], got %v", groups)
+	}
+}
+
+func TestGetGroupsKeycloak(t *testing.T) {
+	memberships := []string{
+		"/group/group1",
+		"/group/group2",
+	}
+
+	groups := getGroupsKeycloak(memberships)
+
+	if len(groups) != 2 {
+		t.Errorf("expected groups length to be 2, got %d", len(groups))
+	}
+
+	if groups[0] != "group1" || groups[1] != "group2" {
+		t.Errorf("expected groups to be [group1, group2], got %v", groups)
+	}
+}
+
+func TestGetIssuerFromToken(t *testing.T) {
+	claims := jwt.MapClaims{
+		"iss":                   "http://example.com",
+		"sub":                   "test-subject",
+		"exp":                   time.Now().Add(1 * time.Hour).Unix(),
+		"iat":                   time.Now().Unix(),
+		"eduperson_entitlement": []string{"/group/group1"},
+	}
+	rawToken := GetToken(claims)
+
+	issuer, err := GetIssuerFromToken(rawToken)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	if issuer != "http://example.com" {
+		t.Errorf("expected issuer to be http://example.com, got %v", issuer)
+	}
+}
+
+func TestGetUserInfo(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		rw.Header().Set("Content-Type", "application/json")
+		if hreq.URL.Path == "/.well-known/openid-configuration" {
+			rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `", "userinfo_endpoint": "http://` + hreq.Host + `/userinfo"}`))
+		} else if hreq.URL.Path == "/userinfo" {
+			rw.Write([]byte(`{"sub": "user1@egi.eu", "group_membership": ["/group/group1"]}`))
+		}
+	}))
+
+	issuer := server.URL
+	subject := "test-subject"
 	groups := []string{"group1", "group2"}
+
+	claims := jwt.MapClaims{
+		"iss":              issuer,
+		"sub":              subject,
+		"exp":              time.Now().Add(1 * time.Hour).Unix(),
+		"iat":              time.Now().Unix(),
+		"group_membership": []string{"/group/group1"},
+	}
 
 	oidcManager, err := NewOIDCManager(issuer, subject, groups)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
 
-	rawToken := GetToken(issuer, subject)
-	oidcManager.config.InsecureSkipSignatureCheck = true
-
-	if !oidcManager.IsAuthorised(rawToken) {
-		t.Errorf("expected token to be authorised")
-	}
-
-	resg1, err2 := oidcManager.UserHasVO(rawToken, "group1")
-	if err2 != nil {
+	rawToken := GetToken(claims)
+	ui, err := oidcManager.GetUserInfo(rawToken)
+	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
-	if !resg1 {
-		t.Errorf("expected user to have VO")
-	}
-	resg2, err3 := oidcManager.UserHasVO(rawToken, "group2")
-	if err3 != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
-	if resg2 {
-		t.Errorf("expected user not to have VO")
-	}
 
-	uid, _ := oidcManager.GetUID(rawToken)
-	if uid != subject {
-		t.Errorf("expected uid to be %v, got %v", subject, uid)
+	expectedGroups := []string{"group1"}
+	if !reflect.DeepEqual(ui.Groups, expectedGroups) {
+		t.Errorf("expected Groups to be %v, got %v", expectedGroups, ui.Groups)
 	}
 }
 
@@ -137,7 +223,7 @@ func TestGetOIDCMiddleware(t *testing.T) {
 		if hreq.URL.Path == "/.well-known/openid-configuration" {
 			rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `", "userinfo_endpoint": "http://` + hreq.Host + `/userinfo"}`))
 		} else if hreq.URL.Path == "/userinfo" {
-			rw.Write([]byte(`{"sub": "user@egi.eu", "eduperson_entitlement": ["urn:mace:egi.eu:group:group1"]}`))
+			rw.Write([]byte(`{"sub": "123433g", "group_membership": ["/group/group1"]}`))
 		} else if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
 			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
@@ -153,19 +239,28 @@ func TestGetOIDCMiddleware(t *testing.T) {
 			Endpoint: server.URL,
 			Verify:   false,
 		},
+		OIDCEnable:       true,
+		OIDCSubject:      "123433g",
+		OIDCValidIssuers: []string{server.URL},
+		OIDCGroups:       []string{"group1", "group2"},
 	}
 	minIOAdminClient, _ := utils.MakeMinIOAdminClient(&cfg)
 	issuer := server.URL
-	subject := "user@egi.eu"
-	groups := []string{"group1", "group2"}
 
 	oidcConfig := &oidc.Config{
 		InsecureSkipSignatureCheck: true,
 		SkipClientIDCheck:          true,
 	}
-	middleware := getOIDCMiddleware(kubeClientset, minIOAdminClient, issuer, subject, groups, oidcConfig)
+	middleware := getOIDCMiddleware(kubeClientset, minIOAdminClient, &cfg, oidcConfig)
 	if middleware == nil {
 		t.Errorf("expected middleware to be non-nil")
+	}
+	validClaims := jwt.MapClaims{
+		"iss":                   issuer,
+		"sub":                   cfg.OIDCSubject,
+		"exp":                   time.Now().Add(1 * time.Hour).Unix(),
+		"iat":                   time.Now().Unix(),
+		"eduperson_entitlement": []string{"/group/group1"},
 	}
 
 	scenarios := []struct {
@@ -176,11 +271,11 @@ func TestGetOIDCMiddleware(t *testing.T) {
 		{
 			name:  "invalid-token",
 			token: "invalid-token",
-			code:  http.StatusUnauthorized,
+			code:  http.StatusBadRequest,
 		},
 		{
 			name:  "valid-token",
-			token: GetToken(issuer, subject),
+			token: GetToken(validClaims),
 			code:  http.StatusOK,
 		},
 	}
@@ -205,15 +300,9 @@ func TestGetOIDCMiddleware(t *testing.T) {
 	}
 }
 
-func GetToken(issuer string, subject string) string {
-	claims := jwt.MapClaims{
-		"iss": issuer,
-		"sub": subject,
-		"exp": time.Now().Add(1 * time.Hour).Unix(),
-		"iat": time.Now().Unix(),
-	}
+func GetToken(claims jwt.MapClaims) string {
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 1024)
-	rawToken, _ := token.SignedString(privateKey)
-	return rawToken
+	signedToken, _ := token.SignedString(privateKey)
+	return signedToken
 }

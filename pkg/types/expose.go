@@ -176,11 +176,11 @@ func ListExpose(kubeClientset kubernetes.Interface, cfg *Config) error {
 	}
 	if err2 != nil {
 		ExposeLogger.Printf("WARNING: %v\n", err2)
-		return err
+		return err2
 	}
 	if err3 != nil {
 		ExposeLogger.Printf("WARNING: %v\n", err3)
-		return err
+		return err3
 	}
 	fmt.Println(deploy, hpa, services, ingress)
 	return nil

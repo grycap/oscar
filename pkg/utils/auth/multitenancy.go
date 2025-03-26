@@ -21,15 +21,19 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"log"
+	"os"
 	"regexp"
 
-	v1 "k8s.io/api/core/v1"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
 const ServicesNamespace = "oscar-svc"
 const ServiceLabelLength = 8
+
+var mcLogger = log.New(os.Stdout, "[OIDC-AUTH] ", log.Flags())
 
 type MultitenancyConfig struct {
 	kubeClientset kubernetes.Interface
@@ -116,27 +120,17 @@ func (mc *MultitenancyConfig) CheckUsersInCache(uids []string) []string {
 }
 
 func (mc *MultitenancyConfig) CreateSecretForOIDC(uid string, sk string) error {
-
-	secret := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      FormatUID(uid),
-			Namespace: ServicesNamespace,
-		},
-		StringData: map[string]string{
-			"oidc_uid":  uid,
-			"accessKey": uid,
-			"secretKey": sk,
-		},
+	secretData := map[string]string{
+		"oidc_uid":  uid,
+		"accessKey": uid,
+		"secretKey": sk,
 	}
-
-	_, err := mc.kubeClientset.CoreV1().Secrets(ServicesNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
-
+	err := utils.CreateSecret(FormatUID(uid), ServicesNamespace, secretData, mc.kubeClientset)
 	if err != nil {
 		return err
 	}
 
 	mc.UpdateCache(uid)
-
 	return nil
 }
 
@@ -169,5 +163,10 @@ func GenerateRandomKey(length int) (string, error) {
 func FormatUID(uid string) string {
 	uidr, _ := regexp.Compile("[0-9a-z]+@")
 	idx := uidr.FindStringIndex(uid)
+	// If the regex is not matched assume it is not an EGI uid
+	// and return the original string
+	if idx == nil {
+		return uid
+	}
 	return uid[0 : idx[1]-1]
 }

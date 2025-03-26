@@ -104,30 +104,32 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		//  If isn't service token check if it is an oidc token
 		var uidFromToken string
 		if len(rawToken) != tokenLength {
-			oidcManager, _ := auth.NewOIDCManager(cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
 
+			issuer, err := auth.GetIssuerFromToken(rawToken)
+			if err != nil {
+				c.String(http.StatusBadGateway, fmt.Sprintf("%v", err))
+			}
+			oidcManager := auth.ClusterOidcManagers[issuer]
+			if oidcManager == nil {
+				c.String(http.StatusBadRequest, fmt.Sprintf("Error getting oidc manager for issuer '%s'", issuer))
+				return
+			}
+
+			ui, err := oidcManager.GetUserInfo(rawToken)
+			uidFromToken = ui.Subject
 			if !oidcManager.IsAuthorised(rawToken) {
 				c.Status(http.StatusUnauthorized)
 				return
 			}
-
-			hasVO, err := oidcManager.UserHasVO(rawToken, service.VO)
 
 			if err != nil {
 				c.String(http.StatusInternalServerError, err.Error())
 				return
 			}
 
-			if !hasVO {
+			if !oidcManager.UserHasVO(ui, service.VO) {
 				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
 				return
-			}
-
-			// Get UID from token
-			var uidErr error
-			uidFromToken, uidErr = oidcManager.GetUID(rawToken)
-			if uidErr != nil {
-				jobLogger.Println("WARNING:", uidErr)
 			}
 		}
 
@@ -225,7 +227,20 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				jobLogger.Printf("unable to delegate job. Error: %v\n", err)
 			}
 		}
+		podSpec.Volumes = append(podSpec.Volumes, v1.Volume{
+			Name: "minio-user-credentials",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: auth.FormatUID(uid),
+				},
+			},
+		})
 
+		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
+			Name:      "minio-user-credentials",
+			ReadOnly:  true,
+			MountPath: "/opt/.credentials",
+		})
 		// Create job definition
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{

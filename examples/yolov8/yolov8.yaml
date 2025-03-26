@@ -14,4 +14,4 @@ functions:
        path: yolov8/input
      output:
      - storage_provider: minio.default
-       path: yolov8/output
+       path: yolov8/output
