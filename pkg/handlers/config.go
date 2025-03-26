@@ -46,7 +46,7 @@ func MakeConfigHandler(cfg *types.Config) gin.HandlerFunc {
 
 			uid, err := auth.GetUIDFromContext(c)
 			if err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+				c.Status(http.StatusInternalServerError)
 			}
 
 			mc, err := auth.GetMultitenancyConfigFromContext(c)

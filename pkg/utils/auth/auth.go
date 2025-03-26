@@ -110,7 +110,7 @@ func GetLoggerMiddleware() gin.HandlerFunc {
 func GetUIDFromContext(c *gin.Context) (string, error) {
 	uidOrigin, uidExists := c.Get("uidOrigin")
 	if !uidExists {
-		return "", fmt.Errorf("missing EGI user uid")
+		return "", fmt.Errorf("missing user identificator")
 	}
 	uid, uidParsed := uidOrigin.(string)
 	if !uidParsed {
