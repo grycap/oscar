@@ -168,6 +168,7 @@ storage_providers:
 | Field                                | Description                          |
 | -------------------------------------| -------------------------------------|
 |`Variables` </br> *map[string]string* | Map to define the environment variables that will be available in the service container |
+|`Secrets` </br> *map[string]string* | Map to define the secret environment variables that will be available in the service container |
 
 ## StorageProviders
 
