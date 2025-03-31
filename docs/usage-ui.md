@@ -163,7 +163,7 @@ located on the right.
 
 ![logs view 2](images/usage/usage-17.png)
 
-The view also features options to to delete one or all logs.
+The view also features options to delete one or all logs.
 
 ## Downloading files from MinIO
 
