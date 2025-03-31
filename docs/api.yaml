@@ -441,6 +441,10 @@ components:
               type: object
               additionalProperties:
                 type: string
+            Secrets:
+              type: object
+              additionalProperties:
+                type: string
         annotations:
           type: object
           additionalProperties:
