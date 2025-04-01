@@ -55,15 +55,11 @@ version of the image in the registry every time a job is launched.
 
 ![new service](images/usage/usage-03.png)
 
-Next, the credentials of the storage providers to be used must be introduced.
-As the platform already has a MinIO deployment to operate, it is not necessary
-to enter its credentials for using it.
+Next, we need to specify input and output storage parameters. You can utilize one or multiple storage providers supported by the platform, like MinIO, Onedata, and Amazon S3.
 
-![add storage provider 1](images/usage/usage-04.png)
+As we use the service creation form provided by the web interface to create the service, we will only have access to the default MinIO storage provided with the platform. In order to configure a more complicated workflow using multiple storage providers, you need to use an FDL file to define the service. 
 
-Multiple MinIO, Onedata and Amazon S3 storage providers can be used. Although in order to use providers distinct from MinIO, you need to create the service through FDL file and not the form provided by the web interface.
-
-In this section, you must first choose the paths of the storage provider to be
+In this step, you must first choose the paths of the storage provider to be
 used as source of events, i.e. the input bucket and/or folder that will
 trigger the service.
 
@@ -79,7 +75,7 @@ to filter the files uploaded to each path by name.
 
 ![add output 1](images/usage/usage-06.png)
 
-***Note that the resulting files can be stored in several storage providers distinct to MinIO, but in order to do that, you must create the service through the FDL file and not the form provided by the web interface.***
+***Note that the resulting files can be stored in several storage providers other than MinIO, but in order to do that, you must create the service through the FDL file.***
 
 ![service created](images/usage/usage-07.png)
 
@@ -87,7 +83,7 @@ After clicking the "Create" button we will see the new service edit menu.
 
 ![service created](images/usage/usage-08.png)
 
-Also we will able to see it on the main
+Also, we will be able to see it on the main
 view after a few seconds.
 
 ![service created](images/usage/usage-09.png)
@@ -130,11 +126,11 @@ you will be able to see their content, upload and download files.
 
 ![minio storage](images/usage/usage-11.png)
 
-To upload files, you can just drag and drop them into the folder.
+To upload files, you simply can just drag and drop them into the folder.
 
 ![upload input file](images/usage/usage-12.png)
 
-he file will be uploaded, raising an event that will trigger the service.
+The file will be uploaded, raising an event that will trigger the service.
 
 ![input file uploaded](images/usage/usage-13.png)
 
@@ -147,7 +143,7 @@ such as images.
 
 When files are being processed by a service, it is important to know their
 status, as well as to observe the execution logs for testing. For this
-purpose, OSCAR includes a log view, accessible by clicking on the "LOGS"
+purpose, OSCAR includes a log view, accessible by clicking on the "Logs"
 button in a service from the main view.
 
 ![logs button](images/usage/usage-15.png)
