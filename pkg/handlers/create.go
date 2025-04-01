@@ -274,19 +274,27 @@ func checkValues(service *types.Service, cfg *types.Config) {
 		service.Annotations = make(map[string]string)
 	}
 
-	// Add the default MinIO provider
+	// Add the default MinIO provider without credentials
+	defaultMinIOInstanceInfo := &types.MinIOProvider{
+		Endpoint:  cfg.MinIOProvider.Endpoint,
+		Verify:    cfg.MinIOProvider.Verify,
+		AccessKey: "hidden",
+		SecretKey: "hidden",
+		Region:    cfg.MinIOProvider.Region,
+	}
+
 	if service.StorageProviders != nil {
 		if service.StorageProviders.MinIO != nil {
-			service.StorageProviders.MinIO[types.DefaultProvider] = cfg.MinIOProvider
+			service.StorageProviders.MinIO[types.DefaultProvider] = defaultMinIOInstanceInfo
 		} else {
 			service.StorageProviders.MinIO = map[string]*types.MinIOProvider{
-				types.DefaultProvider: cfg.MinIOProvider,
+				types.DefaultProvider: defaultMinIOInstanceInfo,
 			}
 		}
 	} else {
 		service.StorageProviders = &types.StorageProviders{
 			MinIO: map[string]*types.MinIOProvider{
-				types.DefaultProvider: cfg.MinIOProvider,
+				types.DefaultProvider: defaultMinIOInstanceInfo,
 			},
 		}
 	}
