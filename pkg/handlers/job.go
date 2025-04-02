@@ -52,8 +52,10 @@ var (
 )
 
 const (
-	SupervisorPath  = "./supervisor"
-	NodeSelectorKey = "kubernetes.io/hostname"
+	SupervisorPath        = "./supervisor"
+	NodeSelectorKey       = "kubernetes.io/hostname"
+	MinIODefaultPath      = "/var/run/secrets/providers/minio.default"
+	MinIOSecretVolumeName = "minio-user"
 
 	// Annotations for InterLink nodes
 	InterLinkDNSPolicy          = "ClusterFirst"
@@ -141,10 +143,11 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		}
 
 		// Check if it has the MinIO event format
-		uid, sourceIPAddress, err := decodeEventBytes(eventBytes)
+		requestUserUID, sourceIPAddress, err := decodeEventBytes(eventBytes)
 		if err != nil {
 			// Check if the request was made with OIDC token to get user UID
 			if uidFromToken != "" {
+				requestUserUID = uidFromToken
 				c.Set("uidOrigin", uidFromToken)
 			} else {
 				// Set as nil string if unable to get an UID
@@ -153,10 +156,26 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			}
 		} else {
 			c.Set("IPAddress", sourceIPAddress)
-			c.Set("uidOrigin", uid)
+			c.Set("uidOrigin", requestUserUID)
 		}
 
 		c.Next()
+
+		// Mount user MinIO credentials
+		podSpec.Volumes = append(podSpec.Volumes, v1.Volume{
+			Name: MinIOSecretVolumeName,
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: auth.FormatUID(requestUserUID),
+				},
+			},
+		})
+
+		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
+			Name:      MinIOSecretVolumeName,
+			ReadOnly:  true,
+			MountPath: MinIODefaultPath,
+		})
 
 		// Initialize event envVar and args var
 		var event v1.EnvVar
@@ -227,20 +246,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				jobLogger.Printf("unable to delegate job. Error: %v\n", err)
 			}
 		}
-		podSpec.Volumes = append(podSpec.Volumes, v1.Volume{
-			Name: "minio-user-credentials",
-			VolumeSource: v1.VolumeSource{
-				Secret: &v1.SecretVolumeSource{
-					SecretName: auth.FormatUID(uid),
-				},
-			},
-		})
 
-		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
-			Name:      "minio-user-credentials",
-			ReadOnly:  true,
-			MountPath: "/opt/.credentials",
-		})
 		// Create job definition
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
