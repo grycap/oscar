@@ -124,7 +124,7 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 		}
 		oidcManager := ClusterOidcManagers[iss]
 		if oidcManager == nil {
-			c.String(http.StatusBadRequest, fmt.Sprintf("Error getting oidc manager for issuer '%s'", iss))
+			c.String(http.StatusUnauthorized, fmt.Sprintf("'%s' is not listed as an authorized issuer", iss))
 			return
 		}
 		// Check the token
