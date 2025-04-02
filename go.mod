@@ -2,8 +2,6 @@ module github.com/grycap/oscar/v3
 
 go 1.21
 
-toolchain go1.21.4
-
 require (
 	github.com/aws/aws-sdk-go v1.44.189
 	github.com/gin-gonic/gin v1.9.1
@@ -47,7 +45,7 @@ require (
 	github.com/barkimedes/go-deepcopy v0.0.0-20220514131651-17c30cfc62df
 	github.com/coreos/go-oidc/v3 v3.5.0
 	github.com/foomo/htpasswd v0.0.0-20200116085101-e3a90e78da9c
-	github.com/golang-jwt/jwt/v4 v4.5.1
+	github.com/golang-jwt/jwt/v4 v4.5.2
 	k8s.io/metrics v0.29.2
 	knative.dev/serving v0.36.0
 )
@@ -74,7 +72,7 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-containerregistry v0.13.0 // indirect
