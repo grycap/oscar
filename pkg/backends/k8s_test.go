@@ -113,28 +113,11 @@ func TestKubeGetInfo(t *testing.T) {
 }
 
 func TestKubeListServices(t *testing.T) {
-	validPodTemplateListReactor := func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
-		podTemplateList := &v1.PodTemplateList{
-			Items: []v1.PodTemplate{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test",
-						Namespace: "testnamespace",
-					},
-					Template: v1.PodTemplateSpec{},
-				},
-			},
-		}
-		return true, podTemplateList, nil
-	}
 
 	t.Run("valid list", func(t *testing.T) {
 		clientset := fake.NewSimpleClientset()
 
 		back := MakeKubeBackend(clientset, testConfig)
-
-		// Return a valid PodTemplateList
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("list", "podtemplates", validPodTemplateListReactor)
 
 		// Return a valid configMap
 		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReaction)
@@ -146,28 +129,10 @@ func TestKubeListServices(t *testing.T) {
 		}
 	})
 
-	t.Run("listing podTemplates throws an error", func(t *testing.T) {
-		clientset := fake.NewSimpleClientset()
-
-		back := MakeKubeBackend(clientset, testConfig)
-
-		// Return an error listing  PodTemplates
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("list", "podtemplates", errorReaction)
-
-		// Call
-		_, err := back.ListServices()
-		if err == nil {
-			t.Error("expecting error, got: nil")
-		}
-	})
-
 	t.Run("getServiceFromFDL throws error getting configMap", func(t *testing.T) {
 		clientset := fake.NewSimpleClientset()
 
 		back := MakeKubeBackend(clientset, testConfig)
-
-		// Return a valid PodTemplateList
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("list", "podtemplates", validPodTemplateListReactor)
 
 		// Return an error getting the configMap
 		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", errorReaction)
@@ -197,9 +162,6 @@ func TestKubeListServices(t *testing.T) {
 			}
 			return true, validCM, nil
 		}
-
-		// Return a valid PodTemplateList
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("list", "podtemplates", validPodTemplateListReactor)
 
 		// Return a valid configMap with invalid FDL
 		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapWithInvalidFDLReactor)

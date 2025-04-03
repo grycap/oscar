@@ -83,8 +83,8 @@ base64 input.png | curl -X POST -H "Authorization: Bearer <TOKEN>" \
 
 ## Service access tokens
 
-As detailed in the [API specification](api.md), invocation paths require the
-service access token in the request header for authentication. Service access
+As detailed in the [API specification](api.md), invocation paths require either the
+service access token or the Access Token of the user when the cluster is integrated with EGI Check-in, in the request header for authentication (any of them is valid). Service access
 tokens are auto-generated in service creation and update, and MinIO eventing
 system is automatically configured to use them for event-driven file
 processing. Tokens can be obtained through the API, using the
