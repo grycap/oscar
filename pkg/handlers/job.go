@@ -54,7 +54,7 @@ var (
 const (
 	SupervisorPath        = "./supervisor"
 	NodeSelectorKey       = "kubernetes.io/hostname"
-	MinIOCredentialsPath  = "/var/run/secrets/providers/minio.default"
+	MinIODefaultPath      = "/var/run/secrets/providers/minio.default"
 	MinIOSecretVolumeName = "minio-user"
 
 	// Annotations for InterLink nodes
@@ -174,7 +174,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
 			Name:      MinIOSecretVolumeName,
 			ReadOnly:  true,
-			MountPath: MinIOCredentialsPath,
+			MountPath: MinIODefaultPath,
 		})
 
 		// Initialize event envVar and args var

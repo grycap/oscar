@@ -274,19 +274,27 @@ func checkValues(service *types.Service, cfg *types.Config) {
 		service.Annotations = make(map[string]string)
 	}
 
-	// Add the default MinIO provider
+	// Add the default MinIO provider without credentials
+	defaultMinIOInstanceInfo := &types.MinIOProvider{
+		Endpoint:  cfg.MinIOProvider.Endpoint,
+		Verify:    cfg.MinIOProvider.Verify,
+		AccessKey: "hidden",
+		SecretKey: "hidden",
+		Region:    cfg.MinIOProvider.Region,
+	}
+
 	if service.StorageProviders != nil {
 		if service.StorageProviders.MinIO != nil {
-			service.StorageProviders.MinIO[types.DefaultProvider] = cfg.MinIOProvider
+			service.StorageProviders.MinIO[types.DefaultProvider] = defaultMinIOInstanceInfo
 		} else {
 			service.StorageProviders.MinIO = map[string]*types.MinIOProvider{
-				types.DefaultProvider: cfg.MinIOProvider,
+				types.DefaultProvider: defaultMinIOInstanceInfo,
 			}
 		}
 	} else {
 		service.StorageProviders = &types.StorageProviders{
 			MinIO: map[string]*types.MinIOProvider{
-				types.DefaultProvider: cfg.MinIOProvider,
+				types.DefaultProvider: defaultMinIOInstanceInfo,
 			},
 		}
 	}
@@ -330,8 +338,8 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			}
 		}
 
-		// Get client for the provider
-		s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
+		// Use admin MinIO client to create the buckets
+		s3Client = cfg.MinIOProvider.GetS3Client()
 
 		path := strings.Trim(in.Path, " /")
 		// Split buckets and folders from path
@@ -460,7 +468,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		case types.MinIOName, types.S3Name:
 			// Use the appropriate client
 			if provName == types.MinIOName {
-				s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
+				s3Client = cfg.MinIOProvider.GetS3Client()
 			} else {
 				s3Client = service.StorageProviders.S3[provID].GetS3Client()
 			}
@@ -549,7 +557,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			// Currently only MinIO/S3 are supported
 			// Use the appropriate client
 			if provName == types.MinIOName {
-				s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
+				s3Client = cfg.MinIOProvider.GetS3Client()
 			} else {
 				s3Client = service.StorageProviders.S3[provID].GetS3Client()
 			}
