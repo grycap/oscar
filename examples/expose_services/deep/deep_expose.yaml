@@ -1,15 +1,19 @@
 functions:
   oscar:
   - oscar-cluster:
-      name: plant
+      name: dogs-breed
       memory: 3Gi
       cpu: '2.0'
-      image: deephdc/deep-oc-plants-classification-tf
+      image: ai4oshub/dogs-breed-detector
       log_level: CRITICAL
-      script: script.sh
+      script: deepscript.sh
+      environment:
+        Variables:
+          basePath: /system/services/dogs-breed/exposed/main
       expose:
         min_scale: 1
         max_scale: 1
         api_port: 5000
+        rewrite_target: true
         cpu_threshold: 90
         set_auth: true

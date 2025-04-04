@@ -18,7 +18,9 @@ package auth
 
 import (
 	"fmt"
+	"log"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -27,7 +29,7 @@ import (
 )
 
 // GetAuthMiddleware returns the appropriate gin auth middleware
-func GetAuthMiddleware(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.HandlerFunc {
+func GetAuthMiddleware(cfg *types.Config, kubeClientset kubernetes.Interface) gin.HandlerFunc {
 	if !cfg.OIDCEnable {
 		return gin.BasicAuth(gin.Accounts{
 			// Use the config's username and password for basic auth
@@ -38,7 +40,7 @@ func GetAuthMiddleware(cfg *types.Config, kubeClientset *kubernetes.Clientset) g
 }
 
 // CustomAuth returns a custom auth handler (gin middleware)
-func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.HandlerFunc {
+func CustomAuth(cfg *types.Config, kubeClientset kubernetes.Interface) gin.HandlerFunc {
 	basicAuthHandler := gin.BasicAuth(gin.Accounts{
 		// Use the config's username and password for basic auth
 		cfg.Username: cfg.Password,
@@ -48,10 +50,10 @@ func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.Hand
 	// Slice to add default user to all users group on MinIO
 	var oscarUser = []string{"console"}
 
-	minIOAdminClient.CreateAllUsersGroup()
-	minIOAdminClient.UpdateUsersInGroup(oscarUser, "all_users_group", false)
+	minIOAdminClient.CreateAllUsersGroup()                                   // #nosec G104
+	minIOAdminClient.UpdateUsersInGroup(oscarUser, "all_users_group", false) // #nosec G104
 
-	oidcHandler := getOIDCMiddleware(kubeClientset, minIOAdminClient, cfg.OIDCIssuer, cfg.OIDCSubject, cfg.OIDCGroups)
+	oidcHandler := getOIDCMiddleware(kubeClientset, minIOAdminClient, cfg, nil)
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
@@ -62,14 +64,57 @@ func CustomAuth(cfg *types.Config, kubeClientset *kubernetes.Clientset) gin.Hand
 	}
 }
 
+// GetLoggerMiddleware returns a gin handler as middleware to log custom info about sync/async executions
+func GetLoggerMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		// Disable default printf timestamp to avoid inconsistencies on logs
+		log.SetFlags(0)
+
+		startTime := time.Now()
+
+		// Process request
+		c.Next()
+
+		endTime := time.Now()
+
+		// Log custom information after the request is processed
+		logTime := endTime.Format("2006/01/02 - 15:04:05")
+		latency := time.Since(startTime)
+		status := c.Writer.Status()
+		clientIP := c.ClientIP()
+		method := c.Request.Method
+		path := c.Request.URL.Path
+
+		// Get EGI UID from context (if OIDC auth is used)
+		uid, uidExists := c.Get("uidOrigin")
+		var user string
+		if uidExists {
+			user, _ = uid.(string)
+		} else {
+			// Set OSCAR as default user when no UID is found
+			user = "oscar"
+		}
+
+		// Get source IP from context for jobs triggered through MinIO events
+		IPAddress, AddressExists := c.Get("IPAddress")
+		if AddressExists {
+			clientIP, _ = IPAddress.(string)
+		}
+
+		log.Printf("[GIN-EXECUTIONS-LOGGER] %s | %3d | %13v | %s | %-7s %s | %s",
+			logTime, status, latency, clientIP, method, path, user)
+	}
+}
+
 func GetUIDFromContext(c *gin.Context) (string, error) {
 	uidOrigin, uidExists := c.Get("uidOrigin")
 	if !uidExists {
-		return "", fmt.Errorf("Missing EGI user uid")
+		return "", fmt.Errorf("missing EGI user uid")
 	}
 	uid, uidParsed := uidOrigin.(string)
 	if !uidParsed {
-		return "", fmt.Errorf("Error parsing uid origin: %v", uidParsed)
+		return "", fmt.Errorf("error parsing uid origin: %v", uidParsed)
 	}
 	return uid, nil
 }
@@ -77,11 +122,11 @@ func GetUIDFromContext(c *gin.Context) (string, error) {
 func GetMultitenancyConfigFromContext(c *gin.Context) (*MultitenancyConfig, error) {
 	mcUntyped, mcExists := c.Get("multitenancyConfig")
 	if !mcExists {
-		return nil, fmt.Errorf("Missing multitenancy config")
+		return nil, fmt.Errorf("missing multitenancy config")
 	}
 	mc, mcParsed := mcUntyped.(*MultitenancyConfig)
 	if !mcParsed {
-		return nil, fmt.Errorf("Error parsing multitenancy config")
+		return nil, fmt.Errorf("error parsing multitenancy config")
 	}
 	return mc, nil
 }

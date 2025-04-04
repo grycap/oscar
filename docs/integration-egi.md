@@ -67,7 +67,7 @@ grant access for all users from that VO.
 
 The static web interface of OSCAR has been integrated with EGI Check-in and
 published in [ui.oscar.grycap.net](https://ui.oscar.grycap.net) to facilitate
-the authorization of users. To login through EGI Checkín using OIDC tokens,
+the authorization of users. To login through EGI Check-In using OIDC tokens,
 users only have to put the endpoint of its OSCAR cluster and click on the
 "EGI CHECK-IN" button.
 

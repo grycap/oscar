@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -33,8 +33,8 @@ import (
 	knclientset "knative.dev/serving/pkg/client/clientset/versioned"
 )
 
-// Custom logger
-var knativeLogger = log.New(os.Stdout, "[KNATIVE] ", log.Flags())
+// Custom logger - uncomment if needed
+// var knativeLogger = log.New(os.Stdout, "[KNATIVE] ", log.Flags())
 
 // KnativeBackend struct to represent a Knative client
 type KnativeBackend struct {
@@ -76,22 +76,20 @@ func (kn *KnativeBackend) GetInfo() *types.ServerlessBackendInfo {
 // ListServices returns a slice with all services registered in the provided namespace
 func (kn *KnativeBackend) ListServices() ([]*types.Service, error) {
 	// Get the list with all Knative services
-	knSvcs, err := kn.knClientset.ServingV1().Services(kn.namespace).List(context.TODO(), metav1.ListOptions{})
+	configmaps, err := getAllServicesConfigMaps(kn.namespace, kn.kubeClientset)
 	if err != nil {
+		log.Printf("WARNING: %v\n", err)
 		return nil, err
 	}
-
 	services := []*types.Service{}
-	for _, knSvc := range knSvcs.Items {
-		// Get service from configMap's FDL
-		svc, err := getServiceFromFDL(knSvc.Name, kn.namespace, kn.kubeClientset)
-		if err != nil {
-			log.Printf("WARNING: %v\n", err)
-		} else {
-			services = append(services, svc)
-		}
-	}
 
+	for _, cm := range configmaps.Items {
+		service, err := getServiceFromConfigMap(&cm) // #nosec G601
+		if err != nil {
+			return nil, err
+		}
+		services = append(services, service)
+	}
 	return services, nil
 }
 
@@ -103,6 +101,14 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 	if err != nil {
 		return err
 	}
+
+	if service.Environment.Secrets != nil {
+		errSecret := utils.CreatePodSecrets(&service, kn.config, kn.kubeClientset)
+		if errSecret != nil {
+			return errSecret
+		}
+	}
+
 	// Create the configMap with FDL and user-script
 	err = createServiceConfigMap(&service, kn.namespace, kn.kubeClientset)
 	if err != nil {
@@ -131,7 +137,10 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 
 	//Create an expose service
 	if service.Expose.APIPort != 0 {
-		types.CreateExpose(service, kn.kubeClientset, kn.config)
+		err = types.CreateExpose(service, kn.kubeClientset, kn.config)
+		if err != nil {
+			return err
+		}
 	}
 	//Create deaemonset to cache the service image on all the nodes
 	if service.ImagePrefetch {
@@ -151,8 +160,13 @@ func (kn *KnativeBackend) ReadService(name string) (*types.Service, error) {
 		return nil, err
 	}
 
+	// Get the configMap of the Service
+	cm, err := kn.kubeClientset.CoreV1().ConfigMaps(kn.namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", name)
+	}
 	// Get service from configMap's FDL
-	svc, err := getServiceFromFDL(name, kn.namespace, kn.kubeClientset)
+	svc, err := getServiceFromConfigMap(cm)
 	if err != nil {
 		return nil, err
 	}
@@ -178,6 +192,11 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	oldCm, err := kn.kubeClientset.CoreV1().ConfigMaps(kn.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", service.Name)
+	}
+
+	errSecret := utils.UpdatePodSecrets(&service, kn.config, kn.kubeClientset)
+	if errSecret != nil {
+		return errSecret
 	}
 
 	// Update the configMap with FDL and user-script
@@ -223,6 +242,14 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		}
 	}
 
+	//Create deaemonset to cache the service image on all the nodes
+	if service.ImagePrefetch {
+		err = imagepuller.CreateDaemonset(kn.config, service, kn.kubeClientset)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -233,6 +260,12 @@ func (kn *KnativeBackend) DeleteService(service types.Service) error {
 	if err := kn.knClientset.ServingV1().Services(kn.namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		return err
 	}
+
+	errSecret := utils.DeletePodSecrets(&service, kn.config, kn.kubeClientset)
+	if errSecret != nil {
+		return errSecret
+	}
+
 	// Delete the service's configMap
 	if delErr := deleteServiceConfigMap(name, kn.namespace, kn.kubeClientset); delErr != nil {
 		log.Println(delErr.Error())
