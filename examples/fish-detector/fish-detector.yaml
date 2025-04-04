@@ -1,0 +1,16 @@
+functions:
+  oscar:
+  - oscar-eu:
+     name: fish-detector
+     memory: 3Gi
+     cpu: '1.0'
+     image: dialdroid/fish-detector:solo
+     script: script.sh
+     log_level: DEBUG
+     input:
+      - storage_provider: minio
+        path: fish-detector/input
+     output:
+      - storage_provider: minio
+        path: fish-detector/output
+
