@@ -4,7 +4,7 @@ functions:
      name: fish-detector
      memory: 3Gi
      cpu: '1.0'
-     image: dialdroid/fish-detector:solo
+     image: ghcr.io/grycap/fish-detector:1.0.0
      script: script.sh
      log_level: DEBUG
      input:

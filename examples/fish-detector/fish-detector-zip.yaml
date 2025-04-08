@@ -4,7 +4,7 @@ functions:
      name: fish-detector-zip
      memory: 3Gi
      cpu: '1.0'
-     image: dialdroid/fish-detector:zip-2
+     image: ghcr.io/grycap/fish-detector-zip:1.0.0
      script: script.sh
      log_level: DEBUG
      input:
