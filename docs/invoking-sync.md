@@ -91,7 +91,7 @@ processing. Tokens can be obtained through the API, using the
 [`oscar-cli service get`](oscar-cli.md#get) command or directly from the web
 interface.
 
-![oscar-ui-service-token.png](images/usage/oscar-ui-service-token.png)
+![oscar-dashboard-service-token.png](images/usage/oscar-dashboard-service-token.png)
 
 
 
