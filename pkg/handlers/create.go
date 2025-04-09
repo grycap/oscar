@@ -61,7 +61,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			service.Owner = "cluster_admin"
 			createLogger.Printf("Creating service '%s' for user '%s'", service.Name, service.Owner)
 		}
-
 		if err := c.ShouldBindJSON(&service); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
@@ -71,7 +70,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		checkValues(&service, cfg)
 		// Check if users in allowed_users have a MinIO associated user
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-
 		// Service is created by an EGI user
 		if !isAdminUser {
 			uid, err := auth.GetUIDFromContext(c)
@@ -181,6 +179,19 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 			}
 		}
+		if len(service.Environment.Secrets) > 0 {
+			secretName := service.Name + "-" + types.GenerateDeterministicString(service.Name)
+			if utils.SecretExists(secretName, cfg.ServicesNamespace, back.GetKubeClientset()) {
+				c.String(http.StatusConflict, "A secret with the given name already exists")
+			}
+			secretsErr := utils.CreateSecret(secretName, cfg.ServicesNamespace, service.Environment.Secrets, back.GetKubeClientset())
+			if secretsErr != nil {
+				c.String(http.StatusConflict, "Error creating secrets for service: %v", secretsErr)
+			}
+
+			// Empty the secrets content from the Configmap
+			service.Environment.Secrets = map[string]string{}
+		}
 
 		// Create the service
 		if err := back.CreateService(service); err != nil {
@@ -263,19 +274,27 @@ func checkValues(service *types.Service, cfg *types.Config) {
 		service.Annotations = make(map[string]string)
 	}
 
-	// Add the default MinIO provider
+	// Add the default MinIO provider without credentials
+	defaultMinIOInstanceInfo := &types.MinIOProvider{
+		Endpoint:  cfg.MinIOProvider.Endpoint,
+		Verify:    cfg.MinIOProvider.Verify,
+		AccessKey: "hidden",
+		SecretKey: "hidden",
+		Region:    cfg.MinIOProvider.Region,
+	}
+
 	if service.StorageProviders != nil {
 		if service.StorageProviders.MinIO != nil {
-			service.StorageProviders.MinIO[types.DefaultProvider] = cfg.MinIOProvider
+			service.StorageProviders.MinIO[types.DefaultProvider] = defaultMinIOInstanceInfo
 		} else {
 			service.StorageProviders.MinIO = map[string]*types.MinIOProvider{
-				types.DefaultProvider: cfg.MinIOProvider,
+				types.DefaultProvider: defaultMinIOInstanceInfo,
 			}
 		}
 	} else {
 		service.StorageProviders = &types.StorageProviders{
 			MinIO: map[string]*types.MinIOProvider{
-				types.DefaultProvider: cfg.MinIOProvider,
+				types.DefaultProvider: defaultMinIOInstanceInfo,
 			},
 		}
 	}
@@ -319,8 +338,8 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			}
 		}
 
-		// Get client for the provider
-		s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
+		// Use admin MinIO client to create the buckets
+		s3Client = cfg.MinIOProvider.GetS3Client()
 
 		path := strings.Trim(in.Path, " /")
 		// Split buckets and folders from path
@@ -449,7 +468,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		case types.MinIOName, types.S3Name:
 			// Use the appropriate client
 			if provName == types.MinIOName {
-				s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
+				s3Client = cfg.MinIOProvider.GetS3Client()
 			} else {
 				s3Client = service.StorageProviders.S3[provID].GetS3Client()
 			}
@@ -538,7 +557,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			// Currently only MinIO/S3 are supported
 			// Use the appropriate client
 			if provName == types.MinIOName {
-				s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
+				s3Client = cfg.MinIOProvider.GetS3Client()
 			} else {
 				s3Client = service.StorageProviders.S3[provID].GetS3Client()
 			}

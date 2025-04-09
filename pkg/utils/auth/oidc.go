@@ -38,7 +38,7 @@ import (
 const (
 	// EGIGroupsURNPrefix prefix to identify EGI group URI
 	EGIGroupsURNPrefix = "urn:mace:egi.eu:group"
-	EGIIssuer          = "https://aai.egi.eu/auth/realms/egi"
+	EGIIssuer          = "/realms/egi"
 	SecretKeyLength    = 10
 )
 
@@ -97,7 +97,6 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 			issuerManager.config = oidcConfig
 		}
 		if err != nil {
-			oidcLogger.Println("Error creating OIDC manager: ", err)
 			return func(c *gin.Context) {
 				c.AbortWithStatus(http.StatusUnauthorized)
 				return
@@ -125,7 +124,7 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 		}
 		oidcManager := ClusterOidcManagers[iss]
 		if oidcManager == nil {
-			c.String(http.StatusBadRequest, fmt.Sprintf("Error getting oidc manager for issuer '%s'", iss))
+			c.String(http.StatusUnauthorized, fmt.Sprintf("'%s' is not listed as an authorized issuer", iss))
 			return
 		}
 		// Check the token

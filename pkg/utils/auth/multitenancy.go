@@ -25,7 +25,7 @@ import (
 	"os"
 	"regexp"
 
-	v1 "k8s.io/api/core/v1"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -120,27 +120,17 @@ func (mc *MultitenancyConfig) CheckUsersInCache(uids []string) []string {
 }
 
 func (mc *MultitenancyConfig) CreateSecretForOIDC(uid string, sk string) error {
-
-	secret := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      FormatUID(uid),
-			Namespace: ServicesNamespace,
-		},
-		StringData: map[string]string{
-			"oidc_uid":  uid,
-			"accessKey": uid,
-			"secretKey": sk,
-		},
+	secretData := map[string]string{
+		"oidc_uid":  uid,
+		"accessKey": uid,
+		"secretKey": sk,
 	}
-
-	_, err := mc.kubeClientset.CoreV1().Secrets(ServicesNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
-
+	err := utils.CreateSecret(FormatUID(uid), ServicesNamespace, secretData, mc.kubeClientset)
 	if err != nil {
 		return err
 	}
 
 	mc.UpdateCache(uid)
-
 	return nil
 }
 

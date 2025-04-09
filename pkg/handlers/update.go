@@ -122,7 +122,13 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 					newService.BucketList = newBucketList
 				}
-
+				secretName := newService.Name + "-" + types.GenerateDeterministicString(newService.Name)
+				if utils.SecretExists(secretName, cfg.ServicesNamespace, back.GetKubeClientset()) {
+					secretsErr := utils.UpdateSecretData(secretName, cfg.ServicesNamespace, newService.Environment.Secrets, back.GetKubeClientset())
+					if secretsErr != nil {
+						c.String(http.StatusInternalServerError, "Error updating asociated secret: %v", secretsErr)
+					}
+				}
 				// Update the group with allowe users, it empthy and add them again
 				err = updateGroup(splitPath[0], oldService, &newService, minIOAdminClient, s3Client)
 				if err != nil {

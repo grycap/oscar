@@ -25,7 +25,6 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
 	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -83,13 +82,6 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 	err := checkAdditionalConfig(ConfigMapNameOSCAR, k.namespace, service, k.config, k.kubeClientset)
 	if err != nil {
 		return err
-	}
-
-	if service.Environment.Secrets != nil {
-		errSecret := utils.CreatePodSecrets(&service, k.config, k.kubeClientset)
-		if errSecret != nil {
-			return errSecret
-		}
 	}
 
 	// Create the configMap with FDL and user-script
@@ -177,11 +169,6 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 		return fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", service.Name)
 	}
 
-	errSecret := utils.UpdatePodSecrets(&service, k.config, k.kubeClientset)
-	if errSecret != nil {
-		return errSecret
-	}
-
 	// Update the configMap with FDL and user-script
 	if err := updateServiceConfigMap(&service, k.namespace, k.kubeClientset); err != nil {
 		return err
@@ -247,11 +234,6 @@ func (k *KubeBackend) DeleteService(service types.Service) error {
 		return err
 	}
 
-	errSecret := utils.DeletePodSecrets(&service, k.config, k.kubeClientset)
-	if errSecret != nil {
-		return errSecret
-	}
-
 	// Delete the service's configMap
 	if delErr := deleteServiceConfigMap(name, k.namespace, k.kubeClientset); delErr != nil {
 		log.Println(delErr.Error())
@@ -310,7 +292,9 @@ func checkAdditionalConfig(configName string, configNamespace string, service ty
 
 	return nil
 }
+func Test() {
 
+}
 func createServiceConfigMap(service *types.Service, namespace string, kubeClientset kubernetes.Interface) error {
 	// Copy script from service
 	script := service.Script

@@ -4,13 +4,13 @@ Each OSCAR cluster includes a deployed MinIO instance, which is used to trigger 
 
 ## Using graphical interfaces
 
-These folders can be accessed via both the OSCAR UI and the MinIO console UI.
+These folders can be accessed via both the OSCAR Dashboard and the MinIO console UI.
 
-- **Using OSCAR-UI**: The following image highlights the section where MinIO buckets are accessible. Users can view a list of available buckets and perform operations such as uploading and deleting files.
+- **Using OSCAR-Dashboard**: The following image highlights the section where MinIO buckets are accessible. Users can view a list of available buckets and perform operations such as uploading and deleting files.
   
 ![minio-buckets](images/bucket-list.png)
 
-- **Using the MinIO Console UI**: Access details for this interface are available in the "Info" tab within the OSCAR UI. This tab provides the MinIO console endpoint and the necessary credentials to log in, where the *Access Key* serves as the username, and the *Secret Key* functions as the password.
+- **Using the MinIO Console UI**: Access details for this interface are available in the "Info" tab within the OSCAR Dashboard. This tab provides the MinIO console endpoint and the necessary credentials to log in, where the *Access Key* serves as the username, and the *Secret Key* functions as the password.
 
 ![oscar-info](images/oscar-info.png)
 

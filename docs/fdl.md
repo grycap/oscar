@@ -1,6 +1,6 @@
 # Functions Definition Language (FDL)
 
- OSCAR services are typically defined via the Functions Definition Language (FDL) to be deployed via the [OSCAR CLI](oscar-cli.md). Alternative approaches are using the web-based wizard in the [OSCAR UI](usage-ui.md) or, for a programmatic integration, via the [OSCAR API](api.md). 
+ OSCAR services are typically defined via the Functions Definition Language (FDL) to be deployed via the [OSCAR CLI](oscar-cli.md). Alternative approaches are using the web-based wizard in the [OSCAR Dashboard](usage-dashboard.md) or, for a programmatic integration, via the [OSCAR API](api.md). 
 
 > ℹ️
 >
@@ -167,7 +167,8 @@ storage_providers:
 
 | Field                                | Description                          |
 | -------------------------------------| -------------------------------------|
-|`Variables` </br> *map[string]string* | Map to define the environment variables that will be available in the service container |
+|`variables` </br> *map[string]string* | Map to define the environment variables that will be available in the service container |
+|`secrets` </br> *map[string]string* | Map to define the secret environment variables that will be available in the service container |
 
 ## StorageProviders
 

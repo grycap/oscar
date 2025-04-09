@@ -55,7 +55,7 @@ to support the OSCAR platform:
     container-based applications for synchronous invocations (default
     Serverless Backend).
 - [OSCAR Manager](https://docs.oscar.grycap.net/api/), the main API, responsible for the management of the services and the integration of the different components. 
-- [OSCAR UI](https://github.com/grycap/oscar-ui), an easy-to-use web-based graphical user interface aimed at end users.
+- [OSCAR Dashboard](https://github.com/grycap/oscar-dashboard), an easy-to-use web-based graphical user interface aimed at end users.
 
 As external storage providers, the following services can be used:
 
@@ -85,5 +85,5 @@ A summary of the components used:
 
 An OSCAR cluster can be accessed via its
 [REST API](https://grycap.github.io/oscar/api/), the web-based 
-[OSCAR UI](https://github.com/grycap/oscar-ui) and the command-line interface provided by
+[OSCAR Dashboard](https://github.com/grycap/oscar-dashboard) and the command-line interface provided by
 [OSCAR CLI](https://github.com/grycap/oscar-cli).
