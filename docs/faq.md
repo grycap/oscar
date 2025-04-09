@@ -4,7 +4,7 @@
 
 - **Sometimes, when trying to deploy the cluster locally, it tells **me that the :80 port** is already in use.**
 
-You may have a server running on the :80 port, such as Apache, while the deployment is trying to use it for the OSCAR UI. Restarting it would solve this problem.
+You may have a server running on the :80 port, such as Apache, while the deployment is trying to use it for the OSCAR Dashboard. Restarting it would solve this problem.
 
 - **I get the following error message: "Unable to communicate with the cluster. Please make sure that the endpoint is well-typed and accessible."**
 
@@ -32,7 +32,7 @@ data:
 type: kubernetes.io/dockerconfigjson
 ```
 
-Apply the file through kubectl into the Kubernetes OSCAR cluster to create the secret. To use it in OSCAR services, you must add the secret name (`dockersecret` in this example) in the definition of the service, using the API or a FDL, under the `image_pull_secrets` parameter, or through the "Docker secret" field in OSCAR-UI.
+Apply the file through kubectl into the Kubernetes OSCAR cluster to create the secret. To use it in OSCAR services, you must add the secret name (`dockersecret` in this example) in the definition of the service, using the API or a FDL, under the `image_pull_secrets` parameter, or through the "Docker secret" field in OSCAR-Dasboard.
 
 - **The OSCAR cluster does not have TLS certificates (HTTPS). Why?**
 
@@ -40,7 +40,7 @@ It could happen when an OSCAR cluster is deployed from an IM recipe that does no
 
 - **I do not have certificates. I can not see the buckets. What do I have to do?**
 
-If the OSCAR cluster has no certificate OSCAR UI will not show the buckets.
+If the OSCAR cluster has no certificate OSCAR Dashboard will not show the buckets.
 
 ![no-buckets.png](images/faq/certificates/02.-no-buckets.png)
 
@@ -48,7 +48,7 @@ You can fix this by entering in the MinIO endpoint `minio.<OSCAR-endpoint>`. The
 
 ![in-minio.png](images/faq/certificates/05.-in-minio.png)
 
-Return to OSCAR UI and, then,  you can see the buckets.
+Return to OSCAR Dashboard and, then,  you can see the buckets.
 The buckets will be shown only in the browser you do this process.
 The results may vary depending on the browser. For example, they will show up in Firefox but not in Chrome.
 
