@@ -1,18 +1,18 @@
-# OSCAR UI
+# OSCAR Dashboard
 
 > ❗️
 >
-> For simple OSCAR services you may use the UI, but its features may not be on par with the latest changes in the [FDL](fdl.md). 
+> For simple OSCAR services you may use the Dashboard, but its features may not be on par with the latest changes in the [FDL](fdl.md). 
 > Therefore, it is recommended to use [OSCAR CLI](oscar-cli.md) to deploy an OSCAR service.  
 
 
-This section details the usage of the OSCAR UI with the
+This section details the usage of the OSCAR Dashboard with the
 [plant classification](https://github.com/grycap/oscar/tree/master/examples/plant-classification-sync) example, from the 
 [OSCAR examples](https://github.com/grycap/oscar/tree/master/examples). 
 
 ## Login
 
-OSCAR UI is exposed via a Kubernetes ingress and it is accessible via the
+OSCAR Dashboard is exposed via a Kubernetes ingress and it is accessible via the
 Kubernetes master node IP. 
 
 ![login](images/usage/usage-01.png)
