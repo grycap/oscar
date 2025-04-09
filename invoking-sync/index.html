@@ -652,12 +652,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../usage-ui/" class="md-nav__link">
+      <a href="../usage-dashboard/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    OSCAR UI
+    OSCAR Dashboard
     
   </span>
   
@@ -1481,7 +1481,7 @@ system is automatically configured to use them for event-driven file
 processing. Tokens can be obtained through the API, using the
 <a href="../oscar-cli/#get"><code>oscar-cli service get</code></a> command or directly from the web
 interface.</p>
-<p><img alt="oscar-ui-service-token.png" src="../images/usage/oscar-ui-service-token.png" /></p>
+<p><img alt="oscar-dashboard-service-token.png" src="../images/usage/oscar-dashboard-service-token.png" /></p>
 <h3 id="limitations">Limitations</h3>
 <p>Although the use of the Knative Serverless Backend for synchronous invocations provides elasticity similar to the one provided by their counterparts in public clouds, such as AWS Lambda, synchronous invocations are not still the best option for run long-running resource-demanding applications, like deep learning inference or video processing. </p>
 <p>The synchronous invocation of long-running resource-demanding applications may lead to timeouts on Knative pods. Therefore, we consider asynchronous invocations (which generate Kubernetes jobs) as the optimal approach to handle event-driven file processing.</p>

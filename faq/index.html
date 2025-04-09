@@ -652,12 +652,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../usage-ui/" class="md-nav__link">
+      <a href="../usage-dashboard/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    OSCAR UI
+    OSCAR Dashboard
     
   </span>
   
@@ -1389,7 +1389,7 @@
 <ul>
 <li><strong>Sometimes, when trying to deploy the cluster locally, it tells </strong>me that the :80 port<strong> is already in use.</strong></li>
 </ul>
-<p>You may have a server running on the :80 port, such as Apache, while the deployment is trying to use it for the OSCAR UI. Restarting it would solve this problem.</p>
+<p>You may have a server running on the :80 port, such as Apache, while the deployment is trying to use it for the OSCAR Dashboard. Restarting it would solve this problem.</p>
 <ul>
 <li><strong>I get the following error message: "Unable to communicate with the cluster. Please make sure that the endpoint is well-typed and accessible."</strong></li>
 </ul>
@@ -1411,7 +1411,7 @@ data:
   .dockerconfigjson: {base64 .docker/config.json}
 type: kubernetes.io/dockerconfigjson
 </code></pre>
-<p>Apply the file through kubectl into the Kubernetes OSCAR cluster to create the secret. To use it in OSCAR services, you must add the secret name (<code>dockersecret</code> in this example) in the definition of the service, using the API or a FDL, under the <code>image_pull_secrets</code> parameter, or through the "Docker secret" field in OSCAR-UI.</p>
+<p>Apply the file through kubectl into the Kubernetes OSCAR cluster to create the secret. To use it in OSCAR services, you must add the secret name (<code>dockersecret</code> in this example) in the definition of the service, using the API or a FDL, under the <code>image_pull_secrets</code> parameter, or through the "Docker secret" field in OSCAR-Dasboard.</p>
 <ul>
 <li><strong>The OSCAR cluster does not have TLS certificates (HTTPS). Why?</strong></li>
 </ul>
@@ -1419,11 +1419,11 @@ type: kubernetes.io/dockerconfigjson
 <ul>
 <li><strong>I do not have certificates. I can not see the buckets. What do I have to do?</strong></li>
 </ul>
-<p>If the OSCAR cluster has no certificate OSCAR UI will not show the buckets.</p>
+<p>If the OSCAR cluster has no certificate OSCAR Dashboard will not show the buckets.</p>
 <p><img alt="no-buckets.png" src="../images/faq/certificates/02.-no-buckets.png" /></p>
 <p>You can fix this by entering in the MinIO endpoint <code>minio.&lt;OSCAR-endpoint&gt;</code>. The browser will block the page because it is unsafe. Once you accept the risk, you will enter the MinIO page. It is not necessary to log in.</p>
 <p><img alt="in-minio.png" src="../images/faq/certificates/05.-in-minio.png" /></p>
-<p>Return to OSCAR UI and, then,  you can see the buckets.
+<p>Return to OSCAR Dashboard and, then,  you can see the buckets.
 The buckets will be shown only in the browser you do this process.
 The results may vary depending on the browser. For example, they will show up in Firefox but not in Chrome.</p>
 <p><img alt="got-buckets.png" src="../images/faq/certificates/06.-got-buckets.png" /></p>
