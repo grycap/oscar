@@ -434,7 +434,7 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 		return jsonErr
 	}
 	if len(actualPolicy.Statement[0].Resource) == 1 {
-		if policyName == ALL_USERS_GROUP {
+		if policyName == ALL_USERS_GROUP || !isGroup {
 			actualPolicy.Statement[0].Effect = "Deny"
 		} else {
 			if err := minIOAdminClient.adminClient.RemoveCannedPolicy(context.TODO(), policyName); err != nil {
