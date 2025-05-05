@@ -1,0 +1,23 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: thunderstorm-nowcast-microstep
+      # Ajustar la memoria según la recomendación del correo
+      memory: 8Gi
+      # Mantener CPU o ajustar si es necesario
+      cpu: '2.0'
+      # Imagen Docker actualizada
+      image: ai4oshub/thunderstorm-nowcast-microstep
+      # Asegúrate de que este script esté accesible para OSCAR
+      script: script.sh
+      vo: vo.ai4eosc.eu
+      allowed_users: []
+      log_level: DEBUG
+      input:
+      # Ruta del bucket de entrada actualizada
+      - storage_provider: minio.default
+        path: thunderstorm-nowcast-microstep/input
+      output:
+      # Ruta del bucket de salida actualizada (necesario en FDL, aunque el script no copie archivos)
+      - storage_provider: minio.default
+        path: thunderstorm-nowcast-microstep/output
