@@ -105,13 +105,7 @@ func (mc *MultitenancyConfig) CheckUsersInCache(uids []string) []string {
 	}
 
 	for _, uid := range uids {
-		found = false
-		for _, cacheUID := range mc.usersCache {
-			if uid == cacheUID {
-				found = true
-				break
-			}
-		}
+		found = mc.UserExists(uid)
 		if !found {
 			notFoundUsers = append(notFoundUsers, uid)
 		}
