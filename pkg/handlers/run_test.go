@@ -44,10 +44,6 @@ func (GinResponseRecorder) Flush() {
 }
 
 func TestMakeRunHandler(t *testing.T) {
-	back := backends.MakeFakeSyncBackend()
-	http.DefaultClient.Timeout = 400 * time.Second
-	r := gin.Default()
-	r.POST("/run/:serviceName", MakeRunHandler(&testConfigValidRun, back))
 
 	scenarios := []struct {
 		name        string
@@ -61,6 +57,11 @@ func TestMakeRunHandler(t *testing.T) {
 		{"Bad token: diff service token", true, "diffErr"},
 	}
 	for _, s := range scenarios {
+		back := backends.MakeFakeSyncBackend()
+		http.DefaultClient.Timeout = 400 * time.Second
+		r := gin.Default()
+		r.POST("/run/:serviceName", MakeRunHandler(&testConfigValidRun, back))
+
 		t.Run(s.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			serviceName := "testName"
@@ -84,7 +85,7 @@ func TestMakeRunHandler(t *testing.T) {
 
 			r.ServeHTTP(GinResponseRecorder{w}, req)
 			// Sleep time to avoid HTTP error 503 on first request
-			time.Sleep(10)
+			time.Sleep(1 * time.Second)
 			if s.returnError {
 
 				if s.errType == "splitErr" || s.errType == "diffErr" {
