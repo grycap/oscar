@@ -19,7 +19,7 @@ nav:
 
 - Interfaces:
   - oscar-cli.md
-  - usage-ui.md  
+  - usage-dashboard.md  
   - api.md
   - MinIO: minio-usage.md
 

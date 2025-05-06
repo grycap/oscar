@@ -1,18 +1,18 @@
-# OSCAR UI
+# OSCAR Dashboard
 
 > ❗️
 >
-> For simple OSCAR services you may use the UI, but its features may not be on par with the latest changes in the [FDL](fdl.md). 
+> For simple OSCAR services you may use the Dashboard, but its features may not be on par with the latest changes in the [FDL](fdl.md). 
 > Therefore, it is recommended to use [OSCAR CLI](oscar-cli.md) to deploy an OSCAR service.  
 
 
-This section details the usage of the OSCAR UI with the
+This section details the usage of the OSCAR Dashboard with the
 [plant classification](https://github.com/grycap/oscar/tree/master/examples/plant-classification-sync) example, from the 
 [OSCAR examples](https://github.com/grycap/oscar/tree/master/examples). 
 
 ## Login
 
-OSCAR UI is exposed via a Kubernetes ingress and it is accessible via the
+OSCAR Dashboard is exposed via a Kubernetes ingress and it is accessible via the
 Kubernetes master node IP. 
 
 ![login](images/usage/usage-01.png)
@@ -23,7 +23,7 @@ After a correct login, you should see the main view:
 
 ## Deploying services
 
-In order to create a new service, you must click on the "DEPLOY NEW SERVICE"
+In order to create a new service, you must click on the "Create service"
 button and follow the wizard. For an [OSCAR Service](oscar-service.md) a script must be provided for the
 processing of files. This script must use the environment variables
 `INPUT_FILE_PATH` and `TMP_OUTPUT_DIR` to refer to the input file and the
@@ -55,47 +55,39 @@ version of the image in the registry every time a job is launched.
 
 ![new service](images/usage/usage-03.png)
 
-Next, the credentials of the storage providers to be used must be introduced.
-As the platform already has a MinIO deployment to operate, it is not necessary
-to enter its credentials for using it.
+Next, we need to specify input and output storage parameters. You can utilize one or multiple storage providers supported by the platform, like MinIO, Onedata, and Amazon S3.
 
-Multiple MinIO, Onedata and Amazon S3 storage providers can be used. Remember
-to click the "ADD" button after completing each one.
+As we use the service creation form provided by the web interface to create the service, we will only have access to the default MinIO storage provided with the platform. In order to configure a more complicated workflow using multiple storage providers, you need to use an FDL file to define the service. 
 
-![add storage provider 1](images/usage/usage-04.png)
-
-Then, click the "NEXT" button to go to the last section of the wizard.
-
-![add storage provider 2](images/usage/usage-05.png)
-
-In this section, you must first choose the paths of the storage provider to be
+In this step, you must first choose the paths of the storage provider to be
 used as source of events, i.e. the input bucket and/or folder that will
 trigger the service.
 
 ***Only the `minio.default` provider can be used as input storage provider.***
 
-![add input 1](images/usage/usage-06.png)
+After filling in each path, remember to click on the "Save" button.
 
-After filling in each path, remember to click on the "ADD INPUT" button.
-
-![add input 2](images/usage/usage-07.png)
+![add input 2](images/usage/usage-05.png)
 
 Finally, the same must be done to indicate the output paths to be used in
 the desired storage providers. You can also indicate suffixes and/or prefixes
 to filter the files uploaded to each path by name.
 
-![add output 1](images/usage/usage-08.png)
+![add output 1](images/usage/usage-06.png)
 
-The resulting files can be stored in several storage providers, like in the
-following example, where they are stored in the MinIO server of the platform
-and in a Onedata space provided by the user.
+***Note that the resulting files can be stored in several storage providers other than MinIO, but in order to do that, you must create the service through the FDL file.***
 
-![add output 2](images/usage/usage-09.png)
+![service created](images/usage/usage-07.png)
 
-After clicking the "SUBMIT" button the new service will appear in the main
+After clicking the "Create" button we will see the new service edit menu.
+
+![service created](images/usage/usage-08.png)
+
+Also, we will be able to see it on the main
 view after a few seconds.
 
-![service created](images/usage/usage-10.png)
+![service created](images/usage/usage-09.png)
+
 
 ## Triggering the service
 
@@ -129,19 +121,16 @@ an edit, the buckets that are not created will be formed.
 Once a service has been created, it can be invoked by uploading files to its
 input bucket/folder. This can be done through the MinIO web interface
 (accessible from the Kubernetes frontend IP, on port `30300`) or from the
-"Minio Storage" section in the side menu of the OSCAR web interface. Expanding
-down that menu will list the buckets created and, by clicking on their name,
+"Buckets" section in the side menu of the OSCAR web interface. Selecting that section will list the buckets created and, by clicking on their name,
 you will be able to see their content, upload and download files.
 
 ![minio storage](images/usage/usage-11.png)
 
-To upload files, first click on the "SELECT FILES" button and choose the files
-you want to upload from your computer.
+To upload files, you simply can just drag and drop them into the folder.
 
 ![upload input file](images/usage/usage-12.png)
 
-Once you have chosen the files to upload, simply click on the "UPLOAD" button
-and the file will be uploaded, raising an event that will trigger the service.
+The file will be uploaded, raising an event that will trigger the service.
 
 ![input file uploaded](images/usage/usage-13.png)
 
@@ -154,7 +143,7 @@ such as images.
 
 When files are being processed by a service, it is important to know their
 status, as well as to observe the execution logs for testing. For this
-purpose, OSCAR includes a log view, accessible by clicking on the "LOGS"
+purpose, OSCAR includes a log view, accessible by clicking on the "Logs"
 button in a service from the main view.
 
 ![logs button](images/usage/usage-15.png)
@@ -170,15 +159,13 @@ located on the right.
 
 ![logs view 2](images/usage/usage-17.png)
 
-The view also features options to refresh the status of one or all jobs, as
-well as to delete them.
+The view also features options to delete one or all logs.
 
 ## Downloading files from MinIO
 
 Downloading files from the platform's MinIO storage provider can also be done
 using the OSCAR web interface. To do it, simply select one or more files and
-click on the button "DOWNLOAD OBJECT" (or "DOWNLOAD ALL AS A ZIP" if several
-files have been selected).
+click on the button "Download" or click on download icon to download one file.
 
 ![output file](images/usage/usage-18.png)
 

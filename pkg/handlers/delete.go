@@ -149,8 +149,8 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			}
 		}
 
-		// Get client for the provider
-		s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
+		// Get admin client for the provider
+		s3Client = cfg.MinIOProvider.GetS3Client()
 
 		path := strings.Trim(in.Path, " /")
 		// Split buckets and folders from path
@@ -219,11 +219,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			// TODO
 		}
 	}
-
-	if service.Mount.Provider != "" {
-		// TODO check if some components of mount need to be deleted
-
-	}
+	// TODO check if some components of mount need to be deleted
 
 	return nil
 }
