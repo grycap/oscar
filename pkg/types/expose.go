@@ -525,9 +525,11 @@ func getIngressSpec(service Service, cfg *Config) *net.Ingress {
 			Hosts:      []string{host},
 			SecretName: host,
 		}
+		ingressClassName := "nginx"
 		specification = net.IngressSpec{
-			TLS:   []net.IngressTLS{tls},
-			Rules: []net.IngressRule{rule}, //IngressClassName:
+			IngressClassName: &ingressClassName,
+			TLS:              []net.IngressTLS{tls},
+			Rules:            []net.IngressRule{rule}, //IngressClassName:
 		}
 	}
 
