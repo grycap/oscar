@@ -282,6 +282,23 @@ func (minIOAdminClient *MinIOAdminClient) RestartServer() error {
 	return nil
 }
 
+func (minIOAdminClient *MinIOAdminClient) GetPolicy(policyName string) (*madmin.PolicyInfo, error) {
+	getPolicy, errInfo := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), policyName)
+	if errInfo != nil {
+		return nil, errInfo
+	} else {
+		return getPolicy, nil
+	}
+}
+
+func (minIOAdminClient *MinIOAdminClient) GetGroup(group string) (*madmin.GroupDesc, error) {
+	groupDesc, err := minIOAdminClient.adminClient.GetGroupDescription(context.TODO(), group)
+	if err != nil {
+		return nil, err
+	}
+	return groupDesc, nil
+}
+
 func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucketName string, policyName string, isGroup bool) error {
 	var jsonErr error
 	var policy []byte
@@ -417,7 +434,7 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 		return jsonErr
 	}
 	if len(actualPolicy.Statement[0].Resource) == 1 {
-		if policyName == ALL_USERS_GROUP {
+		if policyName == ALL_USERS_GROUP || !isGroup {
 			actualPolicy.Statement[0].Effect = "Deny"
 		} else {
 			if err := minIOAdminClient.adminClient.RemoveCannedPolicy(context.TODO(), policyName); err != nil {

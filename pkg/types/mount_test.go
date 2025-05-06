@@ -38,7 +38,12 @@ func TestSetMount(t *testing.T) {
 			},
 		},
 	}
-	cfg := &Config{}
+	cfg := &Config{
+		Name: "oscar",
+		MinIOProvider: &MinIOProvider{
+			AccessKey: "test-access-key",
+			SecretKey: "test-secret-key",
+		}}
 
 	SetMount(podSpec, service, cfg)
 
@@ -99,7 +104,15 @@ func TestSetMinIOEnvVars(t *testing.T) {
 	}
 	providerId := "provider"
 
-	envVars := setMinIOEnvVars(service, providerId)
+	cfg := &Config{
+		Name: "oscar",
+		MinIOProvider: &MinIOProvider{
+			AccessKey: "test-access-key",
+			SecretKey: "test-secret-key",
+		},
+	}
+
+	envVars := setMinIOEnvVars(service, providerId, cfg, cfg.Name)
 
 	expectedEnvVars := map[string]string{
 		"MINIO_BUCKET":          "test-bucket",
