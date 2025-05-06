@@ -26,7 +26,6 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/cdmi-client-go"
@@ -130,9 +129,8 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				service.Labels["uid"] = full_uid[:10]
 				// Check if the uid's from allowed_users have and asociated MinIO user
 				// and create it if not
-				uids := mc.CheckUsersInCache(service.AllowedUsers)
-				if len(uids) > 0 {
-					for _, uid := range uids {
+				for _, uid := range service.AllowedUsers {
+					if !mc.UserExists(uid) {
 						sk, _ := auth.GenerateRandomKey(8)
 						cmuErr := minIOAdminClient.CreateMinIOUser(uid, sk)
 						if cmuErr != nil {
@@ -162,16 +160,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						userBucket = splitPath[0] + "-" + user[:10]
 						service.BucketList = append(service.BucketList, userBucket)
 					}
-				} else {
-					index := 0
-					for !ownerOnList {
-						// Check the uid of the owner is on the allowed_users list
-						// If isolation level is not user the list may not need to be go through fully
-						if service.AllowedUsers[index] == service.Owner {
-							ownerOnList = true
-						}
-						index++
-					}
 				}
 				if !ownerOnList {
 					service.AllowedUsers = append(service.AllowedUsers, uid)
@@ -190,7 +178,9 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 
 			// Empty the secrets content from the Configmap
-			service.Environment.Secrets = map[string]string{}
+			for secretKey, _ := range service.Environment.Secrets {
+				service.Environment.Secrets[secretKey] = ""
+			}
 		}
 
 		// Create the service
@@ -308,11 +298,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	var cdmiClient *cdmi.Client
 	var provName, provID string
 
-	// Create private buckets
-
-	// Create shared buckets (if defined)
-	// Create input buckets
-	createLogger.Printf("Creating input buckets ..")
+	// ========== CREATE INPUT BUCKETS ==========
 	for _, in := range service.Input {
 		provID, provName = getProviderInfo(in.Provider)
 
@@ -338,77 +324,28 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			}
 		}
 
-		// Use admin MinIO client to create the buckets
+		// Use admin MinIO client for the bucket creation
 		s3Client = cfg.MinIOProvider.GetS3Client()
 
 		path := strings.Trim(in.Path, " /")
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
+		folderKey := fmt.Sprintf("%s/", splitPath[1])
 
-		_, err := s3Client.CreateBucket(&s3.CreateBucketInput{
-			Bucket: aws.String(splitPath[0]),
-		})
-
+		err := minIOAdminClient.CreateS3PathWithWebhook(s3Client, splitPath, service.GetMinIOWebhookARN(), false)
 		if err != nil {
-			if aerr, ok := err.(awserr.Error); ok {
-				// Check if the error is caused because the bucket already exists
-				if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
-					log.Printf("The bucket \"%s\" already exists\n", splitPath[0])
-				} else {
-					return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
-				}
-			} else {
-				return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
-			}
+			return err
 		}
 
-		// Create generic folder(s)
-		var folderKey string
-		if len(splitPath) == 2 {
-			// Add "/" to the end of the key in order to create a folder
-			folderKey = fmt.Sprintf("%s/", splitPath[1])
-			_, err := s3Client.PutObject(&s3.PutObjectInput{
-				Bucket: aws.String(splitPath[0]),
-				Key:    aws.String(folderKey),
-			})
-			if err != nil {
-				return fmt.Errorf("error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
-			}
-			// Enable MinIO notifications based on the Input []StorageIOConfig
-			if err := enableInputNotification(s3Client, service.GetMinIOWebhookARN(), splitPath[0], folderKey); err != nil {
-				return err
-			}
-		}
-
+		// Create buckets for services with isolation level
 		if strings.ToUpper(service.IsolationLevel) == "USER" && len(service.BucketList) > 0 {
 			for i, b := range service.BucketList {
 				// Create a bucket for each allowed user if allowed_users is not empty
-				_, err = s3Client.CreateBucket(&s3.CreateBucketInput{
-					Bucket: aws.String(b),
-				})
+				err = minIOAdminClient.CreateS3PathWithWebhook(s3Client, []string{b, folderKey}, service.GetMinIOWebhookARN(), false)
 				if err != nil {
-					if aerr, ok := err.(awserr.Error); ok {
-						// Check if the error is caused because the bucket already exists
-						if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
-							log.Printf("The bucket \"%s\" already exists\n", b)
-						} else {
-							return fmt.Errorf("error creating bucket %s: %v", b, err)
-						}
-					} else {
-						return fmt.Errorf("error creating bucket %s: %v", b, err)
-					}
-				}
-				_, err := s3Client.PutObject(&s3.PutObjectInput{
-					Bucket: aws.String(b),
-					Key:    aws.String(folderKey),
-				})
-				if err != nil {
-					return fmt.Errorf("error creating folder \"%s\" in bucket \"%s\": %v", folderKey, b, err)
-				}
-				if err := enableInputNotification(s3Client, service.GetMinIOWebhookARN(), b, folderKey); err != nil {
 					return err
 				}
-
+				// Create bucket policy
 				if !isAdminUser {
 					err = minIOAdminClient.CreateAddPolicy(b, service.AllowedUsers[i], false)
 					if err != nil {
@@ -418,9 +355,8 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			}
 		}
 
-		// Create group for the service and add users
-		// Check if users in allowed_users have a MinIO associated user
-		// If new allowed users list is empty the service becames public
+		// Create bucket policies
+		// Default policy: Buckets only visible for the service owner
 		if !isUpdate {
 			if !isAdminUser {
 				if len(service.AllowedUsers) == 0 {
@@ -446,23 +382,21 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			}
 		}
 	}
+
+	// ========== CREATE OUTPUT BUCKETS ==========
 	createLogger.Printf("Creating output buckets ..")
 	// Create output buckets
 	for _, out := range service.Output {
 		provID, provName = getProviderInfo(out.Provider)
 		// Check if the provider identifier is defined in StorageProviders
 		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
-			// TODO fix
-			dinErr := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), "")
-			if dinErr != nil {
-				log.Printf("Error disabling input notifications: %v\n", dinErr)
-			}
 			return fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
 		}
 
 		path := strings.Trim(out.Path, " /")
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
+		folderKey := fmt.Sprintf("%s/", splitPath[1])
 
 		switch provName {
 		case types.MinIOName, types.S3Name:
@@ -472,55 +406,14 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			} else {
 				s3Client = service.StorageProviders.S3[provID].GetS3Client()
 			}
-			// Create bucket
-			// ==== TODO check if is necessary repeat the create bucket code ====
-			// _, err := s3Client.CreateBucket(&s3.CreateBucketInput{
-			// 	Bucket: aws.String(splitPath[0]),
-			// })
-
-			// // TODO Add disable notifications in case of an error for every bucket on service.BucketList
-			// if err != nil {
-			// 	if aerr, ok := err.(awserr.Error); ok {
-			// 		// Check if the error is caused because the bucket already exists
-			// 		if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
-			// 			log.Printf("The bucket \"%s\" already exists\n", splitPath[0])
-			// 		} else {
-			// 			disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
-			// 			return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
-			// 		}
-			// 	} else {
-			// 		disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, cfg.MinIOProvider)
-			// 		return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
-			// 	}
-			// }
-			// Create folder(s)
-			var folderKey string
-			if len(splitPath) == 2 {
-				// Add "/" to the end of the key in order to create a folder
-				folderKey = fmt.Sprintf("%s/", splitPath[1])
-				_, err := s3Client.PutObject(&s3.PutObjectInput{
-					Bucket: aws.String(splitPath[0]),
-					Key:    aws.String(folderKey),
-				})
-				if err != nil {
-					dinErr := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), splitPath[0])
-					if dinErr != nil {
-						log.Printf("Error disabling input notifications: %v\n", dinErr)
-					}
-					return fmt.Errorf("error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
-				}
+			err := minIOAdminClient.CreateS3Path(s3Client, splitPath, true)
+			if err != nil {
+				return err
 			}
 
 			if strings.ToUpper(service.IsolationLevel) == "USER" && len(service.BucketList) > 0 {
 				for _, b := range service.BucketList {
-					_, err := s3Client.PutObject(&s3.PutObjectInput{
-						Bucket: aws.String(b),
-						Key:    aws.String(folderKey),
-					})
-					if err != nil {
-						return fmt.Errorf("error creating folder \"%s\" in bucket \"%s\": %v", folderKey, b, err)
-					}
-
+					minIOAdminClient.CreateS3Path(s3Client, []string{b, folderKey}, true)
 				}
 			}
 
@@ -531,11 +424,6 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				if err == cdmi.ErrBadRequest {
 					log.Printf("Error creating \"%s\" folder in Onedata. Error: %v\n", path, err)
 				} else {
-					// TODO fix
-					dinErr := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), "")
-					if dinErr != nil {
-						log.Printf("Error disabling input notifications: %v\n", dinErr)
-					}
 					return fmt.Errorf("error connecting to Onedata's Oneprovider \"%s\". Error: %v", service.StorageProviders.Onedata[provID].OneproviderHost, err)
 				}
 			}
@@ -561,56 +449,12 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			} else {
 				s3Client = service.StorageProviders.S3[provID].GetS3Client()
 			}
-			// Create bucket
-			_, err := s3Client.CreateBucket(&s3.CreateBucketInput{
-				Bucket: aws.String(splitPath[0]),
-			})
+			// Create mount bucket
+			err := minIOAdminClient.CreateS3PathWithWebhook(s3Client, splitPath, service.GetMinIOWebhookARN(), false)
 			if err != nil {
-				if aerr, ok := err.(awserr.Error); ok {
-					// Check if the error is caused because the bucket already exists
-					if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
-						log.Printf("The bucket \"%s\" already exists\n", splitPath[0])
-					} else {
-						return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
-					}
-				} else {
-					return fmt.Errorf("error creating bucket %s: %v", splitPath[0], err)
-				}
-			}
-			if !isUpdate {
-				if !isAdminUser {
-					if len(service.AllowedUsers) == 0 {
-						err = minIOAdminClient.AddServiceToAllUsersGroup(splitPath[0])
-						if err != nil {
-							return fmt.Errorf("error adding service %s to all users group: %v", splitPath[0], err)
-						}
-					} else {
-						err = minIOAdminClient.CreateServiceGroup(splitPath[0])
-						if err != nil {
-							return fmt.Errorf("error creating service group for bucket %s: %v", splitPath[0], err)
-						}
-
-						err = minIOAdminClient.UpdateUsersInGroup(service.AllowedUsers, splitPath[0], false)
-						if err != nil {
-							return err
-						}
-					}
-				}
-			}
-			// Create folder(s)
-			if len(splitPath) == 2 {
-				// Add "/" to the end of the key in order to create a folder
-				folderKey := fmt.Sprintf("%s/", splitPath[1])
-				_, err := s3Client.PutObject(&s3.PutObjectInput{
-					Bucket: aws.String(splitPath[0]),
-					Key:    aws.String(folderKey),
-				})
-				if err != nil {
-					return fmt.Errorf("error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
-				}
+				return err
 			}
 		}
-
 	}
 
 	return nil

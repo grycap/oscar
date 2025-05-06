@@ -37,39 +37,42 @@ var updateLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
 // MakeDeleteHandler makes a handler for deleting services
 func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		bucketName := c.Param("bucketName")
-		var uid string
-		var err error
-		var allowedUsers []string
-		// Check owner
-		if err := c.ShouldBindJSON(&allowedUsers); err != nil {
-			if allowedUsers != nil {
-				c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
-				return
-			}
+
+		var bucket utils.MinIOBucket
+		if err := c.ShouldBindJSON(&bucket); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
+			return
+
 		}
+		isAdminUser = false
+		//uid := cfg.Name
+
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
-			uid = cfg.Name
-			updateLogger.Printf("Updating bucket '%s' for user '%s'", bucketName, uid)
-		} else {
-			uid, err = auth.GetUIDFromContext(c)
-			updateLogger.Printf("Updating bucket '%s' for user '%s'", bucketName, uid)
+			isAdminUser = true
+		}
 
+		if !isAdminUser {
+			_, err := auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-				return
+
 			}
 		}
-		// Check if other policies exist
-		// Check if users in allowed_users have a MinIO associated user
-		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
-		err = UpdateBucket(minIOAdminClient, cfg.MinIOProvider.GetS3Client(), cfg, bucketName, uid, allowedUsers)
-		if err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-
+		if bucket.Visibility == PUBLIC {
+			// Check if is already public
+			// Set public
+		} else {
+			// Check if private -> user is in group members
 		}
+		//minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+
+		// err = UpdateBucket(minIOAdminClient, cfg.MinIOProvider.GetS3Client(), cfg, bucketName, uid, allowedUsers)
+		// if err != nil {
+		// 	c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+
+		// }
 
 		c.Status(http.StatusNoContent)
 	}

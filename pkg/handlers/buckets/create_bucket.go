@@ -23,8 +23,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
@@ -32,33 +30,28 @@ import (
 )
 
 const (
-	defaultMemory   = "256Mi"
-	defaultCPU      = "0.2"
-	defaultLogLevel = "INFO"
-	createPath      = "/system/services"
+	createPath = "/system/services"
+	PRIVATE    = "private"
+	PUBLIC     = "public"
+	RESTRICTED = "restricted"
 )
 
-//var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache)")
-//var overlappingError = "An object key name filtering rule defined with overlapping prefixes"
-
 // Custom logger
-var createLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
+var createLogger = log.New(os.Stdout, "[CREATE-BUCKETS-HANDLER] ", log.Flags())
 var isAdminUser = false
 
 // MakeCreateHandler makes a handler for creating services
 func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		bucketName := c.Param("bucketName")
-		var allowedUsers []string
-		var err error
-		if err := c.ShouldBindJSON(&allowedUsers); err != nil {
-			if allowedUsers != nil {
-				c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
-				return
-			}
+		var uid string
+		var bucket utils.MinIOBucket
+		if err := c.ShouldBindJSON(&bucket); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
+			return
+
 		}
 		isAdminUser = false
-		uid := cfg.Name
+		uid = cfg.Name
 
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
@@ -66,82 +59,48 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		if !isAdminUser {
+			var err error
 			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 
 			}
 		}
+		bucket.Owner = uid
+		// Use admin MinIO client for the bucket creation
+		s3Client := cfg.MinIOProvider.GetS3Client()
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-		//minio := cfg.MinIOProvider
-		err = CreateBucket(minIOAdminClient, cfg.MinIOProvider.GetS3Client(), bucketName, uid, allowedUsers)
-		if err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-		}
-		// Check if users in allowed_users have a MinIO associated user
 
-		createLogger.Printf("%s | %v | %s | %s | %s", "POST", 200, createPath, uid, bucketName)
+		path := strings.Trim(bucket.BucketPath, " /")
+		// Split buckets and folders from path
+		splitPath := strings.SplitN(path, "/", 2)
+		if err := minIOAdminClient.CreateS3Path(s3Client, splitPath, false); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("error creating a bucket with the name '%s' %v", splitPath[0], err))
+			return
+		}
+
+		if bucket.Visibility == PUBLIC {
+			err := minIOAdminClient.CreateAddPolicy(splitPath[0], ALL_USERS_GROUP, true)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("error adding bucket %s to all users group: %v", splitPath[0], err))
+				return
+			}
+		} else {
+			bucket.AllowedUsers = append(bucket.AllowedUsers, uid)
+			err := minIOAdminClient.CreateServiceGroup(splitPath[0])
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("error creating bucket policy: %v", err))
+				return
+			}
+			err = minIOAdminClient.UpdateUsersInGroup(bucket.AllowedUsers, splitPath[0], false)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("error creating bucket policy: %v", err))
+				return
+			}
+		}
+
+		createLogger.Printf("%s | %v | %s | %s | %s", "POST", 200, createPath, uid, bucket.BucketPath)
 		c.Status(http.StatusCreated)
 	}
 
-}
-
-func CreateBucket(minIOAdminClient *utils.MinIOAdminClient, s3Client *s3.S3, bucketName string, uid string, allowedUsers []string) error {
-
-	//minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-	createLogger.Printf("Creating bucket '%s' for user '%s'", bucketName, uid)
-
-	//Minio provider (maybe need to change, i dont know)
-	//minio := cfg.MinIOProvider
-	//s3Client := minio.GetS3Client()
-	// Create Bucket
-	splitPath := strings.SplitN(bucketName, "/", 2)
-	_, err := s3Client.CreateBucket(&s3.CreateBucketInput{
-		Bucket: aws.String(bucketName),
-	})
-
-	var folderKey string
-	if len(splitPath) == 2 {
-		// Add "/" to the end of the key in order to create a folder
-		folderKey = fmt.Sprintf("%s/", splitPath[1])
-		_, err := s3Client.PutObject(&s3.PutObjectInput{
-			Bucket: aws.String(splitPath[0]),
-			Key:    aws.String(folderKey),
-		})
-		if err != nil {
-			return fmt.Errorf("error creating folder \"%s\" in bucket \"%s\": %v", folderKey, splitPath[0], err)
-		}
-	}
-
-	if err != nil {
-		return err
-	}
-
-	// Make the bucket private to the user
-	if !isAdminUser {
-		err = minIOAdminClient.CreateAddPolicy(bucketName, uid, false)
-		createLogger.Printf("User '%s' have added the bucket '%s' to his policy", uid, bucketName)
-		if err != nil {
-			_, _ = s3Client.DeleteBucket(&s3.DeleteBucketInput{
-				Bucket: aws.String(bucketName),
-			})
-		}
-	}
-
-	// More users?
-	if allowedUsers != nil {
-		err := minIOAdminClient.UpdateUsersInGroup(allowedUsers, bucketName, false)
-		if err != nil {
-			return err
-		}
-		createLogger.Printf("Group of users '%s' have added the policy '%s'", allowedUsers, bucketName)
-
-		err = minIOAdminClient.CreateAddPolicy(bucketName, bucketName, true)
-		if err != nil {
-			return err
-		}
-		createLogger.Printf("Policy '%s' has added the bucket '%s' to his policy", bucketName, bucketName)
-
-	}
-	return nil
 }

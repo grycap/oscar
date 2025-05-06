@@ -25,9 +25,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/arn"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -37,11 +40,19 @@ import (
 const ALL_USERS_GROUP = "all_users_group"
 
 var minioLogger = log.New(os.Stdout, "[MINIO] ", log.Flags())
+var overlappingError = "An object key name filtering rule defined with overlapping prefixes"
 
 // MinIOAdminClient struct to represent a MinIO Admin client to configure webhook notifications
 type MinIOAdminClient struct {
 	adminClient   *madmin.AdminClient
 	oscarEndpoint *url.URL
+}
+
+type MinIOBucket struct {
+	BucketPath   string   `json:"bucket_path"`
+	Visibility   string   `json:"visibility"`
+	AllowedUsers []string `json:"allowed_users"`
+	Owner        string   `json:"owner"`
 }
 
 // Define the policy structure using Go structs
@@ -54,6 +65,12 @@ type Statement struct {
 type Policy struct {
 	Version   string      `json:"Version"`
 	Statement []Statement `json:"Statement"`
+}
+
+type ServicePolicy struct {
+	Type         string   `json:"Type"`
+	UIDS         []string `json:"UIDS"`
+	UpdatePolicy bool     `json:"UpdatePolicy"`
 }
 
 // MakeMinIOAdminClient creates a new MinIO Admin client to configure webhook notifications
@@ -115,6 +132,147 @@ func (minIOAdminClient *MinIOAdminClient) CreateMinIOUser(ak string, sk string) 
 	if err2 != nil {
 		return err2
 	}
+	return nil
+}
+
+func (minIOAdminClient *MinIOAdminClient) CreateS3PathWithWebhook(s3Client *s3.S3, path []string, arn string, bucketExists bool) error {
+	bucketKey := path[0]
+	if !bucketExists {
+		if err := createBucket(bucketKey, s3Client); err != nil {
+			return err
+		}
+	}
+	if len(path) < 2 {
+		return fmt.Errorf("error enabling webhook for bucket, missing foler on path \"%s\"", path)
+	} else {
+		folderKey := fmt.Sprintf("%s/", path[1])
+		_, err := s3Client.PutObject(&s3.PutObjectInput{
+			Bucket: aws.String(bucketKey),
+			Key:    aws.String(folderKey),
+		})
+		if err != nil {
+			return fmt.Errorf("error creating folder \"%s\" in bucket \"%s\": %v", folderKey, bucketKey, err)
+		}
+		if err := enableInputNotification(s3Client, arn, bucketKey, folderKey); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (minIOAdminClient *MinIOAdminClient) CreateS3Path(s3Client *s3.S3, path []string, bucketExists bool) error {
+	bucketKey := path[0]
+	// Only create the bucket itself if is input type to avoid recreation
+	if !bucketExists {
+		if err := createBucket(bucketKey, s3Client); err != nil {
+			return err
+		}
+	}
+
+	if len(path) >= 2 {
+		// Add "/" to the end of the key in order to create a folder
+		folderKey := fmt.Sprintf("%s/", path[1])
+		_, err := s3Client.PutObject(&s3.PutObjectInput{
+			Bucket: aws.String(bucketKey),
+			Key:    aws.String(folderKey),
+		})
+		if err != nil {
+			return fmt.Errorf("error creating folder \"%s\" in bucket \"%s\": %v", folderKey, bucketKey, err)
+		}
+	}
+	return nil
+}
+func createBucket(bucketKey string, s3Client *s3.S3) error {
+	_, err := s3Client.CreateBucket(&s3.CreateBucketInput{
+		Bucket: aws.String(bucketKey),
+	})
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			// Check if the error is caused because the bucket already exists
+			if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
+				log.Printf("The bucket \"%s\" already exists\n", bucketKey)
+			} else {
+				return fmt.Errorf("error creating bucket %s: %v", bucketKey, err)
+			}
+		} else {
+			return fmt.Errorf("error creating bucket %s: %v", bucketKey, err)
+		}
+	}
+	return nil
+}
+func enableInputNotification(s3Client *s3.S3, arnStr string, bucket string, path string) error {
+	gbncRequest := &s3.GetBucketNotificationConfigurationRequest{
+		Bucket: aws.String(bucket),
+	}
+	nCfg, err := s3Client.GetBucketNotificationConfiguration(gbncRequest)
+	if err != nil {
+		return fmt.Errorf("error getting bucket \"%s\" notifications: %v", bucket, err)
+	}
+	queueConfiguration := s3.QueueConfiguration{
+		QueueArn: aws.String(arnStr),
+		Events:   []*string{aws.String(s3.EventS3ObjectCreated)},
+	}
+
+	// Add folder filter if required
+	if path != "" {
+		queueConfiguration.Filter = &s3.NotificationConfigurationFilter{
+			Key: &s3.KeyFilter{
+				FilterRules: []*s3.FilterRule{
+					{
+						Name:  aws.String(s3.FilterRuleNamePrefix),
+						Value: aws.String(path),
+					},
+				},
+			},
+		}
+	}
+
+	// Append the new queueConfiguration
+	nCfg.QueueConfigurations = append(nCfg.QueueConfigurations, &queueConfiguration)
+	pbncInput := &s3.PutBucketNotificationConfigurationInput{
+		Bucket:                    aws.String(bucket),
+		NotificationConfiguration: nCfg,
+	}
+
+	// Enable the notification
+	_, err = s3Client.PutBucketNotificationConfiguration(pbncInput)
+
+	if err != nil && !strings.Contains(err.Error(), overlappingError) {
+		return fmt.Errorf("error enabling bucket notification: %v", err)
+	}
+
+	return nil
+}
+
+func disableInputNotifications(s3Client *s3.S3, arnStr string, bucket string) error {
+	parsedARN, _ := arn.Parse(arnStr)
+
+	updatedQueueConfigurations := []*s3.QueueConfiguration{}
+	// Get bucket notification
+	nCfg, err := s3Client.GetBucketNotificationConfiguration(&s3.GetBucketNotificationConfigurationRequest{Bucket: aws.String(bucket)})
+	if err != nil {
+		return fmt.Errorf("error getting bucket \"%s\" notifications: %v", bucket, err)
+	}
+
+	// Filter elements that doesn't match with service's ARN
+	for _, q := range nCfg.QueueConfigurations {
+		queueARN, _ := arn.Parse(*q.QueueArn)
+		if queueARN.Resource == parsedARN.Resource &&
+			queueARN.AccountID != parsedARN.AccountID {
+			updatedQueueConfigurations = append(updatedQueueConfigurations, q)
+		}
+	}
+
+	// Put the updated bucket configuration
+	nCfg.QueueConfigurations = updatedQueueConfigurations
+	pbncInput := &s3.PutBucketNotificationConfigurationInput{
+		Bucket:                    aws.String(bucket),
+		NotificationConfiguration: nCfg,
+	}
+	_, err = s3Client.PutBucketNotificationConfiguration(pbncInput)
+	if err != nil {
+		return fmt.Errorf("error disabling bucket notification: %v", err)
+	}
+
 	return nil
 }
 
@@ -302,7 +460,6 @@ func (minIOAdminClient *MinIOAdminClient) GetGroup(group string) (*madmin.GroupD
 func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucketName string, policyName string, isGroup bool) error {
 	var jsonErr error
 	var policy []byte
-	var resources []string
 
 	rs := "arn:aws:s3:::" + bucketName + "/*"
 	getPolicy, errInfo := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), policyName)
@@ -323,27 +480,15 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucketName string, pol
 			return jsonErr
 		}
 	} else {
-		jsonUnmarshal := &Policy{}
+		actualPolicy := &Policy{}
 
-		jsonErr = json.Unmarshal(getPolicy.Policy, jsonUnmarshal)
-		if len(jsonUnmarshal.Statement) > 0 && jsonErr == nil &&
-			policyName == ALL_USERS_GROUP && jsonUnmarshal.Statement[0].Effect == "Deny" {
-			resources = []string{rs}
-		} else if len(jsonUnmarshal.Statement) > 0 && jsonErr == nil {
-			resources = append(jsonUnmarshal.Statement[0].Resource, rs)
-		} else {
-			resources = []string{rs}
+		jsonErr = json.Unmarshal(getPolicy.Policy, actualPolicy)
+		if jsonErr != nil {
+			return jsonErr
 		}
-		actualPolicy := &Policy{
-			Version: "2012-10-17",
-			Statement: []Statement{
-				{
-					Resource: resources,
-					Action:   []string{"s3:*"},
-					Effect:   "Allow",
-				},
-			},
-		}
+		// Add new resource and create policy
+		actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, rs)
+
 		policy, jsonErr = json.Marshal(actualPolicy)
 		if jsonErr != nil {
 			return jsonErr
@@ -434,14 +579,6 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 		return jsonErr
 	}
 	if len(actualPolicy.Statement[0].Resource) == 1 {
-		if policyName == ALL_USERS_GROUP {
-			actualPolicy.Statement[0].Effect = "Deny"
-		} else {
-			if err := minIOAdminClient.adminClient.RemoveCannedPolicy(context.TODO(), policyName); err != nil {
-				return fmt.Errorf("error removing canned policy: %v", err)
-			}
-			return nil
-		}
 
 	} else {
 		for i, r := range actualPolicy.Statement[0].Resource {
@@ -469,6 +606,13 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 	return nil
 }
 
+func (minIOAdminClient *MinIOAdminClient) RemovePolicy(policyName string, isGroup bool) error {
+
+	if err := minIOAdminClient.adminClient.RemoveCannedPolicy(context.TODO(), policyName); err != nil {
+		return fmt.Errorf("error removing canned policy: %v", err)
+	}
+	return nil
+}
 func (minIOAdminClient *MinIOAdminClient) EmptyPolicy(policyName string, group bool) error {
 	err := minIOAdminClient.adminClient.SetPolicy(context.TODO(), "", policyName, group)
 	if err != nil {

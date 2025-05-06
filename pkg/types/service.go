@@ -253,6 +253,12 @@ type Service struct {
 
 	InterLinkNodeName string `json:"interlink_node_name"`
 
+	// Visibility sets which users will be able to interact with the service
+	// "private" The default state of the service, which means only the owner of the same can interact with it
+	// "public"  Every user can see the service and its buckets
+	// "restricted" A list of users, set on the "allowed_users" variable are able to interact with the service
+	Visibility string `json:"visibility"`
+
 	// AllowedUsers list of EGI UID's identifying the users that will have visibility of the service and its MinIO storage provider
 	// Optional (If the list is empty we asume the visibility is public for all cluster users)
 	AllowedUsers []string `json:"allowed_users"`
