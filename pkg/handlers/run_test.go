@@ -83,6 +83,8 @@ func TestMakeRunHandler(t *testing.T) {
 			}
 
 			r.ServeHTTP(GinResponseRecorder{w}, req)
+			// Sleep time to avoid HTTP error 503 on first request
+			time.Sleep(10)
 			if s.returnError {
 
 				if s.errType == "splitErr" || s.errType == "diffErr" {
