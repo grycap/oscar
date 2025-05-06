@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	"fmt"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -48,7 +49,12 @@ done`
 
 // SetMount Creates the sidecar container that mounts the source volume onto the pod volume
 func SetMount(podSpec *v1.PodSpec, service Service, cfg *Config) {
-	podSpec.Containers = append(podSpec.Containers, sidecarPodSpec(service))
+	podSpec.Containers = append(podSpec.Containers, sidecarPodSpec(service, cfg, cfg.Name))
+	addVolume(podSpec)
+}
+
+func SetMountUID(podSpec *v1.PodSpec, service Service, cfg *Config, uid string) {
+	podSpec.Containers = append(podSpec.Containers, sidecarPodSpec(service, cfg, uid))
 	addVolume(podSpec)
 }
 
@@ -82,7 +88,7 @@ func addVolume(podSpec *v1.PodSpec) {
 	podSpec.Volumes = append(podSpec.Volumes, ephemeralvolumeshare)
 }
 
-func sidecarPodSpec(service Service) v1.Container {
+func sidecarPodSpec(service Service, cfg *Config, uid string) v1.Container {
 	bidirectional := v1.MountPropagationBidirectional
 	var ptr *bool // Uninitialized pointer
 	value := true
@@ -120,7 +126,7 @@ func sidecarPodSpec(service Service) v1.Container {
 
 	provider := strings.Split(service.Mount.Provider, ".")
 	if provider[0] == MinIOName {
-		MinIOEnvVars := setMinIOEnvVars(service, provider[1])
+		MinIOEnvVars := setMinIOEnvVars(service, provider[1], cfg, uid)
 		container.Env = append(container.Env, MinIOEnvVars...)
 		container.Args = []string{"-c", minioCommand + communCommand}
 	}
@@ -133,27 +139,59 @@ func sidecarPodSpec(service Service) v1.Container {
 
 }
 
-func setMinIOEnvVars(service Service, providerId string) []v1.EnvVar {
+func setMinIOEnvVars(service Service, providerId string, cfg *Config, uid string) []v1.EnvVar {
 	//service.Mount.Provider
-	credentials := []v1.EnvVar{
+	variables := []v1.EnvVar{
 		{
 			Name:  "MINIO_BUCKET",
 			Value: service.Mount.Path,
-		},
-		{
-			Name:  "AWS_ACCESS_KEY_ID",
-			Value: service.StorageProviders.MinIO[providerId].AccessKey,
-		},
-		{
-			Name:  "AWS_SECRET_ACCESS_KEY",
-			Value: service.StorageProviders.MinIO[providerId].SecretKey,
 		},
 		{
 			Name:  "MINIO_ENDPOINT",
 			Value: service.StorageProviders.MinIO[providerId].Endpoint,
 		},
 	}
-	return credentials
+	if uid == cfg.Name {
+		credentials := []v1.EnvVar{
+			{
+				Name:  "AWS_ACCESS_KEY_ID",
+				Value: cfg.MinIOProvider.AccessKey,
+			},
+			{
+				Name:  "AWS_SECRET_ACCESS_KEY",
+				Value: cfg.MinIOProvider.SecretKey,
+			},
+		}
+		variables = append(variables, credentials...)
+	} else {
+		credentials := []v1.EnvVar{
+			{
+				Name: "AWS_ACCESS_KEY_ID",
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: uid,
+						},
+						Key: "accessKey",
+					},
+				},
+			},
+			{
+				Name: "AWS_SECRET_ACCESS_KEY",
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: uid,
+						},
+						Key: "secretKey",
+					},
+				},
+			},
+		}
+		variables = append(variables, credentials...)
+	}
+	fmt.Println(variables)
+	return variables
 }
 
 func setWebDavEnvVars(service Service, providerId string) []v1.EnvVar {

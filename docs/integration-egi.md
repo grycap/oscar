@@ -61,17 +61,17 @@ Dashboard deployment window, users can add one
 [EGI Virtual Organization](https://operations-portal.egi.eu/vo/a/list) to
 grant access for all users from that VO.
 
-![oscar-ui.png](images/oidc/im-dashboard-oidc.png)
+![oscar-dashboard.png](images/oidc/im-dashboard-oidc.png)
 
-### Accessing from OSCAR UI
+### Accessing from OSCAR Dashboard
 
 The static web interface of OSCAR has been integrated with EGI Check-in and
-published in [ui.oscar.grycap.net](https://ui.oscar.grycap.net) to facilitate
-the authorization of users. To login through EGI Checkín using OIDC tokens,
+published in [dashboard.oscar.grycap.net](https://dashboard.oscar.grycap.net) to facilitate
+the authorization of users. To login through EGI Check-In using OIDC tokens,
 users only have to put the endpoint of its OSCAR cluster and click on the
 "EGI CHECK-IN" button.
 
-![im-dashboard-oidc.png](images/oidc/oscar-ui.png)
+![im-dashboard-oidc.png](images/oidc/oscar-dashboard.png)
 
 ### Integration with OSCAR-CLI via OIDC Agent
 
@@ -87,3 +87,18 @@ create a new account configuration for the
 After that, clusters can be
 added with the command [`oscar-cli cluster add`](oscar-cli.md#add) specifying
 the oidc-agent account name with the `--oidc-account-name` flag.
+
+### Obtaining an Access Token
+
+Once logged in via EGI Check-In you can obtain an Access Token with one of this approaches:
+
+* From the command-line, using `oidc-agent` with the following command:
+
+    ```sh
+    oidc-token <account-short-name>
+    ```
+    where `account-short-name` is the name of your account configuration.
+    
+* From the EGI Check-In Token Portal: [https://aai.egi.eu/token](https://aai.egi.eu/token)
+
+![egi-checkin-token-portal.png](images/oidc/egi-checkin-token-portal.png)

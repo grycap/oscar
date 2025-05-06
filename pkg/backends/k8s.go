@@ -66,7 +66,7 @@ func (k *KubeBackend) ListServices() ([]*types.Service, error) {
 	services := []*types.Service{}
 
 	for _, cm := range configmaps.Items {
-		service, err := getServiceFromConfigMap(&cm)
+		service, err := getServiceFromConfigMap(&cm) // #nosec G601
 		if err != nil {
 			return nil, err
 		}
@@ -216,6 +216,14 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 		}
 	}
 
+	//Create deaemonset to cache the service image on all the nodes
+	if service.ImagePrefetch {
+		err = imagepuller.CreateDaemonset(k.config, service, k.kubeClientset)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -284,7 +292,9 @@ func checkAdditionalConfig(configName string, configNamespace string, service ty
 
 	return nil
 }
+func Test() {
 
+}
 func createServiceConfigMap(service *types.Service, namespace string, kubeClientset kubernetes.Interface) error {
 	// Copy script from service
 	script := service.Script

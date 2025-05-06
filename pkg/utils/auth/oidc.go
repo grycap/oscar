@@ -21,24 +21,29 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 
 	"net/http"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"golang.org/x/oauth2"
 	"k8s.io/client-go/kubernetes"
 )
 
 const (
-	// EGIGroupsURNPrefix prefix to identify EGI group URNs
+	// EGIGroupsURNPrefix prefix to identify EGI group URI
 	EGIGroupsURNPrefix = "urn:mace:egi.eu:group"
+	EGIIssuer          = "/realms/egi"
 	SecretKeyLength    = 10
 )
 
 var oidcLogger = log.New(os.Stdout, "[OIDC-AUTH] ", log.Flags())
+var ClusterOidcManagers = make(map[string]*oidcManager)
 
 // oidcManager struct to represent a OIDC manager, including a cache of tokens
 type oidcManager struct {
@@ -53,6 +58,14 @@ type oidcManager struct {
 type userInfo struct {
 	Subject string
 	Groups  []string
+}
+
+type KeycloakClaims struct {
+	GroupMembership []string `json:"group_membership"`
+}
+
+type EGIClaims struct {
+	EdupersonEntitlement []string `json:"eduperson_entitlement"`
 }
 
 // newOIDCManager returns a new oidcManager or error if the oidc.Provider can't be created
@@ -76,15 +89,25 @@ func NewOIDCManager(issuer string, subject string, groups []string) (*oidcManage
 }
 
 // getIODCMiddleware returns the Gin's handler middleware to validate OIDC-based auth
-func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *utils.MinIOAdminClient, issuer string, subject string, groups []string) gin.HandlerFunc {
-	oidcManager, err := NewOIDCManager(issuer, subject, groups)
-	if err != nil {
-		return func(c *gin.Context) {
-			c.AbortWithStatus(http.StatusUnauthorized)
+func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *utils.MinIOAdminClient, cfg *types.Config, oidcConfig *oidc.Config) gin.HandlerFunc {
+
+	for _, iss := range cfg.OIDCValidIssuers {
+		issuerManager, err := NewOIDCManager(iss, cfg.OIDCSubject, cfg.OIDCGroups)
+		if oidcConfig != nil {
+			issuerManager.config = oidcConfig
 		}
+		if err != nil {
+			return func(c *gin.Context) {
+				c.AbortWithStatus(http.StatusUnauthorized)
+				return
+			}
+		}
+
+		ClusterOidcManagers[iss] = issuerManager
+
 	}
 
-	mc := NewMultitenancyConfig(kubeClientset, subject)
+	mc := NewMultitenancyConfig(kubeClientset, cfg.OIDCSubject)
 
 	return func(c *gin.Context) {
 		// Get token from headers
@@ -94,7 +117,16 @@ func getOIDCMiddleware(kubeClientset *kubernetes.Clientset, minIOAdminClient *ut
 			return
 		}
 		rawToken := strings.TrimPrefix(authHeader, "Bearer ")
-
+		iss, err := GetIssuerFromToken(rawToken)
+		if err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("%v", err))
+			return
+		}
+		oidcManager := ClusterOidcManagers[iss]
+		if oidcManager == nil {
+			c.String(http.StatusUnauthorized, fmt.Sprintf("'%s' is not listed as an authorized issuer", iss))
+			return
+		}
 		// Check the token
 		if !oidcManager.IsAuthorised(rawToken) {
 			c.AbortWithStatus(http.StatusUnauthorized)
@@ -152,21 +184,34 @@ func (om *oidcManager) GetUserInfo(rawToken string) (*userInfo, error) {
 		return nil, err
 	}
 
-	// Get "eduperson_entitlement" claims
-	var claims struct {
-		EdupersonEntitlement []string `json:"eduperson_entitlement"`
+	// Get claims from the provider
+	providerAuth := om.provider.Endpoint().AuthURL
+	var cerr error
+	var groups []string
+	if strings.Contains(providerAuth, EGIIssuer) {
+		var claims EGIClaims
+		cerr = ui.Claims(&claims)
+		groups = getGroupsEGI(claims.EdupersonEntitlement)
+	} else {
+		var claims KeycloakClaims
+		cerr = ui.Claims(&claims)
+		groups = getGroupsKeycloak(claims.GroupMembership)
 	}
-	ui.Claims(&claims)
+
+	if cerr != nil {
+		return nil, cerr
+	}
 
 	// Create "userInfo" struct and add the groups
 	return &userInfo{
 		Subject: ui.Subject,
-		Groups:  getGroups(claims.EdupersonEntitlement),
+		Groups:  groups,
 	}, nil
 }
 
 // getGroups transforms "eduperson_entitlement" EGI URNs to a slice of group fields
-func getGroups(urns []string) []string {
+
+func getGroupsEGI(urns []string) []string {
 	groups := []string{}
 
 	for _, v := range urns {
@@ -178,31 +223,52 @@ func getGroups(urns []string) []string {
 			}
 		}
 	}
+	return groups
+}
+
+func getGroupsKeycloak(memberships []string) []string {
+	groups := []string{}
+
+	for _, v := range memberships {
+		m := strings.Split(v, "/")
+		if len(m) >= 3 {
+			vo := m[2]
+			if !slices.Contains(groups, vo) {
+				groups = append(groups, vo)
+			}
+		}
+
+	}
 
 	return groups
 }
 
-// UserHasVO checks if the user contained on the request token is enrolled on a specific VO
-func (om *oidcManager) UserHasVO(rawToken string, vo string) (bool, error) {
-	ui, err := om.GetUserInfo(rawToken)
+func GetIssuerFromToken(rawToken string) (string, error) {
+	token, _, err := new(jwt.Parser).ParseUnverified(rawToken, jwt.MapClaims{})
 	if err != nil {
-		return false, err
+		return "", err
 	}
+	claims, _ := token.Claims.(jwt.MapClaims)
+	iss, _ := claims.GetIssuer()
+	return iss, nil
+}
+
+// UserHasVO checks if the user contained on the request token is enrolled on a specific VO
+func (om *oidcManager) UserHasVO(ui *userInfo, vo string) bool {
 	for _, gr := range ui.Groups {
 		if vo == gr {
-			return true, nil
+			return true
 		}
 	}
-	return false, nil
+	return false
 }
 
 func (om *oidcManager) GetUID(rawToken string) (string, error) {
 	ui, err := om.GetUserInfo(rawToken)
-	oidcLogger.Println("received uid: ", ui.Subject)
 	if err != nil {
-		return ui.Subject, nil
+		return "", err
 	}
-	return "", err
+	return ui.Subject, nil
 }
 
 // IsAuthorised checks if a token is authorised to access the API
@@ -221,18 +287,11 @@ func (om *oidcManager) IsAuthorised(rawToken string) bool {
 		if err != nil {
 			return false
 		}
-
 		// Store userInfo in cache
 		om.tokenCache[rawToken] = ui
 
 		// Call clearExpired to delete expired tokens
 		om.clearExpired()
-	}
-
-	// Check if is authorised
-	// Same subject
-	if ui.Subject == om.subject {
-		return true
 	}
 
 	// Groups

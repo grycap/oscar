@@ -83,7 +83,13 @@ func DeleteExpose(name string, kubeClientset kubernetes.Interface, cfg *Config) 
 
 	ingressType := existsIngress(name, cfg.ServicesNamespace, kubeClientset)
 	if ingressType {
-		err = deleteIngress(name, kubeClientset, cfg)
+		err = deleteIngress(getIngressName(name), kubeClientset, cfg)
+		if existsSecret(name, kubeClientset, cfg) {
+			err = deleteSecret(name, kubeClientset, cfg)
+			if err != nil {
+				return err
+			}
+		}
 		if err != nil {
 			return fmt.Errorf("error deleting ingress for exposed service '%s': %v", name, err)
 		}
@@ -124,7 +130,13 @@ func UpdateExpose(service Service, kubeClientset kubernetes.Interface, cfg *Conf
 	if ingressType {
 		// New service config if NodePort
 		if service.Expose.NodePort != 0 {
-			err = deleteIngress(service.Name, kubeClientset, cfg)
+			err = deleteIngress(getIngressName(service.Name), kubeClientset, cfg)
+			if existsSecret(service.Name, kubeClientset, cfg) {
+				err := deleteSecret(service.Name, kubeClientset, cfg)
+				if err != nil {
+					return err
+				}
+			}
 			if err != nil {
 				log.Printf("error deleting ingress service: %v\n", err)
 				return err
@@ -152,8 +164,8 @@ func UpdateExpose(service Service, kubeClientset kubernetes.Interface, cfg *Conf
 
 // TODO check and refactor
 // Main function that list all the kubernetes components
-// This function is not used, in the future could be usefull
-func ListExpose(service Service, kubeClientset kubernetes.Interface, cfg *Config) error {
+// This function is not used, in the future could be useful
+func ListExpose(kubeClientset kubernetes.Interface, cfg *Config) error {
 	deploy, hpa, err := listDeployments(kubeClientset, cfg)
 
 	services, err2 := listServices(kubeClientset, cfg)
@@ -164,11 +176,11 @@ func ListExpose(service Service, kubeClientset kubernetes.Interface, cfg *Config
 	}
 	if err2 != nil {
 		ExposeLogger.Printf("WARNING: %v\n", err2)
-		return err
+		return err2
 	}
 	if err3 != nil {
 		ExposeLogger.Printf("WARNING: %v\n", err3)
-		return err
+		return err3
 	}
 	fmt.Println(deploy, hpa, services, ingress)
 	return nil
@@ -246,11 +258,11 @@ func getHortizontalAutoScaleSpec(service Service, cfg *Config) *autos.Horizontal
 func getPodTemplateSpec(service Service, cfg *Config) v1.PodTemplateSpec {
 	podSpec, _ := service.ToPodSpec(cfg)
 
-	for i, _ := range podSpec.Containers {
+	for i := range podSpec.Containers {
 		podSpec.Containers[i].Ports = []v1.ContainerPort{
 			{
 				Name:          podPortName,
-				ContainerPort: int32(service.Expose.APIPort),
+				ContainerPort: int32(service.Expose.APIPort), // #nosec G115
 			},
 		}
 		podSpec.Containers[i].VolumeMounts[0].ReadOnly = false
@@ -323,7 +335,10 @@ func updateDeployment(service Service, kubeClientset kubernetes.Interface, cfg *
 		return err
 	}
 
-	kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(cfg.ServicesNamespace).Get(context.TODO(), getHPAName(service.Name), metav1.GetOptions{})
+	_, err = kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(cfg.ServicesNamespace).Get(context.TODO(), getHPAName(service.Name), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
 	hpa := getHortizontalAutoScaleSpec(service, cfg)
 	_, err = kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(cfg.ServicesNamespace).Update(context.TODO(), hpa, metav1.UpdateOptions{})
 	if err != nil {
@@ -352,7 +367,7 @@ func getServiceSpec(service Service, cfg *Config) *v1.Service {
 		Port: servicePortNumber,
 		TargetPort: intstr.IntOrString{
 			Type:   0,
-			IntVal: int32(service.Expose.APIPort),
+			IntVal: int32(service.Expose.APIPort), // #nosec G115
 		},
 	}
 	service_type := v1.ServiceType(typeClusterIP)
@@ -414,13 +429,16 @@ func deleteService(name string, kubeClientset kubernetes.Interface, cfg *Config)
 func createIngress(service Service, kubeClientset kubernetes.Interface, cfg *Config) error {
 	// Create Secret
 
-	ingress := getIngressSpec(service, kubeClientset, cfg)
+	ingress := getIngressSpec(service, cfg)
 	_, err := kubeClientset.NetworkingV1().Ingresses(cfg.ServicesNamespace).Create(context.TODO(), ingress, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
 	if service.Expose.SetAuth {
-		createSecret(service, kubeClientset, cfg)
+		cerr := createSecret(service, kubeClientset, cfg)
+		if cerr != nil {
+			return cerr
+		}
 	}
 	return nil
 }
@@ -432,7 +450,7 @@ func updateIngress(service Service, kubeClientset kubernetes.Interface, cfg *Con
 	//if exist continue and need -> Update
 	//if exist and not need -> delete
 	//if not  exist create
-	kube_ingress := getIngressSpec(service, kubeClientset, cfg)
+	kube_ingress := getIngressSpec(service, cfg)
 	_, err := kubeClientset.NetworkingV1().Ingresses(cfg.ServicesNamespace).Update(context.TODO(), kube_ingress, metav1.UpdateOptions{})
 	if err != nil {
 		return err
@@ -441,13 +459,22 @@ func updateIngress(service Service, kubeClientset kubernetes.Interface, cfg *Con
 	secret := existsSecret(serviceName, kubeClientset, cfg)
 	if secret {
 		if service.Expose.SetAuth {
-			updateSecret(service, kubeClientset, cfg)
+			uerr := updateSecret(service, kubeClientset, cfg)
+			if uerr != nil {
+				return uerr
+			}
 		} else {
-			deleteSecret(service.Name, kubeClientset, cfg)
+			derr := deleteSecret(service.Name, kubeClientset, cfg)
+			if derr != nil {
+				return derr
+			}
 		}
 	} else {
 		if service.Expose.SetAuth {
-			createSecret(service, kubeClientset, cfg)
+			cerr := createSecret(service, kubeClientset, cfg)
+			if cerr != nil {
+				return cerr
+			}
 		}
 	}
 
@@ -455,11 +482,11 @@ func updateIngress(service Service, kubeClientset kubernetes.Interface, cfg *Con
 }
 
 // Return a kubernetes ingress component, ready to deploy or update
-func getIngressSpec(service Service, kubeClientset kubernetes.Interface, cfg *Config) *net.Ingress {
+func getIngressSpec(service Service, cfg *Config) *net.Ingress {
 	name_ingress := getIngressName(service.Name)
 	pathofapi := getAPIPath(service.Name)
 	name_service := getServiceName(service.Name)
-	var ptype net.PathType = "Prefix"
+	var ptype net.PathType = "ImplementationSpecific"
 	var ingresspath net.HTTPIngressPath = net.HTTPIngressPath{
 		Path:     pathofapi + "/?(.*)",
 		PathType: &ptype,
@@ -498,9 +525,11 @@ func getIngressSpec(service Service, kubeClientset kubernetes.Interface, cfg *Co
 			Hosts:      []string{host},
 			SecretName: host,
 		}
+		ingressClassName := "nginx"
 		specification = net.IngressSpec{
-			TLS:   []net.IngressTLS{tls},
-			Rules: []net.IngressRule{rule}, //IngressClassName:
+			IngressClassName: &ingressClassName,
+			TLS:              []net.IngressTLS{tls},
+			Rules:            []net.IngressRule{rule}, //IngressClassName:
 		}
 	}
 
@@ -547,14 +576,13 @@ func deleteIngress(name string, kubeClientset kubernetes.Interface, cfg *Config)
 	if err != nil {
 		return err
 	}
-	deleteSecret(name, kubeClientset, cfg)
 	return nil
 }
 
 // Secret
 
 func createSecret(service Service, kubeClientset kubernetes.Interface, cfg *Config) error {
-	secret := getSecretSpec(service, kubeClientset, cfg)
+	secret := getSecretSpec(service, cfg)
 	_, err := kubeClientset.CoreV1().Secrets(cfg.ServicesNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	if err != nil {
 		return err
@@ -563,7 +591,7 @@ func createSecret(service Service, kubeClientset kubernetes.Interface, cfg *Conf
 }
 
 func updateSecret(service Service, kubeClientset kubernetes.Interface, cfg *Config) error {
-	secret := getSecretSpec(service, kubeClientset, cfg)
+	secret := getSecretSpec(service, cfg)
 	_, err := kubeClientset.CoreV1().Secrets(cfg.ServicesNamespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
 	if err != nil {
 		return err
@@ -579,12 +607,12 @@ func deleteSecret(name string, kubeClientset kubernetes.Interface, cfg *Config) 
 	}
 	return nil
 }
-func getSecretSpec(service Service, kubeClientset kubernetes.Interface, cfg *Config) *v1.Secret {
+func getSecretSpec(service Service, cfg *Config) *v1.Secret {
 	//setPassword
 	hash := make(htpasswd.HashedPasswords)
 	err := hash.SetPassword(service.Name, service.Token, htpasswd.HashAPR1)
 	if err != nil {
-		ExposeLogger.Printf(err.Error())
+		ExposeLogger.Print(err.Error())
 	}
 	//Create Secret
 	inmutable := false
@@ -620,10 +648,7 @@ func existsSecret(serviceName string, kubeClientset kubernetes.Interface, cfg *C
 
 func existsIngress(serviceName string, namespace string, kubeClientset kubernetes.Interface) bool {
 	_, err := kubeClientset.NetworkingV1().Ingresses(namespace).Get(context.TODO(), getIngressName(serviceName), metav1.GetOptions{})
-	if err == nil {
-		return true
-	}
-	return false
+	return err == nil
 }
 
 /// These are auxiliary functions
