@@ -486,7 +486,7 @@ func getIngressSpec(service Service, cfg *Config) *net.Ingress {
 	name_ingress := getIngressName(service.Name)
 	pathofapi := getAPIPath(service.Name)
 	name_service := getServiceName(service.Name)
-	var ptype net.PathType = "Prefix"
+	var ptype net.PathType = "ImplementationSpecific"
 	var ingresspath net.HTTPIngressPath = net.HTTPIngressPath{
 		Path:     pathofapi + "/?(.*)",
 		PathType: &ptype,
