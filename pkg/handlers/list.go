@@ -46,7 +46,7 @@ func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 				return
 			}
 
-			var allowedServicesForUser []*types.Service
+			allowedServicesForUser := []*types.Service{}
 			for _, service := range services {
 				if len(service.AllowedUsers) == 0 || slices.Contains(service.AllowedUsers, uid) {
 					allowedServicesForUser = append(allowedServicesForUser, service)
