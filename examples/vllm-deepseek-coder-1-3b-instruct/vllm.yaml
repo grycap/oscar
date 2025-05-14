@@ -1,0 +1,20 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: vllm-gpu-deepseek-coder-1-3b
+      cpu: '2.0'
+      memory: 10Gi
+      image: ghcr.io/rk181/vllm-gpu-deepseek-coder-1-3b:latest
+      script: script.sh
+      environment:
+        Variables:
+          OPENAI_BASE_URL: "/system/services/vllm-gpu-deepseek-coder-1-3b/exposed" # Root URL for the service
+          API_KEY: "secretkey" # API key for authentication 
+          GPU_MEMORY_UTILIZATION: "0.4" # 40% of GPU memory
+          MAX_MODEL_LEN: "10000" # 10k tokens
+      expose:
+        min_scale: 1
+        max_scale: 1
+        api_port: 8000
+        cpu_threshold: 90
+        rewrite_target: true
