@@ -162,17 +162,8 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						userBucket = splitPath[0] + "-" + user[:10]
 						service.BucketList = append(service.BucketList, userBucket)
 					}
-				} else {
-					index := 0
-					for !ownerOnList {
-						// Check the uid of the owner is on the allowed_users list
-						// If isolation level is not user the list may not need to be go through fully
-						if service.AllowedUsers[index] == service.Owner {
-							ownerOnList = true
-						}
-						index++
-					}
 				}
+
 				if !ownerOnList {
 					service.AllowedUsers = append(service.AllowedUsers, uid)
 				}
