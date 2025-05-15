@@ -65,7 +65,7 @@ To deploy the service, you can use either [OSCAR CLI](https://github.com/grycap/
 oscar-cli apply vllm.yaml
 ```
 
-## 4. Check the work of the service
+## 4. Access and test the service
 
 You can test your service in different ways:
 
