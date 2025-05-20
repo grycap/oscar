@@ -25,6 +25,8 @@ import (
 
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -322,7 +324,18 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service) (*kn
 			},
 		},
 	}
-
+	// Add secrets as environment variables if defined
+	if utils.SecretExists(service.Name, kn.namespace, kn.GetKubeClientset()) {
+		podSpec.Containers[0].EnvFrom = []v1.EnvFromSource{
+			{
+				SecretRef: &v1.SecretEnvSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: service.Name,
+					},
+				},
+			},
+		}
+	}
 	// Add to the service labels the user VO for accounting on knative pods
 	if service.Labels["vo"] != "" {
 		knSvc.Spec.ConfigurationSpec.Template.ObjectMeta.Labels["vo"] = service.Labels["vo"]
