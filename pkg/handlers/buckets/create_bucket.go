@@ -78,23 +78,31 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("error creating a bucket with the name '%s' %v", splitPath[0], err))
 			return
 		}
-
-		if bucket.Visibility == PUBLIC {
-			err := minIOAdminClient.CreateAddPolicy(splitPath[0], ALL_USERS_GROUP, true)
-			if err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintf("error adding bucket %s to all users group: %v", splitPath[0], err))
+		// If not specified default visibility is PRIVATE
+		visibility := strings.ToLower(bucket.Visibility)
+		if bucket.Visibility == "" {
+			visibility = utils.PRIVATE
+		}
+		if visibility == RESTRICTED || visibility == PRIVATE {
+			// Both types of visibility require config of the user policy
+			if err := minIOAdminClient.CreateAddPolicy(splitPath[0], bucket.Owner, utils.ALL_ACTIONS, false); err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln("error creating policy for user: %v", err))
 				return
+			}
+			if visibility == RESTRICTED {
+				if err := minIOAdminClient.CreateAddGroup(splitPath[0], bucket.AllowedUsers, false); err != nil {
+					c.String(http.StatusInternalServerError, fmt.Sprintln("error creating group: %v", err))
+					return
+				}
+				if err := minIOAdminClient.CreateAddPolicy(splitPath[0], splitPath[0], utils.RESTRICTED_ACTIONS, true); err != nil {
+					c.String(http.StatusInternalServerError, fmt.Sprintln("error creating group: %v", err))
+					return
+				}
 			}
 		} else {
-			bucket.AllowedUsers = append(bucket.AllowedUsers, uid)
-			err := minIOAdminClient.CreateServiceGroup(splitPath[0])
-			if err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintf("error creating bucket policy: %v", err))
-				return
-			}
-			err = minIOAdminClient.UpdateUsersInGroup(bucket.AllowedUsers, splitPath[0], false)
-			if err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintf("error creating bucket policy: %v", err))
+			// Config public visibility
+			if err := minIOAdminClient.CreateAddPolicy(splitPath[0], ALL_USERS_GROUP, utils.ALL_ACTIONS, true); err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln("error creating policy for user: %v", err))
 				return
 			}
 		}

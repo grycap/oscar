@@ -60,6 +60,7 @@ type MinIOAdminClient struct {
 }
 
 // MinIOBucket definition to create buckets independent of a service
+// Note: BucketPath refers to bucket name
 type MinIOBucket struct {
 	BucketPath   string   `json:"bucket_path"`
 	Visibility   string   `json:"visibility"`
@@ -429,6 +430,35 @@ func (minIOAdminClient *MinIOAdminClient) GetGroup(group string) (*madmin.GroupD
 	return groupDesc, nil
 }
 
+// UserInPolicy asserts if a user policy has a given resource (bucketPath)
+func (minIOAdminClient *MinIOAdminClient) UserInPolicy(uid string, bucket MinIOBucket) bool {
+	if bucket.Visibility == PUBLIC {
+		return true
+	}
+	rs := "arn:aws:s3:::" + bucket.BucketPath + "/*"
+	getPolicy, err := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), uid)
+	if err != nil {
+		fmt.Printf("error reading policy for user %s", uid)
+		return false
+	}
+
+	// Search resource on user policy
+	actualPolicy := &Policy{}
+
+	jsonErr := json.Unmarshal(getPolicy.Policy, actualPolicy)
+	if jsonErr != nil {
+		fmt.Printf("error parsing policy for user %s", uid)
+		return false
+	}
+
+	for _, r := range actualPolicy.Statement[0].Resource {
+		if r == rs {
+			return true
+		}
+	}
+	return false
+}
+
 // CreateAddPolicy creates a policy asociated to a bucket to set its visibility
 func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucket string, policyName string, policyActions []string, isGroup bool) error {
 	var jsonErr error
@@ -512,7 +542,9 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 	}
 	return nil
 }
-func (minIOAdminClient *MinIOAdminClient) DeleteBucket(s3Client *s3.S3, bucketName string, policyName string) error {
+
+// DeleteBucket deletes a MinIO bucket and its contents
+func (minIOAdminClient *MinIOAdminClient) DeleteBucket(s3Client *s3.S3, bucketName string) error {
 
 	iter := s3manager.NewDeleteListIterator(s3Client, &s3.ListObjectsInput{
 		Bucket: aws.String(bucketName),
@@ -532,6 +564,7 @@ func (minIOAdminClient *MinIOAdminClient) DeleteBucket(s3Client *s3.S3, bucketNa
 	return nil
 }
 
+// RemoveResource deletes a resource from a given policy
 func (minIOAdminClient *MinIOAdminClient) RemoveResource(bucketName string, policyName string, isGroup bool) error {
 	var policy []byte
 	var jsonErr error
@@ -567,6 +600,7 @@ func (minIOAdminClient *MinIOAdminClient) RemoveResource(bucketName string, poli
 	return nil
 }
 
+// RemoveGroupPolicy a group and its associated policy
 func (minIOAdminClient *MinIOAdminClient) RemoveGroupPolicy(policyName string) error {
 
 	// Empty group

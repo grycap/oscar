@@ -98,6 +98,15 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusInternalServerError, "Error deleting service buckets: ", err)
 		}
 
+		if len(service.BucketList) > 0 && strings.ToUpper(service.IsolationLevel) == "USER" {
+			for i, b := range service.BucketList {
+				err = minIOAdminClient.RemoveResource(b, service.AllowedUsers[i], false)
+				if err != nil {
+					c.String(http.StatusInternalServerError, "error while removing isolated bucket %v", err)
+				}
+			}
+		}
+
 		// Add Yunikorn queue if enabled
 		if cfg.YunikornEnable {
 			if err := utils.DeleteYunikornQueue(cfg, back.GetKubeClientset(), service); err != nil {
@@ -154,34 +163,16 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		path := strings.Trim(in.Path, " /")
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
-		var policyName string
-		var isGroup bool
-		if strings.ToLower(service.Visibility) == utils.PUBLIC {
-			policyName = ALL_USERS_GROUP
-		} else {
-			isGroup = false
-			policyName = service.Owner
-		}
 
-		err := minIOAdminClient.RemoveResource(splitPath[0], policyName, isGroup)
+		err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+			BucketPath:   splitPath[0],
+			Visibility:   service.Visibility,
+			AllowedUsers: service.AllowedUsers,
+			Owner:        service.Owner,
+		})
+
 		if err != nil {
-			return fmt.Errorf("error removing resource")
-		}
-
-		if strings.ToLower(service.Visibility) == utils.RESTRICTED {
-			err := minIOAdminClient.RemoveGroupPolicy(service.Name)
-			if err != nil {
-				return fmt.Errorf("error removing policy for group")
-			}
-		}
-
-		if len(service.BucketList) > 0 && strings.ToUpper(service.IsolationLevel) == "USER" {
-			for i, b := range service.BucketList {
-				err = minIOAdminClient.RemoveResource(b, service.AllowedUsers[i], false)
-				if err != nil {
-					return fmt.Errorf("error while removing isolated bucket %v", err)
-				}
-			}
+			return fmt.Errorf("error while removing MinIO bucket %v", err)
 		}
 
 		// Disable input notifications for service bucket
@@ -209,6 +200,35 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	}
 	// TODO check if some components of mount need to be deleted
 
+	return nil
+}
+
+func DeleteMinIOBuckets(s3Client *s3.S3, minIOAdminClient *utils.MinIOAdminClient, bucket utils.MinIOBucket) error {
+	var policyName string
+	var isGroup bool
+	if strings.ToLower(bucket.Visibility) == utils.PUBLIC {
+		policyName = ALL_USERS_GROUP
+		isGroup = true
+	} else {
+		policyName = bucket.Owner
+	}
+
+	err := minIOAdminClient.RemoveResource(bucket.BucketPath, policyName, isGroup)
+	if err != nil {
+		return fmt.Errorf("error removing resource")
+	}
+
+	if strings.ToLower(bucket.Visibility) == utils.RESTRICTED {
+		err := minIOAdminClient.RemoveGroupPolicy(bucket.BucketPath)
+		if err != nil {
+			return fmt.Errorf("error removing policy for group")
+		}
+	}
+
+	err = minIOAdminClient.DeleteBucket(s3Client, bucket.BucketPath)
+	if err != nil {
+		return fmt.Errorf("error deleting bucket %s, %v", bucket.BucketPath, err)
+	}
 	return nil
 }
 

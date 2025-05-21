@@ -25,7 +25,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/cdmi-client-go"
@@ -43,7 +42,6 @@ const (
 )
 
 var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache)")
-var overlappingError = "An object key name filtering rule defined with overlapping prefixes"
 
 // Custom logger
 var createLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
@@ -175,7 +173,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 
 			// Empty the secrets content from the Configmap
-			for secretKey, _ := range service.Environment.Secrets {
+			for secretKey := range service.Environment.Secrets {
 				service.Environment.Secrets[secretKey] = ""
 			}
 		}
@@ -534,49 +532,4 @@ func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider,
 	}
 
 	return minIOAdminClient.RestartServer()
-}
-
-// TODO pass the user UID string
-func enableInputNotification(minIOClient *s3.S3, arnStr string, bucket string, path string) error {
-	gbncRequest := &s3.GetBucketNotificationConfigurationRequest{
-		Bucket: aws.String(bucket),
-	}
-	nCfg, err := minIOClient.GetBucketNotificationConfiguration(gbncRequest)
-	if err != nil {
-		return fmt.Errorf("error getting bucket \"%s\" notifications: %v", bucket, err)
-	}
-	queueConfiguration := s3.QueueConfiguration{
-		QueueArn: aws.String(arnStr),
-		Events:   []*string{aws.String(s3.EventS3ObjectCreated)},
-	}
-
-	// Add folder filter if required
-	if path != "" {
-		queueConfiguration.Filter = &s3.NotificationConfigurationFilter{
-			Key: &s3.KeyFilter{
-				FilterRules: []*s3.FilterRule{
-					{
-						Name:  aws.String(s3.FilterRuleNamePrefix),
-						Value: aws.String(path),
-					},
-				},
-			},
-		}
-	}
-
-	// Append the new queueConfiguration
-	nCfg.QueueConfigurations = append(nCfg.QueueConfigurations, &queueConfiguration)
-	pbncInput := &s3.PutBucketNotificationConfigurationInput{
-		Bucket:                    aws.String(bucket),
-		NotificationConfiguration: nCfg,
-	}
-
-	// Enable the notification
-	_, err = minIOClient.PutBucketNotificationConfiguration(pbncInput)
-
-	if err != nil && !strings.Contains(err.Error(), overlappingError) {
-		return fmt.Errorf("error enabling bucket notification: %v", err)
-	}
-
-	return nil
 }

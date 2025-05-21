@@ -37,8 +37,7 @@ func MakeListHandler(cfg *types.Config, back types.ServerlessBackend) gin.Handle
 		var err error
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
-			createLogger.Printf("Listing buckets of user '%s'", cfg.Name)
-			output, err := ListBucket(cfg.MinIOProvider.GetS3Client())
+			output, err := ListUserBuckets(cfg.MinIOProvider.GetS3Client())
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, err)
 			}
@@ -47,19 +46,16 @@ func MakeListHandler(cfg *types.Config, back types.ServerlessBackend) gin.Handle
 		} else {
 			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, err)
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 
 			}
 			mc, err := auth.GetMultitenancyConfigFromContext(c)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, err)
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
 			ak, sk, err := mc.GetUserCredentials(uid)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, err)
 				c.String(http.StatusInternalServerError, "Error getting credentials for MinIO user: ", uid)
 			}
 
@@ -70,17 +66,18 @@ func MakeListHandler(cfg *types.Config, back types.ServerlessBackend) gin.Handle
 				SecretKey: sk,
 				Region:    cfg.MinIOProvider.Region,
 			}
-			output, err := ListBucket(userMinIOProvider.GetS3Client())
+
+			bucketsList, err := ListUserBuckets(userMinIOProvider.GetS3Client())
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, err)
 			}
-			c.JSON(http.StatusOK, output)
+			c.JSON(http.StatusOK, bucketsList)
 
 		}
 	}
 }
 
-func ListBucket(s3Client *s3.S3) (*s3.ListBucketsOutput, error) {
+func ListUserBuckets(s3Client *s3.S3) (*s3.ListBucketsOutput, error) {
 	output, err := s3Client.ListBuckets(&s3.ListBucketsInput{})
 	if err != nil {
 		return nil, err
