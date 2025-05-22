@@ -92,6 +92,20 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 			}
 		}
+		if len(newService.Environment.Secrets) > 0 {
+			if utils.SecretExists(newService.Name, cfg.ServicesNamespace, back.GetKubeClientset()) {
+				secretsErr := utils.UpdateSecretData(newService.Name, cfg.ServicesNamespace, newService.Environment.Secrets, back.GetKubeClientset())
+				if secretsErr != nil {
+					c.String(http.StatusInternalServerError, "error updating asociated secret: %v", secretsErr)
+				}
+			} else {
+				secretsErr := utils.CreateSecret(newService.Name, cfg.ServicesNamespace, newService.Environment.Secrets, back.GetKubeClientset())
+				if secretsErr != nil {
+					c.String(http.StatusInternalServerError, "error adding asociated secret: %v", secretsErr)
+				}
+			}
+		}
+
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
 		for _, in := range oldService.Input {
@@ -122,13 +136,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 					newService.BucketList = newBucketList
 				}
-				secretName := newService.Name + "-" + types.GenerateDeterministicString(newService.Name)
-				if utils.SecretExists(secretName, cfg.ServicesNamespace, back.GetKubeClientset()) {
-					secretsErr := utils.UpdateSecretData(secretName, cfg.ServicesNamespace, newService.Environment.Secrets, back.GetKubeClientset())
-					if secretsErr != nil {
-						c.String(http.StatusInternalServerError, "Error updating asociated secret: %v", secretsErr)
-					}
-				}
+
 				// Update the group with allowe users, it empthy and add them again
 				err = updateGroup(splitPath[0], oldService, &newService, minIOAdminClient, s3Client)
 				if err != nil {
@@ -146,12 +154,6 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						log.Println(uerr.Error())
 					}
 					c.String(http.StatusInternalServerError, err.Error())
-					return
-				}
-
-				// Update the service
-				if err := back.UpdateService(newService); err != nil {
-					c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
 					return
 				}
 
@@ -181,11 +183,9 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 			c.Status(http.StatusNoContent)
 		}
-		if len(oldService.Input) == 0 {
-			if err := back.UpdateService(newService); err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
-				return
-			}
+		if err := back.UpdateService(newService); err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
+			return
 		}
 
 	}

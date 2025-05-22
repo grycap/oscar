@@ -17,11 +17,8 @@ limitations under the License.
 package types
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/goccy/go-yaml"
 	v1 "k8s.io/api/core/v1"
@@ -341,13 +338,6 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 		podSpec.Volumes = append(podSpec.Volumes, volume)
 	}
 
-	// Add secrets as environment variables if defined
-	if len(service.Environment.Secrets) > 0 {
-		secretName := GenerateDeterministicString(service.Name)
-		secretMountSpec := ConvertSecretsEnvVars(secretName)
-		podSpec.Containers[0].EnvFrom = secretMountSpec
-	}
-
 	// Add the required environment variables for the watchdog
 	addWatchdogEnvVars(podSpec, cfg, service)
 
@@ -508,10 +498,4 @@ func (service *Service) GetSupervisorPath() string {
 // HasReplicas checks if the service has replicas defined
 func (service *Service) HasReplicas() bool {
 	return len(service.Replicas) > 0
-}
-
-// GenerateDeterministicString creates a fixed "random" string based on input
-func GenerateDeterministicString(input string) string {
-	hash := sha256.Sum256([]byte(input))                                    // Hash the input
-	return strings.ToLower(base64.URLEncoding.EncodeToString(hash[:])[:10]) // Take first 10 chars
 }

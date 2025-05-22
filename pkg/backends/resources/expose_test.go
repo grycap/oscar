@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package types
+package resources
 
 import (
 	"testing"
 
+	"github.com/grycap/oscar/v3/pkg/types"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -51,16 +52,16 @@ func TestCreateExpose(t *testing.T) {
 
 	kubeClientset := testclient.NewSimpleClientset()
 
-	service := Service{
+	service := types.Service{
 		Name: "test-service",
-		Expose: Expose{
+		Expose: types.Expose{
 			MinScale:     1,
 			MaxScale:     3,
 			CpuThreshold: 80,
 			SetAuth:      true,
 		},
 	}
-	cfg := &Config{ServicesNamespace: "namespace"}
+	cfg := &types.Config{ServicesNamespace: "namespace"}
 
 	err := CreateExpose(service, kubeClientset, cfg)
 
@@ -70,6 +71,7 @@ func TestCreateExpose(t *testing.T) {
 
 	actions := kubeClientset.Actions()
 	expected_actions := []Action{
+		{Verb: "get", Resource: "secrets"},
 		{Verb: "create", Resource: "deployments"},
 		{Verb: "create", Resource: "horizontalpodautoscalers"},
 		{Verb: "create", Resource: "services"},
@@ -106,7 +108,7 @@ func TestDeleteExpose(t *testing.T) {
 	}
 
 	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
-	cfg := &Config{ServicesNamespace: "namespace"}
+	cfg := &types.Config{ServicesNamespace: "namespace"}
 
 	err := DeleteExpose("service", kubeClientset, cfg)
 
@@ -153,11 +155,11 @@ func TestUpdateExpose(t *testing.T) {
 	}
 
 	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
-	cfg := &Config{ServicesNamespace: "namespace"}
+	cfg := &types.Config{ServicesNamespace: "namespace"}
 
-	service := Service{
+	service := types.Service{
 		Name: "service",
-		Expose: Expose{
+		Expose: types.Expose{
 			MinScale:     1,
 			MaxScale:     3,
 			CpuThreshold: 80,
@@ -175,6 +177,7 @@ func TestUpdateExpose(t *testing.T) {
 
 	expected_actions := []Action{
 		{Verb: "get", Resource: "deployments"},
+		{Verb: "get", Resource: "secrets"},
 		{Verb: "update", Resource: "deployments"},
 		{Verb: "get", Resource: "horizontalpodautoscalers"},
 		{Verb: "update", Resource: "horizontalpodautoscalers"},
@@ -191,9 +194,9 @@ func TestUpdateExpose(t *testing.T) {
 
 func TestServiceSpec(t *testing.T) {
 
-	service := Service{
+	service := types.Service{
 		Name: "test-service",
-		Expose: Expose{
+		Expose: types.Expose{
 			MinScale:     1,
 			MaxScale:     3,
 			CpuThreshold: 40,
@@ -201,7 +204,7 @@ func TestServiceSpec(t *testing.T) {
 			SetAuth:      true,
 		},
 	}
-	cfg := &Config{Namespace: "namespace"}
+	cfg := &types.Config{Namespace: "namespace"}
 	res := getServiceSpec(service, cfg)
 	if res.Spec.Ports[0].TargetPort.IntVal != 8080 {
 		t.Errorf("Expected port 8080 but got %d", res.Spec.Ports[0].Port)
@@ -210,15 +213,15 @@ func TestServiceSpec(t *testing.T) {
 
 func TestHortizontalAutoScaleSpec(t *testing.T) {
 
-	service := Service{
+	service := types.Service{
 		Name: "test-service",
-		Expose: Expose{
+		Expose: types.Expose{
 			MinScale:     1,
 			MaxScale:     3,
 			CpuThreshold: 40,
 		},
 	}
-	cfg := &Config{Namespace: "namespace"}
+	cfg := &types.Config{Namespace: "namespace"}
 	res := getHortizontalAutoScaleSpec(service, cfg)
 	if *res.Spec.MinReplicas != 1 {
 		t.Errorf("Expected min replicas 1 but got %d", res.Spec.MinReplicas)
@@ -243,7 +246,7 @@ func TestListIngress(t *testing.T) {
 	}
 
 	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
-	cfg := &Config{ServicesNamespace: "namespace"}
+	cfg := &types.Config{ServicesNamespace: "namespace"}
 
 	_, err := listIngress(kubeClientset, cfg)
 
@@ -263,12 +266,12 @@ func TestUpdateIngress(t *testing.T) {
 		},
 	}
 
-	service := Service{
+	service := types.Service{
 		Name: "service",
 	}
 
 	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
-	cfg := &Config{ServicesNamespace: "namespace"}
+	cfg := &types.Config{ServicesNamespace: "namespace"}
 
 	err := updateIngress(service, kubeClientset, cfg)
 
@@ -295,7 +298,7 @@ func TestDeleteIngress(t *testing.T) {
 	}
 
 	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
-	cfg := &Config{ServicesNamespace: "namespace"}
+	cfg := &types.Config{ServicesNamespace: "namespace"}
 
 	err := deleteIngress("service-ing", kubeClientset, cfg)
 
@@ -314,12 +317,12 @@ func TestUpdateSecret(t *testing.T) {
 			},
 		},
 	}
-	service := Service{
+	service := types.Service{
 		Name: "service",
 	}
 
 	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
-	cfg := &Config{ServicesNamespace: "namespace"}
+	cfg := &types.Config{ServicesNamespace: "namespace"}
 
 	err := updateSecret(service, kubeClientset, cfg)
 
@@ -340,7 +343,7 @@ func TestDeleteSecret(t *testing.T) {
 	}
 
 	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
-	cfg := &Config{ServicesNamespace: "namespace"}
+	cfg := &types.Config{ServicesNamespace: "namespace"}
 
 	err := deleteSecret("service", kubeClientset, cfg)
 
@@ -361,7 +364,7 @@ func TestExistsSecret(t *testing.T) {
 	}
 
 	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
-	cfg := &Config{ServicesNamespace: "namespace"}
+	cfg := &types.Config{ServicesNamespace: "namespace"}
 
 	exists := existsSecret("service", kubeClientset, cfg)
 
