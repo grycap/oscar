@@ -77,7 +77,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 				return
 			}
-
+			if uid == "" {
+				c.String(http.StatusInternalServerError, fmt.Sprintln("Couldn't find user identification"))
+				return
+			}
 			// Set UID from owner
 			service.Owner = uid
 			createLogger.Printf("Creating service '%s' for user '%s'", service.Name, service.Owner)
@@ -127,33 +130,33 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 			ownerOnList := false
 
-			path := strings.Trim(service.Input[0].Path, "/")
-			splitPath := strings.SplitN(path, "/", 2)
 			if len(service.AllowedUsers) > 0 {
+				path := strings.Trim(service.Input[0].Path, "/")
+				splitPath := strings.SplitN(path, "/", 2)
 				// If AllowedUsers is empty don't add uid
 				service.Labels["uid"] = full_uid[:10]
 				var userBucket string
-				for _, uid := range service.AllowedUsers {
+				for _, u := range service.AllowedUsers {
 					// Check if the uid's from allowed_users have and asociated MinIO user
 					// and create it if not
-					if !mc.UserExists(uid) {
+					if !mc.UserExists(u) {
 						sk, _ := auth.GenerateRandomKey(8)
-						cmuErr := minIOAdminClient.CreateMinIOUser(uid, sk)
+						cmuErr := minIOAdminClient.CreateMinIOUser(u, sk)
 						if cmuErr != nil {
-							log.Printf("error creating MinIO user for user %s: %v", uid, cmuErr)
+							log.Printf("error creating MinIO user for user %s: %v", u, cmuErr)
 						}
-						csErr := mc.CreateSecretForOIDC(uid, sk)
+						csErr := mc.CreateSecretForOIDC(u, sk)
 						if csErr != nil {
-							log.Printf("error creating secret for user %s: %v", uid, csErr)
+							log.Printf("error creating secret for user %s: %v", u, csErr)
 						}
 					}
 					// Fill the list of private buckets to be used on users buckets isolation
 					// Check the uid of the owner is on the allowed_users list
-					if uid == service.Owner {
+					if u == service.Owner {
 						ownerOnList = true
 					}
 					// Fill the list of private buckets to create
-					userBucket = splitPath[0] + "-" + uid[:10]
+					userBucket = splitPath[0] + "-" + u[:10]
 					service.BucketList = append(service.BucketList, userBucket)
 				}
 
@@ -214,28 +217,13 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 		for _, b := range buckets {
 			// If not specified default visibility is PRIVATE
-			visibility := strings.ToLower(service.Visibility)
-			if service.Visibility == "" {
-				visibility = utils.PRIVATE
+			if strings.ToLower(service.Visibility) == "" {
+				b.Visibility = utils.PRIVATE
 			}
-			if visibility == utils.RESTRICTED || visibility == utils.PRIVATE {
-				// Both types of visibility require config of the user policy
-				if err := minIOAdminClient.CreateAddPolicy(b.BucketPath, service.Owner, utils.ALL_ACTIONS, false); err != nil {
-					c.String(http.StatusInternalServerError, err.Error())
-				}
-				if visibility == utils.RESTRICTED {
-					if err := minIOAdminClient.CreateAddGroup(b.BucketPath, service.AllowedUsers, false); err != nil {
-						c.String(http.StatusInternalServerError, err.Error())
-					}
-					if err := minIOAdminClient.CreateAddPolicy(b.BucketPath, b.BucketPath, utils.RESTRICTED_ACTIONS, true); err != nil {
-						c.String(http.StatusInternalServerError, err.Error())
-					}
-				}
-			} else {
-				// Config public visibility
-				if err := minIOAdminClient.CreateAddPolicy(b.BucketPath, ALL_USERS_GROUP, utils.ALL_ACTIONS, true); err != nil {
-					c.String(http.StatusInternalServerError, err.Error())
-				}
+			log.Printf("bucket: %s | visibility: %s", b.BucketPath, b.Visibility)
+			err := minIOAdminClient.SetPolicies(b)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 			}
 		}
 
@@ -244,10 +232,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			if err := utils.AddYunikornQueue(cfg, back.GetKubeClientset(), &service); err != nil {
 				log.Println(err.Error())
 			}
-		}
-
-		if service.Owner == "" {
-			uid = "nil"
 		}
 
 		createLogger.Printf("%s | %v | %s | %s | %s", "POST", 200, createPath, service.Name, uid)
@@ -359,7 +343,12 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		if err != nil {
 			return nil, err
 		}
-		minIOBuckets = append(minIOBuckets, utils.MinIOBucket{BucketPath: splitPath[0]})
+		minIOBuckets = append(minIOBuckets, utils.MinIOBucket{
+			BucketPath:   splitPath[0],
+			AllowedUsers: service.AllowedUsers,
+			Visibility:   service.Visibility,
+			Owner:        service.Owner})
+
 		// Create buckets for services with isolation level
 		if strings.ToUpper(service.IsolationLevel) == "USER" && len(service.BucketList) > 0 {
 			for i, b := range service.BucketList {
@@ -463,7 +452,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		}
 	}
 
-	return nil, nil
+	return minIOBuckets, nil
 }
 
 func isStorageProviderDefined(storageName string, storageID string, providers *types.StorageProviders) bool {
