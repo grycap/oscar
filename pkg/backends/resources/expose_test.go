@@ -71,6 +71,7 @@ func TestCreateExpose(t *testing.T) {
 
 	actions := kubeClientset.Actions()
 	expected_actions := []Action{
+		{Verb: "get", Resource: "secrets"},
 		{Verb: "create", Resource: "deployments"},
 		{Verb: "create", Resource: "horizontalpodautoscalers"},
 		{Verb: "create", Resource: "services"},
@@ -176,6 +177,7 @@ func TestUpdateExpose(t *testing.T) {
 
 	expected_actions := []Action{
 		{Verb: "get", Resource: "deployments"},
+		{Verb: "get", Resource: "secrets"},
 		{Verb: "update", Resource: "deployments"},
 		{Verb: "get", Resource: "horizontalpodautoscalers"},
 		{Verb: "update", Resource: "horizontalpodautoscalers"},
