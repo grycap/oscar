@@ -161,12 +161,6 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					return
 				}
 
-				// Update the service
-				if err := back.UpdateService(newService); err != nil {
-					c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
-					return
-				}
-
 				// Update buckets
 				if err := updateBuckets(&newService, &newService, minIOAdminClient, cfg); err != nil {
 					if err == errInput {
