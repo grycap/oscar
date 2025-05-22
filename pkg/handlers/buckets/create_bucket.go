@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	createPath = "/system/services"
+	createPath = "/system/buckets"
 	PRIVATE    = "private"
 	PUBLIC     = "public"
 	RESTRICTED = "restricted"
@@ -63,9 +63,15 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-
+				return
 			}
 		}
+
+		if uid == "" {
+			c.String(http.StatusInternalServerError, fmt.Sprintln("Couldn't find user identification"))
+			return
+		}
+
 		bucket.Owner = uid
 		// Use admin MinIO client for the bucket creation
 		s3Client := cfg.MinIOProvider.GetS3Client()
@@ -75,36 +81,16 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
 		if err := minIOAdminClient.CreateS3Path(s3Client, splitPath, false); err != nil {
-			c.String(http.StatusBadRequest, fmt.Sprintf("error creating a bucket with the name '%s' %v", splitPath[0], err))
+			c.String(http.StatusBadRequest, fmt.Sprintf("Error creating bucket with name '%s': %v", splitPath[0], err))
 			return
 		}
 		// If not specified default visibility is PRIVATE
-		visibility := strings.ToLower(bucket.Visibility)
-		if bucket.Visibility == "" {
-			visibility = utils.PRIVATE
+		if strings.ToLower(bucket.Visibility) == "" {
+			bucket.Visibility = utils.PRIVATE
 		}
-		if visibility == RESTRICTED || visibility == PRIVATE {
-			// Both types of visibility require config of the user policy
-			if err := minIOAdminClient.CreateAddPolicy(splitPath[0], bucket.Owner, utils.ALL_ACTIONS, false); err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintln("error creating policy for user: %v", err))
-				return
-			}
-			if visibility == RESTRICTED {
-				if err := minIOAdminClient.CreateAddGroup(splitPath[0], bucket.AllowedUsers, false); err != nil {
-					c.String(http.StatusInternalServerError, fmt.Sprintln("error creating group: %v", err))
-					return
-				}
-				if err := minIOAdminClient.CreateAddPolicy(splitPath[0], splitPath[0], utils.RESTRICTED_ACTIONS, true); err != nil {
-					c.String(http.StatusInternalServerError, fmt.Sprintln("error creating group: %v", err))
-					return
-				}
-			}
-		} else {
-			// Config public visibility
-			if err := minIOAdminClient.CreateAddPolicy(splitPath[0], ALL_USERS_GROUP, utils.ALL_ACTIONS, true); err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintln("error creating policy for user: %v", err))
-				return
-			}
+		err := minIOAdminClient.SetPolicies(bucket)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating policies for bucket: %v", err))
 		}
 
 		createLogger.Printf("%s | %v | %s | %s | %s", "POST", 200, createPath, uid, bucket.BucketPath)

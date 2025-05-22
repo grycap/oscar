@@ -23,9 +23,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
@@ -37,115 +34,63 @@ var updateLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
 // MakeDeleteHandler makes a handler for deleting services
 func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
+		var uid string
+		var err error
 		var bucket utils.MinIOBucket
 		if err := c.ShouldBindJSON(&bucket); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
 			return
-
 		}
-		isAdminUser = false
-		//uid := cfg.Name
 
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
-			isAdminUser = true
-		}
-
-		if !isAdminUser {
-			_, err := auth.GetUIDFromContext(c)
+			uid = cfg.Name
+		} else {
+			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-
+				c.String(http.StatusInternalServerError, fmt.Sprintln("error getting user from request:", err))
+				return
+			}
+			if uid == "" {
+				c.String(http.StatusInternalServerError, fmt.Sprintln("Couldn't find user identification"))
+				return
 			}
 		}
+		//s3Client := cfg.MinIOProvider.GetS3Client()
+		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+		if bucket.Visibility == utils.PUBLIC || minIOAdminClient.ResourceInPrivatePolicy(uid, bucket) {
+			bucket.Owner = uid
+			var oldVis string
+			if oldVis = minIOAdminClient.GetOldResourceVisibility(bucket); oldVis != "" && oldVis != bucket.Visibility {
+				// Remove old policies
+				err := minIOAdminClient.UnsetPolicies(utils.MinIOBucket{
+					BucketPath: bucket.BucketPath,
+					Visibility: oldVis,
+					Owner:      uid,
+				})
 
-		if bucket.Visibility == PUBLIC {
-			// Check if is already public
-			// Set public
-		} else {
-			// Check if private -> user is in group members
+				if err != nil {
+					c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket:", err))
+					return
+				}
+
+				// Set new policies
+				err = minIOAdminClient.SetPolicies(bucket)
+				if err != nil {
+					c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket:", err))
+					return
+				}
+			} else {
+				if oldVis == RESTRICTED {
+					err = minIOAdminClient.UpdateServiceGroup(bucket.BucketPath, bucket.AllowedUsers)
+					if err != nil {
+						c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket:", err))
+						return
+					}
+				}
+			}
 		}
-		//minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-
-		// err = UpdateBucket(minIOAdminClient, cfg.MinIOProvider.GetS3Client(), cfg, bucketName, uid, allowedUsers)
-		// if err != nil {
-		// 	c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-
-		// }
 
 		c.Status(http.StatusNoContent)
 	}
-}
-func UpdateBucket(minIOAdminClient *utils.MinIOAdminClient, s3Client *s3.S3, cfg *types.Config, bucketName string, uid string, allowedUsers []string) error {
-	// existe el bucket?
-	// si no existe -> error
-	//minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-	//minio := cfg.MinIOProvider
-	//s3Client := minio.GetS3Client()
-	_, err := s3Client.CreateBucket(&s3.CreateBucketInput{
-		Bucket: aws.String(bucketName),
-	})
-
-	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			// Check if the error is caused because the bucket already exists
-			if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
-				log.Printf("The bucket \"%s\" already exists\n", bucketName)
-			}
-		}
-	} else if err == nil {
-		return err
-	}
-	// si existe
-	/*if uid == cfg.Name {
-
-	}*/
-	// es privado for user?
-	allowToChange := allowToChange(cfg, uid, minIOAdminClient, bucketName)
-
-	if allowToChange && allowedUsers != nil {
-		err := minIOAdminClient.UpdateUsersInGroup(allowedUsers, bucketName, false)
-		if err != nil {
-			return err
-		}
-		createLogger.Printf("Group of users '%s' have added the policy '%s'", allowedUsers, bucketName)
-
-		err = minIOAdminClient.CreateAddPolicy(bucketName, bucketName, true)
-		if err != nil {
-			return err
-		}
-		createLogger.Printf("Policy '%s' has added the bucket '%s' to his policy", bucketName, bucketName)
-	} else if allowToChange && allowedUsers == nil {
-		group, errGroup := minIOAdminClient.GetGroup(bucketName)
-		_, errPolicy := getPolicy(minIOAdminClient, bucketName)
-		if errGroup == nil && errPolicy == nil {
-			// Delete users in group
-			err := minIOAdminClient.UpdateUsersInGroup(group.Members, bucketName, true)
-			if err != nil {
-				return err
-			}
-			// Delete group
-			err = minIOAdminClient.UpdateUsersInGroup([]string{}, bucketName, true)
-			if err != nil {
-				//c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-
-				return err
-			}
-
-			// Remove policy
-			err = minIOAdminClient.RemoveFromPolicy(bucketName, bucketName, true)
-			if err != nil {
-				//c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-
-				return err
-			}
-		}
-	}
-	// es privado for other users
-	// si es existe grupo y allowed user != nil -> update
-	// si es existe grupo y allowed user == nil -> delete
-	// si no existe grupo y allowed user == nil -> nada
-	// si no existe grupo y allowed user != nil -> crear
-	return nil
 }

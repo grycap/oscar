@@ -60,7 +60,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 		s3Client := cfg.MinIOProvider.GetS3Client()
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-		if minIOAdminClient.UserInPolicy(uid, bucket) {
+		if bucket.Visibility == utils.PUBLIC || minIOAdminClient.ResourceInPrivatePolicy(uid, bucket) {
 			err := handlers.DeleteMinIOBuckets(s3Client, minIOAdminClient, bucket)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))

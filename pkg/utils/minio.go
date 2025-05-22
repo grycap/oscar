@@ -215,7 +215,7 @@ func createBucket(bucketKey string, s3Client *s3.S3) error {
 		if aerr, ok := err.(awserr.Error); ok {
 			// Check if the error is caused because the bucket already exists
 			if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
-				log.Printf("The bucket \"%s\" already exists\n", bucketKey)
+				return fmt.Errorf("The bucket \"%s\" already exists\n", bucketKey)
 			} else {
 				return fmt.Errorf("error creating bucket %s: %v", bucketKey, err)
 			}
@@ -225,6 +225,7 @@ func createBucket(bucketKey string, s3Client *s3.S3) error {
 	}
 	return nil
 }
+
 func enableInputNotification(s3Client *s3.S3, arnStr string, bucket string, path string) error {
 	gbncRequest := &s3.GetBucketNotificationConfigurationRequest{
 		Bucket: aws.String(bucket),
@@ -311,6 +312,53 @@ func (minIOAdminClient *MinIOAdminClient) CreateAllUsersGroup() error {
 	return nil
 }
 
+func (minIOAdminClient *MinIOAdminClient) SetPolicies(bucket MinIOBucket) error {
+	if bucket.Visibility == RESTRICTED || bucket.Visibility == PRIVATE {
+		// Both types of visibility require config of the user policy
+		if err := minIOAdminClient.CreateAddPolicy(bucket.BucketPath, bucket.Owner, ALL_ACTIONS, false); err != nil {
+			return err
+		}
+		if bucket.Visibility == RESTRICTED {
+			if err := minIOAdminClient.CreateAddGroup(bucket.BucketPath, bucket.AllowedUsers, false); err != nil {
+				return fmt.Errorf("error creating bucket group: %v", err)
+			}
+			if err := minIOAdminClient.CreateAddPolicy(bucket.BucketPath, bucket.BucketPath, RESTRICTED_ACTIONS, true); err != nil {
+				return fmt.Errorf("error creating policy: %v", err)
+			}
+		}
+	} else {
+		// Config public visibility
+		if err := minIOAdminClient.CreateAddPolicy(bucket.BucketPath, ALL_USERS_GROUP, ALL_ACTIONS, true); err != nil {
+			return fmt.Errorf("error creating policy: %v", err)
+		}
+	}
+	return nil
+}
+
+func (minIOAdminClient *MinIOAdminClient) UnsetPolicies(bucket MinIOBucket) error {
+	var policyName string
+	var isGroup bool
+	if strings.ToLower(bucket.Visibility) == PUBLIC {
+		policyName = ALL_USERS_GROUP
+		isGroup = true
+	} else {
+		policyName = bucket.Owner
+	}
+
+	err := minIOAdminClient.RemoveResource(bucket.BucketPath, policyName, isGroup)
+	if err != nil {
+		return fmt.Errorf("error removing resource")
+	}
+
+	if strings.ToLower(bucket.Visibility) == RESTRICTED {
+		err := minIOAdminClient.RemoveGroupPolicy(bucket.BucketPath)
+		if err != nil {
+			return fmt.Errorf("error removing policy for group")
+		}
+	}
+	return nil
+}
+
 func (minIOAdminClient *MinIOAdminClient) CreateAddGroup(groupName string, users []string, remove bool) error {
 	group := madmin.GroupAddRemove{
 		Group:    groupName,
@@ -324,6 +372,39 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddGroup(groupName string, users
 	}
 
 	return nil
+}
+
+func (minIOAdminClient *MinIOAdminClient) GetOldResourceVisibility(bucket MinIOBucket) string {
+	rs := "arn:aws:s3:::" + bucket.BucketPath + "/*"
+
+	// Search for resource on user policy
+	if minIOAdminClient.ResourceInPrivatePolicy(bucket.Owner, bucket) {
+		return PRIVATE
+	}
+
+	// Search for resource on public users group
+	allUsersGroupDescr, err := minIOAdminClient.adminClient.GetGroupDescription(context.TODO(), ALL_USERS_GROUP)
+	if err != nil {
+		fmt.Printf("Warning: couldn't read all_users_group description")
+		return ""
+	}
+
+	if slices.Contains(allUsersGroupDescr.Members, rs) {
+		return PUBLIC
+	}
+
+	// Search for resource on public users group
+	serviceGroupDescr, err := minIOAdminClient.adminClient.GetGroupDescription(context.TODO(), ALL_USERS_GROUP)
+	if err != nil {
+		fmt.Printf("Warning: couldn't read service group description")
+		return ""
+	}
+
+	if slices.Contains(serviceGroupDescr.Members, rs) {
+		return RESTRICTED
+	}
+
+	return ""
 }
 
 func (minIOAdminClient *MinIOAdminClient) UpdateServiceGroup(groupName string, users []string) error {
@@ -431,10 +512,7 @@ func (minIOAdminClient *MinIOAdminClient) GetGroup(group string) (*madmin.GroupD
 }
 
 // UserInPolicy asserts if a user policy has a given resource (bucketPath)
-func (minIOAdminClient *MinIOAdminClient) UserInPolicy(uid string, bucket MinIOBucket) bool {
-	if bucket.Visibility == PUBLIC {
-		return true
-	}
+func (minIOAdminClient *MinIOAdminClient) ResourceInPrivatePolicy(uid string, bucket MinIOBucket) bool {
 	rs := "arn:aws:s3:::" + bucket.BucketPath + "/*"
 	getPolicy, err := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), uid)
 	if err != nil {
