@@ -105,7 +105,10 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 			}
 		} else if utils.SecretExists(newService.Name, cfg.ServicesNamespace, back.GetKubeClientset()) {
-			utils.DeleteSecret(newService.Name, cfg.ServicesNamespace, back.GetKubeClientset())
+			secretsErr := utils.DeleteSecret(newService.Name, cfg.ServicesNamespace, back.GetKubeClientset())
+			if secretsErr != nil {
+				c.String(http.StatusInternalServerError, "error adding asociated secret: %v", secretsErr)
+			}
 		}
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
