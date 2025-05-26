@@ -41,7 +41,7 @@ var createLogger = log.New(os.Stdout, "[CREATE-BUCKETS-HANDLER] ", log.Flags())
 var isAdminUser = false
 
 // MakeCreateHandler makes a handler for creating services
-func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
+func MakeCreateHandler(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var uid string
 		var bucket utils.MinIOBucket

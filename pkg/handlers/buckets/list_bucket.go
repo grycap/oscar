@@ -28,7 +28,7 @@ import (
 )
 
 // MakeListHandler makes a handler for listing services
-func MakeListHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
+func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		authHeader := c.GetHeader("Authorization")
@@ -37,7 +37,7 @@ func MakeListHandler(cfg *types.Config, back types.ServerlessBackend) gin.Handle
 		var err error
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
-			output, err := ListUserBuckets(cfg.MinIOProvider.GetS3Client())
+			output, err := listUserBuckets(cfg.MinIOProvider.GetS3Client())
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, err)
 			}
@@ -67,7 +67,7 @@ func MakeListHandler(cfg *types.Config, back types.ServerlessBackend) gin.Handle
 				Region:    cfg.MinIOProvider.Region,
 			}
 
-			bucketsList, err := ListUserBuckets(userMinIOProvider.GetS3Client())
+			bucketsList, err := listUserBuckets(userMinIOProvider.GetS3Client())
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, err)
 			}
@@ -77,7 +77,7 @@ func MakeListHandler(cfg *types.Config, back types.ServerlessBackend) gin.Handle
 	}
 }
 
-func ListUserBuckets(s3Client *s3.S3) (*s3.ListBucketsOutput, error) {
+func listUserBuckets(s3Client *s3.S3) (*s3.ListBucketsOutput, error) {
 	output, err := s3Client.ListBuckets(&s3.ListBucketsInput{})
 	if err != nil {
 		return nil, err

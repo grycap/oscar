@@ -32,7 +32,7 @@ import (
 var updateLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
 
 // MakeDeleteHandler makes a handler for deleting services
-func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
+func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var uid string
 		var err error
@@ -58,34 +58,38 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 		//s3Client := cfg.MinIOProvider.GetS3Client()
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-		if bucket.Visibility == utils.PUBLIC || minIOAdminClient.ResourceInPrivatePolicy(uid, bucket) {
-			bucket.Owner = uid
-			var oldVis string
-			if oldVis = minIOAdminClient.GetOldResourceVisibility(bucket); oldVis != "" && oldVis != bucket.Visibility {
-				// Remove old policies
-				err := minIOAdminClient.UnsetPolicies(utils.MinIOBucket{
-					BucketPath: bucket.BucketPath,
-					Visibility: oldVis,
-					Owner:      uid,
-				})
 
-				if err != nil {
-					c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket:", err))
-					return
-				}
-
-				// Set new policies
-				err = minIOAdminClient.SetPolicies(bucket)
-				if err != nil {
-					c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket:", err))
-					return
-				}
-			} else {
-				if oldVis == RESTRICTED {
-					err = minIOAdminClient.UpdateServiceGroup(bucket.BucketPath, bucket.AllowedUsers)
+		bucket.Owner = uid
+		var oldVis string
+		if oldVis = minIOAdminClient.GetCurrentResourceVisibility(bucket); oldVis != "" {
+			if oldVis == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucket.BucketPath) {
+				fmt.Printf("Authorised\n")
+				if oldVis != bucket.Visibility {
+					// Remove old policies
+					err := minIOAdminClient.UnsetPolicies(utils.MinIOBucket{
+						BucketPath: bucket.BucketPath,
+						Visibility: oldVis,
+						Owner:      uid,
+					})
 					if err != nil {
 						c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket:", err))
 						return
+					}
+
+					// Set new policies
+					err = minIOAdminClient.SetPolicies(bucket)
+					if err != nil {
+						c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket:", err))
+						return
+					}
+
+				} else {
+					if oldVis == RESTRICTED {
+						err = minIOAdminClient.UpdateServiceGroup(bucket.BucketPath, bucket.AllowedUsers)
+						if err != nil {
+							c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket:", err))
+							return
+						}
 					}
 				}
 			}

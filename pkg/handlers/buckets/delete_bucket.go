@@ -31,16 +31,15 @@ import (
 )
 
 var ALL_USERS_GROUP = "all_users_group"
-var allUserGroupNotExist = "unable to remove bucket from policy \"" + ALL_USERS_GROUP + "\", policy '" + ALL_USERS_GROUP + "' does not exist"
 var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
 
 // MakeDeleteHandler makes a handler for deleting services
-func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
+func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var uid string
-		var bucket utils.MinIOBucket
-		if err := c.ShouldBindJSON(&bucket); err != nil {
-			c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
+		bucketName := c.Param("bucket")
+		if bucketName == "" {
+			c.String(http.StatusBadRequest, fmt.Sprintf("Received empty bucket name"))
 			return
 
 		}
@@ -48,10 +47,10 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			uid = cfg.Name
-			deleteLogger.Printf("Deleting bucket '%s' for user '%s'", bucket.BucketPath, uid)
+			deleteLogger.Printf("Deleting bucket '%s' for user '%s'", bucketName, uid)
 		} else {
 			uid, err := auth.GetUIDFromContext(c)
-			deleteLogger.Printf("Deleting bucket '%s' for user '%s'", bucket.BucketPath, uid)
+			deleteLogger.Printf("Deleting bucket '%s' for user '%s'", bucketName, uid)
 
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln("error getting user from request:", err))
@@ -60,8 +59,13 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 		s3Client := cfg.MinIOProvider.GetS3Client()
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-		if bucket.Visibility == utils.PUBLIC || minIOAdminClient.ResourceInPrivatePolicy(uid, bucket) {
-			err := handlers.DeleteMinIOBuckets(s3Client, minIOAdminClient, bucket)
+		v := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketPath: bucketName, Owner: uid})
+		if v == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucketName) {
+			err := handlers.DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+				BucketPath: bucketName,
+				Visibility: v,
+				Owner:      uid,
+			})
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 				return

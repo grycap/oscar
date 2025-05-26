@@ -97,10 +97,10 @@ func main() {
 	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
 
 	// CRUD Buckets
-	system.POST("/buckets", buckets.MakeCreateHandler(cfg, back))
-	system.GET("/buckets", buckets.MakeListHandler(cfg, back))
-	system.PUT("/buckets", buckets.MakeUpdateHandler(cfg, back))
-	system.DELETE("/buckets", buckets.MakeDeleteHandler(cfg, back))
+	system.POST("/buckets", buckets.MakeCreateHandler(cfg))
+	system.GET("/buckets", buckets.MakeListHandler(cfg))
+	system.PUT("/buckets", buckets.MakeUpdateHandler(cfg))
+	system.DELETE("/buckets/:bucket", buckets.MakeDeleteHandler(cfg))
 
 	// Logs paths
 	system.GET("/logs/:serviceName", handlers.MakeJobsInfoHandler(back, kubeClientset, cfg.ServicesNamespace))
