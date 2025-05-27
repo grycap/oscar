@@ -1,0 +1,21 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: node-red
+      cpu: '1.0'
+      memory: 2Gi
+      image: ghcr.io/rk181/node-red-alpine
+      script: script.sh
+      environment:
+        Variables:
+          NODE_RED_BASE_URL: "/system/services/node-red/exposed"
+          NODE_RED_DIRECTORY: "/mnt/robert"
+      mount:
+        storage_provider: minio.default
+        path: robert
+      expose:
+        min_scale: 1
+        max_scale: 1
+        api_port: 1880
+        cpu_threshold: 90
+        rewrite_target: true
