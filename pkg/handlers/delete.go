@@ -163,7 +163,6 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		path := strings.Trim(in.Path, " /")
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
-
 		err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
 			BucketPath:   splitPath[0],
 			Visibility:   service.Visibility,

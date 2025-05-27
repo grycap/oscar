@@ -161,6 +161,7 @@ func (minIOAdminClient *MinIOAdminClient) CreateMinIOUser(ak string, sk string) 
 	return nil
 }
 
+// CreateS3PathWithWebhook Creates a bucket and its paths and enables the associated webhook
 func (minIOAdminClient *MinIOAdminClient) CreateS3PathWithWebhook(s3Client *s3.S3, path []string, arn string, bucketExists bool) error {
 	bucketKey := path[0]
 	if !bucketExists {
@@ -185,6 +186,8 @@ func (minIOAdminClient *MinIOAdminClient) CreateS3PathWithWebhook(s3Client *s3.S
 	}
 	return nil
 }
+
+// CreateS3Path Creates a bucket and its paths
 func (minIOAdminClient *MinIOAdminClient) CreateS3Path(s3Client *s3.S3, path []string, bucketExists bool) error {
 	bucketKey := path[0]
 	// Only create the bucket itself if is input type to avoid recreation
@@ -207,6 +210,7 @@ func (minIOAdminClient *MinIOAdminClient) CreateS3Path(s3Client *s3.S3, path []s
 	}
 	return nil
 }
+
 func createBucket(bucketKey string, s3Client *s3.S3) error {
 	_, err := s3Client.CreateBucket(&s3.CreateBucketInput{
 		Bucket: aws.String(bucketKey),
@@ -374,36 +378,18 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddGroup(groupName string, users
 	return nil
 }
 
-func (minIOAdminClient *MinIOAdminClient) GetOldResourceVisibility(bucket MinIOBucket) string {
-	rs := "arn:aws:s3:::" + bucket.BucketPath + "/*"
-
-	// Search for resource on user policy
-	if minIOAdminClient.ResourceInPrivatePolicy(bucket.Owner, bucket) {
+func (minIOAdminClient *MinIOAdminClient) GetCurrentResourceVisibility(bucket MinIOBucket) string {
+	if minIOAdminClient.ResourceInPolicy(bucket.Owner, bucket.BucketPath) {
+		if minIOAdminClient.ResourceInPolicy(bucket.BucketPath, bucket.BucketPath) {
+			return RESTRICTED
+		}
 		return PRIVATE
+	} else {
+		if minIOAdminClient.ResourceInPolicy(ALL_USERS_GROUP, bucket.BucketPath) {
+			return PUBLIC
+		}
 	}
-
-	// Search for resource on public users group
-	allUsersGroupDescr, err := minIOAdminClient.adminClient.GetGroupDescription(context.TODO(), ALL_USERS_GROUP)
-	if err != nil {
-		fmt.Printf("Warning: couldn't read all_users_group description")
-		return ""
-	}
-
-	if slices.Contains(allUsersGroupDescr.Members, rs) {
-		return PUBLIC
-	}
-
-	// Search for resource on public users group
-	serviceGroupDescr, err := minIOAdminClient.adminClient.GetGroupDescription(context.TODO(), ALL_USERS_GROUP)
-	if err != nil {
-		fmt.Printf("Warning: couldn't read service group description")
-		return ""
-	}
-
-	if slices.Contains(serviceGroupDescr.Members, rs) {
-		return RESTRICTED
-	}
-
+	// If not found return empty string
 	return ""
 }
 
@@ -492,31 +478,12 @@ func (minIOAdminClient *MinIOAdminClient) RestartServer() error {
 	return nil
 }
 
-// TODO check if delete
-func (minIOAdminClient *MinIOAdminClient) GetPolicy(policyName string) (*madmin.PolicyInfo, error) {
-	getPolicy, errInfo := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), policyName)
-	if errInfo != nil {
-		return nil, errInfo
-	} else {
-		return getPolicy, nil
-	}
-}
-
-// TODO check if delete
-func (minIOAdminClient *MinIOAdminClient) GetGroup(group string) (*madmin.GroupDesc, error) {
-	groupDesc, err := minIOAdminClient.adminClient.GetGroupDescription(context.TODO(), group)
-	if err != nil {
-		return nil, err
-	}
-	return groupDesc, nil
-}
-
 // UserInPolicy asserts if a user policy has a given resource (bucketPath)
-func (minIOAdminClient *MinIOAdminClient) ResourceInPrivatePolicy(uid string, bucket MinIOBucket) bool {
-	rs := "arn:aws:s3:::" + bucket.BucketPath + "/*"
-	getPolicy, err := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), uid)
+func (minIOAdminClient *MinIOAdminClient) ResourceInPolicy(policyName string, resource string) bool {
+	rs := "arn:aws:s3:::" + resource + "/*"
+	getPolicy, err := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), policyName)
 	if err != nil {
-		fmt.Printf("error reading policy for user %s", uid)
+		fmt.Printf("error reading policy for user %s", policyName)
 		return false
 	}
 
@@ -525,7 +492,7 @@ func (minIOAdminClient *MinIOAdminClient) ResourceInPrivatePolicy(uid string, bu
 
 	jsonErr := json.Unmarshal(getPolicy.Policy, actualPolicy)
 	if jsonErr != nil {
-		fmt.Printf("error parsing policy for user %s", uid)
+		fmt.Printf("error parsing policy for user %s", policyName)
 		return false
 	}
 
@@ -680,7 +647,7 @@ func (minIOAdminClient *MinIOAdminClient) RemoveResource(bucketName string, poli
 
 // RemoveGroupPolicy a group and its associated policy
 func (minIOAdminClient *MinIOAdminClient) RemoveGroupPolicy(policyName string) error {
-
+	fmt.Printf("Removing policy: %s", policyName)
 	// Empty group
 	groupDescription, err := minIOAdminClient.adminClient.GetGroupDescription(context.TODO(), policyName)
 	if err != nil {

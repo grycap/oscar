@@ -203,7 +203,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		var buckets []utils.MinIOBucket
-		if buckets, err = createBuckets(&service, cfg, minIOAdminClient); err != nil {
+		if buckets, err = createBuckets(&service, cfg, minIOAdminClient, false); err != nil {
 			if err == errInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {
@@ -215,15 +215,17 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			return
 		}
-		for _, b := range buckets {
-			// If not specified default visibility is PRIVATE
-			if strings.ToLower(service.Visibility) == "" {
-				b.Visibility = utils.PRIVATE
-			}
-			log.Printf("bucket: %s | visibility: %s", b.BucketPath, b.Visibility)
-			err := minIOAdminClient.SetPolicies(b)
-			if err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+		if len(buckets) > 0 {
+			for _, b := range buckets {
+				// If not specified default visibility is PRIVATE
+				if strings.ToLower(service.Visibility) == "" {
+					b.Visibility = utils.PRIVATE
+				}
+				fmt.Println("Bucket info: ", b)
+				err := minIOAdminClient.SetPolicies(b)
+				if err != nil {
+					c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+				}
 			}
 		}
 
@@ -299,7 +301,7 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	service.Token = utils.GenerateToken()
 }
 
-func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient) ([]utils.MinIOBucket, error) {
+func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient, isUpdate bool) ([]utils.MinIOBucket, error) {
 	var s3Client *s3.S3
 	var cdmiClient *cdmi.Client
 	var provName, provID string
@@ -340,22 +342,27 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		folderKey := fmt.Sprintf("%s/", splitPath[1])
 
 		err := minIOAdminClient.CreateS3PathWithWebhook(s3Client, splitPath, service.GetMinIOWebhookARN(), false)
-		if err != nil {
+
+		if err != nil && !isUpdate {
 			return nil, err
 		}
+
 		minIOBuckets = append(minIOBuckets, utils.MinIOBucket{
 			BucketPath:   splitPath[0],
 			AllowedUsers: service.AllowedUsers,
 			Visibility:   service.Visibility,
 			Owner:        service.Owner})
-
 		// Create buckets for services with isolation level
 		if strings.ToUpper(service.IsolationLevel) == "USER" && len(service.BucketList) > 0 {
 			for i, b := range service.BucketList {
 				// Create a bucket for each allowed user if allowed_users is not empty
 				err = minIOAdminClient.CreateS3PathWithWebhook(s3Client, []string{b, folderKey}, service.GetMinIOWebhookARN(), false)
-				if err != nil {
-					return nil, err
+				if err != nil && isUpdate {
+					continue
+				} else {
+					if err != nil {
+						return nil, err
+					}
 				}
 				// Create bucket policy
 				if !isAdminUser {
@@ -369,7 +376,6 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	}
 
 	// ========== CREATE OUTPUT BUCKETS ==========
-	createLogger.Printf("Creating output buckets ..")
 	// Create output buckets
 	for _, out := range service.Output {
 		provID, provName = getProviderInfo(out.Provider)
@@ -399,11 +405,22 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				}
 			}
 			if !found {
-				minIOBuckets = append(minIOBuckets, utils.MinIOBucket{BucketPath: splitPath[0]})
-			}
-			err := minIOAdminClient.CreateS3Path(s3Client, splitPath, true)
-			if err != nil {
-				return nil, err
+				// If the bucket hasn't been created on de input loop create it
+				minIOBuckets = append(minIOBuckets, utils.MinIOBucket{
+					BucketPath:   splitPath[0],
+					AllowedUsers: service.AllowedUsers,
+					Visibility:   service.Visibility,
+					Owner:        service.Owner})
+				err := minIOAdminClient.CreateS3Path(s3Client, splitPath, false)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				// If the bucket is created on the previous loop, add output folders
+				err := minIOAdminClient.CreateS3Path(s3Client, splitPath, true)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			if strings.ToUpper(service.IsolationLevel) == "USER" && len(service.BucketList) > 0 {

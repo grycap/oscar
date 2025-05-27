@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/grycap/oscar/v3/pkg/backends/resources"
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
 	"github.com/grycap/oscar/v3/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -129,7 +130,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 
 	//Create an expose service
 	if service.Expose.APIPort != 0 {
-		err = types.CreateExpose(service, kn.kubeClientset, kn.config)
+		err = resources.CreateExpose(service, kn.kubeClientset, kn.config)
 		if err != nil {
 			return err
 		}
@@ -223,7 +224,7 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 
 	// If the service is exposed update its configuration
 	if service.Expose.APIPort != 0 {
-		err = types.UpdateExpose(service, kn.kubeClientset, kn.config)
+		err = resources.UpdateExpose(service, kn.kubeClientset, kn.config)
 		if err != nil {
 			return err
 		}
@@ -260,7 +261,7 @@ func (kn *KnativeBackend) DeleteService(service types.Service) error {
 
 	// If service is exposed delete the exposed k8s components
 	if service.Expose.APIPort != 0 {
-		if err := types.DeleteExpose(name, kn.kubeClientset, kn.config); err != nil {
+		if err := resources.DeleteExpose(name, kn.kubeClientset, kn.config); err != nil {
 			log.Printf("Error deleting all associated kubernetes component of an exposed service \"%s\": %v\n", name, err)
 		}
 	}
