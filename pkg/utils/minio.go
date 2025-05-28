@@ -620,7 +620,10 @@ func (minIOAdminClient *MinIOAdminClient) RemoveResource(bucketName string, poli
 		return fmt.Errorf("policy '%s' does not exist: %v", policyName, errInfo)
 	}
 	actualPolicy := &Policy{}
-	json.Unmarshal(policyInfo.Policy, actualPolicy)
+	jsonErr = json.Unmarshal(policyInfo.Policy, actualPolicy)
+	if jsonErr != nil {
+		return jsonErr
+	}
 	for i, rs := range actualPolicy.Statement[0].Resource {
 		if rs == resource {
 			actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource[:i], actualPolicy.Statement[0].Resource[i+1:]...)

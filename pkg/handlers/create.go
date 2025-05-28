@@ -428,7 +428,10 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 
 			if strings.ToUpper(service.IsolationLevel) == "USER" && len(service.BucketList) > 0 {
 				for _, b := range service.BucketList {
-					minIOAdminClient.CreateS3Path(s3Client, []string{b, folderKey}, true)
+					err := minIOAdminClient.CreateS3Path(s3Client, []string{b, folderKey}, true)
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
 

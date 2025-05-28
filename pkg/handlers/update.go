@@ -144,12 +144,15 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				if oldServiceBuckets[b.BucketPath] {
 					// If the visibility of the bucket has changed remove old policies and config new ones
 					if oldService.Visibility != newService.Visibility {
-						minIOAdminClient.UnsetPolicies(b)
+						err := minIOAdminClient.UnsetPolicies(b)
+						if err != nil {
+							c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+						}
 						// If not specified default visibility is PRIVATE
 						if strings.ToLower(newService.Visibility) == "" {
 							b.Visibility = utils.PRIVATE
 						}
-						err := minIOAdminClient.SetPolicies(b)
+						err = minIOAdminClient.SetPolicies(b)
 						if err != nil {
 							c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 						}
