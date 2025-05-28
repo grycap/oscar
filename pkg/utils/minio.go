@@ -36,6 +36,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/minio/madmin-go"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/minio/minio-go/v7/pkg/tags"
 )
 
 const (
@@ -56,6 +59,7 @@ var overlappingError = "An object key name filtering rule defined with overlappi
 // MinIOAdminClient struct to represent a MinIO Admin client to configure webhook notifications
 type MinIOAdminClient struct {
 	adminClient   *madmin.AdminClient
+	simpleClient  *minio.Client
 	oscarEndpoint *url.URL
 }
 
@@ -122,7 +126,13 @@ func MakeMinIOAdminClient(cfg *types.Config) (*MinIOAdminClient, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	simpleClient, err := minio.New(endpointURL.Host, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.MinIOProvider.AccessKey, cfg.MinIOProvider.SecretKey, ""),
+		Secure: enableTLS,
+	})
+	if err != nil {
+		return nil, err
+	}
 	// Disable tls verification in client transport if verify == false
 	if !cfg.MinIOProvider.Verify {
 		tr := &http.Transport{
@@ -139,6 +149,7 @@ func MakeMinIOAdminClient(cfg *types.Config) (*MinIOAdminClient, error) {
 
 	minIOAdminClient := &MinIOAdminClient{
 		adminClient:   adminClient,
+		simpleClient:  simpleClient,
 		oscarEndpoint: oscarEndpoint,
 	}
 
@@ -502,6 +513,39 @@ func (minIOAdminClient *MinIOAdminClient) ResourceInPolicy(policyName string, re
 		}
 	}
 	return false
+}
+
+func (minIOAdminClient *MinIOAdminClient) TagOwner(bucket string, uid string) error {
+	// Create tags from a map.
+	btags, err := tags.NewTags(map[string]string{
+		"owner": uid,
+	}, false)
+	if err != nil {
+		return fmt.Errorf("error creating tag owner %s", uid)
+	}
+
+	err = minIOAdminClient.simpleClient.SetBucketTagging(context.Background(), bucket, btags)
+	if err != nil {
+		return fmt.Errorf("error setting tag on bucket %s", bucket)
+	}
+	return nil
+}
+
+func (minIOAdminClient *MinIOAdminClient) GetTaggedOwner(bucket string) (string, error) {
+	btags, err := minIOAdminClient.simpleClient.GetBucketTagging(context.TODO(), bucket)
+	if err != nil {
+		return "", fmt.Errorf("error setting tag on bucket %s", bucket)
+	}
+	tag := btags.ToMap()
+	return tag["owner"], nil
+}
+
+func (minIOAdminClient *MinIOAdminClient) GetBucketMembers(bucket string) ([]string, error) {
+	groupDescription, err := minIOAdminClient.adminClient.GetGroupDescription(context.TODO(), bucket)
+	if err != nil {
+		return []string{}, fmt.Errorf("error getting group description for %s: %v", bucket, err)
+	}
+	return groupDescription.Members, nil
 }
 
 // CreateAddPolicy creates a policy asociated to a bucket to set its visibility

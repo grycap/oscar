@@ -24,6 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 )
 
@@ -68,10 +69,39 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 
 			bucketsList, err := listUserBuckets(userMinIOProvider.GetS3Client())
+
+			var bucketsInfo []utils.MinIOBucket
+			minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+
+			for _, b := range bucketsList.Buckets {
+				path := *b.Name
+				bucketVisibility := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketPath: *b.Name})
+				owner, err := minIOAdminClient.GetTaggedOwner(path)
+				if err != nil {
+					c.String(http.StatusInternalServerError, "Error getting bucket info: ", err)
+				}
+				var allowedUsers []string
+				if bucketVisibility == utils.RESTRICTED {
+					members, err := minIOAdminClient.GetBucketMembers(path)
+					if err != nil {
+						c.String(http.StatusInternalServerError, "Error getting bucket info: ", err)
+					} else {
+						allowedUsers = append(allowedUsers, members...)
+					}
+				}
+
+				bucketsInfo = append(bucketsInfo, utils.MinIOBucket{
+					BucketPath:   *b.Name,
+					Visibility:   bucketVisibility,
+					Owner:        owner,
+					AllowedUsers: allowedUsers,
+				})
+			}
+
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, err)
 			}
-			c.JSON(http.StatusOK, bucketsList)
+			c.JSON(http.StatusOK, bucketsInfo)
 
 		}
 	}

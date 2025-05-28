@@ -225,6 +225,9 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				if err != nil {
 					c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 				}
+				if err := minIOAdminClient.TagOwner(b.BucketPath, uid); err != nil {
+					c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
+				}
 			}
 		}
 
