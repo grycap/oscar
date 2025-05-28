@@ -183,13 +183,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		for key, value := range oldServiceBuckets {
-			if len(newServiceBuckets) == 0 {
-				if oldService.Visibility != newService.Visibility {
-
-				}
-			}
-
-			// If the bucket was not used in the new service set it to private
+			// If the bucket was not used in the new service definition set it to private
 			if value {
 				err := minIOAdminClient.SetPolicies(utils.MinIOBucket{BucketPath: key, Visibility: utils.PRIVATE})
 				if err != nil {
@@ -210,6 +204,10 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				if secretsErr != nil {
 					c.String(http.StatusInternalServerError, "error adding asociated secret: %v", secretsErr)
 				}
+			}
+			// Empty the secrets content from the Configmap
+			for secretKey := range newService.Environment.Secrets {
+				newService.Environment.Secrets[secretKey] = ""
 			}
 		}
 

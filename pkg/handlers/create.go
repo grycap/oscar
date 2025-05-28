@@ -181,7 +181,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 
-		// Create the service
+		// Create service
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
 			if k8sErrors.IsAlreadyExists(err) {
@@ -221,7 +221,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				if strings.ToLower(service.Visibility) == "" {
 					b.Visibility = utils.PRIVATE
 				}
-				fmt.Println("Bucket info: ", b)
 				err := minIOAdminClient.SetPolicies(b)
 				if err != nil {
 					c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
@@ -249,6 +248,10 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	}
 	if service.CPU == "" {
 		service.CPU = defaultCPU
+	}
+	// Check if visibility has been set. If not set default private.
+	if service.Visibility == "" {
+		service.Visibility = utils.PRIVATE
 	}
 
 	// Validate logLevel (Python logging levels for faas-supervisor)
