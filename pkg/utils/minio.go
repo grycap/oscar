@@ -396,6 +396,9 @@ func (minIOAdminClient *MinIOAdminClient) GetCurrentResourceVisibility(bucket Mi
 		}
 		return PRIVATE
 	} else {
+		if minIOAdminClient.ResourceInPolicy(bucket.BucketPath, bucket.BucketPath) {
+			return RESTRICTED
+		}
 		if minIOAdminClient.ResourceInPolicy(ALL_USERS_GROUP, bucket.BucketPath) {
 			return PUBLIC
 		}
@@ -534,7 +537,7 @@ func (minIOAdminClient *MinIOAdminClient) TagOwner(bucket string, uid string) er
 func (minIOAdminClient *MinIOAdminClient) GetTaggedOwner(bucket string) (string, error) {
 	btags, err := minIOAdminClient.simpleClient.GetBucketTagging(context.TODO(), bucket)
 	if err != nil {
-		return "", fmt.Errorf("error setting tag on bucket %s", bucket)
+		return "", fmt.Errorf("error getting tags on bucket %s", bucket)
 	}
 	tag := btags.ToMap()
 	return tag["owner"], nil

@@ -69,37 +69,42 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 
 			bucketsList, err := listUserBuckets(userMinIOProvider.GetS3Client())
-
+			if err != nil {
+				c.String(http.StatusInternalServerError, "Error reading buckets from user: ", uid)
+			}
 			var bucketsInfo []utils.MinIOBucket
 			minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
 			for _, b := range bucketsList.Buckets {
-				path := *b.Name
-				bucketVisibility := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketPath: *b.Name})
-				owner, err := minIOAdminClient.GetTaggedOwner(path)
-				if err != nil {
-					c.String(http.StatusInternalServerError, "Error getting bucket info: ", err)
-				}
 				var allowedUsers []string
+				var bowner string
+				path := *b.Name
+				bucketVisibility := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketPath: *b.Name, Owner: uid})
+
+				if bucketVisibility == utils.PRIVATE {
+					bowner = uid
+				} else {
+					bowner, err = minIOAdminClient.GetTaggedOwner(path)
+					if err != nil {
+						bowner = ""
+						fmt.Printf("Couldn't get bucket owner info: %v", err)
+					}
+				}
 				if bucketVisibility == utils.RESTRICTED {
 					members, err := minIOAdminClient.GetBucketMembers(path)
 					if err != nil {
-						c.String(http.StatusInternalServerError, "Error getting bucket info: ", err)
+						fmt.Printf("Couldn't get bucket owner info: %v", err)
 					} else {
 						allowedUsers = append(allowedUsers, members...)
 					}
 				}
 
 				bucketsInfo = append(bucketsInfo, utils.MinIOBucket{
-					BucketPath:   *b.Name,
+					BucketPath:   path,
 					Visibility:   bucketVisibility,
-					Owner:        owner,
+					Owner:        bowner,
 					AllowedUsers: allowedUsers,
 				})
-			}
-
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, err)
 			}
 			c.JSON(http.StatusOK, bucketsInfo)
 
