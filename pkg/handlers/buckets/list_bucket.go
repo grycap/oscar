@@ -48,7 +48,6 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-
 			}
 			mc, err := auth.GetMultitenancyConfigFromContext(c)
 			if err != nil {
