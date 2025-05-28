@@ -24,6 +24,7 @@ import (
 
 	htpasswd "github.com/foomo/htpasswd"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	apps "k8s.io/api/apps/v1"
 	autos "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
@@ -194,6 +195,17 @@ func ListExpose(kubeClientset kubernetes.Interface, cfg *types.Config) error {
 
 func createDeployment(service types.Service, kubeClientset kubernetes.Interface, cfg *types.Config) error {
 	deployment := getDeploymentSpec(service, cfg)
+	if utils.SecretExists(service.Name, cfg.ServicesNamespace, kubeClientset) {
+		deployment.Spec.Template.Spec.Containers[0].EnvFrom = []v1.EnvFromSource{
+			{
+				SecretRef: &v1.SecretEnvSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: service.Name,
+					},
+				},
+			},
+		}
+	}
 	_, err := kubeClientset.AppsV1().Deployments(cfg.ServicesNamespace).Create(context.TODO(), deployment, metav1.CreateOptions{})
 	if err != nil {
 		return err
@@ -331,6 +343,17 @@ func updateDeployment(service types.Service, kubeClientset kubernetes.Interface,
 	}
 
 	deployment := getDeploymentSpec(service, cfg)
+	if utils.SecretExists(service.Name, cfg.ServicesNamespace, kubeClientset) {
+		deployment.Spec.Template.Spec.Containers[0].EnvFrom = []v1.EnvFromSource{
+			{
+				SecretRef: &v1.SecretEnvSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: service.Name,
+					},
+				},
+			},
+		}
+	}
 	_, err = kubeClientset.AppsV1().Deployments(cfg.ServicesNamespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
 	if err != nil {
 		return err
@@ -526,9 +549,11 @@ func getIngressSpec(service types.Service, cfg *types.Config) *net.Ingress {
 			Hosts:      []string{host},
 			SecretName: host,
 		}
+		ingressClassName := "nginx"
 		specification = net.IngressSpec{
-			TLS:   []net.IngressTLS{tls},
-			Rules: []net.IngressRule{rule}, //IngressClassName:
+			IngressClassName: &ingressClassName,
+			TLS:              []net.IngressTLS{tls},
+			Rules:            []net.IngressRule{rule}, //IngressClassName:
 		}
 	}
 

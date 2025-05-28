@@ -91,6 +91,20 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 			}
 		}
+		if len(newService.Environment.Secrets) > 0 {
+			if utils.SecretExists(newService.Name, cfg.ServicesNamespace, back.GetKubeClientset()) {
+				secretsErr := utils.UpdateSecretData(newService.Name, cfg.ServicesNamespace, newService.Environment.Secrets, back.GetKubeClientset())
+				if secretsErr != nil {
+					c.String(http.StatusInternalServerError, "error updating asociated secret: %v", secretsErr)
+				}
+			} else {
+				secretsErr := utils.CreateSecret(newService.Name, cfg.ServicesNamespace, newService.Environment.Secrets, back.GetKubeClientset())
+				if secretsErr != nil {
+					c.String(http.StatusInternalServerError, "error adding asociated secret: %v", secretsErr)
+				}
+			}
+		}
+
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
 		// If isolation level was USER delete all private buckets

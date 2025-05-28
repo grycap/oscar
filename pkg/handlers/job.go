@@ -31,6 +31,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/grycap/oscar/v3/pkg/resourcemanager"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	genericErrors "github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
@@ -94,6 +95,8 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		}
 
 		// Check if reqToken is the service token
+		var uidFromToken string
+		var minIOSecretKey string
 		rawToken := strings.TrimSpace(splitToken[1])
 		if len(rawToken) == tokenLength {
 
@@ -101,12 +104,10 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				c.Status(http.StatusUnauthorized)
 				return
 			}
-		}
-
-		//  If isn't service token check if it is an oidc token
-		var uidFromToken string
-		if len(rawToken) != tokenLength {
-
+			// Use
+			minIOSecretKey = service.Owner
+		} else {
+			//  If isn't service token check if it is an oidc token
 			issuer, err := auth.GetIssuerFromToken(rawToken)
 			if err != nil {
 				c.String(http.StatusBadGateway, fmt.Sprintf("%v", err))
@@ -134,7 +135,18 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				return
 			}
 		}
-
+		// Add secrets as environment variables if defined
+		if utils.SecretExists(service.Name, cfg.ServicesNamespace, back.GetKubeClientset()) {
+			podSpec.Containers[0].EnvFrom = []v1.EnvFromSource{
+				{
+					SecretRef: &v1.SecretEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: service.Name,
+						},
+					},
+				},
+			}
+		}
 		// Get the event from request body
 		eventBytes, err := io.ReadAll(c.Request.Body)
 		if err != nil {
@@ -147,7 +159,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		if err != nil {
 			// Check if the request was made with OIDC token to get user UID
 			if uidFromToken != "" {
-				requestUserUID = uidFromToken
+				minIOSecretKey = uidFromToken
 				c.Set("uidOrigin", uidFromToken)
 			} else {
 				// Set as nil string if unable to get an UID
@@ -157,6 +169,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		} else {
 			c.Set("IPAddress", sourceIPAddress)
 			c.Set("uidOrigin", requestUserUID)
+			minIOSecretKey = requestUserUID
 		}
 
 		c.Next()
@@ -166,7 +179,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			Name: MinIOSecretVolumeName,
 			VolumeSource: v1.VolumeSource{
 				Secret: &v1.SecretVolumeSource{
-					SecretName: auth.FormatUID(requestUserUID),
+					SecretName: auth.FormatUID(minIOSecretKey),
 				},
 			},
 		})

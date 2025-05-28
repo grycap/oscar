@@ -197,8 +197,8 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			// TODO
 		}
 	}
-	// TODO check if some components of mount need to be deleted
 
+	// TODO check if some components of mount need to be deleted
 	return nil
 }
 

@@ -293,9 +293,7 @@ func checkAdditionalConfig(configName string, configNamespace string, service ty
 
 	return nil
 }
-func Test() {
 
-}
 func createServiceConfigMap(service *types.Service, namespace string, kubeClientset kubernetes.Interface) error {
 	// Copy script from service
 	script := service.Script

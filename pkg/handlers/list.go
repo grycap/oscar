@@ -47,7 +47,7 @@ func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 				return
 			}
 
-			var allowedServicesForUser []*types.Service
+			allowedServicesForUser := []*types.Service{}
 			for _, service := range services {
 				switch service.Visibility {
 				case utils.PUBLIC:
