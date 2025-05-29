@@ -1,0 +1,12 @@
+node-red-dashboard
+node-red-contrib-cowsay
+node-red-contrib-oscar-yolo
+node-red-contrib-oscar-grayify
+node-red-contrib-oscar-plants-classification-tensorflow
+node-red-node-base64
+node-red-contrib-string
+node-red-contrib-time_interval
+node-red-contrib-image-output
+node-red-contrib-exec-queue
+node-red-contrib-minio-all
+node-red-contrib-play-audio
