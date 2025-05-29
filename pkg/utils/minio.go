@@ -66,10 +66,11 @@ type MinIOAdminClient struct {
 // MinIOBucket definition to create buckets independent of a service
 // Note: BucketPath refers to bucket name
 type MinIOBucket struct {
-	BucketPath   string   `json:"bucket_path"`
-	Visibility   string   `json:"visibility"`
-	AllowedUsers []string `json:"allowed_users"`
-	Owner        string   `json:"owner"`
+	BucketPath   string            `json:"bucket_path"`
+	Visibility   string            `json:"visibility"`
+	AllowedUsers []string          `json:"allowed_users"`
+	Owner        string            `json:"owner"`
+	Metadata     map[string]string `json:metadata`
 }
 
 // Define the policy structure using Go structs
@@ -230,7 +231,7 @@ func createBucket(bucketKey string, s3Client *s3.S3) error {
 		if aerr, ok := err.(awserr.Error); ok {
 			// Check if the error is caused because the bucket already exists
 			if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
-				return fmt.Errorf("The bucket \"%s\" already exists\n", bucketKey)
+				return fmt.Errorf("the bucket \"%s\" already exists\n", bucketKey)
 			} else {
 				return fmt.Errorf("error creating bucket %s: %v", bucketKey, err)
 			}
@@ -497,7 +498,6 @@ func (minIOAdminClient *MinIOAdminClient) ResourceInPolicy(policyName string, re
 	rs := "arn:aws:s3:::" + resource + "/*"
 	getPolicy, err := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), policyName)
 	if err != nil {
-		fmt.Printf("error reading policy for user %s", policyName)
 		return false
 	}
 
@@ -518,13 +518,11 @@ func (minIOAdminClient *MinIOAdminClient) ResourceInPolicy(policyName string, re
 	return false
 }
 
-func (minIOAdminClient *MinIOAdminClient) TagOwner(bucket string, uid string) error {
+func (minIOAdminClient *MinIOAdminClient) SetTags(bucket string, newtags map[string]string) error {
 	// Create tags from a map.
-	btags, err := tags.NewTags(map[string]string{
-		"owner": uid,
-	}, false)
+	btags, err := tags.NewTags(newtags, false)
 	if err != nil {
-		return fmt.Errorf("error creating tag owner %s", uid)
+		return fmt.Errorf("error creating tag owner %s", newtags["uid"])
 	}
 
 	err = minIOAdminClient.simpleClient.SetBucketTagging(context.Background(), bucket, btags)
@@ -534,13 +532,13 @@ func (minIOAdminClient *MinIOAdminClient) TagOwner(bucket string, uid string) er
 	return nil
 }
 
-func (minIOAdminClient *MinIOAdminClient) GetTaggedOwner(bucket string) (string, error) {
+func (minIOAdminClient *MinIOAdminClient) GetTaggedMetadata(bucket string) (map[string]string, error) {
 	btags, err := minIOAdminClient.simpleClient.GetBucketTagging(context.TODO(), bucket)
 	if err != nil {
-		return "", fmt.Errorf("error getting tags on bucket %s", bucket)
+		return map[string]string{}, fmt.Errorf("error getting tags on bucket %s", bucket)
 	}
-	tag := btags.ToMap()
-	return tag["owner"], nil
+
+	return btags.ToMap(), nil
 }
 
 func (minIOAdminClient *MinIOAdminClient) GetBucketMembers(bucket string) ([]string, error) {

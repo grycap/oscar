@@ -225,7 +225,12 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				if err != nil {
 					c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 				}
-				if err := minIOAdminClient.TagOwner(b.BucketPath, uid); err != nil {
+				// Bucket metadata for filtering
+				tags := map[string]string{
+					"owner":   uid,
+					"service": "true",
+				}
+				if err := minIOAdminClient.SetTags(b.BucketPath, tags); err != nil {
 					c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
 				}
 			}
@@ -418,13 +423,13 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 					Visibility:   service.Visibility,
 					Owner:        service.Owner})
 				err := minIOAdminClient.CreateS3Path(s3Client, splitPath, false)
-				if err != nil {
+				if err != nil && !isUpdate {
 					return nil, err
 				}
 			} else {
 				// If the bucket is created on the previous loop, add output folders
 				err := minIOAdminClient.CreateS3Path(s3Client, splitPath, true)
-				if err != nil {
+				if err != nil && !isUpdate {
 					return nil, err
 				}
 			}
@@ -432,7 +437,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			if strings.ToUpper(service.IsolationLevel) == "USER" && len(service.BucketList) > 0 {
 				for _, b := range service.BucketList {
 					err := minIOAdminClient.CreateS3Path(s3Client, []string{b, folderKey}, true)
-					if err != nil {
+					if err != nil && !isUpdate {
 						return nil, err
 					}
 				}

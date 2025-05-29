@@ -21,6 +21,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -59,11 +60,21 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 		//s3Client := cfg.MinIOProvider.GetS3Client()
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
+		metadata, err := minIOAdminClient.GetTaggedMetadata(bucket.BucketPath)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintln("Missing bucket metadata: "))
+			return
+		}
+		isService, _ := strconv.ParseBool(metadata["service"])
+		if isService {
+			c.String(http.StatusForbidden, fmt.Sprintln("Forbidden action: A bucket from a service can't be modified"))
+			return
+		}
+
 		bucket.Owner = uid
 		var oldVis string
 		if oldVis = minIOAdminClient.GetCurrentResourceVisibility(bucket); oldVis != "" {
 			if oldVis == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucket.BucketPath) {
-				fmt.Printf("Authorised\n")
 				if oldVis != bucket.Visibility {
 					// Remove old policies
 					err := minIOAdminClient.UnsetPolicies(utils.MinIOBucket{

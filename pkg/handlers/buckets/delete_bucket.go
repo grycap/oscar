@@ -50,12 +50,11 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 			deleteLogger.Printf("Deleting bucket '%s' for user '%s'", bucketName, uid)
 		} else {
 			uid, err := auth.GetUIDFromContext(c)
-			deleteLogger.Printf("Deleting bucket '%s' for user '%s'", bucketName, uid)
-
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln("error getting user from request:", err))
 				return
 			}
+			deleteLogger.Printf("Deleting bucket '%s' for user '%s'", bucketName, uid)
 		}
 		s3Client := cfg.MinIOProvider.GetS3Client()
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)

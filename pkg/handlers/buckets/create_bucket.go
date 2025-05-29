@@ -84,7 +84,12 @@ func MakeCreateHandler(cfg *types.Config) gin.HandlerFunc {
 			c.String(http.StatusBadRequest, fmt.Sprintf("Error creating bucket with name '%s': %v", splitPath[0], err))
 			return
 		}
-		if err := minIOAdminClient.TagOwner(splitPath[0], uid); err != nil {
+		// Bucket metadata for filtering
+		tags := map[string]string{
+			"owner":   uid,
+			"service": "true",
+		}
+		if err := minIOAdminClient.SetTags(splitPath[0], tags); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
 		}
 		// If not specified default visibility is PRIVATE
