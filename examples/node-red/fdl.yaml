@@ -9,10 +9,10 @@ functions:
       environment:
         Variables:
           NODE_RED_BASE_URL: "/system/services/node-red/exposed"
-          NODE_RED_DIRECTORY: "/mnt/robert"
+          NODE_RED_DIRECTORY: "/mnt/node-red"
       mount:
         storage_provider: minio.default
-        path: robert
+        path: node-red
       expose:
         min_scale: 1
         max_scale: 1
