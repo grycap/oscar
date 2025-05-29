@@ -24,6 +24,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/backends"
 	"github.com/grycap/oscar/v3/pkg/handlers"
+	"github.com/grycap/oscar/v3/pkg/handlers/buckets"
 	"github.com/grycap/oscar/v3/pkg/resourcemanager"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
@@ -94,6 +95,12 @@ func main() {
 	system.GET("/services/:serviceName", handlers.MakeReadHandler(back))
 	system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
 	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
+
+	// CRUD Buckets
+	system.POST("/buckets", buckets.MakeCreateHandler(cfg))
+	system.GET("/buckets", buckets.MakeListHandler(cfg))
+	system.PUT("/buckets", buckets.MakeUpdateHandler(cfg))
+	system.DELETE("/buckets/:bucket", buckets.MakeDeleteHandler(cfg))
 
 	// Logs paths
 	system.GET("/logs/:serviceName", handlers.MakeJobsInfoHandler(back, kubeClientset, cfg.ServicesNamespace))

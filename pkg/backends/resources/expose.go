@@ -25,7 +25,6 @@ import (
 	htpasswd "github.com/foomo/htpasswd"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
-
 	apps "k8s.io/api/apps/v1"
 	autos "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
