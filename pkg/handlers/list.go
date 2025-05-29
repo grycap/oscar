@@ -24,6 +24,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 )
 
@@ -46,10 +47,21 @@ func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 				return
 			}
 
-			var allowedServicesForUser []*types.Service
+			allowedServicesForUser := []*types.Service{}
 			for _, service := range services {
-				if len(service.AllowedUsers) == 0 || slices.Contains(service.AllowedUsers, uid) {
+				switch service.Visibility {
+				case utils.PUBLIC:
 					allowedServicesForUser = append(allowedServicesForUser, service)
+
+				case utils.PRIVATE:
+					if service.Owner == uid {
+						allowedServicesForUser = append(allowedServicesForUser, service)
+
+					}
+				case utils.RESTRICTED:
+					if service.Owner == uid || slices.Contains(service.AllowedUsers, uid) {
+						allowedServicesForUser = append(allowedServicesForUser, service)
+					}
 				}
 			}
 

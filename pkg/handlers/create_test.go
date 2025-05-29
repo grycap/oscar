@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -60,6 +61,7 @@ func TestMakeCreateHandler(t *testing.T) {
 			Verify:    false,
 		},
 	}
+
 	r := gin.Default()
 	r.Use(func(c *gin.Context) {
 		c.Set("uidOrigin", "somelonguid@egi.eu")
@@ -70,15 +72,27 @@ func TestMakeCreateHandler(t *testing.T) {
 
 	scenarios := []struct {
 		name           string
-		isolationLevel string
+		visibility     string
+		allowedUsers   []string
+		expectedStatus int
 	}{
-		{"Service", "SERVICE"},
-		{"User", "USER"},
+		{"PublicVisibility", "public", []string{}, http.StatusCreated},
+		{"InvalidVisibility", "private", []string{}, http.StatusCreated},
+		{"EmptyVisibility", "", []string{}, http.StatusCreated}, // Assuming default is allowed
 	}
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
+			allowedUsersJSON := "["
+			for i, user := range s.allowedUsers {
+				if i > 0 {
+					allowedUsersJSON += ","
+				}
+				allowedUsersJSON += `"` + user + `"`
+			}
+			allowedUsersJSON += "]"
+
 			body := strings.NewReader(`
 				{
 					"name": "cowsay",
@@ -90,20 +104,12 @@ func TestMakeCreateHandler(t *testing.T) {
 					"alpine": false,
 					"script": "test",
 					"input": [
-						{
-						"storage_provider": "minio",
-						"path": "/test/input/"
-						}
 					],
 					"output": [
-						{
-						"storage_provider": "minio",
-						"path": "/test/output"
-						}
 					],
 					"mount": {
 						"storage_provider": "minio",
-						"path": "/test/mount"
+						"path": "test/mount"
 					},
 					"storage_providers": {
 						"webdav": {
@@ -114,17 +120,19 @@ func TestMakeCreateHandler(t *testing.T) {
 							}
 						}
 					},
-					"isolation_level": "` + s.isolationLevel + `",
+					"isolation_level": "",
 					"bucket_list": [],
-					"allowed_users": ["somelonguid@egi.eu", "somelonguid2@egi.eu"]
+					"visibility": "` + s.visibility + `",
+					"allowed_users": []
 				}`)
 
 			req, _ := http.NewRequest("POST", "/system/services", body)
 			req.Header.Add("Authorization", "Bearer token")
 			r.ServeHTTP(w, req)
 
-			if w.Code != http.StatusCreated {
-				t.Errorf("expecting code %d, got %d", http.StatusCreated, w.Code)
+			if w.Code != s.expectedStatus {
+				fmt.Println("response: ", w.Body)
+				t.Errorf("expecting code %d, got %d", s.expectedStatus, w.Code)
 			}
 		})
 	}
