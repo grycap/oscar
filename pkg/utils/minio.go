@@ -70,7 +70,7 @@ type MinIOBucket struct {
 	Visibility   string            `json:"visibility"`
 	AllowedUsers []string          `json:"allowed_users"`
 	Owner        string            `json:"owner"`
-	Metadata     map[string]string `json:metadata`
+	Metadata     map[string]string `json:"metadata"`
 }
 
 // Define the policy structure using Go structs
