@@ -87,7 +87,7 @@ func MakeCreateHandler(cfg *types.Config) gin.HandlerFunc {
 		// Bucket metadata for filtering
 		tags := map[string]string{
 			"owner":   uid,
-			"service": "true",
+			"service": "false",
 		}
 		if err := minIOAdminClient.SetTags(splitPath[0], tags); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
