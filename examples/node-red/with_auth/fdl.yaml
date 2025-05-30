@@ -9,11 +9,12 @@ functions:
       environment:
         Variables:
           NODE_RED_BASE_URL: "/system/services/node-red-auth/exposed"
-          NODE_RED_DIRECTORY: "/mnt/node-red-latest"
-          NODE_RED_PWD: "admin"
+          NODE_RED_DIRECTORY: "/mnt/node-red-auth"
+        secrets:
+          PASSWORD: "admin"
       mount:
         storage_provider: minio.default
-        path: node-red-latest
+        path: node-red-auth
       expose:
         min_scale: 1
         max_scale: 1

@@ -3,7 +3,7 @@
 sleep 15
 mkdir -p $NODE_RED_DIRECTORY
 
-NODE_RED_PWD_HASH=$(echo "$NODE_RED_PWD" | node-red admin hash-pw | cut -d' ' -f2)
+NODE_RED_PWD_HASH=$(echo "$PASSWORD" | node-red admin hash-pw | cut -d' ' -f2)
 
 node-red --port 1880 --userDir $NODE_RED_DIRECTORY \
   -D uiHost="::" \
