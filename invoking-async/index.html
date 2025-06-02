@@ -823,6 +823,19 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Asynchronous invocations
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -834,6 +847,34 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#log-information" class="md-nav__link">
+    <span class="md-ellipsis">
+      Log information
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -1346,12 +1387,18 @@
 <h1 id="asynchronous-invocations">Asynchronous invocations</h1>
 <p>For event-driven file processing, OSCAR automatically manages the creation
 and <a href="https://docs.min.io/minio/baremetal/monitoring/bucket-notifications/bucket-notifications.html#minio-bucket-notifications">notification system</a>
-of MinIO buckets. This allow the event-driven invocation of services
+of MinIO buckets. This allows the event-driven invocation of services
 using asynchronous requests for every file uploaded to the bucket, which generates a Kubernetes job for every file to be processed.</p>
 <p><img alt="oscar-async.png" src="../images/oscar-async.png" /></p>
-<p>These jobs will be queued up in the Kubernetes scheduler and will be processed whenever there are resources available. If OSCAR cluster has been deployed as an elastic Kubernetes cluster (see <a href="https://docs.oscar.grycap.net/deploy-im-dashboard/">Deployment with IM</a>), then new Virtual Machines will be provisioned (up to the maximum number of nodes defined) in the underlying Cloud platform and seamlessly integrated in the Kubernetes clusters to proceed with the execution of jobs. These nodes will be terminated as the worload is reduced. Notice that the output files can be stores in MinIO or in any other storage back-end supported by the <a href="../oscar-service/#faas-supervisor">FaaS supervisor</a>. </p>
+<p>These jobs will be queued up in the Kubernetes scheduler and will be processed whenever there are resources available. If OSCAR cluster has been deployed as an elastic Kubernetes cluster (see <a href="https://docs.oscar.grycap.net/deploy-im-dashboard/">Deployment with IM</a>), then new Virtual Machines will be provisioned (up to the maximum number of nodes defined) in the underlying Cloud platform and seamlessly integrated into the Kubernetes clusters to proceed with the execution of jobs. These nodes will be terminated as the workload is reduced. Notice that the output files can be stored in MinIO or in any other storage back-end supported by the <a href="../oscar-service/#faas-supervisor">FaaS supervisor</a>. </p>
 <p>Note that if your OSCAR service runs an AI model for inference, each job will load the AI model weights before performing the inference. You can mitigate this penalty by adjusting the inference code to process a compressed file with several images.</p>
 <p>If you want to process a large number of data files, consider using <a href="https://github.com/grycap/oscar-batch">OSCAR Batch</a>, a tool designed to perform batch-based processing in OSCAR clusters. It includes a coordinator tool where the user provides a MinIO bucket containing files for processing. This service calculates the optimal number of parallel service invocations that can be accommodated within the cluster, according to its current status, and distributes the image processing workload accordingly among the service invocations. This is mainly intended to process large amounts of files, for example, historical data.</p>
+<h2 id="log-information">Log information</h2>
+<p>Each asynchronous invocation within OSCAR generates logs that include execution details, errors, and the service's output, which are essential for tracking job status and debugging. These logs can be accessed through the <a href="https://docs.oscar.grycap.net/oscar-cli/">OSCAR CLI</a>, <a href="https://docs.oscar.grycap.net/usage-dashboard/">OSCAR Dashboard</a> or <a href="https://docs.oscar.grycap.net/api/">OSCAR API</a>, allowing you to view all the jobs created for a service, as well as their status (<code>Pending</code>, <code>Running</code>, <code>Succeeded</code> or <code>Failed</code>) and their creation, start, and finish times. </p>
+<blockquote>
+<p>ℹ️</p>
+<p>On the <a href="https://docs.oscar.grycap.net/usage-dashboard/">OSCAR Dashboard</a> page you can find an example of asynchronous invocation and logs demonstration using the dashboard.</p>
+</blockquote>
 
 
 

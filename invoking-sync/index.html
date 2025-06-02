@@ -859,6 +859,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#synchronous-invocations-via-oscar-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      Synchronous Invocations via OSCAR Dashboard
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#service-access-tokens" class="md-nav__link">
     <span class="md-ellipsis">
       Service access tokens
@@ -1450,7 +1459,7 @@ the result stored in a file using the <code>--output</code> flag:</p>
 input to be passed as text through the <code>--text-input</code> flag or directly a file
 to be sent by passing its path through the <code>--input</code> flag. Both input types
 are automatically encoded in <a href="https://en.wikipedia.org/wiki/Base64">Base64</a>.</p>
-<p>It also allow setting the <code>--output</code> flag to indicate a path for storing
+<p>It also allows setting the <code>--output</code> flag to indicate a path for storing
 (and decoding if needed) the output body in a file, otherwise the output will
 be shown in stdout.</p>
 <p>An illustration of triggering a service synchronously through OSCAR-CLI can be
@@ -1473,6 +1482,16 @@ decoded as well. Save output in the expected format of the use-case.</p>
 <pre><code class="language-sh">base64 input.png | curl -X POST -H &quot;Authorization: Bearer &lt;TOKEN&gt;&quot; \
  -d @- https://&lt;CLUSTER_ENDPOINT&gt;/run/&lt;OSCAR_SERVICE&gt; | base64 -d &gt; result.png
 </code></pre>
+<h2 id="synchronous-invocations-via-oscar-dashboard">Synchronous Invocations via OSCAR Dashboard</h2>
+<p>Another way to perform synchronous invocations is by using the <a href="https://dashboard.oscar.grycap.net">OSCAR Dashboard</a>, which allows you to send files in base64 format or use a built-in code editor to create payloads in a more user-friendly way. You also can access it by navigating directly to the cluster endpoint in your browser.</p>
+<p>After logging in, find the service you want to invoke and click its <strong>invocation</strong> button (<code>&gt;_</code>).</p>
+<p><img alt="oscar-dashboard-sync-invocation-1.png" src="../images/usage/oscar-dashboard-sync-invocation-1.png" /></p>
+<p>Next, you can either upload a file containing the payload or use the built-in code editor to construct it manually.</p>
+<p><img alt="oscar-dashboard-sync-invocation-2.png" src="../images/usage/oscar-dashboard-sync-invocation-2.png" /></p>
+<p>For demonstration purposes, we'll use the built-in code editor to send a JSON payload.</p>
+<p><img alt="oscar-dashboard-sync-invocation-2.png" src="../images/usage/oscar-dashboard-sync-invocation-3.png" /></p>
+<p>Finally, you can view the result of the invocation directly in the dashboard.</p>
+<p><img alt="oscar-dashboard-sync-invocation-2.png" src="../images/usage/oscar-dashboard-sync-invocation-4.png" /></p>
 <h2 id="service-access-tokens">Service access tokens</h2>
 <p>As detailed in the <a href="../api/">API specification</a>, invocation paths require either the
 service access token or the Access Token of the user when the cluster is integrated with EGI Check-in, in the request header for authentication (any of them is valid). Service access
