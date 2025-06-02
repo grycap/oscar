@@ -30,12 +30,7 @@ func TestMakeUpdateHandler(t *testing.T) {
 
 	svc := &types.Service{
 		Token: "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf",
-		Input: []types.StorageIOConfig{
-			{Provider: "minio." + types.DefaultProvider, Path: "/input"},
-		},
-		Output: []types.StorageIOConfig{
-			{Provider: "minio." + types.DefaultProvider, Path: "/output"},
-		},
+		CPU:   "2.0",
 		StorageProviders: &types.StorageProviders{
 			MinIO: map[string]*types.MinIOProvider{types.DefaultProvider: {
 				Region:    "us-east-1",
@@ -44,7 +39,7 @@ func TestMakeUpdateHandler(t *testing.T) {
 				SecretKey: "sk"}},
 		},
 		Owner:        "somelonguid@egi.eu",
-		AllowedUsers: []string{"somelonguid1@egi.eu"}}
+		AllowedUsers: []string{}}
 	back.Service = svc
 
 	// and set the MinIO endpoint to the fake server
@@ -76,16 +71,8 @@ func TestMakeUpdateHandler(t *testing.T) {
 			"alpine": false,
 			"script": "test",
 			"input": [
-				{
-				"storage_provider": "minio",
-				"path": "/input"
-				}
   			],
 			"output": [
-				{
-				"storage_provider": "webdav.id",
-				"path": "/output"
-				}
   			],
 			"storage_providers": {
 				"webdav": {
@@ -96,7 +83,7 @@ func TestMakeUpdateHandler(t *testing.T) {
 					}
 				}
 			},
-			"allowed_users": ["somelonguid1@egi.eu", "somelonguid2@egi.eu"]
+			"allowed_users": []
 		}
 	`)
 	req, _ := http.NewRequest("PUT", "/system/services", body)

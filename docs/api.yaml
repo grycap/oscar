@@ -356,6 +356,102 @@ paths:
               type: string
               format: binary
         description: Event
+  /system/buckets:
+    get:
+      summary: List buckets
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Buckets'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+      operationId: ListBuckets
+      description: List all buckets visible for the user
+      security:
+        - basicAuth: []
+        - token: []
+      tags:
+        - buckets
+    post:
+      summary: Create bucket
+      operationId: CreateBucket
+      responses:
+        '201':
+          description: Bucket created
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+      description: Create a independent bucket
+      security:
+        - basicAuth: []
+        - token: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Buckets'
+      tags:
+        - buckets        
+    put:
+      summary: Update bucket
+      operationId: UpdateBucket
+      responses:
+        '204':
+          description: Bucket updated
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      description: Update a specific bucket
+      security:
+        - basicAuth: []
+        - token: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Buckets'
+      tags:
+        - buckets
+  '/system/buckets/{bucket}':
+    parameters:
+      - schema:
+          type: string
+        name: bucket
+        in: path
+        required: true
+    delete:
+      summary: Delete bucket
+      operationId: DeleteBucket
+      responses:
+        '204':
+          description: Bucket deleted
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      description: Delete a scpecific bucket
+      security:
+        - basicAuth: []
+        - token: []
+      tags:
+        - buckets
 components:
   schemas:
     Service:
@@ -530,6 +626,27 @@ components:
                   type: string
                 password:
                   type: string
+    Buckets:
+      title: Buckets
+      type: object
+      properties:
+        bucket_path:
+          type: string
+        visibility:
+          type: string
+        allowed_users:
+          type: array
+          items:
+            type: string
+        owner:
+          type: string
+        metadata:
+          type: object
+          properties:
+            owner:
+              type: string
+            service:
+              type: boolean
     Clusters:
       title: Clusters
       type: object
@@ -626,6 +743,7 @@ tags:
   - name: async
   - name: info
   - name: health
+  - name: buckets
 servers:
   - url: 'https://localhost'
     description: 'Local testing'

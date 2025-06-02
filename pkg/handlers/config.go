@@ -46,7 +46,7 @@ func MakeConfigHandler(cfg *types.Config) gin.HandlerFunc {
 
 			uid, err := auth.GetUIDFromContext(c)
 			if err != nil {
-				c.Status(http.StatusInternalServerError)
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
 			mc, err := auth.GetMultitenancyConfigFromContext(c)
@@ -56,7 +56,7 @@ func MakeConfigHandler(cfg *types.Config) gin.HandlerFunc {
 
 			ak, sk, err := mc.GetUserCredentials(uid)
 			if err != nil {
-				c.String(http.StatusInternalServerError, "Error getting credentials for MinIO user: ", uid)
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
 			userMinIOProvider := &types.MinIOProvider{

@@ -280,6 +280,7 @@ clusters:
     ssl_verify: true
 owner: ""
 interlink_node_name: ""
+visibility: ""
 allowed_users: []
 isolation_level: ""
 bucket_list: []
