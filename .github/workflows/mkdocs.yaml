@@ -23,6 +23,12 @@ jobs:
         python -m pip install mkdocs-material
         python -m pip install mkdocs-render-swagger-plugin
         python -m pip install mike
+    - name: Get release latest version 
+      id: latest
+      run: |
+        latest=$(curl -s https://api.github.com/repos/OWNER/REPO/releases/latest | jq -r .tag_name)
+        echo "Última release: $latest"
+        echo "tag_name=$latest" >> $GITHUB_OUTPUT
     - name: Build and deploy to gh-pages
       run: |
-        mike deploy ${{ github.ref }}
+        mike deploy ${{ steps.latest.outputs.tag_name }}"
