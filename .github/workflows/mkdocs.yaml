@@ -22,6 +22,7 @@ jobs:
         python -m pip install mkdocs
         python -m pip install mkdocs-material
         python -m pip install mkdocs-render-swagger-plugin
+        python -m pip install mike
     - name: Build and deploy to gh-pages
       run: |
-        mkdocs gh-deploy
+        mike deploy ${{ github.ref }}
