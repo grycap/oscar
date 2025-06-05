@@ -31,4 +31,4 @@ jobs:
         echo "tag_name=$latest" >> $GITHUB_OUTPUT
     - name: Build and deploy to gh-pages
       run: |
-        mike deploy ${{ steps.latest.outputs.tag_name }}"
+        mike deploy ${{ steps.latest.outputs.tag_name }}
