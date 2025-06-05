@@ -26,6 +26,8 @@ jobs:
     - name: Get release latest version 
       id: latest
       run: |
+        git config --global user.name 'github-actions'
+        git config --global user.email 'github-actions@github.com'
         latest=$(curl -s https://api.github.com/repos/grycap/oscar/releases/latest | jq -r .tag_name)
         echo "Last release tag: $latest"
         echo "tag_name=$latest" >> $GITHUB_OUTPUT
