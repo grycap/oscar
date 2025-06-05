@@ -19,7 +19,7 @@ functions:
       cpu: '1.0'
       image: grycap/oscar-theano-plants
       script: plants.sh
-      isolation_level: USER
+      visibility: USER
       allowed_users: 
       - "62bb11b40398f7.......926@egi.eu"
       - "5e14d33ac4abc9.......463@egi.eu"
@@ -114,7 +114,7 @@ storage_providers:
 | `annotations` </br> *map[string]string*                           | User-defined Kubernetes [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/) to be set in job's definition. Optional                                                                                                |
 | `labels` </br> *map[string]string*                                | User-defined Kubernetes [labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) to be set in job's definition. Optional                                                                                                          |
 | `interlink_node_name` </br> *string*                              | Name of the virtual kubelet node (if you are using InterLink nodes) Optional 
-| `isolation_level` </br> *string*                              |  Select the isolation level of the MinIO buckets: `SERVICE` or `USER` (`SERVICE` by default) Optional 
+| `visibility` </br> *string*                              |  Select the visibility level of service: `private`, `restricted` or `public` (`private` by default) Optional 
 
 ## SynchronousSettings
 
