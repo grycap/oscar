@@ -1,4 +1,5 @@
 site_name: OSCAR Documentation
+site_url: https://docs.oscar.grycap.net/
 repo_url: https://github.com/grycap/oscar
 nav:
 - Introduction: 
