@@ -452,6 +452,23 @@ paths:
         - token: []
       tags:
         - buckets
+  /status:
+    get:
+      summary: Your GET endpoint
+      tags:
+        - status
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+      operationId: Status
+      description: Get cluster status
+      security:
+        - basicAuth: []
+        - token: []
 components:
   schemas:
     Service:
