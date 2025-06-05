@@ -10,7 +10,7 @@ functions:
         Variables:
           NODE_RED_BASE_URL: "/system/services/node-red-auth/exposed"
           NODE_RED_DIRECTORY: "/mnt/node-red-auth"
-        secrets:
+        Secrets:
           PASSWORD: "admin"
       mount:
         storage_provider: minio.default

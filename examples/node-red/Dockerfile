@@ -9,10 +9,27 @@ RUN npm install -g --unsafe-perm node-red
 # Install OSCAR nodes for Node-RED
 COPY dependencies.txt /dependencies.txt
 RUN xargs npm install -g --no-audit --no-update-notifier --no-fund --save --save-prefix=~ --omit=dev --engine-stric < /dependencies.txt
+RUN rm dependencies.txt
+
+# Install dependencies: git
+RUN apk add git
+
+# Download flows from GitHub, extract JSONs, delete repo
+RUN git clone --depth=1 https://github.com/ai4os/ai4-compose.git temp_repo && \
+    mkdir -p oscar-subflows && \
+    find temp_repo/node-red/flows -type f -name "*.json" | while read file; do \
+        filename=$(basename "$file"); \
+        parentdir=$(basename "$(dirname "$file")"); \
+        cp "$file" "oscar-subflows/$filename"; \
+    done && \
+    rm -rf temp_repo
+
+# Remove git to reduce image size
+RUN apk del git
 
 # Clean up unnecessary files
 RUN apk cache clean --force
 RUN npm cache clean --force
 
-# Disable npm bin-links to avoid issues with symlink while using MinIO
+# Disable npm bin-links to avoid issues with symlinks using MinIO
 RUN npm config set bin-links false --global
