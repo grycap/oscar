@@ -26,8 +26,8 @@ jobs:
     - name: Get release latest version 
       id: latest
       run: |
-        latest=$(curl -s https://api.github.com/repos/OWNER/REPO/releases/latest | jq -r .tag_name)
-        echo "Última release: $latest"
+        latest=$(curl -s https://api.github.com/repos/grycap/oscar/releases/latest | jq -r .tag_name)
+        echo "Last release tag: $latest"
         echo "tag_name=$latest" >> $GITHUB_OUTPUT
     - name: Build and deploy to gh-pages
       run: |
