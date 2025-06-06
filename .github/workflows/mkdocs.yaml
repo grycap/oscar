@@ -22,6 +22,15 @@ jobs:
         python -m pip install mkdocs
         python -m pip install mkdocs-material
         python -m pip install mkdocs-render-swagger-plugin
+        python -m pip install mike
+    - name: Get release latest version 
+      id: latest
+      run: |
+        git config --global user.name 'github-actions'
+        git config --global user.email 'github-actions@github.com'
+        latest=$(curl -s https://api.github.com/repos/grycap/oscar/releases/latest | jq -r .tag_name)
+        echo "Last release tag: $latest"
+        echo "tag_name=$latest" >> $GITHUB_OUTPUT
     - name: Build and deploy to gh-pages
       run: |
-        mkdocs gh-deploy
+        mike deploy ${{ steps.latest.outputs.tag_name }}

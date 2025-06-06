@@ -20,7 +20,7 @@ environments provided by Docker containers that run on elastic Kubernetes cluste
 
 Information on how to deploy an OSCAR cluster using the Infrastucture Manager can be found at: https://grycap.github.io/oscar/deploy-im-dashboard/
 
-For more documentation visit https://grycap.github.io/oscar/
+For more documentation visit https://docs.oscar.grycap.net
 
 > **_NOTE:_** If you detect inaccurate or unclear information on the documentation please report back to us either opening an issue or contacting us at products@grycap.upv.es
 
@@ -123,7 +123,7 @@ Also, Grant PDC2021-120844-I00 funded by Ministerio de Ciencia e Innovación/Age
 </a>
 
 This software has received a silver badge according to the [Software Quality Baseline criteria](https://www.eosc-synergy.eu/for-developers/) defined by the [EOSC-Synergy](https://www.eosc-synergy.eu) project. Please acknowledge the use of OSCAR by citing the following scientific
-publications ([preprints available](https://www.grycap.upv.es/gmolto/publications)):
+publications ([preprints available](https://www.grycap.upv.es/gmolto/publications.php)):
 
 ```
 Sebastián Risco, Germán Moltó, Diana M. Naranjo and Ignacio Blanquer. (2021). Serverless Workflows for Containerised Applications in the Cloud Continuum. Journal of Grid Computing, 19(3), 30. https://doi.org/10.1007/s10723-021-09570-2
