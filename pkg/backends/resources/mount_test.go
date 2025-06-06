@@ -13,23 +13,24 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package types
+package resources
 
 import (
 	"testing"
 
+	"github.com/grycap/oscar/v3/pkg/types"
 	v1 "k8s.io/api/core/v1"
 )
 
 func TestSetMount(t *testing.T) {
 	podSpec := &v1.PodSpec{}
-	service := Service{
-		Mount: StorageIOConfig{
+	service := types.Service{
+		Mount: types.StorageIOConfig{
 			Provider: "minio.provider",
 			Path:     "test-bucket",
 		},
-		StorageProviders: &StorageProviders{
-			MinIO: map[string]*MinIOProvider{
+		StorageProviders: &types.StorageProviders{
+			MinIO: map[string]*types.MinIOProvider{
 				"provider": {
 					AccessKey: "test-access-key",
 					SecretKey: "test-secret-key",
@@ -38,9 +39,9 @@ func TestSetMount(t *testing.T) {
 			},
 		},
 	}
-	cfg := &Config{
+	cfg := &types.Config{
 		Name: "oscar",
-		MinIOProvider: &MinIOProvider{
+		MinIOProvider: &types.MinIOProvider{
 			AccessKey: "test-access-key",
 			SecretKey: "test-secret-key",
 		}}
@@ -88,12 +89,12 @@ func TestSetMount(t *testing.T) {
 }
 
 func TestSetMinIOEnvVars(t *testing.T) {
-	service := Service{
-		Mount: StorageIOConfig{
+	service := types.Service{
+		Mount: types.StorageIOConfig{
 			Path: "test-bucket",
 		},
-		StorageProviders: &StorageProviders{
-			MinIO: map[string]*MinIOProvider{
+		StorageProviders: &types.StorageProviders{
+			MinIO: map[string]*types.MinIOProvider{
 				"provider": {
 					AccessKey: "test-access-key",
 					SecretKey: "test-secret-key",
@@ -104,9 +105,9 @@ func TestSetMinIOEnvVars(t *testing.T) {
 	}
 	providerId := "provider"
 
-	cfg := &Config{
+	cfg := &types.Config{
 		Name: "oscar",
-		MinIOProvider: &MinIOProvider{
+		MinIOProvider: &types.MinIOProvider{
 			AccessKey: "test-access-key",
 			SecretKey: "test-secret-key",
 		},
@@ -133,12 +134,12 @@ func TestSetMinIOEnvVars(t *testing.T) {
 }
 
 func TestSetWebDavEnvVars(t *testing.T) {
-	service := Service{
-		Mount: StorageIOConfig{
+	service := types.Service{
+		Mount: types.StorageIOConfig{
 			Path: "test-folder",
 		},
-		StorageProviders: &StorageProviders{
-			WebDav: map[string]*WebDavProvider{
+		StorageProviders: &types.StorageProviders{
+			WebDav: map[string]*types.WebDavProvider{
 				"provider": {
 					Login:    "test-login",
 					Password: "test-password",

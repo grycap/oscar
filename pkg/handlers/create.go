@@ -476,7 +476,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				s3Client = service.StorageProviders.S3[provID].GetS3Client()
 			}
 			// Create mount bucket
-			err := minIOAdminClient.CreateS3PathWithWebhook(s3Client, splitPath, service.GetMinIOWebhookARN(), false)
+			err := minIOAdminClient.CreateS3Path(s3Client, splitPath, true)
 			if err != nil {
 				return nil, err
 			}
