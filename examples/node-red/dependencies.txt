@@ -1,5 +1,5 @@
 node-red-dashboard
-node-red-contrib-cowsay
+node-red-contrib-oscar-cowsay
 node-red-contrib-oscar-yolo
 node-red-contrib-oscar-grayify
 node-red-contrib-oscar-plants-classification-tensorflow
