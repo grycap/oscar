@@ -10,3 +10,4 @@ node-red-contrib-image-output
 node-red-contrib-exec-queue
 node-red-contrib-minio-all
 node-red-contrib-play-audio
+node-red-contrib-zip
