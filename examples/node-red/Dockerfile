@@ -14,15 +14,29 @@ RUN rm dependencies.txt
 # Install dependencies: git
 RUN apk add git
 
-# Download flows from GitHub, extract JSONs, delete repo
-RUN git clone --depth=1 https://github.com/ai4os/ai4-compose.git temp_repo && \
-    mkdir -p oscar-subflows && \
-    find temp_repo/node-red/flows -type f -name "*.json" | while read file; do \
+# Prepare directories for subflows and examples
+RUN mkdir -p oscar-subflows
+RUN mkdir -p oscar-examples
+
+# Download subflows and examples from GitHub
+RUN git clone --depth=1 https://github.com/ai4os/ai4-compose.git temp_repo
+
+# Copy subflows to the oscar-subflows directory
+RUN find temp_repo/node-red/flows -type f -name "*.json" | while read file; do \
         filename=$(basename "$file"); \
         parentdir=$(basename "$(dirname "$file")"); \
         cp "$file" "oscar-subflows/$filename"; \
-    done && \
-    rm -rf temp_repo
+    done
+
+# Copy examples to the oscar-examples directory
+RUN find temp_repo/node-red/examples -type f -name "*.json" | while read file; do \
+        filename=$(basename "$file"); \
+        parentdir=$(basename "$(dirname "$file")"); \
+        cp "$file" "oscar-examples/$filename"; \
+    done 
+
+# Clean up temporary repository
+RUN rm -rf temp_repo
 
 # Remove git to reduce image size
 RUN apk del git
