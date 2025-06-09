@@ -6,8 +6,9 @@ functions:
       memory: 2Gi
       image: ghcr.io/rk181/node-red-alpine
       script: script.sh
+      alpine: true
       environment:
-        Variables:
+        variables:
           NODE_RED_BASE_URL: "/system/services/node-red/exposed"
           NODE_RED_DIRECTORY: "/mnt/node-red"
       mount:
