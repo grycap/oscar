@@ -4,7 +4,7 @@ functions:
       name: node-red-auth
       cpu: '1.0'
       memory: 2Gi
-      image: ghcr.io/rk181/node-red-alpine
+      image: ghcr.io/grycap/oscar-flows
       script: script.sh
       alpine: true
       environment:
