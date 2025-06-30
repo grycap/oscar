@@ -323,12 +323,12 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		provID, provName = getProviderInfo(in.Provider)
 
 		// Only allow input from MinIO and dCache
-		if provName != types.MinIOName && provName != types.WebDavName {
+		if provName != types.MinIOName && provName != types.WebDavName && provName != types.RucioName {
 			return nil, errInput
 		}
 
 		// If the provider is WebDav (dCache) skip bucket creation
-		if provName == types.WebDavName {
+		if provName == types.WebDavName || provName == types.RucioName {
 			continue
 		}
 
