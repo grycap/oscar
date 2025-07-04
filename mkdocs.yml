@@ -1,4 +1,5 @@
 site_name: OSCAR Documentation
+site_url: https://docs.oscar.grycap.net/
 repo_url: https://github.com/grycap/oscar
 nav:
 - Introduction: 
@@ -57,11 +58,19 @@ theme:
     primary: teal
   features:
     - instant
+    - navigation.tabs
+    - navigation.sections
+    - versioning
     - toc.integrate
     - content.code.copy
 
 plugins:
 - search
 - render_swagger
+- mike
+
+extra:
+  version:
+    provider: mike
 
 copyright: "&copy; GRyCAP - I3M - Universitat Politècnica de València, Spain."

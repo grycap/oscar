@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package types
+package resources
 
 import (
-	"fmt"
 	"strings"
 
+	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -48,12 +49,12 @@ done`
 )
 
 // SetMount Creates the sidecar container that mounts the source volume onto the pod volume
-func SetMount(podSpec *v1.PodSpec, service Service, cfg *Config) {
+func SetMount(podSpec *v1.PodSpec, service types.Service, cfg *types.Config) {
 	podSpec.Containers = append(podSpec.Containers, sidecarPodSpec(service, cfg, cfg.Name))
 	addVolume(podSpec)
 }
 
-func SetMountUID(podSpec *v1.PodSpec, service Service, cfg *Config, uid string) {
+func SetMountUID(podSpec *v1.PodSpec, service types.Service, cfg *types.Config, uid string) {
 	podSpec.Containers = append(podSpec.Containers, sidecarPodSpec(service, cfg, uid))
 	addVolume(podSpec)
 }
@@ -88,7 +89,7 @@ func addVolume(podSpec *v1.PodSpec) {
 	podSpec.Volumes = append(podSpec.Volumes, ephemeralvolumeshare)
 }
 
-func sidecarPodSpec(service Service, cfg *Config, uid string) v1.Container {
+func sidecarPodSpec(service types.Service, cfg *types.Config, uid string) v1.Container {
 	bidirectional := v1.MountPropagationBidirectional
 	var ptr *bool // Uninitialized pointer
 	value := true
@@ -125,12 +126,12 @@ func sidecarPodSpec(service Service, cfg *Config, uid string) v1.Container {
 	}
 
 	provider := strings.Split(service.Mount.Provider, ".")
-	if provider[0] == MinIOName {
+	if provider[0] == types.MinIOName {
 		MinIOEnvVars := setMinIOEnvVars(service, provider[1], cfg, uid)
 		container.Env = append(container.Env, MinIOEnvVars...)
 		container.Args = []string{"-c", minioCommand + communCommand}
 	}
-	if provider[0] == WebDavName {
+	if provider[0] == types.WebDavName {
 		WebDavEnvVars := setWebDavEnvVars(service, provider[1])
 		container.Env = append(container.Env, WebDavEnvVars...)
 		container.Args = []string{"-c", webdavCommand + communCommand}
@@ -139,7 +140,7 @@ func sidecarPodSpec(service Service, cfg *Config, uid string) v1.Container {
 
 }
 
-func setMinIOEnvVars(service Service, providerId string, cfg *Config, uid string) []v1.EnvVar {
+func setMinIOEnvVars(service types.Service, providerId string, cfg *types.Config, uid string) []v1.EnvVar {
 	//service.Mount.Provider
 	variables := []v1.EnvVar{
 		{
@@ -170,7 +171,7 @@ func setMinIOEnvVars(service Service, providerId string, cfg *Config, uid string
 				ValueFrom: &v1.EnvVarSource{
 					SecretKeyRef: &v1.SecretKeySelector{
 						LocalObjectReference: v1.LocalObjectReference{
-							Name: uid,
+							Name: auth.FormatUID(uid),
 						},
 						Key: "accessKey",
 					},
@@ -181,7 +182,7 @@ func setMinIOEnvVars(service Service, providerId string, cfg *Config, uid string
 				ValueFrom: &v1.EnvVarSource{
 					SecretKeyRef: &v1.SecretKeySelector{
 						LocalObjectReference: v1.LocalObjectReference{
-							Name: uid,
+							Name: auth.FormatUID(uid),
 						},
 						Key: "secretKey",
 					},
@@ -190,11 +191,10 @@ func setMinIOEnvVars(service Service, providerId string, cfg *Config, uid string
 		}
 		variables = append(variables, credentials...)
 	}
-	fmt.Println(variables)
 	return variables
 }
 
-func setWebDavEnvVars(service Service, providerId string) []v1.EnvVar {
+func setWebDavEnvVars(service types.Service, providerId string) []v1.EnvVar {
 	//service.Mount.Provider
 	credentials := []v1.EnvVar{
 		{

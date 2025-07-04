@@ -136,12 +136,12 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		provID, provName = getProviderInfo(in.Provider)
 
 		// Only allow input from MinIO and dCache
-		if provName != types.MinIOName && provName != types.WebDavName {
+		if provName != types.MinIOName && provName != types.WebDavName && provName != types.RucioName {
 			return errInput
 		}
 
 		// If the provider is WebDav (dCache) skip bucket creation
-		if provName == types.WebDavName {
+		if provName == types.WebDavName || provName == types.RucioName {
 			continue
 		}
 
@@ -184,6 +184,12 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	// Delete output buckets
 	for _, out := range service.Output {
 		provID, provName = getProviderInfo(out.Provider)
+
+		// If the provider is WebDav (dCache) skip bucket creation
+		if provName == types.WebDavName || provName == types.RucioName {
+			continue
+		}
+
 		// Check if the provider identifier is defined in StorageProviders
 		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
 			return fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
@@ -191,7 +197,35 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 
 		switch provName {
 		case types.MinIOName, types.S3Name:
-			// TODO check if output is a different bucket and delete
+			//Check if this storage provider is defined in input
+			previousExist := false
+			outPath := strings.Trim(out.Path, " /")
+			outBucket := strings.SplitN(outPath, "/", 2)[0]
+			//Compare this output storage provider with all the input storage provider
+			for _, in := range service.Input {
+				//Don't compare in.Provider with out.Provider directly
+				inProvID, inProvName := getProviderInfo(in.Provider)
+				inPath := strings.Trim(in.Path, " /")
+				inBucket := strings.SplitN(inPath, "/", 2)[0]
+
+				if inProvID == provID && inProvName == provName && inBucket == outBucket {
+					previousExist = true
+				}
+			}
+			//Its is not defined in input -> delete.
+			if !previousExist {
+				s3Client = cfg.MinIOProvider.GetS3Client()
+
+				err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+					BucketPath:   outBucket,
+					Visibility:   service.Visibility,
+					AllowedUsers: service.AllowedUsers,
+					Owner:        service.Owner,
+				})
+				if err != nil {
+					return fmt.Errorf("error while removing MinIO bucket %v", err)
+				}
+			}
 
 		case types.OnedataName:
 			// TODO

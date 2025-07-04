@@ -38,6 +38,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 	return func(c *gin.Context) {
 		var provName string
 		var newService types.Service
+		var uid string
 		if err := c.ShouldBindJSON(&newService); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
@@ -64,7 +65,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		if !isAdminUser {
-			uid, err := auth.GetUIDFromContext(c)
+			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln("Couldn't get UID from context"))
 			}
@@ -158,7 +159,12 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				if oldServiceBuckets[b.BucketPath] {
 					// If the visibility of the bucket has changed remove old policies and config new ones
 					if oldService.Visibility != newService.Visibility {
-						err := minIOAdminClient.UnsetPolicies(b)
+						err := minIOAdminClient.UnsetPolicies(utils.MinIOBucket{
+							BucketPath:   b.BucketPath,
+							AllowedUsers: oldService.AllowedUsers,
+							Visibility:   oldService.Visibility,
+							Owner:        oldService.Owner,
+						})
 						if err != nil {
 							c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 						}

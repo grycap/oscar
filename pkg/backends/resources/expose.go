@@ -290,7 +290,7 @@ func getPodTemplateSpec(service types.Service, cfg *types.Config) v1.PodTemplate
 	var num int32 = 0777
 	podSpec.Volumes[0].VolumeSource.ConfigMap.DefaultMode = &num
 	if service.Mount.Provider != "" {
-		types.SetMount(podSpec, service, cfg)
+		SetMount(podSpec, service, cfg)
 	}
 	template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
