@@ -58,8 +58,6 @@ theme:
     primary: teal
   features:
     - instant
-    - navigation.tabs
-    - navigation.sections
     - versioning
     - toc.integrate
     - content.code.copy
