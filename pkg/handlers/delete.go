@@ -42,11 +42,14 @@ var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
 func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// First get the Service
-		service, _ := back.ReadService(c.Param("serviceName"))
+		var service *types.Service
+		var uid string
+		var err error
+		service, _ = back.ReadService(c.Param("serviceName"))
 		authHeader := c.GetHeader("Authorization")
 
 		if len(strings.Split(authHeader, "Bearer")) > 1 {
-			uid, err := auth.GetUIDFromContext(c)
+			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
@@ -98,7 +101,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusInternalServerError, "Error deleting service buckets: ", err)
 		}
 
-		if len(service.BucketList) > 0 && strings.ToUpper(service.IsolationLevel) == "USER" {
+		if len(service.BucketList) > 0 && strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser {
 			for i, b := range service.BucketList {
 				err = minIOAdminClient.RemoveResource(b, service.AllowedUsers[i], false)
 				if err != nil {
@@ -163,6 +166,12 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		path := strings.Trim(in.Path, " /")
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
+
+		// Disable input notifications for service bucket
+		if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), splitPath[0]); err != nil {
+			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
+		}
+
 		err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
 			BucketPath:   splitPath[0],
 			Visibility:   service.Visibility,
@@ -172,11 +181,6 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 
 		if err != nil {
 			return fmt.Errorf("error while removing MinIO bucket %v", err)
-		}
-
-		// Disable input notifications for service bucket
-		if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), splitPath[0]); err != nil {
-			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 		}
 
 	}
@@ -216,6 +220,11 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			if !previousExist {
 				s3Client = cfg.MinIOProvider.GetS3Client()
 
+				// Disable input notifications for service bucket
+				if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), outBucket); err != nil {
+					log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
+				}
+
 				err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
 					BucketPath:   outBucket,
 					Visibility:   service.Visibility,
@@ -229,6 +238,26 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 
 		case types.OnedataName:
 			// TODO
+		}
+	}
+
+	if strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser && len(service.BucketList) != 0 {
+		for _, bucket := range service.BucketList {
+
+			// Disable input notifications for service bucket
+			if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), bucket); err != nil {
+				log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
+			}
+
+			err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+				BucketPath:   bucket,
+				Visibility:   utils.PRIVATE,
+				AllowedUsers: []string{},
+				Owner:        service.Owner,
+			})
+			if err != nil {
+				fmt.Errorf("error while removing MinIO bucket %v", err)
+			}
 		}
 	}
 

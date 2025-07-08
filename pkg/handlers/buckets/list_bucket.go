@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -70,6 +71,15 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 
 			bucketsList, err := listUserBuckets(userMinIOProvider.GetS3Client())
 			if err != nil {
+				if aerr, ok := err.(awserr.Error); ok {
+					switch aerr.Code() {
+					case "AccessDenied":
+						noBuckets := []utils.MinIOBucket{}
+						fmt.Println(noBuckets)
+						c.JSON(http.StatusOK, noBuckets)
+						return
+					}
+				}
 				c.String(http.StatusInternalServerError, "Error reading buckets from user: ", uid)
 				return
 			}
