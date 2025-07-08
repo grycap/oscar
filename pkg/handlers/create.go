@@ -130,40 +130,46 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 			ownerOnList := false
 
-			if len(service.AllowedUsers) > 0 {
-				path := strings.Trim(service.Input[0].Path, "/")
-				splitPath := strings.SplitN(path, "/", 2)
-				// If AllowedUsers is empty don't add uid
-				service.Labels["uid"] = full_uid[:10]
-				var userBucket string
-				for _, u := range service.AllowedUsers {
-					// Check if the uid's from allowed_users have and asociated MinIO user
-					// and create it if not
-					if !mc.UserExists(u) {
-						sk, _ := auth.GenerateRandomKey(8)
-						cmuErr := minIOAdminClient.CreateMinIOUser(u, sk)
-						if cmuErr != nil {
-							log.Printf("error creating MinIO user for user %s: %v", u, cmuErr)
+			if len(service.AllowedUsers) > 0 && strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser {
+				for _, in := range service.Input {
+					_, provName := getProviderInfo(in.Provider)
+
+					// Only allow input from MinIO and dCache
+					if provName == types.MinIOName {
+						path := strings.Trim(in.Path, "/")
+						splitPath := strings.SplitN(path, "/", 2)
+						// If AllowedUsers is empty don't add uid
+						service.Labels["uid"] = full_uid[:10]
+						var userBucket string
+						for _, u := range service.AllowedUsers {
+							// Check if the uid's from allowed_users have and asociated MinIO user
+							// and create it if not
+							if !mc.UserExists(u) {
+								sk, _ := auth.GenerateRandomKey(8)
+								cmuErr := minIOAdminClient.CreateMinIOUser(u, sk)
+								if cmuErr != nil {
+									log.Printf("error creating MinIO user for user %s: %v", u, cmuErr)
+								}
+								csErr := mc.CreateSecretForOIDC(u, sk)
+								if csErr != nil {
+									log.Printf("error creating secret for user %s: %v", u, csErr)
+								}
+							}
+							// Fill the list of private buckets to be used on users buckets isolation
+							// Check the uid of the owner is on the allowed_users list
+							if u == service.Owner {
+								ownerOnList = true
+							}
+							// Fill the list of private buckets to create
+							userBucket = splitPath[0] + "-" + u[:10]
+							service.BucketList = append(service.BucketList, userBucket)
 						}
-						csErr := mc.CreateSecretForOIDC(u, sk)
-						if csErr != nil {
-							log.Printf("error creating secret for user %s: %v", u, csErr)
+
+						if !ownerOnList {
+							service.AllowedUsers = append(service.AllowedUsers, uid)
 						}
 					}
-					// Fill the list of private buckets to be used on users buckets isolation
-					// Check the uid of the owner is on the allowed_users list
-					if u == service.Owner {
-						ownerOnList = true
-					}
-					// Fill the list of private buckets to create
-					userBucket = splitPath[0] + "-" + u[:10]
-					service.BucketList = append(service.BucketList, userBucket)
 				}
-
-				if !ownerOnList {
-					service.AllowedUsers = append(service.AllowedUsers, uid)
-				}
-
 			}
 		}
 		if len(service.Environment.Secrets) > 0 {
@@ -364,7 +370,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			Visibility:   service.Visibility,
 			Owner:        service.Owner})
 		// Create buckets for services with isolation level
-		if strings.ToUpper(service.IsolationLevel) == "USER" && len(service.BucketList) > 0 {
+		if strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser && len(service.BucketList) > 0 {
 			for i, b := range service.BucketList {
 				// Create a bucket for each allowed user if allowed_users is not empty
 				err = minIOAdminClient.CreateS3PathWithWebhook(s3Client, []string{b, folderKey}, service.GetMinIOWebhookARN(), false)
@@ -439,7 +445,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				}
 			}
 
-			if strings.ToUpper(service.IsolationLevel) == "USER" && len(service.BucketList) > 0 {
+			if strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser && len(service.BucketList) > 0 {
 				for _, b := range service.BucketList {
 					err := minIOAdminClient.CreateS3Path(s3Client, []string{b, folderKey}, true)
 					if err != nil && !isUpdate {
