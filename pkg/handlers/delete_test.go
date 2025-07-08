@@ -63,7 +63,7 @@ func TestMakeDeleteHandler(t *testing.T) {
 		Output: []types.StorageIOConfig{
 			{Provider: "minio." + types.DefaultProvider, Path: "/output"},
 		},
-		IsolationLevel: "USER",
+		IsolationLevel: types.IsolationLevelUser,
 		AllowedUsers:   []string{"somelonguid1@egi.eu"},
 		StorageProviders: &types.StorageProviders{
 			MinIO: map[string]*types.MinIOProvider{types.DefaultProvider: {
