@@ -32,7 +32,7 @@ import (
 )
 
 // Custom logger
-var updateLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
+var updateLogger = log.New(os.Stdout, "[UPDATE-HANDLER] ", log.Flags())
 
 // MakeUpdateHandler makes a handler for updating services
 func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
@@ -103,7 +103,6 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 		s3Client := cfg.MinIOProvider.GetS3Client()
-		fmt.Println(newService)
 		if newService.IsolationLevel == types.IsolationLevelUser && len(newService.AllowedUsers) > 0 {
 			// new bucket list
 			ownerOnList := false
