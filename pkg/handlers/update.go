@@ -164,7 +164,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						Owner:        oldService.Owner,
 					})
 					if err != nil {
-						fmt.Errorf("error while removing MinIO bucket %v", err)
+						log.Printf("error while removing MinIO bucket %v", err)
 					}
 				}
 			}
