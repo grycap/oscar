@@ -10,11 +10,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/backends"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	testclient "k8s.io/client-go/kubernetes/fake"
 )
 
 func TestMakeUpdateHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
-
+	kubeClientset := testclient.NewSimpleClientset()
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
 		if hreq.URL.Path != "/input" && hreq.URL.Path != "/output" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
 			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
@@ -55,6 +57,7 @@ func TestMakeUpdateHandler(t *testing.T) {
 	r := gin.Default()
 	r.Use(func(c *gin.Context) {
 		c.Set("uidOrigin", "somelonguid@egi.eu")
+		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "somelonguid@egi.eu"))
 		c.Next()
 	})
 	r.PUT("/system/services", MakeUpdateHandler(&cfg, back))
@@ -94,6 +97,8 @@ func TestMakeUpdateHandler(t *testing.T) {
 	defer server.Close()
 
 	if w.Code != http.StatusNoContent {
+		fmt.Println("Response body:", w.Body.String())
+
 		fmt.Println(w.Body)
 		t.Errorf("expecting code %d, got %d", http.StatusNoContent, w.Code)
 	}

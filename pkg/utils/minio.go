@@ -571,8 +571,13 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucket string, policyN
 		if jsonErr != nil {
 			return jsonErr
 		}
-		// Add new resource and apply policy
-		actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, rs)
+		if actualPolicy.Statement[0].Effect == "Deny" {
+			actualPolicy = getPolicyDefinition(policyActions, rs)
+
+		} else {
+			// Add new resource and apply policy
+			actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, rs)
+		}
 
 		policy, jsonErr = json.Marshal(actualPolicy)
 		if jsonErr != nil {
@@ -669,10 +674,15 @@ func (minIOAdminClient *MinIOAdminClient) RemoveResource(bucketName string, poli
 	if jsonErr != nil {
 		return jsonErr
 	}
-	for i, rs := range actualPolicy.Statement[0].Resource {
-		if rs == resource {
-			actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource[:i], actualPolicy.Statement[0].Resource[i+1:]...)
-			break
+	if len(actualPolicy.Statement[0].Resource) == 1 {
+		actualPolicy.Statement[0].Effect = "Deny"
+		actualPolicy.Statement[0].Resource = []string{"arn:aws:s3:::" + bucketName + "notValid" + "/*"}
+	} else {
+		for i, rs := range actualPolicy.Statement[0].Resource {
+			if rs == resource {
+				actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource[:i], actualPolicy.Statement[0].Resource[i+1:]...)
+				break
+			}
 		}
 	}
 	policy, jsonErr = json.Marshal(actualPolicy)

@@ -46,6 +46,7 @@ const (
 	// WebDavName string representing a storage provider accessed via webdav
 	WebDavName = "webdav"
 
+	// RucioName string representing the Rucio provider name
 	RucioName = "rucio"
 
 	// ProviderSeparator separator character used to split provider's name and identifier
@@ -103,10 +104,13 @@ type WebDavProvider struct {
 
 // Rucio stores the credentials of the a storage provider that can be accessed via Rucio
 type Rucio struct {
-	Host     string `json:"host"`
-	Rse      string `json:"rse"`
-	Token    string `json:"token"`
-	AuthHost string `json:"auth_host"`
+	Host          string `json:"host"`
+	Account       string `json:"account"`
+	Rse           string `json:"rse"`
+	RefreshToken  string `json:"refresh_token"`
+	AuthHost      string `json:"auth_host"`
+	OidcAudience  string `json:"oidc_audience"`
+	TokenEndpoint string `json:"token_endpoint"`
 }
 
 // GetS3Client creates a new S3 Client from a S3Provider
