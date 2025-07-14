@@ -103,6 +103,10 @@ const (
 
 	// ReSchedulerLabelKey label key to enable/disable the ReScheduler
 	ReSchedulerLabelKey = "oscar_rescheduler"
+
+	IsolationLevelUser = "USER"
+
+	IsolationLevelService = "SERVICE"
 )
 
 // YAMLMarshal package-level yaml marshal function

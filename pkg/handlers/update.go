@@ -21,6 +21,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -31,13 +32,15 @@ import (
 )
 
 // Custom logger
-var updateLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
+var updateLogger = log.New(os.Stdout, "[UPDATE-HANDLER] ", log.Flags())
 
 // MakeUpdateHandler makes a handler for updating services
 func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var provName string
 		var newService types.Service
+		var uid string
+		var mc *auth.MultitenancyConfig
 		if err := c.ShouldBindJSON(&newService); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
@@ -64,7 +67,8 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		if !isAdminUser {
-			uid, err := auth.GetUIDFromContext(c)
+			uid, err = auth.GetUIDFromContext(c)
+
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln("Couldn't get UID from context"))
 			}
@@ -72,6 +76,11 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			if oldService.Owner != uid {
 				c.String(http.StatusForbidden, "User %s doesn't have permision to modify this service", uid)
 				return
+			}
+			mc, err = auth.GetMultitenancyConfigFromContext(c)
+
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln("Couldn't get UID from context"))
 			}
 
 			// Set the owner on the new service definition
@@ -91,24 +100,78 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 			}
 		}
-		if len(newService.Environment.Secrets) > 0 {
-			if utils.SecretExists(newService.Name, cfg.ServicesNamespace, back.GetKubeClientset()) {
-				secretsErr := utils.UpdateSecretData(newService.Name, cfg.ServicesNamespace, newService.Environment.Secrets, back.GetKubeClientset())
-				if secretsErr != nil {
-					c.String(http.StatusInternalServerError, "error updating asociated secret: %v", secretsErr)
-				}
-			} else {
-				secretsErr := utils.CreateSecret(newService.Name, cfg.ServicesNamespace, newService.Environment.Secrets, back.GetKubeClientset())
-				if secretsErr != nil {
-					c.String(http.StatusInternalServerError, "error adding asociated secret: %v", secretsErr)
+
+		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+		s3Client := cfg.MinIOProvider.GetS3Client()
+		if newService.IsolationLevel == types.IsolationLevelUser && len(newService.AllowedUsers) > 0 {
+			// new bucket list
+			ownerOnList := false
+			full_uid := auth.FormatUID(uid)
+			for _, in := range newService.Input {
+				_, provName := getProviderInfo(in.Provider)
+
+				// Only allow input from MinIO
+				if provName == types.MinIOName {
+					path := strings.Trim(in.Path, "/")
+					splitPath := strings.SplitN(path, "/", 2)
+					// If AllowedUsers is empty don't add uid
+					newService.Labels["uid"] = full_uid[:10]
+					var userBucket string
+					for _, u := range newService.AllowedUsers {
+						// Check if the uid's from allowed_users have and asociated MinIO user
+						// and create it if not
+						if mc != nil && !mc.UserExists(u) {
+							sk, _ := auth.GenerateRandomKey(8)
+							cmuErr := minIOAdminClient.CreateMinIOUser(u, sk)
+							if cmuErr != nil {
+								log.Printf("error creating MinIO user for user %s: %v", u, cmuErr)
+							}
+							csErr := mc.CreateSecretForOIDC(u, sk)
+							if csErr != nil {
+								log.Printf("error creating secret for user %s: %v", u, csErr)
+							}
+						}
+						// Fill the list of private buckets to be used on users buckets isolation
+						// Check the uid of the owner is on the allowed_users list
+						if u == newService.Owner {
+							ownerOnList = true
+						}
+						// Fill the list of private buckets to create
+						userBucket = splitPath[0] + "-" + u[:10]
+						newService.BucketList = append(newService.BucketList, userBucket)
+					}
+
+					if !ownerOnList {
+						newService.AllowedUsers = append(newService.AllowedUsers, uid)
+					}
+					/// Create
 				}
 			}
 		}
 
-		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+		if oldService.IsolationLevel == types.IsolationLevelUser && len(oldService.BucketList) != 0 {
+			for _, bucket := range oldService.BucketList {
+				if !slices.Contains(newService.BucketList, bucket) {
+					// Disable input notifications for service bucket
+					if err := disableInputNotifications(s3Client, oldService.GetMinIOWebhookARN(), bucket); err != nil {
+						log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", oldService.Name, err)
+					}
+
+					err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+						BucketPath:   bucket,
+						Visibility:   utils.PRIVATE,
+						AllowedUsers: []string{},
+						Owner:        oldService.Owner,
+					})
+					if err != nil {
+						log.Printf("error while removing MinIO bucket %v", err)
+					}
+				}
+			}
+		}
 
 		// If isolation level was USER delete all private buckets
-		if strings.ToUpper(oldService.IsolationLevel) == "USER" && strings.ToUpper(newService.IsolationLevel) == "USER" {
+		if strings.ToUpper(oldService.IsolationLevel) == types.IsolationLevelUser && strings.ToUpper(newService.IsolationLevel) == types.IsolationLevelUser {
 			// TODO add/remove users buckets
 		}
 
@@ -158,7 +221,12 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				if oldServiceBuckets[b.BucketPath] {
 					// If the visibility of the bucket has changed remove old policies and config new ones
 					if oldService.Visibility != newService.Visibility {
-						err := minIOAdminClient.UnsetPolicies(b)
+						err := minIOAdminClient.UnsetPolicies(utils.MinIOBucket{
+							BucketPath:   b.BucketPath,
+							AllowedUsers: oldService.AllowedUsers,
+							Visibility:   oldService.Visibility,
+							Owner:        oldService.Owner,
+						})
 						if err != nil {
 							c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 						}

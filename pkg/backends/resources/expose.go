@@ -286,6 +286,21 @@ func getPodTemplateSpec(service types.Service, cfg *types.Config) v1.PodTemplate
 			podSpec.Containers[i].Command = []string{"/bin/sh"}
 			podSpec.Containers[i].Args = []string{"-c", fmt.Sprintf("%s/%s", types.ConfigPath, types.ScriptFileName)}
 		}
+
+		probeHandler := v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: "/",
+				Port: intstr.FromString(podPortName),
+			},
+		}
+		podSpec.Containers[i].LivenessProbe = &v1.Probe{
+			InitialDelaySeconds: 5,
+			ProbeHandler:        probeHandler,
+		}
+		podSpec.Containers[i].ReadinessProbe = &v1.Probe{
+			PeriodSeconds: 5,
+			ProbeHandler:  probeHandler,
+		}
 	}
 	var num int32 = 0777
 	podSpec.Volumes[0].VolumeSource.ConfigMap.DefaultMode = &num

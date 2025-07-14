@@ -49,7 +49,8 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 			uid = cfg.Name
 			deleteLogger.Printf("Deleting bucket '%s' for user '%s'", bucketName, uid)
 		} else {
-			uid, err := auth.GetUIDFromContext(c)
+			var err error
+			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln("error getting user from request:", err))
 				return
