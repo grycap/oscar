@@ -274,8 +274,8 @@ func MakeStatusHandler(cfg *types.Config, kubeClientset kubernetes.Interface, me
 		adminClient, err := utils.MakeMinIOAdminClient(cfg)
 		minioClient := adminClient.GetSimpleClient()
 		if err != nil {
-			log.Printf("Error creando cliente admin de MinIO: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creando cliente MinIO"})
+			log.Printf("Error creating MinIO admin client: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating MinIO client"})
 			return
 		}
 		//cliente s3 para poder listar todos los buckets del cluster
@@ -283,7 +283,7 @@ func MakeStatusHandler(cfg *types.Config, kubeClientset kubernetes.Interface, me
 		//listado de todos los buckets
 		bucketList, err := s3Client.ListBuckets(&s3.ListBucketsInput{})
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error listando buckets"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error listing buckets"})
 			return
 		}
 
@@ -293,12 +293,12 @@ func MakeStatusHandler(cfg *types.Config, kubeClientset kubernetes.Interface, me
 			bucketName := *b.Name
 			visibility := adminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketPath: bucketName})
 			if err != nil {
-				log.Printf("Error obteniendo visibilidad del bucket %s: %v", bucketName, err)
+				log.Printf("Error obtaining bucket visibility %s: %v", bucketName, err)
 				visibility = "unknown"
 			}
 			metadata, metaErr := adminClient.GetTaggedMetadata(bucketName)
 			if metaErr != nil {
-				log.Printf("Error obteniendo metadatos del bucket %s: %v", bucketName, metaErr)
+				log.Printf("Error obtaining metadata from the bucket %s: %v", bucketName, metaErr)
 				metadata = map[string]string{}
 			}
 			owner := metadata["owner"]
@@ -308,11 +308,12 @@ func MakeStatusHandler(cfg *types.Config, kubeClientset kubernetes.Interface, me
 			if visibility == utils.RESTRICTED {
 				m, memberErr := adminClient.GetBucketMembers(bucketName)
 				if memberErr != nil {
-					log.Printf("Error obteniendo miembros del bucket %s: %v", bucketName, memberErr)
+					log.Printf("Error obtaining bucket members %s: %v", bucketName, memberErr)
 				} else {
 					members = m
 				}
 			}
+
 
 			var creationDate string
 			if b.CreationDate != nil {
@@ -328,7 +329,7 @@ func MakeStatusHandler(cfg *types.Config, kubeClientset kubernetes.Interface, me
 
 			for obj := range objectCh {
 				if obj.Err != nil {
-					log.Printf("Error al listar objeto en bucket %s: %v", bucketName, obj.Err)
+					log.Printf("Error listing object in bucket %s: %v", bucketName, obj.Err)
 					continue
 				}
 				totalSize += obj.Size
