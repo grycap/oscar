@@ -109,7 +109,7 @@ func main() {
 	system.DELETE("/logs/:serviceName/:jobName", handlers.MakeDeleteJobHandler(back, kubeClientset, cfg.ServicesNamespace))
 
 	// Status path for cluster status (Memory and CPU) checks
-	system.GET("/status", handlers.MakeStatusHandler(kubeClientset, metricsClientset))
+	system.GET("/status", handlers.MakeStatusHandler(cfg,kubeClientset, metricsClientset))
 
 	// Job path for async invocations
 	r.POST("/job/:serviceName", auth.GetLoggerMiddleware(), handlers.MakeJobHandler(cfg, kubeClientset, back, resMan))

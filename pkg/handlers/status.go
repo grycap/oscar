@@ -18,10 +18,9 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 
@@ -32,26 +31,48 @@ import (
 	"k8s.io/client-go/kubernetes"
 	versioned "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
+
+	minio "github.com/minio/minio-go/v7"
 )
 
+type PodSummary struct {
+	Name  string `json:"name"`
+	State string `json:"state"`
+}
+
 type PodInfo struct {
+	Pods   []PodSummary   `json:"pods"`
 	Total  int            `json:"total"`
 	States map[string]int `json:"states"`
 }
 
 type OscarInfo struct {
-	DeploymentName  string         `json:"deploymentName"`
-	DeploymentReady bool           `json:"deploymentReady"`
-	JobsCount       map[string]int `json:"jobsCount"` // "active", "succeeded", "failed"
-	PodsInfo        PodInfo        `json:"podsInfo"`
+	DeploymentName  string                 `json:"deploymentName"`
+	DeploymentReady bool                   `json:"deploymentReady"`
+	DeploymentInfo  map[string]interface{} `json:"deploymentInfo"`
+	JobsCount       map[string]int         `json:"jobsCount"` // "active", "succeeded", "failed"
+	PodsInfo        PodInfo                `json:"podsInfo"`
+	OIDC            OIDCInfo               `json:"OIDC"`
+}
+
+type OIDCInfo struct {
+	Enabled bool     `json:"enabled"`
+	Issuers []string `json:"issuers"`
+	Groups  []string `json:"groups"`
 }
 
 type MinioBucketInfo struct {
-	Name       string `json:"name"`
-	PolicyType string `json:"policy_type"` // private, public, restricted
-	PolicyJSON string `json:"policy_json"` // el JSON completo
+	Name         string   `json:"name"`
+	PolicyType   string   `json:"policy_type"`
+	PolicyJSON   string   `json:"policy_json"`
+	Owner        string   `json:"owner,omitempty"`
+	Members      []string `json:"members,omitempty"`
+	CreationDate string   `json:"creation_date,omitempty"`
+	Size         int64    `json:"size"`        // en bytes
+	NumObjects   int      `json:"num_objects"` // cantidad de objetos
 }
 
 type MinioInfo struct {
@@ -92,7 +113,7 @@ func contains(s, substr string) bool {
 }
 
 // MakeStatusHandler Status handler for kubernetes deployment.
-func MakeStatusHandler(kubeClientset kubernetes.Interface, metricsClientset versioned.MetricsV1beta1Interface) gin.HandlerFunc {
+func MakeStatusHandler(cfg *types.Config, kubeClientset kubernetes.Interface, metricsClientset versioned.MetricsV1beta1Interface) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get  nodes list
 		nodes, err := kubeClientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
@@ -190,11 +211,24 @@ func MakeStatusHandler(kubeClientset kubernetes.Interface, metricsClientset vers
 		deploymentReady := deployment.Status.ReadyReplicas == *deployment.Spec.Replicas
 		oscarDeployment := deployment.Name
 
+		//info sobre el deployment
+		deploymentInfo := map[string]interface{}{
+			"replicas":            deployment.Spec.Replicas,
+			"readyReplicas":       deployment.Status.ReadyReplicas,
+			"availableReplicas":   deployment.Status.AvailableReplicas,
+			"unavailableReplicas": deployment.Status.UnavailableReplicas,
+			"strategy":            deployment.Spec.Strategy.Type,
+			"labels":              deployment.Labels,
+			"creationTimestamp":   deployment.CreationTimestamp,
+		}
+
 		jobs, err := kubeClientset.BatchV1().Jobs("oscar-svc").List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error getting OSCAR jobs: %v\n", err)
 			os.Exit(1)
 		}
+
+		//Jobs info
 		jobCounts := map[string]int{"active": 0, "succeeded": 0, "failed": 0}
 		for _, job := range jobs.Items {
 			jobCounts["active"] += int(job.Status.Active)
@@ -202,130 +236,113 @@ func MakeStatusHandler(kubeClientset kubernetes.Interface, metricsClientset vers
 			jobCounts["failed"] += int(job.Status.Failed)
 		}
 
+		//Pods info
 		pods, err := kubeClientset.CoreV1().Pods("oscar-svc").List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error getting OSCAR pods: %v\n", err)
 			os.Exit(1)
 		}
-		podStates := map[string]int{}
+		// Inicializar todos los posibles estados con 0
+		podStates := map[string]int{
+			"Pending":   0,
+			"Running":   0,
+			"Succeeded": 0,
+			"Failed":    0,
+			"Unknown":   0,
+		}
+
+		podSummaries := []PodSummary{}
+
 		for _, pod := range pods.Items {
-			podStates[string(pod.Status.Phase)]++
+			state := string(pod.Status.Phase)
+			podStates[state]++
+
+			podSummaries = append(podSummaries, PodSummary{
+				Name:  pod.Name,
+				State: state,
+			})
 		}
 
 		podInfo := PodInfo{
+			Pods:   podSummaries,
 			Total:  len(pods.Items),
 			States: podStates,
 		}
 
 		//MinIO info
-		// Configura conexión MinIO
-		//obtiene las variables del deplyment de OSCAR
-		minioEndpoint := os.Getenv("MINIO_ENDPOINT")
-		minioAccessKey := os.Getenv("MINIO_ACCESS_KEY")
-		minioSecretKey := os.Getenv("MINIO_SECRET_KEY")
-
-		//Parseamos la URL de minio_endpoint
-		u, err := url.Parse(minioEndpoint)
+		//creamos el adminClient
+		adminClient, err := utils.MakeMinIOAdminClient(cfg)
+		minioClient := adminClient.GetSimpleClient()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing MINIO_ENDPOINT: %v\n", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error configurando MinIO endpoint"})
+			log.Printf("Error creando cliente admin de MinIO: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creando cliente MinIO"})
 			return
 		}
-
-		host := u.Host
-		secure := u.Scheme == "https"
-		// Crear cliente MinIO
-		minioClient, err := minio.New(host, &minio.Options{
-			Creds:  credentials.NewStaticV4(minioAccessKey, minioSecretKey, ""),
-			Secure: secure,
-		})
+		//cliente s3 para poder listar todos los buckets del cluster
+		s3Client := cfg.MinIOProvider.GetS3Client()
+		//listado de todos los buckets
+		bucketList, err := s3Client.ListBuckets(&s3.ListBucketsInput{})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creando cliente MinIO: %v\n", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error conectando a MinIO"})
-			return
-		}
-
-		// Listar buckets
-		buckets, err := minioClient.ListBuckets(context.Background())
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error listando buckets MinIO: %v\n", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error listando buckets MinIO"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error listando buckets"})
 			return
 		}
 
 		var bucketInfos []MinioBucketInfo
 
-		for _, bucket := range buckets {
-			policyStr := "unknown"
-			policyJSON := ""
-
-			policy, err := minioClient.GetBucketPolicy(context.Background(), bucket.Name)
+		for _, b := range bucketList.Buckets {
+			bucketName := *b.Name
+			visibility := adminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketPath: bucketName})
 			if err != nil {
-				if responseErr, ok := err.(minio.ErrorResponse); ok && responseErr.Code == "NoSuchBucketPolicy" {
-					policyStr = "private"
-				} else {
-					fmt.Fprintf(os.Stderr, "Error obteniendo política del bucket %s: %v\n", bucket.Name, err)
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Error obteniendo política del bucket"})
-					return
-				}
-			} else {
-				policyJSON = policy
+				log.Printf("Error obteniendo visibilidad del bucket %s: %v", bucketName, err)
+				visibility = "unknown"
+			}
+			metadata, metaErr := adminClient.GetTaggedMetadata(bucketName)
+			if metaErr != nil {
+				log.Printf("Error obteniendo metadatos del bucket %s: %v", bucketName, metaErr)
+				metadata = map[string]string{}
+			}
+			owner := metadata["owner"]
+			var members []string
 
-				if policy == "" {
-					policyStr = "private"
-					//Si la política se encuentra vacía tmb la asignamos como privada
-				} else if strings.TrimSpace(policy) == `{"Version":"2012-10-17","Statement":[]}` {
-					policyStr = "private"
+			//para los restricted sus miembros
+			if visibility == utils.RESTRICTED {
+				m, memberErr := adminClient.GetBucketMembers(bucketName)
+				if memberErr != nil {
+					log.Printf("Error obteniendo miembros del bucket %s: %v", bucketName, memberErr)
 				} else {
-					var parsed map[string]interface{}
-					if err := json.Unmarshal([]byte(policy), &parsed); err != nil {
-						fmt.Fprintf(os.Stderr, "Error parseando política del bucket %s: %v\n", bucket.Name, err)
-						policyStr = "unknown"
-					} else {
-						isPublic := false
-						if stmts, ok := parsed["Statement"].([]interface{}); ok {
-							for _, stmtIface := range stmts {
-								if stmt, ok := stmtIface.(map[string]interface{}); ok {
-									if effect, ok := stmt["Effect"].(string); ok && effect == "Allow" {
-										principal := stmt["Principal"]
-										switch p := principal.(type) {
-										case string:
-											if p == "*" {
-												isPublic = true
-											}
-										case map[string]interface{}:
-											if aws, ok := p["AWS"]; ok {
-												switch v := aws.(type) {
-												case string:
-													if v == "*" {
-														isPublic = true
-													}
-												case []interface{}:
-													for _, entry := range v {
-														if s, ok := entry.(string); ok && s == "*" {
-															isPublic = true
-														}
-													}
-												}
-											}
-										}
-									}
-								}
-							}
-						}
-						if isPublic {
-							policyStr = "public"
-						} else {
-							policyStr = "restricted"
-						}
-					}
+					members = m
 				}
 			}
 
+			var creationDate string
+			if b.CreationDate != nil {
+				creationDate = b.CreationDate.Format("2006-01-02T15:04:05Z07:00") // formato RFC3339
+			}
+
+			var totalSize int64 = 0
+			var objectCount int = 0
+
+			objectCh := minioClient.ListObjects(context.Background(), bucketName, minio.ListObjectsOptions{
+				Recursive: true,
+			})
+
+			for obj := range objectCh {
+				if obj.Err != nil {
+					log.Printf("Error al listar objeto en bucket %s: %v", bucketName, obj.Err)
+					continue
+				}
+				totalSize += obj.Size
+				objectCount++
+			}
+
 			bucketInfos = append(bucketInfos, MinioBucketInfo{
-				Name:       bucket.Name,
-				PolicyType: policyStr,
-				PolicyJSON: policyJSON,
+				Name:         bucketName,
+				PolicyType:   visibility,
+				Owner:        owner,
+				Members:      members,
+				CreationDate: creationDate,
+				Size:         totalSize,
+				NumObjects:   objectCount,
 			})
 		}
 
@@ -341,8 +358,14 @@ func MakeStatusHandler(kubeClientset kubernetes.Interface, metricsClientset vers
 			OSCAR: OscarInfo{
 				DeploymentName:  oscarDeployment,
 				DeploymentReady: deploymentReady,
+				DeploymentInfo:  deploymentInfo,
 				JobsCount:       jobCounts,
 				PodsInfo:        podInfo,
+				OIDC: OIDCInfo{
+					Enabled: cfg.OIDCEnable,
+					Issuers: cfg.OIDCValidIssuers,
+					Groups:  cfg.OIDCGroups,
+				},
 			},
 			MinIO: MinioInfo{
 				Buckets: bucketInfos,
