@@ -1,0 +1,12 @@
+{
+  "name": "resnet-50",
+  "implementation": "mlserver_huggingface.HuggingFaceRuntime",
+  "parameters": {
+    "extra": {
+      "task": "image-classification",
+      "optimum_model": true,
+      "pretrained_model": "microsoft/resnet-50",
+      "device": -1
+    }
+  }
+}

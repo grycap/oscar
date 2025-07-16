@@ -1,0 +1,14 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: resnet-50
+      cpu: '1.0'
+      memory: 2Gi
+      image: ghcr.io/rk181/mlserver:resnet-50
+      script: script.sh
+      expose:
+        min_scale: 1
+        max_scale: 1
+        api_port: 80
+        cpu_threshold: 90
+        rewrite_target: true
