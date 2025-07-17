@@ -35,6 +35,7 @@ nav:
   - integration-scone.md
   - integration-interlink.md
   - integration-compss.md
+  - integration-node-red.md
 
 - Tutorials: 
   - training.md
