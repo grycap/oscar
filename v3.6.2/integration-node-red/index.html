@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://docs.oscar.grycap.net/v3.6.2/fdl-composer/">
+        <link rel="canonical" href="https://docs.oscar.grycap.net/v3.6.2/integration-node-red/">
       
       
-        <link rel="prev" href="../fdl/">
+        <link rel="prev" href="../integration-compss/">
       
       
-        <link rel="next" href="../oscar-cli/">
+        <link rel="next" href="../training/">
       
       
       <link rel="icon" href="../images/logo.png">
@@ -22,7 +22,7 @@
     
     
       
-        <title>FDL Composer - OSCAR Documentation</title>
+        <title>Integration with Node-RED - OSCAR Documentation</title>
       
     
     
@@ -72,7 +72,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#fdl-composer" class="md-skip">
+        <a href="#integration-with-node-red" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              FDL Composer
+              Integration with Node-RED
             
           </span>
         </div>
@@ -480,20 +480,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
@@ -509,7 +507,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Service Definition
@@ -566,32 +564,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    FDL Composer
-    
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../fdl-composer/" class="md-nav__link">
         
   
   
@@ -602,113 +578,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#how-to-access-fdl-composer" class="md-nav__link">
-    <span class="md-ellipsis">
-      How to access FDL Composer
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#basic-elements" class="md-nav__link">
-    <span class="md-ellipsis">
-      Basic elements
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Basic elements">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#oscar-services" class="md-nav__link">
-    <span class="md-ellipsis">
-      OSCAR services
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#storage-providers-and-bucketsfolders" class="md-nav__link">
-    <span class="md-ellipsis">
-      Storage providers and buckets/folders
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#download-and-load-state" class="md-nav__link">
-    <span class="md-ellipsis">
-      Download and load state
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#create-a-yaml-file" class="md-nav__link">
-    <span class="md-ellipsis">
-      Create a YAML file
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#connecting-components" class="md-nav__link">
-    <span class="md-ellipsis">
-      Connecting components
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#scar-options" class="md-nav__link">
-    <span class="md-ellipsis">
-      SCAR options
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
-    <span class="md-ellipsis">
-      Example
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -999,18 +868,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
           <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
@@ -1026,7 +897,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             Integrations
@@ -1129,10 +1000,32 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../integration-node-red/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Integration with Node-RED
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1143,6 +1036,50 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#simple-tutorial" class="md-nav__link">
+    <span class="md-ellipsis">
+      Simple tutorial
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Simple tutorial">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      Steps
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1491,78 +1428,93 @@
   
 
 
-<h1 id="fdl-composer">FDL Composer</h1>
-<p>OSCAR Services can be aggregated into data-driven workflows where the output data of one service is stored in the object store that triggers another service, potentially in a different OSCAR cluster. This allows to execute the different phases of the workflow in disparate computing infrastructures.</p>
-<p>However, writing an entire workflow in an <a href="../fdl/">FDL</a> file can be a difficult task for some users.</p>
-<p>To simplify the process you can use
-<a href="http://composer.oscar.grycap.net">FDL Composer</a>, a web-based application
-to facilitate the definition of <a href="https://docs.oscar.grycap.net/fdl/">FDL</a> YAML
-files for <a href="https://oscar.grycap.net/">OSCAR</a> and
-<a href="https://scar.readthedocs.io">SCAR</a>.</p>
-<p><img alt="fdl-composer-workflow.png" src="../images/fdl-composer/fdl-composer-workflow.png" /></p>
-<h2 id="how-to-access-fdl-composer">How to access FDL Composer</h2>
-<p>Just access <a href="https://composer.oscar.grycap.net/">FDL Composer</a> which is a Single Page Application (SPA) running entirely in your browser. If you prefer to
-execute it on your computer instead of using the web, clone the git repository
-by using the following command:</p>
-<pre><code class="language-sh">git clone https://github.com/grycap/fdl-composer
-</code></pre>
-<p>And the run the app with <code>npm</code>:</p>
-<pre><code class="language-sh">npm start
-</code></pre>
-<h2 id="basic-elements">Basic elements</h2>
-<p>Workflows are composed of <code>OSCAR services</code> and <code>Storage providers</code>:</p>
-<h3 id="oscar-services">OSCAR services</h3>
-<p><code>OSCAR services</code> are responsible for processing the data uploaded to
-<code>Storage providers</code>.</p>
-<p>Defining a new <code>OSCAR service</code>  requires filling at least the <code>name</code>, <code>image</code>,
-and <code>script</code> fields.</p>
-<p>To define environment variables you must add them as a comma separated string of
-<em>key=value</em> entries. For example,  to create a variable with the name
-<code>firstName</code> and the value <code>John</code>, the "Environment variables" field should
-look like <code>firstName=John</code>. If you want to assign more than one variable, for
-example, <code>firstName</code> and <code>lastName</code> with the values <code>John</code> and <code>Keats</code>, the
-input field should include them all separated by commas (e.g.,
-<code>firstName=John,lastName=Keats</code>).</p>
-<h3 id="storage-providers-and-bucketsfolders">Storage providers and buckets/folders</h3>
-<p><code>Storage providers</code> are object storage systems  responsible for storing both
-the input files to be processed by <code>OSCAR services</code> and the output files
-generated as a result of the processing.</p>
-<p>Three types of storage providers can be used in OSCAR
-<a href="https://docs.oscar.grycap.net/fdl/">FDLs</a>: <a href="https://min.io">MinIO</a>,
-<a href="https://aws.amazon.com/s3">Amazon S3</a>, and <a href="https://onedata.org">OneData</a>.</p>
-<p>To configure them, drag the storage
-provider from the menu to the canvas and double click on the item created. A
-window with a single input will appear. Then, insert the path of the folder
-name. To edit one of the storage providers, move the mouse over the item and
-select the edit option.</p>
-<p><strong>Remember that only MinIO can be used as input storage provider for OSCAR
-services.</strong></p>
-<h3 id="download-and-load-state">Download and load state</h3>
-<p>The defined workflow can be saved in a file using the "Download state" button.
-OSCAR services, Storage Providers, and Buckets are kept in the file. The
-graphic workflow can be edited later by loading it with the "Load state" button.</p>
-<h3 id="create-a-yaml-file">Create a YAML file</h3>
-<p>You can easily download the workflow's FDL file (in YAML) through the "Export
- YAML" button.</p>
-<h2 id="connecting-components">Connecting components</h2>
-<p>All components have four ports: The up and left ones are input ports while the
-right and down ports are used as output. <code>OSCAR Services</code> can only be
-connected with <code>Storage providers</code>, always linked in the same direction
-(the output of one element with the input of the other).</p>
-<p>When two services are connected, both
-will be declared in the FDL file, but they will work separately, and
-there will be no workflow between them. If two storage providers are connected
-between them, it will have no effect, but both storages will be declared.</p>
-<h2 id="scar-options">SCAR options</h2>
-<p>FDL Composer can also create FDL files for
-<a href="https://github.com/grycap/scar">SCAR</a>. This allows to
-define workflows that can be executed on the Edge or in on-premises Clouds
-through OSCAR, and on the public Cloud (AWS Lambda and/or AWS Batch) through
-SCAR.</p>
-<h2 id="example">Example</h2>
-<p>There is an example of FDL Composer implementing the
-<a href="https://github.com/grycap/oscar/tree/master/examples/video-process">video-process</a>
-use case in our <a href="https://oscar.grycap.net/blog/post-oscar-fdl-composer/">blog</a>.</p>
+<h1 id="integration-with-node-red">Integration with Node-RED</h1>
+<p>Node-RED is a flow-based development tool for visual programming, widely used to connect hardware devices, APIs, and online services. Its browser-based editor makes creating and deploying automation workflows simple.</p>
+<p>In the context of OSCAR integration, Node-RED can be deployed and configured to interact with OSCAR services using authentication tokens obtained after logging in or using tokens specific for the service.</p>
+<h2 id="simple-tutorial">Simple tutorial</h2>
+<p>This tutorial demonstrates a simple workflow that calls the YOLOv8 synchronous service. You will learn:
+- How to deploy a Node-RED instance
+- How to connect Node-RED to the YOLOv8 synchronous service
+- How to authenticate using a token
+- How to process image data through the workflow</p>
+<h3 id="steps">Steps</h3>
+<ol>
+<li>
+<p><strong>Deploy YOLOv8</strong></p>
+<p>Go to the <a href="https://dashboard.oscar.grycap.net/"><code>OSCAR dashboard</code></a> and select <code>Create service -&gt; FDL</code>. Use the following configuration:</p>
+<p>FDL:
+<code>yaml
+functions:
+oscar:
+- oscar-cluster:
+    name: yolov8-node-red
+    memory: 4Gi
+    cpu: '2.0'
+    image: ai4oshub/ai4os-yolov8-torch:latest
+    script: script.sh
+    log_level: CRITICAL</code>
+Script:
+```bash</p>
+<h1 id="binbash">!/bin/bash</h1>
+<p>RENAMED_FILE="${INPUT_FILE_PATH}.png"
+mv "$INPUT_FILE_PATH" "$RENAMED_FILE"
+OUTPUT_FILE="$TMP_OUTPUT_DIR/output.png"
+deepaas-cli --deepaas_method_output="$OUTPUT_FILE" predict --files "$RENAMED_FILE" --accept image/png 2&gt;&amp;1
+echo "Prediction was saved in: $OUTPUT_FILE"
+```</p>
+</li>
+<li>
+<p><strong>Deploy Node-RED</strong></p>
+<p>In the <a href="https://dashboard.oscar.grycap.net/"><code>OSCAR dashboard</code></a>, go to <code>Flows</code> (Sidebar panel). Enter the <strong>admin</strong> password and select or create a Bucket.</p>
+<p><img alt="node-red-dashboard.png" src="../images/integrations/node-red-dashboard.png" /></p>
+<p>After deploying Node-RED we need to navigate to its user interface.</p>
+<p><img alt="node-red-dashboard-visit.png" src="../images/integrations/node-red-dashboard-visit.png" /></p>
+<blockquote>
+<p>ℹ️</p>
+<p>If you get an nginx error, you need to wait a little bit for the service to run.</p>
+</blockquote>
+<p><img alt="node-red-login.png" src="../images/integrations/node-red-login.png" /></p>
+<p>Log in with your credentials (the user is always <strong>admin</strong>).</p>
+</li>
+<li>
+<p><strong>Create a workflow in Node-RED</strong></p>
+<p>Now we will create a workflow that will fetch an image from internet, make a request to Yolo8 service and visualize the result.</p>
+<p>We will need a the following list of components that can be found in the Node-RED sidebar menu:</p>
+<ul>
+<li>Common → <code>inject</code> node</li>
+<li>Network → <code>HTTP request</code> node</li>
+<li>Output → <code>image</code> node</li>
+<li>OSCAR → <code>OSCAR YOLO8</code> node</li>
+</ul>
+<p>Connect the components as shown:</p>
+<p><img alt="node-red-workflow.png" src="../images/integrations/node-red-workflow.png" /></p>
+<p>To configure the <code>HTTP request</code> node (double-click it):</p>
+<ul>
+<li>URL: URL of an image</li>
+<li>Payload: <em>Send as request body</em></li>
+<li>Return: <em>A binary buffer</em></li>
+</ul>
+<p><img alt="node-red-http-request.png" src="../images/integrations/node-red-node-http-request.png" /></p>
+<p>To configure the <code>OSCAR YOLO8</code> node (double-click it):</p>
+<ul>
+<li>Server: URL of the cluster</li>
+<li>Service Name: <em>yolov8-node-red</em></li>
+<li>Token: Obtain the token from <a href="https://dashboard.oscar.grycap.net/"><code>OSCAR dashboard</code></a><code>→ Info (Sidebar panel) → Access token</code></li>
+</ul>
+<p><img alt="node-red-node-oscar-yolo.png" src="../images/integrations/node-red-node-oscar-yolo.png" /></p>
+</li>
+<li>
+<p><strong>Test the workflow</strong></p>
+<p>After configuring your workflow, test it in the Node-RED Editor:</p>
+<ol>
+<li>Click <code>Deploy</code> (top right corner)</li>
+<li>Click the <code>inject</code> node</li>
+</ol>
+<p><img alt="node-red-workflow-run.png" src="../images/integrations/node-red-workflow-run.png" /></p>
+<p>You should see the result:</p>
+<p><img alt="node-red-workflow-result.png" src="../images/integrations/node-red-workflow-result.png" /></p>
+</li>
+</ol>
 
 
 
