@@ -149,7 +149,7 @@ checkOSCARDeploy(){
 
 deployKnative(){
     echo -e "\n[*] Deploying Knative Serving ..."
-    kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.6.0/operator.yaml
+    kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.18.0/operator.yaml
     cat  > $KNATIVE_FILEPATH <<EOF
 ---
 apiVersion: v1
@@ -163,7 +163,7 @@ metadata:
   name: knative-serving
   namespace: knative-serving
 spec:
-  version: 1.6.0
+  version: 1.18.0
   ingress:
     kourier:
       enabled: true
