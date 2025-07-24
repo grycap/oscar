@@ -289,7 +289,7 @@ func getPodTemplateSpec(service types.Service, cfg *types.Config) v1.PodTemplate
 
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
-				Path: "/",
+				Path: getAPIPath(service.Name),
 				Port: intstr.FromString(podPortName),
 			},
 		}
