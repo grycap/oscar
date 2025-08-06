@@ -590,6 +590,57 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#external-storage-providers" class="md-nav__link">
+    <span class="md-ellipsis">
+      External Storage Providers
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="External Storage Providers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minio" class="md-nav__link">
+    <span class="md-ellipsis">
+      MinIO
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dcache" class="md-nav__link">
+    <span class="md-ellipsis">
+      dCache
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#s3" class="md-nav__link">
+    <span class="md-ellipsis">
+      S3
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#onedata" class="md-nav__link">
+    <span class="md-ellipsis">
+      ONEDATA
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1470,6 +1521,19 @@ So, if you are using an image without a specific tag or with the latest tag, the
 in order to test the OSCAR framework for specific applications. We recommend
 you to start with the
 <a href="https://github.com/grycap/oscar/tree/master/examples/plant-classification-sync">plant classification example</a>.</p>
+<h3 id="external-storage-providers">External Storage Providers</h3>
+<p><a href="https://github.com/grycap/faas-supervisor">FaaS Supervisor</a>, download the input file and upload the output file. There are multiple Storage available to interact with. Each <a href="/fdl/#storageproviders">Storage</a> has parameters, an authentication process, and particularities.</p>
+<h4 id="minio">MinIO</h4>
+<p>OSCAR installs a MinIO inside the cluster. This default MinIO can be referenced as <code>minio</code> or <code>minio.default</code> in the input and output parameters of the <a href="/fdl/#service">OSCAR service</a>. Suppose you define a new MinIO cluster in the <a href="/fdl/#minioprovider">storage provider</a>. You can use a MinIO outside the cluster. MinIO Storage works as input or output without any other third-party software. Also, MinIO can make a <a href="/minio-bucket-replication/">bucket replication</a> between two buckets.</p>
+<h4 id="dcache">dCache</h4>
+<p><a href="https://dcache.org/">dCache</a> use <a href="/fdl/#webdavprovider">WebDAV protocol</a>. dCache works as an output storage without any other third-party software. However, <a href="https://intertwin-eu.github.io/dcnios/">DCNiOS</a> is necessary for input storage.</p>
+<p>The EGI check-in authentication process is not available.</p>
+<h4 id="s3">S3</h4>
+<p>You have to pass the AWS credentials to the FaaS Supervisor by defining them in the environment variables with the keys <code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code>, and <code>AWS_DEFAULT_REGION</code>. S3 works as an output storage system without any third-party software. But <a href="https://intertwin-eu.github.io/dcnios/">DCNiOS</a> is necessary as input storage.</p>
+<h4 id="onedata">ONEDATA</h4>
+<p><a href="https://onedata.org">ONEDATA</a> is a global data access solution for science that only works as an output storage provider.
+Check the <a href="/fdl/#onedataprovider">ONEDATA Storage provider</a> for more information.</p>
+<p><img alt="Storage" src="/images/storage.png" /></p>
 
 
 

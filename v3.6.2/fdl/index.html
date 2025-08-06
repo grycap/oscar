@@ -730,6 +730,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#rucioprovider" class="md-nav__link">
+    <span class="md-ellipsis">
+      RucioProvider
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1603,6 +1612,16 @@ storage_providers:
       hostname: my_dcache.com
       login: my_username
       password: my_password
+  rucio:
+    rucio:
+      host: rucio_host
+      auth_host: rucio_auth_host
+      account: rucio_account
+      rse: rucio_rse
+      refresh_token: oidc_refresh_token
+      oidc_audience: oidc_audience
+      token_endpoint: oidc_token_endpoint
+
 </code></pre>
 <h2 id="top-level-parameters">Top level parameters</h2>
 <table>
@@ -1960,6 +1979,10 @@ storage_providers:
 <td><code>webdav</code> </br> <em>map[string]<a href="#webdavprovider">WebDavProvider</a></em></td>
 <td>Map to define the credentials for a storage provider accesible via WebDAV protocol, being the key the user-defined identifier for the provider</td>
 </tr>
+<tr>
+<td><code>rucio</code> </br> <em>map[string]<a href="#rucioprovider">RucioProvider</a></em></td>
+<td>Map to define the credentials for a Rucio storage provider, being the key the user-defined identifier for the provider</td>
+</tr>
 </tbody>
 </table>
 <h2 id="cluster">Cluster</h2>
@@ -2077,7 +2100,7 @@ storage_providers:
 <tbody>
 <tr>
 <td><code>hostname</code> </br> <em>string</em></td>
-<td>Provider hostname</td>
+<td>Provider hostname. It only works with <code>https</code> protocol. Skip the protocol.</td>
 </tr>
 <tr>
 <td><code>login</code> </br> <em>string</em></td>
@@ -2086,6 +2109,45 @@ storage_providers:
 <tr>
 <td><code>password</code> </br> <em>string</em></td>
 <td>Provider account password</td>
+</tr>
+</tbody>
+</table>
+<h2 id="rucioprovider">RucioProvider</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>host</code> </br> <em>string</em></td>
+<td>Rucio Provider hostname. It only works with <code>https</code> protocol. Skip the protocol.</td>
+</tr>
+<tr>
+<td><code>auth_host</code> </br> <em>string</em></td>
+<td>Rucio authentication provider host</td>
+</tr>
+<tr>
+<td><code>account</code> </br> <em>string</em></td>
+<td>Rucio account</td>
+</tr>
+<tr>
+<td><code>rse</code> </br> <em>string</em></td>
+<td>Rucio rse</td>
+</tr>
+<tr>
+<td><code>refresh_token</code> </br> <em>string</em></td>
+<td>OIDC refresh token</td>
+</tr>
+<tr>
+<td><code>oidc_audience</code> </br> <em>string</em></td>
+<td>OIDC audience</td>
+</tr>
+<tr>
+<td><code>token_endpoint</code> </br> <em>string</em></td>
+<td>OIDC issue endpoint</td>
 </tr>
 </tbody>
 </table>
