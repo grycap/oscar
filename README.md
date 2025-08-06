@@ -1,7 +1,7 @@
 # OSCAR - Open Source Serverless Computing for Data-Processing Applications
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/grycap/oscar)](https://goreportcard.com/report/github.com/grycap/oscar)
-[![Codacy Badge](https://app.codacy.com/project/badge/Coverage/8145efdfb9d24af1b5b53e21c6e2df99)](https://www.codacy.com/gh/grycap/oscar/dashboard?utm_source=github.com&utm_medium=referral&utm_content=grycap/oscar&utm_campaign=Badge_Coverage)
+[![Go Report Card](https://goreportcard.com/badge/github.com/grycap/oscar/v3)](https://goreportcard.com/report/github.com/grycap/oscar/v3)
+[![Codacy Badge](https://app.codacy.com/project/badge/Coverage/8145efdfb9d24af1b5b53e21c6e2df99)](https://app.codacy.com/gh/grycap/oscar/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage)
 [![tests](https://github.com/grycap/oscar/actions/workflows/tests.yaml/badge.svg?branch=master)](https://github.com/grycap/oscar/actions/workflows/tests.yaml)
 [![build](https://github.com/grycap/oscar/workflows/build/badge.svg)](https://github.com/grycap/oscar/actions?query=workflow%3Abuild)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/grycap/oscar)](https://github.com/grycap/oscar/pkgs/container/oscar)
@@ -20,7 +20,7 @@ environments provided by Docker containers that run on elastic Kubernetes cluste
 
 Information on how to deploy an OSCAR cluster using the Infrastucture Manager can be found at: https://grycap.github.io/oscar/deploy-im-dashboard/
 
-For more documentation visit https://grycap.github.io/oscar/
+For more documentation visit https://docs.oscar.grycap.net
 
 > **_NOTE:_** If you detect inaccurate or unclear information on the documentation please report back to us either opening an issue or contacting us at products@grycap.upv.es
 
@@ -107,7 +107,12 @@ license text.
 
 This development is partially funded by the [EGI Strategic and Innovation Fund](https://www.egi.eu/about/egi-council/egi-strategic-and-innovation-fund/).
 
-Partially funded by the project [AI-SPRINT](https://ai-sprint-project.eu) "AI in Secure Privacy-Preserving Computing Continuum" that has received funding from the European Union’s Horizon 2020 Research and Innovation Programme under Grant 101016577.
+Partially funded by the projects:
+
+- [AI-SPRINT](https://ai-sprint-project.eu) "AI in Secure Privacy-Preserving Computing Continuum" that has received funding from the European Union’s Horizon 2020 Research and Innovation Programme under Grant 101016577.
+- [interTwin](https://intertwin.eu) "An interdisciplinary Digital Twin Engine for science" that has received funding from the European Union’s Horizon Europe Programme under Grant 101058386.
+- [AI4EOSC](https://ai4eosc.eu) "Artificial Intelligence for the European Open Science Cloud" that has received funding from the European Union’s Horizon Europe Research and Innovation Programme under Grant 101058593."
+- [iMagine](http://imagine-ai.eu) "AI-based image data analysis tools for aquatic research" that has received funding from the European Union’s Horizon Europe Research and Innovation Programme under Grant 101058625.
 
 Also, Grant PDC2021-120844-I00 funded by Ministerio de Ciencia e Innovación/Agencia Estatal de Investigación/ 10.13039/501100011033 and by “European Union NextGenerationEU/PRTR” and Grant PID2020-113126RB-I00 funded by Ministerio de Ciencia e Innovación/Agencia Estatal de Investigación/ 10.13039/501100011033.
 
@@ -118,7 +123,7 @@ Also, Grant PDC2021-120844-I00 funded by Ministerio de Ciencia e Innovación/Age
 </a>
 
 This software has received a silver badge according to the [Software Quality Baseline criteria](https://www.eosc-synergy.eu/for-developers/) defined by the [EOSC-Synergy](https://www.eosc-synergy.eu) project. Please acknowledge the use of OSCAR by citing the following scientific
-publications ([preprints available](https://www.grycap.upv.es/gmolto/publications)):
+publications ([preprints available](https://www.grycap.upv.es/gmolto/publications.php)):
 
 ```
 Sebastián Risco, Germán Moltó, Diana M. Naranjo and Ignacio Blanquer. (2021). Serverless Workflows for Containerised Applications in the Cloud Continuum. Journal of Grid Computing, 19(3), 30. https://doi.org/10.1007/s10723-021-09570-2

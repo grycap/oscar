@@ -3,10 +3,12 @@ name: mkdocs
 on:
   push:
     branches: [master]
+  release:
+    types: [created]
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - name: Checkout
       uses: actions/checkout@v3
@@ -22,6 +24,20 @@ jobs:
         python -m pip install mkdocs
         python -m pip install mkdocs-material
         python -m pip install mkdocs-render-swagger-plugin
+        python -m pip install mike
+    - name: Git configuration
+      id: git
+      run: |
+        git config --global user.name 'github-actions'
+        git config --global user.email 'github-actions@github.com'
+    - name: Get release latest version 
+      id: latest
+      run: |
+        latest=$(curl -s https://api.github.com/repos/grycap/oscar/releases/latest | jq -r .tag_name)
+        echo "Last release tag: $latest"
+        echo "tag_name=$latest" >> $GITHUB_OUTPUT
     - name: Build and deploy to gh-pages
       run: |
-        mkdocs gh-deploy
+        git fetch origin gh-pages:gh-pages
+        mike deploy --push --update-aliases ${{ steps.latest.outputs.tag_name }} latest
+        mike set-default --push latest

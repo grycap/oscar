@@ -47,7 +47,7 @@ input to be passed as text through the `--text-input` flag or directly a file
 to be sent by passing its path through the `--input` flag. Both input types
 are automatically encoded in [Base64](https://en.wikipedia.org/wiki/Base64).
 
-It also allow setting the `--output` flag to indicate a path for storing
+It also allows setting the `--output` flag to indicate a path for storing
 (and decoding if needed) the output body in a file, otherwise the output will
 be shown in stdout.
 
@@ -80,18 +80,38 @@ base64 input.png | curl -X POST -H "Authorization: Bearer <TOKEN>" \
  -d @- https://<CLUSTER_ENDPOINT>/run/<OSCAR_SERVICE> | base64 -d > result.png
 ```
 
+## Synchronous Invocations via OSCAR Dashboard
+
+Another way to perform synchronous invocations is by using the [OSCAR Dashboard](https://dashboard.oscar.grycap.net), which allows you to send files in base64 format or use a built-in code editor to create payloads in a more user-friendly way. You also can access it by navigating directly to the cluster endpoint in your browser.
+
+After logging in, find the service you want to invoke and click its **invocation** button (`>_`).
+
+![oscar-dashboard-sync-invocation-1.png](images/usage/oscar-dashboard-sync-invocation-1.png)
+
+Next, you can either upload a file containing the payload or use the built-in code editor to construct it manually.
+
+![oscar-dashboard-sync-invocation-2.png](images/usage/oscar-dashboard-sync-invocation-2.png)
+
+For demonstration purposes, we'll use the built-in code editor to send a JSON payload.
+
+![oscar-dashboard-sync-invocation-2.png](images/usage/oscar-dashboard-sync-invocation-3.png)
+
+Finally, you can view the result of the invocation directly in the dashboard.
+
+![oscar-dashboard-sync-invocation-2.png](images/usage/oscar-dashboard-sync-invocation-4.png)
+
 
 ## Service access tokens
 
-As detailed in the [API specification](api.md), invocation paths require the
-service access token in the request header for authentication. Service access
+As detailed in the [API specification](api.md), invocation paths require either the
+service access token or the Access Token of the user when the cluster is integrated with EGI Check-in, in the request header for authentication (any of them is valid). Service access
 tokens are auto-generated in service creation and update, and MinIO eventing
 system is automatically configured to use them for event-driven file
 processing. Tokens can be obtained through the API, using the
 [`oscar-cli service get`](oscar-cli.md#get) command or directly from the web
 interface.
 
-![oscar-ui-service-token.png](images/usage/oscar-ui-service-token.png)
+![oscar-dashboard-service-token.png](images/usage/oscar-dashboard-service-token.png)
 
 
 

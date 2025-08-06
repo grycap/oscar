@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - name: Checkout
       uses: actions/checkout@v3
@@ -20,11 +20,11 @@ jobs:
     - name: Setup node
       uses: actions/setup-node@v1
       with:
-        node-version: '14'
+        node-version: '20'
 
     - name: Build OSCAR-UI
       run: npm install && npm run deploy_container
-      working-directory: ./ui
+      working-directory: ./dashboard
 
     - name: Prepare docker buildx
       id: prepare

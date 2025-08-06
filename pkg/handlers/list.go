@@ -19,10 +19,12 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 )
 
@@ -42,18 +44,23 @@ func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 			uid, err := auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+				return
 			}
 
-			var allowedServicesForUser []*types.Service
+			allowedServicesForUser := []*types.Service{}
 			for _, service := range services {
-				if len(service.AllowedUsers) == 0 {
+				switch service.Visibility {
+				case utils.PUBLIC:
 					allowedServicesForUser = append(allowedServicesForUser, service)
-					continue
-				}
-				for _, id := range service.AllowedUsers {
-					if uid == id {
+
+				case utils.PRIVATE:
+					if service.Owner == uid {
 						allowedServicesForUser = append(allowedServicesForUser, service)
-						break
+
+					}
+				case utils.RESTRICTED:
+					if service.Owner == uid || slices.Contains(service.AllowedUsers, uid) {
+						allowedServicesForUser = append(allowedServicesForUser, service)
 					}
 				}
 			}

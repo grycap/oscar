@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
+	"github.com/grycap/oscar/v3/pkg/backends/resources"
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
 	"github.com/grycap/oscar/v3/pkg/types"
 	v1 "k8s.io/api/core/v1"
@@ -57,23 +58,21 @@ func (k *KubeBackend) GetInfo() *types.ServerlessBackendInfo {
 
 // ListServices returns a slice with all services registered in the provided namespace
 func (k *KubeBackend) ListServices() ([]*types.Service, error) {
-	// Get the list with all podTemplates
-	podTemplates, err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).List(context.TODO(), metav1.ListOptions{})
+	// Get the list with all Knative services
+	configmaps, err := getAllServicesConfigMaps(k.namespace, k.kubeClientset)
 	if err != nil {
+		log.Printf("WARNING: %v\n", err)
 		return nil, err
 	}
-
 	services := []*types.Service{}
-	for _, podTemplate := range podTemplates.Items {
-		// Get service from configMap's FDL
-		svc, err := getServiceFromFDL(podTemplate.Name, k.namespace, k.kubeClientset)
-		if err != nil {
-			log.Printf("WARNING: %v\n", err)
-		} else {
-			services = append(services, svc)
-		}
-	}
 
+	for _, cm := range configmaps.Items {
+		service, err := getServiceFromConfigMap(&cm) // #nosec G601
+		if err != nil {
+			return nil, err
+		}
+		services = append(services, service)
+	}
 	return services, nil
 }
 
@@ -125,7 +124,7 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 
 	//Create an expose service
 	if service.Expose.APIPort != 0 {
-		err = types.CreateExpose(service, k.kubeClientset, k.config)
+		err = resources.CreateExpose(service, k.kubeClientset, k.config)
 		if err != nil {
 			return err
 		}
@@ -148,8 +147,14 @@ func (k *KubeBackend) ReadService(name string) (*types.Service, error) {
 		return nil, err
 	}
 
+	// Get the configMap of the Service
+	cm, err := k.kubeClientset.CoreV1().ConfigMaps(k.namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", name)
+	}
+
 	// Get service from configMap's FDL
-	svc, err := getServiceFromFDL(name, k.namespace, k.kubeClientset)
+	svc, err := getServiceFromConfigMap(cm)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +211,15 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 
 	// If the service is exposed update its configuration
 	if service.Expose.APIPort != 0 {
-		err = types.UpdateExpose(service, k.kubeClientset, k.config)
+		err = resources.UpdateExpose(service, k.kubeClientset, k.config)
+		if err != nil {
+			return err
+		}
+	}
+
+	//Create deaemonset to cache the service image on all the nodes
+	if service.ImagePrefetch {
+		err = imagepuller.CreateDaemonset(k.config, service, k.kubeClientset)
 		if err != nil {
 			return err
 		}
@@ -234,7 +247,7 @@ func (k *KubeBackend) DeleteService(service types.Service) error {
 
 	// If service is exposed delete the exposed k8s components
 	if service.Expose.APIPort != 0 {
-		if err := types.DeleteExpose(name, k.kubeClientset, k.config); err != nil {
+		if err := resources.DeleteExpose(name, k.kubeClientset, k.config); err != nil {
 			log.Printf("Error deleting all associated kubernetes component of the expose config \"%s\": %v\n", name, err)
 		}
 	}
@@ -242,17 +255,12 @@ func (k *KubeBackend) DeleteService(service types.Service) error {
 	return nil
 }
 
-func getServiceFromFDL(name string, namespace string, kubeClientset kubernetes.Interface) (*types.Service, error) {
-	// Get the configMap of the Service
-	cm, err := kubeClientset.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", name)
-	}
+func getServiceFromConfigMap(cm *v1.ConfigMap) (*types.Service, error) {
 	service := &types.Service{}
 
 	// Unmarshal the FDL stored in the configMap
-	if err = yaml.Unmarshal([]byte(cm.Data[types.FDLFileName]), service); err != nil {
-		return nil, fmt.Errorf("the FDL of the service \"%s\" cannot be read", name)
+	if err := yaml.Unmarshal([]byte(cm.Data[types.FDLFileName]), service); err != nil {
+		return nil, fmt.Errorf("the FDL of the service \"%s\" cannot be read", cm.Name)
 	}
 
 	// Add the script to the service from configmap's script value
@@ -276,10 +284,11 @@ func checkAdditionalConfig(configName string, configNamespace string, service ty
 
 	if len(additionalConfig.Images.AllowedPrefixes) > 0 {
 		for _, prefix := range additionalConfig.Images.AllowedPrefixes {
-			if !strings.Contains(service.Image, prefix) {
-				return fmt.Errorf("image %s is not allowed for pull on the cluster. Check the additional configuration file on '%s'", service.Image, cfg.AdditionalConfigPath)
+			if strings.Contains(service.Image, prefix) {
+				return nil
 			}
 		}
+		return fmt.Errorf("image %s is not allowed for pull on the cluster. Check the additional configuration file on '%s'", service.Image, cfg.AdditionalConfigPath)
 	}
 
 	return nil
@@ -362,6 +371,17 @@ func deleteServiceConfigMap(name string, namespace string, kubeClientset kuberne
 	}
 
 	return nil
+}
+
+func getAllServicesConfigMaps(namespace string, kubeClientset kubernetes.Interface) (*v1.ConfigMapList, error) {
+	listOpts := metav1.ListOptions{
+		LabelSelector: "oscar_service",
+	}
+	configMapsList, err := kubeClientset.CoreV1().ConfigMaps(namespace).List(context.TODO(), listOpts)
+	if err != nil {
+		return nil, err
+	}
+	return configMapsList, nil
 }
 
 func deleteServiceJobs(name string, namespace string, kubeClientset kubernetes.Interface) error {

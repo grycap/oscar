@@ -1,4 +1,5 @@
 site_name: OSCAR Documentation
+site_url: https://docs.oscar.grycap.net/
 repo_url: https://github.com/grycap/oscar
 nav:
 - Introduction: 
@@ -19,8 +20,9 @@ nav:
 
 - Interfaces:
   - oscar-cli.md
-  - usage-ui.md  
+  - usage-dashboard.md  
   - api.md
+  - MinIO: minio-usage.md
 
 - Service Execution: 
   - invoking.md
@@ -33,6 +35,7 @@ nav:
   - integration-scone.md
   - integration-interlink.md
   - integration-compss.md
+  - integration-node-red.md
 
 - Tutorials: 
   - training.md
@@ -56,11 +59,17 @@ theme:
     primary: teal
   features:
     - instant
+    - versioning
     - toc.integrate
     - content.code.copy
 
 plugins:
 - search
 - render_swagger
+- mike
+
+extra:
+  version:
+    provider: mike
 
 copyright: "&copy; GRyCAP - I3M - Universitat Politècnica de València, Spain."

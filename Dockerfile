@@ -1,4 +1,4 @@
-FROM golang:1.21 as build
+FROM golang:1.24 as build
 
 ARG VERSION
 ARG GIT_COMMIT
@@ -38,7 +38,7 @@ EXPOSE 8080
 COPY --from=build /oscar/oscar .
 
 # Remember to build the ui first (npm install && npm run build)
-COPY /ui/dist assets
+COPY /dashboard/dist assets
 
 RUN chown -R app:app ./
 

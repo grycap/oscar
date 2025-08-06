@@ -47,10 +47,14 @@ var (
 		ImagePullSecrets: []string{"testcred1", "testcred2"},
 		Script:           "testscript",
 		Environment: struct {
-			Vars map[string]string `json:"Variables"`
+			Vars    map[string]string `json:"variables"`
+			Secrets map[string]string `json:"secrets"`
 		}{
 			Vars: map[string]string{
 				"TEST_VAR": "testvalue",
+			},
+			Secrets: map[string]string{
+				"TEST_SECRET": "testsecret",
 			},
 		},
 		Annotations: map[string]string{
@@ -229,6 +233,7 @@ replicas:
   priority: 0
   headers:
     Authorization: Bearer testtoken
+delegation: ""
 rescheduler_threshold: 0
 log_level: ""
 image: testimage
@@ -250,8 +255,10 @@ expose:
   default_command: false
   set_auth: false
 environment:
-  Variables:
+  variables:
     TEST_VAR: testvalue
+  secrets:
+    TEST_SECRET: testsecret
 annotations:
   testannotation: testannotationvalue
 vo: ""
@@ -273,7 +280,10 @@ clusters:
     ssl_verify: true
 owner: ""
 interlink_node_name: ""
+visibility: ""
 allowed_users: []
+isolation_level: ""
+bucket_list: []
 mount:
   storage_provider: ""
   path: ""

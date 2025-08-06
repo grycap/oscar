@@ -56,7 +56,7 @@ func MakeConfigHandler(cfg *types.Config) gin.HandlerFunc {
 
 			ak, sk, err := mc.GetUserCredentials(uid)
 			if err != nil {
-				c.String(http.StatusInternalServerError, "Error getting credentials for MinIO user: ", uid)
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
 			userMinIOProvider := &types.MinIOProvider{

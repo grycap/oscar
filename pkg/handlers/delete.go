@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"reflect"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -32,15 +34,22 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
+var ALL_USERS_GROUP = "all_users_group"
+var allUserGroupNotExist = "unable to remove bucket from policy \"" + ALL_USERS_GROUP + "\", policy '" + ALL_USERS_GROUP + "' does not exist"
+var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
+
 // MakeDeleteHandler makes a handler for deleting services
 func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// First get the Service
-		service, _ := back.ReadService(c.Param("serviceName"))
+		var service *types.Service
+		var uid string
+		var err error
+		service, _ = back.ReadService(c.Param("serviceName"))
 		authHeader := c.GetHeader("Authorization")
 
 		if len(strings.Split(authHeader, "Bearer")) > 1 {
-			uid, err := auth.GetUIDFromContext(c)
+			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
@@ -50,7 +59,12 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				return
 			}
 		}
-
+		if utils.SecretExists(service.Name, cfg.ServicesNamespace, back.GetKubeClientset()) {
+			secretsErr := utils.DeleteSecret(service.Name, cfg.ServicesNamespace, back.GetKubeClientset())
+			if secretsErr != nil {
+				c.String(http.StatusInternalServerError, "Error deleting asociated secret: %v", secretsErr)
+			}
+		}
 		if err := back.DeleteService(*service); err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {
@@ -65,31 +79,35 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			log.Printf("the provided MinIO configuration is not valid: %v", err)
 		}
 
-		// Delete the group and policy
-		for _, in := range service.Input {
-			path := strings.Trim(in.Path, " /")
-			// Split buckets and folders from path
-			bucket := strings.SplitN(path, "/", 2)
-			var users []string
-			minIOAdminClient.UpdateUsersInGroup(users, bucket[0], true)
-		}
-
 		if service.Mount.Path != "" {
 			path := strings.Trim(service.Mount.Path, " /")
 			// Split buckets and folders from path
 			bucket := strings.SplitN(path, "/", 2)
 			var users []string
-			minIOAdminClient.UpdateUsersInGroup(users, bucket[0], true)
-		}
-
-		// Disable input notifications
-		if err := disableInputNotifications(service.GetMinIOWebhookARN(), service.Input, service.StorageProviders.MinIO[types.DefaultProvider]); err != nil {
-			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
+			err = minIOAdminClient.CreateAddGroup(bucket[0], users, true)
+			if err != nil {
+				log.Printf("error updating MinIO users in group: %v", err)
+			}
 		}
 
 		// Remove the service's webhook in MinIO config and restart the server
 		if err := removeMinIOWebhook(service.Name, minIOAdminClient); err != nil {
 			log.Printf("Error removing MinIO webhook for service \"%s\": %v\n", service.Name, err)
+		}
+
+		// Delete service buckets
+		err = deleteBuckets(service, cfg, minIOAdminClient)
+		if err != nil && !strings.Contains(err.Error(), allUserGroupNotExist) {
+			c.String(http.StatusInternalServerError, "Error deleting service buckets: ", err)
+		}
+
+		if len(service.BucketList) > 0 && strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser {
+			for i, b := range service.BucketList {
+				err = minIOAdminClient.RemoveResource(b, service.AllowedUsers[i], false)
+				if err != nil {
+					c.String(http.StatusInternalServerError, "error while removing isolated bucket %v", err)
+				}
+			}
 		}
 
 		// Add Yunikorn queue if enabled
@@ -112,43 +130,202 @@ func removeMinIOWebhook(name string, minIOAdminClient *utils.MinIOAdminClient) e
 	return minIOAdminClient.RestartServer()
 }
 
-func disableInputNotifications(arnStr string, input []types.StorageIOConfig, minIO *types.MinIOProvider) error {
-	parsedARN, _ := arn.Parse(arnStr)
+func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient) error {
+	var s3Client *s3.S3
+	var provName, provID string
 
-	// Create S3 client for MinIO
-	minIOClient := minIO.GetS3Client()
+	// Delete input buckets
+	for _, in := range service.Input {
+		provID, provName = getProviderInfo(in.Provider)
 
-	for _, in := range input {
+		// Only allow input from MinIO and dCache
+		if provName != types.MinIOName && provName != types.WebDavName && provName != types.RucioName {
+			return errInput
+		}
+
+		// If the provider is WebDav (dCache) skip bucket creation
+		if provName == types.WebDavName || provName == types.RucioName {
+			continue
+		}
+
+		// Check if the provider identifier is defined in StorageProviders
+		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
+			return fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
+		}
+
+		// Check if the input provider is the defined in the server config
+		if provID != types.DefaultProvider {
+			if !reflect.DeepEqual(*cfg.MinIOProvider, *service.StorageProviders.MinIO[provID]) {
+				return fmt.Errorf("the provided MinIO server \"%s\" is not the configured in OSCAR", service.StorageProviders.MinIO[provID].Endpoint)
+			}
+		}
+
+		// Get admin client for the provider
+		s3Client = cfg.MinIOProvider.GetS3Client()
+
 		path := strings.Trim(in.Path, " /")
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
 
-		updatedQueueConfigurations := []*s3.QueueConfiguration{}
-		// Get bucket notification
-		nCfg, err := minIOClient.GetBucketNotificationConfiguration(&s3.GetBucketNotificationConfigurationRequest{Bucket: aws.String(splitPath[0])})
-		if err != nil {
-			return fmt.Errorf("error getting bucket \"%s\" notifications: %v", splitPath[0], err)
+		// Disable input notifications for service bucket
+		if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), splitPath[0]); err != nil {
+			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 		}
 
-		// Filter elements that doesn't match with service's ARN
-		for _, q := range nCfg.QueueConfigurations {
-			queueARN, _ := arn.Parse(*q.QueueArn)
-			if queueARN.Resource == parsedARN.Resource &&
-				queueARN.AccountID != parsedARN.AccountID {
-				updatedQueueConfigurations = append(updatedQueueConfigurations, q)
+		err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+			BucketPath:   splitPath[0],
+			Visibility:   service.Visibility,
+			AllowedUsers: service.AllowedUsers,
+			Owner:        service.Owner,
+		})
+
+		if err != nil {
+			return fmt.Errorf("error while removing MinIO bucket %v", err)
+		}
+
+	}
+
+	// Delete output buckets
+	for _, out := range service.Output {
+		provID, provName = getProviderInfo(out.Provider)
+
+		// If the provider is WebDav (dCache) skip bucket creation
+		if provName == types.WebDavName || provName == types.RucioName {
+			continue
+		}
+
+		// Check if the provider identifier is defined in StorageProviders
+		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
+			return fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
+		}
+
+		switch provName {
+		case types.MinIOName, types.S3Name:
+			//Check if this storage provider is defined in input
+			previousExist := false
+			outPath := strings.Trim(out.Path, " /")
+			outBucket := strings.SplitN(outPath, "/", 2)[0]
+			//Compare this output storage provider with all the input storage provider
+			for _, in := range service.Input {
+				//Don't compare in.Provider with out.Provider directly
+				inProvID, inProvName := getProviderInfo(in.Provider)
+				inPath := strings.Trim(in.Path, " /")
+				inBucket := strings.SplitN(inPath, "/", 2)[0]
+
+				if inProvID == provID && inProvName == provName && inBucket == outBucket {
+					previousExist = true
+				}
+			}
+			//Its is not defined in input -> delete.
+			if !previousExist {
+				s3Client = cfg.MinIOProvider.GetS3Client()
+
+				// Disable input notifications for service bucket
+				if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), outBucket); err != nil {
+					log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
+				}
+
+				err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+					BucketPath:   outBucket,
+					Visibility:   service.Visibility,
+					AllowedUsers: service.AllowedUsers,
+					Owner:        service.Owner,
+				})
+				if err != nil {
+					return fmt.Errorf("error while removing MinIO bucket %v", err)
+				}
+			}
+
+		case types.OnedataName:
+			// TODO
+		}
+	}
+
+	if strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser && len(service.BucketList) != 0 {
+		for _, bucket := range service.BucketList {
+
+			// Disable input notifications for service bucket
+			if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), bucket); err != nil {
+				log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
+			}
+
+			err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+				BucketPath:   bucket,
+				Visibility:   utils.PRIVATE,
+				AllowedUsers: []string{},
+				Owner:        service.Owner,
+			})
+			if err != nil {
+				log.Printf("error while removing MinIO bucket %v", err)
 			}
 		}
+	}
 
-		// Put the updated bucket configuration
-		nCfg.QueueConfigurations = updatedQueueConfigurations
-		pbncInput := &s3.PutBucketNotificationConfigurationInput{
-			Bucket:                    aws.String(splitPath[0]),
-			NotificationConfiguration: nCfg,
-		}
-		_, err = minIOClient.PutBucketNotificationConfiguration(pbncInput)
+	// TODO check if some components of mount need to be deleted
+	return nil
+}
+
+func DeleteMinIOBuckets(s3Client *s3.S3, minIOAdminClient *utils.MinIOAdminClient, bucket utils.MinIOBucket) error {
+	var policyName string
+	var isGroup bool
+	if strings.ToLower(bucket.Visibility) == utils.PUBLIC {
+		policyName = ALL_USERS_GROUP
+		isGroup = true
+	} else {
+		policyName = bucket.Owner
+	}
+
+	err := minIOAdminClient.RemoveResource(bucket.BucketPath, policyName, isGroup)
+	if err != nil {
+		return fmt.Errorf("error removing resource")
+	}
+
+	if strings.ToLower(bucket.Visibility) == utils.RESTRICTED {
+		err := minIOAdminClient.RemoveGroupPolicy(bucket.BucketPath)
 		if err != nil {
-			return fmt.Errorf("error disabling bucket notification: %v", err)
+			return fmt.Errorf("error removing policy for group")
 		}
+	}
+
+	err = minIOAdminClient.DeleteBucket(s3Client, bucket.BucketPath)
+	if err != nil {
+		return fmt.Errorf("error deleting bucket %s, %v", bucket.BucketPath, err)
+	}
+	return nil
+}
+
+func disableInputNotifications(s3Client *s3.S3, arnStr string, bucket string) error {
+	parsedARN, _ := arn.Parse(arnStr)
+
+	// path := strings.Trim(in.Path, " /")
+	// // Split buckets and folders from path
+	// splitPath := strings.SplitN(path, "/", 2)
+
+	updatedQueueConfigurations := []*s3.QueueConfiguration{}
+	// Get bucket notification
+	nCfg, err := s3Client.GetBucketNotificationConfiguration(&s3.GetBucketNotificationConfigurationRequest{Bucket: aws.String(bucket)})
+	if err != nil {
+		return fmt.Errorf("error getting bucket \"%s\" notifications: %v", bucket, err)
+	}
+
+	// Filter elements that doesn't match with service's ARN
+	for _, q := range nCfg.QueueConfigurations {
+		queueARN, _ := arn.Parse(*q.QueueArn)
+		if queueARN.Resource == parsedARN.Resource &&
+			queueARN.AccountID != parsedARN.AccountID {
+			updatedQueueConfigurations = append(updatedQueueConfigurations, q)
+		}
+	}
+
+	// Put the updated bucket configuration
+	nCfg.QueueConfigurations = updatedQueueConfigurations
+	pbncInput := &s3.PutBucketNotificationConfigurationInput{
+		Bucket:                    aws.String(bucket),
+		NotificationConfiguration: nCfg,
+	}
+	_, err = s3Client.PutBucketNotificationConfiguration(pbncInput)
+	if err != nil {
+		return fmt.Errorf("error disabling bucket notification: %v", err)
 	}
 
 	return nil

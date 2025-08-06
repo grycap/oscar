@@ -33,6 +33,7 @@ paths:
       description: List all created services
       security:
         - basicAuth: []
+        - token: []
       tags:
         - services
     post:
@@ -50,6 +51,7 @@ paths:
       description: Create a service
       security:
         - basicAuth: []
+        - token: []
       requestBody:
         content:
           application/json:
@@ -74,6 +76,7 @@ paths:
       description: Update a service
       security:
         - basicAuth: []
+        - token: []
       requestBody:
         content:
           application/json:
@@ -108,6 +111,7 @@ paths:
       operationId: ReadService
       security:
         - basicAuth: []
+        - token: []
       description: Read a service
     delete:
       summary: Delete service
@@ -124,6 +128,7 @@ paths:
       description: Delete a service
       security:
         - basicAuth: []
+        - token: []
       tags:
         - services
   '/system/logs/{serviceName}':
@@ -157,6 +162,7 @@ paths:
       operationId: ListJobs
       security:
         - basicAuth: []
+        - token: []
       description: List all jobs with their status
     delete:
       summary: Delete jobs
@@ -173,6 +179,7 @@ paths:
       description: Delete all jobs from a service.
       security:
         - basicAuth: []
+        - token: []
       parameters:
         - schema:
             type: boolean
@@ -214,6 +221,7 @@ paths:
       description: Get the logs from a job
       security:
         - basicAuth: []
+        - token: []
       parameters:
         - schema:
             type: boolean
@@ -234,6 +242,7 @@ paths:
       description: Delete a job
       security:
         - basicAuth: []
+        - token: []
       tags:
         - logs
   /system/info:
@@ -256,6 +265,7 @@ paths:
       description: Get system info
       security:
         - basicAuth: []
+        - token: []
   /health:
     get:
       summary: Health
@@ -316,6 +326,7 @@ paths:
       description: Get system configuration
       security:
         - basicAuth: []
+        - token: []
   '/run/{serviceName}':
     parameters:
       - schema:
@@ -345,6 +356,119 @@ paths:
               type: string
               format: binary
         description: Event
+  /system/buckets:
+    get:
+      summary: List buckets
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Buckets'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+      operationId: ListBuckets
+      description: List all buckets visible for the user
+      security:
+        - basicAuth: []
+        - token: []
+      tags:
+        - buckets
+    post:
+      summary: Create bucket
+      operationId: CreateBucket
+      responses:
+        '201':
+          description: Bucket created
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+      description: Create a independent bucket
+      security:
+        - basicAuth: []
+        - token: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Buckets'
+      tags:
+        - buckets        
+    put:
+      summary: Update bucket
+      operationId: UpdateBucket
+      responses:
+        '204':
+          description: Bucket updated
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      description: Update a specific bucket
+      security:
+        - basicAuth: []
+        - token: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Buckets'
+      tags:
+        - buckets
+  '/system/buckets/{bucket}':
+    parameters:
+      - schema:
+          type: string
+        name: bucket
+        in: path
+        required: true
+    delete:
+      summary: Delete bucket
+      operationId: DeleteBucket
+      responses:
+        '204':
+          description: Bucket deleted
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      description: Delete a scpecific bucket
+      security:
+        - basicAuth: []
+        - token: []
+      tags:
+        - buckets
+  /status:
+    get:
+      summary: Your GET endpoint
+      tags:
+        - status
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+      operationId: Status
+      description: Get cluster status
+      security:
+        - basicAuth: []
+        - token: []
 components:
   schemas:
     Service:
@@ -415,6 +539,10 @@ components:
           default: false
         script:
           type: string
+        isolation_level:
+          type: string
+        mount:
+          $ref: '#/components/schemas/StorageIOConfig'
         image_pull_secrets: 
           type: array
           items: 
@@ -423,6 +551,10 @@ components:
           type: object
           properties:
             Variables:
+              type: object
+              additionalProperties:
+                type: string
+            Secrets:
               type: object
               additionalProperties:
                 type: string
@@ -511,6 +643,27 @@ components:
                   type: string
                 password:
                   type: string
+    Buckets:
+      title: Buckets
+      type: object
+      properties:
+        bucket_path:
+          type: string
+        visibility:
+          type: string
+        allowed_users:
+          type: array
+          items:
+            type: string
+        owner:
+          type: string
+        metadata:
+          type: object
+          properties:
+            owner:
+              type: string
+            service:
+              type: boolean
     Clusters:
       title: Clusters
       type: object
@@ -573,6 +726,10 @@ components:
           type: string
         yunikorn_enable:
           type: boolean
+        oidc_groups:
+          type: array
+          items: 
+            type: string
     MinIOProvider:
       title: MinIOProvider
       type: object
@@ -603,8 +760,11 @@ tags:
   - name: async
   - name: info
   - name: health
+  - name: buckets
 servers:
   - url: 'https://localhost'
     description: 'Local testing'
   - url: 'https://inference.cloud.ai4eosc.eu'
     description: 'AI4EOSC OSCAR cluster'
+  - url: 'https://inference-walton.cloud.imagine-ai.eu'
+    description: 'iMagine OSCAR cluster'

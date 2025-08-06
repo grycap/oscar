@@ -46,6 +46,9 @@ const (
 	// WebDavName string representing a storage provider accessed via webdav
 	WebDavName = "webdav"
 
+	// RucioName string representing the Rucio provider name
+	RucioName = "rucio"
+
 	// ProviderSeparator separator character used to split provider's name and identifier
 	ProviderSeparator = "."
 )
@@ -66,6 +69,7 @@ type StorageProviders struct {
 	MinIO   map[string]*MinIOProvider   `json:"minio,omitempty"`
 	Onedata map[string]*OnedataProvider `json:"onedata,omitempty"`
 	WebDav  map[string]*WebDavProvider  `json:"webdav,omitempty"`
+	Rucio   map[string]*Rucio           `json:"rucio,omitempty"`
 }
 
 // S3Provider stores the credentials of the AWS S3 storage provider
@@ -98,6 +102,17 @@ type WebDavProvider struct {
 	Password string `json:"password"`
 }
 
+// Rucio stores the credentials of the a storage provider that can be accessed via Rucio
+type Rucio struct {
+	Host          string `json:"host"`
+	Account       string `json:"account"`
+	Rse           string `json:"rse"`
+	RefreshToken  string `json:"refresh_token"`
+	AuthHost      string `json:"auth_host"`
+	OidcAudience  string `json:"oidc_audience"`
+	TokenEndpoint string `json:"token_endpoint"`
+}
+
 // GetS3Client creates a new S3 Client from a S3Provider
 func (s3Provider S3Provider) GetS3Client() *s3.S3 {
 	s3Config := &aws.Config{
@@ -121,6 +136,7 @@ func (minIOProvider MinIOProvider) GetS3Client() *s3.S3 {
 
 	// Disable tls verification in client transport if Verify == false
 	if !minIOProvider.Verify {
+		// #nosec
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
