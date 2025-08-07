@@ -1,0 +1,23 @@
+functions:
+  oscar:
+    - oscar-cluster:
+        name: thermal-detector-interlink
+        memory: 4Gi
+        cpu: "3.0"
+        image: "docker://ai4oshub/thermal-bridges-rooftops-detector"
+        script: "script.sh"
+        vo: "dev.intertwin.eu"
+        allowed_users: []
+        log_level: CRITICAL
+        interlink_node_name: vega-new-vk
+        annotations:
+          slurm-job.vk.io/singularity-options: --no-home --no-mount /exa5
+          slurm-job.vk.io/singularity-mounts: --bind /ceph/hpc/home/ciangottinid/oscar_home:/tmp
+          job.vk.io/singularity-mounts: --bind /ceph/hpc/data/st2301-itwin-users/:/interlink/
+          slurm-job.vk.io/flags: --job-name=thermal-detector --time=02:30:00 --nodes=1
+        input:
+          - storage_provider: minio.default
+            path: thermal-detector/input
+        output:
+          - storage_provider: minio.default
+            path: thermal-detector/output
