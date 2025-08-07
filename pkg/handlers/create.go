@@ -227,10 +227,13 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				if strings.ToLower(service.Visibility) == "" {
 					b.Visibility = utils.PRIVATE
 				}
-				err := minIOAdminClient.SetPolicies(b)
-				if err != nil {
-					c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+				if service.Owner != "cluster_admin" {
+					err := minIOAdminClient.SetPolicies(b)
+					if err != nil {
+						c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+					}
 				}
+
 				// Bucket metadata for filtering
 				tags := map[string]string{
 					"owner":   uid,
@@ -508,6 +511,8 @@ func isStorageProviderDefined(storageName string, storageID string, providers *t
 		_, ok = providers.Onedata[storageID]
 	case types.WebDavName:
 		_, ok = providers.WebDav[storageID]
+	case types.RucioName:
+		_, ok = providers.Rucio[storageID]
 	}
 	return ok
 }

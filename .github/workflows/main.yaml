@@ -23,7 +23,7 @@ jobs:
         node-version: '20'
 
     - name: Build OSCAR-UI
-      run: npm install && npm run deploy_container
+      run: npm install -D @types/node@20 && npm run deploy_container
       working-directory: ./dashboard
 
     - name: Prepare docker buildx

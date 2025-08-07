@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -40,7 +39,12 @@ func TestMakeStatusHandler(t *testing.T) {
 		&v1.NodeList{
 			Items: []v1.Node{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "control-plane-node",
+						Labels: map[string]string{
+							"node-role.kubernetes.io/control-plane": "", // This will be filtered out
+						},
+					},
 					Status: v1.NodeStatus{
 						Allocatable: v1.ResourceList{
 							"cpu":    *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -49,11 +53,29 @@ func TestMakeStatusHandler(t *testing.T) {
 					},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "node2"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "worker-node",
+						Labels: map[string]string{}, // No control-plane label - will be included
+					},
 					Status: v1.NodeStatus{
 						Allocatable: v1.ResourceList{
-							"cpu":    *resource.NewMilliQuantity(4000, resource.DecimalSI),
-							"memory": *resource.NewQuantity(16*1024*1024*1024, resource.BinarySI),
+							"cpu":            *resource.NewMilliQuantity(4000, resource.DecimalSI),
+							"memory":         *resource.NewQuantity(16*1024*1024*1024, resource.BinarySI),
+							"nvidia.com/gpu": *resource.NewQuantity(1, resource.DecimalSI), // Has GPU
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "interlink-node",
+						Labels: map[string]string{
+							"virtual-node.interlink/type": "virtual-kubelet", // InterLink node
+						},
+					},
+					Status: v1.NodeStatus{
+						Allocatable: v1.ResourceList{
+							"cpu":    *resource.NewMilliQuantity(8000, resource.DecimalSI),
+							"memory": *resource.NewQuantity(32*1024*1024*1024, resource.BinarySI),
 						},
 					},
 				},
@@ -68,17 +90,17 @@ func TestMakeStatusHandler(t *testing.T) {
 		return true, &metricsv1beta1api.NodeMetricsList{
 			Items: []metricsv1beta1api.NodeMetrics{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+					ObjectMeta: metav1.ObjectMeta{Name: "worker-node"},
 					Usage: v1.ResourceList{
-						"cpu":    *resource.NewMilliQuantity(1000, resource.DecimalSI),
-						"memory": *resource.NewQuantity(4*1024*1024*1024, resource.BinarySI),
+						"cpu":    *resource.NewMilliQuantity(2000, resource.DecimalSI),       // 50% usage
+						"memory": *resource.NewQuantity(8*1024*1024*1024, resource.BinarySI), // 50% usage
 					},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "node2"},
+					ObjectMeta: metav1.ObjectMeta{Name: "interlink-node"},
 					Usage: v1.ResourceList{
-						"cpu":    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						"memory": *resource.NewQuantity(8*1024*1024*1024, resource.BinarySI),
+						"cpu":    *resource.NewMilliQuantity(4000, resource.DecimalSI),        // 50% usage
+						"memory": *resource.NewQuantity(16*1024*1024*1024, resource.BinarySI), // 50% usage
 					},
 				},
 			},
@@ -107,26 +129,100 @@ func TestMakeStatusHandler(t *testing.T) {
 		t.Fatalf("Failed to unmarshal response: %v", err)
 	}
 
+	// Calculate expected values:
+	// worker-node: 4000 - 2000 = 2000 CPU free, 16GB - 8GB = 8GB memory free
+	// interlink-node: 8000 - 4000 = 4000 CPU free, 32GB - 16GB = 16GB memory free
+	// Totals: 6000 CPU free, 24GB memory free
+	// Max: 4000 CPU free, 16GB memory free
 	expectedResponse := map[string]interface{}{
-		"numberNodes":     1.0,
-		"cpuFreeTotal":    2000.0,
-		"cpuMaxFree":      2000.0,
-		"memoryFreeTotal": 16.0 * 1024 * 1024 * 1024,
-		"memoryMaxFree":   8.0 * 1024 * 1024 * 1024,
+		"numberNodes":     2.0,                       // worker-node + interlink-node (control-plane filtered out)
+		"cpuFreeTotal":    6000.0,                    // 2000 + 4000
+		"cpuMaxFree":      4000.0,                    // max(2000, 4000)
+		"memoryFreeTotal": 24.0 * 1024 * 1024 * 1024, // 8GB + 16GB
+		"memoryMaxFree":   16.0 * 1024 * 1024 * 1024, // max(8GB, 16GB)
 		"detail": []interface{}{
 			map[string]interface{}{
-				"nodeName":         "node2",
+				"nodeName":         "worker-node",
 				"cpuCapacity":      "4000",
 				"cpuUsage":         "2000",
 				"cpuPercentage":    "50.00",
-				"memoryCapacity":   "17179869184",
-				"memoryUsage":      "8589934592",
+				"memoryCapacity":   "17179869184", // 16GB in bytes
+				"memoryUsage":      "8589934592",  // 8GB in bytes
 				"memoryPercentage": "50.00",
+				"isInterLink":      false,
+				"hasGPU":           true, // Has nvidia.com/gpu
+			},
+			map[string]interface{}{
+				"nodeName":         "interlink-node",
+				"cpuCapacity":      "8000",
+				"cpuUsage":         "4000",
+				"cpuPercentage":    "50.00",
+				"memoryCapacity":   "34359738368", // 32GB in bytes
+				"memoryUsage":      "17179869184", // 16GB in bytes
+				"memoryPercentage": "50.00",
+				"isInterLink":      true, // Has virtual-node.interlink/type=virtual-kubelet
+				"hasGPU":           false,
 			},
 		},
 	}
 
-	if !reflect.DeepEqual(jsonResponse, expectedResponse) {
-		t.Errorf("Expected response %v, but got %v", expectedResponse, jsonResponse)
+	// Since the order of nodes in the detail array can vary (map iteration),
+	// we should check each field separately rather than using DeepEqual
+	if jsonResponse["numberNodes"] != expectedResponse["numberNodes"] {
+		t.Errorf("Expected numberNodes %v, but got %v", expectedResponse["numberNodes"], jsonResponse["numberNodes"])
+	}
+
+	if jsonResponse["cpuFreeTotal"] != expectedResponse["cpuFreeTotal"] {
+		t.Errorf("Expected cpuFreeTotal %v, but got %v", expectedResponse["cpuFreeTotal"], jsonResponse["cpuFreeTotal"])
+	}
+
+	if jsonResponse["cpuMaxFree"] != expectedResponse["cpuMaxFree"] {
+		t.Errorf("Expected cpuMaxFree %v, but got %v", expectedResponse["cpuMaxFree"], jsonResponse["cpuMaxFree"])
+	}
+
+	if jsonResponse["memoryFreeTotal"] != expectedResponse["memoryFreeTotal"] {
+		t.Errorf("Expected memoryFreeTotal %v, but got %v", expectedResponse["memoryFreeTotal"], jsonResponse["memoryFreeTotal"])
+	}
+
+	if jsonResponse["memoryMaxFree"] != expectedResponse["memoryMaxFree"] {
+		t.Errorf("Expected memoryMaxFree %v, but got %v", expectedResponse["memoryMaxFree"], jsonResponse["memoryMaxFree"])
+	}
+
+	// Check that we have 2 nodes in detail
+	detail, ok := jsonResponse["detail"].([]interface{})
+	if !ok || len(detail) != 2 {
+		t.Errorf("Expected 2 nodes in detail, but got %d", len(detail))
+	}
+
+	// Verify each node exists with correct properties
+	nodeMap := make(map[string]map[string]interface{})
+	for _, nodeInterface := range detail {
+		node := nodeInterface.(map[string]interface{})
+		nodeName := node["nodeName"].(string)
+		nodeMap[nodeName] = node
+	}
+
+	// Check worker-node
+	if workerNode, exists := nodeMap["worker-node"]; exists {
+		if workerNode["hasGPU"] != true {
+			t.Error("Expected worker-node to have GPU")
+		}
+		if workerNode["isInterLink"] != false {
+			t.Error("Expected worker-node to NOT be InterLink")
+		}
+	} else {
+		t.Error("Expected to find worker-node in response")
+	}
+
+	// Check interlink-node
+	if interlinkNode, exists := nodeMap["interlink-node"]; exists {
+		if interlinkNode["hasGPU"] != false {
+			t.Error("Expected interlink-node to NOT have GPU")
+		}
+		if interlinkNode["isInterLink"] != true {
+			t.Error("Expected interlink-node to be InterLink")
+		}
+	} else {
+		t.Error("Expected to find interlink-node in response")
 	}
 }
