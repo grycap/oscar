@@ -68,6 +68,8 @@ func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 				c.String(http.StatusForbidden, "User %s doesn't have permision to get this service", uid)
 				return
 			}
+		} else {
+			c.JSON(http.StatusOK, service)
 		}
 	}
 }
