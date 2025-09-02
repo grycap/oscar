@@ -201,7 +201,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 
 			if service.Mount.Provider != "" {
 				args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath()) + ";echo \"I finish\" > /tmpfolder/finish-file;"}
-				resources.SetMountUID(podSpec, *service, cfg, requestUserUID)
+				resources.SetMount(podSpec, *service, cfg)
 			} else {
 				args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath())}
 			}

@@ -50,12 +50,7 @@ done`
 
 // SetMount Creates the sidecar container that mounts the source volume onto the pod volume
 func SetMount(podSpec *v1.PodSpec, service types.Service, cfg *types.Config) {
-	podSpec.Containers = append(podSpec.Containers, sidecarPodSpec(service, cfg, cfg.Name))
-	addVolume(podSpec)
-}
-
-func SetMountUID(podSpec *v1.PodSpec, service types.Service, cfg *types.Config, uid string) {
-	podSpec.Containers = append(podSpec.Containers, sidecarPodSpec(service, cfg, uid))
+	podSpec.Containers = append(podSpec.Containers, sidecarPodSpec(service, cfg))
 	addVolume(podSpec)
 }
 
@@ -89,7 +84,7 @@ func addVolume(podSpec *v1.PodSpec) {
 	podSpec.Volumes = append(podSpec.Volumes, ephemeralvolumeshare)
 }
 
-func sidecarPodSpec(service types.Service, cfg *types.Config, uid string) v1.Container {
+func sidecarPodSpec(service types.Service, cfg *types.Config) v1.Container {
 	bidirectional := v1.MountPropagationBidirectional
 	var ptr *bool // Uninitialized pointer
 	value := true
@@ -127,7 +122,7 @@ func sidecarPodSpec(service types.Service, cfg *types.Config, uid string) v1.Con
 
 	provider := strings.Split(service.Mount.Provider, ".")
 	if provider[0] == types.MinIOName {
-		MinIOEnvVars := setMinIOEnvVars(service, provider[1], cfg, uid)
+		MinIOEnvVars := setMinIOEnvVars(service, provider[1], cfg)
 		container.Env = append(container.Env, MinIOEnvVars...)
 		container.Args = []string{"-c", minioCommand + communCommand}
 	}
@@ -140,8 +135,8 @@ func sidecarPodSpec(service types.Service, cfg *types.Config, uid string) v1.Con
 
 }
 
-func setMinIOEnvVars(service types.Service, providerId string, cfg *types.Config, uid string) []v1.EnvVar {
-	//service.Mount.Provider
+func setMinIOEnvVars(service types.Service, providerId string, cfg *types.Config) []v1.EnvVar {
+	uid := service.Owner
 	variables := []v1.EnvVar{
 		{
 			Name:  "MINIO_BUCKET",
@@ -152,15 +147,40 @@ func setMinIOEnvVars(service types.Service, providerId string, cfg *types.Config
 			Value: service.StorageProviders.MinIO[providerId].Endpoint,
 		},
 	}
-	if uid == cfg.Name {
-		credentials := []v1.EnvVar{
-			{
-				Name:  "AWS_ACCESS_KEY_ID",
-				Value: cfg.MinIOProvider.AccessKey,
-			},
+	if providerId != types.DefaultProvider {
+		credentials := []v1.EnvVar{{
+			Name:  "AWS_ACCESS_KEY_ID",
+			Value: service.StorageProviders.MinIO[providerId].AccessKey,
+		},
 			{
 				Name:  "AWS_SECRET_ACCESS_KEY",
-				Value: cfg.MinIOProvider.SecretKey,
+				Value: service.StorageProviders.MinIO[providerId].SecretKey,
+			},
+		}
+		variables = append(variables, credentials...)
+	} else if uid == "cluster_admin" {
+		credentials := []v1.EnvVar{
+			{
+				Name: "AWS_ACCESS_KEY_ID",
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "minio",
+						},
+						Key: "accessKey",
+					},
+				},
+			},
+			{
+				Name: "AWS_SECRET_ACCESS_KEY",
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "minio",
+						},
+						Key: "secretKey",
+					},
+				},
 			},
 		}
 		variables = append(variables, credentials...)
