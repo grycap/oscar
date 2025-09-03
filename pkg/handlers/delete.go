@@ -255,7 +255,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				AllowedUsers: service.AllowedUsers,
 				Owner:        service.Owner,
 			})
-			if err != nil {
+			if err != nil && !strings.Contains(err.Error(), "The specified bucket does not exist") {
 				return fmt.Errorf("error while removing MinIO bucket %v", err)
 			}
 		}

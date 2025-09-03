@@ -37,14 +37,36 @@ func TestMakeCreateHandler(t *testing.T) {
 
 	// Create a fake MinIO server
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
-
-		if hreq.URL.Path != "/test" && hreq.URL.Path != "/test/input/" && hreq.URL.Path != "/test/output/" && hreq.URL.Path != "/test/mount/" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") && !strings.HasPrefix(hreq.URL.Path, "/test-somelongui") {
+		fmt.Printf("Received request: %s %s\n", hreq.Method, hreq.URL.String())
+		if hreq.URL.Path != "/test" && hreq.URL.Path != "/test/" && hreq.URL.Path != "/test/input/" && hreq.URL.Path != "/test/output/" && hreq.URL.Path != "/test/mount/" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") && !strings.HasPrefix(hreq.URL.Path, "/test-somelongui") {
 			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
 		}
 
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
 			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+		} else if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/info-canned-policy") {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{
+				"Version": "2012-10-17",
+				"Statement": [
+					{
+						"Effect": "Allow",
+						"Action": [
+							"s3:*"
+						],
+						"Resource": [
+							"arn:aws:s3:::test/*",
+						]
+					}
+				]
+			}`))
+		} else if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/set-user-or-group-policy") {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"status":"success","binding":"done"}`))
+		} else if hreq.Method == http.MethodGet && strings.HasPrefix(hreq.URL.Path, "/test") && hreq.URL.RawQuery == "location=" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>`))
 		} else {
 			rw.WriteHeader(http.StatusOK)
 			rw.Write([]byte(`{"status": "success"}`))
