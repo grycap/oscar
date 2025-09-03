@@ -88,7 +88,7 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/mast
 
 OSCAR depends on [MinIO](https://min.io/) as a storage provider and function
 trigger. The easy way to run MinIO in a Kubernetes cluster is by installing
-its [helm chart](https://github.com/minio/charts). To  install the helm MinIO
+its [helm chart](https://github.com/minio/helm). To  install the helm MinIO
 repo and install the chart, run the following commands replacing
 `<MINIO_PASSWORD>` with a password. It must have at least 8 characters:
 
@@ -139,10 +139,10 @@ to deploy it in the kind cluster, first you must deploy the
 [Knative Operator](https://knative.dev/docs/install/operator/knative-with-operators/)
 
 ```
-kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.3.1/operator.yaml
+kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.18.0/operator.yaml
 ```
 
-*Note that the above command deploys the version `v1.3.1` of the Operator.
+*Note that the above command deploys the version `v1.18.0` of the Operator.
 You can check if there are new versions [here](https://github.com/knative/operator/releases).*
 
 Once the Operator has been successfully deployed, you can install the Knative
@@ -162,7 +162,7 @@ metadata:
   name: knative-serving
   namespace: knative-serving
 spec:
-  version: 1.3.0
+  version: 1.18.0
   ingress:
     kourier:
       enabled: true
