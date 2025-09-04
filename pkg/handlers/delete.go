@@ -240,6 +240,26 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			// TODO
 		}
 	}
+	// Delete mount bucket
+	if service.Mount.Provider != "" {
+		provID, provName = getProviderInfo(service.Mount.Provider)
+		if provName == types.MinIOName && provID == types.DefaultProvider {
+			mountPath := strings.Trim(service.Mount.Path, " /")
+			mountBucket := strings.SplitN(mountPath, "/", 2)[0]
+
+			s3Client = cfg.MinIOProvider.GetS3Client()
+
+			err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+				BucketPath:   mountBucket,
+				Visibility:   service.Visibility,
+				AllowedUsers: service.AllowedUsers,
+				Owner:        service.Owner,
+			})
+			if err != nil && !strings.Contains(err.Error(), "The specified bucket does not exist") {
+				return fmt.Errorf("error while removing MinIO bucket %v", err)
+			}
+		}
+	}
 
 	if strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser && len(service.BucketList) != 0 {
 		for _, bucket := range service.BucketList {

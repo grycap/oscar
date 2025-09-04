@@ -472,7 +472,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 
 	if service.Mount.Provider != "" {
 		provID, provName = getProviderInfo(service.Mount.Provider)
-		if provName == types.MinIOName {
+		if provName == types.MinIOName && provID == types.DefaultProvider {
 			// Check if the provider identifier is defined in StorageProviders
 			if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
 				return nil, fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
@@ -489,10 +489,32 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			} else {
 				s3Client = service.StorageProviders.S3[provID].GetS3Client()
 			}
-			// Create mount bucket
-			err := minIOAdminClient.CreateS3Path(s3Client, splitPath, true)
-			if err != nil {
-				return nil, err
+			// Check if the bucket exists
+			var found bool
+			for _, b := range minIOBuckets {
+				if b.BucketPath == splitPath[0] {
+					fmt.Println(b.BucketPath, splitPath[0])
+					found = true
+					break
+				}
+			}
+
+			if found {
+				err := minIOAdminClient.CreateS3Path(s3Client, splitPath, true)
+				if err != nil && !isUpdate {
+					return nil, err
+				}
+			} else {
+				// Create mount bucket
+				err := minIOAdminClient.CreateS3Path(s3Client, splitPath, false)
+				minIOBuckets = append(minIOBuckets, utils.MinIOBucket{
+					BucketPath:   splitPath[0],
+					AllowedUsers: service.AllowedUsers,
+					Visibility:   service.Visibility,
+					Owner:        service.Owner})
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
