@@ -55,7 +55,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
-			service.Owner = "cluster_admin"
+			service.Owner = types.DefaultOwner
 			createLogger.Printf("Creating service '%s' for user '%s'", service.Name, service.Owner)
 		}
 		if err := c.ShouldBindJSON(&service); err != nil {
@@ -227,7 +227,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				if strings.ToLower(service.Visibility) == "" {
 					b.Visibility = utils.PRIVATE
 				}
-				if service.Owner != "cluster_admin" {
+				if service.Owner != types.DefaultOwner {
 					err := minIOAdminClient.SetPolicies(b)
 					if err != nil {
 						c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))

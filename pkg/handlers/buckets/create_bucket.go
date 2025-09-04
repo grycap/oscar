@@ -97,9 +97,11 @@ func MakeCreateHandler(cfg *types.Config) gin.HandlerFunc {
 			bucket.Visibility = utils.PRIVATE
 		}
 
-		err := minIOAdminClient.SetPolicies(bucket)
-		if err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating policies for bucket: %v", err))
+		if uid != cfg.Name {
+			err := minIOAdminClient.SetPolicies(bucket)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating policies for bucket: %v", err))
+			}
 		}
 
 		createLogger.Printf("%s | %v | %s | %s | %s", "POST", 200, createPath, uid, bucket.BucketPath)
