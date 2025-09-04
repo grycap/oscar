@@ -294,17 +294,17 @@ func DeleteMinIOBuckets(s3Client *s3.S3, minIOAdminClient *utils.MinIOAdminClien
 	} else {
 		policyName = bucket.Owner
 	}
-	if bucket.Owner != "cluster_admin" {
+	if bucket.Owner != types.DefaultOwner {
 		err := minIOAdminClient.RemoveResource(bucket.BucketPath, policyName, isGroup)
 		if err != nil {
 			return fmt.Errorf("error removing resource")
 		}
-	}
 
-	if strings.ToLower(bucket.Visibility) == utils.RESTRICTED {
-		err := minIOAdminClient.RemoveGroupPolicy(bucket.BucketPath)
-		if err != nil {
-			return fmt.Errorf("error removing policy for group")
+		if strings.ToLower(bucket.Visibility) == utils.RESTRICTED {
+			err := minIOAdminClient.RemoveGroupPolicy(bucket.BucketPath)
+			if err != nil {
+				return fmt.Errorf("error removing policy for group")
+			}
 		}
 	}
 

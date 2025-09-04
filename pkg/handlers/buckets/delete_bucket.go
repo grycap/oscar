@@ -46,7 +46,7 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 		// Check owner
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
-			uid = cfg.Name
+			uid = types.DefaultOwner
 			deleteLogger.Printf("Deleting bucket '%s' for user '%s'", bucketName, uid)
 		} else {
 			var err error
@@ -60,7 +60,7 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 		s3Client := cfg.MinIOProvider.GetS3Client()
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 		v := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketPath: bucketName, Owner: uid})
-		if v == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucketName) {
+		if (uid == types.DefaultOwner) || (v == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucketName)) {
 			err := handlers.DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
 				BucketPath: bucketName,
 				Visibility: v,
