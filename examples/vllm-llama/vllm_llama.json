@@ -1,0 +1,48 @@
+{
+  "name": "vllm-gpu-llama",
+  "cluster_id": "",
+  "memory": "12Gi",
+  "cpu": "2.0",
+  "total_memory": "",
+  "total_cpu": "",
+  "enable_gpu": false,
+  "enable_sgx": false,
+  "image_prefetch": false,
+  "synchronous": {
+    "min_scale": 0,
+    "max_scale": 0
+  },
+  "delegation": "",
+  "rescheduler_threshold": 0,
+  "log_level": "INFO",
+  "image": "juanttito/vllm-llama:latest",
+  "alpine": false,
+  "script": "#!/bin/bash\npython3 -m vllm.entrypoints.openai.api_server --root-path $OPENAI_BASE_URL --model unsloth/Llama-3.2-1B-Instruct --max_model_len $MAX_MODEL_LEN --enforce-eager --gpu-memory-utilization $GPU_MEMORY_UTILIZATION \n",
+  "environment": {
+    "Variables": {
+      "API_KEY": "secretkey",
+      "GPU_MEMORY_UTILIZATION": "0.5",
+      "MAX_MODEL_LEN": "1000",
+      "OPENAI_BASE_URL": "/system/services/vllm-gpu-llama/exposed"
+    },
+    "secrets": {}
+  },
+  "annotations": {},
+        "vo": "vo.oscar-dev-prod.eu",
+        "labels": {
+            "applicationId": "vllm-gpu-llama",
+            "oscar_service": "vllm-gpu-llama",
+            "queue": "root.oscar-queue.vllm-gpu-llama",
+            "vo": "vo.oscar-dev-prod.eu"
+  },
+  "expose": {
+            "min_scale": 1,
+            "max_scale": 2,
+            "api_port": 8000,
+            "cpu_threshold": 90,
+            "rewrite_target": true,
+            "nodePort": 0,
+            "default_command": false,
+            "set_auth": false
+  }
+}
