@@ -323,7 +323,6 @@ func MakeStatusHandler(cfg *types.Config, kubeClientset kubernetes.Interface, me
 		}
 
 		//MinIO info
-		//creamos el adminClient
 		adminClient, err := utils.MakeMinIOAdminClient(cfg)
 		minioClient := adminClient.GetSimpleClient()
 		if err != nil {

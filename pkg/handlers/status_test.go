@@ -18,11 +18,15 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/v3/pkg/types"
+	apps "k8s.io/api/apps/v1"
+	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +38,20 @@ import (
 )
 
 func TestMakeStatusHandler(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		if hreq.URL.Path != "/input" && hreq.URL.Path != "/output" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
+			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
+		}
+		if hreq.URL.Path == "/minio/admin/v3/info" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+		} else {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"status": "success"}`))
+		}
+	}))
 	// Create a fake Kubernetes clientset
+	replicas := int32(1)
 	kubeClientset := fake.NewSimpleClientset(
 		&v1.NodeList{
 			Items: []v1.Node{
@@ -81,6 +98,61 @@ func TestMakeStatusHandler(t *testing.T) {
 				},
 			},
 		},
+		&apps.DeploymentList{
+			Items: []apps.Deployment{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "oscar",
+						Namespace:         "oscar",
+						CreationTimestamp: metav1.Now(),
+					},
+					Status: apps.DeploymentStatus{
+						Replicas:          1,
+						AvailableReplicas: 1,
+						ReadyReplicas:     1,
+					},
+					Spec: apps.DeploymentSpec{
+						Strategy: apps.DeploymentStrategy{
+							Type: apps.RollingUpdateDeploymentStrategyType,
+						},
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "oscar"},
+						},
+						Replicas: &replicas,
+					},
+				},
+			},
+		},
+		&batch.JobList{
+			Items: []batch.Job{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "oscar-job-1",
+						Namespace:         "oscar-svc",
+						CreationTimestamp: metav1.Now(),
+					},
+					Status: batch.JobStatus{
+						Succeeded: 1,
+						Active:    0,
+						Failed:    0,
+					},
+				},
+			},
+		},
+		&v1.PodList{
+			Items: []v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "oscar-pod-1",
+						Namespace:         "oscar-svc",
+						CreationTimestamp: metav1.Now(),
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodSucceeded,
+					},
+				},
+			},
+		},
 	)
 
 	// Create a fake Metrics clientset
@@ -106,10 +178,21 @@ func TestMakeStatusHandler(t *testing.T) {
 			},
 		}, nil
 	})
+	cfg := types.Config{
+		ServicesNamespace: "oscar-svc",
+		Namespace:         "oscar",
+		MinIOProvider: &types.MinIOProvider{
+			Region:    "us-east-1",
+			Endpoint:  server.URL,
+			AccessKey: "ak",
+			SecretKey: "sk",
+		},
+	}
+	}
 
 	// Create a new Gin router
 	router := gin.Default()
-	router.GET("/status", MakeStatusHandler(kubeClientset, metricsClientset.MetricsV1beta1()))
+	router.GET("/status", MakeStatusHandler(&cfg, kubeClientset, metricsClientset.MetricsV1beta1()))
 
 	// Create a new HTTP request
 	req, _ := http.NewRequest("GET", "/status", nil)
@@ -128,6 +211,7 @@ func TestMakeStatusHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to unmarshal response: %v", err)
 	}
+	fmt.Println(jsonResponse)
 
 	// Calculate expected values:
 	// worker-node: 4000 - 2000 = 2000 CPU free, 16GB - 8GB = 8GB memory free
