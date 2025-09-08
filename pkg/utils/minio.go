@@ -104,6 +104,11 @@ func getPolicyDefinition(actions []string, resource string) *Policy {
 	}
 }
 
+// GetSimpleClient devuelve *minio.Client para operaciones
+func (c *MinIOAdminClient) GetSimpleClient() *minio.Client {
+	return c.simpleClient
+}
+
 // MakeMinIOAdminClient creates a new MinIO Admin client to configure webhook notifications
 func MakeMinIOAdminClient(cfg *types.Config) (*MinIOAdminClient, error) {
 	// Parse minIO endpoint
