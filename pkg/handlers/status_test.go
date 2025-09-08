@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -39,7 +40,7 @@ import (
 
 func TestMakeStatusHandler(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
-		if hreq.URL.Path != "/input" && hreq.URL.Path != "/output" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
+		if hreq.URL.Path != "/" && hreq.URL.Path != "/output" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
 			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
 		}
 		if hreq.URL.Path == "/minio/admin/v3/info" {
@@ -187,7 +188,6 @@ func TestMakeStatusHandler(t *testing.T) {
 			AccessKey: "ak",
 			SecretKey: "sk",
 		},
-	}
 	}
 
 	// Create a new Gin router
