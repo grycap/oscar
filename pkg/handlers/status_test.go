@@ -18,7 +18,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -211,7 +210,6 @@ func TestMakeStatusHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to unmarshal response: %v", err)
 	}
-	fmt.Println(jsonResponse)
 
 	// Calculate expected values:
 	// worker-node: 4000 - 2000 = 2000 CPU free, 16GB - 8GB = 8GB memory free
