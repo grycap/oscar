@@ -160,7 +160,7 @@ func MakeStatusHandler(cfg *types.Config, kubeClientset kubernetes.Interface, me
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error getting metrics info: %v", err)})
 			return
 		}
-		getDeploymentInfo(kubeClientset, cfg, &clusterInfo)
+		err = getDeploymentInfo(kubeClientset, cfg, &clusterInfo)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error getting OSCAR deployment: %v", err)})
 			return
@@ -173,7 +173,7 @@ func MakeStatusHandler(cfg *types.Config, kubeClientset kubernetes.Interface, me
 				return
 			}
 
-			getMinioInfo(cfg, &clusterInfo)
+			err = getMinioInfo(cfg, &clusterInfo)
 			if err != nil {
 				log.Printf("Error creating MinIO admin client: %v", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating MinIO client"})
