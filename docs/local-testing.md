@@ -28,7 +28,7 @@ access them.
 >
 >Also, port 80 must be available to avoid errors during the deployment since OSCAR-Dashboard uses it. Check the [Frequently Asked Questions (FAQ)](faq.md) for more info.
 
-## Automated local testing
+## Automated local deployment
 
 To set up the enviroment for the platform testing you can run the following
 command. This script automatically executes all the necessary steps to deploy
@@ -38,7 +38,7 @@ the local cluster and the OSCAR platform along with all the required tools.
 curl -sSL http://go.oscar.grycap.net | bash
 ```
 
-## Steps for manual local testing
+## Steps for manual local deployment
 
 If you want to do it manualy you can follow the listed steps.
 
@@ -228,3 +228,8 @@ flag to disable verification of the self-signed certificates:
 ```sh
 oscar-cli cluster add oscar-cluster https://localhost oscar <OSCAR_PASSWORD> --disable-ssl
 ```
+
+
+## Testing the OSCAR cluster
+
+We suggest you follow the instructions for the [simple-test](https://github.com/grycap/oscar/tree/master/examples/simple-test) example.
