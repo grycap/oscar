@@ -171,16 +171,27 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), splitPath[0]); err != nil {
 			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 		}
+		// Check if the bucket is in the mount path
+		if !sameStorage(in, service.Mount) {
+			err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+				BucketPath:   splitPath[0],
+				Visibility:   service.Visibility,
+				AllowedUsers: service.AllowedUsers,
+				Owner:        service.Owner,
+			})
 
-		err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
-			BucketPath:   splitPath[0],
-			Visibility:   service.Visibility,
-			AllowedUsers: service.AllowedUsers,
-			Owner:        service.Owner,
-		})
-
-		if err != nil {
-			return fmt.Errorf("error while removing MinIO bucket %v", err)
+			if err != nil {
+				return fmt.Errorf("error while removing MinIO bucket %v", err)
+			}
+		} else {
+			// Bucket metadata for filtering
+			tags := map[string]string{
+				"owner":   service.Owner,
+				"service": "false",
+			}
+			if err := minIOAdminClient.SetTags(splitPath[0], tags); err != nil {
+				return fmt.Errorf("Error tagging bucket: %v", err)
+			}
 		}
 
 	}
@@ -224,43 +235,34 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), outBucket); err != nil {
 					log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 				}
-
-				err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
-					BucketPath:   outBucket,
-					Visibility:   service.Visibility,
-					AllowedUsers: service.AllowedUsers,
-					Owner:        service.Owner,
-				})
-				if err != nil {
-					return fmt.Errorf("error while removing MinIO bucket %v", err)
+				if !sameStorage(out, service.Mount) {
+					err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+						BucketPath:   outBucket,
+						Visibility:   service.Visibility,
+						AllowedUsers: service.AllowedUsers,
+						Owner:        service.Owner,
+					})
+					if err != nil {
+						return fmt.Errorf("error while removing MinIO bucket %v", err)
+					}
+				} else {
+					// Bucket metadata for filtering
+					tags := map[string]string{
+						"owner":   service.Owner,
+						"service": "false",
+					}
+					if err := minIOAdminClient.SetTags(outBucket, tags); err != nil {
+						return fmt.Errorf("Error tagging bucket: %v", err)
+					}
 				}
+
 			}
 
 		case types.OnedataName:
 			// TODO
 		}
 	}
-	// Delete mount bucket
-	if service.Mount.Provider != "" {
-		provID, provName = getProviderInfo(service.Mount.Provider)
-		if provName == types.MinIOName && provID == types.DefaultProvider {
-			mountPath := strings.Trim(service.Mount.Path, " /")
-			mountBucket := strings.SplitN(mountPath, "/", 2)[0]
-
-			s3Client = cfg.MinIOProvider.GetS3Client()
-
-			err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
-				BucketPath:   mountBucket,
-				Visibility:   service.Visibility,
-				AllowedUsers: service.AllowedUsers,
-				Owner:        service.Owner,
-			})
-			if err != nil && !strings.Contains(err.Error(), "The specified bucket does not exist") {
-				return fmt.Errorf("error while removing MinIO bucket %v", err)
-			}
-		}
-	}
-
+	// Delete isolated buckets
 	if strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser && len(service.BucketList) != 0 {
 		for _, bucket := range service.BucketList {
 
@@ -350,4 +352,17 @@ func disableInputNotifications(s3Client *s3.S3, arnStr string, bucket string) er
 	}
 
 	return nil
+}
+
+func sameStorage(firstStorage types.StorageIOConfig, secondStorage types.StorageIOConfig) bool {
+	// Check if the bucket is in the mount path
+	firstProvID, firstProvName := getProviderInfo(firstStorage.Provider)
+	secondProvID, secondProvName := getProviderInfo(secondStorage.Provider)
+	firstPath := strings.Trim(firstStorage.Path, " /")
+	secondPath := strings.Trim(secondStorage.Path, " /")
+	// Split buckets and folders from path
+	splitPathBucket := strings.SplitN(firstPath, "/", 2)
+	splitPathMount := strings.SplitN(secondPath, "/", 2)
+
+	return firstProvID == secondProvID && firstProvName == secondProvName && splitPathBucket[0] == splitPathMount[0]
 }
