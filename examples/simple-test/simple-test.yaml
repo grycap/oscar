@@ -1,0 +1,16 @@
+functions:
+  oscar:
+  - oscar-cluster:
+     name: simple-test
+     memory: 256Mi
+     cpu: '1.0'
+     image: ubuntu
+     script: script.sh
+     allowed_users: []
+     log_level: CRITICAL		
+     input:
+     - storage_provider: minio.default
+       path: simple-test/input
+     output:
+     - storage_provider: minio.default
+       path: simple-test/output
