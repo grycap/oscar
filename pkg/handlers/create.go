@@ -490,7 +490,6 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			if provName == types.MinIOName && provID == types.DefaultProvider {
 				s3Client = cfg.MinIOProvider.GetS3Client()
 			} else if provName == types.MinIOName {
-				//s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
 				return minIOBuckets, nil
 			} else {
 				s3Client = service.StorageProviders.S3[provID].GetS3Client()
