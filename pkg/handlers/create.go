@@ -110,7 +110,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					for _, vo := range cfg.OIDCGroups {
 						service.VO = vo
 						err := checkIdentity(&service, authHeader)
-						fmt.Println(vo)
 						if err != nil {
 							fmt.Println(err)
 							c.String(http.StatusBadRequest, fmt.Sprintln(err))
@@ -490,6 +489,9 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			// Use the appropriate client
 			if provName == types.MinIOName && provID == types.DefaultProvider {
 				s3Client = cfg.MinIOProvider.GetS3Client()
+			} else if provName == types.MinIOName {
+				//s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
+				return minIOBuckets, nil
 			} else {
 				s3Client = service.StorageProviders.S3[provID].GetS3Client()
 			}
