@@ -38,7 +38,7 @@ func TestMakeCreateHandler(t *testing.T) {
 	// Create a fake MinIO server
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
 		fmt.Printf("Received request: %s %s\n", hreq.Method, hreq.URL.String())
-		if hreq.URL.Path != "/test" && hreq.URL.Path != "/test/" && hreq.URL.Path != "/test/input/" && hreq.URL.Path != "/test/output/" && hreq.URL.Path != "/test/mount/" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") && !strings.HasPrefix(hreq.URL.Path, "/test-somelongui") {
+		if hreq.URL.Path != "/test" && hreq.URL.Path != "/" && hreq.URL.Path != "/test/" && hreq.URL.Path != "/test/input/" && hreq.URL.Path != "/test/output/" && hreq.URL.Path != "/test/mount/" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") && !strings.HasPrefix(hreq.URL.Path, "/test-somelongui") {
 			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
 		}
 
