@@ -577,9 +577,13 @@ func getIngressSpec(service types.Service, cfg *types.Config) *net.Ingress {
 		rewriteOption = pathofapi + "/$1"
 	}
 	annotation := map[string]string{
-		"nginx.ingress.kubernetes.io/rewrite-target": rewriteOption,
-		"spec.ingressClassName":                      "nginx",
-		"nginx.ingress.kubernetes.io/use-regex":      "true",
+		"nginx.ingress.kubernetes.io/rewrite-target":     rewriteOption,
+		"spec.ingressClassName":                          "nginx",
+		"nginx.ingress.kubernetes.io/use-regex":          "true",
+		"nginx.ingress.kubernetes.io/enable-cors":        "true",
+		"nginx.ingress.kubernetes.io/cors-allow-origin":  "https://dashboard.oscar.grycap.net,https://dashboard-devel.oscar.grycap.net,https://dashboard-demo.oscar.grycap.net,http://oscar.oscar.svc.cluster.local,http://host.docker.internal,http://localhost,http://localhost:5173",
+		"nginx.ingress.kubernetes.io/cors-allow-methods": "GET, PUT, POST, DELETE, PATCH",
+		"nginx.ingress.kubernetes.io/cors-allow-headers": "Authorization, Content-Type",
 	}
 	if service.Expose.SetAuth {
 		annotation["nginx.ingress.kubernetes.io/auth-type"] = "basic"
