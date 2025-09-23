@@ -262,7 +262,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		}
 
 		// Create job definition
-		ttl := int32(cfg.TTLJob)
+		ttl := int32(cfg.TTLJob) //nolint:gosec
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				// UUID used as a name for jobs
