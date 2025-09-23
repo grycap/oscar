@@ -251,9 +251,9 @@ var configVars = []configVar{
 	{"UsersAdmin", "USERS_ADMIN", false, stringSliceType, ""},
 	{"IngressHost", "INGRESS_HOST", false, stringType, ""},
 	{"SupervisorKitImage", "SUPERVISOR_KIT_IMAGE", false, stringType, ""},
-	{"IngressServicesCORSAllowedOrigins", "INGRESS_SERVICES_CORS_ALLOWED_ORIGINS", false, stringSliceType, "https://dashboard.oscar.grycap.net,https://dashboard-devel.oscar.grycap.net,https://dashboard-demo.oscar.grycap.net,http://oscar.oscar.svc.cluster.local,http://host.docker.internal,http://localhost,http://localhost:5173"},
-	{"IngressServicesCORSAllowedMethods", "INGRESS_SERVICES_CORS_ALLOWED_METHODS", false, stringSliceType, "GET, PUT, POST, DELETE, PATCH, HEAD"},
-	{"IngressServicesCORSAllowedHeaders", "INGRESS_SERVICES_CORS_ALLOWED_HEADERS", false, stringSliceType, "Authorization, Content-Type"},
+	{"IngressServicesCORSAllowedOrigins", "INGRESS_SERVICES_CORS_ALLOWED_ORIGINS", false, stringType, "https://dashboard.oscar.grycap.net,https://dashboard-devel.oscar.grycap.net,https://dashboard-demo.oscar.grycap.net,http://oscar.oscar.svc.cluster.local,http://host.docker.internal,http://localhost,http://localhost:5173"},
+	{"IngressServicesCORSAllowedMethods", "INGRESS_SERVICES_CORS_ALLOWED_METHODS", false, stringType, "GET, PUT, POST, DELETE, PATCH, HEAD"},
+	{"IngressServicesCORSAllowedHeaders", "INGRESS_SERVICES_CORS_ALLOWED_HEADERS", false, stringType, "Authorization, Content-Type"},
 	{"AdditionalConfigPath", "ADDITIONAL_CONFIG_PATH", false, stringType, "config.yaml"},
 }
 
