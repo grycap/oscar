@@ -34,41 +34,30 @@ import (
 
 // TODO Try using cookies to avoid excesive calls to the k8s API //
 
+type JobsResponse struct {
+	Jobs         map[string]*types.JobInfo `json:"jobs"`
+	NextPage     string                    `json:"next_page,omitempty"`
+	RemainingJob *int64                    `json:"remaining_jobs,omitempty"`
+}
+
 // MakeJobsInfoHandler makes a handler for listing all existing jobs from a service and show their JobInfo
-func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, namespace string) gin.HandlerFunc {
+func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		jobsInfo := make(map[string]*types.JobInfo)
 		// Get serviceName
 		serviceName := c.Param("serviceName")
+		page := c.DefaultQuery("page", "")
 		isOIDCAuthorised(c, back, serviceName)
 
 		// List jobs
 		listOpts := metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("%s=%s", types.ServiceLabel, serviceName),
-		}
-
-		jobs, err := kubeClientset.BatchV1().Jobs(namespace).List(context.TODO(), listOpts)
-		if err != nil {
-			// Check if error is caused because the service is not found
-			if errors.IsNotFound(err) || errors.IsGone(err) {
-				c.Status(http.StatusNotFound)
-			} else {
-				c.String(http.StatusInternalServerError, err.Error())
-			}
-			return
-		}
-
-		// Populate jobsInfo with keys (job names) and creation time
-		for _, job := range jobs.Items {
-			if job.Status.StartTime != nil {
-				jobsInfo[job.Name] = &types.JobInfo{
-					CreationTime: job.Status.StartTime,
-				}
-			}
+			Limit:         int64(cfg.JobListingLimit),
+			Continue:      page,
 		}
 
 		// List jobs' pods
-		pods, err := kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), listOpts)
+		pods, err := kubeClientset.CoreV1().Pods(cfg.ServicesNamespace).List(context.TODO(), listOpts)
 		if err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {
@@ -82,16 +71,9 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.
 		// Populate jobsInfo with status, start and finish times (from pods)
 		for _, pod := range pods.Items {
 			if jobName, ok := pod.Labels["job-name"]; ok {
-				// JobInfo details the current status of a service's job
-				var creationtime *metav1.Time
-				if jobsInfo[jobName] != nil && jobsInfo[jobName].CreationTime != nil {
-					creationtime = jobsInfo[jobName].CreationTime
-				} else {
-					creationtime = pod.Status.StartTime
-				}
 				jobsInfo[jobName] = &types.JobInfo{
 					Status:       string(pod.Status.Phase),
-					CreationTime: creationtime,
+					CreationTime: pod.Status.StartTime,
 				}
 				// Loop through job.Status.ContainerStatuses to find oscar-container
 				for _, contStatus := range pod.Status.ContainerStatuses {
@@ -106,14 +88,19 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.
 				}
 			}
 		}
+		jr := JobsResponse{
+			Jobs:         jobsInfo,
+			NextPage:     pods.ListMeta.Continue,
+			RemainingJob: pods.ListMeta.RemainingItemCount,
+		}
 
-		c.JSON(http.StatusOK, jobsInfo)
+		c.JSON(http.StatusOK, jr)
 	}
 }
 
 // MakeDeleteJobsHandler makes a handler for deleting all jobs created by the provided service.
 // If 'all' querystring is set to 'true' pending, running and failed jobs will also be deleted
-func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, namespace string) gin.HandlerFunc {
+func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get serviceName and jobName
 		serviceName := c.Param("serviceName")
@@ -141,7 +128,7 @@ func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset kubernete
 			PropagationPolicy: &background,
 		}
 
-		err = kubeClientset.BatchV1().Jobs(namespace).DeleteCollection(context.TODO(), delOpts, listOpts)
+		err = kubeClientset.BatchV1().Jobs(cfg.ServicesNamespace).DeleteCollection(context.TODO(), delOpts, listOpts)
 		if err != nil {
 			// Check if error is caused because the service is not found
 			if !errors.IsNotFound(err) && !errors.IsGone(err) {
@@ -157,7 +144,7 @@ func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset kubernete
 }
 
 // MakeGetLogsHandler makes a handler for getting logs from the 'oscar-container' inside the pod created by the specified job
-func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, namespace string) gin.HandlerFunc {
+func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get serviceName and jobName
 		serviceName := c.Param("serviceName")
@@ -173,7 +160,7 @@ func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset kubernetes.I
 		listOpts := metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("%s=%s,job-name=%s", types.ServiceLabel, serviceName, jobName),
 		}
-		pods, err := kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), listOpts)
+		pods, err := kubeClientset.CoreV1().Pods(cfg.ServicesNamespace).List(context.TODO(), listOpts)
 		if err != nil || len(pods.Items) < 1 {
 			// Check if error is caused because the service is not found
 			if !errors.IsNotFound(err) && !errors.IsGone(err) {
@@ -189,7 +176,7 @@ func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset kubernetes.I
 			Timestamps: timestamps,
 			Container:  types.ContainerName,
 		}
-		req := kubeClientset.CoreV1().Pods(namespace).GetLogs(pods.Items[0].Name, podLogOpts)
+		req := kubeClientset.CoreV1().Pods(cfg.ServicesNamespace).GetLogs(pods.Items[0].Name, podLogOpts)
 		result := req.Do(context.TODO())
 
 		// Check result status code
@@ -210,7 +197,7 @@ func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset kubernetes.I
 }
 
 // MakeDeleteJobHandler makes a handler for removing a job
-func MakeDeleteJobHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, namespace string) gin.HandlerFunc {
+func MakeDeleteJobHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get serviceName and jobName
 		serviceName := c.Param("serviceName")
@@ -218,7 +205,7 @@ func MakeDeleteJobHandler(back types.ServerlessBackend, kubeClientset kubernetes
 		jobName := c.Param("jobName")
 
 		// Get job in order to check if it is associated with the provided serviceName
-		job, err := kubeClientset.BatchV1().Jobs(namespace).Get(context.TODO(), jobName, metav1.GetOptions{})
+		job, err := kubeClientset.BatchV1().Jobs(cfg.ServicesNamespace).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if err != nil {
 			// Check if error is caused because the service is not found
 			if !errors.IsNotFound(err) && !errors.IsGone(err) {
@@ -242,7 +229,7 @@ func MakeDeleteJobHandler(back types.ServerlessBackend, kubeClientset kubernetes
 		}
 
 		// Delete the job
-		err = kubeClientset.BatchV1().Jobs(namespace).Delete(context.TODO(), jobName, delOpts)
+		err = kubeClientset.BatchV1().Jobs(cfg.ServicesNamespace).Delete(context.TODO(), jobName, delOpts)
 		if err != nil {
 			// Check if error is caused because the service is not found
 			if !errors.IsNotFound(err) && !errors.IsGone(err) {
