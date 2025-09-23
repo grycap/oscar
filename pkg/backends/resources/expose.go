@@ -581,9 +581,9 @@ func getIngressSpec(service types.Service, cfg *types.Config) *net.Ingress {
 		"spec.ingressClassName":                          "nginx",
 		"nginx.ingress.kubernetes.io/use-regex":          "true",
 		"nginx.ingress.kubernetes.io/enable-cors":        "true",
-		"nginx.ingress.kubernetes.io/cors-allow-origin":  "https://dashboard.oscar.grycap.net,https://dashboard-devel.oscar.grycap.net,https://dashboard-demo.oscar.grycap.net,http://oscar.oscar.svc.cluster.local,http://host.docker.internal,http://localhost,http://localhost:5173",
-		"nginx.ingress.kubernetes.io/cors-allow-methods": "GET, PUT, POST, DELETE, PATCH, HEAD",
-		"nginx.ingress.kubernetes.io/cors-allow-headers": "Authorization, Content-Type",
+		"nginx.ingress.kubernetes.io/cors-allow-origin":  cfg.IngressServicesCORSAllowedOrigins,
+		"nginx.ingress.kubernetes.io/cors-allow-methods": cfg.IngressServicesCORSAllowedMethods,
+		"nginx.ingress.kubernetes.io/cors-allow-headers": cfg.IngressServicesCORSAllowedHeaders,
 	}
 	if service.Expose.SetAuth {
 		annotation["nginx.ingress.kubernetes.io/auth-type"] = "basic"
