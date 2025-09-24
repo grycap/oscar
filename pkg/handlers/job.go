@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -263,12 +262,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		}
 
 		// Create job definition
-		var ttl int32
-		if cfg.TTLJob < 0 || cfg.TTLJob > math.MaxInt32 {
-			ttl = 2592000
-		} else {
-			ttl = int32(cfg.TTLJob) //nolint:gosec
-		}
+		ttl := int32(cfg.TTLJob) // #nosec
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				// UUID used as a name for jobs
