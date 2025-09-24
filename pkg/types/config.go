@@ -204,6 +204,12 @@ type Config struct {
 
 	//Path to additional OSCAR configuration setted by users
 	AdditionalConfigPath string `json:"-"`
+
+	//Time to Life of job SecondsAfterFinished
+	TTLJob int `json:"-"`
+
+	//Job listing limit
+	JobListingLimit int `json:"-"`
 }
 
 var configVars = []configVar{
@@ -255,6 +261,8 @@ var configVars = []configVar{
 	{"IngressServicesCORSAllowedMethods", "INGRESS_SERVICES_CORS_ALLOWED_METHODS", false, stringType, "GET, PUT, POST, DELETE, PATCH, HEAD"},
 	{"IngressServicesCORSAllowedHeaders", "INGRESS_SERVICES_CORS_ALLOWED_HEADERS", false, stringType, "Authorization, Content-Type"},
 	{"AdditionalConfigPath", "ADDITIONAL_CONFIG_PATH", false, stringType, "config.yaml"},
+	{"TTLJob", "TTL_JOB", false, intType, "2592000"},
+	{"JobListingLimit", "JOB_LISTING_LIMIT", false, intType, "70"},
 }
 
 func readConfigVar(cfgVar configVar) (string, error) {
