@@ -4,7 +4,7 @@ functions:
       name: vllm-gpu-llama
       cpu: '2.0'
       memory: 10Gi
-      image: juanttito/vllm-llama:latest
+      image: ghcr.io/grycap/vllm-llama
       script: script.sh
       environment:
         Variables:
@@ -14,8 +14,9 @@ functions:
           MAX_MODEL_LEN: "1000" 
       expose:
         min_scale: 1
-        max_scale: 2
+        max_scale: 1
         api_port: 8000
         cpu_threshold: 90
         rewrite_target: true
+
 
