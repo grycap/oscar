@@ -57,6 +57,7 @@ type PodCounter struct {
 
 var pc PodCounter
 var stopper chan struct{}
+var watchPodsFunc = watchPods
 
 // Create daemonset
 func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kubernetes.Interface) error {
@@ -81,7 +82,7 @@ func CreateDaemonset(cfg *types.Config, service types.Service, kubeClientset kub
 	}
 
 	//Set watcher informer
-	watchPods(kubeClientset, cfg)
+	watchPodsFunc(kubeClientset, cfg)
 
 	return nil
 }
