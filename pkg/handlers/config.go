@@ -26,6 +26,11 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 )
 
+var (
+	getUIDFromContextFn                = auth.GetUIDFromContext
+	getMultitenancyConfigFromContextFn = auth.GetMultitenancyConfigFromContext
+)
+
 type configForUser struct {
 	Cfg           *types.Config        `json:"config"`
 	MinIOProvider *types.MinIOProvider `json:"minio_provider"`
@@ -44,12 +49,12 @@ func MakeConfigHandler(cfg *types.Config) gin.HandlerFunc {
 
 			// Get MinIO credentials from k8s secret for user
 
-			uid, err := auth.GetUIDFromContext(c)
+			uid, err := getUIDFromContextFn(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
-			mc, err := auth.GetMultitenancyConfigFromContext(c)
+			mc, err := getMultitenancyConfigFromContextFn(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
