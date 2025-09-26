@@ -13,7 +13,11 @@ func SkipIfCannotListen(t *testing.T) {
 		t.Skipf("skipping test: cannot open local listener: %v", err)
 		return
 	}
+<<<<<<< HEAD
 	if err := listener.Close(); err != nil {
 		t.Fatalf("failed to close listener: %v", err)
 	}
+=======
+	listener.Close()
+>>>>>>> 7a6c4de (Bump test coverage)
 }
