@@ -13,5 +13,7 @@ func SkipIfCannotListen(t *testing.T) {
 		t.Skipf("skipping test: cannot open local listener: %v", err)
 		return
 	}
-	listener.Close()
+	if err := listener.Close(); err != nil {
+		t.Fatalf("failed to close listener: %v", err)
+	}
 }
