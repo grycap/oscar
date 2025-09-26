@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/v3/pkg/testsupport"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	apps "k8s.io/api/apps/v1"
@@ -250,6 +251,8 @@ func checkResult(jsonResponse map[string]interface{}, t *testing.T, isAdmin bool
 }
 
 func TestMakeStatusHandler(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
 		if hreq.URL.Path != "/" && hreq.URL.Path != "/output" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
 			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)

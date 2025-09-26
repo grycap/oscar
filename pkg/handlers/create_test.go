@@ -26,12 +26,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/backends"
+	"github.com/grycap/oscar/v3/pkg/testsupport"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
 
 func TestMakeCreateHandler(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
 	back := backends.MakeFakeBackend()
 	kubeClientset := testclient.NewSimpleClientset()
 
@@ -161,4 +165,88 @@ func TestMakeCreateHandler(t *testing.T) {
 
 	// Close the fake MinIO server
 	defer server.Close()
+}
+
+func TestCheckValuesDefaults(t *testing.T) {
+	cfg := types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint: "http://minio:9000",
+			Region:   "us-east-1",
+			Verify:   false,
+		},
+	}
+
+	service := types.Service{
+		Name:        "demo",
+		LogLevel:    "invalid",
+		Labels:      nil,
+		Annotations: map[string]string{},
+	}
+
+	checkValues(&service, &cfg)
+
+	if service.Memory != defaultMemory {
+		t.Fatalf("expected default memory %s, got %s", defaultMemory, service.Memory)
+	}
+	if service.CPU != defaultCPU {
+		t.Fatalf("expected default cpu %s, got %s", defaultCPU, service.CPU)
+	}
+	if service.Visibility != utils.PRIVATE {
+		t.Fatalf("expected visibility %s, got %s", utils.PRIVATE, service.Visibility)
+	}
+	if service.LogLevel != defaultLogLevel {
+		t.Fatalf("expected log level %s, got %s", defaultLogLevel, service.LogLevel)
+	}
+	if service.Labels[types.ServiceLabel] != service.Name {
+		t.Fatalf("expected service label to be set for %s", service.Name)
+	}
+	if service.StorageProviders == nil || service.StorageProviders.MinIO == nil {
+		t.Fatalf("expected default MinIO provider to be created")
+	}
+	if service.StorageProviders.MinIO[types.DefaultProvider].AccessKey != "hidden" {
+		t.Fatalf("expected hidden credentials to be used")
+	}
+	if service.Token == "" {
+		t.Fatalf("expected token to be generated")
+	}
+}
+
+func TestGetProviderInfo(t *testing.T) {
+	provID, provName := getProviderInfo("minio.custom")
+	if provName != types.MinIOName || provID != "custom" {
+		t.Fatalf("unexpected provider info: %s %s", provName, provID)
+	}
+
+	provID, provName = getProviderInfo("rucio")
+	if provName != types.RucioName || provID != types.DefaultProvider {
+		t.Fatalf("expected default provider id, got %s %s", provName, provID)
+	}
+}
+
+func TestIsStorageProviderDefined(t *testing.T) {
+	providers := &types.StorageProviders{
+		MinIO:   map[string]*types.MinIOProvider{"custom": {}},
+		S3:      map[string]*types.S3Provider{"s3": {}},
+		Onedata: map[string]*types.OnedataProvider{"op": {}},
+		WebDav:  map[string]*types.WebDavProvider{"wd": {}},
+		Rucio:   map[string]*types.Rucio{"ru": {}},
+	}
+	tests := []struct {
+		name     string
+		id       string
+		expected bool
+	}{
+		{types.MinIOName, "custom", true},
+		{types.S3Name, "s3", true},
+		{types.OnedataName, "op", true},
+		{types.WebDavName, "wd", true},
+		{types.RucioName, "ru", true},
+		{types.MinIOName, "missing", false},
+	}
+
+	for _, tt := range tests {
+		if isStorageProviderDefined(tt.name, tt.id, providers) != tt.expected {
+			t.Fatalf("unexpected result for %s.%s", tt.name, tt.id)
+		}
+	}
 }
