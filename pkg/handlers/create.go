@@ -110,11 +110,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					for _, vo := range cfg.OIDCGroups {
 						service.VO = vo
 						err := checkIdentity(&service, authHeader)
-						if err != nil {
-							fmt.Println(err)
-							c.String(http.StatusBadRequest, fmt.Sprintln(err))
-							//return
-						} else {
+						if err == nil {
 							notFound = false
 							break
 						}
