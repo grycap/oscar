@@ -19,7 +19,6 @@ package imagepuller
 import (
 	"testing"
 
-	"bou.ke/monkey"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -37,8 +36,9 @@ func TestCreateDaemonset(t *testing.T) {
 	kubeClientset := fake.NewSimpleClientset()
 
 	// Patch the watchPods function to return a mock result
-	monkey.Patch(watchPods, func(kubernetes.Interface, *types.Config) {
-	})
+	origWatchPods := watchPodsFunc
+	watchPodsFunc = func(kubernetes.Interface, *types.Config) {}
+	t.Cleanup(func() { watchPodsFunc = origWatchPods })
 
 	err := CreateDaemonset(cfg, service, kubeClientset)
 	if err != nil {
@@ -70,5 +70,4 @@ func TestCreateDaemonset(t *testing.T) {
 		t.Errorf("expected container image to be '%s', got %s", service.Image, daemonset.Spec.Template.Spec.Containers[0].Image)
 	}
 
-	defer monkey.Unpatch(watchPods)
 }
