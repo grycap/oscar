@@ -34,12 +34,6 @@ import (
 
 // TODO Try using cookies to avoid excesive calls to the k8s API //
 
-type JobsResponse struct {
-	Jobs         map[string]*types.JobInfo `json:"jobs"`
-	NextPage     string                    `json:"next_page,omitempty"`
-	RemainingJob *int64                    `json:"remaining_jobs,omitempty"`
-}
-
 // MakeJobsInfoHandler makes a handler for listing all existing jobs from a service and show their JobInfo
 func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -88,7 +82,7 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.
 				}
 			}
 		}
-		jr := JobsResponse{
+		jr := types.JobsResponse{
 			Jobs:         jobsInfo,
 			NextPage:     pods.ListMeta.Continue,
 			RemainingJob: pods.ListMeta.RemainingItemCount,
