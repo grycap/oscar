@@ -130,6 +130,73 @@ using the [NFS server provisioner](https://github.com/kubernetes-sigs/nfs-ganesh
 with kind due to its default configuration of kernel-limit file descriptors.
 To workaround it, please run `sudo sysctl -w fs.nr_open=1048576`.*
 
+### Deploy Metrics server
+
+It's required to install Metrics server in order to avoid seeing an error on the OSCAR `/status` endpoint. Also we patch it disabling certificate verification in order to use self-signed certificates.
+
+```sh
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+kubectl -n kube-system patch deployment metrics-server --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
+```
+
+> Note that the local testing environment uses Kind, therefore the metrics will not work as expected.
+
+## Configure RBAC permissions
+
+Once we have deployed Metrics server we must configure RBAC permissions for OSCAR in order to allow it to interact with Metrics server.
+
+> Note that without the permissions the `/status` will show us an error.
+
+```sh
+cat <<EOF | kubectl apply -f -
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: oscar-cluster-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  - pods
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: oscar-cluster-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: oscar-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: oscar-sa
+  namespace: oscar
+EOF
+```
+
 ### Deploy Knative Serving as Serverless Backend (OPTIONAL)
 
 OSCAR supports [Knative Serving](https://knative.dev/docs/serving/) as
@@ -233,3 +300,9 @@ oscar-cli cluster add oscar-cluster https://localhost oscar <OSCAR_PASSWORD> --d
 ## Testing the OSCAR cluster
 
 We suggest you follow the instructions for the [simple-test](https://github.com/grycap/oscar/tree/master/examples/simple-test) example.
+
+## Limitations
+
+Please note that the local deployment has several limitations in terms of functionality, which includes:
+
+- Inaccurate information obtained via `/status`
