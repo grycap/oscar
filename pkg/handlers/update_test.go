@@ -9,12 +9,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/backends"
+	"github.com/grycap/oscar/v3/pkg/testsupport"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
 
 func TestMakeUpdateHandler(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
 	back := backends.MakeFakeBackend()
 	kubeClientset := testclient.NewSimpleClientset()
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
