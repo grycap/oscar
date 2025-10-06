@@ -49,26 +49,31 @@ To develop the examples you must have a service deployed (`COWSAY`).Go to the [`
 
 In the [`OSCAR dashboard`](https://dashboard.oscar.grycap.net/), go to *Notebooks* (Sidebar panel)  and then click *New*. 
 ![juno-deployed.png](images/integrations/juno-deployed.png)
-
-Enter the Jupyter Notebook instance configuration values. 
-![juno-dashboard.png](images/integrations/juno-dashboard.png)
-
+</br>
+</br>
+Enter the Jupyter Notebook instance configuration values.
+</br>![juno-dashboard.png](images/integrations/juno-dashboard.png)
+</br>
+</br>
 After deploying Jupyter Notebook we need to navigate to its user interface.
 ![juno-dashboard-visit.png](images/integrations/juno-dashboard-visit.png)
-
-```
-ℹ️
-If you get an nginx error, you need to wait a little bit for the service to run.
-```
+</br>
+</br>
+`
+ℹ️ If you get an nginx error, you need to wait a little bit for the service to run.
+`
 ![juno-error.png](images/integrations/juno-error.png)
-
+</br>
+</br>
 This is the Jupyter Notebook working interface.
 ![juno-page.png](images/integrations/juno-page.png)
-
+</br>
+</br>
 
 **Create a notebook in Jupyter**
 
 Create a new notebook.
+
 ![juno-file.png](images/integrations/juno-file.png)
 
 To interact with OSCAR from a Jupyter Notebook, we will use the [`OSCAR Python client`](https://github.com/grycap/oscar_python) library.

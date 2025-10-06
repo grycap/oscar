@@ -48,17 +48,18 @@ echo "Prediction was saved in: $OUTPUT_FILE"
     ![node-red-deployed.png](images/integrations/node-red-deployed.png) 
 
 1. Enter the **admin** password and select or create a Bucket.
+   
     ![node-red-dashboard.png](images/integrations/node-red-dashboard.png)
 
 1. After deploying Node-RED we need to navigate to its user interface.
     ![node-red-dashboard-visit.png](images/integrations/node-red-dashboard-visit.png)
 
-```
-    ℹ️
-    If you get an nginx error, you need to wait a little bit for the service to run.
-```
+`
+ℹ️ If you get an nginx error, you need to wait a little bit for the service to run.
+`
 ![node-red-error.png](images/integrations/node-red-error.png)
-
+</br>
+</br>
 Log in with your credentials (the user is always **admin**).
 
 ![node-red-login.png](images/integrations/node-red-login.png)
