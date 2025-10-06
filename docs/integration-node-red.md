@@ -14,7 +14,7 @@ This tutorial demonstrates a simple workflow that calls the YOLOv8 synchronous s
 
 ### Steps
 
-#### Deploy YOLOv8
+**Deploy YOLOv8**
 
 Go to [`OSCAR Dashboard`](https://dashboard.oscar.grycap.net/) and select `Create service -> FDL`. Use the following configuration:
 
@@ -42,7 +42,7 @@ deepaas-cli --deepaas_method_output="$OUTPUT_FILE" predict --files "$RENAMED_FIL
 echo "Prediction was saved in: $OUTPUT_FILE"
 ```
 
-#### Deploy Node-RED
+**Deploy Node-RED instance**
 
 1. In the [`OSCAR dashboard`](https://dashboard.oscar.grycap.net/), go to `Flows` (Sidebar panel)  and then click `New`. 
     ![node-red-deployed.png](images/integrations/node-red-deployed.png) 
@@ -53,17 +53,18 @@ echo "Prediction was saved in: $OUTPUT_FILE"
 1. After deploying Node-RED we need to navigate to its user interface.
     ![node-red-dashboard-visit.png](images/integrations/node-red-dashboard-visit.png)
 
-    ```
+```
     ℹ️
     If you get an nginx error, you need to wait a little bit for the service to run.
-    ```
-    ![node-red-error.png](images/integrations/node-red-error.png)
+```
+![node-red-error.png](images/integrations/node-red-error.png)
 
-1. Log in with your credentials (the user is always **admin**).
-    ![node-red-login.png](images/integrations/node-red-login.png)
+Log in with your credentials (the user is always **admin**).
+
+![node-red-login.png](images/integrations/node-red-login.png)
     
 
-#### Create a workflow in Node-RED
+**Create a workflow in Node-RED**
 
 Now we will create a workflow that will fetch an image from internet, make a request to Yolo8 service and visualize the result.
 
@@ -97,17 +98,20 @@ To configure the `OSCAR YOLO8` node (double-click it):
 
 ![node-red-node-oscar-yolo.png](images/integrations/node-red-node-oscar-yolo.png)
 
-`ℹ️ If you want to download this example and others, visit the `[`AI4Compose`](https://github.com/ai4os/ai4-compose/tree/main)` repository.`
+
+ℹ️ 
+If you want to download this example and others, visit the [`AI4Compose`](https://github.com/ai4os/ai4-compose/tree/main) repository.
+
     
-#### Test the workflow
+**Test the workflow**
 
 After configuring your workflow, test it in the Node-RED Editor:
 
-1. Click *Deploy* (top right corner)
-1. Click the *inject* node
+Click *Deploy* (top right corner)
+Click the *inject* node
 
-    ![node-red-workflow-run.png](images/integrations/node-red-workflow-run.png)
+![node-red-workflow-run.png](images/integrations/node-red-workflow-run.png)
 
-1. You should see the result.
+You should see the result.
 
-    ![node-red-workflow-result.png](images/integrations/node-red-workflow-result.png)
+![node-red-workflow-result.png](images/integrations/node-red-workflow-result.png)
