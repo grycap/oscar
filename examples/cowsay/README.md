@@ -13,19 +13,18 @@
 ```
 
 This example shows the basic functionality to invoke OSCAR services
-synchronously. The idea is to rely on a Serverless backend like OpenFaaS to
-manage the HTTP requests. For this, OSCAR implements an HTTP proxy that
-redirects invocations to the Serverless backend gateway, which internally is
-in charge of managing the "function" pods.
+synchronously. The idea is to rely on a Knative serverless backend to manage
+the HTTP requests. For this, OSCAR implements an HTTP proxy that redirects
+invocations to the Knative service, which internally is in charge of managing
+the "function" pods.
 
 ![oscar-sync.png](../../docs/images/oscar-sync.png)
 
 ## Deployment
 
 Deployment of synchronous services doesn't differ from asynchronous ones, the
-only requirement is that a Serverless backend must be deployed and configured
-in the cluster (currently only [OpenFaaS](https://github.com/openfaas/faas) is
-supported). Then, the `/run/<SERVICE_NAME>` path will be available within the
+only requirement is that the Knative serverless backend must be deployed and
+configured in the cluster. Then, the `/run/<SERVICE_NAME>` path will be available within the
 [OSCAR's API](https://grycap.github.io/oscar/api/).
 
 To deploy this service through

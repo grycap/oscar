@@ -4,12 +4,6 @@ Synchronous invocations allow obtaining the execution output as the response
 to the HTTP call to the `/run/<SERVICE_NAME>` path of the [OSCAR API](api.md). For this, OSCAR delegates
 the execution to a serverless back-end (e.g. [Knative](https://knative.dev)) which uses an auto-scaled set of pods to process the requests.
 
-> ℹ️
->
-> You may find references in the documentation or examples to [OpenFaaS](https://openfaas.com), which was used in older versions of OSCAR. 
-> Recent versions of OSCAR use Knative as the serverless back-end for synchronous invocations, which provides several benefits such as scale-to-zero or load-balanced auto-scaled set of pods.
-
-
 ![oscar-sync.png](images/oscar-sync.png)
 
 Synchronous invocations can be made through [OSCAR CLI](oscar-cli.md), using the command
@@ -120,4 +114,3 @@ interface.
 Although the use of the Knative Serverless Backend for synchronous invocations provides elasticity similar to the one provided by their counterparts in public clouds, such as AWS Lambda, synchronous invocations are not still the best option for run long-running resource-demanding applications, like deep learning inference or video processing. 
 
 The synchronous invocation of long-running resource-demanding applications may lead to timeouts on Knative pods. Therefore, we consider asynchronous invocations (which generate Kubernetes jobs) as the optimal approach to handle event-driven file processing.
-

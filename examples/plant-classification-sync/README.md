@@ -4,7 +4,7 @@ This example uses the pre-trained classification model by DEEP-Hybrid-DataCloud
 [Plants species classifier](https://marketplace.deep-hybrid-datacloud.eu/modules/deep-oc-plants-classification-tf.html)
 and is prepared to be used with synchronous invocations.
 
-**Note: To use this example, you must enable a ServerlessBackend (Knative or OpenFaaS).**
+**Note: To use this example, you must enable the Knative serverless backend.**
 
 In order to invoke the function, first you have to do is create a service,
 either by the OSCAR UI or by using the FLD within the following command.
