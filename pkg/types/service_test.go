@@ -28,12 +28,13 @@ import (
 
 var (
 	testService Service = Service{
-		Name:      "testname",
-		ClusterID: "testcluster",
-		Image:     "testimage",
-		Alpine:    false,
-		Memory:    "1Gi",
-		CPU:       "1.0",
+		Name:           "testname",
+		ClusterID:      "testcluster",
+		Image:          "testimage",
+		Alpine:         false,
+		PropagateToken: false,
+		Memory:         "1Gi",
+		CPU:            "1.0",
 		Replicas: []Replica{
 			{
 				Type:        "oscar",
@@ -238,6 +239,7 @@ rescheduler_threshold: 0
 log_level: ""
 image: testimage
 alpine: false
+propagate_token: false
 token: ""
 file_stage_in: false
 input: []
@@ -404,4 +406,56 @@ func checkEnvVars(cfg *Config, podSpec *v1.PodSpec) error {
 	}
 
 	return nil
+}
+
+func TestPropagateTokenEnvVar(t *testing.T) {
+	copy, err := deepcopy.Anything(testService)
+	if err != nil {
+		t.Fatalf("unable to deep copy the testService: %v", err)
+	}
+	svc := copy.(Service)
+	svc.PropagateToken = true
+	expectedToken := "test-token"
+	svc.Token = expectedToken
+
+	podSpec, err := svc.ToPodSpec(&testConfig)
+	if err != nil {
+		t.Fatalf("unexpected error generating pod spec: %v", err)
+	}
+
+	var found bool
+	for _, envVar := range podSpec.Containers[0].Env {
+		if envVar.Name == AccessTokenEnvVar {
+			found = true
+			if envVar.Value != expectedToken {
+				t.Fatalf("access token env var has wrong value. Expected %s, got %s", expectedToken, envVar.Value)
+			}
+			break
+		}
+	}
+
+	if !found {
+		t.Fatal("expected ACCESS_TOKEN environment variable to be present when propagate_token is true")
+	}
+}
+
+func TestPropagateTokenEnvVarDisabled(t *testing.T) {
+	copy, err := deepcopy.Anything(testService)
+	if err != nil {
+		t.Fatalf("unable to deep copy the testService: %v", err)
+	}
+	svc := copy.(Service)
+	svc.PropagateToken = false
+	svc.Token = "test-token"
+
+	podSpec, err := svc.ToPodSpec(&testConfig)
+	if err != nil {
+		t.Fatalf("unexpected error generating pod spec: %v", err)
+	}
+
+	for _, envVar := range podSpec.Containers[0].Env {
+		if envVar.Name == AccessTokenEnvVar {
+			t.Fatal("did not expect ACCESS_TOKEN environment variable when propagate_token is false")
+		}
+	}
 }
