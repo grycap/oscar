@@ -101,6 +101,7 @@ func main() {
 	system.GET("/buckets", buckets.MakeListHandler(cfg))
 	system.PUT("/buckets", buckets.MakeUpdateHandler(cfg))
 	system.DELETE("/buckets/:bucket", buckets.MakeDeleteHandler(cfg))
+	system.POST("/buckets/:bucket/presign", buckets.MakePresignHandler(cfg))
 
 	// Logs paths
 	system.GET("/logs/:serviceName", handlers.MakeJobsInfoHandler(back, kubeClientset, cfg))
