@@ -30,6 +30,9 @@ const (
 	minioCommand         = `mkdir -p $MNT_POINT/$MINIO_BUCKET
 rclone config create minio s3  provider=Minio access_key_id=$AWS_ACCESS_KEY_ID secret_access_key=$AWS_SECRET_ACCESS_KEY endpoint=$MINIO_ENDPOINT acl=public-read-write
 rclone mount minio:/$MINIO_BUCKET $MNT_POINT/$MINIO_BUCKET `
+	s3Command = `mkdir -p $MNT_POINT/$S3_BUCKET
+rclone config create s3 s3   endpoint=https://s3.amazonaws.com  provider=AWS access_key_id=$AWS_ACCESS_KEY_ID secret_access_key=$AWS_SECRET_ACCESS_KEY region=$S3_REGION acl=public-read-write
+rclone mount s3:/$S3_BUCKET $MNT_POINT/$S3_BUCKET `
 	webdavCommand = `mkdir -p $MNT_POINT/$WEBDAV_FOLDER
 rclone config create dcache webdav url=$WEBDAV_HOSTNAME vendor=other user=$WEBDAV_LOGIN pass=$WEBDAV_PASSWORD
 rclone mount dcache:$WEBDAV_FOLDER $MNT_POINT/$WEBDAV_FOLDER --vfs-cache-mode full `
@@ -126,6 +129,11 @@ func sidecarPodSpec(service types.Service, cfg *types.Config) v1.Container {
 		container.Env = append(container.Env, MinIOEnvVars...)
 		container.Args = []string{"-c", minioCommand + communCommand}
 	}
+	if provider[0] == types.S3Name {
+		S3EnvVars := setS3Vars(service, provider[1], cfg)
+		container.Env = append(container.Env, S3EnvVars...)
+		container.Args = []string{"-c", s3Command + communCommand}
+	}
 	if provider[0] == types.WebDavName {
 		WebDavEnvVars := setWebDavEnvVars(service, provider[1])
 		container.Env = append(container.Env, WebDavEnvVars...)
@@ -133,6 +141,28 @@ func sidecarPodSpec(service types.Service, cfg *types.Config) v1.Container {
 	}
 	return container
 
+}
+
+func setS3Vars(service types.Service, providerId string, cfg *types.Config) []v1.EnvVar {
+	variables := []v1.EnvVar{
+		{
+			Name:  "S3_BUCKET",
+			Value: service.Mount.Path,
+		},
+		{
+			Name:  "S3_REGION",
+			Value: service.StorageProviders.S3[providerId].Region,
+		},
+		{
+			Name:  "AWS_ACCESS_KEY_ID",
+			Value: service.StorageProviders.S3[providerId].AccessKey,
+		},
+		{
+			Name:  "AWS_SECRET_ACCESS_KEY",
+			Value: service.StorageProviders.S3[providerId].SecretKey,
+		},
+	}
+	return variables
 }
 
 func setMinIOEnvVars(service types.Service, providerId string, cfg *types.Config) []v1.EnvVar {
@@ -148,10 +178,11 @@ func setMinIOEnvVars(service types.Service, providerId string, cfg *types.Config
 		},
 	}
 	if providerId != types.DefaultProvider {
-		credentials := []v1.EnvVar{{
-			Name:  "AWS_ACCESS_KEY_ID",
-			Value: service.StorageProviders.MinIO[providerId].AccessKey,
-		},
+		credentials := []v1.EnvVar{
+			{
+				Name:  "AWS_ACCESS_KEY_ID",
+				Value: service.StorageProviders.MinIO[providerId].AccessKey,
+			},
 			{
 				Name:  "AWS_SECRET_ACCESS_KEY",
 				Value: service.StorageProviders.MinIO[providerId].SecretKey,
