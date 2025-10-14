@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 )
 
 // Variables used to configure jobs
@@ -86,6 +87,8 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
+		// Ensure service links are disabled for the job pod
+		podSpec.EnableServiceLinks = ptr.To(false)
 
 		// Check auth token
 		authHeader := c.GetHeader("Authorization")
@@ -284,6 +287,8 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				},
 			},
 		}
+		// Defensive: ensure service links stay disabled on the final job spec
+		job.Spec.Template.Spec.EnableServiceLinks = ptr.To(false)
 
 		// Add ReScheduler label if there are replicas defined and the cfg.ReSchedulerEnable is true
 		if service.HasReplicas() && cfg.ReSchedulerEnable {

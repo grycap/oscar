@@ -23,6 +23,7 @@ import (
 	"github.com/goccy/go-yaml"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -296,7 +297,8 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 	}
 
 	podSpec := &v1.PodSpec{
-		ImagePullSecrets: SetImagePullSecrets(service.ImagePullSecrets),
+		ImagePullSecrets:   SetImagePullSecrets(service.ImagePullSecrets),
+		EnableServiceLinks: ptr.To(false),
 		Containers: []v1.Container{
 			{
 				Name:            ContainerName,

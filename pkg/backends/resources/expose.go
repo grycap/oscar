@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -270,6 +271,7 @@ func getHortizontalAutoScaleSpec(service types.Service, cfg *types.Config) *auto
 
 func getPodTemplateSpec(service types.Service, cfg *types.Config) v1.PodTemplateSpec {
 	podSpec, _ := service.ToPodSpec(cfg)
+	podSpec.EnableServiceLinks = ptr.To(false)
 
 	for i := range podSpec.Containers {
 		podSpec.Containers[i].Ports = []v1.ContainerPort{
