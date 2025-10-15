@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,10 +55,9 @@ type configVar struct {
 	defaultValue string
 }
 
-type AdditionalConfig struct {
-	Images struct {
-		AllowedPrefixes []string `yaml:"allowed_prefixes"`
-	} `yaml:"images"`
+// UpdateConfigRequest represents the payload for mutable runtime configuration fields.
+type UpdateConfigRequest struct {
+	AllowedImageRepositories []string `json:"allowed_image_repositories"`
 }
 
 // Config stores the configuration for the OSCAR server
@@ -202,14 +202,14 @@ type Config struct {
 	// Ingress CORS allowed headers for exposed services
 	IngressServicesCORSAllowedHeaders string `json:"-"`
 
-	//Path to additional OSCAR configuration setted by users
-	AdditionalConfigPath string `json:"-"`
-
 	//Time to Life of job SecondsAfterFinished
 	TTLJob int `json:"-"`
 
 	//Job listing limit
 	JobListingLimit int `json:"-"`
+
+	allowedImageReposMutex   sync.RWMutex `json:"-"`
+	AllowedImageRepositories []string     `json:"allowed_image_repositories"`
 }
 
 var configVars = []configVar{
@@ -260,9 +260,9 @@ var configVars = []configVar{
 	{"IngressServicesCORSAllowedOrigins", "INGRESS_SERVICES_CORS_ALLOWED_ORIGINS", false, stringType, "https://dashboard.oscar.grycap.net,https://dashboard-devel.oscar.grycap.net,https://dashboard-demo.oscar.grycap.net,http://oscar.oscar.svc.cluster.local,http://host.docker.internal,http://localhost,http://localhost:5173"},
 	{"IngressServicesCORSAllowedMethods", "INGRESS_SERVICES_CORS_ALLOWED_METHODS", false, stringType, "GET, PUT, POST, DELETE, PATCH, HEAD"},
 	{"IngressServicesCORSAllowedHeaders", "INGRESS_SERVICES_CORS_ALLOWED_HEADERS", false, stringType, "Authorization, Content-Type"},
-	{"AdditionalConfigPath", "ADDITIONAL_CONFIG_PATH", false, stringType, "config.yaml"},
 	{"TTLJob", "TTL_JOB", false, intType, "2592000"},
 	{"JobListingLimit", "JOB_LISTING_LIMIT", false, intType, "70"},
+	{"AllowedImageRepositories", "ALLOWED_IMAGE_REPOSITORIES", false, stringSliceType, ""},
 }
 
 func readConfigVar(cfgVar configVar) (string, error) {
@@ -377,7 +377,217 @@ func ReadConfig() (*Config, error) {
 
 	}
 
+	// Normalize allowed image repositories after parsing environment variables
+	if len(config.AllowedImageRepositories) > 0 {
+		if err := config.SetAllowedImageRepositories(config.AllowedImageRepositories); err != nil {
+			return nil, err
+		}
+	}
+
 	return config, nil
+}
+
+// SetAllowedImageRepositories atomically updates the allowed Docker image repositories.
+// Entries are normalized to lowercase canonical references (registry[/path]).
+func (cfg *Config) SetAllowedImageRepositories(repos []string) error {
+	cfg.allowedImageReposMutex.Lock()
+	defer cfg.allowedImageReposMutex.Unlock()
+
+	cleaned := make([]string, 0, len(repos))
+	for _, repo := range repos {
+		repo = strings.TrimSpace(repo)
+		if repo == "" {
+			continue
+		}
+		normalized, err := normalizeAllowedRepositoryEntry(repo)
+		if err != nil {
+			return err
+		}
+		cleaned = append(cleaned, normalized)
+	}
+
+	cfg.AllowedImageRepositories = cleaned
+	return nil
+}
+
+// GetAllowedImageRepositories returns a copy of the allowed Docker image repositories.
+func (cfg *Config) GetAllowedImageRepositories() []string {
+	cfg.allowedImageReposMutex.RLock()
+	defer cfg.allowedImageReposMutex.RUnlock()
+	if len(cfg.AllowedImageRepositories) == 0 {
+		return nil
+	}
+	repos := make([]string, len(cfg.AllowedImageRepositories))
+	copy(repos, cfg.AllowedImageRepositories)
+	return repos
+}
+
+const defaultImageRegistry = "docker.io"
+
+func normalizeAllowedRepositoryEntry(repo string) (string, error) {
+	registry, repository, err := parseAllowedRepository(repo)
+	if err != nil {
+		return "", err
+	}
+
+	if repository == "" {
+		return registry, nil
+	}
+	return fmt.Sprintf("%s/%s", registry, repository), nil
+}
+
+func parseAllowedRepository(repo string) (string, string, error) {
+	repo = strings.TrimSpace(repo)
+	if repo == "" {
+		return "", "", fmt.Errorf("allowed repository cannot be empty")
+	}
+
+	repo = strings.ToLower(repo)
+	repo = strings.TrimSuffix(repo, "/")
+	if repo == "" {
+		return "", "", fmt.Errorf("allowed repository cannot be empty")
+	}
+
+	if strings.Contains(repo, "://") {
+		return "", "", fmt.Errorf("allowed repository must not include a URI scheme")
+	}
+
+	if !strings.Contains(repo, "/") {
+		return repo, "", nil
+	}
+
+	firstSlash := strings.Index(repo, "/")
+	if firstSlash == 0 {
+		return "", "", fmt.Errorf("allowed repository is not valid")
+	}
+	firstSegment := repo[:firstSlash]
+	rest := repo[firstSlash+1:]
+
+	if rest == "" {
+		return firstSegment, "", nil
+	}
+
+	if strings.Contains(firstSegment, ".") || strings.Contains(firstSegment, ":") || firstSegment == "localhost" {
+		return firstSegment, rest, nil
+	}
+
+	return defaultImageRegistry, repo, nil
+}
+
+func parseImageReference(image string) (string, string, error) {
+	image = strings.TrimSpace(image)
+	if image == "" {
+		return "", "", fmt.Errorf("image reference cannot be empty")
+	}
+
+	image = strings.ToLower(image)
+	if idx := strings.Index(image, "@"); idx != -1 {
+		image = image[:idx]
+	}
+
+	lastSlash := strings.LastIndex(image, "/")
+	lastColon := strings.LastIndex(image, ":")
+	if lastColon > -1 && (lastSlash == -1 || lastColon > lastSlash) {
+		image = image[:lastColon]
+	}
+
+	image = strings.TrimSuffix(image, "/")
+	if image == "" {
+		return "", "", fmt.Errorf("image reference cannot be empty")
+	}
+
+	if !strings.Contains(image, "/") {
+		return defaultImageRegistry, fmt.Sprintf("library/%s", image), nil
+	}
+
+	firstSlash := strings.Index(image, "/")
+	firstSegment := image[:firstSlash]
+	rest := image[firstSlash+1:]
+
+	if rest == "" {
+		return firstSegment, "", nil
+	}
+
+	if strings.Contains(firstSegment, ".") || strings.Contains(firstSegment, ":") || firstSegment == "localhost" {
+		return firstSegment, rest, nil
+	}
+
+	return defaultImageRegistry, image, nil
+}
+
+// IsImageRepositoryAllowed returns true if the provided image reference matches any of the allowed repositories.
+func (cfg *Config) IsImageRepositoryAllowed(image string) bool {
+	repos := cfg.GetAllowedImageRepositories()
+	if len(repos) == 0 {
+		return true
+	}
+
+	registry, repository, err := parseImageReference(image)
+	if err != nil {
+		return false
+	}
+
+	for _, allowed := range repos {
+		allowedRegistry, allowedRepo, err := parseAllowedRepository(allowed)
+		if err != nil {
+			continue
+		}
+
+		if allowedRegistry != "" && allowedRegistry != registry {
+			continue
+		}
+
+		if allowedRepo == "" {
+			return true
+		}
+
+		if strings.HasPrefix(repository, allowedRepo) {
+			if len(repository) == len(allowedRepo) {
+				return true
+			}
+			if repository[len(allowedRepo)] == '/' {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// ValidateImageRepository validates if an image reference is allowed and returns a descriptive error otherwise.
+func (cfg *Config) ValidateImageRepository(image string) error {
+	if cfg.IsImageRepositoryAllowed(image) {
+		return nil
+	}
+	return fmt.Errorf("image %q is not allowed on this OSCAR cluster", image)
+}
+
+// Clone returns a shallow copy of the configuration with a safe copy of mutable slices.
+func (cfg *Config) Clone() *Config {
+	if cfg == nil {
+		return nil
+	}
+
+	cfg.allowedImageReposMutex.RLock()
+	defer cfg.allowedImageReposMutex.RUnlock()
+
+	clone := *cfg
+	if len(cfg.AllowedImageRepositories) > 0 {
+		clone.AllowedImageRepositories = make([]string, len(cfg.AllowedImageRepositories))
+		copy(clone.AllowedImageRepositories, cfg.AllowedImageRepositories)
+	}
+
+	if len(cfg.OIDCValidIssuers) > 0 {
+		clone.OIDCValidIssuers = append([]string(nil), cfg.OIDCValidIssuers...)
+	}
+	if len(cfg.OIDCGroups) > 0 {
+		clone.OIDCGroups = append([]string(nil), cfg.OIDCGroups...)
+	}
+	if len(cfg.UsersAdmin) > 0 {
+		clone.UsersAdmin = append([]string(nil), cfg.UsersAdmin...)
+	}
+
+	return &clone
 }
 
 // CheckAvailableGPUs checks if there are "nvidia.com/gpu" resources in the cluster

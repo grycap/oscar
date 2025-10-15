@@ -65,6 +65,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Check service values and set defaults
 		checkValues(&service, cfg)
+		if err := cfg.ValidateImageRepository(service.Image); err != nil {
+			c.String(http.StatusForbidden, err.Error())
+			return
+		}
 		// Check if users in allowed_users have a MinIO associated user
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 

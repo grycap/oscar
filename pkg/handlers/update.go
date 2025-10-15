@@ -66,6 +66,13 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
+		if err := cfg.ValidateImageRepository(newService.Image); err != nil {
+			if oldService == nil || newService.Image != oldService.Image {
+				c.String(http.StatusForbidden, err.Error())
+				return
+			}
+		}
+
 		if !isAdminUser {
 			uid, err = auth.GetUIDFromContext(c)
 

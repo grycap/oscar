@@ -196,12 +196,97 @@ func TestCustomValues(t *testing.T) {
 				if err == nil {
 					t.Error("expected error, got nil")
 				}
-			} else {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
+			} else if err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
 		})
+	}
+}
+
+func TestSetAllowedImageRepositories(t *testing.T) {
+	cfg := &Config{}
+	input := []string{"GhCr.io/ORG/Repo ", " docker.io ", "docker.io/library/oscar"}
+	if err := cfg.SetAllowedImageRepositories(input); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	repos := cfg.GetAllowedImageRepositories()
+	expected := []string{"ghcr.io/org/repo", "docker.io", "docker.io/library/oscar"}
+	if len(repos) != len(expected) {
+		t.Fatalf("expected %d repos, got %d", len(expected), len(repos))
+	}
+	for i := range expected {
+		if repos[i] != expected[i] {
+			t.Fatalf("expected repo %q, got %q", expected[i], repos[i])
+		}
+	}
+}
+
+func TestValidateImageRepository(t *testing.T) {
+	cfg := &Config{}
+	if err := cfg.SetAllowedImageRepositories([]string{"ghcr.io/org", "docker.io/library/oscar"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		image   string
+		wantErr bool
+	}{
+		{"Allowed same repo", "ghcr.io/org/service:latest", false},
+		{"Allowed subpath", "ghcr.io/org/sub/service:1.0", false},
+		{"Allowed docker hub canonical", "docker.io/library/oscar:1.0", false},
+		{"Allowed docker hub implicit", "oscar:latest", false},
+		{"Disallowed registry", "quay.io/org/service:v1", true},
+		{"Disallowed path prefix", "ghcr.io/org-other/service:1.0", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := cfg.ValidateImageRepository(tt.image)
+			if tt.wantErr && err == nil {
+				t.Fatalf("expected error for image %q", tt.image)
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error for image %q: %v", tt.image, err)
+			}
+		})
+	}
+}
+
+func TestReadConfigAllowedRepositories(t *testing.T) {
+	t.Setenv("OSCAR_USERNAME", "testuser")
+	t.Setenv("OSCAR_PASSWORD", "testpass")
+	t.Setenv("MINIO_ACCESS_KEY", "testminioaccess")
+	t.Setenv("MINIO_SECRET_KEY", "testminiosecret")
+	t.Setenv("ALLOWED_IMAGE_REPOSITORIES", "ghcr.io/grycap/oscar,docker.io/library/safe")
+
+	cfg, err := ReadConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	repos := cfg.GetAllowedImageRepositories()
+	expected := []string{"ghcr.io/grycap/oscar", "docker.io/library/safe"}
+	if len(repos) != len(expected) {
+		t.Fatalf("expected %d repos, got %d", len(expected), len(repos))
+	}
+	for i := range expected {
+		if repos[i] != expected[i] {
+			t.Fatalf("expected repo %q, got %q", expected[i], repos[i])
+		}
+	}
+}
+
+func TestReadConfigInvalidAllowedRepository(t *testing.T) {
+	t.Setenv("OSCAR_USERNAME", "testuser")
+	t.Setenv("OSCAR_PASSWORD", "testpass")
+	t.Setenv("MINIO_ACCESS_KEY", "testminioaccess")
+	t.Setenv("MINIO_SECRET_KEY", "testminiosecret")
+	t.Setenv("ALLOWED_IMAGE_REPOSITORIES", "https://invalid")
+
+	if _, err := ReadConfig(); err == nil {
+		t.Fatalf("expected error for invalid allowed repository")
 	}
 }
 
