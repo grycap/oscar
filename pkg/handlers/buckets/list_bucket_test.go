@@ -2,6 +2,7 @@ package buckets
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -65,16 +66,18 @@ func TestMakeListBucketHandlerAdmin(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, res.Code)
 	}
 
-	var payload struct {
-		Buckets []struct {
-			Name string `json:"Name"`
-		} `json:"Buckets"`
-	}
-	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+	Buckets := []struct {
+		BucketName   string `json:"bucket_path"`
+		Visibility   string `json:"visibility"`
+		AllowedUsers string `json:"allowed_users"`
+		Owner        string `json:"owner"`
+	}{}
+	fmt.Println(res.Body.String())
+	if err := json.Unmarshal(res.Body.Bytes(), &Buckets); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
-	if len(payload.Buckets) != 1 || payload.Buckets[0].Name != "bucket-one" {
-		t.Fatalf("unexpected response payload: %v", payload.Buckets)
+	if len(Buckets) != 1 || Buckets[0].BucketName != "bucket-one" {
+		t.Fatalf("unexpected response payload: %v", Buckets)
 	}
 }
 
