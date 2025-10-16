@@ -62,6 +62,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
+		service.Script = utils.NormalizeLineEndings(service.Script)
 
 		// Check service values and set defaults
 		checkValues(&service, cfg)
