@@ -92,7 +92,7 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 			var allowedUsers []string
 			var bowner string
 			path := *b.Name
-			bucketVisibility := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketPath: *b.Name, Owner: uid})
+			bucketVisibility := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: *b.Name, Owner: uid})
 			metadata, err := minIOAdminClient.GetTaggedMetadata(path)
 			if bucketVisibility == utils.PRIVATE {
 				bowner = uid
@@ -113,7 +113,7 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 
 			bucketsInfo = append(bucketsInfo, utils.MinIOBucket{
-				BucketPath:   path,
+				BucketName:   path,
 				Visibility:   bucketVisibility,
 				Owner:        bowner,
 				AllowedUsers: allowedUsers,

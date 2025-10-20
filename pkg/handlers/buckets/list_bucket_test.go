@@ -67,7 +67,7 @@ func TestMakeListBucketHandlerAdmin(t *testing.T) {
 	}
 
 	Buckets := []struct {
-		BucketName   string `json:"bucket_path"`
+		BucketName   string `json:"bucket_name"`
 		Visibility   string `json:"visibility"`
 		AllowedUsers string `json:"allowed_users"`
 		Owner        string `json:"owner"`

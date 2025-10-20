@@ -160,9 +160,9 @@ func MakePresignHandler(cfg *types.Config) gin.HandlerFunc {
 			owner = types.DefaultOwner
 		}
 
-		visibility := adminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketPath: bucketName, Owner: owner})
+		visibility := adminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: owner})
 		if visibility == "" && !isAdmin {
-			visibility = adminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketPath: bucketName, Owner: requester})
+			visibility = adminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: requester})
 		}
 
 		if !isAdmin {

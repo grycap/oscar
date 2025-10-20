@@ -64,9 +64,8 @@ type MinIOAdminClient struct {
 }
 
 // MinIOBucket definition to create buckets independent of a service
-// Note: BucketPath refers to bucket name
 type MinIOBucket struct {
-	BucketPath   string            `json:"bucket_path"`
+	BucketName   string            `json:"bucket_name"`
 	Visibility   string            `json:"visibility"`
 	AllowedUsers []string          `json:"allowed_users"`
 	Owner        string            `json:"owner"`
@@ -336,20 +335,20 @@ func (minIOAdminClient *MinIOAdminClient) CreateAllUsersGroup() error {
 func (minIOAdminClient *MinIOAdminClient) SetPolicies(bucket MinIOBucket) error {
 	if bucket.Visibility == RESTRICTED || bucket.Visibility == PRIVATE {
 		// Both types of visibility require config of the user policy
-		if err := minIOAdminClient.CreateAddPolicy(bucket.BucketPath, bucket.Owner, ALL_ACTIONS, false); err != nil {
+		if err := minIOAdminClient.CreateAddPolicy(bucket.BucketName, bucket.Owner, ALL_ACTIONS, false); err != nil {
 			return err
 		}
 		if bucket.Visibility == RESTRICTED {
-			if err := minIOAdminClient.CreateAddGroup(bucket.BucketPath, bucket.AllowedUsers, false); err != nil {
+			if err := minIOAdminClient.CreateAddGroup(bucket.BucketName, bucket.AllowedUsers, false); err != nil {
 				return fmt.Errorf("error creating bucket group: %v", err)
 			}
-			if err := minIOAdminClient.CreateAddPolicy(bucket.BucketPath, bucket.BucketPath, RESTRICTED_ACTIONS, true); err != nil {
+			if err := minIOAdminClient.CreateAddPolicy(bucket.BucketName, bucket.BucketName, RESTRICTED_ACTIONS, true); err != nil {
 				return fmt.Errorf("error creating policy: %v", err)
 			}
 		}
 	} else {
 		// Config public visibility
-		if err := minIOAdminClient.CreateAddPolicy(bucket.BucketPath, ALL_USERS_GROUP, ALL_ACTIONS, true); err != nil {
+		if err := minIOAdminClient.CreateAddPolicy(bucket.BucketName, ALL_USERS_GROUP, ALL_ACTIONS, true); err != nil {
 			return fmt.Errorf("error creating policy: %v", err)
 		}
 	}
@@ -366,13 +365,13 @@ func (minIOAdminClient *MinIOAdminClient) UnsetPolicies(bucket MinIOBucket) erro
 		policyName = bucket.Owner
 	}
 
-	err := minIOAdminClient.RemoveResource(bucket.BucketPath, policyName, isGroup)
+	err := minIOAdminClient.RemoveResource(bucket.BucketName, policyName, isGroup)
 	if err != nil {
 		return fmt.Errorf("error removing resource")
 	}
 
 	if strings.ToLower(bucket.Visibility) == RESTRICTED {
-		err := minIOAdminClient.RemoveGroupPolicy(bucket.BucketPath)
+		err := minIOAdminClient.RemoveGroupPolicy(bucket.BucketName)
 		if err != nil {
 			return fmt.Errorf("error removing policy for group")
 		}
@@ -396,16 +395,16 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddGroup(groupName string, users
 }
 
 func (minIOAdminClient *MinIOAdminClient) GetCurrentResourceVisibility(bucket MinIOBucket) string {
-	if minIOAdminClient.ResourceInPolicy(bucket.Owner, bucket.BucketPath) {
-		if minIOAdminClient.ResourceInPolicy(bucket.BucketPath, bucket.BucketPath) {
+	if minIOAdminClient.ResourceInPolicy(bucket.Owner, bucket.BucketName) {
+		if minIOAdminClient.ResourceInPolicy(bucket.BucketName, bucket.BucketName) {
 			return RESTRICTED
 		}
 		return PRIVATE
 	} else {
-		if minIOAdminClient.ResourceInPolicy(bucket.BucketPath, bucket.BucketPath) {
+		if minIOAdminClient.ResourceInPolicy(bucket.BucketName, bucket.BucketName) {
 			return RESTRICTED
 		}
-		if minIOAdminClient.ResourceInPolicy(ALL_USERS_GROUP, bucket.BucketPath) {
+		if minIOAdminClient.ResourceInPolicy(ALL_USERS_GROUP, bucket.BucketName) {
 			return PUBLIC
 		}
 	}

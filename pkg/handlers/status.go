@@ -408,7 +408,7 @@ func getMinioInfo(cfg *types.Config, clusterInfo *GeneralInfo) (err error) {
 
 	for _, b := range bucketList.Buckets {
 		bucketName := *b.Name
-		visibility := adminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketPath: bucketName})
+		visibility := adminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName})
 		if err != nil {
 			log.Printf("Error obtaining bucket visibility %s: %v", bucketName, err)
 			visibility = "unknown"
