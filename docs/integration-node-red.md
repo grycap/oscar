@@ -55,21 +55,21 @@ echo "Prediction was saved in: $OUTPUT_FILE"
     ![node-red-dashboard-visit.png](images/integrations/node-red-dashboard-visit.png)
 
 `
-ℹ️ If you get an nginx error, you need to wait a little bit for the service to run.
+ℹ️ NOTE: If you get an nginx error like the image below, you need to wait a little bit for the service to run.
 `
 ![node-red-error.png](images/integrations/node-red-error.png)
 </br>
 </br>
-Log in with your credentials (the user is always **admin**).
+Once the service is up and running, you can log in with your credentials (the user is always **admin**).
 
 ![node-red-login.png](images/integrations/node-red-login.png)
     
 
 **Create a workflow in Node-RED**
 
-Now we will create a workflow that will fetch an image from internet, make a request to Yolo8 service and visualize the result.
+Now we will create a workflow that will fetch an image from the internet, make a request to Yolo8 service and visualize the result.
 
-We will need a the following list of components that can be found in the Node-RED sidebar menu:
+We will need the following list of components, that can be found in the Node-RED sidebar menu:
 
 - **Common** → `inject` node
 - **Network** → `HTTP request` node
@@ -79,21 +79,21 @@ We will need a the following list of components that can be found in the Node-RE
 ![node-red-nodes.png](images/integrations/node-red-nodes.png)
 
 
-Connect the components as shown:
+Drag and drop the boxes to the canvas and then connect the components as shown:
 
 ![node-red-workflow.png](images/integrations/node-red-workflow.png)
 
-To configure the *HTTP request node* (double-click it):
+Now we need to configure the components. To configure the *HTTP request node* (double-click on it):
 
-- **URL**: URL of an image
+- **URL**: URL of an image you want to analyze with YOLO (for example, you can use this [`image`](https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Cat_August_2010-4.jpg/640px-Cat_August_2010-4.jpg))
 - **Payload**: _Send as request body_
 - **Return**: _A binary buffer_
 
 ![node-red-http-request.png](images/integrations/node-red-node-http-request.png)
 
-To configure the `OSCAR YOLO8` node (double-click it):
+To configure the `OSCAR YOLO8` node (double-click on it):
 
-- **Server**: URL of the cluster
+- **Server**: URL of the OSCAR cluster. You can get it from [`OSCAR dashboard`](https://dashboard.oscar.grycap.net/) → *Info* (Sidebar panel) → *Endpoint*
 - **Service** Name: _yolov8-node-red_
 - **Token**: Obtain the token from [`OSCAR dashboard`](https://dashboard.oscar.grycap.net/) → *Info* (Sidebar panel) → *Access token*
 
@@ -101,18 +101,17 @@ To configure the `OSCAR YOLO8` node (double-click it):
 
 
 ℹ️ 
-If you want to download this example and others, visit the [`AI4Compose`](https://github.com/ai4os/ai4-compose/tree/main) repository.
+NOTE: If you want to download this example and others, visit the [`AI4Compose`](https://github.com/ai4os/ai4-compose/tree/main) repository.
 
     
 **Test the workflow**
 
-After configuring your workflow, test it in the Node-RED Editor:
+After configuring your workflow, you can test it in the Node-RED Editor:
 
-Click *Deploy* (top right corner)
-Click the *inject* node
+Click *Deploy* (top right corner) and then click on the *inject* node:
 
 ![node-red-workflow-run.png](images/integrations/node-red-workflow-run.png)
 
-You should see the result.
+You should see the result as below.
 
 ![node-red-workflow-result.png](images/integrations/node-red-workflow-result.png)
