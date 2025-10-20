@@ -48,7 +48,7 @@ func TestMakeCreateBucketHandler(t *testing.T) {
 		},
 		{
 			name: "admin creates bucket",
-			body: `{"bucket_path":"test-bucket","visibility":"private"}`,
+			body: `{"bucket_name":"test-bucket","visibility":"private"}`,
 			headers: map[string]string{
 				"Content-Type": "application/json",
 			},
