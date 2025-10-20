@@ -112,6 +112,9 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 				}
 			}
 
+			// Remove owner from metadata as it is already included in the response
+			delete(metadata, "owner")
+
 			bucketsInfo = append(bucketsInfo, utils.MinIOBucket{
 				BucketName:   path,
 				Visibility:   bucketVisibility,
