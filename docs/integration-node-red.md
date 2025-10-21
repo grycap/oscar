@@ -7,6 +7,7 @@ In the context of OSCAR integration, Node-RED can be deployed and configured to 
 ## Simple tutorial
 
 This tutorial demonstrates a simple workflow that calls the YOLOv8 synchronous service. You will learn:
+
 - How to deploy a Node-RED instance
 - How to connect Node-RED to the YOLOv8 synchronous service
 - How to authenticate using a token
