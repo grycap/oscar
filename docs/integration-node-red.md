@@ -4,7 +4,6 @@
 
 In the context of OSCAR integration, Node-RED can be deployed and configured to interact with OSCAR services using authentication tokens obtained after logging in or using tokens specific for the service.
 
-## Simple tutorial
 
 This tutorial demonstrates a simple workflow that calls the [YOLOv8](https://github.com/grycap/oscar/tree/master/examples/yolov8) synchronous service. You will learn:
 
@@ -13,13 +12,12 @@ This tutorial demonstrates a simple workflow that calls the [YOLOv8](https://git
 - How to authenticate using a token
 - How to process image data through the workflow
 
-### Steps
 
-**Deploy YOLOv8**
+## Deploy YOLOv8
 
 Go to [`OSCAR Dashboard`](https://dashboard.oscar.grycap.net/) and, in the `Services` panel, select `Create service -> FDL`. Use the following configuration:
 
-##### FDL:
+FDL:
 ```yaml
 functions:
   oscar:
@@ -32,7 +30,7 @@ functions:
       log_level: CRITICAL
 ```
     
-##### Script:
+Script:
 
 ```bash
 #!/bin/bash
@@ -43,7 +41,7 @@ deepaas-cli --deepaas_method_output="$OUTPUT_FILE" predict --files "$RENAMED_FIL
 echo "Prediction was saved in: $OUTPUT_FILE"
 ```
 
-**Deploy Node-RED instance**
+## Deploy Node-RED
 
 1. In the [`OSCAR dashboard`](https://dashboard.oscar.grycap.net/), go to the `Flows` panel and then click `New`. 
     ![node-red-deployed.png](images/integrations/node-red-deployed.png) 
@@ -60,7 +58,7 @@ Once the service is up and running, you can log in with your credentials (the us
 ![node-red-login.png](images/integrations/node-red-login.png)
     
 
-**Create a workflow in Node-RED**
+## Create a workflow in Node-RED
 
 Let's create a workflow that fetches an image from the Internet, makes a request to the YOLO service and visualizes the result.
 
@@ -94,7 +92,7 @@ Configure the `OSCAR YOLO8` node:
 
 ![node-red-node-oscar-yolo.png](images/integrations/node-red-node-oscar-yolo.png)
     
-**Test the workflow**
+## Test the workflow
 
 After configuring your workflow, you can test it in the Node-RED Editor:
 
