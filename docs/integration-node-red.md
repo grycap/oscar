@@ -17,7 +17,7 @@ This tutorial demonstrates a simple workflow that calls the [YOLOv8](https://git
 
 **Deploy YOLOv8**
 
-Go to [`OSCAR Dashboard`](https://dashboard.oscar.grycap.net/) and select `Create service -> FDL`. Use the following configuration:
+Go to [`OSCAR Dashboard`](https://dashboard.oscar.grycap.net/) and, in the `Services` panel, select `Create service -> FDL`. Use the following configuration:
 
 ##### FDL:
 ```yaml
@@ -45,22 +45,16 @@ echo "Prediction was saved in: $OUTPUT_FILE"
 
 **Deploy Node-RED instance**
 
-1. In the [`OSCAR dashboard`](https://dashboard.oscar.grycap.net/), go to `Flows` (Sidebar panel)  and then click `New`. 
+1. In the [`OSCAR dashboard`](https://dashboard.oscar.grycap.net/), go to the `Flows` panel and then click `New`. 
     ![node-red-deployed.png](images/integrations/node-red-deployed.png) 
 
-1. Enter the **admin** password and select or create a Bucket.
+1. Enter the **admin** password, that you will be asked to access later on this instance of Node-RED, and select or create a Bucket.
    
     ![node-red-dashboard.png](images/integrations/node-red-dashboard.png)
 
-1. After deploying Node-RED we need to navigate to its user interface.
+1. After deploying Node-RED we access its user interface.
     ![node-red-dashboard-visit.png](images/integrations/node-red-dashboard-visit.png)
 
-`
-ℹ️ NOTE: If you get an nginx error like the image below, you need to wait a little bit for the service to run.
-`
-![node-red-error.png](images/integrations/node-red-error.png)
-</br>
-</br>
 Once the service is up and running, you can log in with your credentials (the user is always **admin**).
 
 ![node-red-login.png](images/integrations/node-red-login.png)
@@ -68,9 +62,9 @@ Once the service is up and running, you can log in with your credentials (the us
 
 **Create a workflow in Node-RED**
 
-Now we will create a workflow that will fetch an image from the internet, make a request to Yolo8 service and visualize the result.
+Let's create a workflow that fetches an image from the Internet, makes a request to the YOLO service and visualizes the result.
 
-We will need the following list of components, that can be found in the Node-RED sidebar menu:
+We need the following list of components from the Node-RED sidebar menu:
 
 - **Common** → `inject` node
 - **Network** → `HTTP request` node
@@ -84,7 +78,7 @@ Drag and drop the boxes to the canvas and then connect the components as shown:
 
 ![node-red-workflow.png](images/integrations/node-red-workflow.png)
 
-Now we need to configure the components. To configure the *HTTP request node* (double-click on it):
+Now we need to configure the components. To configure the *HTTP request node* double-click on it:
 
 - **URL**: URL of an image you want to analyze with YOLO (for example, you can use this [`image`](https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Cat_August_2010-4.jpg/640px-Cat_August_2010-4.jpg))
 - **Payload**: _Send as request body_
@@ -92,18 +86,13 @@ Now we need to configure the components. To configure the *HTTP request node* (d
 
 ![node-red-http-request.png](images/integrations/node-red-node-http-request.png)
 
-To configure the `OSCAR YOLO8` node (double-click on it):
+Configure the `OSCAR YOLO8` node:
 
 - **Server**: URL of the OSCAR cluster. You can get it from [`OSCAR dashboard`](https://dashboard.oscar.grycap.net/) → *Info* (Sidebar panel) → *Endpoint*
 - **Service** Name: _yolov8-node-red_
 - **Token**: Obtain the token from [`OSCAR dashboard`](https://dashboard.oscar.grycap.net/) → *Info* (Sidebar panel) → *Access token*
 
 ![node-red-node-oscar-yolo.png](images/integrations/node-red-node-oscar-yolo.png)
-
-
-ℹ️ 
-NOTE: If you want to download this example and others, visit the [`AI4Compose`](https://github.com/ai4os/ai4-compose/tree/main) repository.
-
     
 **Test the workflow**
 
@@ -113,6 +102,10 @@ Click *Deploy* (top right corner) and then click on the *inject* node:
 
 ![node-red-workflow-run.png](images/integrations/node-red-workflow-run.png)
 
-You should see the result as below.
+You should see the result as indicated below. 
 
 ![node-red-workflow-result.png](images/integrations/node-red-workflow-result.png)
+
+
+ℹ️ 
+NOTE: If you want to download this example and others, visit the [`AI4Compose`](https://github.com/ai4os/ai4-compose/tree/main) repository.
