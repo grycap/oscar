@@ -55,13 +55,14 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
-			service.Owner = "cluster_admin"
+			service.Owner = types.DefaultOwner
 			createLogger.Printf("Creating service '%s' for user '%s'", service.Name, service.Owner)
 		}
 		if err := c.ShouldBindJSON(&service); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
+		service.Script = utils.NormalizeLineEndings(service.Script)
 
 		// Check service values and set defaults
 		checkValues(&service, cfg)
@@ -110,12 +111,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					for _, vo := range cfg.OIDCGroups {
 						service.VO = vo
 						err := checkIdentity(&service, authHeader)
-						fmt.Println(vo)
-						if err != nil {
-							fmt.Println(err)
-							c.String(http.StatusBadRequest, fmt.Sprintln(err))
-							//return
-						} else {
+						if err == nil {
 							notFound = false
 							break
 						}
@@ -219,6 +215,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			if derr != nil {
 				log.Printf("Error deleting service: %v\n", derr)
 			}
+			bderr := deleteBuckets(&service, cfg, minIOAdminClient)
+			if bderr != nil {
+				log.Printf("Error deleting buckets: %v\n", bderr)
+			}
 			return
 		}
 		if len(buckets) > 0 {
@@ -227,7 +227,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				if strings.ToLower(service.Visibility) == "" {
 					b.Visibility = utils.PRIVATE
 				}
-				if service.Owner != "cluster_admin" {
+				if service.Owner != types.DefaultOwner {
 					err := minIOAdminClient.SetPolicies(b)
 					if err != nil {
 						c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
@@ -236,10 +236,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 				// Bucket metadata for filtering
 				tags := map[string]string{
-					"owner":   uid,
-					"service": "true",
+					"owner":        uid,
+					"from_service": service.Name,
 				}
-				if err := minIOAdminClient.SetTags(b.BucketPath, tags); err != nil {
+				if err := minIOAdminClient.SetTags(b.BucketName, tags); err != nil {
 					c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
 				}
 			}
@@ -368,7 +368,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		}
 
 		minIOBuckets = append(minIOBuckets, utils.MinIOBucket{
-			BucketPath:   splitPath[0],
+			BucketName:   splitPath[0],
 			AllowedUsers: service.AllowedUsers,
 			Visibility:   service.Visibility,
 			Owner:        service.Owner})
@@ -424,7 +424,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			}
 			var found bool
 			for _, b := range minIOBuckets {
-				if b.BucketPath == splitPath[0] {
+				if b.BucketName == splitPath[0] {
 					found = true
 					break
 				}
@@ -432,7 +432,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			if !found {
 				// If the bucket hasn't been created on de input loop create it
 				minIOBuckets = append(minIOBuckets, utils.MinIOBucket{
-					BucketPath:   splitPath[0],
+					BucketName:   splitPath[0],
 					AllowedUsers: service.AllowedUsers,
 					Visibility:   service.Visibility,
 					Owner:        service.Owner})
@@ -484,16 +484,80 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 
 			// Currently only MinIO/S3 are supported
 			// Use the appropriate client
-			if provName == types.MinIOName {
+			if provName == types.MinIOName && provID == types.DefaultProvider {
 				s3Client = cfg.MinIOProvider.GetS3Client()
+			} else if provName == types.MinIOName {
+				return minIOBuckets, nil
 			} else {
 				s3Client = service.StorageProviders.S3[provID].GetS3Client()
 			}
-			// Create mount bucket
-			err := minIOAdminClient.CreateS3Path(s3Client, splitPath, true)
+
+			// Check if the bucket exists in the service
+			var foundInService bool
+			for _, b := range minIOBuckets {
+				if b.BucketName == splitPath[0] {
+					foundInService = true
+					break
+				}
+			}
+
+			// If the bucket exists in the input/output loop don't create it again
+			// just create the folder if needed
+
+			if foundInService {
+				err := minIOAdminClient.CreateS3Path(s3Client, splitPath, true)
+				if err != nil && !isUpdate {
+					return nil, err
+				}
+				return minIOBuckets, nil
+			}
+
+			// List buckets to check if the bucket exists in MinIO
+			bucketInfo, err := s3Client.ListBuckets(&s3.ListBucketsInput{})
 			if err != nil {
 				return nil, err
 			}
+
+			var foundInMinIO bool
+			for _, b := range bucketInfo.Buckets {
+				if *b.Name == splitPath[0] {
+					foundInMinIO = true
+					break
+				}
+			}
+			if foundInMinIO {
+				minio := utils.MinIOBucket{
+					BucketName: splitPath[0],
+					Owner:      service.Owner,
+				}
+				visibility := minIOAdminClient.GetCurrentResourceVisibility(minio)
+				if visibility != utils.PRIVATE {
+					return nil, fmt.Errorf("the bucket \"%s\" must be private to be used as mount", minio.BucketName)
+				} else {
+					err := minIOAdminClient.CreateS3Path(s3Client, splitPath, true)
+					minIOBuckets = append(minIOBuckets, utils.MinIOBucket{
+						BucketName:   splitPath[0],
+						AllowedUsers: service.AllowedUsers,
+						Visibility:   service.Visibility,
+						Owner:        service.Owner})
+					if err != nil && !isUpdate {
+						return nil, err
+					}
+					return minIOBuckets, nil
+				}
+			}
+
+			// Create mount bucket
+			err = minIOAdminClient.CreateS3Path(s3Client, splitPath, false)
+			minIOBuckets = append(minIOBuckets, utils.MinIOBucket{
+				BucketName:   splitPath[0],
+				AllowedUsers: service.AllowedUsers,
+				Visibility:   service.Visibility,
+				Owner:        service.Owner})
+			if err != nil {
+				return nil, err
+			}
+
 		}
 	}
 

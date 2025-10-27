@@ -37,13 +37,14 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 		isAdminUser = false
 		var uid string
 		var err error
+		var bucketsList *s3.ListBucketsOutput
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
-			output, err := listUserBuckets(cfg.MinIOProvider.GetS3Client())
+			bucketsList, err = listUserBuckets(cfg.MinIOProvider.GetS3Client())
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, err)
 			}
-			c.JSON(http.StatusOK, output)
+			//c.JSON(http.StatusOK, bucketsList)
 
 		} else {
 			uid, err = auth.GetUIDFromContext(c)
@@ -69,7 +70,7 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 				Region:    cfg.MinIOProvider.Region,
 			}
 
-			bucketsList, err := listUserBuckets(userMinIOProvider.GetS3Client())
+			bucketsList, err = listUserBuckets(userMinIOProvider.GetS3Client())
 			if err != nil {
 				if aerr, ok := err.(awserr.Error); ok {
 					switch aerr.Code() {
@@ -83,44 +84,47 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 				c.String(http.StatusInternalServerError, "Error reading buckets from user: ", uid)
 				return
 			}
-			var bucketsInfo []utils.MinIOBucket
-			minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-
-			for _, b := range bucketsList.Buckets {
-				var allowedUsers []string
-				var bowner string
-				path := *b.Name
-				bucketVisibility := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketPath: *b.Name, Owner: uid})
-				metadata, err := minIOAdminClient.GetTaggedMetadata(path)
-				if bucketVisibility == utils.PRIVATE {
-					bowner = uid
-				} else {
-					if err != nil {
-						bowner = ""
-					} else {
-						bowner = metadata["owner"]
-					}
-				}
-				if bucketVisibility == utils.RESTRICTED {
-					members, err := minIOAdminClient.GetBucketMembers(path)
-					if err != nil {
-						fmt.Printf("WARNING: Couldn't get bucket owner info: %v\n", err)
-					} else {
-						allowedUsers = append(allowedUsers, members...)
-					}
-				}
-
-				bucketsInfo = append(bucketsInfo, utils.MinIOBucket{
-					BucketPath:   path,
-					Visibility:   bucketVisibility,
-					Owner:        bowner,
-					AllowedUsers: allowedUsers,
-					Metadata:     metadata,
-				})
-			}
-			c.JSON(http.StatusOK, bucketsInfo)
-
 		}
+		var bucketsInfo []utils.MinIOBucket
+		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+
+		for _, b := range bucketsList.Buckets {
+			var allowedUsers []string
+			var bowner string
+			path := *b.Name
+			bucketVisibility := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: *b.Name, Owner: uid})
+			metadata, err := minIOAdminClient.GetTaggedMetadata(path)
+			if bucketVisibility == utils.PRIVATE {
+				bowner = uid
+			} else {
+				if err != nil {
+					bowner = ""
+				} else {
+					bowner = metadata["owner"]
+				}
+			}
+			if bucketVisibility == utils.RESTRICTED {
+				members, err := minIOAdminClient.GetBucketMembers(path)
+				if err != nil {
+					fmt.Printf("WARNING: Couldn't get bucket owner info: %v\n", err)
+				} else {
+					allowedUsers = append(allowedUsers, members...)
+				}
+			}
+
+			// Remove owner from metadata as it is already included in the response
+			delete(metadata, "owner")
+
+			bucketsInfo = append(bucketsInfo, utils.MinIOBucket{
+				BucketName:   path,
+				Visibility:   bucketVisibility,
+				Owner:        bowner,
+				AllowedUsers: allowedUsers,
+				Metadata:     metadata,
+			})
+		}
+		c.JSON(http.StatusOK, bucketsInfo)
+
 	}
 }
 

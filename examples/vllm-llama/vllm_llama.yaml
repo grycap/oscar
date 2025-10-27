@@ -1,0 +1,22 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: vllm-gpu-llama
+      cpu: '2.0'
+      memory: 10Gi
+      image: ghcr.io/grycap/vllm-llama
+      script: script.sh
+      environment:
+        variables:
+          OPENAI_BASE_URL: "/system/services/vllm-gpu-llama/exposed"
+          API_KEY: "secretkey"
+          GPU_MEMORY_UTILIZATION: "0.5"
+          MAX_MODEL_LEN: "1000"
+      expose:
+        min_scale: 1
+        max_scale: 1
+        api_port: 8000
+        cpu_threshold: 90
+        rewrite_target: true
+
+

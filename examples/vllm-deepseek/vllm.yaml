@@ -7,7 +7,7 @@ functions:
       image: ghcr.io/rk181/vllm-gpu-deepseek-coder-1-3b:latest
       script: script.sh
       environment:
-        Variables:
+        variables:
           OPENAI_BASE_URL: "/system/services/vllm-gpu-deepseek-coder-1-3b/exposed" # Root URL for the service
           API_KEY: "secretkey" # API key for authentication 
           GPU_MEMORY_UTILIZATION: "0.4" # 40% of GPU memory

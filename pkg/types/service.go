@@ -107,6 +107,8 @@ const (
 	IsolationLevelUser = "USER"
 
 	IsolationLevelService = "SERVICE"
+
+	DefaultOwner = "cluster_admin"
 )
 
 // YAMLMarshal package-level yaml marshal function

@@ -22,6 +22,9 @@ import (
 func TestMakeJobsInfoHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
 	now := time.Now()
+	cfg := types.Config{
+		JobListingLimit: 70,
+	}
 
 	K8sObjects := []runtime.Object{
 		&batchv1.Job{
@@ -51,6 +54,7 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 								},
 							},
 						},
+						StartTime: &metav1.Time{Time: now},
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pod",
@@ -66,7 +70,7 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
 
 	r := gin.Default()
-	r.GET("/system/logs/:serviceName", MakeJobsInfoHandler(back, kubeClientset, "namespace"))
+	r.GET("/system/logs/:serviceName", MakeJobsInfoHandler(back, kubeClientset, &cfg))
 
 	w := httptest.NewRecorder()
 	serviceName := "test"
@@ -84,10 +88,12 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 	}
 
 	expected := map[string]interface{}{
-		"job": map[string]interface{}{
-			"status":        "Running",
-			"creation_time": now.UTC().Format(time.RFC3339),
-			"start_time":    now.UTC().Format(time.RFC3339),
+		"jobs": map[string]interface{}{
+			"job": map[string]interface{}{
+				"status":        "Running",
+				"creation_time": now.UTC().Format(time.RFC3339),
+				"start_time":    now.UTC().Format(time.RFC3339),
+			},
 		},
 	}
 
@@ -96,24 +102,23 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 	}
 
 	actions := kubeClientset.Actions()
-	if len(actions) != 2 {
-		t.Errorf("expecting 2 actions, got %d", len(actions))
+	if len(actions) != 1 {
+		t.Errorf("expecting 1 actions, got %d", len(actions))
 	}
 
-	if actions[0].GetVerb() != "list" || actions[0].GetResource().Resource != "jobs" {
-		t.Errorf("expecting list jobs, got %s %s", actions[0].GetVerb(), actions[0].GetResource().Resource)
-	}
-	if actions[1].GetVerb() != "list" || actions[1].GetResource().Resource != "pods" {
-		t.Errorf("expecting list pods, got %s %s", actions[1].GetVerb(), actions[1].GetResource().Resource)
+	if actions[0].GetVerb() != "list" || actions[0].GetResource().Resource != "pods" {
+		t.Errorf("expecting list pods, got %s %s", actions[0].GetVerb(), actions[0].GetResource().Resource)
 	}
 }
 
 func TestMakeDeleteJobsHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
 	kubeClientset := testclient.NewSimpleClientset()
-
+	cfg := types.Config{
+		JobListingLimit: 70,
+	}
 	r := gin.Default()
-	r.DELETE("/system/logs/:serviceName", MakeDeleteJobsHandler(back, kubeClientset, "namespace"))
+	r.DELETE("/system/logs/:serviceName", MakeDeleteJobsHandler(back, kubeClientset, &cfg))
 
 	w := httptest.NewRecorder()
 	serviceName := "test"
@@ -137,7 +142,9 @@ func TestMakeDeleteJobsHandler(t *testing.T) {
 
 func TestMakeGetLogsHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
-
+	cfg := types.Config{
+		JobListingLimit: 70,
+	}
 	K8sObjects := []runtime.Object{
 		&corev1.PodList{
 			Items: []corev1.Pod{
@@ -156,7 +163,7 @@ func TestMakeGetLogsHandler(t *testing.T) {
 	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
 
 	r := gin.Default()
-	r.GET("/system/logs/:serviceName/:jobName", MakeGetLogsHandler(back, kubeClientset, "namespace"))
+	r.GET("/system/logs/:serviceName/:jobName", MakeGetLogsHandler(back, kubeClientset, &cfg))
 
 	w := httptest.NewRecorder()
 	serviceName := "test"
@@ -186,7 +193,10 @@ func TestMakeGetLogsHandler(t *testing.T) {
 }
 func TestMakeDeleteJobHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
-
+	cfg := types.Config{
+		JobListingLimit:   70,
+		ServicesNamespace: "namespace",
+	}
 	K8sObjects := []runtime.Object{
 		&batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
@@ -205,7 +215,7 @@ func TestMakeDeleteJobHandler(t *testing.T) {
 		c.Set("uidOrigin", "some-uid-value")
 		c.Next()
 	})
-	r.DELETE("/system/logs/:serviceName/:jobName", MakeDeleteJobHandler(back, kubeClientset, "namespace"))
+	r.DELETE("/system/logs/:serviceName/:jobName", MakeDeleteJobHandler(back, kubeClientset, &cfg))
 
 	w := httptest.NewRecorder()
 	serviceName := "test"

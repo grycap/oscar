@@ -9,12 +9,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/backends"
+	"github.com/grycap/oscar/v3/pkg/testsupport"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
 
 func TestMakeUpdateHandler(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
 	back := backends.MakeFakeBackend()
 	kubeClientset := testclient.NewSimpleClientset()
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
@@ -72,7 +75,7 @@ func TestMakeUpdateHandler(t *testing.T) {
 			"log_level": "CRITICAL",
 			"image": "ghcr.io/grycap/cowsay",
 			"alpine": false,
-			"script": "test",
+			"script": "line1\r\nline2\r\n",
 			"input": [
   			],
 			"output": [
@@ -103,4 +106,10 @@ func TestMakeUpdateHandler(t *testing.T) {
 		t.Errorf("expecting code %d, got %d", http.StatusNoContent, w.Code)
 	}
 
+	if back.UpdatedService == nil {
+		t.Fatal("expected backend to receive updated service, got nil")
+	}
+	if strings.Contains(back.UpdatedService.Script, "\r") {
+		t.Fatalf("expected script without CR characters, got %q", back.UpdatedService.Script)
+	}
 }

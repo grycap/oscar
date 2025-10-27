@@ -33,6 +33,8 @@ var errFake = errors.New("fake error")
 type FakeBackend struct {
 	errors  map[string][]error
 	Service *types.Service // service to be returned by the ReadService function
+	// UpdatedService stores the last service received through UpdateService.
+	UpdatedService *types.Service
 }
 
 // MakeFakeBackend returns the pointer of a new FakeBackend struct
@@ -92,6 +94,8 @@ func (f *FakeBackend) ReadService(name string) (*types.Service, error) {
 
 // UpdateService updates an existent service (fake)
 func (f *FakeBackend) UpdateService(service types.Service) error {
+	svcCopy := service
+	f.UpdatedService = &svcCopy
 	return f.returnError(getCurrentFuncName())
 }
 

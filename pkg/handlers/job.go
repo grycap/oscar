@@ -201,7 +201,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 
 			if service.Mount.Provider != "" {
 				args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath()) + ";echo \"I finish\" > /tmpfolder/finish-file;"}
-				resources.SetMountUID(podSpec, *service, cfg, requestUserUID)
+				resources.SetMount(podSpec, *service, cfg)
 			} else {
 				args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath())}
 			}
@@ -262,6 +262,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		}
 
 		// Create job definition
+		ttl := int32(cfg.TTLJob) // #nosec
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				// UUID used as a name for jobs
@@ -272,7 +273,8 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				Annotations: service.Annotations,
 			},
 			Spec: batchv1.JobSpec{
-				BackoffLimit: &backoffLimit,
+				BackoffLimit:            &backoffLimit,
+				TTLSecondsAfterFinished: &ttl,
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels:      service.Labels,

@@ -233,3 +233,103 @@ func TestIsSchedulable(t *testing.T) {
 		}
 	})
 }
+
+func TestUpdateResourcesCalculatesCapacity(t *testing.T) {
+	memoryAlloc := resource.MustParse("4Gi")
+	cpuAlloc := resource.MustParse("2000m")
+
+	reqMem := resource.MustParse("1Gi")
+	reqCPU := resource.MustParse("500m")
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+		Spec:       v1.NodeSpec{Unschedulable: false},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
+			Allocatable: v1.ResourceList{
+				v1.ResourceMemory: memoryAlloc,
+				v1.ResourceCPU:    cpuAlloc,
+			},
+		},
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod1"},
+		Spec: v1.PodSpec{
+			NodeName: "node1",
+			Containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: reqMem,
+						v1.ResourceCPU:    reqCPU,
+					},
+				}},
+			},
+		},
+		Status: v1.PodStatus{Phase: v1.PodRunning},
+	}
+
+	krm := KubeResourceManager{kubeClientset: fake.NewSimpleClientset(node, pod)}
+
+	if err := krm.UpdateResources(); err != nil {
+		t.Fatalf("unexpected error updating resources: %v", err)
+	}
+
+	if len(krm.resources) != 1 {
+		t.Fatalf("expected one node resource entry, got %d", len(krm.resources))
+	}
+
+	expectedMemory := memoryAlloc.Value() - reqMem.Value()
+	expectedCPU := cpuAlloc.MilliValue() - reqCPU.MilliValue()
+
+	if krm.resources[0].memory != expectedMemory {
+		t.Fatalf("expected memory %d, got %d", expectedMemory, krm.resources[0].memory)
+	}
+	if krm.resources[0].cpu != expectedCPU {
+		t.Fatalf("expected cpu %d, got %d", expectedCPU, krm.resources[0].cpu)
+	}
+
+	cases := []struct {
+		name     string
+		memory   string
+		cpu      string
+		expected bool
+	}{
+		{"fits", "1Gi", "400m", true},
+		{"exceeds", "5Gi", "400m", false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			reqs := v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse(c.memory),
+					v1.ResourceCPU:    resource.MustParse(c.cpu),
+				},
+			}
+			if krm.IsSchedulable(reqs) != c.expected {
+				t.Fatalf("unexpected schedulable result for %s", c.name)
+			}
+		})
+	}
+}
+
+func TestUpdateResourcesSkipsNotReadyNodes(t *testing.T) {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+		Spec:       v1.NodeSpec{Unschedulable: false},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
+		},
+	}
+
+	krm := KubeResourceManager{kubeClientset: fake.NewSimpleClientset(node)}
+
+	if err := krm.UpdateResources(); err != nil {
+		t.Fatalf("unexpected error updating resources: %v", err)
+	}
+
+	if len(krm.resources) != 0 {
+		t.Fatalf("expected no schedulable nodes, got %d", len(krm.resources))
+	}
+}

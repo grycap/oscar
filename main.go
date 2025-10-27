@@ -101,15 +101,16 @@ func main() {
 	system.GET("/buckets", buckets.MakeListHandler(cfg))
 	system.PUT("/buckets", buckets.MakeUpdateHandler(cfg))
 	system.DELETE("/buckets/:bucket", buckets.MakeDeleteHandler(cfg))
+	system.POST("/buckets/:bucket/presign", buckets.MakePresignHandler(cfg))
 
 	// Logs paths
-	system.GET("/logs/:serviceName", handlers.MakeJobsInfoHandler(back, kubeClientset, cfg.ServicesNamespace))
-	system.DELETE("/logs/:serviceName", handlers.MakeDeleteJobsHandler(back, kubeClientset, cfg.ServicesNamespace))
-	system.GET("/logs/:serviceName/:jobName", handlers.MakeGetLogsHandler(back, kubeClientset, cfg.ServicesNamespace))
-	system.DELETE("/logs/:serviceName/:jobName", handlers.MakeDeleteJobHandler(back, kubeClientset, cfg.ServicesNamespace))
+	system.GET("/logs/:serviceName", handlers.MakeJobsInfoHandler(back, kubeClientset, cfg))
+	system.DELETE("/logs/:serviceName", handlers.MakeDeleteJobsHandler(back, kubeClientset, cfg))
+	system.GET("/logs/:serviceName/:jobName", handlers.MakeGetLogsHandler(back, kubeClientset, cfg))
+	system.DELETE("/logs/:serviceName/:jobName", handlers.MakeDeleteJobHandler(back, kubeClientset, cfg))
 
 	// Status path for cluster status (Memory and CPU) checks
-	system.GET("/status", handlers.MakeStatusHandler(kubeClientset, metricsClientset))
+	system.GET("/status", handlers.MakeStatusHandler(cfg, kubeClientset, metricsClientset))
 
 	// Job path for async invocations
 	r.POST("/job/:serviceName", auth.GetLoggerMiddleware(), handlers.MakeJobHandler(cfg, kubeClientset, back, resMan))
