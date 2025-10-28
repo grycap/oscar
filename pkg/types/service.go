@@ -18,7 +18,6 @@ package types
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/goccy/go-yaml"
 	v1 "k8s.io/api/core/v1"
@@ -53,12 +52,6 @@ const (
 	// PVCName name of the OSCAR PVC
 	PVCName = "oscar-pvc"
 
-	// WatchdogName name of the OpenFaaS watchdog binary
-	WatchdogName = "fwatchdog"
-
-	// WatchdogProcess name of the environment variable used by the watchdog to handle requests
-	WatchdogProcess = "fprocess"
-
 	// SupervisorName name of the FaaS Supervisor binary
 	SupervisorName = "supervisor"
 
@@ -70,9 +63,6 @@ const (
 
 	// JobUUIDVariable name used by the environment variable of the job UUID
 	JobUUIDVariable = "JOB_UUID"
-
-	// OpenfaasZeroScalingLabel label to enable zero scaling in OpenFaaS functions
-	OpenfaasZeroScalingLabel = "com.openfaas.scale.zero"
 
 	// YunikornApplicationIDLabel label to define the Yunikorn's application ID
 	YunikornApplicationIDLabel = "applicationId"
@@ -310,7 +300,7 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 						MountPath: ConfigPath,
 					},
 				},
-				Command:   []string{fmt.Sprintf("%s/%s", VolumePath, WatchdogName)},
+				Command:   []string{service.GetSupervisorPath()},
 				Resources: resources,
 			},
 		},
@@ -349,9 +339,6 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, volumeMount)
 		podSpec.Volumes = append(podSpec.Volumes, volume)
 	}
-
-	// Add the required environment variables for the watchdog
-	addWatchdogEnvVars(podSpec, cfg, service)
 
 	if service.EnableSGX {
 		SetSecurityContext(podSpec)
@@ -455,48 +442,6 @@ func createResources(service *Service) (v1.ResourceRequirements, error) {
 	}
 
 	return resources, nil
-}
-
-func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) {
-	requiredEnvVars := []v1.EnvVar{
-		// Use FaaS Supervisor to handle requests
-		{
-			Name:  WatchdogProcess,
-			Value: service.GetSupervisorPath(),
-		},
-		// Other OpenFaaS Watchdog options
-		// https://github.com/openfaas/classic-watchdog
-		{
-			Name:  "max_inflight",
-			Value: strconv.Itoa(cfg.WatchdogMaxInflight),
-		},
-		{
-			Name:  "write_debug",
-			Value: strconv.FormatBool(cfg.WatchdogWriteDebug),
-		},
-		{
-			Name:  "exec_timeout",
-			Value: strconv.Itoa(cfg.WatchdogExecTimeout),
-		},
-		{
-			Name:  "read_timeout",
-			Value: strconv.Itoa(cfg.WatchdogReadTimeout),
-		},
-		{
-			Name:  "write_timeout",
-			Value: strconv.Itoa(cfg.WatchdogWriteTimeout),
-		},
-		{
-			Name:  "healthcheck_interval",
-			Value: strconv.Itoa(cfg.WatchdogHealthCheckInterval),
-		},
-	}
-
-	for i, cont := range p.Containers {
-		if cont.Name == ContainerName {
-			p.Containers[i].Env = append(p.Containers[i].Env, requiredEnvVars...)
-		}
-	}
 }
 
 // GetSupervisorPath returns the appropriate supervisor path

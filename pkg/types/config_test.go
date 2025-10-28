@@ -120,29 +120,23 @@ func TestRequiredValues(t *testing.T) {
 
 func TestCustomValues(t *testing.T) {
 	environment := map[string]string{
-		"OSCAR_USERNAME":                "testuser",
-		"OSCAR_PASSWORD":                "testpass",
-		"MINIO_ACCESS_KEY":              "testminioaccess",
-		"MINIO_SECRET_KEY":              "testminiosecret",
-		"MINIO_REGION":                  "testminioregion",
-		"MINIO_TLS_VERIFY":              "true",
-		"MINIO_ENDPOINT":                "https://test.minio.endpoint",
-		"OSCAR_NAME":                    "testname",
-		"OSCAR_NAMESPACE":               "testnamespace",
-		"OSCAR_SERVICES_NAMESPACE":      "testservicesnamespace",
-		"WATCHDOG_MAX_INFLIGHT":         "20",
-		"WATCHDOG_WRITE_DEBUG":          "false",
-		"WATCHDOG_EXEC_TIMEOUT":         "50",
-		"WATCHDOG_READ_TIMEOUT":         "50",
-		"WATCHDOG_WRITE_TIMEOUT":        "50",
-		"WATCHDOG_HEALTHCHECK_INTERVAL": "50",
-		"READ_TIMEOUT":                  "50",
-		"WRITE_TIMEOUT":                 "50",
-		"OSCAR_SERVICE_PORT":            "8000",
-		"YUNIKORN_ENABLE":               "true",
-		"YUNIKORN_NAMESPACE":            "testyunikornnamespace",
-		"YUNIKORN_CONFIGMAP":            "testyunikornconfigmap",
-		"YUNIKORN_CONFIG_FILENAME":      "testyunikornconfigfilename",
+		"OSCAR_USERNAME":           "testuser",
+		"OSCAR_PASSWORD":           "testpass",
+		"MINIO_ACCESS_KEY":         "testminioaccess",
+		"MINIO_SECRET_KEY":         "testminiosecret",
+		"MINIO_REGION":             "testminioregion",
+		"MINIO_TLS_VERIFY":         "true",
+		"MINIO_ENDPOINT":           "https://test.minio.endpoint",
+		"OSCAR_NAME":               "testname",
+		"OSCAR_NAMESPACE":          "testnamespace",
+		"OSCAR_SERVICES_NAMESPACE": "testservicesnamespace",
+		"READ_TIMEOUT":             "50",
+		"WRITE_TIMEOUT":            "50",
+		"OSCAR_SERVICE_PORT":       "8000",
+		"YUNIKORN_ENABLE":          "true",
+		"YUNIKORN_NAMESPACE":       "testyunikornnamespace",
+		"YUNIKORN_CONFIGMAP":       "testyunikornconfigmap",
+		"YUNIKORN_CONFIG_FILENAME": "testyunikornconfigfilename",
 	}
 
 	scenarios := []struct {
@@ -171,7 +165,7 @@ func TestCustomValues(t *testing.T) {
 		},
 		{
 			"Invalid int",
-			"WATCHDOG_MAX_INFLIGHT",
+			"OSCAR_SERVICE_PORT",
 			"test",
 			true,
 		},
@@ -219,8 +213,8 @@ func TestServerlessBackend(t *testing.T) {
 		returnError       bool
 	}{
 		{
-			"Valid \"openfaas\"",
-			"openfaas",
+			"Empty value",
+			"",
 			false,
 		},
 		{
@@ -229,15 +223,13 @@ func TestServerlessBackend(t *testing.T) {
 			false,
 		},
 		{
-			"Valid \"OPENFAAS\"",
-			"OPENFAAS",
-
+			"Valid uppercase",
+			"KNATIVE",
 			false,
 		},
 		{
 			"Invalid",
-			"test",
-
+			"legacy",
 			true,
 		},
 	}
