@@ -47,6 +47,20 @@ rules:
   - create
   - delete
   - deletecollection
+- apiGroups:
+  - serving.knative.dev
+  resources:
+  - services
+  - revisions
+  - configurations
+  - routes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -57,6 +71,36 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: oscar-controller
+subjects:
+- kind: ServiceAccount
+  name: oscar-sa
+  namespace: oscar
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: oscar-manager
+  namespace: oscar
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/log
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: oscar-manager-binding
+  namespace: oscar
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: oscar-manager
 subjects:
 - kind: ServiceAccount
   name: oscar-sa

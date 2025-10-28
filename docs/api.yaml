@@ -131,6 +131,40 @@ paths:
         - token: []
       tags:
         - services
+  '/system/logs':
+    get:
+      summary: Get system logs
+      operationId: GetSystemLogs
+      tags:
+        - logs
+      parameters:
+        - schema:
+            type: boolean
+          in: query
+          name: timestamps
+          description: Include timestamps in the system logs output (default: false)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SystemLogEntry'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      security:
+        - basicAuth: []
   '/system/logs/{serviceName}':
     parameters:
       - schema:
@@ -836,6 +870,26 @@ components:
           type: string
         verify:
           type: boolean
+    SystemLogEntry:
+      title: SystemLogEntry
+      type: object
+      properties:
+        timestamp:
+          type: string
+        status:
+          type: integer
+        latency:
+          type: string
+        client_ip:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+        user:
+          type: string
+        raw:
+          type: string
   securitySchemes:
     basicAuth:
       type: http
