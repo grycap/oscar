@@ -231,7 +231,6 @@ rescheduler_threshold: 0
 log_level: ""
 image: testimage
 alpine: false
-propagate_token: false
 token: ""
 file_stage_in: false
 input: []
