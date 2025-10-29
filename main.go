@@ -64,10 +64,10 @@ func main() {
 	back := backends.MakeServerlessBackend(kubeClientset, kubeConfig, cfg)
 
 	// Start OpenFaaS Scaler
-	if cfg.ServerlessBackend == "openfaas" && cfg.OpenfaasScalerEnable {
+	/*if cfg.ServerlessBackend == "openfaas" && cfg.OpenfaasScalerEnable {
 		ofBack := back.(*backends.OpenfaasBackend)
 		go ofBack.StartScaler()
-	}
+	}*/
 
 	// Create the ResourceManager and start it if enabled
 	resMan := resourcemanager.MakeResourceManager(cfg, kubeClientset)
