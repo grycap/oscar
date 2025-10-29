@@ -98,8 +98,8 @@ view after a few seconds.
 OSCAR services can be invoked through auto-generated HTTP endpoints. Requests
 to these endpoints can be made in two ways:
 
-- **Synchronous** through the path `/run/<SERVICE_NAME>`. This delegates the
-    request to the Knative service backing the OSCAR function.
+- **Synchronous** through the path `/run/<SERVICE_NAME>`. This redirects the
+    request to the OpenFaaS gateway in order to perform the processing.
 - **Asynchronous** through the path `/job/<SERVICE_NAME>`. This mode is used
     to perform file-processing when files are uploaded to the input storage
     provider, creating a Kubernetes job per service invocation.

@@ -6,7 +6,7 @@ audio files from plain text.
 
 *Note: If you're going to invoke the service
 [synchronously](https://docs.oscar.grycap.net/invoking/#synchronous-invocations),
-you must enable the Knative serverless backend in OSCAR.*
+you must enable a ServerlessBackend in OSCAR (Knative or OpenFaaS).*
 
 ```yaml
 functions:
