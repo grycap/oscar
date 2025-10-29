@@ -110,6 +110,7 @@ made available in the `/var/tmp` folder of the front-end node of the cluster.
 |----------------|---------------------------|--------------|-----------------|
 | OSCAR          | https://{FRONT_NODE}      | oscar        | oscar_password  |
 | MinIO          | https://{FRONT_NODE}:30300| minio        | minio_secret_key|
+| OpenFaaS       | http://{FRONT_NODE}:31112 | admin        | gw_password     |
 | Kubernetes API | https://{FRONT_NODE}:6443 |              | tokenpass       |
 | Kube. Dashboard| https://{FRONT_NODE}:30443|              | dashboard_token |
 

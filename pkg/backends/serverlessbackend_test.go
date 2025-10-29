@@ -35,6 +35,11 @@ func TestMakeServerlessBackend(t *testing.T) {
 		expectedBackendType string
 	}{
 		{
+			name:                "OpenFaaS Backend",
+			serverlessBackend:   "openfaas",
+			expectedBackendType: "*backends.OpenfaasBackend",
+		},
+		{
 			name:                "Knative Backend",
 			serverlessBackend:   "knative",
 			expectedBackendType: "*backends.KnativeBackend",

@@ -19,6 +19,7 @@ package types
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/barkimedes/go-deepcopy"
@@ -83,7 +84,13 @@ var (
 		},
 	}
 
-	testConfig Config = Config{}
+	testConfig Config = Config{
+		WatchdogMaxInflight:  20,
+		WatchdogWriteDebug:   true,
+		WatchdogExecTimeout:  60,
+		WatchdogReadTimeout:  60,
+		WatchdogWriteTimeout: 60,
+	}
 )
 
 func TestCreateResources(t *testing.T) {
@@ -347,14 +354,7 @@ func TestToPodSpec(t *testing.T) {
 					t.Errorf("unexpected error: %v", err)
 				}
 
-				if len(podSpec.Containers[0].Command) != 1 {
-					t.Fatalf("expected a single command entry, got %d", len(podSpec.Containers[0].Command))
-				}
-				if podSpec.Containers[0].Command[0] != svc.GetSupervisorPath() {
-					t.Fatalf("expected command to be supervisor path %s, got %s", svc.GetSupervisorPath(), podSpec.Containers[0].Command[0])
-				}
-
-				if err = checkEnvVars(podSpec); err != nil {
+				if err = checkEnvVars(&testConfig, podSpec); err != nil {
 					t.Error(err.Error())
 				}
 			}
@@ -362,21 +362,45 @@ func TestToPodSpec(t *testing.T) {
 	}
 }
 
-func checkEnvVars(podSpec *v1.PodSpec) error {
-	disallowed := map[string]struct{}{
-		"max_inflight":         {},
-		"write_debug":          {},
-		"exec_timeout":         {},
-		"read_timeout":         {},
-		"write_timeout":        {},
-		"healthcheck_interval": {},
-		"fprocess":             {},
-	}
+func checkEnvVars(cfg *Config, podSpec *v1.PodSpec) error {
+	var expected string
+	var found = []string{}
 
 	for _, envVar := range podSpec.Containers[0].Env {
-		if _, ok := disallowed[envVar.Name]; ok {
-			return fmt.Errorf("unexpected watchdog environment variable %q present in pod spec", envVar.Name)
+		switch envVar.Name {
+		case "max_inflight":
+			expected = strconv.Itoa(cfg.WatchdogMaxInflight)
+			if envVar.Value != expected {
+				return fmt.Errorf("componenteax_inflight environment variable has not the correct value. Expected: %s, got: %s", expected, envVar.Value)
+			}
+		case "write_debug":
+			expected = strconv.FormatBool(cfg.WatchdogWriteDebug)
+			if envVar.Value != expected {
+				return fmt.Errorf("the write_debug environment variable has not the correct value. Expected: %s, got: %s", expected, envVar.Value)
+			}
+		case "exec_timeout":
+			expected = strconv.Itoa(cfg.WatchdogExecTimeout)
+			if envVar.Value != expected {
+				return fmt.Errorf("the exec_timeout environment variable has not the correct value. Expected: %s, got: %s", expected, envVar.Value)
+			}
+		case "read_timeout":
+			expected = strconv.Itoa(cfg.WatchdogReadTimeout)
+			if envVar.Value != expected {
+				return fmt.Errorf("the read_timeout environment variable has not the correct value. Expected: %s, got: %s", expected, envVar.Value)
+			}
+		case "write_timeout":
+			expected = strconv.Itoa(cfg.WatchdogWriteTimeout)
+			if envVar.Value != expected {
+				return fmt.Errorf("the write_timeout environment variable has not the correct value. Expected: %s, got: %s", expected, envVar.Value)
+			}
+		default:
+			continue
 		}
+		found = append(found, envVar.Name)
+	}
+
+	if len(found) != 5 {
+		return fmt.Errorf("only the following watchdog environment variables are correctly defined: %v", found)
 	}
 
 	return nil
