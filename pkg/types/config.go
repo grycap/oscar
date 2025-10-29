@@ -94,7 +94,7 @@ type Config struct {
 	ServerlessBackend string `json:"serverless_backend,omitempty"`
 
 	// OpenfaasNamespace namespace where the OpenFaaS gateway is deployed
-	OpenfaasNamespace string `json:"-"`
+	/*OpenfaasNamespace string `json:"-"`
 
 	// OpenfaasPort service port where the OpenFaaS gateway is exposed
 	OpenfaasPort int `json:"-"`
@@ -127,7 +127,7 @@ type Config struct {
 	WatchdogReadTimeout int `json:"-"`
 
 	// WatchdogWriteTimeout
-	WatchdogWriteTimeout int `json:"-"`
+	WatchdogWriteTimeout int `json:"-"`*/
 
 	// WatchdogHealthCheckInterval
 	WatchdogHealthCheckInterval int `json:"-"`
@@ -224,18 +224,18 @@ var configVars = []configVar{
 	{"Namespace", "OSCAR_NAMESPACE", false, stringType, "oscar"},
 	{"ServicesNamespace", "OSCAR_SERVICES_NAMESPACE", false, stringType, "oscar-svc"},
 	{"ServerlessBackend", "SERVERLESS_BACKEND", false, serverlessBackendType, ""},
-	{"OpenfaasNamespace", "OPENFAAS_NAMESPACE", false, stringType, "openfaas"},
-	{"OpenfaasPort", "OPENFAAS_PORT", false, intType, "8080"},
-	{"OpenfaasBasicAuthSecret", "OPENFAAS_BASIC_AUTH_SECRET", false, stringType, "basic-auth"},
-	{"OpenfaasPrometheusPort", "OPENFAAS_PROMETHEUS_PORT", false, intType, "9090"},
-	{"OpenfaasScalerEnable", "OPENFAAS_SCALER_ENABLE", false, boolType, "false"},
-	{"OpenfaasScalerInterval", "OPENFAAS_SCALER_INTERVAL", false, stringType, "2m"},
-	{"OpenfaasScalerInactivityDuration", "OPENFAAS_SCALER_INACTIVITY_DURATION", false, stringType, "10m"},
-	{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
-	{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
-	{"WatchdogExecTimeout", "WATCHDOG_EXEC_TIMEOUT", false, intType, "0"},
-	{"WatchdogReadTimeout", "WATCHDOG_READ_TIMEOUT", false, intType, "300"},
-	{"WatchdogWriteTimeout", "WATCHDOG_WRITE_TIMEOUT", false, intType, "300"},
+	//{"OpenfaasNamespace", "OPENFAAS_NAMESPACE", false, stringType, "openfaas"},
+	//{"OpenfaasPort", "OPENFAAS_PORT", false, intType, "8080"},
+	//{"OpenfaasBasicAuthSecret", "OPENFAAS_BASIC_AUTH_SECRET", false, stringType, "basic-auth"},
+	//{"OpenfaasPrometheusPort", "OPENFAAS_PROMETHEUS_PORT", false, intType, "9090"},
+	//{"OpenfaasScalerEnable", "OPENFAAS_SCALER_ENABLE", false, boolType, "false"},
+	//{"OpenfaasScalerInterval", "OPENFAAS_SCALER_INTERVAL", false, stringType, "2m"},
+	//{"OpenfaasScalerInactivityDuration", "OPENFAAS_SCALER_INACTIVITY_DURATION", false, stringType, "10m"},
+	//{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
+	//{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
+	//{"WatchdogExecTimeout", "WATCHDOG_EXEC_TIMEOUT", false, intType, "0"},
+	//{"WatchdogReadTimeout", "WATCHDOG_READ_TIMEOUT", false, intType, "300"},
+	//{"WatchdogWriteTimeout", "WATCHDOG_WRITE_TIMEOUT", false, intType, "300"},
 	{"WatchdogHealthCheckInterval", "WATCHDOG_HEALTHCHECK_INTERVAL", false, intType, "5"},
 	{"ReadTimeout", "READ_TIMEOUT", false, secondsType, "300"},
 	{"WriteTimeout", "WRITE_TIMEOUT", false, secondsType, "300"},
