@@ -88,6 +88,7 @@ func main() {
 
 	// Config path
 	system.GET("/config", handlers.MakeConfigHandler(cfg))
+	system.PUT("/config", handlers.MakeConfigUpdateHandler(cfg))
 
 	// CRUD Services
 	system.POST("/services", handlers.MakeCreateHandler(cfg, back))

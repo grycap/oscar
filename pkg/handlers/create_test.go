@@ -165,6 +165,55 @@ func TestMakeCreateHandler(t *testing.T) {
 
 	// Close the fake MinIO server
 	defer server.Close()
+
+	t.Run("Rejects disallowed image", func(t *testing.T) {
+		if err := cfg.SetAllowedImageRepositories([]string{"docker.io/library/safe"}); err != nil {
+			t.Fatalf("unexpected error configuring allowed repositories: %v", err)
+		}
+		defer func() {
+			_ = cfg.SetAllowedImageRepositories(nil)
+		}()
+
+		w := httptest.NewRecorder()
+		body := strings.NewReader(`
+				{
+					"name": "cowsay",
+					"cluster_id": "oscar",
+					"memory": "1Gi",
+					"cpu": "1.0",
+					"log_level": "CRITICAL",
+					"image": "ghcr.io/grycap/cowsay",
+					"alpine": false,
+					"script": "test",
+					"input": [],
+					"output": [],
+					"mount": {
+						"storage_provider": "minio",
+						"path": "test/mount"
+					},
+					"storage_providers": {
+						"webdav": {
+							"id": {
+								"hostname": "` + server.URL + `",
+								"login": "user",
+								"password": "pass"
+							}
+						}
+					},
+					"isolation_level": "",
+					"bucket_list": [],
+					"visibility": "public",
+					"allowed_users": []
+				}`)
+
+		req, _ := http.NewRequest("POST", "/system/services", body)
+		req.Header.Add("Authorization", "Bearer token")
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusForbidden {
+			t.Fatalf("expected status %d, got %d; body: %s", http.StatusForbidden, w.Code, w.Body.String())
+		}
+	})
 }
 
 func TestCheckValuesDefaults(t *testing.T) {

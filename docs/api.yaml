@@ -308,7 +308,7 @@ paths:
         description: Event
   /system/config:
     get:
-      summary: Your GET endpoint
+      summary: Get system configuration
       tags:
         - config
       responses:
@@ -327,6 +327,47 @@ paths:
       security:
         - basicAuth: []
         - token: []
+    put:
+      summary: Update system configuration
+      description: Update mutable configuration values. Only the `oscar` user authenticated via basic auth may perform this operation.
+      tags:
+        - config
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                allowed_image_repositories:
+                  type: array
+                  description: List of Docker repositories allowed for OSCAR services.
+                  items:
+                    type: string
+              required:
+                - allowed_image_repositories
+            example:
+              allowed_image_repositories:
+                - ghcr.io/grycap/oscar
+                - docker.io/library/safe
+      responses:
+        '200':
+          description: Updated configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Config'
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '500':
+          description: Internal Server Error
+      operationId: UpdateConfig
+      security:
+        - basicAuth: []
   '/run/{serviceName}':
     parameters:
       - schema:

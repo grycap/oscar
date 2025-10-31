@@ -97,15 +97,12 @@ func (kn *KnativeBackend) ListServices() ([]*types.Service, error) {
 
 // CreateService creates a new service as a Knative service
 func (kn *KnativeBackend) CreateService(service types.Service) error {
-
-	// Check if there is some user defined settings for OSCAR
-	err := checkAdditionalConfig(ConfigMapNameOSCAR, kn.namespace, service, kn.config, kn.kubeClientset)
-	if err != nil {
+	if err := kn.config.ValidateImageRepository(service.Image); err != nil {
 		return err
 	}
 
 	// Create the configMap with FDL and user-script
-	err = createServiceConfigMap(&service, kn.namespace, kn.kubeClientset)
+	err := createServiceConfigMap(&service, kn.namespace, kn.kubeClientset)
 	if err != nil {
 		return err
 	}
@@ -172,12 +169,6 @@ func (kn *KnativeBackend) ReadService(name string) (*types.Service, error) {
 // UpdateService updates an existent service
 func (kn *KnativeBackend) UpdateService(service types.Service) error {
 
-	// Check if there is some user defined settings for OSCAR
-	err := checkAdditionalConfig(ConfigMapNameOSCAR, kn.namespace, service, kn.config, kn.kubeClientset)
-	if err != nil {
-		return err
-	}
-
 	// Get the old knative service
 	oldSvc, err := kn.knClientset.ServingV1().Services(kn.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
@@ -187,6 +178,17 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	oldCm, err := kn.kubeClientset.CoreV1().ConfigMaps(kn.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", service.Name)
+	}
+
+	oldService, err := getServiceFromConfigMap(oldCm)
+	if err != nil {
+		return err
+	}
+
+	if err := kn.config.ValidateImageRepository(service.Image); err != nil {
+		if oldService == nil || oldService.Image != service.Image {
+			return err
+		}
 	}
 
 	// Update the configMap with FDL and user-script

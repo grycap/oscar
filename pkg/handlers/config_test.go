@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -36,13 +37,14 @@ import (
 func createExpectedBody(access_key string, secret_key string, cfg *types.Config) map[string]interface{} {
 	return map[string]interface{}{
 		"config": map[string]interface{}{
-			"name":                "",
-			"namespace":           "",
-			"services_namespace":  "",
-			"gpu_available":       false,
-			"interLink_available": false,
-			"yunikorn_enable":     false,
-			"oidc_groups":         nil,
+			"name":                       "",
+			"namespace":                  "",
+			"services_namespace":         "",
+			"gpu_available":              false,
+			"interLink_available":        false,
+			"yunikorn_enable":            false,
+			"oidc_groups":                nil,
+			"allowed_image_repositories": []interface{}{},
 		},
 		"minio_provider": map[string]interface{}{
 			"endpoint":   cfg.MinIOProvider.Endpoint,
@@ -51,6 +53,7 @@ func createExpectedBody(access_key string, secret_key string, cfg *types.Config)
 			"secret_key": secret_key,
 			"region":     cfg.MinIOProvider.Region,
 		},
+		"allowed_image_repositories": []interface{}{},
 	}
 }
 
@@ -162,6 +165,113 @@ func TestMakeConfigHandler(t *testing.T) {
 
 		if !reflect.DeepEqual(responseBody, expected_body) {
 			t.Fatalf("Unexpected response body: %s", w.Body.String())
+		}
+	})
+}
+
+func TestMakeConfigUpdateHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("Rejects bearer token", func(t *testing.T) {
+		cfg := &types.Config{}
+		router := gin.New()
+		router.PUT("/config", MakeConfigUpdateHandler(cfg))
+
+		body := bytes.NewBufferString(`{"allowed_image_repositories":["ghcr.io/grycap"]}`)
+		req, _ := http.NewRequest("PUT", "/config", body)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer token")
+		resp := httptest.NewRecorder()
+
+		router.ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusForbidden {
+			t.Fatalf("expected status %d, got %d", http.StatusForbidden, resp.Code)
+		}
+	})
+
+	t.Run("Rejects non-oscar user", func(t *testing.T) {
+		cfg := &types.Config{}
+		router := gin.New()
+		router.Use(func(c *gin.Context) {
+			c.Set(gin.AuthUserKey, "admin")
+		})
+		router.PUT("/config", MakeConfigUpdateHandler(cfg))
+
+		body := bytes.NewBufferString(`{"allowed_image_repositories":["ghcr.io/grycap"]}`)
+		req, _ := http.NewRequest("PUT", "/config", body)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+
+		router.ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusForbidden {
+			t.Fatalf("expected status %d, got %d", http.StatusForbidden, resp.Code)
+		}
+	})
+
+	t.Run("Updates allowed repositories", func(t *testing.T) {
+		cfg := &types.Config{
+			MinIOProvider: &types.MinIOProvider{
+				Endpoint: "http://minio",
+			},
+		}
+		router := gin.New()
+		router.Use(func(c *gin.Context) {
+			c.Set(gin.AuthUserKey, "oscar")
+		})
+		router.PUT("/config", MakeConfigUpdateHandler(cfg))
+
+		body := bytes.NewBufferString(`{"allowed_image_repositories":["GHCR.io/grycap/oscar","docker.io/library/safe"]}`)
+		req, _ := http.NewRequest("PUT", "/config", body)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+
+		router.ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, resp.Code)
+		}
+
+		var response struct {
+			Config struct {
+				Allowed []string `json:"allowed_image_repositories"`
+			} `json:"config"`
+			Allowed []string `json:"allowed_image_repositories"`
+		}
+		if err := json.Unmarshal(resp.Body.Bytes(), &response); err != nil {
+			t.Fatalf("error parsing response: %v", err)
+		}
+
+		expected := []string{"ghcr.io/grycap/oscar", "docker.io/library/safe"}
+		if !reflect.DeepEqual(response.Config.Allowed, expected) {
+			t.Fatalf("expected allowed repos %v, got %v", expected, response.Config.Allowed)
+		}
+		if !reflect.DeepEqual(response.Allowed, expected) {
+			t.Fatalf("expected top-level allowed repos %v, got %v", expected, response.Allowed)
+		}
+		if !reflect.DeepEqual(cfg.GetAllowedImageRepositories(), expected) {
+			t.Fatalf("config not updated correctly, got %v", cfg.GetAllowedImageRepositories())
+		}
+	})
+
+	t.Run("Rejects invalid repository", func(t *testing.T) {
+		cfg := &types.Config{}
+		router := gin.New()
+		router.Use(func(c *gin.Context) {
+			c.Set(gin.AuthUserKey, "oscar")
+		})
+		router.PUT("/config", MakeConfigUpdateHandler(cfg))
+
+		body := bytes.NewBufferString(`{"allowed_image_repositories":["https://bad"]}`)
+		req, _ := http.NewRequest("PUT", "/config", body)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+
+		router.ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusBadRequest {
+			t.Fatalf("expected status %d, got %d", http.StatusBadRequest, resp.Code)
 		}
 	})
 }
