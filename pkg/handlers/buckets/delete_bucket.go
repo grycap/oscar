@@ -25,7 +25,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/handlers"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
@@ -77,10 +76,14 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 			return
 		}
 		// If bucket exit
-		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+		minIOAdminClient, err := makeBucketAdminClient(cfg)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", err))
+			return
+		}
 		v := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: uid})
 		if (uid == types.DefaultOwner) || (v == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucketName)) {
-			err := handlers.DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+			err := minIOAdminClient.DeleteBuckets(s3Client, utils.MinIOBucket{
 				BucketName: bucketName,
 				Visibility: v,
 				Owner:      uid,
