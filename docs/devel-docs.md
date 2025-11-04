@@ -5,7 +5,7 @@ OSCAR uses [MKDocs](https://www.mkdocs.org) for the documentation. In particular
 Install the following dependencies:
 
 ```sh
-pip install mkdocs mkdocs-material mkdocs-render-swagger-plugin
+pip install mkdocs mkdocs-material mkdocs-render-swagger-plugin mike
 ```
 
 The from the main folder `oscar` run:

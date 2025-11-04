@@ -64,10 +64,10 @@ func main() {
 	back := backends.MakeServerlessBackend(kubeClientset, kubeConfig, cfg)
 
 	// Start OpenFaaS Scaler
-	if cfg.ServerlessBackend == "openfaas" && cfg.OpenfaasScalerEnable {
+	/*if cfg.ServerlessBackend == "openfaas" && cfg.OpenfaasScalerEnable {
 		ofBack := back.(*backends.OpenfaasBackend)
 		go ofBack.StartScaler()
-	}
+	}*/
 
 	// Create the ResourceManager and start it if enabled
 	resMan := resourcemanager.MakeResourceManager(cfg, kubeClientset)
@@ -101,6 +101,7 @@ func main() {
 	system.GET("/buckets", buckets.MakeListHandler(cfg))
 	system.PUT("/buckets", buckets.MakeUpdateHandler(cfg))
 	system.DELETE("/buckets/:bucket", buckets.MakeDeleteHandler(cfg))
+	system.POST("/buckets/:bucket/presign", buckets.MakePresignHandler(cfg))
 
 	// Logs paths
 	system.GET("/logs/:serviceName", handlers.MakeJobsInfoHandler(back, kubeClientset, cfg))

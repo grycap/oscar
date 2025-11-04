@@ -78,10 +78,10 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 		}
 		// If bucket exit
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-		v := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketPath: bucketName, Owner: uid})
+		v := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: uid})
 		if (uid == types.DefaultOwner) || (v == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucketName)) {
 			err := handlers.DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
-				BucketPath: bucketName,
+				BucketName: bucketName,
 				Visibility: v,
 				Owner:      uid,
 			})

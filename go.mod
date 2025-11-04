@@ -14,7 +14,6 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/minio/madmin-go v1.7.5
 	github.com/minio/minio-go/v7 v7.0.47
-	github.com/openfaas/faas-netes v0.0.0-20230128105321-d45bc4d2a2b1
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.14.0
 	github.com/shirou/gopsutil/v3 v3.24.5 // indirect

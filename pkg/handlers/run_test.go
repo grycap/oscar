@@ -23,12 +23,7 @@ var (
 	}
 
 	testConfigValidRun types.Config = types.Config{
-		MinIOProvider:        &testMinIOProviderRun,
-		WatchdogMaxInflight:  20,
-		WatchdogWriteDebug:   true,
-		WatchdogExecTimeout:  60,
-		WatchdogReadTimeout:  60,
-		WatchdogWriteTimeout: 60,
+		MinIOProvider: &testMinIOProviderRun,
 	}
 )
 

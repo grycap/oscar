@@ -174,7 +174,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		// Check if the bucket is in the mount path
 		if !sameStorage(in, service.Mount) {
 			err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
-				BucketPath:   splitPath[0],
+				BucketName:   splitPath[0],
 				Visibility:   service.Visibility,
 				AllowedUsers: service.AllowedUsers,
 				Owner:        service.Owner,
@@ -237,7 +237,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				}
 				if !sameStorage(out, service.Mount) {
 					err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
-						BucketPath:   outBucket,
+						BucketName:   outBucket,
 						Visibility:   service.Visibility,
 						AllowedUsers: service.AllowedUsers,
 						Owner:        service.Owner,
@@ -272,7 +272,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			}
 
 			err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
-				BucketPath:   bucket,
+				BucketName:   bucket,
 				Visibility:   utils.PRIVATE,
 				AllowedUsers: []string{},
 				Owner:        service.Owner,
@@ -297,22 +297,22 @@ func DeleteMinIOBuckets(s3Client *s3.S3, minIOAdminClient *utils.MinIOAdminClien
 		policyName = bucket.Owner
 	}
 	if bucket.Owner != types.DefaultOwner {
-		err := minIOAdminClient.RemoveResource(bucket.BucketPath, policyName, isGroup)
+		err := minIOAdminClient.RemoveResource(bucket.BucketName, policyName, isGroup)
 		if err != nil {
 			return fmt.Errorf("error removing resource")
 		}
 
 		if strings.ToLower(bucket.Visibility) == utils.RESTRICTED {
-			err := minIOAdminClient.RemoveGroupPolicy(bucket.BucketPath)
+			err := minIOAdminClient.RemoveGroupPolicy(bucket.BucketName)
 			if err != nil {
 				return fmt.Errorf("error removing policy for group")
 			}
 		}
 	}
 
-	err := minIOAdminClient.DeleteBucket(s3Client, bucket.BucketPath)
+	err := minIOAdminClient.DeleteBucket(s3Client, bucket.BucketName)
 	if err != nil {
-		return fmt.Errorf("error deleting bucket %s, %v", bucket.BucketPath, err)
+		return fmt.Errorf("error deleting bucket %s, %v", bucket.BucketName, err)
 	}
 	return nil
 }
