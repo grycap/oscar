@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -379,29 +380,50 @@ func checkStatusModResult(jsonResponse map[string]interface{}, t *testing.T, isA
 
 func TestMakeStatusHandler(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
-
 	// Mock HTTP Server for MinIO
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
-		// Mock ListBuckets (used by getMinioInfo)
-		if hreq.URL.Path == "/?list-type=2" {
+		// 1. Mock Admin info (used by the admin client)
+		if strings.HasPrefix(hreq.URL.Path, "/minio/admin/") {
 			rw.WriteHeader(http.StatusOK)
-			// Mock of 2 buckets: "bucket-a" and "bucket-b"
-			rw.Write([]byte(`
-			<ListAllMyBucketsResult>
-				<Buckets>
-					<Bucket><Name>bucket-a</Name><CreationDate>2023-01-01T00:00:00Z</CreationDate></Bucket>
-					<Bucket><Name>bucket-b</Name><CreationDate>2023-01-02T00:00:00Z</CreationDate></Bucket>
-				</Buckets>
-			</ListAllMyBucketsResult>`))
+			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 			return
 		}
+		fmt.Println("URL")
+		fmt.Println(hreq.URL.Path + "?" + hreq.URL.RawQuery)
+		// 2. Mock ListBuckets (used by getMinioInfo - called via AWS S3 client)
+		// The AWS S3 client typically sends GET / for ListBuckets.
+		if hreq.URL.Path == "/" {
+			// If RawQuery is "list-type=2" or "delimiter=/" (MinIO internal check) or "" (AWS S3 ListBuckets)
+			if hreq.URL.RawQuery == "list-type=2" {
+				rw.WriteHeader(http.StatusOK)
+				// Mock of 2 buckets: "bucket-a" and "bucket-b"
+				rw.Write([]byte(`
+				<ListAllMyBucketsResult>
+					<Buckets>
+						<Bucket><Name>bucket-a</Name><CreationDate>2023-01-01T00:00:00Z</CreationDate></Bucket>
+						<Bucket><Name>bucket-b</Name><CreationDate>2023-01-02T00:00:00Z</CreationDate></Bucket>
+					</Buckets>
+				</ListAllMyBucketsResult>`))
+				return
+			}
+			// Fallback (e.g., if we only expect "" or list-type=2, but get another query)
+			// In a successful scenario, this should not be reached for ListBuckets
+			if hreq.URL.RawQuery != "" {
+				t.Errorf("Unexpected query for ListBuckets: %s", hreq.URL.RawQuery)
+			}
+		}
 
-		// Mock ListObjects (used by getMinioInfo to calculate count)
-		if strings.Contains(hreq.URL.RawQuery, "list-type=2") {
+		// 3. Mock ListObjects (used by getMinioInfo to calculate count - called via MinIO client)
+		// Check if the request path starts with a bucket name (i.e., not just /) AND contains a query for listing (list-type=2)
+		if hreq.URL.Path != "/" && strings.Contains(hreq.URL.RawQuery, "list-type=2") {
 			rw.WriteHeader(http.StatusOK)
-			// Mock of 3 total objects (2 in bucket-a, 1 in bucket-b)
-			if strings.HasPrefix(hreq.URL.Path, "/bucket-a") {
-				// 2 objects
+
+			// Determine which bucket is being queried
+			bucketPath := strings.Trim(hreq.URL.Path, "/")
+
+			// Mock of 3 total objects (2 in bucket-a, 1 in bucket-b, including a directory)
+			if strings.HasPrefix(bucketPath, "bucket-a") {
+				// 2 files, 1 directory (Size 0)
 				rw.Write([]byte(`
 				<ListBucketResult>
 					<Contents><Key>file1.txt</Key><Size>100</Size></Contents>
@@ -409,7 +431,7 @@ func TestMakeStatusHandler(t *testing.T) {
 					<Contents><Key>dir/</Key><Size>0</Size></Contents>
 				</ListBucketResult>`))
 				return
-			} else if strings.HasPrefix(hreq.URL.Path, "/bucket-b") {
+			} else if strings.HasPrefix(bucketPath, "bucket-b") {
 				// 1 object
 				rw.Write([]byte(`
 				<ListBucketResult>
@@ -419,13 +441,9 @@ func TestMakeStatusHandler(t *testing.T) {
 			}
 		}
 
-		// Mock Admin info (used by the admin client)
-		if strings.HasPrefix(hreq.URL.Path, "/minio/admin/") {
-			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
-			return
-		}
-
+		// Fail the test if an unexpected path is hit (e.g., if ListBuckets fails the first check)
+		fmt.Println("URL")
+		fmt.Println(hreq.URL.Path + "?" + hreq.URL.RawQuery)
 		t.Errorf("Unexpected path or query in MinIO request: %s", hreq.URL.Path+"?"+hreq.URL.RawQuery)
 		rw.WriteHeader(http.StatusNotFound)
 	}))
@@ -434,7 +452,7 @@ func TestMakeStatusHandler(t *testing.T) {
 	// Create a fake Metrics clientset
 	metricsClientset := metricsfake.NewSimpleClientset()
 	// Add NodeMetrics objects to the fake clientset store
-	metricsClientset.Fake.PrependReactor("list", "nodemetrics", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+	metricsClientset.Fake.PrependReactor("list", "nodes", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 		// Usage values must be 50% of the Allocatable defined above
 		return true, &metricsv1beta1api.NodeMetricsList{
 			Items: []metricsv1beta1api.NodeMetrics{
@@ -478,7 +496,7 @@ func TestMakeStatusHandler(t *testing.T) {
 	router.Use(func(c *gin.Context) {
 		// Simulate context values set by another middleware for a regular user
 		c.Set("uidOrigin", "somelonguid@egi.eu")
-		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "regularuser@egi.eu"))
+		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "somelonguid@egi.eu"))
 		c.Next()
 	})
 	router.GET("/status", MakeStatusHandler(&cfg, kubeClientset, metricsClientset.MetricsV1beta1()))
@@ -525,6 +543,7 @@ func TestMakeStatusHandler(t *testing.T) {
 	}
 
 	var jsonResponse2 map[string]interface{}
+
 	err2 := json.Unmarshal(w2.Body.Bytes(), &jsonResponse2)
 	if err2 != nil {
 		t.Fatalf("Failed to decode admin response: %v", err2)
