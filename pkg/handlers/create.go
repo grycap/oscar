@@ -65,6 +65,11 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
+		fmt.Println(service)
+		fmt.Println(service.Federation.GroupID)
+		fmt.Println(service.Federation.Delegation)
+		fmt.Println(service.Federation.Topology)
+		fmt.Println(service.Federation.Members[0])
 		service.Script = utils.NormalizeLineEndings(service.Script)
 
 		// Check service values and set defaults
@@ -322,6 +327,8 @@ func checkValues(service *types.Service, cfg *types.Config) {
 
 	// Generate a new access token
 	service.Token = utils.GenerateToken()
+
+	// Definition of default values ​​within Federation
 
 	if service.Federation.Topology == "" {
 		service.Federation.Topology = defaultTopology

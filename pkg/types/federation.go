@@ -17,22 +17,23 @@ limitations under the License.
 package types
 
 type Federation struct {
-	GroupID string `yaml:"group_id,omitempty"`
+	//
+	GroupID string `json:"group_id,omitempty"`
 	//Topology Mode: Defines the network structure that the replicated services will have within the federation.
 	//Optional (default: none)
 	//"mesh": Mesh structure of federated services.
 	//"tree": Tree structure of federated services.
 	//"none": No structure defined
-	Topology string `yaml:"topology,omitempty"`
+	Topology string `json:"topology,omitempty"`
 	//Delegation Mode of job delegation for replicas
 	// Opcional (default: manual)
 	//"static" The user select the priority to delegate jobs to the replicas.
 	//"random" The job delegation priority is generated randomly among the clusters of the available replicas.
 	//"load-based" The job delegation priority is generated depending on the CPU and Memory available in the replica clusters.
 	//Delegation string `json:"delegation"`
-	Delegation string `yaml:"delegation"`
+	Delegation string `json:"delegation"`
 	// Cluster where the replica services are located
-	Members []Members `yaml:"members,omitempty"`
+	Members []Members `json:"members,omitempty"`
 }
 
 // Clusters struct to define service's replicas in other clusters or endpoints

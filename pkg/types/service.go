@@ -169,7 +169,7 @@ type Service struct {
 		MaxScale int `json:"max_scale"`
 	} `json:"synchronous"`
 
-	Federation Federation `json:"federation,omitempty"`
+	Federation *Federation `json:"federation,omitempty"`
 
 	// Replicas list of replicas to delegate jobs
 	// Optional
@@ -511,5 +511,5 @@ func (service *Service) GetSupervisorPath() string {
 
 // HasReplicas checks if the service has replicas defined
 func (service *Service) HasReplicas() bool {
-	return len(service.Replicas) > 0
+	return len(service.Federation.Members) > 0
 }
