@@ -169,18 +169,18 @@ type Service struct {
 		MaxScale int `json:"max_scale"`
 	} `json:"synchronous"`
 
-	Federation *Federation `json:"federation,omitempty"`
+	Federation Federation `json:"federation,omitempty"`
 
 	// Replicas list of replicas to delegate jobs
 	// Optional
-	//Replicas ReplicaList `json:"replicas,omitempty"`
+	Replicas ReplicaList `json:"replicas,omitempty"`
 
 	//Delegation Mode of job delegation for replicas
 	// Opcional (default: manual)
 	//"static" The user select the priority to delegate jobs to the replicas.
 	//"random" The job delegation priority is generated randomly among the clusters of the available replicas.
 	//"load-based" The job delegation priority is generated depending on the CPU and Memory available in the replica clusters.
-	//Delegation string `json:"delegation"`
+	Delegation string `json:"delegation"`
 
 	// ReSchedulerThreshold time (in seconds) that a job (with replicas) can be queued before delegating it
 	// Optional
