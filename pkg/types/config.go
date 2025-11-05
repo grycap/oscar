@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"net/url"
 	"os"
 	"reflect"
@@ -311,9 +312,32 @@ func parseStringSlice(s string) []string {
 	return strs
 }
 
+func parseInt(s string) (int, error) {
+	s = strings.TrimSpace(s)
+	if val, err := strconv.Atoi(s); err == nil {
+		return val, nil
+	}
+
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	rounded := math.Round(f)
+	if math.Abs(f-rounded) > 1e-6 {
+		return 0, fmt.Errorf("the value must be an integer")
+	}
+
+	if rounded > float64(math.MaxInt) || rounded < float64(math.MinInt) {
+		return 0, fmt.Errorf("the value is out of range for int")
+	}
+
+	return int(rounded), nil
+}
+
 func parseSeconds(s string) (time.Duration, error) {
 	if len(s) > 0 {
-		parsed, err := strconv.Atoi(s)
+		parsed, err := parseInt(s)
 		if err == nil && parsed > 0 {
 			return time.Duration(parsed) * time.Second, nil
 		}
@@ -352,7 +376,7 @@ func ReadConfig() (*Config, error) {
 		case stringSliceType:
 			value = parseStringSlice(strValue)
 		case intType:
-			value, parseErr = strconv.Atoi(strValue)
+			value, parseErr = parseInt(strValue)
 		case boolType:
 			value, parseErr = strconv.ParseBool(strValue)
 		case secondsType:
