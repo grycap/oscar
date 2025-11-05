@@ -70,6 +70,162 @@ type MinIOBucket struct {
 	AllowedUsers []string          `json:"allowed_users"`
 	Owner        string            `json:"owner"`
 	Metadata     map[string]string `json:"metadata"`
+	Objects      []MinIOObject     `json:"objects,omitempty"`
+}
+
+// MinIOObject captures object level metadata inside a MinIO bucket
+type MinIOObject struct {
+	ObjectName   string `json:"object_name"`
+	SizeBytes    int64  `json:"size_bytes"`
+	Owner        string `json:"owner,omitempty"`
+	LastModified string `json:"last_modified,omitempty"`
+}
+
+// MinIODataClient wraps S3 operations for bucket/object access
+type MinIODataClient struct {
+	s3Client *s3.S3
+}
+
+// NewMinIODataClient creates a data client using the supplied provider credentials.
+func NewMinIODataClient(provider *types.MinIOProvider) *MinIODataClient {
+	return &MinIODataClient{
+		s3Client: provider.GetS3Client(),
+	}
+}
+
+// BucketExists checks if the bucket can be accessed with the configured credentials.
+func (c *MinIODataClient) BucketExists(ctx context.Context, bucket string) (bool, error) {
+	_, err := c.s3Client.HeadBucketWithContext(ctx, &s3.HeadBucketInput{
+		Bucket: aws.String(bucket),
+	})
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case "NotFound", s3.ErrCodeNoSuchBucket:
+				return false, nil
+			case "AccessDenied":
+				// Bucket exists but caller lacks permissions
+				return true, nil
+			}
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+// ListBucketObjects lists all non-directory objects within the bucket.
+func (c *MinIODataClient) ListBucketObjects(ctx context.Context, bucket string, includeOwner bool) ([]MinIOObject, error) {
+	var continuationToken *string
+	var fetchOwner *bool
+	if includeOwner {
+		fetchOwner = aws.Bool(true)
+	}
+
+	var objects []MinIOObject
+	for {
+		input := &s3.ListObjectsV2Input{
+			Bucket: aws.String(bucket),
+		}
+		if continuationToken != nil {
+			input.ContinuationToken = continuationToken
+		}
+		if fetchOwner != nil {
+			input.FetchOwner = fetchOwner
+		}
+
+		output, err := c.s3Client.ListObjectsV2WithContext(ctx, input)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, object := range output.Contents {
+			key := aws.StringValue(object.Key)
+			size := aws.Int64Value(object.Size)
+
+			if strings.HasSuffix(key, "/") && size == 0 {
+				continue
+			}
+
+			var owner string
+			if includeOwner && object.Owner != nil {
+				owner = aws.StringValue(object.Owner.DisplayName)
+				if owner == "" {
+					owner = aws.StringValue(object.Owner.ID)
+				}
+			}
+
+			objects = append(objects, MinIOObject{
+				ObjectName: key,
+				SizeBytes:  size,
+				Owner:      owner,
+				LastModified: func() string {
+					if object.LastModified == nil {
+						return ""
+					}
+					return object.LastModified.UTC().Format(time.RFC3339)
+				}(),
+			})
+		}
+
+		if !aws.BoolValue(output.IsTruncated) {
+			break
+		}
+		continuationToken = output.NextContinuationToken
+	}
+
+	return objects, nil
+}
+
+// MinIOObjectInfo represents metadata for an individual object
+type MinIOObjectInfo struct {
+	BucketName   string            `json:"bucket_name"`
+	ObjectName   string            `json:"object_name"`
+	SizeBytes    int64             `json:"size_bytes"`
+	ContentType  string            `json:"content_type,omitempty"`
+	ETag         string            `json:"etag,omitempty"`
+	LastModified time.Time         `json:"last_modified,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+}
+
+// StatObject retrieves metadata for a specific object.
+func (c *MinIODataClient) StatObject(ctx context.Context, bucket string, object string) (*MinIOObjectInfo, error) {
+	output, err := c.s3Client.HeadObjectWithContext(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(object),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	metadata := map[string]string{}
+	for k, v := range output.Metadata {
+		if v == nil {
+			continue
+		}
+		metadata[k] = aws.StringValue(v)
+	}
+
+	info := &MinIOObjectInfo{
+		BucketName:  bucket,
+		ObjectName:  object,
+		SizeBytes:   aws.Int64Value(output.ContentLength),
+		ContentType: aws.StringValue(output.ContentType),
+		ETag: func() string {
+			if output.ETag == nil {
+				return ""
+			}
+			return *output.ETag
+		}(),
+		LastModified: func() time.Time {
+			if output.LastModified == nil {
+				return time.Time{}
+			}
+			return *output.LastModified
+		}(),
+		Metadata: metadata,
+	}
+
+	return info, nil
 }
 
 // Define the policy structure using Go structs

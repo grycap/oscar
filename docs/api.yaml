@@ -434,6 +434,30 @@ paths:
         name: bucket
         in: path
         required: true
+    get:
+      summary: Get bucket details
+      operationId: GetBucket
+      responses:
+        '200':
+          description: Bucket details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Buckets'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      description: Retrieve metadata and object listing for a specific bucket
+      security:
+        - basicAuth: []
+        - token: []
+      tags:
+        - buckets
     delete:
       summary: Delete bucket
       operationId: DeleteBucket
@@ -446,7 +470,7 @@ paths:
           description: Not Found
         '500':
           description: Internal Server Error
-      description: Delete a scpecific bucket
+      description: Delete a specific bucket
       security:
         - basicAuth: []
         - token: []
@@ -686,7 +710,7 @@ components:
       title: Buckets
       type: object
       properties:
-        bucket_path:
+        bucket_name:
           type: string
         visibility:
           type: string
@@ -703,6 +727,22 @@ components:
               type: string
             service:
               type: boolean
+        objects:
+          type: array
+          items:
+            $ref: '#/components/schemas/BucketObject'
+    BucketObject:
+      title: BucketObject
+      type: object
+      properties:
+        object_name:
+          type: string
+        size_bytes:
+          type: integer
+          format: int64
+        last_modified:
+          type: string
+          format: date-time
     BucketPresignRequest:
       title: BucketPresignRequest
       type: object
