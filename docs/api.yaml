@@ -359,6 +359,18 @@ paths:
   /system/buckets:
     get:
       summary: List buckets
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: string
+          description: Continuation token returned by a previous request.
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 0
+          description: Maximum number of objects to return in the response.
       responses:
         '200':
           description: OK
@@ -731,6 +743,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BucketObject'
+        next_page:
+          type: string
+        is_truncated:
+          type: boolean
+        returned_items:
+          type: integer
     BucketObject:
       title: BucketObject
       type: object

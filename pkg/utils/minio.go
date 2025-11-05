@@ -81,6 +81,14 @@ type MinIOObject struct {
 	LastModified string `json:"last_modified,omitempty"`
 }
 
+// MinIOListResult wraps paginated listing details
+type MinIOListResult struct {
+    Objects           []MinIOObject
+    NextToken         string
+    IsTruncated       bool
+    ReturnedItemCount int
+}
+
 // MinIODataClient wraps S3 operations for bucket/object access
 type MinIODataClient struct {
 	s3Client *s3.S3
@@ -114,66 +122,62 @@ func (c *MinIODataClient) BucketExists(ctx context.Context, bucket string) (bool
 }
 
 // ListBucketObjects lists all non-directory objects within the bucket.
-func (c *MinIODataClient) ListBucketObjects(ctx context.Context, bucket string, includeOwner bool) ([]MinIOObject, error) {
-	var continuationToken *string
-	var fetchOwner *bool
-	if includeOwner {
-		fetchOwner = aws.Bool(true)
+func (c *MinIODataClient) ListBucketObjects(ctx context.Context, bucket string, includeOwner bool, limit int, continuation string) (*MinIOListResult, error) {
+    input := &s3.ListObjectsV2Input{
+        Bucket: aws.String(bucket),
+    }
+    if continuation != "" {
+        input.ContinuationToken = aws.String(continuation)
+    }
+    if includeOwner {
+        input.FetchOwner = aws.Bool(true)
+    }
+    if limit > 0 {
+        mk := int64(limit)
+        input.MaxKeys = aws.Int64(mk)
+    }
+
+    output, err := c.s3Client.ListObjectsV2WithContext(ctx, input)
+	if err != nil {
+		return nil, err
 	}
 
 	var objects []MinIOObject
-	for {
-		input := &s3.ListObjectsV2Input{
-			Bucket: aws.String(bucket),
-		}
-		if continuationToken != nil {
-			input.ContinuationToken = continuationToken
-		}
-		if fetchOwner != nil {
-			input.FetchOwner = fetchOwner
+	for _, object := range output.Contents {
+		key := aws.StringValue(object.Key)
+		size := aws.Int64Value(object.Size)
+
+		if strings.HasSuffix(key, "/") && size == 0 {
+			continue
 		}
 
-		output, err := c.s3Client.ListObjectsV2WithContext(ctx, input)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, object := range output.Contents {
-			key := aws.StringValue(object.Key)
-			size := aws.Int64Value(object.Size)
-
-			if strings.HasSuffix(key, "/") && size == 0 {
-				continue
+		var owner string
+		if includeOwner && object.Owner != nil {
+			owner = aws.StringValue(object.Owner.DisplayName)
+			if owner == "" {
+				owner = aws.StringValue(object.Owner.ID)
 			}
+		}
 
-			var owner string
-			if includeOwner && object.Owner != nil {
-				owner = aws.StringValue(object.Owner.DisplayName)
-				if owner == "" {
-					owner = aws.StringValue(object.Owner.ID)
+		objects = append(objects, MinIOObject{
+			ObjectName: key,
+			SizeBytes:  size,
+			Owner:      owner,
+			LastModified: func() string {
+				if object.LastModified == nil {
+					return ""
 				}
-			}
-
-			objects = append(objects, MinIOObject{
-				ObjectName: key,
-				SizeBytes:  size,
-				Owner:      owner,
-				LastModified: func() string {
-					if object.LastModified == nil {
-						return ""
-					}
-					return object.LastModified.UTC().Format(time.RFC3339)
-				}(),
-			})
-		}
-
-		if !aws.BoolValue(output.IsTruncated) {
-			break
-		}
-		continuationToken = output.NextContinuationToken
+				return object.LastModified.UTC().Format(time.RFC3339)
+			}(),
+		})
 	}
 
-	return objects, nil
+    return &MinIOListResult{
+        Objects:           objects,
+        NextToken:         aws.StringValue(output.NextContinuationToken),
+        IsTruncated:       aws.BoolValue(output.IsTruncated),
+        ReturnedItemCount: len(objects),
+    }, nil
 }
 
 // MinIOObjectInfo represents metadata for an individual object

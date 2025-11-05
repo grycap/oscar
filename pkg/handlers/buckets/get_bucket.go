@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -82,7 +83,7 @@ func (d *defaultBucketAdminClient) DeleteBucket(s3Client *s3.S3, bucketName stri
 
 type bucketObjectClient interface {
 	BucketExists(ctx context.Context, bucket string) (bool, error)
-	ListObjects(ctx context.Context, bucket string, includeOwner bool) ([]utils.MinIOObject, error)
+	ListObjects(ctx context.Context, bucket string, includeOwner bool, limit int, continuation string) (*utils.MinIOListResult, error)
 	StatObject(ctx context.Context, bucket string, object string) (*utils.MinIOObjectInfo, error)
 }
 
@@ -120,8 +121,8 @@ func (c *defaultBucketObjectClient) BucketExists(ctx context.Context, bucket str
 	return c.client.BucketExists(ctx, bucket)
 }
 
-func (c *defaultBucketObjectClient) ListObjects(ctx context.Context, bucket string, includeOwner bool) ([]utils.MinIOObject, error) {
-	return c.client.ListBucketObjects(ctx, bucket, includeOwner)
+func (c *defaultBucketObjectClient) ListObjects(ctx context.Context, bucket string, includeOwner bool, limit int, continuation string) (*utils.MinIOListResult, error) {
+	return c.client.ListBucketObjects(ctx, bucket, includeOwner, limit, continuation)
 }
 
 func (c *defaultBucketObjectClient) StatObject(ctx context.Context, bucket string, object string) (*utils.MinIOObjectInfo, error) {
@@ -211,24 +212,38 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 		}
 
-		objects, err := objectClient.ListObjects(ctx, bucketName, false)
+		pageToken := strings.TrimSpace(c.DefaultQuery("page", ""))
+		limit := cfg.JobListingLimit
+		if limitParam := strings.TrimSpace(c.DefaultQuery("limit", "")); limitParam != "" {
+			if parsed, perr := strconv.Atoi(limitParam); perr == nil && parsed >= 0 {
+				limit = parsed
+			}
+		}
+
+		listResult, err := objectClient.ListObjects(ctx, bucketName, false, limit, pageToken)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error retrieving objects for bucket '%s': %v", bucketName, err))
 			return
 		}
+		objects := listResult.Objects
 		for i := range objects {
 			objects[i].Owner = ""
 		}
 
 		delete(metadata, "owner")
 
-		response := utils.MinIOBucket{
-			BucketName:   bucketName,
-			Visibility:   visibility,
-			Owner:        ownerCandidate,
-			AllowedUsers: allowedUsers,
-			Metadata:     metadata,
-			Objects:      objects,
+		response := bucketListResponse{
+			MinIOBucket: utils.MinIOBucket{
+				BucketName:   bucketName,
+				Visibility:   visibility,
+				Owner:        ownerCandidate,
+				AllowedUsers: allowedUsers,
+				Metadata:     metadata,
+				Objects:      objects,
+			},
+			NextPage:      listResult.NextToken,
+			IsTruncated:   listResult.IsTruncated,
+			ReturnedItems: listResult.ReturnedItemCount,
 		}
 
 		c.JSON(http.StatusOK, response)
@@ -277,4 +292,11 @@ func isRequesterAuthorised(adminClient bucketAdminClient, requester string, owne
 	default:
 		return adminClient.ResourceInPolicy(requester, bucketName)
 	}
+}
+
+type bucketListResponse struct {
+	utils.MinIOBucket
+	NextPage      string `json:"next_page,omitempty"`
+	IsTruncated   bool   `json:"is_truncated"`
+	ReturnedItems int    `json:"returned_items"`
 }

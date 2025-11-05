@@ -60,6 +60,9 @@ func TestMakeGetBucketHandlerAdmin(t *testing.T) {
 			SizeBytes    int64  `json:"size_bytes"`
 			LastModified string `json:"last_modified"`
 		} `json:"objects"`
+		NextPage      string `json:"next_page"`
+		ReturnedItems int    `json:"returned_items"`
+		IsTruncated   bool   `json:"is_truncated"`
 	}
 	if err := json.Unmarshal(res.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
@@ -72,6 +75,15 @@ func TestMakeGetBucketHandlerAdmin(t *testing.T) {
 	}
 	if response.Objects[0].LastModified != lastModified {
 		t.Fatalf("expected last_modified %s, got %s", lastModified, response.Objects[0].LastModified)
+	}
+	if response.NextPage != "" {
+		t.Fatalf("expected empty next_page, got %s", response.NextPage)
+	}
+	if response.ReturnedItems != 1 {
+		t.Fatalf("expected returned_items 1, got %d", response.ReturnedItems)
+	}
+	if response.IsTruncated {
+		t.Fatalf("expected is_truncated false")
 	}
 
 	var raw struct {
@@ -177,6 +189,9 @@ func TestMakeGetBucketHandlerRestrictedMember(t *testing.T) {
 			ObjectName   string `json:"object_name"`
 			LastModified string `json:"last_modified"`
 		} `json:"objects"`
+		NextPage      string `json:"next_page"`
+		ReturnedItems int    `json:"returned_items"`
+		IsTruncated   bool   `json:"is_truncated"`
 	}
 	if err := json.Unmarshal(res.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
@@ -186,6 +201,68 @@ func TestMakeGetBucketHandlerRestrictedMember(t *testing.T) {
 	}
 	if response.Objects[0].LastModified != lastModified {
 		t.Fatalf("expected last_modified %s, got %s", lastModified, response.Objects[0].LastModified)
+	}
+	if response.NextPage != "" {
+		t.Fatalf("expected empty next_page, got %s", response.NextPage)
+	}
+	if response.ReturnedItems != 1 {
+		t.Fatalf("expected returned_items 1, got %d", response.ReturnedItems)
+	}
+	if response.IsTruncated {
+		t.Fatalf("expected is_truncated false")
+	}
+}
+
+func TestMakeGetBucketHandlerPagination(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	fakeAdmin := &fakeBucketAdminClient{
+		metadata:   map[string]string{"owner": "alice"},
+		visibility: utils.PUBLIC,
+	}
+	overrideBucketAdminFactory(t, fakeAdmin)
+	overrideBucketObjectFactory(t, func(cfg *types.Config, c *gin.Context, requester string, isAdmin bool) (bucketObjectClient, error) {
+		return &fakeBucketObjectClient{
+			exists:      true,
+			objects:     []utils.MinIOObject{{ObjectName: "a.txt", SizeBytes: 10}},
+			nextToken:   "cursor",
+			isTruncated: true,
+		}, nil
+	})
+
+	cfg := &types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  "http://127.0.0.1:9000",
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+
+	router := gin.New()
+	router.GET("/system/buckets/:bucket", MakeGetHandler(cfg))
+
+	req := httptest.NewRequest(http.MethodGet, "/system/buckets/demo?page=token&limit=1", nil)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, res.Code)
+	}
+
+	var response struct {
+		NextPage    string `json:"next_page"`
+		IsTruncated bool   `json:"is_truncated"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if response.NextPage != "cursor" {
+		t.Fatalf("expected next_page cursor, got %s", response.NextPage)
+	}
+	if !response.IsTruncated {
+		t.Fatalf("expected is_truncated true")
 	}
 }
 
@@ -270,12 +347,14 @@ func (f *fakeBucketAdminClient) DeleteBucket(s3Client *s3.S3, bucketName string)
 }
 
 type fakeBucketObjectClient struct {
-	exists    bool
-	existsErr error
-	objects   []utils.MinIOObject
-	listErr   error
-	statInfo  *utils.MinIOObjectInfo
-	statErr   error
+	exists      bool
+	existsErr   error
+	objects     []utils.MinIOObject
+	nextToken   string
+	isTruncated bool
+	listErr     error
+	statInfo    *utils.MinIOObjectInfo
+	statErr     error
 }
 
 func (f *fakeBucketObjectClient) BucketExists(ctx context.Context, bucket string) (bool, error) {
@@ -285,11 +364,16 @@ func (f *fakeBucketObjectClient) BucketExists(ctx context.Context, bucket string
 	return f.exists, nil
 }
 
-func (f *fakeBucketObjectClient) ListObjects(ctx context.Context, bucket string, includeOwner bool) ([]utils.MinIOObject, error) {
+func (f *fakeBucketObjectClient) ListObjects(ctx context.Context, bucket string, includeOwner bool, limit int, continuation string) (*utils.MinIOListResult, error) {
 	if f.listErr != nil {
 		return nil, f.listErr
 	}
-	return f.objects, nil
+	return &utils.MinIOListResult{
+		Objects:           f.objects,
+		NextToken:         f.nextToken,
+		IsTruncated:       f.isTruncated,
+		ReturnedItemCount: len(f.objects),
+	}, nil
 }
 
 func (f *fakeBucketObjectClient) StatObject(ctx context.Context, bucket string, object string) (*utils.MinIOObjectInfo, error) {
