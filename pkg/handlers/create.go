@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand" // for generating random IDs
 	"net/http"
 	"os"
 	"reflect"
@@ -35,10 +36,12 @@ import (
 )
 
 const (
-	defaultMemory   = "256Mi"
-	defaultCPU      = "0.2"
-	defaultLogLevel = "INFO"
-	createPath      = "/system/services"
+	defaultMemory     = "256Mi"
+	defaultCPU        = "0.2"
+	defaultLogLevel   = "INFO"
+	createPath        = "/system/services"
+	defaultTopology   = "none"
+	defaultDelegation = "static"
 )
 
 var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache)")
@@ -319,6 +322,38 @@ func checkValues(service *types.Service, cfg *types.Config) {
 
 	// Generate a new access token
 	service.Token = utils.GenerateToken()
+
+	if service.Federation.Topology == "" {
+		service.Federation.Topology = defaultTopology
+	} else {
+		switch service.Federation.Topology {
+		case "mesh", "tree", "none":
+		default:
+			service.Federation.Topology = defaultTopology
+		}
+	}
+	if service.Federation.GroupID == "" {
+		service.Federation.GroupID = "federation-" + generateRandomID(8)
+	}
+	if service.Federation.Delegation != "" {
+		switch service.Federation.Delegation {
+		case "static", "random", "load-based":
+		default:
+			service.Federation.Delegation = defaultDelegation
+		}
+	} else {
+		service.Federation.Delegation = defaultDelegation
+	}
+
+}
+
+func generateRandomID(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
 }
 
 func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient, isUpdate bool) ([]utils.MinIOBucket, error) {
