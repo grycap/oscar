@@ -32,12 +32,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	versioned "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
-
-	minio "github.com/minio/minio-go/v7"
 )
 
 // NEW STRUCTURES (CLUSTER)
@@ -420,13 +418,6 @@ func getDeploymentInfo(kubeClientset kubernetes.Interface, cfg *types.Config, cl
 }
 
 func getMinioInfo(cfg *types.Config, clusterInfo *NewStatusInfo) (err error) {
-	adminClient, err := utils.MakeMinIOAdminClient(cfg)
-	minioClient := adminClient.GetSimpleClient()
-	if err != nil {
-		log.Printf("Error creating MinIO admin client: %v", err)
-		return err
-	}
-
 	// S3 client to list all buckets in the cluster
 	s3Client := cfg.MinIOProvider.GetS3Client()
 	bucketList, err := s3Client.ListBuckets(&s3.ListBucketsInput{})
@@ -436,22 +427,16 @@ func getMinioInfo(cfg *types.Config, clusterInfo *NewStatusInfo) (err error) {
 
 	bucketCount := len(bucketList.Buckets)
 	var totalObjectCount int = 0
-
 	// Calculate the total object count
 	for _, b := range bucketList.Buckets {
 		bucketName := *b.Name
-
-		objectCh := minioClient.ListObjects(context.Background(), bucketName, minio.ListObjectsOptions{
-			Recursive: true,
-		})
-
-		for obj := range objectCh {
-			if obj.Err != nil {
-				log.Printf("Error listing object in bucket %s: %v", bucketName, obj.Err)
-				continue
-			}
+		input := &s3.ListObjectsInput{
+			Bucket: aws.String(bucketName),
+		}
+		objectCh, _ := s3Client.ListObjects(input)
+		for obj := range objectCh.Contents {
 			// Only count objects that are not directories (directories have size 0 and usually end with a slash).
-			if obj.Size > 0 {
+			if int(*objectCh.Contents[obj].Size) > 0 {
 				totalObjectCount++
 			}
 

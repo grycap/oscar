@@ -355,7 +355,7 @@ func checkStatusModResult(jsonResponse map[string]interface{}, t *testing.T, isA
 		if states["Running"].(float64) != 1.0 {
 			t.Errorf("Expected 1 Running pod, got %v", states["Running"])
 		}
-
+		fmt.Printf("MinIO info: %+v\n", minio)
 		// MinIO is only available for admin
 		if minio["buckets_count"].(float64) != 2.0 { // Mock has 2 buckets
 			t.Errorf("Expected buckets_count 2, got %v", minio["buckets_count"])
@@ -388,13 +388,12 @@ func TestMakeStatusHandler(t *testing.T) {
 			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 			return
 		}
-		fmt.Println("URL")
 		fmt.Println(hreq.URL.Path + "?" + hreq.URL.RawQuery)
 		// 2. Mock ListBuckets (used by getMinioInfo - called via AWS S3 client)
 		// The AWS S3 client typically sends GET / for ListBuckets.
 		if hreq.URL.Path == "/" {
 			// If RawQuery is "list-type=2" or "delimiter=/" (MinIO internal check) or "" (AWS S3 ListBuckets)
-			if hreq.URL.RawQuery == "list-type=2" {
+			if hreq.URL.RawQuery == "" {
 				rw.WriteHeader(http.StatusOK)
 				// Mock of 2 buckets: "bucket-a" and "bucket-b"
 				rw.Write([]byte(`
@@ -412,10 +411,14 @@ func TestMakeStatusHandler(t *testing.T) {
 				t.Errorf("Unexpected query for ListBuckets: %s", hreq.URL.RawQuery)
 			}
 		}
-
+		/*if hreq.URL.Path != "/" && hreq.URL.RawQuery == "" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			return
+		}*/
 		// 3. Mock ListObjects (used by getMinioInfo to calculate count - called via MinIO client)
 		// Check if the request path starts with a bucket name (i.e., not just /) AND contains a query for listing (list-type=2)
-		if hreq.URL.Path != "/" && strings.Contains(hreq.URL.RawQuery, "list-type=2") {
+		if hreq.URL.Path != "/" && strings.Contains(hreq.URL.RawQuery, "") {
 			rw.WriteHeader(http.StatusOK)
 
 			// Determine which bucket is being queried
@@ -424,7 +427,7 @@ func TestMakeStatusHandler(t *testing.T) {
 			// Mock of 3 total objects (2 in bucket-a, 1 in bucket-b, including a directory)
 			if strings.HasPrefix(bucketPath, "bucket-a") {
 				// 2 files, 1 directory (Size 0)
-				rw.Write([]byte(`
+				rw.Write([]byte(` <?xml version="1.0" encoding="UTF-8"?>
 				<ListBucketResult>
 					<Contents><Key>file1.txt</Key><Size>100</Size></Contents>
 					<Contents><Key>file2.txt</Key><Size>200</Size></Contents>
@@ -499,10 +502,10 @@ func TestMakeStatusHandler(t *testing.T) {
 		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "somelonguid@egi.eu"))
 		c.Next()
 	})
-	router.GET("/status", MakeStatusHandler(&cfg, kubeClientset, metricsClientset.MetricsV1beta1()))
+	router.GET("/system/status", MakeStatusHandler(&cfg, kubeClientset, metricsClientset.MetricsV1beta1()))
 
 	// --- 1. NON-ADMIN Test (Bearer Token) ---
-	req, _ := http.NewRequest("GET", "/status", nil)
+	req, _ := http.NewRequest("GET", "/system/status", nil)
 	// Non-admin/user token, so isAdmin will be FALSE
 	req.Header.Set("Authorization", "Bearer 11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf")
 
@@ -530,9 +533,9 @@ func TestMakeStatusHandler(t *testing.T) {
 		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "adminuser@egi.eu"))
 		c.Next()
 	})
-	router.GET("/status", MakeStatusHandler(&cfg, kubeClientset, metricsClientset.MetricsV1beta1()))
+	router.GET("/system/status", MakeStatusHandler(&cfg, kubeClientset, metricsClientset.MetricsV1beta1()))
 
-	req2, _ := http.NewRequest("GET", "/status", nil)
+	req2, _ := http.NewRequest("GET", "/system/status", nil)
 	req2.Header.Set("Authorization", "Basic dGVzdHVzZXI6dGVzdHBhc3M=") // Ignored, but Basic Auth usually implies Admin
 
 	w2 := httptest.NewRecorder()
