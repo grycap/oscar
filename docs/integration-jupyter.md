@@ -51,7 +51,7 @@ Now, let's create the Jupyter instance. In the [`OSCAR dashboard`](https://dashb
 ![juno-deployed.png](images/integrations/juno-deployed.png)
 </br>
 </br>
-Enter the Jupyter Notebook instance configuration values. You can specify the name of an already existing bucket or create a new one (for example"juno-test").
+Enter the Jupyter Notebook instance configuration values. You can specify the name of an already existing bucket or create a new one (for example *juno-test*).
 </br>![juno-dashboard.png](images/integrations/juno-dashboard.png)
 </br>
 </br>
@@ -60,10 +60,8 @@ After deploying our Jupyter Notebooks instance, we need to navigate to its user 
 </br>
 </br>
 `
-ℹ️ If you get an nginx error, you need to wait a little bit more for the Jupyter service to run.
+ℹ️ In case you don't see the Jupyter instance available to be accessed, you can refresh the OSCAR Dashboard by pressing the refresh button on the upper side of the panel. 
 `
-![juno-error.png](images/integrations/juno-error.png)
-</br>
 </br>
 Once you have access to the instance, this is the Jupyter Notebook working interface you'll find.
 ![juno-page.png](images/integrations/juno-page.png)
