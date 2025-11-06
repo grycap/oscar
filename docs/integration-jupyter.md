@@ -16,7 +16,7 @@ This tutorial shows a simple example of how to run the COWSAY synchronous servic
 
 **Deploy the COWSAY service**
 
-To develop the examples, you must first deploy a service in OSCAR (`COWSAY`). For that, go to the [`OSCAR dashboard`](https://dashboard.oscar.grycap.net/) and select *Create service -> FDL*. Use the following configuration:
+To develop the examples, you must first deploy a service in OSCAR (`COWSAY`). For that, go to the [`OSCAR dashboard`](https://dashboard.oscar.grycap.net/) and select *New -> FDL*. Use the following configuration:
 
 **FDL:**
 
@@ -55,7 +55,7 @@ Enter the Jupyter Notebook instance configuration values. You can specify the na
 </br>![juno-dashboard.png](images/integrations/juno-dashboard.png)
 </br>
 </br>
-After deploying our Jupyter Notebooks instance, we need to navigate to its user interface. Notice that it takes some seconds to have the Jupyter service up and running, and this is represented by a charging circle.
+After deploying our Jupyter Notebooks instance, we need to navigate to its user interface. Notice that it takes some seconds to have the Jupyter service up and running, and this is represented by a spinning circle.
 ![juno-dashboard-visit.png](images/integrations/juno-dashboard-visit.png)
 </br>
 </br>
@@ -84,7 +84,7 @@ from oscar_python.client import Client
 token="yourToken"
 oscar_options = {'cluster_id': 'cluster-id',
                 'endpoint': 'https://cluster-endpoint.com',
-                'oidc_token': token,
+                'oidc_token': "token",
                 'ssl': 'True'}
 client = Client(options=oscar_options)
 
@@ -99,7 +99,7 @@ except Exception as err:
 In the code, you must configure the following parameters within `oscar_options`:
 
 - **cluster_id**: Name of the OSCAR cluster, representing an identifier for that cluster (for example 'sandbox').
-- **endpoint**: URL of the OSCAR cluster where the OSCAR service you want to run is created. You can get it from the [`OSCAR dashboard`](https://dashboard.oscar.grycap.net/).
+- **endpoint**: URL of the OSCAR cluster where the OSCAR service you want to run is created. You can get it from the [`OSCAR dashboard`](https://dashboard.oscar.grycap.net/) (`Info` panel).
 - **oidc_token**: Obtain your token from [`EGI Token`](https://aai.egi.eu/token/) or your personal token. Also available in the [`OSCAR dashboard`](https://dashboard.oscar.grycap.net/), section "Info".
 
 For the **serviceName** parameter, this is the name of the service you want to run. In our tutorial, this is "cowsay-sync-test".
@@ -179,7 +179,7 @@ The `Get EGI Token` node (*setup_client.py*) contains the elements of the OSCAR 
 Now configure properly the environment variables:
 
 - **OSCAR_ENDPOINT**: OSCAR cluster URL ( *https://default-endpoint.com* ). You can get it from the [`OSCAR dashboard`](https://dashboard.oscar.grycap.net/).
-- **YOUR_TOKEN**: User token (can be obtained from [`EGI TOKEN`]( https://aai.egi.eu/token) )
+- **YOUR_TOKEN**: User token (can be obtained from the `Info`panel in the OSCAR Dashboard.
 
 The `OSCAR Cowsay` node (*invoke_service_cowsay.ipynb*) contains the following environment variables.
 
