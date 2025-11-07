@@ -138,26 +138,6 @@ You can follow this example step by step in the oscar-tutorial folder in your Ju
 
 [`Elyra`](https://github.com/elyra-ai/elyra) is a JupyterLab extension that enhances the creation and management of workflows in data science and machine learning projects. It allows users to design processing and analysis pipelines through a visual interface, integrating notebooks, scripts, and components in a modular way. In our case, Elyra will facilitate the composition of different OSCAR services.
 
-To work with Elyra, you have to create a new Elyra project. For that, click on the *Generic Pipeline Editor* Elyra icon in the "Launcher" page of Jupyter.
-
-![juno-elyra-project.png](images/integrations/juno-elyra-project.png)
-
-In the left-side panel, you have to locate the notebooks (*.ipynb*) or scripts (*.py*) you want to include as nodes in your pipeline. If you wish, you can change the name of your pipeline file (*.pipeline*).
-
-![juno-elyra-pipeline.png](images/integrations/juno-elyra-pipeline.png)
-
-The general workflow consists on dragging and dropping each file you want to use in your pipeline onto the canvas. With this action, each file becomes a pipeline node. For example, in the next Figure you can see how a notebook node is created.
-
-![juno-elyra-node.png](images/integrations/juno-elyra-node.png)
-
-Then, you configure the nodes. For that, right-click on the node to access the node properties, where the notebook name (*file name*), runtime image, and other properties are located.
-
-![juno-elyra-properties.png](images/integrations/juno-elyra-properties.png)
-
-When you have several nodes, connect them by dragging a line from the output of one node to the input of the next, defining the order of execution. After you have connected the nodes in the desired execution order, save the pipeline and run it with the :arrow_forward: *Run Pipeline* button.
-
-![juno-elyra-conect.png](images/integrations/juno-elyra-conect.png)
-
 **Test the COWSAY example with Elyra**
     
 Let's reproduce the COWSAY example in Elyra. For that, you have in the `oscar-tutorial` folder all the files needed. Locate them in the `03-elyra` folder on the left-side panel.
@@ -195,8 +175,22 @@ Once all the nodes are configured, you can run the workflow. Keep in mind that a
 
 ![juno-elyra-result.png](images/integrations/juno-elyra-result.png)
 
-You can download this and other examples from the [`AI4Compose`](https://github.com/ai4os/ai4-compose/tree/main/elyra/examples) repository. You can use the Git tool available in the Jupyter Notebooks to clone the examples in the repository.
 
+**Further details with Elyra**
+
+In general, to work with Elyra, you have to create a new Elyra project. For that, click on the *Generic Pipeline Editor* Elyra icon in the "Launcher" page of Jupyter.
+
+![juno-elyra-project.png](images/integrations/juno-elyra-project.png)
+
+In the left-side panel, you have to locate the notebooks (*.ipynb*) or scripts (*.py*) you want to include as nodes in your pipeline. The general workflow consists on dragging and dropping each file you want to use in your pipeline onto the canvas. With this action, each file becomes a pipeline node. 
+
+![juno-elyra-node.png](images/integrations/juno-elyra-node.png)
+
+Then, you configure the nodes. For that, right-click on the node to access the node properties (as we have done in the previous example), where the notebook name (*Filename*), runtime image, and other properties are located. When you have several nodes, connect them by dragging a line from the output of one node to the input of the next, defining the order of execution. After you have connected the nodes in the desired execution order, save the pipeline and run it with the :arrow_forward: *Run Pipeline* button.
+
+![juno-elyra-node.png](images/integrations/juno-elyra-conect.png)
+
+You can download the Cowsay example and other examples from the [`AI4Compose`](https://github.com/ai4os/ai4-compose/tree/main/elyra/examples) repository. You can use the Git tool available in the Jupyter Notebooks to clone the examples in the repository.
 
       
 
