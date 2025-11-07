@@ -45,21 +45,22 @@ func newExposeService(name string, nodePort int32, setAuth bool) types.Service {
 func TestCreateExposeWithIngressAndAuth(t *testing.T) {
 	cfg := newTestConfig()
 	svc := newExposeService("ingress-service", 0, true)
+	svc.Namespace = cfg.ServicesNamespace
 	client := fake.NewSimpleClientset()
 
-	if err := CreateExpose(svc, client, cfg); err != nil {
+	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("CreateExpose returned error: %v", err)
 	}
 
-	if _, err := client.AppsV1().Deployments(cfg.ServicesNamespace).Get(context.TODO(), getDeploymentName(svc.Name), metav1.GetOptions{}); err != nil {
+	if _, err := client.AppsV1().Deployments(svc.Namespace).Get(context.TODO(), getDeploymentName(svc.Name), metav1.GetOptions{}); err != nil {
 		t.Fatalf("expected deployment to exist: %v", err)
 	}
 
-	if _, err := client.AutoscalingV1().HorizontalPodAutoscalers(cfg.ServicesNamespace).Get(context.TODO(), getHPAName(svc.Name), metav1.GetOptions{}); err != nil {
+	if _, err := client.AutoscalingV1().HorizontalPodAutoscalers(svc.Namespace).Get(context.TODO(), getHPAName(svc.Name), metav1.GetOptions{}); err != nil {
 		t.Fatalf("expected hpa to exist: %v", err)
 	}
 
-	kubeSvc, err := client.CoreV1().Services(cfg.ServicesNamespace).Get(context.TODO(), getServiceName(svc.Name), metav1.GetOptions{})
+	kubeSvc, err := client.CoreV1().Services(svc.Namespace).Get(context.TODO(), getServiceName(svc.Name), metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("expected service to exist: %v", err)
 	}
@@ -68,11 +69,11 @@ func TestCreateExposeWithIngressAndAuth(t *testing.T) {
 		t.Fatalf("expected ClusterIP service, got %s", kubeSvc.Spec.Type)
 	}
 
-	if _, err := client.NetworkingV1().Ingresses(cfg.ServicesNamespace).Get(context.TODO(), getIngressName(svc.Name), metav1.GetOptions{}); err != nil {
+	if _, err := client.NetworkingV1().Ingresses(svc.Namespace).Get(context.TODO(), getIngressName(svc.Name), metav1.GetOptions{}); err != nil {
 		t.Fatalf("expected ingress to exist: %v", err)
 	}
 
-	if _, err := client.CoreV1().Secrets(cfg.ServicesNamespace).Get(context.TODO(), getSecretName(svc.Name), metav1.GetOptions{}); err != nil {
+	if _, err := client.CoreV1().Secrets(svc.Namespace).Get(context.TODO(), getSecretName(svc.Name), metav1.GetOptions{}); err != nil {
 		t.Fatalf("expected auth secret to exist: %v", err)
 	}
 }
@@ -80,13 +81,14 @@ func TestCreateExposeWithIngressAndAuth(t *testing.T) {
 func TestCreateExposeNodePort(t *testing.T) {
 	cfg := newTestConfig()
 	svc := newExposeService("nodeport-service", 30080, false)
+	svc.Namespace = cfg.ServicesNamespace
 	client := fake.NewSimpleClientset()
 
-	if err := CreateExpose(svc, client, cfg); err != nil {
+	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("CreateExpose returned error: %v", err)
 	}
 
-	kubeSvc, err := client.CoreV1().Services(cfg.ServicesNamespace).Get(context.TODO(), getServiceName(svc.Name), metav1.GetOptions{})
+	kubeSvc, err := client.CoreV1().Services(svc.Namespace).Get(context.TODO(), getServiceName(svc.Name), metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("expected service to exist: %v", err)
 	}
@@ -99,7 +101,7 @@ func TestCreateExposeNodePort(t *testing.T) {
 		t.Fatalf("expected nodePort %d, got %d", svc.Expose.NodePort, kubeSvc.Spec.Ports[0].NodePort)
 	}
 
-	if existsIngress(svc.Name, cfg.ServicesNamespace, client) {
+	if existsIngress(svc.Name, svc.Namespace, client) {
 		t.Fatalf("expected no ingress to be created for NodePort expose")
 	}
 }
@@ -109,25 +111,27 @@ func TestUpdateExposeTransitions(t *testing.T) {
 	client := fake.NewSimpleClientset()
 
 	ingressSvc := newExposeService("transition", 0, true)
-	if err := CreateExpose(ingressSvc, client, cfg); err != nil {
+	ingressSvc.Namespace = cfg.ServicesNamespace
+	if err := CreateExpose(ingressSvc, ingressSvc.Namespace, client, cfg); err != nil {
 		t.Fatalf("failed to create ingress expose: %v", err)
 	}
 
 	// Switch to NodePort and disable auth
 	nodePortSvc := newExposeService("transition", 30200, false)
-	if err := UpdateExpose(nodePortSvc, client, cfg); err != nil {
+	nodePortSvc.Namespace = cfg.ServicesNamespace
+	if err := UpdateExpose(nodePortSvc, nodePortSvc.Namespace, client, cfg); err != nil {
 		t.Fatalf("UpdateExpose (to NodePort) returned error: %v", err)
 	}
 
-	if existsIngress(nodePortSvc.Name, cfg.ServicesNamespace, client) {
+	if existsIngress(nodePortSvc.Name, nodePortSvc.Namespace, client) {
 		t.Fatalf("expected ingress to be removed when switching to NodePort")
 	}
 
-	if existsSecret(nodePortSvc.Name, client, cfg) {
+	if existsSecret(nodePortSvc.Name, nodePortSvc.Namespace, client, cfg) {
 		t.Fatalf("expected auth secret to be removed when auth disabled")
 	}
 
-	kubeSvc, err := client.CoreV1().Services(cfg.ServicesNamespace).Get(context.TODO(), getServiceName(nodePortSvc.Name), metav1.GetOptions{})
+	kubeSvc, err := client.CoreV1().Services(nodePortSvc.Namespace).Get(context.TODO(), getServiceName(nodePortSvc.Name), metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("expected service to exist: %v", err)
 	}
@@ -137,15 +141,16 @@ func TestUpdateExposeTransitions(t *testing.T) {
 
 	// Switch back to ingress with auth
 	ingressSvcAgain := newExposeService("transition", 0, true)
-	if err := UpdateExpose(ingressSvcAgain, client, cfg); err != nil {
+	ingressSvcAgain.Namespace = cfg.ServicesNamespace
+	if err := UpdateExpose(ingressSvcAgain, ingressSvcAgain.Namespace, client, cfg); err != nil {
 		t.Fatalf("UpdateExpose (back to ingress) returned error: %v", err)
 	}
 
-	if !existsIngress(ingressSvcAgain.Name, cfg.ServicesNamespace, client) {
+	if !existsIngress(ingressSvcAgain.Name, ingressSvcAgain.Namespace, client) {
 		t.Fatalf("expected ingress to be recreated")
 	}
 
-	if !existsSecret(ingressSvcAgain.Name, client, cfg) {
+	if !existsSecret(ingressSvcAgain.Name, ingressSvcAgain.Namespace, client, cfg) {
 		t.Fatalf("expected auth secret to be recreated when auth enabled")
 	}
 }
@@ -155,31 +160,32 @@ func TestDeleteExposeRemovesResources(t *testing.T) {
 	client := fake.NewSimpleClientset()
 
 	svc := newExposeService("cleanup", 0, true)
-	if err := CreateExpose(svc, client, cfg); err != nil {
+	svc.Namespace = cfg.ServicesNamespace
+	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("failed to create expose: %v", err)
 	}
 
-	if err := DeleteExpose(svc.Name, client, cfg); err != nil {
+	if err := DeleteExpose(svc.Name, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("DeleteExpose returned error: %v", err)
 	}
 
-	if _, err := client.AppsV1().Deployments(cfg.ServicesNamespace).Get(context.TODO(), getDeploymentName(svc.Name), metav1.GetOptions{}); err == nil {
+	if _, err := client.AppsV1().Deployments(svc.Namespace).Get(context.TODO(), getDeploymentName(svc.Name), metav1.GetOptions{}); err == nil {
 		t.Fatalf("expected deployment to be removed")
 	}
 
-	if _, err := client.AutoscalingV1().HorizontalPodAutoscalers(cfg.ServicesNamespace).Get(context.TODO(), getHPAName(svc.Name), metav1.GetOptions{}); err == nil {
+	if _, err := client.AutoscalingV1().HorizontalPodAutoscalers(svc.Namespace).Get(context.TODO(), getHPAName(svc.Name), metav1.GetOptions{}); err == nil {
 		t.Fatalf("expected hpa to be removed")
 	}
 
-	if _, err := client.CoreV1().Services(cfg.ServicesNamespace).Get(context.TODO(), getServiceName(svc.Name), metav1.GetOptions{}); err == nil {
+	if _, err := client.CoreV1().Services(svc.Namespace).Get(context.TODO(), getServiceName(svc.Name), metav1.GetOptions{}); err == nil {
 		t.Fatalf("expected service to be removed")
 	}
 
-	if existsIngress(svc.Name, cfg.ServicesNamespace, client) {
+	if existsIngress(svc.Name, svc.Namespace, client) {
 		t.Fatalf("expected ingress to be removed")
 	}
 
-	if existsSecret(svc.Name, client, cfg) {
+	if existsSecret(svc.Name, svc.Namespace, client, cfg) {
 		t.Fatalf("expected secret to be removed")
 	}
 }
@@ -188,7 +194,8 @@ func TestListExpose(t *testing.T) {
 	cfg := newTestConfig()
 	client := fake.NewSimpleClientset()
 	svc := newExposeService("list", 0, false)
-	if err := CreateExpose(svc, client, cfg); err != nil {
+	svc.Namespace = cfg.ServicesNamespace
+	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("failed to create expose: %v", err)
 	}
 	if err := ListExpose(client, cfg); err != nil {

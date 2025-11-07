@@ -100,10 +100,6 @@ func TestMakeKnativeBackend(t *testing.T) {
 		t.Error("error setting the kubernetes clientset")
 	}
 
-	if back.namespace != testConfig.ServicesNamespace {
-		t.Errorf("invalid servicesNamespace. Expected: %s, got: %s", testConfig.ServicesNamespace, back.namespace)
-	}
-
 	if back.config != testConfig {
 		t.Error("error setting the config")
 	}
@@ -342,7 +338,7 @@ func TestKnativeReadService(t *testing.T) {
 			}
 
 			// Read service
-			svc, err := back.ReadService("test")
+			svc, err := back.ReadService(testConfig.ServicesNamespace, "test")
 			if s.returnError {
 				if err == nil {
 					t.Errorf("expected error, got: %v", svc)
@@ -365,7 +361,7 @@ func TestKnativeReadService(t *testing.T) {
 		back.knClientset.(*knFake.Clientset).Fake.PrependReactor("get", "services", knGetSvcReactor.React)
 
 		// Read service
-		_, err := back.ReadService("test")
+		_, err := back.ReadService(testConfig.ServicesNamespace, "test")
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -697,7 +693,7 @@ func TestKnativeGetProxyDirector(t *testing.T) {
 
 	proxyDirector(testReq)
 
-	expectedHost := fmt.Sprintf("%s.%s", "testService", back.namespace)
+	expectedHost := fmt.Sprintf("%s.%s", "testService", testConfig.ServicesNamespace)
 
 	if testReq.Host != expectedHost && testReq.URL.Host != expectedHost {
 		t.Errorf("invalid host. Expected: %s, got: %s / (URL) %s", expectedHost, testReq.Host, testReq.URL.Host)

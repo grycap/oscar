@@ -254,6 +254,9 @@ type Service struct {
 	// If the service is created through basic auth the default owner is "cluster_admin"
 	Owner string `json:"owner"`
 
+	// Namespace where the service resources are deployed. Internal use only, not part of FDL.
+	Namespace string `json:"namespace,omitempty" yaml:"-"`
+
 	InterLinkNodeName string `json:"interlink_node_name"`
 
 	// Visibility sets which users will be able to interact with the service
