@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"net/url"
 	"os"
 	"reflect"
@@ -32,6 +33,8 @@ import (
 )
 
 const (
+	// OpenFaaSBackend string to identify the OpenFaaS Serverless Backend in the configuration
+	OpenFaaSBackend = "openfaas"
 	// KnativeBackend string to identify the Knative Serverless Backend in the configuration
 	KnativeBackend = "knative"
 
@@ -87,9 +90,48 @@ type Config struct {
 	// Port used for the ClusterIP k8s service (default: 8080)
 	ServicePort int `json:"-"`
 
-	// Serverless framework used to deploy services (Knative)
+	// Serverless framework used to deploy services (Openfaas | Knative)
 	// If not defined only async invocations allowed (Using KubeBackend)
 	ServerlessBackend string `json:"serverless_backend,omitempty"`
+
+	// OpenfaasNamespace namespace where the OpenFaaS gateway is deployed
+	/*OpenfaasNamespace string `json:"-"`
+
+	// OpenfaasPort service port where the OpenFaaS gateway is exposed
+	OpenfaasPort int `json:"-"`
+
+	// OpenfaasBasicAuthSecret name of the secret used to store the OpenFaaS credentials
+	OpenfaasBasicAuthSecret string `json:"-"`
+
+	// OpenfaasPrometheusPort service port where the OpenFaaS' Prometheus is exposed
+	OpenfaasPrometheusPort int `json:"-"`
+
+	// OpenfaasScalerEnable option to enable the Openfaas scaler
+	OpenfaasScalerEnable bool `json:"-"`
+
+	// OpenfaasScalerInterval time interval to check if any function could be scaled
+	OpenfaasScalerInterval string `json:"-"`
+
+	// OpenfaasScalerInactivityDuration
+	OpenfaasScalerInactivityDuration string `json:"-"`
+
+	// WatchdogMaxInflight
+	WatchdogMaxInflight int `json:"-"`
+
+	// WatchdogWriteDebug
+	WatchdogWriteDebug bool `json:"-"`
+
+	// WatchdogExecTimeout
+	WatchdogExecTimeout int `json:"-"`
+
+	// WatchdogReadTimeout
+	WatchdogReadTimeout int `json:"-"`
+
+	// WatchdogWriteTimeout
+	WatchdogWriteTimeout int `json:"-"`*/
+
+	// WatchdogHealthCheckInterval
+	WatchdogHealthCheckInterval int `json:"-"`
 
 	// HTTP timeout for reading the payload (default: 300)
 	ReadTimeout time.Duration `json:"-"`
@@ -183,6 +225,19 @@ var configVars = []configVar{
 	{"Namespace", "OSCAR_NAMESPACE", false, stringType, "oscar"},
 	{"ServicesNamespace", "OSCAR_SERVICES_NAMESPACE", false, stringType, "oscar-svc"},
 	{"ServerlessBackend", "SERVERLESS_BACKEND", false, serverlessBackendType, ""},
+	//{"OpenfaasNamespace", "OPENFAAS_NAMESPACE", false, stringType, "openfaas"},
+	//{"OpenfaasPort", "OPENFAAS_PORT", false, intType, "8080"},
+	//{"OpenfaasBasicAuthSecret", "OPENFAAS_BASIC_AUTH_SECRET", false, stringType, "basic-auth"},
+	//{"OpenfaasPrometheusPort", "OPENFAAS_PROMETHEUS_PORT", false, intType, "9090"},
+	//{"OpenfaasScalerEnable", "OPENFAAS_SCALER_ENABLE", false, boolType, "false"},
+	//{"OpenfaasScalerInterval", "OPENFAAS_SCALER_INTERVAL", false, stringType, "2m"},
+	//{"OpenfaasScalerInactivityDuration", "OPENFAAS_SCALER_INACTIVITY_DURATION", false, stringType, "10m"},
+	//{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
+	//{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
+	//{"WatchdogExecTimeout", "WATCHDOG_EXEC_TIMEOUT", false, intType, "0"},
+	//{"WatchdogReadTimeout", "WATCHDOG_READ_TIMEOUT", false, intType, "300"},
+	//{"WatchdogWriteTimeout", "WATCHDOG_WRITE_TIMEOUT", false, intType, "300"},
+	{"WatchdogHealthCheckInterval", "WATCHDOG_HEALTHCHECK_INTERVAL", false, intType, "5"},
 	{"ReadTimeout", "READ_TIMEOUT", false, secondsType, "300"},
 	{"WriteTimeout", "WRITE_TIMEOUT", false, secondsType, "300"},
 	{"ServicePort", "OSCAR_SERVICE_PORT", false, intType, "8080"},
@@ -257,9 +312,32 @@ func parseStringSlice(s string) []string {
 	return strs
 }
 
+func parseInt(s string) (int, error) {
+	s = strings.TrimSpace(s)
+	if val, err := strconv.Atoi(s); err == nil {
+		return val, nil
+	}
+
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	rounded := math.Round(f)
+	if math.Abs(f-rounded) > 1e-6 {
+		return 0, fmt.Errorf("the value must be an integer")
+	}
+
+	if rounded > float64(math.MaxInt) || rounded < float64(math.MinInt) {
+		return 0, fmt.Errorf("the value is out of range for int")
+	}
+
+	return int(rounded), nil
+}
+
 func parseSeconds(s string) (time.Duration, error) {
 	if len(s) > 0 {
-		parsed, err := strconv.Atoi(s)
+		parsed, err := parseInt(s)
 		if err == nil && parsed > 0 {
 			return time.Duration(parsed) * time.Second, nil
 		}
@@ -270,8 +348,8 @@ func parseSeconds(s string) (time.Duration, error) {
 func parseServerlessBackend(s string) (string, error) {
 	if len(s) > 0 {
 		str := strings.ToLower(s)
-		if str != KnativeBackend {
-			return "", fmt.Errorf("must be \"Knative\"")
+		if str != OpenFaaSBackend && str != KnativeBackend {
+			return "", fmt.Errorf("must be \"Openfaas\" or \"Knative\"")
 		}
 		return str, nil
 	}
@@ -298,7 +376,7 @@ func ReadConfig() (*Config, error) {
 		case stringSliceType:
 			value = parseStringSlice(strValue)
 		case intType:
-			value, parseErr = strconv.Atoi(strValue)
+			value, parseErr = parseInt(strValue)
 		case boolType:
 			value, parseErr = strconv.ParseBool(strValue)
 		case secondsType:

@@ -350,11 +350,11 @@ func TestToPodSpec(t *testing.T) {
 				if len(podSpec.Containers[0].Command) != 1 {
 					t.Fatalf("expected a single command entry, got %d", len(podSpec.Containers[0].Command))
 				}
-				if podSpec.Containers[0].Command[0] != svc.GetSupervisorPath() {
-					t.Fatalf("expected command to be supervisor path %s, got %s", svc.GetSupervisorPath(), podSpec.Containers[0].Command[0])
+				if podSpec.Containers[0].Command[0] != fmt.Sprintf("%s/%s", VolumePath, WatchdogName) {
+					t.Fatalf("expected command to be supervisor path %s, got %s", fmt.Sprintf("%s/%s", VolumePath, WatchdogName), podSpec.Containers[0].Command[0])
 				}
 
-				if err = checkEnvVars(podSpec); err != nil {
+				if err = checkEnvVars(&testConfig, podSpec); err != nil {
 					t.Error(err.Error())
 				}
 			}
@@ -362,21 +362,19 @@ func TestToPodSpec(t *testing.T) {
 	}
 }
 
-func checkEnvVars(podSpec *v1.PodSpec) error {
+func checkEnvVars(cfg *Config, podSpec *v1.PodSpec) error {
 	disallowed := map[string]struct{}{
-		"max_inflight":         {},
-		"write_debug":          {},
-		"exec_timeout":         {},
-		"read_timeout":         {},
-		"write_timeout":        {},
-		"healthcheck_interval": {},
-		"fprocess":             {},
+		"max_inflight":  {},
+		"write_debug":   {},
+		"exec_timeout":  {},
+		"read_timeout":  {},
+		"write_timeout": {},
 	}
-
 	for _, envVar := range podSpec.Containers[0].Env {
 		if _, ok := disallowed[envVar.Name]; ok {
 			return fmt.Errorf("unexpected watchdog environment variable %q present in pod spec", envVar.Name)
 		}
+
 	}
 
 	return nil
