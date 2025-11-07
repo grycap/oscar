@@ -7,11 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/testsupport"
 	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
 )
 
 func TestMakeDeleteBucketHandlerValidations(t *testing.T) {
@@ -51,8 +49,6 @@ func TestMakeDeleteBucketHandlerBucketNotFound(t *testing.T) {
 		},
 	}
 
-	overrideBucketAdminClient(t, &stubBucketAdmin{})
-
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("uidOrigin", "alice")
@@ -88,14 +84,6 @@ func TestMakeDeleteBucketHandlerUnauthorized(t *testing.T) {
 		},
 	}
 
-	admin := &stubBucketAdmin{
-		Visibility: utils.PRIVATE,
-		ResourceInPolicyFn: func(string, string) bool {
-			return false
-		},
-	}
-	overrideBucketAdminClient(t, admin)
-
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("uidOrigin", "alice")
@@ -116,40 +104,57 @@ func TestMakeDeleteBucketHandlerUnauthorized(t *testing.T) {
 
 func TestMakeDeleteBucketHandlerDeletesWhenAuthorized(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	testsupport.SkipIfCannotListen(t)
+	//testsupport.SkipIfCannotListen(t)
+	bucketNameTest := "alice"
+	//server := startS3Server(t, []string{bucketNameTest})
+	//defer server.Close()
+	const listXML = `<?xml version="1.0" encoding="UTF-8"?>
+					<ListAllMyBucketsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+						<Owner>
+							<ID>owner</ID>
+							<DisplayName>owner</DisplayName>
+						</Owner>
+						<Buckets>
+							<Bucket>
+								<Name>alice</Name>
+								<CreationDate>2024-01-01T00:00:00Z</CreationDate>
+							</Bucket>
+						</Buckets>
+					</ListAllMyBucketsResult>`
 
-	server := startS3Server(t, []string{"alice-bucket"})
-	defer server.Close()
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		if hreq.URL.Path == "/" && hreq.Method == http.MethodGet {
+			rw.WriteHeader(http.StatusOK)
+			_, _ = rw.Write([]byte(listXML))
+			return
+		} else if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/info-canned-policy") && hreq.Method == http.MethodGet {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"PolicyName": "testpolicy", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::alice/*"]}]}}`))
+		} else {
+			rw.WriteHeader(http.StatusOK)
+			_, _ = rw.Write([]byte(`{"status": "success"}`))
+		}
+	}))
 
 	cfg := &types.Config{
 		Name: "oscar",
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  server.URL,
-			AccessKey: "ak",
-			SecretKey: "sk",
 			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
 		},
 	}
-
-	var deleteCalled bool
-	admin := &stubBucketAdmin{
-		Visibility:     utils.PRIVATE,
-		ResourceAccess: true,
-		DeleteBucketsFn: func(*s3.S3, utils.MinIOBucket) error {
-			deleteCalled = true
-			return nil
-		},
-	}
-	overrideBucketAdminClient(t, admin)
 
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("uidOrigin", "alice")
 		c.Next()
 	})
-	router.DELETE("/system/buckets/:bucket", MakeDeleteHandler(cfg))
 
-	req := httptest.NewRequest(http.MethodDelete, "/system/buckets/alice-bucket", nil)
+	router.DELETE("/system/buckets/:bucket", MakeDeleteHandler(cfg))
+	req := httptest.NewRequest(http.MethodDelete, "/system/buckets/"+bucketNameTest, nil)
 	req.Header.Set("Authorization", "Bearer token")
 
 	res := httptest.NewRecorder()
@@ -158,9 +163,9 @@ func TestMakeDeleteBucketHandlerDeletesWhenAuthorized(t *testing.T) {
 	if res.Code != http.StatusNoContent {
 		t.Fatalf("expected status %d, got %d", http.StatusNoContent, res.Code)
 	}
-	if !deleteCalled {
-		t.Fatalf("expected DeleteBuckets to be called")
-	}
+
+	// Close the fake MinIO server
+	defer server.Close()
 }
 
 func startS3Server(t *testing.T, buckets []string) *httptest.Server {

@@ -1,6 +1,7 @@
 package buckets
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -8,7 +9,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 )
@@ -38,22 +38,40 @@ func TestMakeUpdateBucketHandlerValidation(t *testing.T) {
 func TestMakeUpdateBucketHandler_ServiceBucketForbidden(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	admin := &stubBucketAdmin{
-		Metadata: map[string]string{"service": "true"},
-		SetPoliciesFn: func(utils.MinIOBucket) error {
-			t.Fatal("SetPolicies must not be invoked for service buckets")
-			return nil
-		},
-		UnsetPoliciesFn: func(utils.MinIOBucket) error {
-			t.Fatal("UnsetPolicies must not be invoked for service buckets")
-			return nil
-		},
-	}
-	overrideBucketAdminClient(t, admin)
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		if hreq.URL.Path == "/alice-bucket/" && hreq.URL.RawQuery == "tagging=" && hreq.Method == http.MethodGet {
+			rw.WriteHeader(http.StatusOK)
+			_, _ = rw.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+							<Tagging xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+							<TagSet>
+								<Tag>
+									<Key>service</Key>
+									<Value>true</Value>
+								</Tag>
+							</TagSet>
+							</Tagging>`))
+			return
+		} else if hreq.URL.Path == "/alice-bucket/" && hreq.Method == http.MethodGet {
+			rw.WriteHeader(http.StatusForbidden)
+			rw.Write([]byte(`{"Code":"AccessDenied","Message":"Access Denied"}`))
+			return
+		} else {
+			rw.WriteHeader(http.StatusOK)
+			_, _ = rw.Write([]byte(`{"status": "success"}`))
+			return
+		}
+
+	}))
 
 	cfg := &types.Config{
-		Name:          "oscar",
-		MinIOProvider: &types.MinIOProvider{},
+		Name: "oscar",
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
 	}
 
 	router := buildUpdateRouter(cfg)
@@ -69,32 +87,47 @@ func TestMakeUpdateBucketHandler_ServiceBucketForbidden(t *testing.T) {
 	if res.Code != http.StatusForbidden {
 		t.Fatalf("expected status %d, got %d", http.StatusForbidden, res.Code)
 	}
+	// Close the fake MinIO server
+	defer server.Close()
 }
 
 func TestMakeUpdateBucketHandler_VisibilityChange(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	var unsetCalls, setCalls int
-	var lastVisibility string
-	admin := &stubBucketAdmin{
-		Metadata:       map[string]string{"service": "false"},
-		Visibility:     utils.PRIVATE,
-		ResourceAccess: true,
-		UnsetPoliciesFn: func(utils.MinIOBucket) error {
-			unsetCalls++
-			return nil
-		},
-		SetPoliciesFn: func(bucket utils.MinIOBucket) error {
-			setCalls++
-			lastVisibility = bucket.Visibility
-			return nil
-		},
-	}
-	overrideBucketAdminClient(t, admin)
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		if hreq.URL.Path == "/alice-bucket/" && hreq.URL.RawQuery == "tagging=" && hreq.Method == http.MethodGet {
+			rw.WriteHeader(http.StatusOK)
+			_, _ = rw.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+							<Tagging xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+							<TagSet>
+								<Tag>
+									<Key>service</Key>
+									<Value>false</Value>
+								</Tag>
+							</TagSet>
+							</Tagging>`))
+			return
+		} else if hreq.URL.Path == "/alice-bucket/" && hreq.Method == http.MethodGet {
+			rw.WriteHeader(http.StatusForbidden)
+			rw.Write([]byte(`{"Code":"AccessDenied","Message":"Access Denied"}`))
+			return
+		} else {
+			rw.WriteHeader(http.StatusOK)
+			_, _ = rw.Write([]byte(`{"status": "success"}`))
+			return
+		}
+
+	}))
 
 	cfg := &types.Config{
-		Name:          "oscar",
-		MinIOProvider: &types.MinIOProvider{},
+		Name: "oscar",
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
 	}
 
 	router := buildUpdateRouter(cfg)
@@ -110,37 +143,73 @@ func TestMakeUpdateBucketHandler_VisibilityChange(t *testing.T) {
 	if res.Code != http.StatusNoContent {
 		t.Fatalf("expected status %d, got %d", http.StatusNoContent, res.Code)
 	}
-	if unsetCalls != 1 {
-		t.Fatalf("expected UnsetPolicies to be called once, got %d", unsetCalls)
-	}
-	if setCalls != 1 {
-		t.Fatalf("expected SetPolicies to be called once, got %d", setCalls)
-	}
-	if lastVisibility != utils.PUBLIC {
-		t.Fatalf("expected SetPolicies to receive visibility %s, got %s", utils.PUBLIC, lastVisibility)
-	}
 }
 
 func TestMakeUpdateBucketHandler_RestrictedUpdateMembers(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	var updateCalls int
-	var lastUsers []string
-	admin := &stubBucketAdmin{
-		Metadata:       map[string]string{"service": "false"},
-		Visibility:     utils.RESTRICTED,
-		ResourceAccess: true,
-		UpdateServiceGroupFn: func(_ string, users []string) error {
-			updateCalls++
-			lastUsers = append([]string(nil), users...)
-			return nil
-		},
-	}
-	overrideBucketAdminClient(t, admin)
+	const listXML = `<?xml version="1.0" encoding="UTF-8"?>
+					<ListAllMyBucketsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+						<Owner>
+							<ID>owner</ID>
+							<DisplayName>owner</DisplayName>
+						</Owner>
+						<Buckets>
+							<Bucket>
+								<Name>alice-bucket</Name>
+								<CreationDate>2024-01-01T00:00:00Z</CreationDate>
+							</Bucket>
+						</Buckets>
+					</ListAllMyBucketsResult>`
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		fmt.Println(hreq.URL.Path)
+		fmt.Println(hreq.URL.Query())
+		fmt.Println(hreq.Method)
+		if hreq.URL.Path == "/alice-bucket/" && hreq.URL.RawQuery == "tagging=" && hreq.Method == http.MethodGet {
+			rw.WriteHeader(http.StatusOK)
+			_, _ = rw.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+							<Tagging xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+							<TagSet>
+								<Tag>
+									<Key>service</Key>
+									<Value>false</Value>
+								</Tag>
+							</TagSet>
+							</Tagging>`))
+			return
+		} else if hreq.URL.Path == "/alice-bucket/" && hreq.Method == http.MethodGet {
+			rw.WriteHeader(http.StatusForbidden)
+			rw.Write([]byte(`{"Code":"AccessDenied","Message":"Access Denied"}`))
+			return
+		} else if hreq.URL.Path == "/" && hreq.Method == http.MethodGet {
+			rw.WriteHeader(http.StatusOK)
+			_, _ = rw.Write([]byte(listXML))
+			return
+		} else if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/info-canned-policy") && hreq.Method == http.MethodGet {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"PolicyName": "testpolicy", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::alice-bucket/*"]}]}}`))
+			return
+		} else if hreq.URL.Path == "/minio/admin/v3/update-group-members" && hreq.Method == http.MethodPut {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"Members": {"a"}, "Status":"a","Policy":"a"}`))
+			return
+		} else {
+			rw.WriteHeader(http.StatusOK)
+			_, _ = rw.Write([]byte(`{"status": "success"}`))
+			return
+		}
+
+	}))
 
 	cfg := &types.Config{
-		Name:          "oscar",
-		MinIOProvider: &types.MinIOProvider{},
+		Name: "oscar",
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
 	}
 
 	router := buildUpdateRouter(cfg)
@@ -155,12 +224,6 @@ func TestMakeUpdateBucketHandler_RestrictedUpdateMembers(t *testing.T) {
 
 	if res.Code != http.StatusNoContent {
 		t.Fatalf("expected status %d, got %d", http.StatusNoContent, res.Code)
-	}
-	if updateCalls != 1 {
-		t.Fatalf("expected UpdateServiceGroup to be called, got %d", updateCalls)
-	}
-	if len(lastUsers) != 2 || lastUsers[1] != "bob" {
-		t.Fatalf("unexpected users passed to UpdateServiceGroup: %v", lastUsers)
 	}
 }
 

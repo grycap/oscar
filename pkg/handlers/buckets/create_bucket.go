@@ -75,7 +75,7 @@ func MakeCreateHandler(cfg *types.Config) gin.HandlerFunc {
 		bucket.Owner = uid
 		// Use admin MinIO client for the bucket creation
 		s3Client := cfg.MinIOProvider.GetS3Client()
-		minIOAdminClient, err := makeBucketAdminClient(cfg)
+		minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", err))
 			return

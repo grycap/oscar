@@ -57,8 +57,8 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 				return
 			}
 		}
-		//s3Client := cfg.MinIOProvider.GetS3Client()
-		minIOAdminClient, err := makeBucketAdminClient(cfg)
+
+		minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintln("error creating MinIO admin client:", err))
 			return

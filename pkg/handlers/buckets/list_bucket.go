@@ -86,7 +86,7 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 		}
 		var bucketsInfo []utils.MinIOBucket
-		minIOAdminClient, err := makeBucketAdminClient(cfg)
+		minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", err))
 			return
