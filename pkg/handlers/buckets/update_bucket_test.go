@@ -1,7 +1,6 @@
 package buckets
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -162,9 +161,6 @@ func TestMakeUpdateBucketHandler_RestrictedUpdateMembers(t *testing.T) {
 						</Buckets>
 					</ListAllMyBucketsResult>`
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
-		fmt.Println(hreq.URL.Path)
-		fmt.Println(hreq.URL.Query())
-		fmt.Println(hreq.Method)
 		if hreq.URL.Path == "/alice-bucket/" && hreq.URL.RawQuery == "tagging=" && hreq.Method == http.MethodGet {
 			rw.WriteHeader(http.StatusOK)
 			_, _ = rw.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>

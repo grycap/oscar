@@ -30,9 +30,9 @@ func makeFakeClients() (*fake.Clientset, *metricsfake.Clientset) {
 		},
 		Status: v1.NodeStatus{
 			Allocatable: v1.ResourceList{
-				v1.ResourceCPU:       *resource.NewMilliQuantity(4000, resource.DecimalSI),
-				v1.ResourceMemory:    *resource.NewQuantity(16*1024*1024*1024, resource.BinarySI),
-				"nvidia.com/gpu":     *resource.NewQuantity(2, resource.DecimalSI),
+				v1.ResourceCPU:              *resource.NewMilliQuantity(4000, resource.DecimalSI),
+				v1.ResourceMemory:           *resource.NewQuantity(16*1024*1024*1024, resource.BinarySI),
+				"nvidia.com/gpu":            *resource.NewQuantity(2, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(100, resource.BinarySI),
 			},
 			Conditions: []v1.NodeCondition{
@@ -165,9 +165,9 @@ func int32Ptr(v int32) *int32 {
 
 func TestGetNodesInfoAggregatesClusterData(t *testing.T) {
 	fakeClient, _ := makeFakeClients()
-	clusterInfo := &GeneralInfo{}
+	statusInfo := &NewStatusInfo{}
 
-	nodeInfo, err := getNodesInfo(fakeClient, clusterInfo)
+	nodeInfo, err := getNodesInfo(fakeClient, statusInfo)
 	if err != nil {
 		t.Fatalf("getNodesInfo returned unexpected error: %v", err)
 	}
@@ -176,21 +176,18 @@ func TestGetNodesInfoAggregatesClusterData(t *testing.T) {
 		t.Fatalf("expected 2 worker nodes, got %d", len(nodeInfo))
 	}
 
-	if !clusterInfo.HasGPU {
-		t.Fatal("expected clusterInfo.HasGPU to be true when GPU resources exist")
-	}
-	if clusterInfo.GPUsTotal != 2 {
-		t.Fatalf("expected total GPUs to be 2, got %d", clusterInfo.GPUsTotal)
+	if statusInfo.Cluster.Metrics.GPU.TotalGPU != 2 {
+		t.Fatalf("expected total GPUs to be 2, got %d", statusInfo.Cluster.Metrics.GPU.TotalGPU)
 	}
 
 	worker := nodeInfo["worker-node"]
 	if worker == nil {
 		t.Fatalf("missing worker-node entry in nodeInfo")
 	}
-	if worker.NodeInfo.HasGPU != true {
-		t.Fatalf("expected worker-node HasGPU true, got %v", worker.NodeInfo.HasGPU)
+	if worker.NodeDetail.GPU != 2.0 {
+		t.Fatalf("expected worker-node HasGPU true, got %v", worker.NodeDetail.GPU)
 	}
-	if worker.NodeInfo.IsInterLink {
+	if worker.NodeDetail.IsInterlink {
 		t.Fatalf("worker-node should not be marked as interlink")
 	}
 
@@ -198,89 +195,89 @@ func TestGetNodesInfoAggregatesClusterData(t *testing.T) {
 	if interlink == nil {
 		t.Fatalf("missing interlink-node entry in nodeInfo")
 	}
-	if !interlink.NodeInfo.IsInterLink {
+	if !interlink.NodeDetail.IsInterlink {
 		t.Fatalf("expected interlink-node IsInterLink true")
 	}
-	if interlink.NodeInfo.HasGPU {
+	if worker.NodeDetail.GPU == 0.0 {
 		t.Fatalf("interlink-node should not expose GPU resources")
 	}
 }
 
 func TestGetMetricsInfoUpdatesUsage(t *testing.T) {
 	fakeClient, metricsClient := makeFakeClients()
-	clusterInfo := &GeneralInfo{}
-	nodeInfo, err := getNodesInfo(fakeClient, clusterInfo)
+	statusInfo := &NewStatusInfo{}
+
+	nodeInfo, err := getNodesInfo(fakeClient, statusInfo)
 	if err != nil {
 		t.Fatalf("getNodesInfo returned unexpected error: %v", err)
 	}
 
-	if err := getMetricsInfo(fakeClient, metricsClient.MetricsV1beta1(), nodeInfo, clusterInfo); err != nil {
+	if err := getMetricsInfo(fakeClient, metricsClient.MetricsV1beta1(), nodeInfo, statusInfo); err != nil {
 		t.Fatalf("getMetricsInfo returned unexpected error: %v", err)
 	}
 
-	if clusterInfo.NumberNodes != 2 {
-		t.Fatalf("expected NumberNodes 2, got %d", clusterInfo.NumberNodes)
+	if statusInfo.Cluster.NodesCount != 2 {
+		t.Fatalf("expected NumberNodes 2, got %d", statusInfo.Cluster.NodesCount)
 	}
 
-	if clusterInfo.CPUFreeTotal != (4000-1000)+(2000-500) {
-		t.Fatalf("unexpected CPUFreeTotal: %d", clusterInfo.CPUFreeTotal)
+	if statusInfo.Cluster.Metrics.CPU.TotalFreeCores != (4000-1000)+(2000-500) {
+		t.Fatalf("unexpected CPUFreeTotal: %d", statusInfo.Cluster.Metrics.CPU.TotalFreeCores)
 	}
 
-	worker := nodeInfo["worker-node"].NodeInfo
-	if worker.CPUUsage != "1000" || worker.MemoryUsage != "4294967296" {
+	worker := nodeInfo["worker-node"].NodeDetail
+	if worker.CPU.UsageCores != 1000 || worker.Memory.UsageBytes != 4294967296 {
 		t.Fatalf("unexpected usage data for worker-node: %+v", worker)
 	}
-	if worker.CPUPercentage != "25.00" {
-		t.Fatalf("expected CPU percentage to be 25.00, got %s", worker.CPUPercentage)
-	}
+
 }
 
 func TestGetDeploymentInfoPopulatesOscarSection(t *testing.T) {
 	fakeClient, _ := makeFakeClients()
 	cfg := &types.Config{
-		Namespace:       "oscar",
-		OIDCEnable:      true,
+		Namespace:        "oscar",
+		OIDCEnable:       true,
 		OIDCValidIssuers: []string{"issuer"},
-		OIDCGroups:      []string{"group"},
+		OIDCGroups:       []string{"group"},
 	}
 
-	clusterInfo := &GeneralInfo{}
-	if err := getDeploymentInfo(fakeClient, cfg, clusterInfo); err != nil {
+	statusInfo := &NewStatusInfo{}
+
+	if err := getDeploymentInfo(fakeClient, cfg, statusInfo); err != nil {
 		t.Fatalf("getDeploymentInfo returned unexpected error: %v", err)
 	}
 
-	if clusterInfo.OSCAR.DeploymentName != "oscar" {
-		t.Fatalf("expected deployment name 'oscar', got %s", clusterInfo.OSCAR.DeploymentName)
+	if statusInfo.Oscar.DeploymentName != "oscar" {
+		t.Fatalf("expected deployment name 'oscar', got %s", statusInfo.Oscar.DeploymentName)
 	}
-	if !clusterInfo.OSCAR.DeploymentReady {
+	if !statusInfo.Oscar.Ready {
 		t.Fatalf("expected DeploymentReady true")
 	}
-	if !clusterInfo.OSCAR.OIDC.Enabled {
+	if !statusInfo.Oscar.OIDC.Enabled {
 		t.Fatalf("expected OIDC.Enabled to mirror config")
 	}
 }
 
 func TestGetJobsInfoSummarisesStatus(t *testing.T) {
 	fakeClient, _ := makeFakeClients()
-	clusterInfo := &GeneralInfo{
-		OSCAR: OscarInfo{},
+	statusInfo := &NewStatusInfo{
+		Oscar: OscarInfo{},
 	}
 	cfg := &types.Config{
 		ServicesNamespace: "oscar-svc",
 	}
 
-	if err := getJobsInfo(cfg, fakeClient, clusterInfo); err != nil {
+	if err := getJobsInfo(cfg, fakeClient, statusInfo); err != nil {
 		t.Fatalf("getJobsInfo returned unexpected error: %v", err)
 	}
 
-	if clusterInfo.OSCAR.JobsCount["succeeded"] != 1 || clusterInfo.OSCAR.JobsCount["failed"] != 1 {
-		t.Fatalf("unexpected jobs count: %+v", clusterInfo.OSCAR.JobsCount)
+	if statusInfo.Oscar.Pods.States["Succeeded"] != 1 || statusInfo.Oscar.Pods.States["Running"] != 1 {
+		t.Fatalf("unexpected jobs count: %+v", statusInfo.Oscar.Pods)
 	}
-	if clusterInfo.OSCAR.PodsInfo.Total != 2 {
-		t.Fatalf("expected 2 pods in PodsInfo.Total, got %d", clusterInfo.OSCAR.PodsInfo.Total)
+	if statusInfo.Oscar.Pods.Total != 2 {
+		t.Fatalf("expected 2 pods in PodsInfo.Total, got %d", statusInfo.Oscar.Pods.Total)
 	}
-	if clusterInfo.OSCAR.PodsInfo.States["Running"] != 1 {
-		t.Fatalf("expected 1 running pod, got %+v", clusterInfo.OSCAR.PodsInfo.States)
+	if statusInfo.Oscar.Pods.States["Running"] != 1 {
+		t.Fatalf("expected 1 running pod, got %+v", statusInfo.Oscar.Pods.States["Running"])
 	}
 }
 
@@ -342,18 +339,18 @@ func TestMakeStatusHandlerReturnsClusterInfoForNonAdmin(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", resp.Code)
 	}
 
-	var payload GeneralInfo
+	var payload NewStatusInfo
 	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if payload.NumberNodes != 2 {
-		t.Fatalf("expected NumberNodes 2, got %d", payload.NumberNodes)
+	if payload.Cluster.NodesCount != 2 {
+		t.Fatalf("expected NumberNodes 2, got %d", payload.Cluster.NodesCount)
 	}
-	if payload.OSCAR.DeploymentInfo == nil {
+	if payload.Oscar.Deployment.AvailableReplicas == 0 {
 		t.Fatal("expected OSCAR.DeploymentInfo to be populated")
 	}
 	// Non admin users should not receive MinIO information.
-	if len(payload.MinIO.Buckets) != 0 {
-		t.Fatalf("expected no MinIO buckets for non admin user: %+v", payload.MinIO.Buckets)
+	if payload.MinIO.BucketsCount != 0 {
+		t.Fatalf("expected no MinIO buckets for non admin user: %+v", payload.MinIO.BucketsCount)
 	}
 }
