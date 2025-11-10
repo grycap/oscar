@@ -5,8 +5,8 @@ RED="\e[31m"
 ORANGE="\e[167m"
 END_COLOR="\033[0m"
 
-CONFIG_FILEPATH="$(pwd)/config.yaml"
-KNATIVE_FILEPATH="$(pwd)/knative.yaml"
+CONFIG_FILEPATH=$(mktemp -t oscar-kind-config.XXXXXX)
+KNATIVE_FILEPATH=$(mktemp -t oscar-knative-config.XXXXXX)
 MINIO_HELM_NAME="minio"
 NFS_HELM_NAME="nfs-server-provisioner"
 OSCAR_HELM_NAME="oscar"
@@ -21,6 +21,19 @@ MINIO_PASSWORD=`date +%s | sha256sum | base64 | head -c 8`
 
 #Not use knative by default
 use_knative="n"
+
+RANDOM_SUFFIX=`echo $OSCAR_PASSWORD | cut -c1-3 | tr '[:upper:]' '[:lower:]'`
+if [ -z "$RANDOM_SUFFIX" ]; then
+    RANDOM_SUFFIX=`LC_CTYPE=C tr -dc 'a-z0-9' </dev/urandom | head -c 3`
+fi
+CLUSTER_NAME="oscar-test-$RANDOM_SUFFIX"
+KIND_CONTEXT="kind-$CLUSTER_NAME"
+DEFAULT_HTTP_PORT=80
+DEFAULT_HTTPS_PORT=443
+DEFAULT_MINIO_API_PORT=30300
+DEFAULT_MINIO_CONSOLE_PORT=30301
+DEFAULT_REGISTRY_PORT=5001
+OSCAR_IMAGE_BRANCH="master"
 
 showInfo(){
     echo "[*] This script will install a Kubernetes cluster using Kind along with all the required OSCAR services (if not installed): "
@@ -38,6 +51,164 @@ showInfo(){
         echo "Stopping execution ..."
         exit
     fi
+}
+
+portInUse(){
+    local port=$1
+    if command -v lsof &> /dev/null; then
+        if lsof -PiTCP -sTCP:LISTEN -n -P 2>/dev/null | grep -q ":${port} " ; then
+            return 0
+        fi
+    fi
+    if command -v netstat &> /dev/null; then
+        if netstat -an 2>/dev/null | grep -E "[:\.]${port}[[:space:]].*LISTEN" >/dev/null; then
+            return 0
+        fi
+    fi
+    if command -v docker &> /dev/null; then
+        if docker ps --format '{{.Ports}}' 2>/dev/null | tr ',' '\n' | grep -E "(:|::)${port}->" >/dev/null; then
+            return 0
+        fi
+    fi
+    if command -v nc &> /dev/null; then
+        if nc -z localhost "$port" >/dev/null 2>&1; then
+            return 0
+        fi
+        if nc -z 127.0.0.1 "$port" >/dev/null 2>&1; then
+            return 0
+        fi
+    elif command -v python3 &> /dev/null; then
+        python3 - "$port" <<'PY'
+import socket, sys
+port = int(sys.argv[1])
+for family, host in ((socket.AF_INET, "127.0.0.1"), (socket.AF_INET6, "::1")):
+    try:
+        with socket.socket(family, socket.SOCK_STREAM) as s:
+            s.settimeout(0.2)
+            if s.connect_ex((host, port)) == 0:
+                sys.exit(0)
+    except OSError:
+        continue
+sys.exit(1)
+PY
+        if [ $? -eq 0 ]; then
+            return 0
+        fi
+    fi
+    if [ "$port" -ge 1024 ]; then
+        if command -v python3 &> /dev/null; then
+            if ! python3 - "$port" <<'PY'
+import errno
+import socket
+import sys
+
+port = int(sys.argv[1])
+
+def can_bind(family, addr):
+    try:
+        s = socket.socket(family, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind((addr, port))
+        s.close()
+        return True
+    except OSError as exc:
+        if exc.errno in (getattr(errno, "EADDRINUSE", 98), getattr(errno, "EACCES", 13)):
+            return False
+        if exc.errno in (
+            getattr(errno, "EAFNOSUPPORT", 97),
+            getattr(errno, "EOPNOTSUPP", 95),
+            getattr(errno, "EPROTONOSUPPORT", 93),
+            getattr(errno, "EADDRNOTAVAIL", 99),
+            getattr(errno, "EINVAL", 22),
+        ):
+            return True
+        return False
+
+if not can_bind(socket.AF_INET, "0.0.0.0"):
+    sys.exit(1)
+
+if not can_bind(socket.AF_INET6, "::"):
+    sys.exit(1)
+
+sys.exit(0)
+PY
+            then
+                return 0
+            fi
+        elif command -v python &> /dev/null; then
+            if ! python - "$port" <<'PY'
+import errno
+import socket
+import sys
+
+port = int(sys.argv[1])
+
+def can_bind(family, addr):
+    try:
+        s = socket.socket(family, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind((addr, port))
+        s.close()
+        return True
+    except socket.error as exc:
+        if exc.errno in (getattr(errno, "EADDRINUSE", 98), getattr(errno, "EACCES", 13)):
+            return False
+        if exc.errno in (
+            getattr(errno, "EAFNOSUPPORT", 97),
+            getattr(errno, "EOPNOTSUPP", 95),
+            getattr(errno, "EPROTONOSUPPORT", 93),
+            getattr(errno, "EADDRNOTAVAIL", 99),
+            getattr(errno, "EINVAL", 22),
+        ):
+            return True
+        return False
+
+if not can_bind(socket.AF_INET, "0.0.0.0"):
+    sys.exit(1)
+
+if not can_bind(socket.AF_INET6, "::"):
+    sys.exit(1)
+
+sys.exit(0)
+PY
+            then
+                return 0
+            fi
+        fi
+    fi
+    return 1
+}
+
+findAvailablePort(){
+    local default_port=$1
+    shift
+    local candidates=("$default_port" "$@")
+    for candidate in "${candidates[@]}"; do
+        if ! portInUse "$candidate"; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    echo ""
+    return 1
+}
+
+findAvailablePortExclude(){
+    local default_port=$1
+    local excluded_port=$2
+    shift 2
+    local candidates=("$default_port" "$@")
+    for candidate in "${candidates[@]}"; do
+        if [ "$candidate" == "$excluded_port" ]; then
+            continue
+        fi
+        if ! portInUse "$candidate"; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    echo ""
+    return 1
 }
 
 #Check if Docker is installed
@@ -127,24 +298,46 @@ checkIngressStatus(){
 }
 
 checkOSCARDeploy(){
-    timeout=100
+    timeout=300
     start=$(date +%s)
-    while [ "$status" != "Running" ]; do
-        status=`kubectl get pods -n oscar 2>/dev/null | awk '/oscar/ {print $3}'`
-        actual=$(date +%s)
-        if [ `expr $actual - $start` -gt $timeout ]; then
-            echo -e "\n$RED[!]$END_COLOR Error: Timeout: Pod status: $status"
-            exit
+    echo -e "\n[*] Waiting for OSCAR pods to become ready ..."
+    while true; do
+        pod_info=$(kubectl get pods -n oscar -l app=oscar --no-headers 2>/dev/null)
+        statuses=$(echo "$pod_info" | awk '{print $3}')
+
+        if echo "$statuses" | grep -qw "Running"; then
+            break
         fi
+
+        if echo "$statuses" | grep -Eiq "Error|CrashLoopBackOff|ImagePullBackOff"; then
+            echo -e "\n$RED[!]$END_COLOR Error: Pod failure detected. Current statuses:"
+            kubectl get pods -n oscar
+            exit 1
+        fi
+
+        actual=$(date +%s)
+        if [ $((actual - start)) -gt $timeout ]; then
+            echo -e "\n$RED[!]$END_COLOR Error: Timeout waiting for OSCAR pods. Current statuses: ${statuses:-Unknown}"
+            kubectl get pods -n oscar
+            exit 1
+        fi
+        sleep 5
     done
     echo -e "\n[$GREEN$CHECK$END_COLOR] OSCAR platform deployed correctly"
-    echo -e "\n > You can now acces to the OSCAR web interface through https://localhost with the following credentials: "
+    if [ "$HOST_HTTPS_PORT" == "$DEFAULT_HTTPS_PORT" ]; then
+        oscar_url="https://localhost"
+    else
+        oscar_url="https://localhost:$HOST_HTTPS_PORT"
+    fi
+    echo -e "\n > You can now acces to the OSCAR web interface through $oscar_url with the following credentials: "
     echo "  - username: oscar"
     echo "  - password: $OSCAR_PASSWORD"
-    echo -e "\n > You can now access to MinIO console through http://localhost:30300 with the following credentials: "
+    minio_api_url="http://localhost:$HOST_MINIO_API_PORT"
+    minio_console_url="http://localhost:$HOST_MINIO_CONSOLE_PORT"
+    echo -e "\n > You can now access MinIO object storage through $minio_api_url and the console through $minio_console_url with the following credentials: "
     echo "  - username: minio"
     echo "  - password: $MINIO_PASSWORD"
-    echo -e "\n[*] Note: To delete the cluster type 'kind delete cluster --name=oscar-test'\n"
+    echo -e "\n[*] Note: To delete the cluster type 'kind delete cluster --name=$CLUSTER_NAME'\n"
 }
 
 deployKnative(){
@@ -181,9 +374,9 @@ EOF
 
 createKindCluster(){
     echo -e "\n[*] Creating kind cluster"
-    kind create cluster --config=$CONFIG_FILEPATH --name=oscar-test
+    kind create cluster --config=$CONFIG_FILEPATH --name="$CLUSTER_NAME"
 
-    if [ ! `kubectl cluster-info --context kind-oscar-test` &> /dev/null ]; then
+    if ! kubectl cluster-info --context "$KIND_CONTEXT" &> /dev/null; then
         echo -e "$RED[*]$END_COLOR Kind cluster not found."
         echo "Stopping execution ...."
         if [ -f $CONFIG_FILEPATH ]; then 
@@ -204,15 +397,81 @@ checkKind
 echo -e "\n"
 read -p "Do you want to use Knative Serving as Serverless Backend? [y/n] " use_knative </dev/tty
 read -p "Do you want suport for local docker images? [y/n] " local_reg </dev/tty
+read -p "Do you want to install OSCAR from the devel branch? [y/n] (default uses master) " use_devel_branch </dev/tty
+
+if [ `echo $use_devel_branch | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+    OSCAR_IMAGE_BRANCH="devel"
+fi
+
+HTTP_PORT_FALLBACKS=(8080 8081 8082 8880 9080 10080)
+HTTPS_PORT_FALLBACKS=(444 8443 9443 10443)
+MINIO_API_PORT_FALLBACKS=(30302 30304 30306 31300 32000 32500)
+MINIO_CONSOLE_PORT_FALLBACKS=(30303 30305 30307 31301 32001 32501)
+HOST_HTTP_PORT=$(findAvailablePort "$DEFAULT_HTTP_PORT" "${HTTP_PORT_FALLBACKS[@]}")
+HOST_HTTPS_PORT=$(findAvailablePort "$DEFAULT_HTTPS_PORT" "${HTTPS_PORT_FALLBACKS[@]}")
+HOST_MINIO_API_PORT=$(findAvailablePort "$DEFAULT_MINIO_API_PORT" "${MINIO_API_PORT_FALLBACKS[@]}")
+HOST_MINIO_CONSOLE_PORT=$(findAvailablePortExclude "$DEFAULT_MINIO_CONSOLE_PORT" "$HOST_MINIO_API_PORT" "${MINIO_CONSOLE_PORT_FALLBACKS[@]}")
+
+if [ -z "$HOST_HTTP_PORT" ]; then
+    echo -e "$RED[!]$END_COLOR Error: Unable to find a free port for HTTP ingress"
+    exit 1
+fi
+
+if [ -z "$HOST_HTTPS_PORT" ]; then
+    echo -e "$RED[!]$END_COLOR Error: Unable to find a free port for HTTPS ingress"
+    exit 1
+fi
+
+if [ -z "$HOST_MINIO_API_PORT" ]; then
+    echo -e "$RED[!]$END_COLOR Error: Unable to find a free port for MinIO API"
+    exit 1
+fi
+
+if [ -z "$HOST_MINIO_CONSOLE_PORT" ]; then
+    echo -e "$RED[!]$END_COLOR Error: Unable to find a free port for MinIO console"
+    exit 1
+fi
+
+if [ "$HOST_HTTP_PORT" != "$DEFAULT_HTTP_PORT" ]; then
+    echo -e "$ORANGE[*]$END_COLOR Port 80 is busy. Using $HOST_HTTP_PORT for ingress HTTP instead."
+fi
+
+if [ "$HOST_HTTPS_PORT" != "$DEFAULT_HTTPS_PORT" ]; then
+    echo -e "$ORANGE[*]$END_COLOR Port 443 is busy. Using $HOST_HTTPS_PORT for ingress HTTPS instead."
+fi
+
+if [ "$HOST_MINIO_API_PORT" != "$DEFAULT_MINIO_API_PORT" ]; then
+    echo -e "$ORANGE[*]$END_COLOR Port $DEFAULT_MINIO_API_PORT is busy. Using $HOST_MINIO_API_PORT for MinIO API instead."
+fi
+
+if [ "$HOST_MINIO_CONSOLE_PORT" != "$DEFAULT_MINIO_CONSOLE_PORT" ]; then
+    echo -e "$ORANGE[*]$END_COLOR Port $DEFAULT_MINIO_CONSOLE_PORT is busy. Using $HOST_MINIO_CONSOLE_PORT for MinIO console instead."
+fi
 
 #Deploy Knative Serving
 if [ `echo $local_reg | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
     reg_name='local-registry'
-    reg_port='5001'
+    registry_status="created"
+    reg_port=$DEFAULT_REGISTRY_PORT
 
-    # create registry container unless it already exists
-    if [ "$(docker inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || true)" != 'true' ]; then
-        docker run -d --restart=always -p "127.0.0.1:${reg_port}:5000" --name "${reg_name}" registry:2
+    if docker inspect -f '{{.Name}}' "${reg_name}" &>/dev/null; then
+        registry_status="reused"
+        if [ "$(docker inspect -f '{{.State.Running}}' "${reg_name}")" != 'true' ]; then
+            docker start "${reg_name}" >/dev/null
+        fi
+        existing_port=$(docker port "${reg_name}" 5000/tcp 2>/dev/null | head -n1 | awk -F':' '{print $NF}')
+        if [ -n "$existing_port" ]; then
+            reg_port=$existing_port
+        fi
+        echo -e "$GREEN$CHECK$END_COLOR Reusing existing local registry '${reg_name}' on port ${reg_port}"
+    else
+        if portInUse "$DEFAULT_REGISTRY_PORT"; then
+            echo -e "$RED[!]$END_COLOR Port ${DEFAULT_REGISTRY_PORT} is already in use. Stop the service using it or rerun with an existing local registry."
+            exit 1
+        fi
+        docker run -d --restart=always -p "127.0.0.1:${DEFAULT_REGISTRY_PORT}:5000" --name "${reg_name}" registry:2
+        reg_port=$DEFAULT_REGISTRY_PORT
+        echo -e "$GREEN$CHECK$END_COLOR Local registry '${reg_name}' created on port ${DEFAULT_REGISTRY_PORT}"
     fi
 
 # Kind cluster definition with local registry
@@ -233,16 +492,16 @@ nodes:
         node-labels: "ingress-ready=true"
   extraPortMappings:
   - containerPort: 80
-    hostPort: 80
+    hostPort: ${HOST_HTTP_PORT}
     protocol: TCP
   - containerPort: 443
-    hostPort: 443
+    hostPort: ${HOST_HTTPS_PORT}
     protocol: TCP
-  - containerPort: 30300
-    hostPort: 30300
+  - containerPort: ${HOST_MINIO_API_PORT}
+    hostPort: ${HOST_MINIO_API_PORT}
     protocol: TCP
-  - containerPort: 30301
-    hostPort: 30301
+  - containerPort: ${HOST_MINIO_CONSOLE_PORT}
+    hostPort: ${HOST_MINIO_CONSOLE_PORT}
     protocol: TCP
 EOF
     #Create kind cluster
@@ -284,16 +543,16 @@ nodes:
         node-labels: "ingress-ready=true"
   extraPortMappings:
   - containerPort: 80
-    hostPort: 80
+    hostPort: ${HOST_HTTP_PORT}
     protocol: TCP
   - containerPort: 443
-    hostPort: 443
+    hostPort: ${HOST_HTTPS_PORT}
     protocol: TCP
-  - containerPort: 30300
-    hostPort: 30300
+  - containerPort: ${HOST_MINIO_API_PORT}
+    hostPort: ${HOST_MINIO_API_PORT}
     protocol: TCP
-  - containerPort: 30301
-    hostPort: 30301
+  - containerPort: ${HOST_MINIO_CONSOLE_PORT}
+    hostPort: ${HOST_MINIO_CONSOLE_PORT}
     protocol: TCP
 EOF
     #Create kind cluster
@@ -308,7 +567,7 @@ checkIngressStatus
 #Deploy MinIO
 echo -e "\n[*] Deploying MinIO storage provider ..."
 helm repo add --force-update minio https://charts.min.io
-helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=30300,consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 --create-namespace --version 4.0.7
+helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT --create-namespace --version 4.0.7
 
 #Deploy NFS server provisioner
 echo -e "\n[*] Deploying NFS server provider ..."
@@ -340,6 +599,14 @@ if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then
     helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative
 else
     helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD
+fi
+
+if [ "$OSCAR_IMAGE_BRANCH" == "devel" ]; then
+    echo -e "\n[*] Forcing OSCAR deployment to use grycap/oscar:$OSCAR_IMAGE_BRANCH image ..."
+    if ! kubectl -n oscar set image deployment/oscar oscar="grycap/oscar:$OSCAR_IMAGE_BRANCH"; then
+        echo -e "$RED[!]$END_COLOR Failed to switch OSCAR deployment to grycap/oscar:$OSCAR_IMAGE_BRANCH"
+        exit 1
+    fi
 fi
 
 #Wait for OSCAR deployment
@@ -393,6 +660,34 @@ subjects:
   name: oscar-sa
   namespace: oscar
 EOF
+
+echo -e "\n[*] Deployment details:"
+echo "  - Kind cluster name: $CLUSTER_NAME"
+echo "  - Kind context: $KIND_CONTEXT"
+if [ "$HOST_HTTP_PORT" == "$DEFAULT_HTTP_PORT" ]; then
+    oscar_http_url="http://localhost"
+else
+    oscar_http_url="http://localhost:$HOST_HTTP_PORT"
+fi
+if [ "$HOST_HTTPS_PORT" == "$DEFAULT_HTTPS_PORT" ]; then
+    oscar_https_url="https://localhost"
+else
+    oscar_https_url="https://localhost:$HOST_HTTPS_PORT"
+fi
+minio_api_url="http://localhost:$HOST_MINIO_API_PORT"
+minio_console_url="http://localhost:$HOST_MINIO_CONSOLE_PORT"
+echo "  - OSCAR HTTP port: $HOST_HTTP_PORT ($oscar_http_url)"
+echo "  - OSCAR HTTPS port: $HOST_HTTPS_PORT ($oscar_https_url)"
+echo "  - MinIO API NodePort/host port: $HOST_MINIO_API_PORT ($minio_api_url)"
+echo "  - MinIO console NodePort/host port: $HOST_MINIO_CONSOLE_PORT ($minio_console_url)"
+echo "  - OSCAR image branch: $OSCAR_IMAGE_BRANCH"
+echo "  - OSCAR credentials: username='oscar', password='$OSCAR_PASSWORD'"
+echo "  - MinIO credentials: username='minio', password='$MINIO_PASSWORD'"
+if [ `echo $local_reg | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+    echo "  - Local registry: ${reg_name} (port ${reg_port}, ${registry_status})"
+else
+    echo "  - Local registry: not configured"
+fi
 
 echo -e "\n[$GREEN$CHECK$END_COLOR] Deployment completed successfully"
 
