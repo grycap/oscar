@@ -426,7 +426,7 @@ func (minIOAdminClient *MinIOAdminClient) UpdateServiceGroup(groupName string, u
 	if err != nil {
 		return fmt.Errorf("error getting group description for %s: %v", groupName, err)
 	}
-
+	fmt.Println(groupDescription)
 	membersMap := make(map[string]bool)
 	for _, member := range groupDescription.Members {
 		membersMap[member] = true
