@@ -71,7 +71,6 @@ func TestMakeListBucketHandlerAdmin(t *testing.T) {
 		AllowedUsers string `json:"allowed_users"`
 		Owner        string `json:"owner"`
 	}{}
-	//fmt.Println(res.Body.String())
 	if err := json.Unmarshal(res.Body.Bytes(), &Buckets); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}

@@ -70,6 +70,15 @@ type MinIOBucket struct {
 	AllowedUsers []string          `json:"allowed_users"`
 	Owner        string            `json:"owner"`
 	Metadata     map[string]string `json:"metadata"`
+	Objects      []MinIOObject     `json:"objects,omitempty"`
+}
+
+// MinIOObject captures object level metadata inside a MinIO bucket
+type MinIOObject struct {
+	ObjectName   string `json:"object_name"`
+	SizeBytes    int64  `json:"size_bytes"`
+	Owner        string `json:"owner,omitempty"`
+	LastModified string `json:"last_modified,omitempty"`
 }
 
 // Define the policy structure using Go structs

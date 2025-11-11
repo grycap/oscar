@@ -99,6 +99,7 @@ func main() {
 	// CRUD Buckets
 	system.POST("/buckets", buckets.MakeCreateHandler(cfg))
 	system.GET("/buckets", buckets.MakeListHandler(cfg))
+	system.GET("/buckets/:bucket", buckets.MakeGetHandler(cfg))
 	system.PUT("/buckets", buckets.MakeUpdateHandler(cfg))
 	system.DELETE("/buckets/:bucket", buckets.MakeDeleteHandler(cfg))
 	system.POST("/buckets/:bucket/presign", buckets.MakePresignHandler(cfg))
