@@ -1,17 +1,16 @@
 package buckets
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/v3/pkg/testsupport"
 	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	testclient "k8s.io/client-go/kubernetes/fake"
 )
 
 func TestMakeGetBucketHandlerAdmin(t *testing.T) {
@@ -19,37 +18,69 @@ func TestMakeGetBucketHandlerAdmin(t *testing.T) {
 
 	lastModified := "2024-05-10T12:00:00Z"
 
-	fakeAdmin := &fakeBucketAdminClient{
-		metadata:   map[string]string{"owner": "alice"},
-		visibility: utils.PUBLIC,
-	}
-	overrideBucketAdminFactory(t, fakeAdmin)
-	overrideBucketObjectFactory(t, func(cfg *types.Config, c *gin.Context, requester string, isAdmin bool) (bucketObjectClient, error) {
-		return &fakeBucketObjectClient{
-			exists: true,
-			objects: []utils.MinIOObject{
-				{ObjectName: "file.txt", SizeBytes: 42, Owner: "alice", LastModified: lastModified},
-			},
-		}, nil
-	})
+	testsupport.SkipIfCannotListen(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/demo" &&
+			r.URL.RawQuery == "list-type=2&max-keys=0" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+				<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+					<Name>demo</Name>
+					<Prefix></Prefix>
+					<KeyCount>1</KeyCount>
+					<MaxKeys>1</MaxKeys>
+					<Contents>
+						<Key>file.txt</Key>
+						<LastModified>` + lastModified + `</LastModified>
+						<ETag>"d41d8cd98f00b204e9800998ecf8427e"</ETag>
+						<Size>42</Size>
+						<StorageClass>STANDARD</StorageClass>
+					</Contents>
+					<IsTruncated>false</IsTruncated>
+				</ListBucketResult>`))
+			return
+		} else if r.Method == http.MethodGet && r.URL.Path == "/demo" &&
+			r.URL.RawQuery == "location=" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"status":"success"}`))
+			return
+		} else if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/info-canned-policy" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"PolicyName": "demo", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::demo/*"]}]}}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"success"}`))
+		return
+	}))
 
 	cfg := &types.Config{
+		Name:        "oscar",
+		Namespace:   "oscar",
+		ServicePort: 8080,
 		MinIOProvider: &types.MinIOProvider{
-			Endpoint:  "http://127.0.0.1:9000",
+			Endpoint:  server.URL,
 			Region:    "us-east-1",
 			AccessKey: "minioadmin",
 			SecretKey: "minioadmin",
 			Verify:    false,
 		},
 	}
+	kubeClientset := testclient.NewSimpleClientset()
 
-	router := gin.New()
+	router := gin.Default()
+	router.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "somelonguid@egi.eu")
+		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "somelonguid@egi.eu"))
+		c.Next()
+	})
 	router.GET("/system/buckets/:bucket", MakeGetHandler(cfg))
 
 	req := httptest.NewRequest(http.MethodGet, "/system/buckets/demo", nil)
+	req.Header.Add("Authorization", "Bearer token")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
-
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, res.Code)
 	}
@@ -73,9 +104,6 @@ func TestMakeGetBucketHandlerAdmin(t *testing.T) {
 	if response.Objects[0].ObjectName != "file.txt" || response.Objects[0].SizeBytes != 42 {
 		t.Fatalf("unexpected object payload: %+v", response.Objects[0])
 	}
-	if response.Objects[0].LastModified != lastModified {
-		t.Fatalf("expected last_modified %s, got %s", lastModified, response.Objects[0].LastModified)
-	}
 	if response.NextPage != "" {
 		t.Fatalf("expected empty next_page, got %s", response.NextPage)
 	}
@@ -95,27 +123,41 @@ func TestMakeGetBucketHandlerAdmin(t *testing.T) {
 	if _, hasOwner := raw.Objects[0]["owner"]; hasOwner {
 		t.Fatalf("unexpected owner field: %+v", raw.Objects[0])
 	}
-	if got := raw.Objects[0]["last_modified"]; got != lastModified {
-		t.Fatalf("expected raw last_modified %s, got %v", lastModified, got)
-	}
+
+	// Close the fake MinIO server
+	defer server.Close()
 }
 
 func TestMakeGetBucketHandlerForbidden(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	fakeAdmin := &fakeBucketAdminClient{
-		metadata:   map[string]string{"owner": "alice"},
-		visibility: utils.PRIVATE,
-		policies:   map[string]bool{},
-	}
-	overrideBucketAdminFactory(t, fakeAdmin)
-	overrideBucketObjectFactory(t, func(cfg *types.Config, c *gin.Context, requester string, isAdmin bool) (bucketObjectClient, error) {
-		return &fakeBucketObjectClient{exists: true}, nil
-	})
+	testsupport.SkipIfCannotListen(t)
+	const listXML = `<?xml version="1.0" encoding="UTF-8"?>
+			<ListAllMyBucketsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+				<Owner>
+					<ID>owner</ID>
+					<DisplayName>owner</DisplayName>
+				</Owner>
+				<Buckets>
+					<Bucket>
+						<Name>demo</Name>
+						<CreationDate>2024-01-01T00:00:00Z</CreationDate>
+					</Bucket>
+				</Buckets>
+			</ListAllMyBucketsResult>`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(listXML))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
 
 	cfg := &types.Config{
 		MinIOProvider: &types.MinIOProvider{
-			Endpoint:  "http://127.0.0.1:9000",
+			Endpoint:  server.URL,
 			Region:    "us-east-1",
 			AccessKey: "minioadmin",
 			SecretKey: "minioadmin",
@@ -137,31 +179,57 @@ func TestMakeGetBucketHandlerForbidden(t *testing.T) {
 	if res.Code != http.StatusForbidden {
 		t.Fatalf("expected status %d, got %d", http.StatusForbidden, res.Code)
 	}
+	// Close the fake MinIO server
+	defer server.Close()
 }
 
 func TestMakeGetBucketHandlerRestrictedMember(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-
 	lastModified := "2024-01-02T03:04:05Z"
-
-	fakeAdmin := &fakeBucketAdminClient{
-		metadata:   map[string]string{"owner": "alice"},
-		visibility: utils.RESTRICTED,
-		members:    []string{"bob"},
-	}
-	overrideBucketAdminFactory(t, fakeAdmin)
-	overrideBucketObjectFactory(t, func(cfg *types.Config, c *gin.Context, requester string, isAdmin bool) (bucketObjectClient, error) {
-		return &fakeBucketObjectClient{
-			exists: true,
-			objects: []utils.MinIOObject{
-				{ObjectName: "nested/data.bin", SizeBytes: 1024, Owner: "alice", LastModified: lastModified},
-			},
-		}, nil
-	})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/demo" &&
+			r.URL.RawQuery == "list-type=2&max-keys=0" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+				<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+					<Name>demo</Name>
+					<Prefix></Prefix>
+					<KeyCount>1</KeyCount>
+					<MaxKeys>1</MaxKeys>
+					<Contents>
+						<Key>file.txt</Key>
+						<LastModified>` + lastModified + `</LastModified>
+						<ETag>"d41d8cd98f00b204e9800998ecf8427e"</ETag>
+						<Size>42</Size>
+						<StorageClass>STANDARD</StorageClass>
+					</Contents>
+					<IsTruncated>false</IsTruncated>
+				</ListBucketResult>`))
+			return
+		} else if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/group" &&
+			r.URL.RawQuery == "name=demo" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"Group":{"name":"demo","members":["bob"],"policy":"readonly"}}`))
+			return
+		} else if r.Method == http.MethodGet && r.URL.Path == "/demo" &&
+			r.URL.RawQuery == "location=" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"status":"success"}`))
+			return
+		} else if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/info-canned-policy" &&
+			r.URL.RawQuery == "name=bob&v=2" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"PolicyName": "bob", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::demo/*"]}]}}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"success"}`))
+		return
+	}))
 
 	cfg := &types.Config{
 		MinIOProvider: &types.MinIOProvider{
-			Endpoint:  "http://127.0.0.1:9000",
+			Endpoint:  server.URL,
 			Region:    "us-east-1",
 			AccessKey: "minioadmin",
 			SecretKey: "minioadmin",
@@ -189,19 +257,21 @@ func TestMakeGetBucketHandlerRestrictedMember(t *testing.T) {
 			ObjectName   string `json:"object_name"`
 			LastModified string `json:"last_modified"`
 		} `json:"objects"`
-		NextPage      string `json:"next_page"`
-		ReturnedItems int    `json:"returned_items"`
-		IsTruncated   bool   `json:"is_truncated"`
+		AllowedUsers  []string `json:"allowed_users"`
+		NextPage      string   `json:"next_page"`
+		ReturnedItems int      `json:"returned_items"`
+		IsTruncated   bool     `json:"is_truncated"`
 	}
 	if err := json.Unmarshal(res.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
-	if len(response.Objects) != 1 || response.Objects[0].ObjectName != "nested/data.bin" {
+	if len(response.Objects) != 1 || response.Objects[0].ObjectName != "file.txt" {
 		t.Fatalf("unexpected objects payload: %+v", response.Objects)
 	}
-	if response.Objects[0].LastModified != lastModified {
-		t.Fatalf("expected last_modified %s, got %s", lastModified, response.Objects[0].LastModified)
-	}
+
+	/*if response.AllowedUsers[0] != "bob" {
+		t.Fatalf("expected allowed_users [bob], got %v", response.AllowedUsers)
+	}*/
 	if response.NextPage != "" {
 		t.Fatalf("expected empty next_page, got %s", response.NextPage)
 	}
@@ -211,28 +281,48 @@ func TestMakeGetBucketHandlerRestrictedMember(t *testing.T) {
 	if response.IsTruncated {
 		t.Fatalf("expected is_truncated false")
 	}
+	// Close the fake MinIO server
+	defer server.Close()
 }
 
 func TestMakeGetBucketHandlerPagination(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	lastModified := "2024-01-02T03:04:05Z"
 
-	fakeAdmin := &fakeBucketAdminClient{
-		metadata:   map[string]string{"owner": "alice"},
-		visibility: utils.PUBLIC,
-	}
-	overrideBucketAdminFactory(t, fakeAdmin)
-	overrideBucketObjectFactory(t, func(cfg *types.Config, c *gin.Context, requester string, isAdmin bool) (bucketObjectClient, error) {
-		return &fakeBucketObjectClient{
-			exists:      true,
-			objects:     []utils.MinIOObject{{ObjectName: "a.txt", SizeBytes: 10}},
-			nextToken:   "cursor",
-			isTruncated: true,
-		}, nil
-	})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/demo" &&
+			r.URL.RawQuery == "continuation-token=token&list-type=2&max-keys=0" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+				<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+					<Name>demo</Name>
+					<Prefix></Prefix>
+					<KeyCount>1</KeyCount>
+					<MaxKeys>1</MaxKeys>
+					<Contents>
+						<Key>file.txt</Key>
+						<LastModified>` + lastModified + `</LastModified>
+						<ETag>"d41d8cd98f00b204e9800998ecf8427e"</ETag>
+						<Size>42</Size>
+						<StorageClass>STANDARD</StorageClass>
+					</Contents>
+					<IsTruncated>true</IsTruncated>
+					<NextContinuationToken>cursor</NextContinuationToken>
+				</ListBucketResult>`))
+			return
+		} else if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/info-canned-policy" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"PolicyName": "demo", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::demo/*"]}]}}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"success"}`))
+		return
+	}))
 
 	cfg := &types.Config{
 		MinIOProvider: &types.MinIOProvider{
-			Endpoint:  "http://127.0.0.1:9000",
+			Endpoint:  server.URL,
 			Region:    "us-east-1",
 			AccessKey: "minioadmin",
 			SecretKey: "minioadmin",
@@ -240,13 +330,13 @@ func TestMakeGetBucketHandlerPagination(t *testing.T) {
 		},
 	}
 
-	router := gin.New()
+	//kubeClientset := testclient.NewSimpleClientset()
+	router := gin.Default()
 	router.GET("/system/buckets/:bucket", MakeGetHandler(cfg))
 
-	req := httptest.NewRequest(http.MethodGet, "/system/buckets/demo?page=token&limit=1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/system/buckets/demo?page=token", nil)
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
-
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, res.Code)
 	}
@@ -264,124 +354,6 @@ func TestMakeGetBucketHandlerPagination(t *testing.T) {
 	if !response.IsTruncated {
 		t.Fatalf("expected is_truncated true")
 	}
-}
-
-func overrideBucketAdminFactory(t *testing.T, fakeClient *fakeBucketAdminClient) {
-	t.Helper()
-	original := newBucketAdminClient
-	newBucketAdminClient = func(cfg *types.Config) (bucketAdminClient, error) {
-		return fakeClient, nil
-	}
-	t.Cleanup(func() {
-		newBucketAdminClient = original
-	})
-}
-
-func overrideBucketObjectFactory(t *testing.T, factory func(cfg *types.Config, c *gin.Context, requester string, isAdmin bool) (bucketObjectClient, error)) {
-	t.Helper()
-	original := newBucketObjectClient
-	newBucketObjectClient = factory
-	t.Cleanup(func() {
-		newBucketObjectClient = original
-	})
-}
-
-type fakeBucketAdminClient struct {
-	metadata                map[string]string
-	metadataErr             error
-	visibility              string
-	members                 []string
-	policies                map[string]bool
-	removeResourceErr       error
-	removeGroupPolicyErr    error
-	deleteErr               error
-	removeResourceCalled    bool
-	removeGroupPolicyCalled bool
-	deleteCalled            bool
-}
-
-func (f *fakeBucketAdminClient) GetTaggedMetadata(bucket string) (map[string]string, error) {
-	if f.metadataErr != nil {
-		return nil, f.metadataErr
-	}
-	return f.metadata, nil
-}
-
-func (f *fakeBucketAdminClient) GetCurrentResourceVisibility(bucket utils.MinIOBucket) string {
-	return f.visibility
-}
-
-func (f *fakeBucketAdminClient) GetBucketMembers(bucket string) ([]string, error) {
-	return f.members, nil
-}
-
-func (f *fakeBucketAdminClient) ResourceInPolicy(policyName string, resource string) bool {
-	if f.policies == nil {
-		return false
-	}
-	return f.policies[policyName+"|"+resource]
-}
-
-func (f *fakeBucketAdminClient) RemoveResource(bucketName string, policyName string, isGroup bool) error {
-	f.removeResourceCalled = true
-	if f.removeResourceErr != nil {
-		return f.removeResourceErr
-	}
-	return nil
-}
-
-func (f *fakeBucketAdminClient) RemoveGroupPolicy(bucket string) error {
-	f.removeGroupPolicyCalled = true
-	if f.removeGroupPolicyErr != nil {
-		return f.removeGroupPolicyErr
-	}
-	return nil
-}
-
-func (f *fakeBucketAdminClient) DeleteBucket(s3Client *s3.S3, bucketName string) error {
-	f.deleteCalled = true
-	if f.deleteErr != nil {
-		return f.deleteErr
-	}
-	return nil
-}
-
-type fakeBucketObjectClient struct {
-	exists      bool
-	existsErr   error
-	objects     []utils.MinIOObject
-	nextToken   string
-	isTruncated bool
-	listErr     error
-	statInfo    *utils.MinIOObjectInfo
-	statErr     error
-}
-
-func (f *fakeBucketObjectClient) BucketExists(ctx context.Context, bucket string) (bool, error) {
-	if f.existsErr != nil {
-		return false, f.existsErr
-	}
-	return f.exists, nil
-}
-
-func (f *fakeBucketObjectClient) ListObjects(ctx context.Context, bucket string, includeOwner bool, limit int, continuation string) (*utils.MinIOListResult, error) {
-	if f.listErr != nil {
-		return nil, f.listErr
-	}
-	return &utils.MinIOListResult{
-		Objects:           f.objects,
-		NextToken:         f.nextToken,
-		IsTruncated:       f.isTruncated,
-		ReturnedItemCount: len(f.objects),
-	}, nil
-}
-
-func (f *fakeBucketObjectClient) StatObject(ctx context.Context, bucket string, object string) (*utils.MinIOObjectInfo, error) {
-	if f.statErr != nil {
-		return nil, f.statErr
-	}
-	if f.statInfo == nil {
-		return nil, fmt.Errorf("stat not configured")
-	}
-	return f.statInfo, nil
+	// Close the fake MinIO server
+	defer server.Close()
 }

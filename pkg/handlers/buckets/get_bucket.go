@@ -17,11 +17,8 @@ limitations under the License.
 package buckets
 
 import (
-	"context"
 	"fmt"
 	"net/http"
-	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -31,104 +28,6 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 )
 
-type bucketAdminClient interface {
-	GetTaggedMetadata(bucket string) (map[string]string, error)
-	GetCurrentResourceVisibility(bucket utils.MinIOBucket) string
-	GetBucketMembers(bucket string) ([]string, error)
-	ResourceInPolicy(policyName string, resource string) bool
-	RemoveResource(bucketName string, policyName string, isGroup bool) error
-	RemoveGroupPolicy(bucket string) error
-	DeleteBucket(s3Client *s3.S3, bucketName string) error
-}
-
-var newBucketAdminClient = func(cfg *types.Config) (bucketAdminClient, error) {
-	client, err := utils.MakeMinIOAdminClient(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return &defaultBucketAdminClient{delegate: client}, nil
-}
-
-type defaultBucketAdminClient struct {
-	delegate *utils.MinIOAdminClient
-}
-
-func (d *defaultBucketAdminClient) GetTaggedMetadata(bucket string) (map[string]string, error) {
-	return d.delegate.GetTaggedMetadata(bucket)
-}
-
-func (d *defaultBucketAdminClient) GetCurrentResourceVisibility(bucket utils.MinIOBucket) string {
-	return d.delegate.GetCurrentResourceVisibility(bucket)
-}
-
-func (d *defaultBucketAdminClient) GetBucketMembers(bucket string) ([]string, error) {
-	return d.delegate.GetBucketMembers(bucket)
-}
-
-func (d *defaultBucketAdminClient) ResourceInPolicy(policyName string, resource string) bool {
-	return d.delegate.ResourceInPolicy(policyName, resource)
-}
-
-func (d *defaultBucketAdminClient) RemoveResource(bucketName string, policyName string, isGroup bool) error {
-	return d.delegate.RemoveResource(bucketName, policyName, isGroup)
-}
-
-func (d *defaultBucketAdminClient) RemoveGroupPolicy(bucket string) error {
-	return d.delegate.RemoveGroupPolicy(bucket)
-}
-
-func (d *defaultBucketAdminClient) DeleteBucket(s3Client *s3.S3, bucketName string) error {
-	return d.delegate.DeleteBucket(s3Client, bucketName)
-}
-
-type bucketObjectClient interface {
-	BucketExists(ctx context.Context, bucket string) (bool, error)
-	ListObjects(ctx context.Context, bucket string, includeOwner bool, limit int, continuation string) (*utils.MinIOListResult, error)
-	StatObject(ctx context.Context, bucket string, object string) (*utils.MinIOObjectInfo, error)
-}
-
-var newBucketObjectClient = func(cfg *types.Config, c *gin.Context, requester string, isAdmin bool) (bucketObjectClient, error) {
-	provider := &types.MinIOProvider{
-		Endpoint: cfg.MinIOProvider.Endpoint,
-		Verify:   cfg.MinIOProvider.Verify,
-		Region:   cfg.MinIOProvider.Region,
-	}
-
-	if isAdmin {
-		provider.AccessKey = cfg.MinIOProvider.AccessKey
-		provider.SecretKey = cfg.MinIOProvider.SecretKey
-	} else {
-		mc, err := auth.GetMultitenancyConfigFromContext(c)
-		if err != nil {
-			return nil, fmt.Errorf("error getting multitenancy config: %w", err)
-		}
-		ak, sk, err := mc.GetUserCredentials(requester)
-		if err != nil {
-			return nil, fmt.Errorf("error getting credentials for MinIO user: %s", requester)
-		}
-		provider.AccessKey = ak
-		provider.SecretKey = sk
-	}
-
-	return &defaultBucketObjectClient{client: utils.NewMinIODataClient(provider)}, nil
-}
-
-type defaultBucketObjectClient struct {
-	client *utils.MinIODataClient
-}
-
-func (c *defaultBucketObjectClient) BucketExists(ctx context.Context, bucket string) (bool, error) {
-	return c.client.BucketExists(ctx, bucket)
-}
-
-func (c *defaultBucketObjectClient) ListObjects(ctx context.Context, bucket string, includeOwner bool, limit int, continuation string) (*utils.MinIOListResult, error) {
-	return c.client.ListBucketObjects(ctx, bucket, includeOwner, limit, continuation)
-}
-
-func (c *defaultBucketObjectClient) StatObject(ctx context.Context, bucket string, object string) (*utils.MinIOObjectInfo, error) {
-	return c.client.StatObject(ctx, bucket, object)
-}
-
 // MakeGetHandler makes a handler that returns bucket information including stored objects.
 func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -137,17 +36,16 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			c.String(http.StatusBadRequest, "Bucket parameter cannot be empty")
 			return
 		}
+		//ctx := c.Request.Context()
 
-		adminClient, err := newBucketAdminClient(cfg)
+		authHeader := c.GetHeader("Authorization")
+		isAdmin := len(strings.Split(authHeader, "Bearer")) == 1
+		adminClient, err := utils.MakeMinIOAdminClient(cfg)
+
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", err))
 			return
 		}
-
-		ctx := c.Request.Context()
-
-		authHeader := c.GetHeader("Authorization")
-		isAdmin := len(strings.Split(authHeader, "Bearer")) == 1
 
 		requester := types.DefaultOwner
 		if !isAdmin {
@@ -162,22 +60,6 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 		}
 
-		objectClient, err := newBucketObjectClient(cfg, c, requester, isAdmin)
-		if err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error configuring storage client: %v", err))
-			return
-		}
-
-		exists, err := objectClient.BucketExists(ctx, bucketName)
-		if err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error validating bucket '%s': %v", bucketName, err))
-			return
-		}
-		if !exists {
-			c.String(http.StatusNotFound, fmt.Sprintf("Bucket '%s' not found", bucketName))
-			return
-		}
-
 		metadata, metaErr := adminClient.GetTaggedMetadata(bucketName)
 		if metaErr != nil {
 			metadata = map[string]string{}
@@ -188,10 +70,7 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			ownerCandidate = types.DefaultOwner
 		}
 
-		visibility, resolvedOwner := resolveBucketVisibility(adminClient, bucketName, ownerCandidate, requester)
-		if resolvedOwner != "" {
-			ownerCandidate = resolvedOwner
-		}
+		visibility := adminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: ownerCandidate})
 		if visibility == "" {
 			visibility = utils.PRIVATE
 		}
@@ -206,31 +85,43 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 		}
 
 		if !isAdmin {
-			if !isRequesterAuthorised(adminClient, requester, ownerCandidate, bucketName, visibility, allowedUsers) {
+			if !adminClient.ResourceInPolicy(requester, bucketName) {
 				c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", requester))
 				return
 			}
 		}
 
-		pageToken := strings.TrimSpace(c.DefaultQuery("page", ""))
-		limit := cfg.JobListingLimit
-		if limitParam := strings.TrimSpace(c.DefaultQuery("limit", "")); limitParam != "" {
-			if parsed, perr := strconv.Atoi(limitParam); perr == nil && parsed >= 0 {
-				limit = parsed
-			}
+		pageToken := c.DefaultQuery("page", "")
+		limit := int64(cfg.JobListingLimit)
+		listObjectsInput := &s3.ListObjectsV2Input{
+			Bucket:            &bucketName,
+			MaxKeys:           &limit,
+			ContinuationToken: nil,
+		}
+		if pageToken != "" {
+			listObjectsInput.ContinuationToken = &pageToken
 		}
 
-		listResult, err := objectClient.ListObjects(ctx, bucketName, false, limit, pageToken)
+		s3Client := cfg.MinIOProvider.GetS3Client()
+		listResult, err := s3Client.ListObjectsV2(listObjectsInput)
+
 		if err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error retrieving objects for bucket '%s': %v", bucketName, err))
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error listing objects in bucket '%s': %v", bucketName, err))
 			return
 		}
-		objects := listResult.Objects
-		for i := range objects {
-			objects[i].Owner = ""
-		}
 
-		delete(metadata, "owner")
+		allObjects := []utils.MinIOObject{}
+		returnedItemCount := 0
+		for k := range listResult.Contents {
+			singleObject := utils.MinIOObject{
+				ObjectName:   *listResult.Contents[k].Key,
+				SizeBytes:    *listResult.Contents[k].Size,
+				LastModified: string(listResult.Contents[k].LastModified.String()),
+			}
+			allObjects = append(allObjects, singleObject)
+			returnedItemCount++
+			//latestObject = k.Key
+		}
 
 		response := bucketListResponse{
 			MinIOBucket: utils.MinIOBucket{
@@ -239,58 +130,16 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 				Owner:        ownerCandidate,
 				AllowedUsers: allowedUsers,
 				Metadata:     metadata,
-				Objects:      objects,
+				Objects:      allObjects,
 			},
-			NextPage:      listResult.NextToken,
-			IsTruncated:   listResult.IsTruncated,
-			ReturnedItems: listResult.ReturnedItemCount,
+			IsTruncated:   *listResult.IsTruncated,
+			ReturnedItems: returnedItemCount,
+		}
+		if listResult.NextContinuationToken != nil {
+			response.NextPage = *listResult.NextContinuationToken
 		}
 
 		c.JSON(http.StatusOK, response)
-	}
-}
-
-func resolveBucketVisibility(adminClient bucketAdminClient, bucketName string, owner string, requester string) (string, string) {
-	candidates := []string{}
-	if owner != "" {
-		candidates = append(candidates, owner)
-	}
-	if requester != "" && requester != owner {
-		candidates = append(candidates, requester)
-	}
-	if owner != types.DefaultOwner {
-		candidates = append(candidates, types.DefaultOwner)
-	}
-
-	for _, candidate := range candidates {
-		visibility := adminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: candidate})
-		if visibility != "" {
-			if visibility != utils.PUBLIC {
-				return visibility, candidate
-			}
-			return visibility, owner
-		}
-	}
-	return "", owner
-}
-
-func isRequesterAuthorised(adminClient bucketAdminClient, requester string, owner string, bucketName string, visibility string, allowedUsers []string) bool {
-	if requester == owner {
-		return true
-	}
-
-	switch visibility {
-	case utils.PUBLIC:
-		return true
-	case utils.PRIVATE:
-		return adminClient.ResourceInPolicy(requester, bucketName)
-	case utils.RESTRICTED:
-		if adminClient.ResourceInPolicy(requester, bucketName) {
-			return true
-		}
-		return slices.Contains(allowedUsers, requester)
-	default:
-		return adminClient.ResourceInPolicy(requester, bucketName)
 	}
 }
 
