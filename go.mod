@@ -1,6 +1,6 @@
 module github.com/grycap/oscar/v3
 
-go 1.21
+go 1.25
 
 require (
 	github.com/aws/aws-sdk-go v1.44.189
