@@ -72,7 +72,7 @@ const (
 	JobUUIDVariable = "JOB_UUID"
 
 	// OpenfaasZeroScalingLabel label to enable zero scaling in OpenFaaS functions
-	OpenfaasZeroScalingLabel = "com.openfaas.scale.zero"
+	//OpenfaasZeroScalingLabel = "com.openfaas.scale.zero"
 
 	// YunikornApplicationIDLabel label to define the Yunikorn's application ID
 	YunikornApplicationIDLabel = "applicationId"
@@ -466,7 +466,7 @@ func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) {
 		},
 		// Other OpenFaaS Watchdog options
 		// https://github.com/openfaas/classic-watchdog
-		{
+		/*{
 			Name:  "max_inflight",
 			Value: strconv.Itoa(cfg.WatchdogMaxInflight),
 		},
@@ -485,7 +485,7 @@ func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) {
 		{
 			Name:  "write_timeout",
 			Value: strconv.Itoa(cfg.WatchdogWriteTimeout),
-		},
+		},*/
 		{
 			Name:  "healthcheck_interval",
 			Value: strconv.Itoa(cfg.WatchdogHealthCheckInterval),

@@ -75,7 +75,7 @@ func TestMakeUpdateHandler(t *testing.T) {
 			"log_level": "CRITICAL",
 			"image": "ghcr.io/grycap/cowsay",
 			"alpine": false,
-			"script": "test",
+			"script": "line1\r\nline2\r\n",
 			"input": [
   			],
 			"output": [
@@ -106,4 +106,10 @@ func TestMakeUpdateHandler(t *testing.T) {
 		t.Errorf("expecting code %d, got %d", http.StatusNoContent, w.Code)
 	}
 
+	if back.UpdatedService == nil {
+		t.Fatal("expected backend to receive updated service, got nil")
+	}
+	if strings.Contains(back.UpdatedService.Script, "\r") {
+		t.Fatalf("expected script without CR characters, got %q", back.UpdatedService.Script)
+	}
 }

@@ -130,11 +130,6 @@ func TestCustomValues(t *testing.T) {
 		"OSCAR_NAME":                    "testname",
 		"OSCAR_NAMESPACE":               "testnamespace",
 		"OSCAR_SERVICES_NAMESPACE":      "testservicesnamespace",
-		"WATCHDOG_MAX_INFLIGHT":         "20",
-		"WATCHDOG_WRITE_DEBUG":          "false",
-		"WATCHDOG_EXEC_TIMEOUT":         "50",
-		"WATCHDOG_READ_TIMEOUT":         "50",
-		"WATCHDOG_WRITE_TIMEOUT":        "50",
 		"WATCHDOG_HEALTHCHECK_INTERVAL": "50",
 		"READ_TIMEOUT":                  "50",
 		"WRITE_TIMEOUT":                 "50",
@@ -171,7 +166,7 @@ func TestCustomValues(t *testing.T) {
 		},
 		{
 			"Invalid int",
-			"WATCHDOG_MAX_INFLIGHT",
+			"OSCAR_SERVICE_PORT",
 			"test",
 			true,
 		},
@@ -219,8 +214,8 @@ func TestServerlessBackend(t *testing.T) {
 		returnError       bool
 	}{
 		{
-			"Valid \"openfaas\"",
-			"openfaas",
+			"Empty value",
+			"",
 			false,
 		},
 		{
@@ -229,15 +224,14 @@ func TestServerlessBackend(t *testing.T) {
 			false,
 		},
 		{
-			"Valid \"OPENFAAS\"",
-			"OPENFAAS",
+			"Valid uppercase",
+			"KNATIVE",
 
 			false,
 		},
 		{
 			"Invalid",
-			"test",
-
+			"legacy",
 			true,
 		},
 	}

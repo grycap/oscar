@@ -25,8 +25,8 @@ import (
 // MakeServerlessBackend returns a ServerlessBackend based on the configuration
 func MakeServerlessBackend(kubeClientset kubernetes.Interface, kubeConfig *rest.Config, cfg *types.Config) types.ServerlessBackend {
 	switch cfg.ServerlessBackend {
-	case "openfaas":
-		return MakeOpenfaasBackend(kubeClientset, kubeConfig, cfg)
+	/*case "openfaas":
+	return MakeOpenfaasBackend(kubeClientset, kubeConfig, cfg)*/
 	case "knative":
 		return MakeKnativeBackend(kubeClientset, kubeConfig, cfg)
 	}

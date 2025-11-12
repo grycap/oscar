@@ -57,10 +57,14 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 				return
 			}
 		}
-		//s3Client := cfg.MinIOProvider.GetS3Client()
-		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
-		metadata, err := minIOAdminClient.GetTaggedMetadata(bucket.BucketPath)
+		minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintln("error creating MinIO admin client:", err))
+			return
+		}
+
+		metadata, err := minIOAdminClient.GetTaggedMetadata(bucket.BucketName)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintln("Missing bucket metadata: "))
 			return
@@ -74,11 +78,11 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 		bucket.Owner = uid
 		var oldVis string
 		if oldVis = minIOAdminClient.GetCurrentResourceVisibility(bucket); oldVis != "" {
-			if oldVis == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucket.BucketPath) {
+			if oldVis == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucket.BucketName) {
 				if oldVis != bucket.Visibility {
 					// Remove old policies
 					err := minIOAdminClient.UnsetPolicies(utils.MinIOBucket{
-						BucketPath: bucket.BucketPath,
+						BucketName: bucket.BucketName,
 						Visibility: oldVis,
 						Owner:      uid,
 					})
@@ -96,7 +100,7 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 
 				} else {
 					if oldVis == RESTRICTED {
-						err = minIOAdminClient.UpdateServiceGroup(bucket.BucketPath, bucket.AllowedUsers)
+						err = minIOAdminClient.UpdateServiceGroup(bucket.BucketName, bucket.AllowedUsers)
 						if err != nil {
 							c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket:", err))
 							return

@@ -75,9 +75,13 @@ func MakeCreateHandler(cfg *types.Config) gin.HandlerFunc {
 		bucket.Owner = uid
 		// Use admin MinIO client for the bucket creation
 		s3Client := cfg.MinIOProvider.GetS3Client()
-		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+		minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", err))
+			return
+		}
 
-		path := strings.Trim(bucket.BucketPath, " /")
+		path := strings.Trim(bucket.BucketName, " /")
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
 		if err := minIOAdminClient.CreateS3Path(s3Client, splitPath, false); err != nil {
@@ -86,9 +90,9 @@ func MakeCreateHandler(cfg *types.Config) gin.HandlerFunc {
 		}
 		// Bucket metadata for filtering
 		tags := map[string]string{
-			"owner":   uid,
-			"service": "false",
+			"owner": uid,
 		}
+
 		if err := minIOAdminClient.SetTags(splitPath[0], tags); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
 		}
@@ -104,7 +108,7 @@ func MakeCreateHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 		}
 
-		createLogger.Printf("%s | %v | %s | %s | %s", "POST", 200, createPath, uid, bucket.BucketPath)
+		createLogger.Printf("%s | %v | %s | %s | %s", "POST", 200, createPath, uid, bucket.BucketName)
 		c.Status(http.StatusCreated)
 	}
 
