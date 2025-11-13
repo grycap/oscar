@@ -48,6 +48,13 @@ sh oscar/deploy/kind-deploy.sh
 ```
 The wizard will instruct you to choose the "devel" version.
 
+To skip the wizard prompts and automatically install from the `devel` branch, run:
+
+```sh
+sh oscar/deploy/kind-deploy.sh --devel
+```
+This flag auto-enables Knative Serving and the local Docker registry so you can test the full development stack without manual input.
+
 ## Steps for manual local deployment
 
 If you want to do it manualy you can follow the listed steps.

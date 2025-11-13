@@ -37,12 +37,29 @@ OSCAR_IMAGE_BRANCH="master"
 OSCAR_HELM_IMAGE_OVERRIDES=""
 OSCAR_POST_DEPLOYMENT_IMAGE=""
 OSCAR_TARGET_REPLICAS=1
+SKIP_PROMPTS="false"
+
+usage(){
+    cat <<EOF
+Usage: $(basename "$0") [options]
+
+Options:
+  --devel        Deploy using the OSCAR devel branch without interactive prompts.
+  -h, --help     Show this help message and exit.
+EOF
+}
 
 showInfo(){
     echo "[*] This script will install a Kubernetes cluster using Kind along with all the required OSCAR services (if not installed): "
     echo -e "\n- MinIO"
     echo -e "- Helm"
     echo -e "- Kubectl\n"
+
+    if [ "$SKIP_PROMPTS" == "true" ]; then
+        echo "[*] --devel flag detected. Continuing without interactive confirmation."
+        return
+    fi
+
     read -p "No additional changes to your system will be performed. Would you like to continue? [y/n] " res </dev/tty
 
     if [ -z "$res" ]; then
@@ -401,6 +418,25 @@ createKindCluster(){
     fi
 }
 
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --devel)
+            SKIP_PROMPTS="true"
+            OSCAR_IMAGE_BRANCH="devel"
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo -e "$RED[!]$END_COLOR Unknown option: $1"
+            usage
+            exit 1
+            ;;
+    esac
+done
+
 showInfo
 
 echo -e "\n[*] Checking prerequisites ..."
@@ -410,9 +446,16 @@ checkHelm
 checkKind
 
 echo -e "\n"
-read -p "Do you want to use Knative Serving as Serverless Backend? [y/n] " use_knative </dev/tty
-read -p "Do you want suport for local docker images? [y/n] " local_reg </dev/tty
-read -p "Do you want to install OSCAR from the devel branch? [y/n] (default uses master) " use_devel_branch </dev/tty
+use_knative="y"
+local_reg="y"
+use_devel_branch="y"
+if [ "$SKIP_PROMPTS" == "true" ]; then
+    echo "[*] Running in non-interactive mode: Knative, local registry, and OSCAR devel branch enabled."
+else
+    read -p "Do you want to use Knative Serving as Serverless Backend? [y/n] " use_knative </dev/tty
+    read -p "Do you want suport for local docker images? [y/n] " local_reg </dev/tty
+    read -p "Do you want to install OSCAR from the devel branch? [y/n] (default uses master) " use_devel_branch </dev/tty
+fi
 
 if [ `echo $use_devel_branch | tr '[:upper:]' '[:lower:]'` == "y" ]; then
     OSCAR_IMAGE_BRANCH="devel"
