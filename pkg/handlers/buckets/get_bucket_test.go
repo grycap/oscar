@@ -47,6 +47,7 @@ func TestMakeGetBucketHandlerAdmin(t *testing.T) {
 			_, _ = w.Write([]byte(`{"status":"success"}`))
 			return
 		} else if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/info-canned-policy" {
+			fmt.Println("query:", r.URL.RawQuery)
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"PolicyName": "demo", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::demo/*"]}]}}`))
 			return
@@ -208,20 +209,30 @@ func TestMakeGetBucketHandlerRestrictedMember(t *testing.T) {
 				</ListBucketResult>`))
 			return
 		} else if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/group" &&
-			r.URL.RawQuery == "name=demo" {
+			r.URL.Query().Get("group") == "demo" {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"Group":{"name":"demo","members":["bob"],"policy":"readonly"}}`))
+			_, _ = w.Write([]byte(`{"name":"demo","members":["bob"],"policy":"readonly","status":"enabled"}`))
 			return
 		} else if r.Method == http.MethodGet && r.URL.Path == "/demo" &&
 			r.URL.RawQuery == "location=" {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"status":"success"}`))
 			return
-		} else if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/info-canned-policy" &&
-			r.URL.RawQuery == "name=bob&v=2" {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"PolicyName": "bob", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::demo/*"]}]}}`))
-			return
+		} else if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/info-canned-policy" {
+			switch r.URL.Query().Get("name") {
+			case types.DefaultOwner:
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"PolicyName": "cluster_admin", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::demo/*"]}]}}`))
+				return
+			case "demo":
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"PolicyName": "demo", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::demo/*"]}]}}`))
+				return
+			default:
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"PolicyName": "other", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::other/*"]}]}}`))
+				return
+			}
 		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"success"}`))

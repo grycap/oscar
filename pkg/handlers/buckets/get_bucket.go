@@ -84,8 +84,20 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 		}
 
-		if !isAdmin && visibility != utils.PUBLIC {
-			if !adminClient.ResourceInPolicy(requester, bucketName) {
+		if !isAdmin {
+			allowed := false
+			switch visibility {
+			case utils.PUBLIC:
+				allowed = true
+			case utils.RESTRICTED:
+				allowed = userInList(requester, allowedUsers)
+				if !allowed {
+					allowed = adminClient.ResourceInPolicy(requester, bucketName)
+				}
+			default:
+				allowed = adminClient.ResourceInPolicy(requester, bucketName)
+			}
+			if !allowed {
 				c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", requester))
 				return
 			}
@@ -148,4 +160,13 @@ type bucketListResponse struct {
 	NextPage      string `json:"next_page,omitempty"`
 	IsTruncated   bool   `json:"is_truncated"`
 	ReturnedItems int    `json:"returned_items"`
+}
+
+func userInList(user string, users []string) bool {
+	for _, u := range users {
+		if u == user {
+			return true
+		}
+	}
+	return false
 }
