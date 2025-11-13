@@ -38,6 +38,16 @@ the local cluster and the OSCAR platform along with all the required tools.
 curl -sSL http://go.oscar.grycap.net | bash
 ```
 
+## Automated local deployment (development version)
+
+You can deploy the "devel" version of OSCAR to access the latest development version:
+
+```sh
+git clone https://github.com/grycap/oscar
+sh oscar/deploy/kind-deploy.sh
+```
+The wizard will instruct you to choose the "devel" version.
+
 ## Steps for manual local deployment
 
 If you want to do it manualy you can follow the listed steps.
