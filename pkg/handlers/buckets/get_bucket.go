@@ -84,7 +84,7 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 		}
 
-		if !isAdmin {
+		if !isAdmin && visibility != utils.PUBLIC {
 			if !adminClient.ResourceInPolicy(requester, bucketName) {
 				c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", requester))
 				return

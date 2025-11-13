@@ -2,6 +2,7 @@ package buckets
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -283,6 +284,81 @@ func TestMakeGetBucketHandlerRestrictedMember(t *testing.T) {
 	}
 	// Close the fake MinIO server
 	defer server.Close()
+}
+
+func TestMakeGetBucketHandlerPublicBucket(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	lastModified := "2024-06-15T10:00:00Z"
+	testsupport.SkipIfCannotListen(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/demo" &&
+			r.URL.RawQuery == "list-type=2&max-keys=0":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+				<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+					<Name>demo</Name>
+					<Prefix></Prefix>
+					<KeyCount>1</KeyCount>
+					<MaxKeys>1</MaxKeys>
+					<Contents>
+						<Key>public.txt</Key>
+						<LastModified>` + lastModified + `</LastModified>
+						<ETag>"abc"</ETag>
+						<Size>10</Size>
+						<StorageClass>STANDARD</StorageClass>
+					</Contents>
+					<IsTruncated>false</IsTruncated>
+				</ListBucketResult>`))
+			return
+		case r.Method == http.MethodGet && r.URL.Path == "/demo" &&
+			r.URL.RawQuery == "location=":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"status":"success"}`))
+			return
+		case r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/info-canned-policy":
+			policyName := r.URL.Query().Get("name")
+			payload := fmt.Sprintf(`{"PolicyName": "%s", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::other/*"]}]}}`, policyName)
+			if policyName == "all_users_group" {
+				payload = fmt.Sprintf(`{"PolicyName": "%s", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::demo/*"]}]}}`, policyName)
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(payload))
+			return
+		default:
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"status":"success"}`))
+			return
+		}
+	}))
+	defer server.Close()
+
+	cfg := &types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "charlie")
+	})
+	router.GET("/system/buckets/:bucket", MakeGetHandler(cfg))
+
+	req := httptest.NewRequest(http.MethodGet, "/system/buckets/demo", nil)
+	req.Header.Set("Authorization", "Bearer token")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, res.Code)
+	}
 }
 
 func TestMakeGetBucketHandlerPagination(t *testing.T) {
