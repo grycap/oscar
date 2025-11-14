@@ -34,12 +34,32 @@ DEFAULT_MINIO_API_PORT=30300
 DEFAULT_MINIO_CONSOLE_PORT=30301
 DEFAULT_REGISTRY_PORT=5001
 OSCAR_IMAGE_BRANCH="master"
+OSCAR_HELM_IMAGE_OVERRIDES=""
+OSCAR_POST_DEPLOYMENT_IMAGE=""
+OSCAR_TARGET_REPLICAS=1
+SKIP_PROMPTS="false"
+
+usage(){
+    cat <<EOF
+Usage: $(basename "$0") [options]
+
+Options:
+  --devel        Deploy using the OSCAR devel branch without interactive prompts.
+  -h, --help     Show this help message and exit.
+EOF
+}
 
 showInfo(){
     echo "[*] This script will install a Kubernetes cluster using Kind along with all the required OSCAR services (if not installed): "
     echo -e "\n- MinIO"
     echo -e "- Helm"
     echo -e "- Kubectl\n"
+
+    if [ "$SKIP_PROMPTS" == "true" ]; then
+        echo "[*] --devel flag detected. Continuing without interactive confirmation."
+        return
+    fi
+
     read -p "No additional changes to your system will be performed. Would you like to continue? [y/n] " res </dev/tty
 
     if [ -z "$res" ]; then
@@ -298,31 +318,43 @@ checkIngressStatus(){
 }
 
 checkOSCARDeploy(){
-    timeout=300
+    creation_timeout=120
+    readiness_timeout=600
     start=$(date +%s)
-    echo -e "\n[*] Waiting for OSCAR pods to become ready ..."
+    echo -e "\n[*] Waiting for OSCAR pods to be scheduled ..."
     while true; do
         pod_info=$(kubectl get pods -n oscar -l app=oscar --no-headers 2>/dev/null)
-        statuses=$(echo "$pod_info" | awk '{print $3}')
-
-        if echo "$statuses" | grep -qw "Running"; then
+        if [ -n "$pod_info" ]; then
+            pod_count=$(echo "$pod_info" | wc -l | tr -d ' ')
+            echo -e "\n[*] Detected $pod_count OSCAR pod(s). Waiting for them to become ready (timeout ${readiness_timeout}s) ..."
             break
         fi
-
-        if echo "$statuses" | grep -Eiq "Error|CrashLoopBackOff|ImagePullBackOff"; then
-            echo -e "\n$RED[!]$END_COLOR Error: Pod failure detected. Current statuses:"
-            kubectl get pods -n oscar
-            exit 1
-        fi
-
         actual=$(date +%s)
-        if [ $((actual - start)) -gt $timeout ]; then
-            echo -e "\n$RED[!]$END_COLOR Error: Timeout waiting for OSCAR pods. Current statuses: ${statuses:-Unknown}"
+        if [ $((actual - start)) -gt $creation_timeout ]; then
+            echo -e "\n$RED[!]$END_COLOR Error: OSCAR pods were not created after ${creation_timeout}s."
             kubectl get pods -n oscar
             exit 1
         fi
         sleep 5
     done
+
+    if ! kubectl wait --namespace oscar --for=condition=Ready pod -l app=oscar --timeout="${readiness_timeout}s"; then
+        echo -e "\n$RED[!]$END_COLOR Error: OSCAR pods did not become ready after ${readiness_timeout}s."
+        kubectl get pods -n oscar
+        failing_pods=$(kubectl get pods -n oscar -l app=oscar --no-headers | awk '{
+            split($2, ready, "/");
+            if (ready[1] != ready[2] || $3 != "Running") {
+                print "- " $1 " (ready=" $2 ", status=" $3 ")"
+            }
+        }')
+        if [ -n "$failing_pods" ]; then
+            echo -e "\n[*] Pods still unstable:"
+            echo "$failing_pods"
+        fi
+        echo -e "\n[*] Recent OSCAR namespace events:"
+        kubectl get events -n oscar --sort-by=.metadata.creationTimestamp | tail -n 20
+        exit 1
+    fi
     echo -e "\n[$GREEN$CHECK$END_COLOR] OSCAR platform deployed correctly"
     if [ "$HOST_HTTPS_PORT" == "$DEFAULT_HTTPS_PORT" ]; then
         oscar_url="https://localhost"
@@ -386,6 +418,25 @@ createKindCluster(){
     fi
 }
 
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --devel)
+            SKIP_PROMPTS="true"
+            OSCAR_IMAGE_BRANCH="devel"
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo -e "$RED[!]$END_COLOR Unknown option: $1"
+            usage
+            exit 1
+            ;;
+    esac
+done
+
 showInfo
 
 echo -e "\n[*] Checking prerequisites ..."
@@ -395,12 +446,23 @@ checkHelm
 checkKind
 
 echo -e "\n"
-read -p "Do you want to use Knative Serving as Serverless Backend? [y/n] " use_knative </dev/tty
-read -p "Do you want suport for local docker images? [y/n] " local_reg </dev/tty
-read -p "Do you want to install OSCAR from the devel branch? [y/n] (default uses master) " use_devel_branch </dev/tty
+use_knative="y"
+local_reg="y"
+use_devel_branch="y"
+if [ "$SKIP_PROMPTS" == "true" ]; then
+    echo "[*] Running in non-interactive mode: Knative, local registry, and OSCAR devel branch enabled."
+else
+    read -p "Do you want to use Knative Serving as Serverless Backend? [y/n] " use_knative </dev/tty
+    read -p "Do you want suport for local docker images? [y/n] " local_reg </dev/tty
+    read -p "Do you want to install OSCAR from the devel branch? [y/n] (default uses master) " use_devel_branch </dev/tty
+fi
 
 if [ `echo $use_devel_branch | tr '[:upper:]' '[:lower:]'` == "y" ]; then
     OSCAR_IMAGE_BRANCH="devel"
+fi
+if [ "$OSCAR_IMAGE_BRANCH" == "devel" ]; then
+    OSCAR_HELM_IMAGE_OVERRIDES="--set replicas=0"
+    OSCAR_POST_DEPLOYMENT_IMAGE="ghcr.io/grycap/oscar:devel"
 fi
 
 HTTP_PORT_FALLBACKS=(8080 8081 8082 8880 9080 10080)
@@ -596,15 +658,20 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 echo -e "\n[*] Deploying OSCAR ..."
 helm repo add --force-update grycap https://grycap.github.io/helm-charts/
 if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative $OSCAR_HELM_IMAGE_OVERRIDES
 else
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD $OSCAR_HELM_IMAGE_OVERRIDES
 fi
 
-if [ "$OSCAR_IMAGE_BRANCH" == "devel" ]; then
-    echo -e "\n[*] Forcing OSCAR deployment to use grycap/oscar:$OSCAR_IMAGE_BRANCH image ..."
-    if ! kubectl -n oscar set image deployment/oscar oscar="grycap/oscar:$OSCAR_IMAGE_BRANCH"; then
-        echo -e "$RED[!]$END_COLOR Failed to switch OSCAR deployment to grycap/oscar:$OSCAR_IMAGE_BRANCH"
+if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
+    echo -e "\n[*] Switching OSCAR deployment to use $OSCAR_POST_DEPLOYMENT_IMAGE ..."
+    if ! kubectl -n oscar set image deployment/oscar oscar="$OSCAR_POST_DEPLOYMENT_IMAGE"; then
+        echo -e "$RED[!]$END_COLOR Failed to switch OSCAR deployment to $OSCAR_POST_DEPLOYMENT_IMAGE"
+        exit 1
+    fi
+    echo -e "\n[*] Scaling OSCAR deployment to $OSCAR_TARGET_REPLICAS replica(s) ..."
+    if ! kubectl -n oscar scale deployment/oscar --replicas="$OSCAR_TARGET_REPLICAS"; then
+        echo -e "$RED[!]$END_COLOR Failed to scale OSCAR deployment"
         exit 1
     fi
 fi
