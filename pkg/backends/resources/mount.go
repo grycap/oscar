@@ -14,11 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package types
+package resources
 
 import (
 	"strings"
 
+	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -28,6 +30,9 @@ const (
 	minioCommand         = `mkdir -p $MNT_POINT/$MINIO_BUCKET
 rclone config create minio s3  provider=Minio access_key_id=$AWS_ACCESS_KEY_ID secret_access_key=$AWS_SECRET_ACCESS_KEY endpoint=$MINIO_ENDPOINT acl=public-read-write
 rclone mount minio:/$MINIO_BUCKET $MNT_POINT/$MINIO_BUCKET `
+	s3Command = `mkdir -p $MNT_POINT/$S3_BUCKET
+rclone config create s3 s3   endpoint=https://s3.amazonaws.com  provider=AWS access_key_id=$AWS_ACCESS_KEY_ID secret_access_key=$AWS_SECRET_ACCESS_KEY region=$S3_REGION acl=public-read-write
+rclone mount s3:/$S3_BUCKET $MNT_POINT/$S3_BUCKET `
 	webdavCommand = `mkdir -p $MNT_POINT/$WEBDAV_FOLDER
 rclone config create dcache webdav url=$WEBDAV_HOSTNAME vendor=other user=$WEBDAV_LOGIN pass=$WEBDAV_PASSWORD
 rclone mount dcache:$WEBDAV_FOLDER $MNT_POINT/$WEBDAV_FOLDER --vfs-cache-mode full `
@@ -47,8 +52,8 @@ done`
 )
 
 // SetMount Creates the sidecar container that mounts the source volume onto the pod volume
-func SetMount(podSpec *v1.PodSpec, service Service, cfg *Config) {
-	podSpec.Containers = append(podSpec.Containers, sidecarPodSpec(service))
+func SetMount(podSpec *v1.PodSpec, service types.Service, cfg *types.Config) {
+	podSpec.Containers = append(podSpec.Containers, sidecarPodSpec(service, cfg))
 	addVolume(podSpec)
 }
 
@@ -82,7 +87,7 @@ func addVolume(podSpec *v1.PodSpec) {
 	podSpec.Volumes = append(podSpec.Volumes, ephemeralvolumeshare)
 }
 
-func sidecarPodSpec(service Service) v1.Container {
+func sidecarPodSpec(service types.Service, cfg *types.Config) v1.Container {
 	bidirectional := v1.MountPropagationBidirectional
 	var ptr *bool // Uninitialized pointer
 	value := true
@@ -119,12 +124,17 @@ func sidecarPodSpec(service Service) v1.Container {
 	}
 
 	provider := strings.Split(service.Mount.Provider, ".")
-	if provider[0] == MinIOName {
-		MinIOEnvVars := setMinIOEnvVars(service, provider[1])
+	if provider[0] == types.MinIOName {
+		MinIOEnvVars := setMinIOEnvVars(service, provider[1], cfg)
 		container.Env = append(container.Env, MinIOEnvVars...)
 		container.Args = []string{"-c", minioCommand + communCommand}
 	}
-	if provider[0] == WebDavName {
+	if provider[0] == types.S3Name {
+		S3EnvVars := setS3Vars(service, provider[1], cfg)
+		container.Env = append(container.Env, S3EnvVars...)
+		container.Args = []string{"-c", s3Command + communCommand}
+	}
+	if provider[0] == types.WebDavName {
 		WebDavEnvVars := setWebDavEnvVars(service, provider[1])
 		container.Env = append(container.Env, WebDavEnvVars...)
 		container.Args = []string{"-c", webdavCommand + communCommand}
@@ -133,30 +143,109 @@ func sidecarPodSpec(service Service) v1.Container {
 
 }
 
-func setMinIOEnvVars(service Service, providerId string) []v1.EnvVar {
-	//service.Mount.Provider
-	credentials := []v1.EnvVar{
+func setS3Vars(service types.Service, providerId string, cfg *types.Config) []v1.EnvVar {
+	variables := []v1.EnvVar{
 		{
-			Name:  "MINIO_BUCKET",
+			Name:  "S3_BUCKET",
 			Value: service.Mount.Path,
 		},
 		{
+			Name:  "S3_REGION",
+			Value: service.StorageProviders.S3[providerId].Region,
+		},
+		{
 			Name:  "AWS_ACCESS_KEY_ID",
-			Value: service.StorageProviders.MinIO[providerId].AccessKey,
+			Value: service.StorageProviders.S3[providerId].AccessKey,
 		},
 		{
 			Name:  "AWS_SECRET_ACCESS_KEY",
-			Value: service.StorageProviders.MinIO[providerId].SecretKey,
+			Value: service.StorageProviders.S3[providerId].SecretKey,
+		},
+	}
+	return variables
+}
+
+func setMinIOEnvVars(service types.Service, providerId string, cfg *types.Config) []v1.EnvVar {
+	uid := service.Owner
+	variables := []v1.EnvVar{
+		{
+			Name:  "MINIO_BUCKET",
+			Value: service.Mount.Path,
 		},
 		{
 			Name:  "MINIO_ENDPOINT",
 			Value: service.StorageProviders.MinIO[providerId].Endpoint,
 		},
 	}
-	return credentials
+	if providerId != types.DefaultProvider {
+		credentials := []v1.EnvVar{
+			{
+				Name:  "AWS_ACCESS_KEY_ID",
+				Value: service.StorageProviders.MinIO[providerId].AccessKey,
+			},
+			{
+				Name:  "AWS_SECRET_ACCESS_KEY",
+				Value: service.StorageProviders.MinIO[providerId].SecretKey,
+			},
+		}
+		variables = append(variables, credentials...)
+	} else if uid == "cluster_admin" {
+		credentials := []v1.EnvVar{
+			{
+				Name: "AWS_ACCESS_KEY_ID",
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "minio",
+						},
+						Key: "accessKey",
+					},
+				},
+			},
+			{
+				Name: "AWS_SECRET_ACCESS_KEY",
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "minio",
+						},
+						Key: "secretKey",
+					},
+				},
+			},
+		}
+		variables = append(variables, credentials...)
+	} else {
+		credentials := []v1.EnvVar{
+			{
+				Name: "AWS_ACCESS_KEY_ID",
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: auth.FormatUID(uid),
+						},
+						Key: "accessKey",
+					},
+				},
+			},
+			{
+				Name: "AWS_SECRET_ACCESS_KEY",
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: auth.FormatUID(uid),
+						},
+						Key: "secretKey",
+					},
+				},
+			},
+		}
+		variables = append(variables, credentials...)
+	}
+	return variables
 }
 
-func setWebDavEnvVars(service Service, providerId string) []v1.EnvVar {
+func setWebDavEnvVars(service types.Service, providerId string) []v1.EnvVar {
 	//service.Mount.Provider
 	credentials := []v1.EnvVar{
 		{

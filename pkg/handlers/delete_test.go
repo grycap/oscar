@@ -9,11 +9,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/backends"
+	"github.com/grycap/oscar/v3/pkg/testsupport"
 	"github.com/grycap/oscar/v3/pkg/types"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 )
 
 func TestMakeDeleteHandler(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
 	back := backends.MakeFakeBackend()
 
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
@@ -63,7 +66,7 @@ func TestMakeDeleteHandler(t *testing.T) {
 		Output: []types.StorageIOConfig{
 			{Provider: "minio." + types.DefaultProvider, Path: "/output"},
 		},
-		IsolationLevel: "USER",
+		IsolationLevel: types.IsolationLevelUser,
 		AllowedUsers:   []string{"somelonguid1@egi.eu"},
 		StorageProviders: &types.StorageProviders{
 			MinIO: map[string]*types.MinIOProvider{types.DefaultProvider: {

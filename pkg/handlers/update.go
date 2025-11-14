@@ -21,9 +21,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
@@ -32,17 +32,20 @@ import (
 )
 
 // Custom logger
-var updateLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
+var updateLogger = log.New(os.Stdout, "[UPDATE-HANDLER] ", log.Flags())
 
 // MakeUpdateHandler makes a handler for updating services
 func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var provName, provID string
+		var provName string
 		var newService types.Service
+		var uid string
+		var mc *auth.MultitenancyConfig
 		if err := c.ShouldBindJSON(&newService); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
+		newService.Script = utils.NormalizeLineEndings(newService.Script)
 
 		// Check service values and set defaults
 		checkValues(&newService, cfg)
@@ -65,7 +68,8 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		if !isAdminUser {
-			uid, err := auth.GetUIDFromContext(c)
+			uid, err = auth.GetUIDFromContext(c)
+
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln("Couldn't get UID from context"))
 			}
@@ -73,6 +77,11 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			if oldService.Owner != uid {
 				c.String(http.StatusForbidden, "User %s doesn't have permision to modify this service", uid)
 				return
+			}
+			mc, err = auth.GetMultitenancyConfigFromContext(c)
+
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln("Couldn't get UID from context"))
 			}
 
 			// Set the owner on the new service definition
@@ -92,149 +101,208 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 			}
 		}
-		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
+		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+		s3Client := cfg.MinIOProvider.GetS3Client()
+		if newService.IsolationLevel == types.IsolationLevelUser && len(newService.AllowedUsers) > 0 {
+			// new bucket list
+			ownerOnList := false
+			full_uid := auth.FormatUID(uid)
+			for _, in := range newService.Input {
+				_, provName := getProviderInfo(in.Provider)
+
+				// Only allow input from MinIO
+				if provName == types.MinIOName {
+					path := strings.Trim(in.Path, "/")
+					splitPath := strings.SplitN(path, "/", 2)
+					// If AllowedUsers is empty don't add uid
+					newService.Labels["uid"] = full_uid[:10]
+					var userBucket string
+					for _, u := range newService.AllowedUsers {
+						// Check if the uid's from allowed_users have and asociated MinIO user
+						// and create it if not
+						if mc != nil && !mc.UserExists(u) {
+							sk, _ := auth.GenerateRandomKey(8)
+							cmuErr := minIOAdminClient.CreateMinIOUser(u, sk)
+							if cmuErr != nil {
+								log.Printf("error creating MinIO user for user %s: %v", u, cmuErr)
+							}
+							csErr := mc.CreateSecretForOIDC(u, sk)
+							if csErr != nil {
+								log.Printf("error creating secret for user %s: %v", u, csErr)
+							}
+						}
+						// Fill the list of private buckets to be used on users buckets isolation
+						// Check the uid of the owner is on the allowed_users list
+						if u == newService.Owner {
+							ownerOnList = true
+						}
+						// Fill the list of private buckets to create
+						userBucket = splitPath[0] + "-" + u[:10]
+						newService.BucketList = append(newService.BucketList, userBucket)
+					}
+
+					if !ownerOnList {
+						newService.AllowedUsers = append(newService.AllowedUsers, uid)
+					}
+					/// Create
+				}
+			}
+		}
+
+		if oldService.IsolationLevel == types.IsolationLevelUser && len(oldService.BucketList) != 0 {
+			for _, bucket := range oldService.BucketList {
+				if !slices.Contains(newService.BucketList, bucket) {
+					// Disable input notifications for service bucket
+					if err := disableInputNotifications(s3Client, oldService.GetMinIOWebhookARN(), bucket); err != nil {
+						log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", oldService.Name, err)
+					}
+
+					err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+						BucketName:   bucket,
+						Visibility:   utils.PRIVATE,
+						AllowedUsers: []string{},
+						Owner:        oldService.Owner,
+					})
+					if err != nil {
+						log.Printf("error while removing MinIO bucket %v", err)
+					}
+				}
+			}
+		}
+
+		// If isolation level was USER delete all private buckets
+		if strings.ToUpper(oldService.IsolationLevel) == types.IsolationLevelUser && strings.ToUpper(newService.IsolationLevel) == types.IsolationLevelUser {
+			// TODO add/remove users buckets
+		}
+
+		// Use create buckets function to create new inputs/outputs if needed
+		var newServiceBuckets []utils.MinIOBucket
+		if newServiceBuckets, err = createBuckets(&newService, cfg, minIOAdminClient, true); err != nil {
+			if err == errInput {
+				c.String(http.StatusBadRequest, err.Error())
+			} else {
+				c.String(http.StatusInternalServerError, err.Error())
+			}
+			// If createBuckets fails restore the oldService
+			uerr := back.UpdateService(*oldService)
+			if uerr != nil {
+				log.Println(uerr.Error())
+			}
+			return
+		}
+
+		// Get old service buckets and compare to the new ones
+		var oldServiceBuckets = make(map[string]bool)
+		// Set true all MinIO buckets of the previous definition
 		for _, in := range oldService.Input {
 
-			provID, provName = getProviderInfo(in.Provider)
+			_, provName = getProviderInfo(in.Provider)
 
 			if provName == types.MinIOName {
-				s3Client := oldService.StorageProviders.MinIO[provID].GetS3Client()
-
-				// Get bucket name
 				path := strings.Trim(in.Path, " /")
 				// Split buckets and folders from path
 				splitPath := strings.SplitN(path, "/", 2)
-				// If isolation level was USER delete all private buckets
-				if strings.ToUpper(oldService.IsolationLevel) == "USER" {
-					err = updatePrivateBuckets(oldService, minIOAdminClient, s3Client)
+				oldServiceBuckets[splitPath[0]] = true
+			}
+		}
+		for _, in := range oldService.Output {
+
+			_, provName = getProviderInfo(in.Provider)
+
+			if provName == types.MinIOName {
+				path := strings.Trim(in.Path, " /")
+				// Split buckets and folders from path
+				splitPath := strings.SplitN(path, "/", 2)
+				oldServiceBuckets[splitPath[0]] = true
+			}
+		}
+		if len(newServiceBuckets) > 0 {
+			for _, b := range newServiceBuckets {
+				if oldServiceBuckets[b.BucketName] {
+					// If the visibility of the bucket has changed remove old policies and config new ones
+					if oldService.Visibility != newService.Visibility {
+						err := minIOAdminClient.UnsetPolicies(utils.MinIOBucket{
+							BucketName:   b.BucketName,
+							AllowedUsers: oldService.AllowedUsers,
+							Visibility:   oldService.Visibility,
+							Owner:        oldService.Owner,
+						})
+						if err != nil {
+							c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+						}
+						// If not specified default visibility is PRIVATE
+						if strings.ToLower(newService.Visibility) == "" {
+							b.Visibility = utils.PRIVATE
+						}
+						err = minIOAdminClient.SetPolicies(b)
+						if err != nil {
+							c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+						}
+					} else {
+						if newService.Visibility == utils.RESTRICTED {
+							err := minIOAdminClient.UpdateServiceGroup(b.BucketName, newService.AllowedUsers)
+							if err != nil {
+								c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+							}
+						}
+					}
+					// Set false to know which buckets need to be private
+					oldServiceBuckets[b.BucketName] = false
+				} else {
+					// If the bucket didn't exist on the old service assume its created an set policies & webhooks
+					err := minIOAdminClient.SetPolicies(b)
 					if err != nil {
+						c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+					}
+					// Register minio webhook and restart the server
+					if err = registerMinIOWebhook(newService.Name, newService.Token, newService.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
+						uerr := back.UpdateService(*oldService)
+						if uerr != nil {
+							log.Println(uerr.Error())
+						}
+						c.String(http.StatusInternalServerError, err.Error())
 						return
 					}
 				}
-				if strings.ToUpper(newService.IsolationLevel) == "USER" {
-					var newBucketList []string
-					var userBucket string
-					for _, user := range newService.AllowedUsers {
-						userBucket = splitPath[0] + "-" + user[:10]
-						newBucketList = append(newBucketList, userBucket)
-					}
+			}
+		}
 
-					newService.BucketList = newBucketList
-				}
-				secretName := newService.Name + "-" + types.GenerateDeterministicString(newService.Name)
-				if utils.SecretExists(secretName, cfg.ServicesNamespace, back.GetKubeClientset()) {
-					secretsErr := utils.UpdateSecretData(secretName, cfg.ServicesNamespace, newService.Environment.Secrets, back.GetKubeClientset())
-					if secretsErr != nil {
-						c.String(http.StatusInternalServerError, "Error updating asociated secret: %v", secretsErr)
-					}
-				}
-				// Update the group with allowe users, it empthy and add them again
-				err = updateGroup(splitPath[0], oldService, &newService, minIOAdminClient, s3Client)
+		for key, value := range oldServiceBuckets {
+			// If the bucket was not used in the new service definition set it to private
+			if value {
+				err := minIOAdminClient.SetPolicies(utils.MinIOBucket{BucketName: key, Visibility: utils.PRIVATE})
 				if err != nil {
-					return
-				}
-
-				err = disableInputNotifications(s3Client, oldService.GetMinIOWebhookARN(), splitPath[0])
-				if err != nil {
-					return
-				}
-				// Register minio webhook and restart the server
-				if err := registerMinIOWebhook(newService.Name, newService.Token, newService.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
-					uerr := back.UpdateService(*oldService)
-					if uerr != nil {
-						log.Println(uerr.Error())
-					}
-					c.String(http.StatusInternalServerError, err.Error())
-					return
-				}
-
-				// Update the service
-				if err := back.UpdateService(newService); err != nil {
-					c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
-					return
-				}
-
-				// Update buckets
-				if err := updateBuckets(&newService, &newService, minIOAdminClient, cfg); err != nil {
-					if err == errInput {
-						c.String(http.StatusBadRequest, err.Error())
-					} else {
-						c.String(http.StatusInternalServerError, err.Error())
-					}
-					// If updateBuckets fails restore the oldService
-					uerr := back.UpdateService(*oldService)
-					if uerr != nil {
-						log.Println(uerr.Error())
-					}
-					return
-				}
-
-			}
-
-			// Add Yunikorn queue if enabled
-			if cfg.YunikornEnable {
-				if err := utils.AddYunikornQueue(cfg, back.GetKubeClientset(), &newService); err != nil {
-					log.Println(err.Error())
+					c.String(http.StatusInternalServerError, "error setting new policies: %v", err)
 				}
 			}
-
-			c.Status(http.StatusNoContent)
 		}
-		if len(oldService.Input) == 0 {
-			if err := back.UpdateService(newService); err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
-				return
+
+		// Update service secret data or create it
+		if len(newService.Environment.Secrets) > 0 {
+			if utils.SecretExists(newService.Name, cfg.ServicesNamespace, back.GetKubeClientset()) {
+				secretsErr := utils.UpdateSecretData(newService.Name, cfg.ServicesNamespace, newService.Environment.Secrets, back.GetKubeClientset())
+				if secretsErr != nil {
+					c.String(http.StatusInternalServerError, "error updating asociated secret: %v", secretsErr)
+				}
+			} else {
+				secretsErr := utils.CreateSecret(newService.Name, cfg.ServicesNamespace, newService.Environment.Secrets, back.GetKubeClientset())
+				if secretsErr != nil {
+					c.String(http.StatusInternalServerError, "error adding asociated secret: %v", secretsErr)
+				}
+			}
+			// Empty the secrets content from the Configmap
+			for secretKey := range newService.Environment.Secrets {
+				newService.Environment.Secrets[secretKey] = ""
 			}
 		}
 
-	}
-}
-
-func updateGroup(group string, oldService *types.Service, newService *types.Service, minIOAdminClient *utils.MinIOAdminClient, s3Client *s3.S3) error {
-	//delete users in group
-	err := minIOAdminClient.UpdateUsersInGroup(oldService.AllowedUsers, group, true)
-	if err != nil {
-		return err
-	}
-	//add the new ones
-	err = minIOAdminClient.UpdateUsersInGroup(newService.AllowedUsers, group, false)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func updateBuckets(newService, oldService *types.Service, minIOAdminClient *utils.MinIOAdminClient, cfg *types.Config) error {
-	// Disable notifications from oldService.Input
-
-	// TODO diable all old service notifications if needed
-	//if err := disableInputNotifications(oldService.GetMinIOWebhookARN(), oldService.Input); err != nil {
-	//	return fmt.Errorf("error disabling MinIO input notifications: %v", err)
-	//}
-
-	// Create the input and output buckets/folders from newService
-	return createBuckets(newService, cfg, minIOAdminClient, true)
-}
-
-func updatePrivateBuckets(service *types.Service, minIOAdminClient *utils.MinIOAdminClient, s3Client *s3.S3) error {
-	for i, b := range service.BucketList {
-		// Disable input notifications for user bucket
-		if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), b); err != nil {
-			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
+		// Update the service
+		if err := back.UpdateService(newService); err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
+			return
 		}
-		//Delete bucket and unset the associated policy
-		err := minIOAdminClient.EmptyPolicy(service.AllowedUsers[i], false)
-		if err != nil {
-			fmt.Println(err)
-		}
-		err = minIOAdminClient.RemoveFromPolicy(b, service.AllowedUsers[i], false)
-		if err != nil {
-			return fmt.Errorf("unable to remove bucket from policy %q, %v", b, err)
-		}
-		/*if err := minIOAdminClient.DeleteBucket(s3Client, b, service.AllowedUsers[i]); err != nil {
-			return fmt.Errorf("unable to delete bucket %q, %v", b, err)
-		}*/
+
+		c.Status(http.StatusNoContent)
 	}
-	return nil
 }

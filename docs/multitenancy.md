@@ -1,19 +1,25 @@
 # Multitenancy support in OSCAR
 
-In the context of OSCAR, multi-tenancy support refers to the platform's ability to enable multiple users or organizations (tenants) to deploy and run their applications or functions on the same underlying infrastructure. Support for multitenancy in OSCAR has been available since version v3.0.0. To use this functionality, there are some requisites that the cluster and the users have to fulfil:
+In the context of OSCAR, multi-tenancy support refers to the platform's ability to enable multiple users or organizations (tenants) to deploy and run their applications or functions on the same underlying infrastructure. For this multitenancy support is required minimum version of OSCAR 3.6.0. 
+
+In this context, services can be defined with different visibility levels: **private** (accessible only by the owner), **public** (accessible by all users), or **restricted** (accessible only by a specified list of users defined by the owner). This allows fine-grained control over who can access and use each deployed service.
+
+> **_NOTE:_** By default, services are treated as **private** unless a visibility setting is explicitly defined.
+> 
+To use this functionality, there are some requisites that the cluster and the users have to fulfil:
 
 - **The cluster needs to have enabled OIDC access.**
 
 	This is because the implementation of this functionality relies on the EGI ePUIDs to distinguish between users, therefore removing the need to manage a database.  
 
-- **Users who want to create new services need to know the ePUID of the users who will have access to the service.**
+- **Users who want to create restricted services need to know the ePUID of the users who will have access to the service.**
 	
-	Each service has a list of "allowed users," so a service can be accessed not only by one but multiple users chosen by the service creator. This way, users can decide who can operate over its services. It is important to note that only the service creator or "owner" can update it; this means that only allowed users can see the service (and its buckets) and perform service invocations. At creation time, the ePUID of the user creating the service doesn't need to be present on the list; however, when a service is updated, if the user who has created the service needs to access it, its ePUID must be on the list. This "allowed users" list is defined on the FDL at service creation time (more info in [FDL docs](fdl.md)).
+	If a service's visibility is set to restricted, the service owner must provide a list of allowed users by specifying their unique user ePUID to grant them access. It’s important to note that only the service creator, or owner, has permission to update the service. Allowed users can view the service and its associated buckets, and they may invoke the service, but they cannot perform any modifications or administrative actions. At creation time, the ePUID of the user creating the service doesn't need to be present on the list; however, when a service is updated, if the user who has created the service needs to access it, its ePUID must be on the list. This "allowed users" list is defined on the FDL at service creation time (more info in [FDL docs](fdl.md)).
 
 > **_NOTE:_** A user can obtain its EGI User ePUID by login into https://aai.egi.eu/ (for the production instance of EGI Check-In) or https://aai-demo.egi.eu (for the demo instance of EGI Check-In). 
 
 
-The following is an example of an FDL that creates a service whose usage is limited to two different EGI users. Notice that, if the *allowed_users* field is **empty**, the service is treated as **public**, so every user within the cluster can use it and access the corresponding MinIO bucket and its content.
+The following is an example of an FDL that creates a service whose usage is limited to two different EGI users.
 
 
 ``` yaml
@@ -27,6 +33,7 @@ functions:
       script: script.sh
       vo: "vo.example.eu"
       isolation_level: USER
+      visibility: restricted
       allowed_users: 
       - "62bb11b40398f73778b66f344d282242debb8ee3ebb106717a123ca213162926@egi.eu"
       - "5e14d33ac4abc96272cc163da6a200c2e18591bfb3b0f32a4c9c867f5e938463@egi.eu"
