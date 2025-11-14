@@ -32,7 +32,10 @@ import (
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
+
+	//v1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -45,6 +48,15 @@ const (
 )
 
 var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache)")
+
+type StorageIOConfig struct {
+	// Provider reference to the provider's name and identifier specified in StorageProviders
+	// The provider's name is separated from the ID by a point (e.g. "minio.myidentifier")
+	Provider string   `json:"storage_provider"`
+	Path     string   `json:"path"`
+	Suffix   []string `json:"suffix,omitempty"`
+	Prefix   []string `json:"prefix,omitempty"`
+}
 
 // Custom logger
 var createLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
@@ -65,11 +77,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
-		fmt.Println(service)
-		fmt.Println(service.Federation.GroupID)
-		fmt.Println(service.Federation.Delegation)
-		fmt.Println(service.Federation.Topology)
-		fmt.Println(service.Federation.Members[0])
+
 		service.Script = utils.NormalizeLineEndings(service.Script)
 
 		// Check service values and set defaults
@@ -189,6 +197,170 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			for secretKey := range service.Environment.Secrets {
 				service.Environment.Secrets[secretKey] = ""
 			}
+		}
+
+		// Logic for deploying service replicas (tree and mesh topology)
+
+		if len(service.Federation.Members) > 0 && service.Federation.Topology != "none" {
+			serviceMesh := make([]types.Service, len(service.Federation.Members))
+			serviceTree := make([]types.Service, len(service.Federation.Members))
+
+			// --- I. Centralized Secrets Logic (Executed once) ---
+			existingSecret, err := utils.GetExistingSecret(service.Name, cfg.ServicesNamespace, back.GetKubeClientset())
+
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error checking Secret existence: %v", err))
+				return
+			}
+
+			var secretKeyName string
+			// Assumes only the FIRST key from the Environment.Secrets map is used
+			for k := range service.Environment.Secrets {
+				secretKeyName = k
+				break // Takes the first key
+			}
+
+			var secretValue string
+			if existingSecret != nil && len(secretKeyName) > 0 {
+				secretBytes := existingSecret.Data[secretKeyName]
+				secretValue = string(secretBytes)
+				// Optional: fmt.Printf("The Secret value is: %s\n", secretValue)
+			}
+
+			// --- II. Unique Output Configuration Lookup ---
+			minioDefaultOutputPos := -1  // Position of the default/common MinIO provider
+			otherProviderOutputPos := -1 // Position of another provider (non-MinIO)
+
+			for k := range service.Output {
+				provider := service.Output[k].Provider
+				if provider == "minio.default" || provider == "minio" {
+					minioDefaultOutputPos = k
+				} else {
+					otherProviderOutputPos = k
+				}
+			}
+
+			// --- III. Main Replica Loop ---
+			for i := range service.Federation.Members {
+				member := service.Federation.Members[i]
+
+				// 1. Deep Cloning (Replaces duplication of cloning logic)
+				clonedService := cloneServiceForFederation(service)
+
+				// 2. Common Input Logic (Applies to mesh and tree)
+				clonedService.Input = []types.StorageIOConfig{
+					{Provider: "minio.default", Path: fmt.Sprintf("%s/in", member.ServiceName)},
+				}
+				for w := range service.Input {
+					provider := service.Input[w].Provider
+					if provider != "minio.default" && provider != "minio" {
+						// Copy the non-minio Input configuration from the original service
+						clonedService.Input = append(clonedService.Input, service.Input[w])
+					}
+				}
+
+				// 3. Common Output Logic
+				clonedService.Output = []types.StorageIOConfig{
+					{Provider: "minio.default", Path: fmt.Sprintf("%s/out", member.ServiceName)},
+				}
+
+				// 4. Common Secrets Assignment Logic
+				if len(secretKeyName) > 0 {
+					// Assumes service.Environment.Secrets was already cloned and is not nil.
+					clonedService.Environment.Secrets[secretKeyName] = secretValue
+				}
+
+				switch service.Federation.Topology {
+				case "mesh":
+					// MESH specific logic
+					serviceMesh[i] = clonedService
+
+					// Assign member data to the replica
+					serviceMesh[i].ClusterID = member.ClusterID
+					serviceMesh[i].Name = member.ServiceName
+
+					// Assign orchestrator data to the replica's member list
+					serviceMesh[i].Federation.Members[i].ClusterID = service.ClusterID
+					serviceMesh[i].Federation.Members[i].ServiceName = service.Name
+
+					// Conditional Output logic
+					if minioDefaultOutputPos != -1 { // If a default MinIO provider exists
+						// 1. Add the orchestrator's output configuration
+						serviceMesh[i].Output = append(serviceMesh[i].Output, types.StorageIOConfig{
+							Provider: fmt.Sprintf("minio.%s", service.ClusterID),
+							Path:     service.Output[minioDefaultOutputPos].Path,
+							Suffix:   service.Output[minioDefaultOutputPos].Suffix,
+							Prefix:   service.Output[minioDefaultOutputPos].Prefix,
+						})
+
+						// 2. Add the new Storage Provider (orchestrator) to the cloned MinIO map
+						storageMesh := types.MinIOProvider{
+							Endpoint: service.StorageProviders.MinIO[types.DefaultProvider].Endpoint,
+						}
+						serviceMesh[i].StorageProviders.MinIO[service.ClusterID] = &storageMesh
+
+					} else if otherProviderOutputPos != -1 {
+						// Add the non-MinIO provider if it exists
+						serviceMesh[i].Output = append(serviceMesh[i].Output, service.Output[otherProviderOutputPos])
+					}
+
+					fmt.Println("ServiceMesh: ", serviceMesh[i])
+					fmt.Println("federation: ", serviceMesh[i].Federation)
+					fmt.Println("Modified input[i] copy:", serviceMesh[i].Input)
+					fmt.Println("Modified output[i] copy:", serviceMesh[i].Output)
+					fmt.Println("Clusters:", serviceMesh[i].Clusters)
+					fmt.Println("Secrets: ", serviceMesh[i].Environment.Secrets)
+					fmt.Println("Storage Providers:", serviceMesh[i].StorageProviders.MinIO)
+
+				case "tree":
+					// TREE specific logic
+					serviceTree[i] = clonedService
+
+					// Assign member data to the replica
+					serviceTree[i].ClusterID = member.ClusterID
+					serviceTree[i].Name = member.ServiceName
+
+					// TREE specific logic: Remove federation members
+					serviceTree[i].Federation.Members = nil
+
+					// Conditional Output logic (same as for mesh)
+					if minioDefaultOutputPos != -1 {
+						serviceTree[i].Output = append(serviceTree[i].Output, types.StorageIOConfig{
+							Provider: fmt.Sprintf("minio.%s", service.ClusterID),
+							Path:     service.Output[minioDefaultOutputPos].Path,
+							Suffix:   service.Output[minioDefaultOutputPos].Suffix,
+							Prefix:   service.Output[minioDefaultOutputPos].Prefix,
+						})
+
+						storageTreeProvider := types.MinIOProvider{
+							Endpoint: service.StorageProviders.MinIO[types.DefaultProvider].Endpoint,
+						}
+						serviceTree[i].StorageProviders.MinIO[service.ClusterID] = &storageTreeProvider
+
+					} else if otherProviderOutputPos != -1 {
+						serviceTree[i].Output = append(serviceTree[i].Output, service.Output[otherProviderOutputPos])
+					}
+
+					// TREE specific logic: Remove Clusters
+					serviceTree[i].Clusters = nil
+
+					fmt.Println("ServiceTree: ", serviceTree[i])
+					fmt.Println("Federation: ", serviceTree[i].Federation)
+					fmt.Println("Modified input[i] copy: ", serviceTree[i].Input)
+					fmt.Println("Modified output[i] copy: ", serviceTree[i].Output)
+					fmt.Println("Clusters: ", serviceTree[i].Clusters)
+					fmt.Println("Secrets : ", serviceTree[i].Environment.Secrets)
+					fmt.Println("Storage Providers: ", serviceTree[i].StorageProviders.MinIO)
+
+				}
+
+			}
+			fmt.Println("Original Service: ", service)
+			fmt.Println("Federation: ", service.Federation)
+			fmt.Println("Input: ", service.Input)
+			fmt.Println("Output. ", service.Output)
+			fmt.Println("Storage Providers: ", service.StorageProviders.MinIO)
+
 		}
 
 		// Create service
@@ -674,4 +846,51 @@ func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider,
 	}
 
 	return minIOAdminClient.RestartServer()
+}
+
+// Utility function to perform a deep copy of the base service configuration.
+func cloneServiceForFederation(originalService types.Service) types.Service {
+	// 1. Create a shallow copy of the base service struct.
+	clonedService := originalService
+
+	// --- DEEP CLONE: FEDERATION STRUCT ---
+	federationCopy := &types.Federation{}
+	*federationCopy = *originalService.Federation // Clone Federation struct by value
+	membersCopy := make([]types.Members, len(federationCopy.Members))
+
+	for j, member := range federationCopy.Members {
+		membersCopy[j] = member // Shallow copy of the Members struct
+
+		// Deep clone the Headers map within the Member struct.
+		if member.Headers != nil {
+			clonedHeaders := make(map[string]string, len(member.Headers))
+			for k, v := range member.Headers {
+				clonedHeaders[k] = v
+			}
+			membersCopy[j].Headers = clonedHeaders
+		}
+	}
+	federationCopy.Members = membersCopy
+	clonedService.Federation = federationCopy
+
+	// --- DEEP CLONE: StorageProviders.MinIO Map ---
+	if originalService.StorageProviders != nil && originalService.StorageProviders.MinIO != nil {
+		storageProvidersCopy := &types.StorageProviders{}
+		// Copy the StorageProviders struct's contents by value.
+		if originalService.StorageProviders != nil {
+			*storageProvidersCopy = *originalService.StorageProviders
+		}
+
+		// Deep copy the MinIO map entries.
+		minioCopy := make(map[string]*types.MinIOProvider, len(originalService.StorageProviders.MinIO))
+		for k, v := range originalService.StorageProviders.MinIO {
+			minioCopy[k] = v // Copy existing pointers to MinIOProvider structs
+		}
+
+		// Assign the independent map copy to the cloned service.
+		storageProvidersCopy.MinIO = minioCopy
+		clonedService.StorageProviders = storageProvidersCopy
+	}
+
+	return clonedService
 }

@@ -58,6 +58,17 @@ func SecretExists(name string, namespace string, kubeClientset kubernetes.Interf
 	return !errors.IsNotFound(err)
 }
 
+func GetExistingSecret(name string, namespace string, kubeClientset kubernetes.Interface) (*v1.Secret, error) {
+	secret, err := kubeClientset.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return secret, nil
+}
+
 func getPodSecretSpec(secretName string, secretData map[string]string, namespace string) v1.Secret {
 	inmutable := false
 	return v1.Secret{
