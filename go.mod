@@ -1,7 +1,6 @@
 module github.com/grycap/oscar/v3
 
-go 1.21
-toolchain go1.24.1
+go 1.25.0
 
 require (
 	github.com/aws/aws-sdk-go v1.44.189
@@ -42,6 +41,7 @@ require (
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
+	google.golang.org/appengine v1.6.7 // indirect
 	k8s.io/kube-openapi v0.0.0-20231010175941-2dd684a91f00 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
