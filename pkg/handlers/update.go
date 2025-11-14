@@ -45,6 +45,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
+		newService.Script = utils.NormalizeLineEndings(newService.Script)
 
 		// Check service values and set defaults
 		checkValues(&newService, cfg)
@@ -158,7 +159,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					}
 
 					err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
-						BucketPath:   bucket,
+						BucketName:   bucket,
 						Visibility:   utils.PRIVATE,
 						AllowedUsers: []string{},
 						Owner:        oldService.Owner,
@@ -218,11 +219,11 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 		if len(newServiceBuckets) > 0 {
 			for _, b := range newServiceBuckets {
-				if oldServiceBuckets[b.BucketPath] {
+				if oldServiceBuckets[b.BucketName] {
 					// If the visibility of the bucket has changed remove old policies and config new ones
 					if oldService.Visibility != newService.Visibility {
 						err := minIOAdminClient.UnsetPolicies(utils.MinIOBucket{
-							BucketPath:   b.BucketPath,
+							BucketName:   b.BucketName,
 							AllowedUsers: oldService.AllowedUsers,
 							Visibility:   oldService.Visibility,
 							Owner:        oldService.Owner,
@@ -240,14 +241,14 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						}
 					} else {
 						if newService.Visibility == utils.RESTRICTED {
-							err := minIOAdminClient.UpdateServiceGroup(b.BucketPath, newService.AllowedUsers)
+							err := minIOAdminClient.UpdateServiceGroup(b.BucketName, newService.AllowedUsers)
 							if err != nil {
 								c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 							}
 						}
 					}
 					// Set false to know which buckets need to be private
-					oldServiceBuckets[b.BucketPath] = false
+					oldServiceBuckets[b.BucketName] = false
 				} else {
 					// If the bucket didn't exist on the old service assume its created an set policies & webhooks
 					err := minIOAdminClient.SetPolicies(b)
@@ -270,7 +271,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		for key, value := range oldServiceBuckets {
 			// If the bucket was not used in the new service definition set it to private
 			if value {
-				err := minIOAdminClient.SetPolicies(utils.MinIOBucket{BucketPath: key, Visibility: utils.PRIVATE})
+				err := minIOAdminClient.SetPolicies(utils.MinIOBucket{BucketName: key, Visibility: utils.PRIVATE})
 				if err != nil {
 					c.String(http.StatusInternalServerError, "error setting new policies: %v", err)
 				}

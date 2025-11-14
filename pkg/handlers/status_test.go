@@ -20,10 +20,15 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/v3/pkg/testsupport"
+	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	apps "k8s.io/api/apps/v1"
+	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,13 +39,18 @@ import (
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 )
 
-func TestMakeStatusHandler(t *testing.T) {
-	// Create a fake Kubernetes clientset
-	kubeClientset := fake.NewSimpleClientset(
+var (
+	replicas      = int32(1)
+	kubeClientset = fake.NewSimpleClientset(
 		&v1.NodeList{
 			Items: []v1.Node{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "control-plane-node",
+						Labels: map[string]string{
+							"node-role.kubernetes.io/control-plane": "", // This will be filtered out
+						},
+					},
 					Status: v1.NodeStatus{
 						Allocatable: v1.ResourceList{
 							"cpu":    *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -49,18 +59,212 @@ func TestMakeStatusHandler(t *testing.T) {
 					},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "node2"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "worker-node",
+						Labels: map[string]string{}, // No control-plane label - will be included
+					},
 					Status: v1.NodeStatus{
 						Allocatable: v1.ResourceList{
-							"cpu":    *resource.NewMilliQuantity(4000, resource.DecimalSI),
-							"memory": *resource.NewQuantity(16*1024*1024*1024, resource.BinarySI),
+							"cpu":            *resource.NewMilliQuantity(4000, resource.DecimalSI),
+							"memory":         *resource.NewQuantity(16*1024*1024*1024, resource.BinarySI),
+							"nvidia.com/gpu": *resource.NewQuantity(1, resource.DecimalSI), // Has GPU
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "interlink-node",
+						Labels: map[string]string{
+							"virtual-node.interlink/type": "virtual-kubelet", // InterLink node
+						},
+					},
+					Status: v1.NodeStatus{
+						Allocatable: v1.ResourceList{
+							"cpu":    *resource.NewMilliQuantity(8000, resource.DecimalSI),
+							"memory": *resource.NewQuantity(32*1024*1024*1024, resource.BinarySI),
 						},
 					},
 				},
 			},
 		},
+		&apps.DeploymentList{
+			Items: []apps.Deployment{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "oscar",
+						Namespace:         "oscar",
+						CreationTimestamp: metav1.Now(),
+					},
+					Status: apps.DeploymentStatus{
+						Replicas:          1,
+						AvailableReplicas: 1,
+						ReadyReplicas:     1,
+					},
+					Spec: apps.DeploymentSpec{
+						Strategy: apps.DeploymentStrategy{
+							Type: apps.RollingUpdateDeploymentStrategyType,
+						},
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "oscar"},
+						},
+						Replicas: &replicas,
+					},
+				},
+			},
+		},
+		&batch.JobList{
+			Items: []batch.Job{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "oscar-job-1",
+						Namespace:         "oscar-svc",
+						CreationTimestamp: metav1.Now(),
+					},
+					Status: batch.JobStatus{
+						Succeeded: 1,
+						Active:    0,
+						Failed:    0,
+					},
+				},
+			},
+		},
+		&v1.PodList{
+			Items: []v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "oscar-pod-1",
+						Namespace:         "oscar-svc",
+						CreationTimestamp: metav1.Now(),
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodSucceeded,
+					},
+				},
+			},
+		},
 	)
+	// Calculate expected values:
+	// worker-node: 4000 - 2000 = 2000 CPU free, 16GB - 8GB = 8GB memory free
+	// interlink-node: 8000 - 4000 = 4000 CPU free, 32GB - 16GB = 16GB memory free
+	// Totals: 6000 CPU free, 24GB memory free
+	// Max: 4000 CPU free, 16GB memory free
+	expectedResponse = map[string]interface{}{
+		"numberNodes":     2.0,                       // worker-node + interlink-node (control-plane filtered out)
+		"cpuFreeTotal":    6000.0,                    // 2000 + 4000
+		"cpuMaxFree":      4000.0,                    // max(2000, 4000)
+		"memoryFreeTotal": 24.0 * 1024 * 1024 * 1024, // 8GB + 16GB
+		"memoryMaxFree":   16.0 * 1024 * 1024 * 1024, // max(8GB, 16GB)
+		"detail": []interface{}{
+			map[string]interface{}{
+				"nodeName":         "worker-node",
+				"cpuCapacity":      "4000",
+				"cpuUsage":         "2000",
+				"cpuPercentage":    "50.00",
+				"memoryCapacity":   "17179869184", // 16GB in bytes
+				"memoryUsage":      "8589934592",  // 8GB in bytes
+				"memoryPercentage": "50.00",
+				"isInterLink":      false,
+				"hasGPU":           true, // Has nvidia.com/gpu
+			},
+			map[string]interface{}{
+				"nodeName":         "interlink-node",
+				"cpuCapacity":      "8000",
+				"cpuUsage":         "4000",
+				"cpuPercentage":    "50.00",
+				"memoryCapacity":   "34359738368", // 32GB in bytes
+				"memoryUsage":      "17179869184", // 16GB in bytes
+				"memoryPercentage": "50.00",
+				"isInterLink":      true, // Has virtual-node.interlink/type=virtual-kubelet
+				"hasGPU":           false,
+			},
+		},
+	}
+)
 
+func checkResult(jsonResponse map[string]interface{}, t *testing.T, isAdmin bool) {
+	// Since the order of nodes in the detail array can vary (map iteration),
+	// we should check each field separately rather than using DeepEqual
+	if jsonResponse["numberNodes"] != expectedResponse["numberNodes"] {
+		t.Errorf("Expected numberNodes %v, but got %v", expectedResponse["numberNodes"], jsonResponse["numberNodes"])
+	}
+
+	if jsonResponse["cpuFreeTotal"] != expectedResponse["cpuFreeTotal"] {
+		t.Errorf("Expected cpuFreeTotal %v, but got %v", expectedResponse["cpuFreeTotal"], jsonResponse["cpuFreeTotal"])
+	}
+
+	if jsonResponse["cpuMaxFree"] != expectedResponse["cpuMaxFree"] {
+		t.Errorf("Expected cpuMaxFree %v, but got %v", expectedResponse["cpuMaxFree"], jsonResponse["cpuMaxFree"])
+	}
+
+	if jsonResponse["memoryFreeTotal"] != expectedResponse["memoryFreeTotal"] {
+		t.Errorf("Expected memoryFreeTotal %v, but got %v", expectedResponse["memoryFreeTotal"], jsonResponse["memoryFreeTotal"])
+	}
+
+	if jsonResponse["memoryMaxFree"] != expectedResponse["memoryMaxFree"] {
+		t.Errorf("Expected memoryMaxFree %v, but got %v", expectedResponse["memoryMaxFree"], jsonResponse["memoryMaxFree"])
+	}
+
+	// Check that we have 2 nodes in detail
+	detail, ok := jsonResponse["detail"].([]interface{})
+	if !ok || len(detail) != 2 {
+		t.Errorf("Expected 2 nodes in detail, but got %d", len(detail))
+	}
+
+	// Verify each node exists with correct properties
+	nodeMap := make(map[string]map[string]interface{})
+	for _, nodeInterface := range detail {
+		node := nodeInterface.(map[string]interface{})
+		nodeName := node["nodeName"].(string)
+		nodeMap[nodeName] = node
+	}
+
+	// Check worker-node
+	if workerNode, exists := nodeMap["worker-node"]; exists {
+		if workerNode["hasGPU"] != true {
+			t.Error("Expected worker-node to have GPU")
+		}
+		if workerNode["isInterLink"] != false {
+			t.Error("Expected worker-node to NOT be InterLink")
+		}
+	} else {
+		t.Error("Expected to find worker-node in response")
+	}
+
+	// Check interlink-node
+	if interlinkNode, exists := nodeMap["interlink-node"]; exists {
+		if interlinkNode["hasGPU"] != false {
+			t.Error("Expected interlink-node to NOT have GPU")
+		}
+		if interlinkNode["isInterLink"] != true {
+			t.Error("Expected interlink-node to be InterLink")
+		}
+	} else {
+		t.Error("Expected to find interlink-node in response")
+	}
+	oscar := jsonResponse["OSCAR"].(map[string]interface{})
+	if isAdmin && oscar["states"] != nil {
+		t.Errorf("Expected JobsCount %v, but got %v", nil, oscar["states"])
+	} else if !isAdmin && oscar["states"] != nil {
+		t.Errorf("Expected JobsCount %v, but got %v", nil, oscar["states"])
+	}
+
+}
+
+func TestMakeStatusHandler(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		if hreq.URL.Path != "/" && hreq.URL.Path != "/output" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
+			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
+		}
+		if hreq.URL.Path == "/minio/admin/v3/info" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+		} else {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"status": "success"}`))
+		}
+	}))
 	// Create a fake Metrics clientset
 	metricsClientset := metricsfake.NewSimpleClientset()
 	// Add NodeMetrics objects to the fake clientset's store
@@ -68,29 +272,48 @@ func TestMakeStatusHandler(t *testing.T) {
 		return true, &metricsv1beta1api.NodeMetricsList{
 			Items: []metricsv1beta1api.NodeMetrics{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+					ObjectMeta: metav1.ObjectMeta{Name: "worker-node"},
 					Usage: v1.ResourceList{
-						"cpu":    *resource.NewMilliQuantity(1000, resource.DecimalSI),
-						"memory": *resource.NewQuantity(4*1024*1024*1024, resource.BinarySI),
+						"cpu":    *resource.NewMilliQuantity(2000, resource.DecimalSI),       // 50% usage
+						"memory": *resource.NewQuantity(8*1024*1024*1024, resource.BinarySI), // 50% usage
 					},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "node2"},
+					ObjectMeta: metav1.ObjectMeta{Name: "interlink-node"},
 					Usage: v1.ResourceList{
-						"cpu":    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						"memory": *resource.NewQuantity(8*1024*1024*1024, resource.BinarySI),
+						"cpu":    *resource.NewMilliQuantity(4000, resource.DecimalSI),        // 50% usage
+						"memory": *resource.NewQuantity(16*1024*1024*1024, resource.BinarySI), // 50% usage
 					},
 				},
 			},
 		}, nil
 	})
+	cfg := types.Config{
+		ServicesNamespace: "oscar-svc",
+		Namespace:         "oscar",
+		Username:          "testuser",
+		Password:          "testpass",
+		MinIOProvider: &types.MinIOProvider{
+			Region:    "us-east-1",
+			Endpoint:  server.URL,
+			AccessKey: "ak",
+			SecretKey: "sk",
+		},
+	}
 
 	// Create a new Gin router
 	router := gin.Default()
-	router.GET("/status", MakeStatusHandler(kubeClientset, metricsClientset.MetricsV1beta1()))
+	router.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "somelonguid@egi.eu")
+		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "somelonguid@egi.eu"))
+		c.Next()
+	})
+	router.GET("/status", MakeStatusHandler(&cfg, kubeClientset, metricsClientset.MetricsV1beta1()))
 
 	// Create a new HTTP request
 	req, _ := http.NewRequest("GET", "/status", nil)
+	req.Header.Set("Authorization", "Bearer 11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf") // Filter InterLink nodes
+
 	w := httptest.NewRecorder()
 
 	// Perform the request
@@ -107,26 +330,25 @@ func TestMakeStatusHandler(t *testing.T) {
 		t.Fatalf("Failed to unmarshal response: %v", err)
 	}
 
-	expectedResponse := map[string]interface{}{
-		"numberNodes":     1.0,
-		"cpuFreeTotal":    2000.0,
-		"cpuMaxFree":      2000.0,
-		"memoryFreeTotal": 16.0 * 1024 * 1024 * 1024,
-		"memoryMaxFree":   8.0 * 1024 * 1024 * 1024,
-		"detail": []interface{}{
-			map[string]interface{}{
-				"nodeName":         "node2",
-				"cpuCapacity":      "4000",
-				"cpuUsage":         "2000",
-				"cpuPercentage":    "50.00",
-				"memoryCapacity":   "17179869184",
-				"memoryUsage":      "8589934592",
-				"memoryPercentage": "50.00",
-			},
-		},
+	// Create a new HTTP request
+	req2, _ := http.NewRequest("GET", "/status", nil)
+	req2.Header.Set("Authorization", "Basic dGVzdHVzZXI6dGVzdHBhc3M=") // Filter InterLink nodes
+	w2 := httptest.NewRecorder()
+
+	// Perform the request
+	router.ServeHTTP(w2, req2)
+
+	// Check the response
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status code %d, but got %d", http.StatusOK, w.Code)
 	}
 
-	if !reflect.DeepEqual(jsonResponse, expectedResponse) {
-		t.Errorf("Expected response %v, but got %v", expectedResponse, jsonResponse)
+	var jsonResponse2 map[string]interface{}
+	err2 := json.Unmarshal(w2.Body.Bytes(), &jsonResponse2)
+	if err2 != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err2)
 	}
+
+	checkResult(jsonResponse, t, false)
+	checkResult(jsonResponse2, t, true)
 }

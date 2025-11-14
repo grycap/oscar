@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/grycap/oscar/v3/pkg/testsupport"
 	"github.com/grycap/oscar/v3/pkg/types"
 )
 
@@ -58,6 +59,8 @@ func createMinIOConfig() (types.Config, *httptest.Server) {
 }
 
 func TestCreateMinIOUser(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
 	// Create a fake MinIO server
 	cfg, server := createMinIOConfig()
 
@@ -78,6 +81,8 @@ func TestCreateMinIOUser(t *testing.T) {
 }
 
 func TestCreateServiceGroup(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
 	// Create a fake MinIO server
 	cfg, server := createMinIOConfig()
 

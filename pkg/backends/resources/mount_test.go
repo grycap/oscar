@@ -113,7 +113,7 @@ func TestSetMinIOEnvVars(t *testing.T) {
 		},
 	}
 
-	envVars := setMinIOEnvVars(service, providerId, cfg, cfg.Name)
+	envVars := setMinIOEnvVars(service, providerId, cfg)
 
 	expectedEnvVars := map[string]string{
 		"MINIO_BUCKET":          "test-bucket",

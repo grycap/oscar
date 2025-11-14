@@ -171,16 +171,27 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), splitPath[0]); err != nil {
 			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 		}
+		// Check if the bucket is in the mount path
+		if !sameStorage(in, service.Mount) {
+			err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+				BucketName:   splitPath[0],
+				Visibility:   service.Visibility,
+				AllowedUsers: service.AllowedUsers,
+				Owner:        service.Owner,
+			})
 
-		err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
-			BucketPath:   splitPath[0],
-			Visibility:   service.Visibility,
-			AllowedUsers: service.AllowedUsers,
-			Owner:        service.Owner,
-		})
-
-		if err != nil {
-			return fmt.Errorf("error while removing MinIO bucket %v", err)
+			if err != nil {
+				return fmt.Errorf("error while removing MinIO bucket %v", err)
+			}
+		} else {
+			// Bucket metadata for filtering
+			tags := map[string]string{
+				"owner":   service.Owner,
+				"service": "false",
+			}
+			if err := minIOAdminClient.SetTags(splitPath[0], tags); err != nil {
+				return fmt.Errorf("Error tagging bucket: %v", err)
+			}
 		}
 
 	}
@@ -224,23 +235,34 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), outBucket); err != nil {
 					log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 				}
-
-				err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
-					BucketPath:   outBucket,
-					Visibility:   service.Visibility,
-					AllowedUsers: service.AllowedUsers,
-					Owner:        service.Owner,
-				})
-				if err != nil {
-					return fmt.Errorf("error while removing MinIO bucket %v", err)
+				if !sameStorage(out, service.Mount) {
+					err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+						BucketName:   outBucket,
+						Visibility:   service.Visibility,
+						AllowedUsers: service.AllowedUsers,
+						Owner:        service.Owner,
+					})
+					if err != nil {
+						return fmt.Errorf("error while removing MinIO bucket %v", err)
+					}
+				} else {
+					// Bucket metadata for filtering
+					tags := map[string]string{
+						"owner":   service.Owner,
+						"service": "false",
+					}
+					if err := minIOAdminClient.SetTags(outBucket, tags); err != nil {
+						return fmt.Errorf("Error tagging bucket: %v", err)
+					}
 				}
+
 			}
 
 		case types.OnedataName:
 			// TODO
 		}
 	}
-
+	// Delete isolated buckets
 	if strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser && len(service.BucketList) != 0 {
 		for _, bucket := range service.BucketList {
 
@@ -250,7 +272,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			}
 
 			err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
-				BucketPath:   bucket,
+				BucketName:   bucket,
 				Visibility:   utils.PRIVATE,
 				AllowedUsers: []string{},
 				Owner:        service.Owner,
@@ -274,22 +296,23 @@ func DeleteMinIOBuckets(s3Client *s3.S3, minIOAdminClient *utils.MinIOAdminClien
 	} else {
 		policyName = bucket.Owner
 	}
-
-	err := minIOAdminClient.RemoveResource(bucket.BucketPath, policyName, isGroup)
-	if err != nil {
-		return fmt.Errorf("error removing resource")
-	}
-
-	if strings.ToLower(bucket.Visibility) == utils.RESTRICTED {
-		err := minIOAdminClient.RemoveGroupPolicy(bucket.BucketPath)
+	if bucket.Owner != types.DefaultOwner {
+		err := minIOAdminClient.RemoveResource(bucket.BucketName, policyName, isGroup)
 		if err != nil {
-			return fmt.Errorf("error removing policy for group")
+			return fmt.Errorf("error removing resource")
+		}
+
+		if strings.ToLower(bucket.Visibility) == utils.RESTRICTED {
+			err := minIOAdminClient.RemoveGroupPolicy(bucket.BucketName)
+			if err != nil {
+				return fmt.Errorf("error removing policy for group")
+			}
 		}
 	}
 
-	err = minIOAdminClient.DeleteBucket(s3Client, bucket.BucketPath)
+	err := minIOAdminClient.DeleteBucket(s3Client, bucket.BucketName)
 	if err != nil {
-		return fmt.Errorf("error deleting bucket %s, %v", bucket.BucketPath, err)
+		return fmt.Errorf("error deleting bucket %s, %v", bucket.BucketName, err)
 	}
 	return nil
 }
@@ -329,4 +352,17 @@ func disableInputNotifications(s3Client *s3.S3, arnStr string, bucket string) er
 	}
 
 	return nil
+}
+
+func sameStorage(firstStorage types.StorageIOConfig, secondStorage types.StorageIOConfig) bool {
+	// Check if the bucket is in the mount path
+	firstProvID, firstProvName := getProviderInfo(firstStorage.Provider)
+	secondProvID, secondProvName := getProviderInfo(secondStorage.Provider)
+	firstPath := strings.Trim(firstStorage.Path, " /")
+	secondPath := strings.Trim(secondStorage.Path, " /")
+	// Split buckets and folders from path
+	splitPathBucket := strings.SplitN(firstPath, "/", 2)
+	splitPathMount := strings.SplitN(secondPath, "/", 2)
+
+	return firstProvID == secondProvID && firstProvName == secondProvName && splitPathBucket[0] == splitPathMount[0]
 }

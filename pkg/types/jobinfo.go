@@ -25,3 +25,9 @@ type JobInfo struct {
 	StartTime    *metav1.Time `json:"start_time,omitempty"`
 	FinishTime   *metav1.Time `json:"finish_time,omitempty"`
 }
+
+type JobsResponse struct {
+	Jobs         map[string]*JobInfo `json:"jobs"`
+	NextPage     string              `json:"next_page,omitempty"`
+	RemainingJob *int64              `json:"remaining_jobs,omitempty"`
+}

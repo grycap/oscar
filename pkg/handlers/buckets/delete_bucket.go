@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/handlers"
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -46,7 +47,7 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 		// Check owner
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
-			uid = cfg.Name
+			uid = types.DefaultOwner
 			deleteLogger.Printf("Deleting bucket '%s' for user '%s'", bucketName, uid)
 		} else {
 			var err error
@@ -58,11 +59,29 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 			deleteLogger.Printf("Deleting bucket '%s' for user '%s'", bucketName, uid)
 		}
 		s3Client := cfg.MinIOProvider.GetS3Client()
+		// Check that the bucket exists
+		bucketInfo, err := s3Client.ListBuckets(&s3.ListBucketsInput{})
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+		}
+
+		var foundInMinIO bool
+		for _, b := range bucketInfo.Buckets {
+			if *b.Name == bucketName {
+				foundInMinIO = true
+				break
+			}
+		}
+		if !foundInMinIO {
+			c.String(http.StatusNotFound, fmt.Sprintf("The bucket '%s' does not exist", bucketName))
+			return
+		}
+		// If bucket exit
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
-		v := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketPath: bucketName, Owner: uid})
-		if v == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucketName) {
+		v := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: uid})
+		if (uid == types.DefaultOwner) || (v == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucketName)) {
 			err := handlers.DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
-				BucketPath: bucketName,
+				BucketName: bucketName,
 				Visibility: v,
 				Owner:      uid,
 			})
@@ -71,7 +90,7 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 				return
 			}
 		} else {
-			c.String(http.StatusUnauthorized, fmt.Sprintf("User '%s' is not authorised", uid))
+			c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", uid))
 			return
 		}
 

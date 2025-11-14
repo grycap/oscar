@@ -36,6 +36,7 @@ nav:
   - integration-interlink.md
   - integration-compss.md
   - integration-node-red.md
+  - integration-jupyter.md
 
 - Tutorials: 
   - training.md

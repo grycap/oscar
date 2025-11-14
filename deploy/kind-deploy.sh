@@ -149,7 +149,7 @@ checkOSCARDeploy(){
 
 deployKnative(){
     echo -e "\n[*] Deploying Knative Serving ..."
-    kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.6.0/operator.yaml
+    kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.18.0/operator.yaml
     cat  > $KNATIVE_FILEPATH <<EOF
 ---
 apiVersion: v1
@@ -163,7 +163,7 @@ metadata:
   name: knative-serving
   namespace: knative-serving
 spec:
-  version: 1.6.0
+  version: 1.18.0
   ingress:
     kourier:
       enabled: true
@@ -260,10 +260,10 @@ cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: ConfigMap
 metadata:
-name: local-registry-hosting
-namespace: kube-public
+  name: local-registry-hosting
+  namespace: kube-public
 data:
-localRegistryHosting.v1: |
+  localRegistryHosting.v1: |
     host: "localhost:${reg_port}"
     help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
 EOF
@@ -319,6 +319,11 @@ else
     helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner --set image.tag=v3.0.1
 fi
 
+#Deploy metrics-server
+echo -e "\n[*] Deploying metrics-server ..."
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml && \
+kubectl -n kube-system patch deployment metrics-server --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
+
 #Deploy Knative Serving
 if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
     deployKnative
@@ -339,6 +344,57 @@ fi
 
 #Wait for OSCAR deployment
 checkOSCARDeploy
+
+echo -e "[*] Configuring RBAC permissions ..."
+cat <<EOF | kubectl apply -f -
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: oscar-cluster-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  - pods
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: oscar-cluster-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: oscar-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: oscar-sa
+  namespace: oscar
+EOF
+
+echo -e "\n[$GREEN$CHECK$END_COLOR] Deployment completed successfully"
 
 rm $CONFIG_FILEPATH
 

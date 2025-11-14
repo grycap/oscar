@@ -28,12 +28,15 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/grycap/oscar/v3/pkg/testsupport"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestNewOIDCManager(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
 		if hreq.URL.Path == "/.well-known/openid-configuration" {
 			rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `"}`))
@@ -77,6 +80,7 @@ func TestUserHasVO(t *testing.T) {
 }
 
 func TestIsAuthorised(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")
 		if hreq.URL.Path == "/.well-known/openid-configuration" {
@@ -180,6 +184,8 @@ func TestGetIssuerFromToken(t *testing.T) {
 }
 
 func TestGetUserInfo(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")
 		if hreq.URL.Path == "/.well-known/openid-configuration" {
@@ -219,6 +225,8 @@ func TestGetUserInfo(t *testing.T) {
 }
 
 func TestGetOIDCMiddleware(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
 		if hreq.URL.Path == "/.well-known/openid-configuration" {
 			rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `", "userinfo_endpoint": "http://` + hreq.Host + `/userinfo"}`))
