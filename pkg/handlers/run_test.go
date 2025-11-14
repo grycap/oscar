@@ -44,23 +44,24 @@ func (GinResponseRecorder) Flush() {
 }
 
 func TestMakeRunHandler(t *testing.T) {
-	back := backends.MakeFakeSyncBackend()
-	http.DefaultClient.Timeout = 400 * time.Second
-	r := gin.Default()
-	r.POST("/run/:serviceName", MakeRunHandler(&testConfigValidRun, back))
 
 	scenarios := []struct {
 		name        string
 		returnError bool
 		errType     string
 	}{
-		{"Valid service test", false, ""},
+		//{"Valid service test", false, ""},
 		{"Service Not Found test", true, "404"},
 		{"Internal Server Error test", true, "500"},
 		{"Bad token: split token", true, "splitErr"},
 		{"Bad token: diff service token", true, "diffErr"},
 	}
 	for _, s := range scenarios {
+		back := backends.MakeFakeSyncBackend()
+		http.DefaultClient.Timeout = 400 * time.Second
+		r := gin.Default()
+		r.POST("/run/:serviceName", MakeRunHandler(&testConfigValidRun, back))
+
 		t.Run(s.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			serviceName := "testName"

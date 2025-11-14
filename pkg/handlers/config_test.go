@@ -24,7 +24,6 @@ import (
 	"strings"
 	"testing"
 
-	"bou.ke/monkey"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
@@ -108,13 +107,18 @@ func TestMakeConfigHandler(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer some-token")
 		w := httptest.NewRecorder()
 
-		// Mocking auth functions
-		monkey.Patch(auth.GetUIDFromContext, func(c *gin.Context) (string, error) {
+		// Mock auth helpers using test hook variables
+		origGetUID := getUIDFromContextFn
+		origGetMultitenancy := getMultitenancyConfigFromContextFn
+		getUIDFromContextFn = func(*gin.Context) (string, error) {
 			return "somelonguserid@egi.eu", nil
-		})
-
-		monkey.Patch(auth.GetMultitenancyConfigFromContext, func(c *gin.Context) (*auth.MultitenancyConfig, error) {
+		}
+		getMultitenancyConfigFromContextFn = func(*gin.Context) (*auth.MultitenancyConfig, error) {
 			return auth.NewMultitenancyConfig(kubeClientset, "somelonguserid@egi.eu"), nil
+		}
+		t.Cleanup(func() {
+			getUIDFromContextFn = origGetUID
+			getMultitenancyConfigFromContextFn = origGetMultitenancy
 		})
 
 		router.ServeHTTP(w, req)
@@ -134,8 +138,6 @@ func TestMakeConfigHandler(t *testing.T) {
 			t.Fatalf("Unexpected response body: %s", w.Body.String())
 		}
 
-		defer monkey.Unpatch(auth.GetUIDFromContext)
-		defer monkey.Unpatch(auth.GetMultitenancyConfigFromContext)
 	})
 
 	t.Run("With Token Authorization Header", func(t *testing.T) {

@@ -19,7 +19,8 @@ functions:
       cpu: '1.0'
       image: grycap/oscar-theano-plants
       script: plants.sh
-      isolation_level: USER
+      isolation_level: user
+      visibility: restricted
       allowed_users: 
       - "62bb11b40398f7.......926@egi.eu"
       - "5e14d33ac4abc9.......463@egi.eu"
@@ -67,6 +68,16 @@ storage_providers:
       hostname: my_dcache.com
       login: my_username
       password: my_password
+  rucio:
+    rucio:
+      host: rucio_host
+      auth_host: rucio_auth_host
+      account: rucio_account
+      rse: rucio_rse
+      refresh_token: oidc_refresh_token
+      oidc_audience: oidc_audience
+      token_endpoint: oidc_token_endpoint
+
 ```
 
 ## Top level parameters
@@ -115,6 +126,7 @@ storage_providers:
 | `labels` </br> *map[string]string*                                | User-defined Kubernetes [labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) to be set in job's definition. Optional                                                                                                          |
 | `interlink_node_name` </br> *string*                              | Name of the virtual kubelet node (if you are using InterLink nodes) Optional 
 | `isolation_level` </br> *string*                              |  Select the isolation level of the MinIO buckets: `SERVICE` or `USER` (`SERVICE` by default) Optional 
+| `visibility` </br> *string*                              |  Select the visibility level of service: `private`, `restricted` or `public` (`private` by default) Optional 
 
 ## SynchronousSettings
 
@@ -178,6 +190,7 @@ storage_providers:
 | `s3` </br> *map[string][S3Provider](#s3provider)*                | Map to define the credentials for an Amazon S3 storage provider, being the key the user-defined identifier for the provider                     |
 | `onedata` </br> *map[string][OnedataProvider](#onedataprovider)* | Map to define the credentials for a Onedata storage provider, being the key the user-defined identifier for the provider                       |
 | `webdav` </br> *map[string][WebDavProvider](#webdavprovider)*    | Map to define the credentials for a storage provider accesible via WebDAV protocol, being the key the user-defined identifier for the provider |
+| `rucio` </br> *map[string][RucioProvider](#rucioprovider)*    | Map to define the credentials for a Rucio storage provider, being the key the user-defined identifier for the provider |
 
 ## Cluster
 
@@ -218,6 +231,19 @@ storage_providers:
 
 | Field                     | Description               |
 | ------------------------- | ------------------------- |
-| `hostname` </br> *string* | Provider hostname         |
+| `hostname` </br> *string* | Provider hostname. It only works with `https` protocol. Skip the protocol.       |
 | `login` </br> *string*    | Provider account username |
 | `password` </br> *string* | Provider account password |
+
+
+## RucioProvider
+
+| Field                     | Description               |
+| ------------------------- | ------------------------- |
+| `host` </br> *string* | Rucio Provider hostname. It only works with `https` protocol. Skip the protocol.       |
+| `auth_host` </br> *string*    | Rucio authentication provider host |
+| `account` </br> *string* | Rucio account |
+| `rse` </br> *string* | Rucio rse |
+| `refresh_token` </br> *string* | OIDC refresh token |
+| `oidc_audience` </br> *string* | OIDC audience |
+| `token_endpoint` </br> *string* | OIDC issue endpoint  |

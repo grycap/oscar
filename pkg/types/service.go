@@ -17,11 +17,8 @@ limitations under the License.
 package types
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/goccy/go-yaml"
 	v1 "k8s.io/api/core/v1"
@@ -106,6 +103,12 @@ const (
 
 	// ReSchedulerLabelKey label key to enable/disable the ReScheduler
 	ReSchedulerLabelKey = "oscar_rescheduler"
+
+	IsolationLevelUser = "USER"
+
+	IsolationLevelService = "SERVICE"
+
+	DefaultOwner = "cluster_admin"
 )
 
 // YAMLMarshal package-level yaml marshal function
@@ -253,6 +256,12 @@ type Service struct {
 
 	InterLinkNodeName string `json:"interlink_node_name"`
 
+	// Visibility sets which users will be able to interact with the service
+	// "private" The default state of the service, which means only the owner of the same can interact with it
+	// "public"  Every user can see the service and its buckets
+	// "restricted" A list of users, set on the "allowed_users" variable are able to interact with the service
+	Visibility string `json:"visibility"`
+
 	// AllowedUsers list of EGI UID's identifying the users that will have visibility of the service and its MinIO storage provider
 	// Optional (If the list is empty we asume the visibility is public for all cluster users)
 	AllowedUsers []string `json:"allowed_users"`
@@ -339,13 +348,6 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 		}
 		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, volumeMount)
 		podSpec.Volumes = append(podSpec.Volumes, volume)
-	}
-
-	// Add secrets as environment variables if defined
-	if len(service.Environment.Secrets) > 0 {
-		secretName := GenerateDeterministicString(service.Name)
-		secretMountSpec := ConvertSecretsEnvVars(secretName)
-		podSpec.Containers[0].EnvFrom = secretMountSpec
 	}
 
 	// Add the required environment variables for the watchdog
@@ -508,10 +510,4 @@ func (service *Service) GetSupervisorPath() string {
 // HasReplicas checks if the service has replicas defined
 func (service *Service) HasReplicas() bool {
 	return len(service.Replicas) > 0
-}
-
-// GenerateDeterministicString creates a fixed "random" string based on input
-func GenerateDeterministicString(input string) string {
-	hash := sha256.Sum256([]byte(input))                                    // Hash the input
-	return strings.ToLower(base64.URLEncoding.EncodeToString(hash[:])[:10]) // Take first 10 chars
 }

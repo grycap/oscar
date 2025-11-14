@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"bou.ke/monkey"
 	"github.com/grycap/oscar/v3/pkg/backends"
 	"github.com/grycap/oscar/v3/pkg/types"
 	jobv1 "k8s.io/api/batch/v1"
@@ -176,17 +175,18 @@ func TestStartReScheduler(t *testing.T) {
 		ServicesNamespace:   namespace,
 	}
 
-	// Mock the Delegate function using monkey patching
-	monkey.Patch(DelegateJob, func(service *types.Service, event string, logger *log.Logger) error {
+	// Mock the Delegate function using test hook variable
+	origDelegate := delegateJobFunc
+	delegateJobFunc = func(*types.Service, string, *log.Logger) error {
 		return nil
-	})
+	}
+	t.Cleanup(func() { delegateJobFunc = origDelegate })
 	var buf bytes.Buffer
 	reSchedulerLogger = log.New(&buf, "[RE-SCHEDULER] ", log.Flags())
 	// Call the function to test
 	go StartReScheduler(cfg, back, kubeClientset)
 	time.Sleep(2 * time.Second)
 
-	defer monkey.Unpatch(DelegateJob)
 	if buf.String() != "" {
 		t.Fatalf("error starting rescheduler: %v", buf.String())
 	}
