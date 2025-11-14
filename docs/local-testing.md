@@ -28,7 +28,7 @@ access them.
 >
 >Also, port 80 must be available to avoid errors during the deployment since OSCAR-Dashboard uses it. Check the [Frequently Asked Questions (FAQ)](faq.md) for more info.
 
-## Automated local testing
+## Automated local deployment
 
 To set up the enviroment for the platform testing you can run the following
 command. This script automatically executes all the necessary steps to deploy
@@ -38,7 +38,7 @@ the local cluster and the OSCAR platform along with all the required tools.
 curl -sSL http://go.oscar.grycap.net | bash
 ```
 
-## Steps for manual local testing
+## Steps for manual local deployment
 
 If you want to do it manualy you can follow the listed steps.
 
@@ -88,7 +88,7 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/mast
 
 OSCAR depends on [MinIO](https://min.io/) as a storage provider and function
 trigger. The easy way to run MinIO in a Kubernetes cluster is by installing
-its [helm chart](https://github.com/minio/charts). To  install the helm MinIO
+its [helm chart](https://github.com/minio/helm). To  install the helm MinIO
 repo and install the chart, run the following commands replacing
 `<MINIO_PASSWORD>` with a password. It must have at least 8 characters:
 
@@ -130,6 +130,73 @@ using the [NFS server provisioner](https://github.com/kubernetes-sigs/nfs-ganesh
 with kind due to its default configuration of kernel-limit file descriptors.
 To workaround it, please run `sudo sysctl -w fs.nr_open=1048576`.*
 
+### Deploy Metrics server
+
+It's required to install Metrics server in order to avoid seeing an error on the OSCAR `/status` endpoint. Also we patch it disabling certificate verification in order to use self-signed certificates.
+
+```sh
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+kubectl -n kube-system patch deployment metrics-server --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
+```
+
+> Note that the local testing environment uses Kind, therefore the metrics will not work as expected.
+
+## Configure RBAC permissions
+
+Once we have deployed Metrics server we must configure RBAC permissions for OSCAR in order to allow it to interact with Metrics server.
+
+> Note that without the permissions the `/status` will show us an error.
+
+```sh
+cat <<EOF | kubectl apply -f -
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: oscar-cluster-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  - pods
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: oscar-cluster-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: oscar-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: oscar-sa
+  namespace: oscar
+EOF
+```
+
 ### Deploy Knative Serving as Serverless Backend (OPTIONAL)
 
 OSCAR supports [Knative Serving](https://knative.dev/docs/serving/) as
@@ -139,10 +206,10 @@ to deploy it in the kind cluster, first you must deploy the
 [Knative Operator](https://knative.dev/docs/install/operator/knative-with-operators/)
 
 ```
-kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.3.1/operator.yaml
+kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.18.0/operator.yaml
 ```
 
-*Note that the above command deploys the version `v1.3.1` of the Operator.
+*Note that the above command deploys the version `v1.18.0` of the Operator.
 You can check if there are new versions [here](https://github.com/knative/operator/releases).*
 
 Once the Operator has been successfully deployed, you can install the Knative
@@ -162,7 +229,7 @@ metadata:
   name: knative-serving
   namespace: knative-serving
 spec:
-  version: 1.3.0
+  version: 1.18.0
   ingress:
     kourier:
       enabled: true
@@ -228,3 +295,14 @@ flag to disable verification of the self-signed certificates:
 ```sh
 oscar-cli cluster add oscar-cluster https://localhost oscar <OSCAR_PASSWORD> --disable-ssl
 ```
+
+
+## Testing the OSCAR cluster
+
+We suggest you follow the instructions for the [simple-test](https://github.com/grycap/oscar/tree/master/examples/simple-test) example.
+
+## Limitations
+
+Please note that the local deployment has several limitations in terms of functionality, which includes:
+
+- Inaccurate information obtained via `/status`

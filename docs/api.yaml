@@ -356,6 +356,158 @@ paths:
               type: string
               format: binary
         description: Event
+  /system/buckets:
+    get:
+      summary: List buckets
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Buckets'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+      operationId: ListBuckets
+      description: List all buckets visible for the user
+      security:
+        - basicAuth: []
+        - token: []
+      tags:
+        - buckets
+    post:
+      summary: Create bucket
+      operationId: CreateBucket
+      responses:
+        '201':
+          description: Bucket created
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+      description: Create a independent bucket
+      security:
+        - basicAuth: []
+        - token: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Buckets'
+      tags:
+        - buckets        
+    put:
+      summary: Update bucket
+      operationId: UpdateBucket
+      responses:
+        '204':
+          description: Bucket updated
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      description: Update a specific bucket
+      security:
+        - basicAuth: []
+        - token: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Buckets'
+      tags:
+        - buckets
+  '/system/buckets/{bucket}':
+    parameters:
+      - schema:
+          type: string
+        name: bucket
+        in: path
+        required: true
+    delete:
+      summary: Delete bucket
+      operationId: DeleteBucket
+      responses:
+        '204':
+          description: Bucket deleted
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      description: Delete a scpecific bucket
+      security:
+        - basicAuth: []
+        - token: []
+      tags:
+        - buckets
+  '/system/buckets/{bucket}/presign':
+    parameters:
+      - schema:
+          type: string
+        name: bucket
+        in: path
+        required: true
+    post:
+      summary: Generate presigned object URL
+      operationId: PresignBucketObject
+      description: Create a short-lived MinIO presigned URL to upload or download an object within the bucket.
+      tags:
+        - buckets
+      security:
+        - basicAuth: []
+        - token: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BucketPresignRequest'
+      responses:
+        '200':
+          description: Presigned URL generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BucketPresignResponse'
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+  /status:
+    get:
+      summary: Your GET endpoint
+      tags:
+        - status
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+      operationId: Status
+      description: Get cluster status
+      security:
+        - basicAuth: []
+        - token: []
 components:
   schemas:
     Service:
@@ -530,6 +682,80 @@ components:
                   type: string
                 password:
                   type: string
+    Buckets:
+      title: Buckets
+      type: object
+      properties:
+        bucket_path:
+          type: string
+        visibility:
+          type: string
+        allowed_users:
+          type: array
+          items:
+            type: string
+        owner:
+          type: string
+        metadata:
+          type: object
+          properties:
+            owner:
+              type: string
+            service:
+              type: boolean
+    BucketPresignRequest:
+      title: BucketPresignRequest
+      type: object
+      properties:
+        object_key:
+          type: string
+        operation:
+          type: string
+          enum:
+            - upload
+            - download
+        expires_in:
+          type: integer
+          format: int64
+          description: Requested expiration time in seconds for the presigned URL.
+        content_type:
+          type: string
+        extra_headers:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+        - object_key
+        - operation
+    BucketPresignResponse:
+      title: BucketPresignResponse
+      type: object
+      properties:
+        object_key:
+          type: string
+        operation:
+          type: string
+          enum:
+            - upload
+            - download
+        method:
+          type: string
+        url:
+          type: string
+          format: uri
+        expires_at:
+          type: string
+          format: date-time
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+        - object_key
+        - operation
+        - method
+        - url
+        - expires_at
     Clusters:
       title: Clusters
       type: object
@@ -626,6 +852,7 @@ tags:
   - name: async
   - name: info
   - name: health
+  - name: buckets
 servers:
   - url: 'https://localhost'
     description: 'Local testing'

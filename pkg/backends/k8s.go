@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
+	"github.com/grycap/oscar/v3/pkg/backends/resources"
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
 	"github.com/grycap/oscar/v3/pkg/types"
 	v1 "k8s.io/api/core/v1"
@@ -123,7 +124,7 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 
 	//Create an expose service
 	if service.Expose.APIPort != 0 {
-		err = types.CreateExpose(service, k.kubeClientset, k.config)
+		err = resources.CreateExpose(service, k.kubeClientset, k.config)
 		if err != nil {
 			return err
 		}
@@ -210,7 +211,7 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 
 	// If the service is exposed update its configuration
 	if service.Expose.APIPort != 0 {
-		err = types.UpdateExpose(service, k.kubeClientset, k.config)
+		err = resources.UpdateExpose(service, k.kubeClientset, k.config)
 		if err != nil {
 			return err
 		}
@@ -246,7 +247,7 @@ func (k *KubeBackend) DeleteService(service types.Service) error {
 
 	// If service is exposed delete the exposed k8s components
 	if service.Expose.APIPort != 0 {
-		if err := types.DeleteExpose(name, k.kubeClientset, k.config); err != nil {
+		if err := resources.DeleteExpose(name, k.kubeClientset, k.config); err != nil {
 			log.Printf("Error deleting all associated kubernetes component of the expose config \"%s\": %v\n", name, err)
 		}
 	}
@@ -292,9 +293,7 @@ func checkAdditionalConfig(configName string, configNamespace string, service ty
 
 	return nil
 }
-func Test() {
 
-}
 func createServiceConfigMap(service *types.Service, namespace string, kubeClientset kubernetes.Interface) error {
 	// Copy script from service
 	script := service.Script

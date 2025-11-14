@@ -2,21 +2,25 @@
 
 Each OSCAR cluster includes a deployed MinIO instance, which is used to trigger service executions. When a service is configured to use MinIO as its storage provider, it monitors a specified input folder for new data. Whenever new data is added to this folder, it triggers the associated service to execute. 
 
+Additionally, OSCAR allows direct operations on the MinIO instance—such as creating, updating, and deleting buckets—that are independent of any specific service but still governed by the same visibility rules as services.
+
 ## Using graphical interfaces
 
-These folders can be accessed via both the OSCAR Dashboard and the MinIO console UI.
-
-- **Using OSCAR-Dashboard**: The following image highlights the section where MinIO buckets are accessible. Users can view a list of available buckets and perform operations such as uploading and deleting files.
+- **Using OSCAR-Dashboard**: The following image highlights the section where MinIO buckets are accessible. In this section, users can view a list of buckets visible to them, including both service-associated and standalone buckets. They can also perform actions such as creating folders and uploading files.
   
-![minio-buckets](images/bucket-list.png)
+![minio-buckets](images/usage/minio/bucket-list.png)
+
+As shown in the image below, this section allows users to create individual buckets and define the desired visibility policy for each bucket.
+
+![create-buckets](images/usage/minio/create_bucket.png)
 
 - **Using the MinIO Console UI**: Access details for this interface are available in the "Info" tab within the OSCAR Dashboard. This tab provides the MinIO console endpoint and the necessary credentials to log in, where the *Access Key* serves as the username, and the *Secret Key* functions as the password.
 
 ![oscar-info](images/oscar-info.png)
 
-Finally, the following image provides an overview of the MinIO login panel and the "Object Browser" tab. Once logged in, the "Object Browser" tab allows users to navigate their available buckets, view stored objects, and perform various operations such as uploading, downloading, or deleting files.
+Finally, the following image provides an overview of the MinIO login panel and the "Object Browser" tab. Once logged in, the "Object Browser" tab allows users to navigate their available buckets, view stored objects, and perform various operations such as uploading, downloading, or deleting files. However, users do not have permission to create buckets directly from this interface, as each bucket requires specific policies to define its visibility.
 
-![oscar-info](images/minio-ui.png)
+![oscar-info](images/usage/minio/minio-ui.png)
 
 Further information about the MinIO Console avaliable on [MinIO Console documentation](https://min.io/docs/minio/linux/administration/minio-console.html).
 

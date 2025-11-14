@@ -19,10 +19,12 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
@@ -48,24 +50,26 @@ func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 
-			var isAllowed bool
-			if len(service.AllowedUsers) == 0 || service.Owner == uid {
-				isAllowed = true
-			} else {
-				for _, id := range service.AllowedUsers {
-					if uid == id {
-						isAllowed = true
-						break
-					}
+			switch service.Visibility {
+			case utils.PUBLIC:
+				c.JSON(http.StatusOK, service)
+				return
+			case utils.PRIVATE:
+				if service.Owner == uid {
+					c.JSON(http.StatusOK, service)
+					return
 				}
-			}
-
-			if !isAllowed {
+			case utils.RESTRICTED:
+				if service.Owner == uid || slices.Contains(service.AllowedUsers, uid) {
+					c.JSON(http.StatusOK, service)
+					return
+				}
+			default:
 				c.String(http.StatusForbidden, "User %s doesn't have permision to get this service", uid)
 				return
 			}
+		} else {
+			c.JSON(http.StatusOK, service)
 		}
-
-		c.JSON(http.StatusOK, service)
 	}
 }

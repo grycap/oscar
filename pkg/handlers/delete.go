@@ -42,11 +42,14 @@ var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
 func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// First get the Service
-		service, _ := back.ReadService(c.Param("serviceName"))
+		var service *types.Service
+		var uid string
+		var err error
+		service, _ = back.ReadService(c.Param("serviceName"))
 		authHeader := c.GetHeader("Authorization")
 
 		if len(strings.Split(authHeader, "Bearer")) > 1 {
-			uid, err := auth.GetUIDFromContext(c)
+			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
@@ -56,9 +59,8 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				return
 			}
 		}
-		secretName := service.Name + "-" + types.GenerateDeterministicString(service.Name)
-		if utils.SecretExists(secretName, cfg.ServicesNamespace, back.GetKubeClientset()) {
-			secretsErr := utils.DeleteSecret(secretName, cfg.ServicesNamespace, back.GetKubeClientset())
+		if utils.SecretExists(service.Name, cfg.ServicesNamespace, back.GetKubeClientset()) {
+			secretsErr := utils.DeleteSecret(service.Name, cfg.ServicesNamespace, back.GetKubeClientset())
 			if secretsErr != nil {
 				c.String(http.StatusInternalServerError, "Error deleting asociated secret: %v", secretsErr)
 			}
@@ -82,7 +84,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			// Split buckets and folders from path
 			bucket := strings.SplitN(path, "/", 2)
 			var users []string
-			err = minIOAdminClient.UpdateUsersInGroup(users, bucket[0], true)
+			err = minIOAdminClient.CreateAddGroup(bucket[0], users, true)
 			if err != nil {
 				log.Printf("error updating MinIO users in group: %v", err)
 			}
@@ -97,6 +99,15 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		err = deleteBuckets(service, cfg, minIOAdminClient)
 		if err != nil && !strings.Contains(err.Error(), allUserGroupNotExist) {
 			c.String(http.StatusInternalServerError, "Error deleting service buckets: ", err)
+		}
+
+		if len(service.BucketList) > 0 && strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser {
+			for i, b := range service.BucketList {
+				err = minIOAdminClient.RemoveResource(b, service.AllowedUsers[i], false)
+				if err != nil {
+					c.String(http.StatusInternalServerError, "error while removing isolated bucket %v", err)
+				}
+			}
 		}
 
 		// Add Yunikorn queue if enabled
@@ -128,12 +139,12 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		provID, provName = getProviderInfo(in.Provider)
 
 		// Only allow input from MinIO and dCache
-		if provName != types.MinIOName && provName != types.WebDavName {
+		if provName != types.MinIOName && provName != types.WebDavName && provName != types.RucioName {
 			return errInput
 		}
 
 		// If the provider is WebDav (dCache) skip bucket creation
-		if provName == types.WebDavName {
+		if provName == types.WebDavName || provName == types.RucioName {
 			continue
 		}
 
@@ -156,44 +167,31 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
 
-		// Delete policies from bucket
-		if len(service.AllowedUsers) == 0 {
-			deleteLogger.Println("Deleting public service bucket")
-			// Remove bucket resource from all users policy
-
-			err := minIOAdminClient.RemoveFromPolicy(splitPath[0], ALL_USERS_GROUP, true)
-			if err != nil {
-				return fmt.Errorf("unable to remove bucket from policy %q, %v", ALL_USERS_GROUP, err)
-			}
-		} else {
-			// Empty users group
-			err := minIOAdminClient.UpdateUsersInGroup(service.AllowedUsers, splitPath[0], true)
-			if err != nil {
-				return fmt.Errorf("unable to delete users from group %q, %v", splitPath[0], err)
-			}
-			// Delete group
-			err = minIOAdminClient.UpdateUsersInGroup([]string{}, splitPath[0], true)
-			if err != nil {
-				return fmt.Errorf("unable delete group %q, %v", splitPath[0], err)
-			}
-			// Remove policy
-			err = minIOAdminClient.RemoveFromPolicy(splitPath[0], splitPath[0], true)
-			if err != nil {
-				return fmt.Errorf("unable to remove bucket from policy %q, %v", splitPath[0], err)
-			}
-			// Delete user's buckets if isolated spaces had been created
-			if strings.ToUpper(service.IsolationLevel) == "USER" && len(service.BucketList) > 0 {
-				// Delete all private buckets
-				err = deletePrivateBuckets(service, minIOAdminClient, s3Client)
-				if err != nil {
-					return fmt.Errorf("error while disable the input notification")
-				}
-			}
-		}
-
 		// Disable input notifications for service bucket
 		if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), splitPath[0]); err != nil {
 			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
+		}
+		// Check if the bucket is in the mount path
+		if !sameStorage(in, service.Mount) {
+			err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+				BucketName:   splitPath[0],
+				Visibility:   service.Visibility,
+				AllowedUsers: service.AllowedUsers,
+				Owner:        service.Owner,
+			})
+
+			if err != nil {
+				return fmt.Errorf("error while removing MinIO bucket %v", err)
+			}
+		} else {
+			// Bucket metadata for filtering
+			tags := map[string]string{
+				"owner":   service.Owner,
+				"service": "false",
+			}
+			if err := minIOAdminClient.SetTags(splitPath[0], tags); err != nil {
+				return fmt.Errorf("Error tagging bucket: %v", err)
+			}
 		}
 
 	}
@@ -201,47 +199,120 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	// Delete output buckets
 	for _, out := range service.Output {
 		provID, provName = getProviderInfo(out.Provider)
+
+		// If the provider is WebDav (dCache) skip bucket creation
+		if provName == types.WebDavName || provName == types.RucioName {
+			continue
+		}
+
 		// Check if the provider identifier is defined in StorageProviders
 		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
-			// TODO fix
-			err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), "")
-			if err != nil {
-				return fmt.Errorf("error while disable the input notification")
-			}
 			return fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
 		}
 
 		switch provName {
 		case types.MinIOName, types.S3Name:
-			// needed ?
+			//Check if this storage provider is defined in input
+			previousExist := false
+			outPath := strings.Trim(out.Path, " /")
+			outBucket := strings.SplitN(outPath, "/", 2)[0]
+			//Compare this output storage provider with all the input storage provider
+			for _, in := range service.Input {
+				//Don't compare in.Provider with out.Provider directly
+				inProvID, inProvName := getProviderInfo(in.Provider)
+				inPath := strings.Trim(in.Path, " /")
+				inBucket := strings.SplitN(inPath, "/", 2)[0]
+
+				if inProvID == provID && inProvName == provName && inBucket == outBucket {
+					previousExist = true
+				}
+			}
+			//Its is not defined in input -> delete.
+			if !previousExist {
+				s3Client = cfg.MinIOProvider.GetS3Client()
+
+				// Disable input notifications for service bucket
+				if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), outBucket); err != nil {
+					log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
+				}
+				if !sameStorage(out, service.Mount) {
+					err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+						BucketName:   outBucket,
+						Visibility:   service.Visibility,
+						AllowedUsers: service.AllowedUsers,
+						Owner:        service.Owner,
+					})
+					if err != nil {
+						return fmt.Errorf("error while removing MinIO bucket %v", err)
+					}
+				} else {
+					// Bucket metadata for filtering
+					tags := map[string]string{
+						"owner":   service.Owner,
+						"service": "false",
+					}
+					if err := minIOAdminClient.SetTags(outBucket, tags); err != nil {
+						return fmt.Errorf("Error tagging bucket: %v", err)
+					}
+				}
+
+			}
 
 		case types.OnedataName:
 			// TODO
 		}
 	}
-	// TODO check if some components of mount need to be deleted
+	// Delete isolated buckets
+	if strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser && len(service.BucketList) != 0 {
+		for _, bucket := range service.BucketList {
 
+			// Disable input notifications for service bucket
+			if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), bucket); err != nil {
+				log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
+			}
+
+			err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+				BucketName:   bucket,
+				Visibility:   utils.PRIVATE,
+				AllowedUsers: []string{},
+				Owner:        service.Owner,
+			})
+			if err != nil {
+				log.Printf("error while removing MinIO bucket %v", err)
+			}
+		}
+	}
+
+	// TODO check if some components of mount need to be deleted
 	return nil
 }
 
-func deletePrivateBuckets(service *types.Service, minIOAdminClient *utils.MinIOAdminClient, s3Client *s3.S3) error {
-	for i, b := range service.BucketList {
-		// Disable input notifications for user bucket
-		if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), b); err != nil {
-			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
-		}
-		//Delete bucket and unset the associated policy
-		err := minIOAdminClient.EmptyPolicy(service.AllowedUsers[i], false)
+func DeleteMinIOBuckets(s3Client *s3.S3, minIOAdminClient *utils.MinIOAdminClient, bucket utils.MinIOBucket) error {
+	var policyName string
+	var isGroup bool
+	if strings.ToLower(bucket.Visibility) == utils.PUBLIC {
+		policyName = ALL_USERS_GROUP
+		isGroup = true
+	} else {
+		policyName = bucket.Owner
+	}
+	if bucket.Owner != types.DefaultOwner {
+		err := minIOAdminClient.RemoveResource(bucket.BucketName, policyName, isGroup)
 		if err != nil {
-			fmt.Println(err)
+			return fmt.Errorf("error removing resource")
 		}
-		err = minIOAdminClient.RemoveFromPolicy(b, service.AllowedUsers[i], false)
-		if err != nil {
-			return fmt.Errorf("unable to remove bucket from policy %q, %v", b, err)
+
+		if strings.ToLower(bucket.Visibility) == utils.RESTRICTED {
+			err := minIOAdminClient.RemoveGroupPolicy(bucket.BucketName)
+			if err != nil {
+				return fmt.Errorf("error removing policy for group")
+			}
 		}
-		/*if err := minIOAdminClient.DeleteBucket(s3Client, b, service.AllowedUsers[i]); err != nil {
-			return fmt.Errorf("unable to delete bucket %q, %v", b, err)
-		}*/
+	}
+
+	err := minIOAdminClient.DeleteBucket(s3Client, bucket.BucketName)
+	if err != nil {
+		return fmt.Errorf("error deleting bucket %s, %v", bucket.BucketName, err)
 	}
 	return nil
 }
@@ -281,4 +352,17 @@ func disableInputNotifications(s3Client *s3.S3, arnStr string, bucket string) er
 	}
 
 	return nil
+}
+
+func sameStorage(firstStorage types.StorageIOConfig, secondStorage types.StorageIOConfig) bool {
+	// Check if the bucket is in the mount path
+	firstProvID, firstProvName := getProviderInfo(firstStorage.Provider)
+	secondProvID, secondProvName := getProviderInfo(secondStorage.Provider)
+	firstPath := strings.Trim(firstStorage.Path, " /")
+	secondPath := strings.Trim(secondStorage.Path, " /")
+	// Split buckets and folders from path
+	splitPathBucket := strings.SplitN(firstPath, "/", 2)
+	splitPathMount := strings.SplitN(secondPath, "/", 2)
+
+	return firstProvID == secondProvID && firstProvName == secondProvName && splitPathBucket[0] == splitPathMount[0]
 }

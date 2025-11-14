@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/grycap/oscar/v3/pkg/testsupport"
 	"time"
 
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -101,6 +103,8 @@ func TestGetScalableFunctions(t *testing.T) {
 }
 
 func TestScaleToZero(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
 	kubeClientset := fake.NewSimpleClientset()
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
 	}))
@@ -117,6 +121,8 @@ func TestScaleToZero(t *testing.T) {
 }
 
 func TestIsIdle(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
 		if hreq.URL.Path == "/api/v1/query" {
 			rw.Write([]byte(`{"status":"success","data":{"resultType":"vector","result":[{"metric":{},"value":[1620810000,"0"]}]},"error":null}`))
@@ -135,6 +141,8 @@ func TestIsIdle(t *testing.T) {
 }
 
 func TestStart(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "basic-auth",

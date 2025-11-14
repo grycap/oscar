@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/grycap/oscar/v3/pkg/testsupport"
 	"github.com/grycap/oscar/v3/pkg/types"
 )
 
@@ -58,6 +59,8 @@ func createMinIOConfig() (types.Config, *httptest.Server) {
 }
 
 func TestCreateMinIOUser(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
 	// Create a fake MinIO server
 	cfg, server := createMinIOConfig()
 
@@ -77,42 +80,14 @@ func TestCreateMinIOUser(t *testing.T) {
 	defer server.Close()
 }
 
-func TestPublicToPrivateBucket(t *testing.T) {
-	// Create a fake MinIO server
-	cfg, server := createMinIOConfig()
-
-	client, _ := MakeMinIOAdminClient(&cfg)
-	err := client.PublicToPrivateBucket("testbucket", []string{"testuser"})
-
-	if err != nil {
-		t.Errorf("Error creating MinIO user: %v", err)
-	}
-
-	// Close the fake MinIO server
-	defer server.Close()
-}
-
 func TestCreateServiceGroup(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
 	// Create a fake MinIO server
 	cfg, server := createMinIOConfig()
 
 	client, _ := MakeMinIOAdminClient(&cfg)
-	err := client.CreateServiceGroup("bucket")
-
-	if err != nil {
-		t.Errorf("Error creating MinIO user: %v", err)
-	}
-
-	// Close the fake MinIO server
-	defer server.Close()
-}
-
-func TestPrivateToPublicBucket(t *testing.T) {
-	// Create a fake MinIO server
-	cfg, server := createMinIOConfig()
-
-	client, _ := MakeMinIOAdminClient(&cfg)
-	err := client.PrivateToPublicBucket([]string{}, "testbucket")
+	err := client.CreateAddGroup("bucket", []string{}, false)
 
 	if err != nil {
 		t.Errorf("Error creating MinIO user: %v", err)

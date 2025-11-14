@@ -1,14 +1,14 @@
 functions:
   oscar:
   - oscar-cluster:
-     name: nginx
+     name: nginx2
      memory: 2Gi
      cpu: '1.0'
      image: nginx
      script: nginxscript.sh
      expose:
-      min_scale: 2 
+      min_scale: 1
       max_scale: 10 
       api_port: 80  
       cpu_threshold: 50 
-      default_command: true
+      default_command: false

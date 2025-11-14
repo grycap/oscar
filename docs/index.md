@@ -73,7 +73,7 @@ As external storage providers, the following services can be used:
     quantities.
 
 ***Note**: All of the mentioned storage providers can be used as output, but
-only MinIO can be used as input.*
+only MinIO can be used as input. Amazon S3 and dCache  need [DCNiOS](https://intertwin-eu.github.io/dcnios/) as output.*
 
 
 An OSCAR cluster can be easily deployed via the [IM Dashboard](http://im.egi.eu)
