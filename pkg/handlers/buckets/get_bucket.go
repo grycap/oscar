@@ -143,12 +143,3 @@ type bucketListResponse struct {
 	IsTruncated   bool   `json:"is_truncated"`
 	ReturnedItems int    `json:"returned_items"`
 }
-
-func userInList(user string, users []string) bool {
-	for _, u := range users {
-		if u == user {
-			return true
-		}
-	}
-	return false
-}
