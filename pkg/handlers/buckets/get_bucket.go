@@ -71,9 +71,6 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 		}
 
 		visibility := adminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: ownerCandidate})
-		if visibility == "" {
-			visibility = utils.PRIVATE
-		}
 
 		var allowedUsers []string
 		if visibility == utils.RESTRICTED {
@@ -84,11 +81,9 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 		}
 
-		if !isAdmin {
-			if !adminClient.ResourceInPolicy(requester, bucketName) {
-				c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", requester))
-				return
-			}
+		if !isAdmin && visibility == "" {
+			c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", requester))
+			return
 		}
 
 		pageToken := c.DefaultQuery("page", "")
@@ -120,7 +115,6 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 			allObjects = append(allObjects, singleObject)
 			returnedItemCount++
-			//latestObject = k.Key
 		}
 
 		response := bucketListResponse{
