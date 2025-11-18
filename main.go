@@ -44,8 +44,6 @@ import (
 	"github.com/grycap/oscar/v3/pkg/resourcemanager"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	versioned "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
