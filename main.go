@@ -37,7 +37,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	docs "github.com/grycap/oscar/v3/pkg/apidocs"
 	"github.com/grycap/oscar/v3/pkg/backends"
 	"github.com/grycap/oscar/v3/pkg/handlers"
 	"github.com/grycap/oscar/v3/pkg/handlers/buckets"
@@ -50,11 +49,6 @@ import (
 )
 
 func main() {
-	docs.SwaggerInfo.Title = "OSCAR API"
-	docs.SwaggerInfo.Version = "v2.0.0"
-	docs.SwaggerInfo.Description = "Secure REST API to manage OSCAR services, storage, invocations and monitoring."
-	docs.SwaggerInfo.BasePath = "/"
-
 	// Read configuration from the environment
 	cfg, err := types.ReadConfig()
 	if err != nil {
