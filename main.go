@@ -25,6 +25,7 @@ limitations under the License.
 // @schemes https http
 // @securityDefinitions.basic BasicAuth
 // @securityDefinitions.apikey BearerAuth
+// @description OIDC Bearer token (e.g. Authorization: Bearer <token>)
 // @in header
 // @name Authorization
 
@@ -105,8 +106,8 @@ func main() {
 	// Create the router
 	r := gin.Default()
 
-	// Swagger UI endpoint
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	// Swagger UI endpoint (disabled in production)
+	// r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Define system group with basic auth middleware
 	system := r.Group("/system", auth.GetAuthMiddleware(cfg, kubeClientset))
