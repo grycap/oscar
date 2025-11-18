@@ -32,7 +32,19 @@ import (
 
 var updateLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
 
-// MakeDeleteHandler makes a handler for deleting services
+// MakeUpdateHandler godoc
+// @Summary Update bucket
+// @Description Change bucket visibility or allowed users.
+// @Tags buckets
+// @Accept json
+// @Param bucket body utils.MinIOBucket true "Bucket definition"
+// @Success 204 {string} string "No Content"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 403 {string} string "Forbidden"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/buckets [put]
 func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var uid string

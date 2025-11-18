@@ -1,3 +1,5 @@
+//go:generate swag init --parseDependency --parseInternal --generalInfo main.go --output pkg/apidocs
+
 /*
 Copyright (C) GRyCAP - I3M - UPV
 
@@ -14,6 +16,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// @title OSCAR API
+// @version v2.0.0
+// @description Secure REST API to manage OSCAR services, storage and executions.
+// @contact.name GRyCAP
+// @contact.email products@grycap.upv.es
+// @BasePath /
+// @schemes https http
+// @securityDefinitions.basic BasicAuth
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+
 package main
 
 import (
@@ -22,18 +36,26 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	docs "github.com/grycap/oscar/v3/pkg/apidocs"
 	"github.com/grycap/oscar/v3/pkg/backends"
 	"github.com/grycap/oscar/v3/pkg/handlers"
 	"github.com/grycap/oscar/v3/pkg/handlers/buckets"
 	"github.com/grycap/oscar/v3/pkg/resourcemanager"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	versioned "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
 func main() {
+	docs.SwaggerInfo.Title = "OSCAR API"
+	docs.SwaggerInfo.Version = "v2.0.0"
+	docs.SwaggerInfo.Description = "Secure REST API to manage OSCAR services, storage, invocations and monitoring."
+	docs.SwaggerInfo.BasePath = "/"
+
 	// Read configuration from the environment
 	cfg, err := types.ReadConfig()
 	if err != nil {
@@ -82,6 +104,9 @@ func main() {
 
 	// Create the router
 	r := gin.Default()
+
+	// Swagger UI endpoint
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Define system group with basic auth middleware
 	system := r.Group("/system", auth.GetAuthMiddleware(cfg, kubeClientset))

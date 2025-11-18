@@ -40,7 +40,19 @@ const (
 var createLogger = log.New(os.Stdout, "[CREATE-BUCKETS-HANDLER] ", log.Flags())
 var isAdminUser = false
 
-// MakeCreateHandler makes a handler for creating services
+// MakeCreateHandler godoc
+// @Summary Create bucket
+// @Description Create a user MinIO bucket with the desired visibility.
+// @Tags buckets
+// @Accept json
+// @Param bucket body utils.MinIOBucket true "Bucket definition"
+// @Success 201 {string} string "Created"
+// @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/buckets [post]
 func MakeCreateHandler(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var uid string

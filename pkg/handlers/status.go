@@ -146,7 +146,17 @@ func contains(s, substr string) bool {
 	return strings.Contains(s, substr)
 }
 
-// MakeStatusHandler Status handler for kubernetes deployment.
+// MakeStatusHandler godoc
+// @Summary Get status
+// @Description Retrieve cluster, OSCAR deployment and MinIO status data.
+// @Tags status
+// @Produce json
+// @Success 200 {object} handlers.NewStatusInfo
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/status [get]
 func MakeStatusHandler(cfg *types.Config, kubeClientset kubernetes.Interface, metricsClientset versioned.MetricsV1beta1Interface) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")

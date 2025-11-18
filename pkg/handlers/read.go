@@ -29,7 +29,19 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
-// MakeReadHandler makes a handler for reading a service
+// MakeReadHandler godoc
+// @Summary Read service
+// @Description Get details of a specific service.
+// @Tags services
+// @Produce json
+// @Param serviceName path string true "Service name"
+// @Success 200 {object} types.Service
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/services/{serviceName} [get]
 func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		service, err := back.ReadService(c.Param("serviceName"))

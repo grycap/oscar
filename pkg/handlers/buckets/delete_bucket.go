@@ -34,7 +34,21 @@ import (
 var ALL_USERS_GROUP = "all_users_group"
 var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
 
-// MakeDeleteHandler makes a handler for deleting services
+// MakeDeleteHandler godoc
+// @Summary Delete bucket
+// @Description Delete a MinIO bucket owned by the authenticated user.
+// @Tags buckets
+// @Produce json
+// @Param bucket path string true "Bucket name"
+// @Success 204 {string} string "No Content"
+// @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 403 {string} string "Forbidden"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/buckets/{bucket} [delete]
 func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var uid string

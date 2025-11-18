@@ -28,7 +28,21 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 )
 
-// MakeGetHandler makes a handler that returns bucket information including stored objects.
+// MakeGetHandler godoc
+// @Summary Get bucket details
+// @Description Retrieve metadata and objects for a specific bucket.
+// @Tags buckets
+// @Produce json
+// @Param bucket path string true "Bucket name"
+// @Param page query string false "Continuation token"
+// @Success 200 {object} buckets.BucketListResponse
+// @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 403 {string} string "Forbidden"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/buckets/{bucket} [get]
 func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		bucketName := strings.TrimSpace(c.Param("bucket"))
@@ -117,7 +131,7 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			returnedItemCount++
 		}
 
-		response := bucketListResponse{
+		response := BucketListResponse{
 			MinIOBucket: utils.MinIOBucket{
 				BucketName:   bucketName,
 				Visibility:   visibility,
@@ -137,7 +151,7 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 	}
 }
 
-type bucketListResponse struct {
+type BucketListResponse struct {
 	utils.MinIOBucket
 	NextPage      string `json:"next_page,omitempty"`
 	IsTruncated   bool   `json:"is_truncated"`
