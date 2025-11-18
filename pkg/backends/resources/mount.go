@@ -24,6 +24,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+var (
+	// Don't restart jobs in order to keep logs
+	restartPolicy = v1.ContainerRestartPolicyAlways
+)
+
 const (
 	rcloneContainerName  = "rclone-container"
 	rcloneContainerImage = "rclone/rclone"
@@ -53,7 +58,9 @@ done`
 
 // SetMount Creates the sidecar container that mounts the source volume onto the pod volume
 func SetMount(podSpec *v1.PodSpec, service types.Service, cfg *types.Config) {
-	podSpec.Containers = append(podSpec.Containers, sidecarPodSpec(service, cfg))
+	//podSpec.Containers = append(podSpec.Containers, sidecarPodSpec(service, cfg))
+	podSpec.InitContainers = append(podSpec.InitContainers, sidecarPodSpec(service, cfg))
+
 	addVolume(podSpec)
 }
 
@@ -102,6 +109,7 @@ func sidecarPodSpec(service types.Service, cfg *types.Config) v1.Container {
 				ContainerPort: 9000,
 			},
 		},
+		RestartPolicy:   &restartPolicy,
 		SecurityContext: &v1.SecurityContext{Privileged: ptr},
 		Env: []v1.EnvVar{
 			{
@@ -125,6 +133,9 @@ func sidecarPodSpec(service types.Service, cfg *types.Config) v1.Container {
 
 	provider := strings.Split(service.Mount.Provider, ".")
 	if provider[0] == types.MinIOName {
+		if len(provider) == 1 {
+			provider = append(provider, types.DefaultProvider)
+		}
 		MinIOEnvVars := setMinIOEnvVars(service, provider[1], cfg)
 		container.Env = append(container.Env, MinIOEnvVars...)
 		container.Args = []string{"-c", minioCommand + communCommand}
