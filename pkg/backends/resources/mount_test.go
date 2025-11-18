@@ -23,7 +23,26 @@ import (
 )
 
 func TestSetMount(t *testing.T) {
-	podSpec := &v1.PodSpec{}
+	podSpec := &v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name:  rcloneContainerName,
+				Image: rcloneContainerImage,
+				Env:   []v1.EnvVar{},
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      rcloneVolumeName,
+						MountPath: rcloneFolderMount,
+					},
+					{
+						Name:      ephemeralVolumeName,
+						MountPath: ephemeralVolumeMount,
+					},
+				},
+			},
+		},
+		Volumes: []v1.Volume{},
+	}
 	service := types.Service{
 		Mount: types.StorageIOConfig{
 			Provider: "minio.provider",
