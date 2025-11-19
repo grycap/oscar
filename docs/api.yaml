@@ -138,6 +138,11 @@ paths:
         name: serviceName
         in: path
         required: true
+      - in: query
+        name: page
+        schema:
+          type: string
+        description: Continuation token returned by a previous request.
     get:
       summary: List jobs
       tags:
@@ -148,11 +153,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  jobName:
-                    allOf:
-                      - $ref: '#/components/schemas/JobInfo'
+                $ref: '#/components/schemas/JobsResponse'
         '401':
           description: Unauthorized
         '404':
@@ -300,15 +301,17 @@ paths:
       description: Invoke a service asynchronously (create kubernetes job)
       requestBody:
         content:
-          application/json:
+          application/octet-stream:
             schema:
               type: string
               format: binary
-            examples: {}
-        description: Event
+          application/json:
+            schema:
+              type: string
+        description: Event payload forwarded to the service
   /system/config:
     get:
-      summary: Your GET endpoint
+      summary: Get OSCAR configuration
       tags:
         - config
       responses:
@@ -317,9 +320,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Config'
+                $ref: '#/components/schemas/ConfigForUser'
         '401':
-          description: ''
+          description: Unauthorized
         '500':
           description: Internal Server Error
       operationId: GetConfig
@@ -339,6 +342,10 @@ paths:
       responses:
         '200':
           description: OK
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
         '404':
           description: Not Found
         '500':
@@ -351,11 +358,14 @@ paths:
       description: Invoke a service synchronously (a Serverless backend is required)
       requestBody:
         content:
-          application/json:
+          application/octet-stream:
             schema:
               type: string
               format: binary
-        description: Event
+          application/json:
+            schema:
+              type: string
+        description: Event payload forwarded to the service
   /system/buckets:
     get:
       summary: List buckets
@@ -367,7 +377,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Buckets'
+                  $ref: '#/components/schemas/BucketSummary'
         '401':
           description: Unauthorized
         '500':
@@ -399,7 +409,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Buckets'
+              $ref: '#/components/schemas/BucketSummary'
       tags:
         - buckets        
     put:
@@ -424,7 +434,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Buckets'
+              $ref: '#/components/schemas/BucketSummary'
       tags:
         - buckets
   '/system/buckets/{bucket}':
@@ -434,6 +444,35 @@ paths:
         name: bucket
         in: path
         required: true
+      - in: query
+        name: page
+        schema:
+          type: string
+        description: Continuation token returned by a previous request.
+    get:
+      summary: Get bucket details
+      operationId: GetBucket
+      responses:
+        '200':
+          description: Bucket details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BucketDetails'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      description: Retrieve metadata and object listing for a specific bucket
+      security:
+        - basicAuth: []
+        - token: []
+      tags:
+        - buckets
     delete:
       summary: Delete bucket
       operationId: DeleteBucket
@@ -446,7 +485,7 @@ paths:
           description: Not Found
         '500':
           description: Internal Server Error
-      description: Delete a scpecific bucket
+      description: Delete a specific bucket
       security:
         - basicAuth: []
         - token: []
@@ -491,14 +530,18 @@ paths:
           description: Not Found
         '500':
           description: Internal Server Error
-  /status:
+  '/system/status':
     get:
-      summary: Your GET endpoint
+      summary: Get OSCAR and cluster status
       tags:
         - status
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusInfo'
         '401':
           description: Unauthorized
         '500':
@@ -522,53 +565,35 @@ components:
           type: string
         cpu:
           type: string
-        enable_gpu:
-          type: boolean
-          default: false
         total_memory:
           type: string
         total_cpu:
           type: string
+        enable_gpu:
+          type: boolean
+          default: false
+        enable_sgx:
+          type: boolean
+          default: false
+        image_prefetch:
+          type: boolean
+          default: false
         synchronous:
           type: object
           properties:
             min_scale:
               type: integer
-              default: 0
             max_scale:
               type: integer
-              default: 0
         replicas:
           type: array
           items:
-            type: object
-            properties:
-              type: 
-                type: string
-              cluster_id: 
-                type: string
-              service_name: 
-                type: string
-              url: 
-                type: string
-              ssl_verify: 
-                type: boolean
-                default: true
-              priority: 
-                type: integer
-                default: 0
-              headers:
-                type: object
-                additionalProperties:
-                  type: string
-                  properties:
-                    value:
-                      type: string
+            $ref: '#/components/schemas/Replica'
+        delegation:
+          type: string
+          description: Replica delegation mode (static, random, load-based)
         rescheduler_threshold:
-          type: string
-        token:
-          type: string
-          readOnly: true
+          type: integer
         log_level:
           type: string
         image:
@@ -576,35 +601,11 @@ components:
         alpine:
           type: boolean
           default: false
-        script:
+        token:
           type: string
-        isolation_level:
-          type: string
-        mount:
-          $ref: '#/components/schemas/StorageIOConfig'
-        image_pull_secrets: 
-          type: array
-          items: 
-            type: string
-        environment:
-          type: object
-          properties:
-            Variables:
-              type: object
-              additionalProperties:
-                type: string
-            Secrets:
-              type: object
-              additionalProperties:
-                type: string
-        annotations:
-          type: object
-          additionalProperties:
-            type: string
-        labels:
-          type: object
-          additionalProperties:
-            type: string
+          readOnly: true
+        file_stage_in:
+          type: boolean
         input:
           type: array
           items:
@@ -613,10 +614,52 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/StorageIOConfig'
+        script:
+          type: string
+        image_pull_secrets:
+          type: array
+          items:
+            type: string
+        expose:
+          $ref: '#/components/schemas/ExposeSettings'
+        environment:
+          $ref: '#/components/schemas/EnvironmentConfig'
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+        vo:
+          type: string
+        labels:
+          type: object
+          additionalProperties:
+            type: string
         storage_providers:
           $ref: '#/components/schemas/StorageProviders'
         clusters:
           $ref: '#/components/schemas/Clusters'
+        owner:
+          type: string
+        interlink_node_name:
+          type: string
+        visibility:
+          type: string
+          enum:
+            - private
+            - public
+            - restricted
+        allowed_users:
+          type: array
+          items:
+            type: string
+        isolation_level:
+          type: string
+        bucket_list:
+          type: array
+          items:
+            type: string
+        mount:
+          $ref: '#/components/schemas/StorageIOConfig'
       required:
         - name
         - image
@@ -643,50 +686,39 @@ components:
       properties:
         s3:
           type: object
-          properties:
-            id:
-              type: object
-              properties:
-                access_key:
-                  type: string
-                secret_key:
-                  type: string
-                region:
-                  type: string
+          additionalProperties:
+            $ref: '#/components/schemas/S3Provider'
         minio:
           type: object
-          properties:
-            id:
-              $ref: '#/components/schemas/MinIOProvider'
+          additionalProperties:
+            $ref: '#/components/schemas/MinIOProvider'
         onedata:
           type: object
-          properties:
-            id:
-              type: object
-              properties:
-                oneprovider_host:
-                  type: string
-                token:
-                  type: string
-                space:
-                  type: string
+          additionalProperties:
+            $ref: '#/components/schemas/OnedataProvider'
         webdav:
           type: object
-          properties:
-            id:
-              type: object
-              properties:
-                hostname:
-                  type: string
-                login:
-                  type: string
-                password:
-                  type: string
-    Buckets:
-      title: Buckets
+          additionalProperties:
+            $ref: '#/components/schemas/WebDavProvider'
+        rucio:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/RucioProvider'
+    S3Provider:
+      title: S3Provider
       type: object
       properties:
-        bucket_path:
+        access_key:
+          type: string
+        secret_key:
+          type: string
+        region:
+          type: string
+    BucketSummary:
+      title: BucketSummary
+      type: object
+      properties:
+        bucket_name:
           type: string
         visibility:
           type: string
@@ -698,11 +730,35 @@ components:
           type: string
         metadata:
           type: object
+          additionalProperties:
+            type: string
+    BucketDetails:
+      allOf:
+        - $ref: '#/components/schemas/BucketSummary'
+        - type: object
           properties:
-            owner:
+            objects:
+              type: array
+              items:
+                $ref: '#/components/schemas/BucketObject'
+            next_page:
               type: string
-            service:
+            is_truncated:
               type: boolean
+            returned_items:
+              type: integer
+    BucketObject:
+      title: BucketObject
+      type: object
+      properties:
+        object_name:
+          type: string
+        size_bytes:
+          type: integer
+          format: int64
+        last_modified:
+          type: string
+          format: date-time
     BucketPresignRequest:
       title: BucketPresignRequest
       type: object
@@ -759,18 +815,129 @@ components:
     Clusters:
       title: Clusters
       type: object
+      additionalProperties:
+        $ref: '#/components/schemas/Cluster'
+    Cluster:
+      title: Cluster
+      type: object
       properties:
-        id:
+        endpoint:
+          type: string
+        auth_user:
+          type: string
+        auth_password:
+          type: string
+        ssl_verify:
+          type: boolean
+    Replica:
+      title: Replica
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - oscar
+            - endpoint
+        cluster_id:
+          type: string
+        service_name:
+          type: string
+        url:
+          type: string
+          format: uri
+        ssl_verify:
+          type: boolean
+          default: true
+        priority:
+          type: integer
+          default: 0
+        headers:
           type: object
-          properties:
-            endpoint:
-              type: string
-            auth_user:
-              type: string
-            auth_password:
-              type: string
-            ssl_verify:
-              type: boolean
+          additionalProperties:
+            type: string
+    OnedataProvider:
+      title: OnedataProvider
+      type: object
+      properties:
+        oneprovider_host:
+          type: string
+        token:
+          type: string
+        space:
+          type: string
+    WebDavProvider:
+      title: WebDavProvider
+      type: object
+      properties:
+        hostname:
+          type: string
+        login:
+          type: string
+        password:
+          type: string
+    RucioProvider:
+      title: RucioProvider
+      type: object
+      properties:
+        host:
+          type: string
+        account:
+          type: string
+        rse:
+          type: string
+        refresh_token:
+          type: string
+        auth_host:
+          type: string
+        oidc_audience:
+          type: string
+        token_endpoint:
+          type: string
+    EnvironmentConfig:
+      title: EnvironmentConfig
+      type: object
+      properties:
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+        secrets:
+          type: object
+          additionalProperties:
+            type: string
+    ExposeSettings:
+      title: ExposeSettings
+      type: object
+      properties:
+        min_scale:
+          type: integer
+        max_scale:
+          type: integer
+        api_port:
+          type: integer
+        cpu_threshold:
+          type: integer
+        rewrite_target:
+          type: boolean
+        nodePort:
+          type: integer
+        default_command:
+          type: boolean
+        set_auth:
+          type: boolean
+    JobsResponse:
+      title: JobsResponse
+      type: object
+      properties:
+        jobs:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/JobInfo'
+        next_page:
+          type: string
+        remaining_jobs:
+          type: integer
+          format: int64
     JobInfo:
       title: JobInfo
       type: object
@@ -779,10 +946,13 @@ components:
           type: string
         creation_time:
           type: string
+          format: date-time
         start_time:
           type: string
+          format: date-time
         finish_time:
           type: string
+          format: date-time
     Info:
       title: Info
       type: object
@@ -802,17 +972,27 @@ components:
               type: string
             version:
               type: string
+    ConfigForUser:
+      title: ConfigForUser
+      type: object
+      properties:
+        config:
+          $ref: '#/components/schemas/Config'
+        minio_provider:
+          $ref: '#/components/schemas/MinIOProvider'
     Config:
       title: Config
       type: object
       properties:
-        minio_provider:
-          $ref: '#/components/schemas/MinIOProvider'
         name:
           type: string
         namespace:
           type: string
-        gpu_avaliable:
+        services_namespace:
+          type: string
+        gpu_available:
+          type: boolean
+        interLink_available:
           type: boolean
         serverless_backend:
           type: string
@@ -820,7 +1000,7 @@ components:
           type: boolean
         oidc_groups:
           type: array
-          items: 
+          items:
             type: string
     MinIOProvider:
       title: MinIOProvider
@@ -836,6 +1016,178 @@ components:
           type: string
         verify:
           type: boolean
+    StatusInfo:
+      title: StatusInfo
+      type: object
+      properties:
+        cluster:
+          $ref: '#/components/schemas/ClusterStatus'
+        oscar:
+          $ref: '#/components/schemas/OscarStatus'
+        minio:
+          $ref: '#/components/schemas/MinioStatus'
+    ClusterStatus:
+      title: ClusterStatus
+      type: object
+      properties:
+        nodes_count:
+          type: integer
+          format: int64
+        metrics:
+          $ref: '#/components/schemas/ClusterMetrics'
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/NodeDetail'
+    ClusterMetrics:
+      title: ClusterMetrics
+      type: object
+      properties:
+        cpu:
+          $ref: '#/components/schemas/CPUMetrics'
+        memory:
+          $ref: '#/components/schemas/MemoryMetrics'
+        gpu:
+          $ref: '#/components/schemas/GPUMetrics'
+    CPUMetrics:
+      title: CPUMetrics
+      type: object
+      properties:
+        total_free_cores:
+          type: integer
+          format: int64
+        max_free_on_node_cores:
+          type: integer
+          format: int64
+    MemoryMetrics:
+      title: MemoryMetrics
+      type: object
+      properties:
+        total_free_bytes:
+          type: integer
+          format: int64
+        max_free_on_node_bytes:
+          type: integer
+          format: int64
+    GPUMetrics:
+      title: GPUMetrics
+      type: object
+      properties:
+        total_gpu:
+          type: integer
+          format: int64
+    NodeDetail:
+      title: NodeDetail
+      type: object
+      properties:
+        name:
+          type: string
+        cpu:
+          $ref: '#/components/schemas/NodeResource'
+        memory:
+          $ref: '#/components/schemas/NodeResource'
+        gpu:
+          type: integer
+          format: int64
+        is_interlink:
+          type: boolean
+        status:
+          type: string
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/NodeCondition'
+    NodeResource:
+      title: NodeResource
+      type: object
+      properties:
+        capacity_cores:
+          type: integer
+          format: int64
+        usage_cores:
+          type: integer
+          format: int64
+        capacity_bytes:
+          type: integer
+          format: int64
+        usage_bytes:
+          type: integer
+          format: int64
+    NodeCondition:
+      title: NodeCondition
+      type: object
+      properties:
+        type:
+          type: string
+        status:
+          type: boolean
+    OscarStatus:
+      title: OscarStatus
+      type: object
+      properties:
+        deployment_name:
+          type: string
+        ready:
+          type: boolean
+        deployment:
+          $ref: '#/components/schemas/OscarDeployment'
+        jobs_count:
+          type: integer
+        pods:
+          $ref: '#/components/schemas/PodStates'
+        oidc:
+          $ref: '#/components/schemas/OIDCInfo'
+    OscarDeployment:
+      title: OscarDeployment
+      type: object
+      properties:
+        available_replicas:
+          type: integer
+        ready_replicas:
+          type: integer
+        replicas:
+          type: integer
+        creation_timestamp:
+          type: string
+          format: date-time
+        strategy:
+          type: string
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+    PodStates:
+      title: PodStates
+      type: object
+      properties:
+        total:
+          type: integer
+        states:
+          type: object
+          additionalProperties:
+            type: integer
+    OIDCInfo:
+      title: OIDCInfo
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        issuers:
+          type: array
+          items:
+            type: string
+        groups:
+          type: array
+          items:
+            type: string
+    MinioStatus:
+      title: MinioStatus
+      type: object
+      properties:
+        buckets_count:
+          type: integer
+        total_objects:
+          type: integer
   securitySchemes:
     basicAuth:
       type: http
@@ -852,6 +1204,8 @@ tags:
   - name: async
   - name: info
   - name: health
+  - name: status
+  - name: config
   - name: buckets
 servers:
   - url: 'https://localhost'
