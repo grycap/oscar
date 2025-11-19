@@ -36,11 +36,9 @@ import (
 
 const (
 	// EGIGroupsURNPrefix prefix to identify EGI group URI
-	EGIGroupsURNPrefix       = "urn:mace:egi.eu:group"
-	EGIIssuer                = "/realms/egi"
-	SecretKeyLength          = 10
-	KeycloakGroupSeparator   = "/"
-	KeycloakGroupReplacement = "_"
+	EGIGroupsURNPrefix = "urn:mace:egi.eu:group"
+	EGIIssuer          = "/realms/egi"
+	SecretKeyLength    = 10
 )
 
 var oidcLogger = log.New(os.Stdout, "[OIDC-AUTH] ", log.Flags())
@@ -228,29 +226,6 @@ func getGroupsEGI(urns []string) []string {
 	}
 	return groups
 }
-
-/*
-func getGroupsKeycloak(memberships []string) []string {
-	groups := []string{}
-	for _, v := range memberships {
-		/*m := strings.Split(v, "/")
-		fmt.Println("Membership split:", m)
-		if len(m) >= 3 {
-			vo := m[2]
-			if !slices.Contains(groups, vo) {
-				fmt.Println("Adding VO by split:", vo)
-				groups = append(groups, vo)
-			}
-		} else {
-		parseFirstSlash := strings.Replace(v, KeycloakGroupSeparator, "", 1)
-		parseAll := strings.ReplaceAll(parseFirstSlash, KeycloakGroupSeparator, KeycloakGroupReplacement)
-		groups = append(groups, parseAll)
-		//}
-
-	}
-
-	return groups
-}*/
 
 func GetIssuerFromToken(rawToken string) (string, error) {
 	token, _, err := new(jwt.Parser).ParseUnverified(rawToken, jwt.MapClaims{})
