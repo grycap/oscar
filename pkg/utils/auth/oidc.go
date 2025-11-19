@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"slices"
 
 	"net/http"
 	"strings"
@@ -37,9 +36,11 @@ import (
 
 const (
 	// EGIGroupsURNPrefix prefix to identify EGI group URI
-	EGIGroupsURNPrefix = "urn:mace:egi.eu:group"
-	EGIIssuer          = "/realms/egi"
-	SecretKeyLength    = 10
+	EGIGroupsURNPrefix       = "urn:mace:egi.eu:group"
+	EGIIssuer                = "/realms/egi"
+	SecretKeyLength          = 10
+	KeycloakGroupSeparator   = "/"
+	KeycloakGroupReplacement = "_"
 )
 
 var oidcLogger = log.New(os.Stdout, "[OIDC-AUTH] ", log.Flags())
@@ -195,7 +196,9 @@ func (om *oidcManager) GetUserInfo(rawToken string) (*userInfo, error) {
 	} else {
 		var claims KeycloakClaims
 		cerr = ui.Claims(&claims)
-		groups = getGroupsKeycloak(claims.GroupMembership)
+		//groups = getGroupsKeycloak(claims.GroupMembership)
+		groups = claims.GroupMembership
+		//fmt.Println("Groups from Keycloak claims:", groups)
 	}
 
 	if cerr != nil {
@@ -226,22 +229,28 @@ func getGroupsEGI(urns []string) []string {
 	return groups
 }
 
+/*
 func getGroupsKeycloak(memberships []string) []string {
 	groups := []string{}
-
 	for _, v := range memberships {
-		m := strings.Split(v, "/")
+		/*m := strings.Split(v, "/")
+		fmt.Println("Membership split:", m)
 		if len(m) >= 3 {
 			vo := m[2]
 			if !slices.Contains(groups, vo) {
+				fmt.Println("Adding VO by split:", vo)
 				groups = append(groups, vo)
 			}
-		}
+		} else {
+		parseFirstSlash := strings.Replace(v, KeycloakGroupSeparator, "", 1)
+		parseAll := strings.ReplaceAll(parseFirstSlash, KeycloakGroupSeparator, KeycloakGroupReplacement)
+		groups = append(groups, parseAll)
+		//}
 
 	}
 
 	return groups
-}
+}*/
 
 func GetIssuerFromToken(rawToken string) (string, error) {
 	token, _, err := new(jwt.Parser).ParseUnverified(rawToken, jwt.MapClaims{})
