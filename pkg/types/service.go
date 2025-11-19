@@ -360,10 +360,6 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 	// Add the required environment variables for the watchdog
 	addWatchdogEnvVars(podSpec, cfg, service)
 
-	if service.PropagateToken && service.Token != "" {
-		addAccessTokenEnvVar(podSpec, service.Token)
-	}
-
 	if service.EnableSGX {
 		SetSecurityContext(podSpec)
 	}
@@ -408,7 +404,8 @@ func ConvertSecretsEnvVars(secretName string) []v1.EnvFromSource {
 	}
 }
 
-func addAccessTokenEnvVar(p *v1.PodSpec, token string) {
+// AddAccessTokenEnvVar appends the ACCESS_TOKEN env var with the provided token to the service container.
+func AddAccessTokenEnvVar(p *v1.PodSpec, token string) {
 	tokenEnvVar := v1.EnvVar{
 		Name:  AccessTokenEnvVar,
 		Value: token,

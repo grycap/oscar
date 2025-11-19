@@ -1,4 +1,4 @@
-This example extends the `simple-test` service to showcase the `propagate_token` functionality. When `propagate_token` is set, OSCAR injects the service access token into the container as the `ACCESS_TOKEN` environment variable. The script prints the token so you can confirm it is available.
+This example extends the `simple-test` service to showcase the `propagate_token` functionality. When `propagate_token` is set, asynchronous executions receive the caller's access token via the `ACCESS_TOKEN` environment variable. The script prints the token so you can confirm it is available during async runs.
 
 ## Overview
 
@@ -35,10 +35,9 @@ The quick brown fox jumped over the lazy dog
 Analysis:
 Words: 9
 Characters: 44
-ACCESS_TOKEN: <token-value>
 ```
 
-The token is also echoed to the container logs for easy inspection.
+**Note:** `ACCESS_TOKEN` is only injected for asynchronous jobs, so it is not available in synchronous executions.
 
 ### Option 2. Asynchronous
 
@@ -61,7 +60,7 @@ The script relies on these environment variables:
 
 - `INPUT_FILE_PATH`: Path to the input file.
 - `TMP_OUTPUT_DIR`: Directory for output files.
-- `ACCESS_TOKEN`: Service access token injected when `propagate_token` is enabled.
+- `ACCESS_TOKEN`: Access token of the asynchronous caller injected when `propagate_token` is enabled.
 
 It performs:
 

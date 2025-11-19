@@ -4,7 +4,7 @@
 # It uses environment variables set by the OSCAR framework:
 # - INPUT_FILE_PATH: the path to the input file
 # - TMP_OUTPUT_DIR: the directory where output files should be written
-# - ACCESS_TOKEN: the OSCAR access token (available when propagate_token is true)
+# - ACCESS_TOKEN: the caller access token for asynchronous executions (available when propagate_token is true)
 
 
 FILE_NAME=$(basename "$INPUT_FILE_PATH" | cut -d. -f1)  # Get the base name of the input file without extension

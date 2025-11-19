@@ -136,6 +136,11 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				return
 			}
 		}
+
+		if service.PropagateToken && rawToken != "" {
+			types.AddAccessTokenEnvVar(podSpec, rawToken)
+		}
+
 		// Add secrets as environment variables if defined
 		if utils.SecretExists(service.Name, cfg.ServicesNamespace, back.GetKubeClientset()) {
 			podSpec.Containers[0].EnvFrom = []v1.EnvFromSource{
