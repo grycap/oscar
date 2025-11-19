@@ -194,9 +194,7 @@ func (om *oidcManager) GetUserInfo(rawToken string) (*userInfo, error) {
 	} else {
 		var claims KeycloakClaims
 		cerr = ui.Claims(&claims)
-		//groups = getGroupsKeycloak(claims.GroupMembership)
 		groups = claims.GroupMembership
-		//fmt.Println("Groups from Keycloak claims:", groups)
 	}
 
 	if cerr != nil {
