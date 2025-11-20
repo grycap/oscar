@@ -173,6 +173,56 @@ func TestMakeCreateHandler(t *testing.T) {
 	defer server.Close()
 }
 
+func TestMakeCreateHandlerWebhookError(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+	back := backends.MakeFakeBackend()
+	kubeClientset := testclient.NewSimpleClientset()
+
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		// Simulate MinIO info ok, but webhook restart error
+		if hreq.URL.Path == "/minio/admin/v3/info" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			return
+		}
+		if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/service") {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"Status": "success"}`))
+	}))
+	defer server.Close()
+
+	cfg := types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "ak",
+			SecretKey: "sk",
+			Verify:    false,
+		},
+	}
+
+	r := gin.Default()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "owner@example.com")
+		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "owner@example.com"))
+		c.Next()
+	})
+	r.POST("/system/services", MakeCreateHandler(&cfg, back))
+
+	body := strings.NewReader(`{"name":"svc","image":"img","script":"echo","mount":{"storage_provider":"minio","path":"test/mount"},"visibility":"public"}`)
+	req := httptest.NewRequest(http.MethodPost, "/system/services", body)
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 on webhook failure, got %d", resp.Code)
+	}
+}
+
 func TestCheckValuesDefaults(t *testing.T) {
 	cfg := types.Config{
 		MinIOProvider: &types.MinIOProvider{
