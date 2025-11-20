@@ -308,6 +308,43 @@ func TestGetOIDCMiddleware(t *testing.T) {
 	}
 }
 
+func TestGetUID(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		rw.Header().Set("Content-Type", "application/json")
+		if hreq.URL.Path == "/.well-known/openid-configuration" {
+			rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `", "userinfo_endpoint": "http://` + hreq.Host + `/userinfo"}`))
+		} else if hreq.URL.Path == "/userinfo" {
+			rw.Write([]byte(`{"sub": "uid-1234", "group_membership": ["/group/group1"]}`))
+		}
+	}))
+	defer server.Close()
+
+	issuer := server.URL
+	oidcManager, err := NewOIDCManager(issuer, "uid-1234", []string{"group1"})
+	if err != nil {
+		t.Fatalf("unexpected error creating manager: %v", err)
+	}
+	oidcManager.config.InsecureSkipSignatureCheck = true
+
+	claims := jwt.MapClaims{
+		"iss":              issuer,
+		"sub":              "uid-1234",
+		"exp":              time.Now().Add(1 * time.Hour).Unix(),
+		"iat":              time.Now().Unix(),
+		"group_membership": []string{"/group/group1"},
+	}
+
+	rawToken := GetToken(claims)
+	uid, err := oidcManager.GetUID(rawToken)
+	if err != nil {
+		t.Fatalf("unexpected error getting uid: %v", err)
+	}
+	if uid != "uid-1234" {
+		t.Fatalf("unexpected uid, got %s", uid)
+	}
+}
+
 func GetToken(claims jwt.MapClaims) string {
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 1024)

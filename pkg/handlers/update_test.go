@@ -113,3 +113,29 @@ func TestMakeUpdateHandler(t *testing.T) {
 		t.Fatalf("expected script without CR characters, got %q", back.UpdatedService.Script)
 	}
 }
+
+func TestMakeUpdateHandlerForbiddenOwner(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{Name: "svc", Owner: "owner"}
+	cfg := &types.Config{MinIOProvider: &types.MinIOProvider{}}
+	isAdminUser = false
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "other")
+		c.Next()
+	})
+	r.PUT("/system/services", MakeUpdateHandler(cfg, back))
+
+	body := `{"name":"svc","token":"t","visibility":"private"}`
+	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code == http.StatusOK {
+		t.Fatalf("expected error status for different owner, got %d", resp.Code)
+	}
+}

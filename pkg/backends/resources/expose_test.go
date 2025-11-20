@@ -195,3 +195,42 @@ func TestListExpose(t *testing.T) {
 		t.Fatalf("ListExpose returned error: %v", err)
 	}
 }
+
+func TestUpdateIngressSecretTransitions(t *testing.T) {
+	cfg := newTestConfig()
+	client := fake.NewSimpleClientset()
+	svc := newExposeService("update-ingress", 0, true)
+
+	// initial resources so Update succeeds
+	if _, err := client.NetworkingV1().Ingresses(cfg.ServicesNamespace).Create(context.TODO(), getIngressSpec(svc, cfg), metav1.CreateOptions{}); err != nil {
+		t.Fatalf("failed to seed ingress: %v", err)
+	}
+
+	if err := updateIngress(svc, client, cfg); err != nil {
+		t.Fatalf("updateIngress returned error: %v", err)
+	}
+	if !existsSecret(svc.Name, client, cfg) {
+		t.Fatalf("expected secret to be created when auth enabled")
+	}
+
+	// switch off auth and ensure secret gets removed on update
+	svc.Expose.SetAuth = false
+	if err := updateIngress(svc, client, cfg); err != nil {
+		t.Fatalf("updateIngress (remove auth) returned error: %v", err)
+	}
+	if existsSecret(svc.Name, client, cfg) {
+		t.Fatalf("expected secret to be deleted when auth disabled")
+	}
+
+	// enable auth again and ensure updateSecret path is exercised
+	if _, err := client.CoreV1().Secrets(cfg.ServicesNamespace).Create(context.TODO(), getSecretSpec(svc, cfg), metav1.CreateOptions{}); err != nil {
+		t.Fatalf("failed to seed secret for update path: %v", err)
+	}
+	svc.Expose.SetAuth = true
+	if err := updateIngress(svc, client, cfg); err != nil {
+		t.Fatalf("updateIngress (re-enable auth) returned error: %v", err)
+	}
+	if !existsSecret(svc.Name, client, cfg) {
+		t.Fatalf("expected secret to exist after re-enabling auth")
+	}
+}

@@ -379,3 +379,45 @@ func checkEnvVars(cfg *Config, podSpec *v1.PodSpec) error {
 
 	return nil
 }
+
+func TestConvertSecretsEnvVars(t *testing.T) {
+	secretRefs := ConvertSecretsEnvVars("my-secret")
+	if len(secretRefs) != 1 {
+		t.Fatalf("expected a single secret ref, got %d", len(secretRefs))
+	}
+	if secretRefs[0].SecretRef == nil || secretRefs[0].SecretRef.Name != "my-secret" {
+		t.Fatalf("unexpected secret ref: %#v", secretRefs[0].SecretRef)
+	}
+}
+
+func TestSetSecurityContext(t *testing.T) {
+	pod := &v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: ContainerName},
+		},
+	}
+
+	SetSecurityContext(pod)
+
+	if pod.Containers[0].SecurityContext == nil {
+		t.Fatalf("expected security context to be set")
+	}
+	if pod.Containers[0].SecurityContext.Capabilities == nil {
+		t.Fatalf("expected capabilities to be set")
+	}
+	if len(pod.Containers[0].SecurityContext.Capabilities.Add) == 0 || pod.Containers[0].SecurityContext.Capabilities.Add[0] != "SYS_RAWIO" {
+		t.Fatalf("unexpected capabilities: %#v", pod.Containers[0].SecurityContext.Capabilities.Add)
+	}
+}
+
+func TestHasReplicas(t *testing.T) {
+	svc := Service{}
+	if svc.HasReplicas() {
+		t.Fatalf("expected HasReplicas to be false with no replicas")
+	}
+
+	svc.Replicas = []Replica{{Type: "oscar", ClusterID: "a", ServiceName: "svc"}}
+	if !svc.HasReplicas() {
+		t.Fatalf("expected HasReplicas to be true when replicas are defined")
+	}
+}
