@@ -653,8 +653,10 @@ func checkIdentity(service *types.Service, authHeader string) error {
 	if !hasVO {
 		return fmt.Errorf("this user isn't enrrolled on the vo: %v", service.VO)
 	}
-
-	service.Labels["vo"] = service.VO
+	voFirstReplace := strings.Replace(service.VO, "/", "", 1)
+	voParse := strings.ReplaceAll(voFirstReplace, "/", "--")
+	voParse = strings.ReplaceAll(voParse, " ", "__")
+	service.Labels["vo"] = voParse
 
 	return nil
 }
