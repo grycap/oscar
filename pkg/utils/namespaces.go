@@ -464,6 +464,6 @@ func ownerHash(owner string) string {
 	if owner == "" {
 		return ""
 	}
-	hash := sha1.Sum([]byte(owner)) // #nosec G104
+	hash := sha1.Sum([]byte(owner)) // #nosec G401
 	return hex.EncodeToString(hash[:])
 }
