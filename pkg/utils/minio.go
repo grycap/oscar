@@ -70,6 +70,15 @@ type MinIOBucket struct {
 	AllowedUsers []string          `json:"allowed_users"`
 	Owner        string            `json:"owner"`
 	Metadata     map[string]string `json:"metadata"`
+	Objects      []MinIOObject     `json:"objects,omitempty"`
+}
+
+// MinIOObject captures object level metadata inside a MinIO bucket
+type MinIOObject struct {
+	ObjectName   string `json:"object_name"`
+	SizeBytes    int64  `json:"size_bytes"`
+	Owner        string `json:"owner,omitempty"`
+	LastModified string `json:"last_modified,omitempty"`
 }
 
 // Define the policy structure using Go structs
@@ -417,7 +426,7 @@ func (minIOAdminClient *MinIOAdminClient) UpdateServiceGroup(groupName string, u
 	if err != nil {
 		return fmt.Errorf("error getting group description for %s: %v", groupName, err)
 	}
-
+	fmt.Println(groupDescription)
 	membersMap := make(map[string]bool)
 	for _, member := range groupDescription.Members {
 		membersMap[member] = true

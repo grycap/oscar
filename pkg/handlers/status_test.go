@@ -18,7 +18,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -355,7 +354,6 @@ func checkStatusModResult(jsonResponse map[string]interface{}, t *testing.T, isA
 		if states["Running"].(float64) != 1.0 {
 			t.Errorf("Expected 1 Running pod, got %v", states["Running"])
 		}
-		fmt.Printf("MinIO info: %+v\n", minio)
 		// MinIO is only available for admin
 		if minio["buckets_count"].(float64) != 2.0 { // Mock has 2 buckets
 			t.Errorf("Expected buckets_count 2, got %v", minio["buckets_count"])
@@ -388,7 +386,6 @@ func TestMakeStatusHandler(t *testing.T) {
 			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 			return
 		}
-		fmt.Println(hreq.URL.Path + "?" + hreq.URL.RawQuery)
 		// 2. Mock ListBuckets (used by getMinioInfo - called via AWS S3 client)
 		// The AWS S3 client typically sends GET / for ListBuckets.
 		if hreq.URL.Path == "/" {
@@ -445,8 +442,6 @@ func TestMakeStatusHandler(t *testing.T) {
 		}
 
 		// Fail the test if an unexpected path is hit (e.g., if ListBuckets fails the first check)
-		fmt.Println("URL")
-		fmt.Println(hreq.URL.Path + "?" + hreq.URL.RawQuery)
 		t.Errorf("Unexpected path or query in MinIO request: %s", hreq.URL.Path+"?"+hreq.URL.RawQuery)
 		rw.WriteHeader(http.StatusNotFound)
 	}))
