@@ -66,7 +66,20 @@ const (
 	InterLinkTolerationOperator = "Exists"
 )
 
-// MakeJobHandler makes a handler to manage async invocations
+// MakeJobHandler godoc
+// @Summary Invoke service asynchronously
+// @Description Invoke a service asynchronously creating a Kubernetes Job.
+// @Tags async
+// @Accept json
+// @Accept octet-stream
+// @Param serviceName path string true "Service name"
+// @Param payload body string false "Event payload"
+// @Success 201 {string} string "Created"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BearerAuth
+// @Router /job/{serviceName} [post]
 func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back types.ServerlessBackend, rm resourcemanager.ResourceManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		service, err := back.ReadService(c.Param("serviceName"))

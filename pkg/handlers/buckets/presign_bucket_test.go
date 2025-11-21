@@ -46,7 +46,7 @@ func TestMakePresignHandler_AdminUpload(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", resp.Code, resp.Body.String())
 	}
 
-	var output presignResponse
+	var output PresignResponse
 	if err := json.Unmarshal(resp.Body.Bytes(), &output); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestMakePresignHandler_RestrictedMemberDownload(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", resp.Code, resp.Body.String())
 	}
 
-	var output presignResponse
+	var output PresignResponse
 	if err := json.Unmarshal(resp.Body.Bytes(), &output); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}

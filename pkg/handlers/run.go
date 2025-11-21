@@ -32,7 +32,21 @@ const (
 	tokenLength = 64
 )
 
-// MakeRunHandler makes a handler to manage sync invocations sending them to the gateway of the ServerlessBackend
+// MakeRunHandler godoc
+// @Summary Invoke service synchronously
+// @Description Invoke a service synchronously using the configured Serverless backend.
+// @Tags sync
+// @Accept json
+// @Accept octet-stream
+// @Param serviceName path string true "Service name"
+// @Param payload body string false "Event payload"
+// @Success 200 {string} string "OK"
+// @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BearerAuth
+// @Router /run/{serviceName} [post]
 func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		service, err := back.ReadService(c.Param("serviceName"))

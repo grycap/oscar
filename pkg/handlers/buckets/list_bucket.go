@@ -29,7 +29,17 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 )
 
-// MakeListHandler makes a handler for listing services
+// MakeListHandler godoc
+// @Summary List buckets
+// @Description List MinIO buckets visible to the authenticated user.
+// @Tags buckets
+// @Produce json
+// @Success 200 {array} utils.MinIOBucket
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/buckets [get]
 func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 

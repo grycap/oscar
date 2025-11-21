@@ -47,7 +47,20 @@ var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache
 var createLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
 var isAdminUser = false
 
-// MakeCreateHandler makes a handler for creating services
+// MakeCreateHandler godoc
+// @Summary Create service
+// @Description Create a new OSCAR service definition.
+// @Tags services
+// @Accept json
+// @Produce json
+// @Param service body types.Service true "Service definition"
+// @Success 201 {string} string "Created"
+// @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/services [post]
 func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var service types.Service

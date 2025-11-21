@@ -38,7 +38,20 @@ var ALL_USERS_GROUP = "all_users_group"
 var allUserGroupNotExist = "unable to remove bucket from policy \"" + ALL_USERS_GROUP + "\", policy '" + ALL_USERS_GROUP + "' does not exist"
 var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
 
-// MakeDeleteHandler makes a handler for deleting services
+// MakeDeleteHandler godoc
+// @Summary Delete service
+// @Description Delete an existing service by name.
+// @Tags services
+// @Produce json
+// @Param serviceName path string true "Service name"
+// @Success 204 {string} string "No Content"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 403 {string} string "Forbidden"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/services/{serviceName} [delete]
 func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// First get the Service

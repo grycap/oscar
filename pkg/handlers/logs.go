@@ -34,7 +34,20 @@ import (
 
 // TODO Try using cookies to avoid excesive calls to the k8s API //
 
-// MakeJobsInfoHandler makes a handler for listing all existing jobs from a service and show their JobInfo
+// MakeJobsInfoHandler godoc
+// @Summary List jobs
+// @Description List jobs created by a service including their status and timestamps.
+// @Tags logs
+// @Produce json
+// @Param serviceName path string true "Service name"
+// @Param page query string false "Continuation token"
+// @Success 200 {object} types.JobsResponse
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/logs/{serviceName} [get]
 func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		jobsInfo := make(map[string]*types.JobInfo)
@@ -92,8 +105,19 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.
 	}
 }
 
-// MakeDeleteJobsHandler makes a handler for deleting all jobs created by the provided service.
-// If 'all' querystring is set to 'true' pending, running and failed jobs will also be deleted
+// MakeDeleteJobsHandler godoc
+// @Summary Delete jobs
+// @Description Delete jobs created by the provided service. If `all` is true pending, running and failed jobs are also removed.
+// @Tags logs
+// @Param serviceName path string true "Service name"
+// @Param all query bool false "Delete running and failed jobs as well"
+// @Success 204 {string} string "No Content"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/logs/{serviceName} [delete]
 func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get serviceName and jobName
@@ -137,7 +161,21 @@ func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset kubernete
 	}
 }
 
-// MakeGetLogsHandler makes a handler for getting logs from the 'oscar-container' inside the pod created by the specified job
+// MakeGetLogsHandler godoc
+// @Summary Get job logs
+// @Description Stream logs of a specific job execution.
+// @Tags logs
+// @Produce plain
+// @Param serviceName path string true "Service name"
+// @Param jobName path string true "Job name"
+// @Param timestamps query bool false "Include timestamps"
+// @Success 200 {string} string "Logs"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/logs/{serviceName}/{jobName} [get]
 func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get serviceName and jobName
@@ -190,7 +228,19 @@ func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset kubernetes.I
 	}
 }
 
-// MakeDeleteJobHandler makes a handler for removing a job
+// MakeDeleteJobHandler godoc
+// @Summary Delete job
+// @Description Delete a specific job and its pod.
+// @Tags logs
+// @Param serviceName path string true "Service name"
+// @Param jobName path string true "Job name"
+// @Success 204 {string} string "No Content"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/logs/{serviceName}/{jobName} [delete]
 func MakeDeleteJobHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get serviceName and jobName

@@ -34,7 +34,22 @@ import (
 // Custom logger
 var updateLogger = log.New(os.Stdout, "[UPDATE-HANDLER] ", log.Flags())
 
-// MakeUpdateHandler makes a handler for updating services
+// MakeUpdateHandler godoc
+// @Summary Update service
+// @Description Update an existing service definition.
+// @Tags services
+// @Accept json
+// @Produce json
+// @Param service body types.Service true "Service definition"
+// @Success 204 {string} string "No Content"
+// @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 403 {string} string "Forbidden"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/services [put]
 func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var provName string
