@@ -109,6 +109,8 @@ const (
 	IsolationLevelService = "SERVICE"
 
 	DefaultOwner = "cluster_admin"
+
+	JobOwnerExecutionAnnotation = "oscar.grycap/job-owner"
 )
 
 // YAMLMarshal package-level yaml marshal function
@@ -254,6 +256,9 @@ type Service struct {
 	// If the service is created through basic auth the default owner is "cluster_admin"
 	Owner string `json:"owner"`
 
+	// Namespace where the service resources are deployed. Internal use only, not part of FDL.
+	Namespace string `json:"namespace,omitempty" yaml:"-"`
+
 	InterLinkNodeName string `json:"interlink_node_name"`
 
 	// Visibility sets which users will be able to interact with the service
@@ -263,7 +268,7 @@ type Service struct {
 	Visibility string `json:"visibility"`
 
 	// AllowedUsers list of EGI UID's identifying the users that will have visibility of the service and its MinIO storage provider
-	// Optional (If the list is empty we asume the visibility is public for all cluster users)
+	// Optional - only used if Visibility is set to "restricted"
 	AllowedUsers []string `json:"allowed_users"`
 
 	// IsolationLevel level of isolation for the buckets of the service (default:service)

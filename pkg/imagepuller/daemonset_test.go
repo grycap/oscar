@@ -45,10 +45,10 @@ func TestCreateDaemonset(t *testing.T) {
 
 	// Patch the watchPods function to return a mock result
 	origWatchPods := watchPodsFunc
-	watchPodsFunc = func(kubernetes.Interface, *types.Config) {}
+	watchPodsFunc = func(kubernetes.Interface, string) {}
 	t.Cleanup(func() { watchPodsFunc = origWatchPods })
 
-	err := CreateDaemonset(cfg, service, kubeClientset)
+	err := CreateDaemonset(cfg, service, cfg.ServicesNamespace, kubeClientset)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -64,7 +64,7 @@ func TestCreateDaemonset(t *testing.T) {
 		t.Errorf("Expected create job action but got %v", actions[1])
 	}
 
-	daemonset := getDaemonset(cfg, service)
+	daemonset := getDaemonset(cfg, service, cfg.ServicesNamespace)
 
 	if daemonset.Name != "image-puller-test-service" {
 		t.Errorf("expected daemonset name to be 'image-puller-test-service', got %s", daemonset.Name)
@@ -90,10 +90,10 @@ func TestCreateDaemonsetFailsOnNodeListError(t *testing.T) {
 	})
 
 	origWatch := watchPodsFunc
-	watchPodsFunc = func(kubernetes.Interface, *types.Config) {}
+	watchPodsFunc = func(kubernetes.Interface, string) {}
 	t.Cleanup(func() { watchPodsFunc = origWatch })
 
-	err := CreateDaemonset(cfg, service, client)
+	err := CreateDaemonset(cfg, service, cfg.ServicesNamespace, client)
 	if err == nil {
 		t.Fatalf("expected error when listing nodes fails")
 	}

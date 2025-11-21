@@ -44,7 +44,7 @@ import (
 // @Router /system/services/{serviceName} [get]
 func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		service, err := back.ReadService(c.Param("serviceName"))
+		service, err := back.ReadService("", c.Param("serviceName"))
 		authHeader := c.GetHeader("Authorization")
 
 		if err != nil {

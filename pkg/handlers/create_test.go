@@ -30,14 +30,83 @@ import (
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
 
 func TestMakeCreateHandler(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
 
+	baseNamespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "oscar-svc",
+		},
+	}
+
+	storageClass := "nfs"
+	basePV := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "oscar-runtime-pv",
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			Capacity: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse("2Gi"),
+			},
+			AccessModes:                   []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
+			PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimRetain,
+			StorageClassName:              "nfs",
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				NFS: &corev1.NFSVolumeSource{
+					Server: "nfs.example.com",
+					Path:   "/exports/oscar",
+				},
+			},
+		},
+	}
+	basePV.Spec.ClaimRef = &corev1.ObjectReference{
+		Kind:      "PersistentVolumeClaim",
+		Namespace: "oscar-svc",
+		Name:      types.PVCName,
+	}
+
+	basePVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      types.PVCName,
+			Namespace: "oscar-svc",
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse("2Gi"),
+				},
+			},
+			VolumeName:       basePV.Name,
+			StorageClassName: &storageClass,
+		},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Phase: corev1.ClaimBound,
+		},
+	}
+
 	back := backends.MakeFakeBackend()
-	kubeClientset := testclient.NewSimpleClientset()
+	baseSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      auth.FormatUID("somelonguid@egi.eu"),
+			Namespace: "oscar-svc",
+		},
+		Data: map[string][]byte{
+			"oidc_uid":  []byte("somelonguid@egi.eu"),
+			"accessKey": []byte("somelonguid@egi.eu"),
+			"secretKey": []byte("secret"),
+		},
+		Type: corev1.SecretTypeOpaque,
+	}
+
+	kubeClientset := testclient.NewSimpleClientset(baseNamespace, basePV, basePVC, baseSecret)
+	back.SetKubeClientset(kubeClientset)
 
 	// Create a fake MinIO server
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
@@ -86,6 +155,8 @@ func TestMakeCreateHandler(t *testing.T) {
 			SecretKey: "minioadmin",
 			Verify:    false,
 		},
+		ServicesNamespace: "oscar-svc",
+		Namespace:         "oscar",
 	}
 
 	r := gin.Default()

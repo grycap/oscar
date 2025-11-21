@@ -75,6 +75,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
+		service.AllowedUsers = sanitizeUsers(service.AllowedUsers)
 		service.Script = utils.NormalizeLineEndings(service.Script)
 
 		// Check service values and set defaults
@@ -85,6 +86,8 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// Service is created by an EGI user
 		var uid string
 		var err error
+		var mc *auth.MultitenancyConfig
+		namespace := cfg.ServicesNamespace
 		if !isAdminUser {
 			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {
@@ -99,7 +102,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			service.Owner = uid
 			createLogger.Printf("Creating service '%s' for user '%s'", service.Name, service.Owner)
 
-			mc, err := auth.GetMultitenancyConfigFromContext(c)
+			mc, err = auth.GetMultitenancyConfigFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 				return
@@ -138,6 +141,15 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 
 			ownerOnList := false
+			namespace, err = utils.EnsureUserNamespace(c.Request.Context(), back.GetKubeClientset(), cfg, uid)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring namespace for user %s: %v", uid, err))
+				return
+			}
+			if err := mc.EnsureSecretInNamespace(uid, namespace); err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", uid, err))
+				return
+			}
 
 			if len(service.AllowedUsers) > 0 && strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser {
 				for _, in := range service.Input {
@@ -172,6 +184,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 							// Fill the list of private buckets to create
 							userBucket = splitPath[0] + "-" + u[:10]
 							service.BucketList = append(service.BucketList, userBucket)
+							if err := mc.EnsureSecretInNamespace(u, namespace); err != nil {
+								c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", u, err))
+								return
+							}
 						}
 
 						if !ownerOnList {
@@ -181,11 +197,20 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 			}
 		}
+		if service.Namespace == "" {
+			service.Namespace = namespace
+		}
+		if !isAdminUser {
+			if err := mc.EnsureSecretInNamespace(service.Owner, service.Namespace); err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", service.Owner, err))
+				return
+			}
+		}
 		if len(service.Environment.Secrets) > 0 {
-			if utils.SecretExists(service.Name, cfg.ServicesNamespace, back.GetKubeClientset()) {
+			if utils.SecretExists(service.Name, service.Namespace, back.GetKubeClientset()) {
 				c.String(http.StatusConflict, "A secret with the given name already exists")
 			}
-			secretsErr := utils.CreateSecret(service.Name, cfg.ServicesNamespace, service.Environment.Secrets, back.GetKubeClientset())
+			secretsErr := utils.CreateSecret(service.Name, service.Namespace, service.Environment.Secrets, back.GetKubeClientset())
 			if secretsErr != nil {
 				c.String(http.StatusConflict, "Error creating secrets for service: %v", secretsErr)
 			}

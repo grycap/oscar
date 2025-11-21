@@ -24,8 +24,11 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/grycap/oscar/v3/pkg/utils"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -143,6 +146,70 @@ func (mc *MultitenancyConfig) GetUserCredentials(uid string) (string, string, er
 		return access_key, secret_key, nil
 	}
 	return "", "", fmt.Errorf("error decoding secret data")
+}
+
+func (mc *MultitenancyConfig) EnsureSecretInNamespace(uid string, namespace string) error {
+	if namespace == "" || namespace == ServicesNamespace {
+		return nil
+	}
+
+	uid = strings.TrimSpace(uid)
+	if uid == "" {
+		return nil
+	}
+
+	secretName := FormatUID(uid)
+	if _, err := mc.kubeClientset.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{}); err == nil {
+		return nil
+	} else if !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	baseSecret, err := mc.kubeClientset.CoreV1().Secrets(ServicesNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	newSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        secretName,
+			Namespace:   namespace,
+			Labels:      map[string]string{},
+			Annotations: map[string]string{},
+		},
+		Data: mapCopy(baseSecret.Data),
+		Type: baseSecret.Type,
+	}
+
+	for k, v := range baseSecret.Labels {
+		newSecret.Labels[k] = v
+	}
+	for k, v := range baseSecret.Annotations {
+		newSecret.Annotations[k] = v
+	}
+
+	if _, err := mc.kubeClientset.CoreV1().Secrets(namespace).Create(context.TODO(), newSecret, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+
+	return nil
+}
+
+func mapCopy(src map[string][]byte) map[string][]byte {
+	if src == nil {
+		return nil
+	}
+	dst := make(map[string][]byte, len(src))
+	for k, v := range src {
+		if v != nil {
+			copied := make([]byte, len(v))
+			copy(copied, v)
+			dst[k] = copied
+		} else {
+			dst[k] = nil
+		}
+	}
+	return dst
 }
 
 func GenerateRandomKey(length int) (string, error) {

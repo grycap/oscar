@@ -49,7 +49,7 @@ const (
 // @Router /run/{serviceName} [post]
 func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		service, err := back.ReadService(c.Param("serviceName"))
+		service, err := back.ReadService("", c.Param("serviceName"))
 		if err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {

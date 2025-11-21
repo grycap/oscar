@@ -82,7 +82,7 @@ const (
 // @Router /job/{serviceName} [post]
 func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back types.ServerlessBackend, rm resourcemanager.ResourceManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		service, err := back.ReadService(c.Param("serviceName"))
+		service, err := back.ReadService("", c.Param("serviceName"))
 		if err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {
@@ -98,6 +98,10 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
+		}
+		serviceNamespace := service.Namespace
+		if serviceNamespace == "" {
+			serviceNamespace = cfg.ServicesNamespace
 		}
 
 		// Check auth token
@@ -134,6 +138,11 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 
 			ui, err := oidcManager.GetUserInfo(rawToken)
 			uidFromToken = ui.Subject
+			if err != nil {
+				c.String(http.StatusInternalServerError, err.Error())
+				return
+			}
+			service.Labels[types.JobOwnerExecutionAnnotation] = uidFromToken
 			if !oidcManager.IsAuthorised(rawToken) {
 				c.Status(http.StatusUnauthorized)
 				return
@@ -150,7 +159,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			}
 		}
 		// Add secrets as environment variables if defined
-		if utils.SecretExists(service.Name, cfg.ServicesNamespace, back.GetKubeClientset()) {
+		if utils.SecretExists(service.Name, serviceNamespace, back.GetKubeClientset()) {
 			podSpec.Containers[0].EnvFrom = []v1.EnvFromSource{
 				{
 					SecretRef: &v1.SecretEnvSource{
@@ -181,9 +190,22 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				c.Set("uidOrigin", "nil")
 			}
 		} else {
+			if service.Labels == nil {
+				service.Labels = make(map[string]string)
+			}
+			service.Labels[types.JobOwnerExecutionAnnotation] = requestUserUID
 			c.Set("IPAddress", sourceIPAddress)
 			c.Set("uidOrigin", requestUserUID)
 			minIOSecretKey = requestUserUID
+		}
+
+		if minIOSecretKey == "" {
+			minIOSecretKey = service.Owner
+		}
+
+		if err := ensureMinIOSecret(kubeClientset, minIOSecretKey, serviceNamespace); err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", minIOSecretKey, err))
+			return
 		}
 
 		c.Next()
@@ -281,7 +303,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				// UUID used as a name for jobs
 				// To filter jobs by service name use the label "oscar_service"
 				Name:        jobUUID,
-				Namespace:   cfg.ServicesNamespace,
+				Namespace:   serviceNamespace,
 				Labels:      service.Labels,
 				Annotations: service.Annotations,
 			},
@@ -307,7 +329,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			}
 		}
 
-		_, err = kubeClientset.BatchV1().Jobs(cfg.ServicesNamespace).Create(context.TODO(), job, metav1.CreateOptions{})
+		_, err = kubeClientset.BatchV1().Jobs(serviceNamespace).Create(context.TODO(), job, metav1.CreateOptions{})
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
@@ -342,4 +364,59 @@ func decodeEventBytes(eventBytes []byte) (string, string, error) {
 		return "", "", genericErrors.New("Failed to decode records")
 	}
 
+}
+
+func ensureMinIOSecret(kubeClientset kubernetes.Interface, uid, namespace string) error {
+	if namespace == "" || namespace == auth.ServicesNamespace {
+		return nil
+	}
+	uid = strings.TrimSpace(uid)
+	if uid == "" {
+		return nil
+	}
+
+	secretName := auth.FormatUID(uid)
+	if _, err := kubeClientset.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{}); err == nil {
+		return nil
+	} else if !errors.IsNotFound(err) {
+		return err
+	}
+
+	baseSecret, err := kubeClientset.CoreV1().Secrets(auth.ServicesNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	newSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        secretName,
+			Namespace:   namespace,
+			Labels:      map[string]string{},
+			Annotations: map[string]string{},
+		},
+		Data: map[string][]byte{},
+		Type: baseSecret.Type,
+	}
+
+	for k, v := range baseSecret.Data {
+		if v != nil {
+			copied := make([]byte, len(v))
+			copy(copied, v)
+			newSecret.Data[k] = copied
+		} else {
+			newSecret.Data[k] = nil
+		}
+	}
+	for k, v := range baseSecret.Labels {
+		newSecret.Labels[k] = v
+	}
+	for k, v := range baseSecret.Annotations {
+		newSecret.Annotations[k] = v
+	}
+
+	if _, err := kubeClientset.CoreV1().Secrets(namespace).Create(context.TODO(), newSecret, metav1.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
+		return err
+	}
+
+	return nil
 }

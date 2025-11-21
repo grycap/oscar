@@ -81,6 +81,9 @@ type Config struct {
 	// Kubernetes namespace for services and jobs (default: oscar-svc)
 	ServicesNamespace string `json:"services_namespace"`
 
+	// Kubernetes service account used by the OSCAR controller to manage user namespaces (default: oscar-sa)
+	ControllerServiceAccount string `json:"controller_service_account"`
+
 	// Parameter used to check if the cluster have GPUs
 	GPUAvailable bool `json:"gpu_available"`
 
@@ -224,6 +227,7 @@ var configVars = []configVar{
 	{"Name", "OSCAR_NAME", false, stringType, "oscar"},
 	{"Namespace", "OSCAR_NAMESPACE", false, stringType, "oscar"},
 	{"ServicesNamespace", "OSCAR_SERVICES_NAMESPACE", false, stringType, "oscar-svc"},
+	{"ControllerServiceAccount", "OSCAR_CONTROLLER_SERVICE_ACCOUNT", false, stringType, "oscar-sa"},
 	{"ServerlessBackend", "SERVERLESS_BACKEND", false, serverlessBackendType, ""},
 	//{"OpenfaasNamespace", "OPENFAAS_NAMESPACE", false, stringType, "openfaas"},
 	//{"OpenfaasPort", "OPENFAAS_PORT", false, intType, "8080"},

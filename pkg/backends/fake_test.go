@@ -141,7 +141,7 @@ func TestFakeReadService(t *testing.T) {
 				back.AddError("ReadService", errFake)
 			}
 
-			_, err := back.ReadService("test")
+			_, err := back.ReadService("", "test")
 
 			if s.returnError {
 				if err == nil {
