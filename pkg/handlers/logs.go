@@ -46,10 +46,16 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.
 			return
 		}
 		serviceNamespace := resolveServiceNamespace(service, cfg)
-
+		uid, err := auth.GetUIDFromContext(c)
 		// List jobs
+		var labelSelector string
+		if err != nil {
+			labelSelector = fmt.Sprintf("%s=%s", types.ServiceLabel, serviceName)
+		} else {
+			labelSelector = fmt.Sprintf("%s=%s,%s=%s", types.ServiceLabel, serviceName, types.JobOwnerExecutionAnnotation, uid)
+		}
 		listOpts := metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s", types.ServiceLabel, serviceName),
+			LabelSelector: labelSelector,
 			Limit:         int64(cfg.JobListingLimit),
 			Continue:      page,
 		}
@@ -280,7 +286,9 @@ func authorizeRequest(c *gin.Context, service *types.Service) bool {
 			c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			return false
 		}
-
+		if service.Visibility == "public" {
+			return true
+		}
 		isAllowed := len(service.AllowedUsers) == 0 || uid == service.Owner
 		if !isAllowed {
 			for _, id := range service.AllowedUsers {
