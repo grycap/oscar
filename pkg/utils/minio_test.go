@@ -18,6 +18,7 @@ package utils
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,14 +26,25 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	awscreds "github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"slices"
+
 	"github.com/grycap/oscar/v3/pkg/testsupport"
 	"github.com/grycap/oscar/v3/pkg/types"
 	madmin "github.com/minio/madmin-go"
+	"github.com/minio/minio-go/v7"
+	miniocreds "github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 type minioMock struct {
 	policies     map[string][]string
 	groupMembers map[string][]string
+	bucketTags   map[string]map[string]string
 	configWrites []string
 }
 
@@ -40,6 +52,7 @@ func newMinioMock() *minioMock {
 	return &minioMock{
 		policies:     map[string][]string{},
 		groupMembers: map[string][]string{},
+		bucketTags:   map[string]map[string]string{},
 	}
 }
 
@@ -80,6 +93,9 @@ func (m *minioMock) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		delete(m.policies, name)
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"Status":"success"}`))
+	case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/service/restart"):
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"Status":"success"}`))
 	case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/update-group-members"):
 		body, _ := io.ReadAll(r.Body)
 		var group madmin.GroupAddRemove
@@ -107,9 +123,81 @@ func (m *minioMock) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"Status":"success"}`))
 	default:
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"Status":"success"}`))
+		if _, ok := r.URL.Query()["tagging"]; ok || strings.Contains(r.URL.RawQuery, "tagging") {
+			bucket := strings.TrimPrefix(r.URL.Path, "/")
+			switch r.Method {
+			case http.MethodPut:
+				body, _ := io.ReadAll(r.Body)
+				m.bucketTags[bucket] = parseBucketTags(body)
+				w.WriteHeader(http.StatusNoContent)
+			case http.MethodGet:
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(buildBucketTagsResponse(m.bucketTags[bucket])))
+			default:
+				w.WriteHeader(http.StatusMethodNotAllowed)
+			}
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"Status":"success"}`))
+		}
 	}
+}
+
+type bucketTagsXML struct {
+	TagSet []struct {
+		Key   string `xml:"Key"`
+		Value string `xml:"Value"`
+	} `xml:"TagSet>Tag"`
+}
+
+type fakeMinioRoundTripper struct {
+	tags  map[string]map[string]string
+	calls int
+}
+
+func (f *fakeMinioRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	f.calls++
+	bucket := strings.TrimPrefix(req.URL.Path, "/")
+	if strings.Contains(req.URL.RawQuery, "tagging") {
+		switch req.Method {
+		case http.MethodPut:
+			body, _ := io.ReadAll(req.Body)
+			if f.tags == nil {
+				f.tags = map[string]map[string]string{}
+			}
+			f.tags[bucket] = parseBucketTags(body)
+			return &http.Response{StatusCode: http.StatusNoContent, Body: io.NopCloser(strings.NewReader("")), Header: http.Header{}}, nil
+		case http.MethodGet:
+			resp := buildBucketTagsResponse(f.tags[bucket])
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(resp)), Header: http.Header{}}, nil
+		default:
+			return &http.Response{StatusCode: http.StatusMethodNotAllowed, Body: io.NopCloser(strings.NewReader("")), Header: http.Header{}}, nil
+		}
+	}
+
+	return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"Status":"success"}`)), Header: http.Header{}}, nil
+}
+
+func parseBucketTags(data []byte) map[string]string {
+	var tagSet bucketTagsXML
+	result := map[string]string{}
+	if err := xml.Unmarshal(data, &tagSet); err != nil {
+		return result
+	}
+	for _, tag := range tagSet.TagSet {
+		result[tag.Key] = tag.Value
+	}
+	return result
+}
+
+func buildBucketTagsResponse(tags map[string]string) string {
+	builder := strings.Builder{}
+	builder.WriteString(`<Tagging><TagSet>`)
+	for k, v := range tags {
+		builder.WriteString(fmt.Sprintf("<Tag><Key>%s</Key><Value>%s</Value></Tag>", k, v))
+	}
+	builder.WriteString(`</TagSet></Tagging>`)
+	return builder.String()
 }
 
 func filterMembers(current []string, removals []string) []string {
@@ -391,6 +479,62 @@ func TestUpdateServiceGroup(t *testing.T) {
 	}
 }
 
+func TestBucketMetadataHelpers(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	rt := &fakeMinioRoundTripper{tags: map[string]map[string]string{}}
+	simpleClient, err := minio.New("localhost:9000", &minio.Options{
+		Creds:     miniocreds.NewStaticV4("minioadmin", "minioadmin", ""),
+		Secure:    false,
+		Transport: rt,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating minio client: %v", err)
+	}
+
+	client := &MinIOAdminClient{simpleClient: simpleClient}
+
+	if err := client.SetTags("bucket", map[string]string{"uid": "alice"}); err == nil {
+		t.Fatalf("expected error setting tags with fake transport")
+	}
+
+	if _, err := client.GetTaggedMetadata("bucket"); err == nil {
+		t.Fatalf("expected error getting tags with fake transport")
+	}
+}
+
+func TestGetBucketMembers(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	mock := newMinioMock()
+	mock.groupMembers["bucket"] = []string{"user1", "user2"}
+	server := httptest.NewServer(mock)
+	defer server.Close()
+
+	cfg := types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+
+	client, err := MakeMinIOAdminClient(&cfg)
+	if err != nil {
+		t.Fatalf("unexpected error creating client: %v", err)
+	}
+
+	members, err := client.GetBucketMembers("bucket")
+	if err != nil {
+		t.Fatalf("unexpected error getting bucket members: %v", err)
+	}
+	if len(members) != 2 || members[0] != "user1" {
+		t.Fatalf("unexpected members: %v", members)
+	}
+}
+
 func TestRegisterAndRemoveWebhook(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
 
@@ -425,5 +569,243 @@ func TestRegisterAndRemoveWebhook(t *testing.T) {
 
 	if err := client.RemoveWebhook("bucket"); err != nil {
 		t.Fatalf("unexpected error removing webhook: %v", err)
+	}
+}
+
+func TestRemoveFromPolicy(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	mock := newMinioMock()
+	mock.policies["owner"] = []string{"arn:aws:s3:::bucket/*", "arn:aws:s3:::other/*"}
+	server := httptest.NewServer(mock)
+	defer server.Close()
+
+	cfg := types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+
+	client, err := MakeMinIOAdminClient(&cfg)
+	if err != nil {
+		t.Fatalf("unexpected error creating client: %v", err)
+	}
+
+	if err := client.RemoveFromPolicy("bucket", "owner", false); err != nil {
+		t.Fatalf("unexpected error removing from policy: %v", err)
+	}
+	if slices.Contains(mock.policies["owner"], "arn:aws:s3:::bucket/*") {
+		t.Fatalf("expected bucket resource to be removed from policy")
+	}
+}
+
+func TestCreateAllUsersGroup(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	mock := newMinioMock()
+	server := httptest.NewServer(mock)
+	defer server.Close()
+
+	cfg := types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+
+	client, err := MakeMinIOAdminClient(&cfg)
+	if err != nil {
+		t.Fatalf("unexpected error creating client: %v", err)
+	}
+
+	if err := client.CreateAllUsersGroup(); err != nil {
+		t.Fatalf("unexpected error creating group: %v", err)
+	}
+
+	if _, ok := mock.groupMembers[ALL_USERS_GROUP]; !ok {
+		t.Fatalf("expected all users group to be created")
+	}
+}
+
+func TestGetSimpleClientAndRestartServer(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	cfg, server := createMinIOConfig()
+	defer server.Close()
+
+	client, err := MakeMinIOAdminClient(&cfg)
+	if err != nil {
+		t.Fatalf("unexpected error creating client: %v", err)
+	}
+	if client.GetSimpleClient() == nil {
+		t.Fatalf("expected simple client to be initialized")
+	}
+
+	// RestartServer includes a small wait to verify the server is reachable again.
+	if err := client.RestartServer(); err != nil {
+		t.Fatalf("unexpected error restarting server: %v", err)
+	}
+}
+
+// S3 path helpers (merged from minio_s3_test.go)
+
+type fakeS3Client struct {
+	client        *s3.S3
+	buckets       map[string]struct{}
+	notifications map[string][]*s3.QueueConfiguration
+}
+
+func newFakeS3Client(t *testing.T) *fakeS3Client {
+	t.Helper()
+
+	sess := session.Must(session.NewSession(&aws.Config{
+		Region:      aws.String("us-east-1"),
+		Credentials: awscreds.NewStaticCredentials("ak", "sk", ""),
+	}))
+
+	client := s3.New(sess)
+	client.Handlers.Send.Clear()
+	client.Handlers.Unmarshal.Clear()
+	client.Handlers.UnmarshalMeta.Clear()
+	client.Handlers.UnmarshalError.Clear()
+	client.Handlers.ValidateResponse.Clear()
+
+	f := &fakeS3Client{
+		client:        client,
+		buckets:       map[string]struct{}{},
+		notifications: map[string][]*s3.QueueConfiguration{},
+	}
+
+	client.Handlers.Send.PushBack(func(r *request.Request) {
+		r.HTTPResponse = &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader("")),
+			Header:     http.Header{},
+		}
+
+		switch r.Operation.Name {
+		case "CreateBucket":
+			name := aws.StringValue(r.Params.(*s3.CreateBucketInput).Bucket)
+			if _, ok := f.buckets[name]; ok {
+				r.Error = awserr.New(s3.ErrCodeBucketAlreadyOwnedByYou, "bucket exists", nil)
+				return
+			}
+			f.buckets[name] = struct{}{}
+			r.Data = &s3.CreateBucketOutput{}
+		case "PutObject":
+			r.Data = &s3.PutObjectOutput{}
+		case "GetBucketNotificationConfiguration":
+			input := r.Params.(*s3.GetBucketNotificationConfigurationRequest)
+			bucket := aws.StringValue(input.Bucket)
+			r.Data = &s3.NotificationConfiguration{
+				QueueConfigurations: f.notifications[bucket],
+			}
+		case "PutBucketNotificationConfiguration":
+			input := r.Params.(*s3.PutBucketNotificationConfigurationInput)
+			bucket := aws.StringValue(input.Bucket)
+			f.notifications[bucket] = input.NotificationConfiguration.QueueConfigurations
+			r.Data = &s3.PutBucketNotificationConfigurationOutput{}
+		case "ListObjects":
+			r.Data = &s3.ListObjectsOutput{}
+		case "ListObjectsV2":
+			r.Data = &s3.ListObjectsV2Output{}
+		case "DeleteObjects":
+			r.Data = &s3.DeleteObjectsOutput{}
+		case "DeleteBucket":
+			name := aws.StringValue(r.Params.(*s3.DeleteBucketInput).Bucket)
+			delete(f.buckets, name)
+			delete(f.notifications, name)
+			r.Data = &s3.DeleteBucketOutput{}
+		default:
+			r.Error = fmt.Errorf("unexpected operation %s", r.Operation.Name)
+		}
+	})
+
+	return f
+}
+
+func TestCreateS3PathWithWebhook(t *testing.T) {
+	fake := newFakeS3Client(t)
+	client := &MinIOAdminClient{}
+
+	err := client.CreateS3PathWithWebhook(fake.client, []string{"bucket", "folder"}, "arn:aws:sqs:us-east-1:1234:queue", false)
+	if err != nil {
+		t.Fatalf("unexpected error creating path with webhook: %v", err)
+	}
+
+	if _, ok := fake.buckets["bucket"]; !ok {
+		t.Fatalf("expected bucket to be created")
+	}
+
+	ncfg := fake.notifications["bucket"]
+	if len(ncfg) != 1 {
+		t.Fatalf("expected a single notification configuration, got %d", len(ncfg))
+	}
+}
+
+func TestCreateS3PathWithWebhookMissingFolder(t *testing.T) {
+	fake := newFakeS3Client(t)
+	client := &MinIOAdminClient{}
+
+	err := client.CreateS3PathWithWebhook(fake.client, []string{"bucket"}, "arn:aws:sqs:us-east-1:1234:queue", false)
+	if err == nil {
+		t.Fatalf("expected error for missing folder in path")
+	}
+}
+
+func TestCreateS3PathBucketExists(t *testing.T) {
+	fake := newFakeS3Client(t)
+	client := &MinIOAdminClient{}
+	fake.buckets["bucket"] = struct{}{}
+
+	if err := client.CreateS3Path(fake.client, []string{"bucket"}, true); err != nil {
+		t.Fatalf("unexpected error when bucket already exists: %v", err)
+	}
+}
+
+func TestCreateS3PathDuplicateBucket(t *testing.T) {
+	fake := newFakeS3Client(t)
+	client := &MinIOAdminClient{}
+	fake.buckets["bucket"] = struct{}{}
+
+	err := client.CreateS3Path(fake.client, []string{"bucket"}, false)
+	if err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("expected duplicate bucket error, got %v", err)
+	}
+}
+
+func TestDisableInputNotificationsRemovesQueue(t *testing.T) {
+	fake := newFakeS3Client(t)
+	fake.notifications["bucket"] = []*s3.QueueConfiguration{
+		{QueueArn: aws.String("arn:aws:sqs:us-east-1:1234:queue")},
+	}
+
+	if err := disableInputNotifications(fake.client, "arn:aws:sqs:us-east-1:1234:queue", "bucket"); err != nil {
+		t.Fatalf("unexpected error disabling notifications: %v", err)
+	}
+
+	if len(fake.notifications["bucket"]) != 0 {
+		t.Fatalf("expected notifications to be cleared, got %v", fake.notifications["bucket"])
+	}
+}
+
+func TestDeleteBucketRemovesResources(t *testing.T) {
+	fake := newFakeS3Client(t)
+	client := &MinIOAdminClient{}
+	fake.buckets["bucket"] = struct{}{}
+
+	if err := client.DeleteBucket(fake.client, "bucket"); err != nil {
+		t.Fatalf("unexpected error deleting bucket: %v", err)
+	}
+
+	if _, ok := fake.buckets["bucket"]; ok {
+		t.Fatalf("expected bucket to be deleted")
 	}
 }

@@ -352,3 +352,51 @@ func TestReorganizeIfNearby(t *testing.T) {
 		}
 	}
 }
+
+func TestEventBuild(t *testing.T) {
+	raw := `{"event":"payload","storage_provider":"s3"}`
+	eventJSON, storage := eventBuild(raw, "minio")
+	if storage != "s3" {
+		t.Fatalf("expected storage from event, got %s", storage)
+	}
+	if string(eventJSON) == "" {
+		t.Fatalf("expected delegated event to be returned")
+	}
+
+	eventJSON, storage = eventBuild(`{"event":"payload"}`, "onedata")
+	if storage != "onedata" {
+		t.Fatalf("expected fallback storage provider, got %s", storage)
+	}
+	if string(eventJSON) == "" {
+		t.Fatalf("expected delegated event for fallback storage")
+	}
+}
+
+func TestCountJobsAggregation(t *testing.T) {
+	now := time.Now()
+	jobStatuses := map[string]JobStatus{
+		"a": {Status: "Succeeded", CreationTime: now.Add(-2 * time.Minute).Format(time.RFC3339), FinishTime: now.Format(time.RFC3339)},
+		"b": {Status: "Failed"},
+		"c": {Status: "Pending"},
+	}
+
+	avg, pending := countJobs(jobStatuses)
+	if pending != 1 {
+		t.Fatalf("expected 1 pending job, got %d", pending)
+	}
+	if avg <= 0 {
+		t.Fatalf("expected average execution time to be > 0")
+	}
+}
+
+func TestCreateParametersConstraints(t *testing.T) {
+	results := createParameters(nil, 5*time.Second, GeneralInfo{CPUMaxFree: 2000, NumberNodes: 2, MemoryFreeTotal: 1024, CPUFreeTotal: 4000}, 0.5, 10, 0)
+	if len(results) == 0 || len(results[0]) != 6 {
+		t.Fatalf("expected populated parameter slice, got %v", results)
+	}
+
+	results = createParameters(nil, 5*time.Second, GeneralInfo{CPUMaxFree: 100, NumberNodes: 2, MemoryFreeTotal: 1024, CPUFreeTotal: 4000}, 2.0, 10, 0)
+	if results[0][1] != 0 {
+		t.Fatalf("expected zeroed values when insufficient CPU, got %v", results)
+	}
+}

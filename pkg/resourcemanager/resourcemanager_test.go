@@ -19,6 +19,8 @@ package resourcemanager
 import (
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
+
 	"github.com/grycap/oscar/v3/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -35,5 +37,36 @@ func TestMakeResourceManager(t *testing.T) {
 	}
 	if rmEnable == nil {
 		t.Errorf("expecting resource manager instance, got %d", rmEnable)
+	}
+}
+
+type stubResourceManager struct {
+	calls int
+}
+
+func (s *stubResourceManager) UpdateResources() error {
+	s.calls++
+	if s.calls >= 1 {
+		panic("stop")
+	}
+	return nil
+}
+func (s *stubResourceManager) IsSchedulable(v1.ResourceRequirements) bool { return true }
+
+func TestStartResourceManager(t *testing.T) {
+	rm := &stubResourceManager{}
+
+	done := make(chan struct{})
+	go func() {
+		defer func() {
+			recover()
+			close(done)
+		}()
+		StartResourceManager(rm, 0)
+	}()
+
+	<-done
+	if rm.calls == 0 {
+		t.Fatalf("expected UpdateResources to be invoked at least once")
 	}
 }

@@ -113,3 +113,63 @@ func TestMakeUpdateHandler(t *testing.T) {
 		t.Fatalf("expected script without CR characters, got %q", back.UpdatedService.Script)
 	}
 }
+
+func TestMakeUpdateHandlerUnauthorizedVO(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	back := backends.MakeFakeBackend()
+	cfg := types.Config{
+		OIDCGroups: []string{"vo1"},
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  "http://minio:9000",
+			Region:    "us-east-1",
+			AccessKey: "ak",
+			SecretKey: "sk",
+		},
+	}
+	// Existing service owned by user with different VO
+	back.Service = &types.Service{Name: "svc", Owner: "owner", VO: "vo2"}
+
+	r := gin.Default()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "owner")
+		c.Next()
+	})
+	r.PUT("/system/services", MakeUpdateHandler(&cfg, back))
+
+	body := `{"name":"svc","vo":"vo1","token":"t","visibility":"private"}`
+	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 when VO not authorized, got %d", resp.Code)
+	}
+}
+
+func TestMakeUpdateHandlerForbiddenOwner(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{Name: "svc", Owner: "owner"}
+	cfg := &types.Config{MinIOProvider: &types.MinIOProvider{}}
+	isAdminUser = false
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "other")
+		c.Next()
+	})
+	r.PUT("/system/services", MakeUpdateHandler(cfg, back))
+
+	body := `{"name":"svc","token":"t","visibility":"private"}`
+	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code == http.StatusOK {
+		t.Fatalf("expected error status for different owner, got %d", resp.Code)
+	}
+}

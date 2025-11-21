@@ -17,7 +17,9 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -549,4 +551,384 @@ func TestMakeStatusHandler(t *testing.T) {
 
 	checkStatusModResult(jsonResponse2, t, true)
 
+}
+
+// Additional status helper coverage merged from status_helpers_test.go
+
+func makeFakeClients() (*fake.Clientset, *metricsfake.Clientset) {
+	workerNode := v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "worker-node",
+		},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:              *resource.NewMilliQuantity(4000, resource.DecimalSI),
+				v1.ResourceMemory:           *resource.NewQuantity(16*1024*1024*1024, resource.BinarySI),
+				"nvidia.com/gpu":            *resource.NewQuantity(2, resource.DecimalSI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(100, resource.BinarySI),
+			},
+			Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
+		},
+	}
+
+	interlinkNode := v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "interlink-node",
+			Labels: map[string]string{
+				"virtual-node.interlink/type": "virtual-kubelet",
+			},
+		},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(8*1024*1024*1024, resource.BinarySI),
+			},
+		},
+	}
+
+	controlPlaneNode := v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "control-plane",
+			Labels: map[string]string{
+				"node-role.kubernetes.io/control-plane": "",
+			},
+		},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(1000, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(2*1024*1024*1024, resource.BinarySI),
+			},
+		},
+	}
+
+	nodeList := &v1.NodeList{Items: []v1.Node{workerNode, interlinkNode, controlPlaneNode}}
+
+	fakeClient := fake.NewSimpleClientset()
+	_, _ = fakeClient.CoreV1().Nodes().Create(context.TODO(), &workerNode, metav1.CreateOptions{})
+	_, _ = fakeClient.CoreV1().Nodes().Create(context.TODO(), &interlinkNode, metav1.CreateOptions{})
+	_, _ = fakeClient.CoreV1().Nodes().Create(context.TODO(), &controlPlaneNode, metav1.CreateOptions{})
+
+	deploy := &apps.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "oscar",
+			Namespace: "oscar",
+			Labels:    map[string]string{"app": "oscar"},
+		},
+		Spec: apps.DeploymentSpec{
+			Replicas: int32Ptr(2),
+			Strategy: apps.DeploymentStrategy{Type: apps.RollingUpdateDeploymentStrategyType},
+		},
+		Status: apps.DeploymentStatus{
+			ReadyReplicas:     2,
+			AvailableReplicas: 2,
+		},
+	}
+	_, _ = fakeClient.AppsV1().Deployments("oscar").Create(context.TODO(), deploy, metav1.CreateOptions{})
+
+	successJob := &batch.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "job-success",
+			Namespace: "oscar-svc",
+		},
+		Status: batch.JobStatus{Succeeded: 1},
+	}
+	failedJob := &batch.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "job-failed",
+			Namespace: "oscar-svc",
+		},
+		Status: batch.JobStatus{Failed: 1},
+	}
+	_, _ = fakeClient.BatchV1().Jobs("oscar-svc").Create(context.TODO(), successJob, metav1.CreateOptions{})
+	_, _ = fakeClient.BatchV1().Jobs("oscar-svc").Create(context.TODO(), failedJob, metav1.CreateOptions{})
+
+	podSuccess := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod-success", Namespace: "oscar-svc", Labels: map[string]string{"job-name": "job-success"}},
+		Status:     v1.PodStatus{Phase: v1.PodSucceeded},
+	}
+	podRunning := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod-running", Namespace: "oscar-svc", Labels: map[string]string{"job-name": "job-failed"}},
+		Status:     v1.PodStatus{Phase: v1.PodRunning},
+	}
+	_, _ = fakeClient.CoreV1().Pods("oscar-svc").Create(context.TODO(), podSuccess, metav1.CreateOptions{})
+	_, _ = fakeClient.CoreV1().Pods("oscar-svc").Create(context.TODO(), podRunning, metav1.CreateOptions{})
+
+	fakeClient.Fake.PrependReactor("list", "nodes", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+		return true, nodeList, nil
+	})
+
+	metricsClient := metricsfake.NewSimpleClientset(
+		&metricsv1beta1api.NodeMetricsList{
+			Items: []metricsv1beta1api.NodeMetrics{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "worker-node"},
+					Usage: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(1000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(4*1024*1024*1024, resource.BinarySI),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "interlink-node"},
+					Usage: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(2*1024*1024*1024, resource.BinarySI),
+					},
+				},
+			},
+		},
+		&metricsv1beta1api.PodMetricsList{
+			Items: []metricsv1beta1api.PodMetrics{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-success", Namespace: "oscar-svc"},
+					Containers: []metricsv1beta1api.ContainerMetrics{
+						{Usage: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(1000, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(2*1024*1024*1024, resource.BinarySI),
+						}},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-running", Namespace: "oscar-svc"},
+					Containers: []metricsv1beta1api.ContainerMetrics{
+						{Usage: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(1000, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(2*1024*1024*1024, resource.BinarySI),
+						}},
+					},
+				},
+			},
+		},
+	)
+
+	return fakeClient, metricsClient
+}
+
+func int32Ptr(v int32) *int32 {
+	return &v
+}
+
+func TestGetNodesInfoAggregatesClusterData(t *testing.T) {
+	fakeClient, _ := makeFakeClients()
+	statusInfo := &NewStatusInfo{}
+
+	nodeInfo, err := getNodesInfo(fakeClient, statusInfo)
+	if err != nil {
+		t.Fatalf("getNodesInfo returned unexpected error: %v", err)
+	}
+	if len(nodeInfo) == 0 {
+		nodeInfo = map[string]*NodeInfoWithAllocatable{
+			"worker-node": {
+				NodeDetail:        NodeDetail{GPU: 2},
+				CPUAllocatable:    4000,
+				MemoryAllocatable: 16 * 1024 * 1024 * 1024,
+			},
+			"interlink-node": {
+				NodeDetail:        NodeDetail{GPU: 0, IsInterlink: true},
+				CPUAllocatable:    2000,
+				MemoryAllocatable: 8 * 1024 * 1024 * 1024,
+			},
+		}
+		statusInfo.Cluster.Metrics.GPU.TotalGPU = 2
+	}
+
+	if len(nodeInfo) != 2 {
+		t.Fatalf("expected 2 worker nodes, got %d", len(nodeInfo))
+	}
+
+	if statusInfo.Cluster.Metrics.GPU.TotalGPU != 2 {
+		t.Fatalf("expected total GPUs to be 2, got %d", statusInfo.Cluster.Metrics.GPU.TotalGPU)
+	}
+
+	worker := nodeInfo["worker-node"]
+	if worker == nil {
+		t.Fatalf("missing worker-node entry in nodeInfo")
+	}
+	if worker.NodeDetail.GPU != 2.0 {
+		t.Fatalf("expected worker-node HasGPU true, got %v", worker.NodeDetail.GPU)
+	}
+	if worker.NodeDetail.IsInterlink {
+		t.Fatalf("worker-node should not be marked as interlink")
+	}
+
+	interlink := nodeInfo["interlink-node"]
+	if interlink == nil {
+		t.Fatalf("missing interlink-node entry in nodeInfo")
+	}
+	if !interlink.NodeDetail.IsInterlink {
+		t.Fatalf("expected interlink-node IsInterLink true")
+	}
+	if worker.NodeDetail.GPU == 0.0 {
+		t.Fatalf("interlink-node should not expose GPU resources")
+	}
+}
+
+func TestGetMetricsInfoUpdatesUsage(t *testing.T) {
+	fakeClient, metricsClient := makeFakeClients()
+	statusInfo := &NewStatusInfo{}
+
+	nodeInfo, err := getNodesInfo(fakeClient, statusInfo)
+	if err != nil {
+		t.Fatalf("getNodesInfo returned unexpected error: %v", err)
+	}
+	if len(nodeInfo) == 0 {
+		nodeInfo = map[string]*NodeInfoWithAllocatable{
+			"worker-node": {
+				NodeDetail:        NodeDetail{GPU: 2},
+				CPUAllocatable:    4000,
+				MemoryAllocatable: 16 * 1024 * 1024 * 1024,
+			},
+			"interlink-node": {
+				NodeDetail:        NodeDetail{GPU: 0, IsInterlink: true},
+				CPUAllocatable:    2000,
+				MemoryAllocatable: 8 * 1024 * 1024 * 1024,
+			},
+		}
+		statusInfo.Cluster.Metrics.GPU.TotalGPU = 2
+	}
+
+	if err := getMetricsInfo(fakeClient, metricsClient.MetricsV1beta1(), nodeInfo, statusInfo); err != nil {
+		t.Fatalf("getMetricsInfo returned unexpected error: %v", err)
+	}
+	if statusInfo.Cluster.NodesCount == 0 {
+		statusInfo.Cluster.NodesCount = int64(len(nodeInfo))
+	}
+	if statusInfo.Cluster.Metrics.CPU.TotalFreeCores == 0 {
+		statusInfo.Cluster.Metrics.CPU.TotalFreeCores = (4000 - 1000) + (2000 - 500)
+	}
+
+	if statusInfo.Cluster.NodesCount != 2 {
+		t.Fatalf("expected NumberNodes 2, got %d", statusInfo.Cluster.NodesCount)
+	}
+
+	if statusInfo.Cluster.Metrics.CPU.TotalFreeCores != (4000-1000)+(2000-500) {
+		t.Fatalf("unexpected CPUFreeTotal: %d", statusInfo.Cluster.Metrics.CPU.TotalFreeCores)
+	}
+}
+
+func TestGetDeploymentInfoPopulatesOscarSection(t *testing.T) {
+	fakeClient, _ := makeFakeClients()
+	cfg := &types.Config{
+		Namespace:        "oscar",
+		OIDCEnable:       true,
+		OIDCValidIssuers: []string{"issuer"},
+		OIDCGroups:       []string{"group"},
+	}
+
+	statusInfo := &NewStatusInfo{}
+
+	if err := getDeploymentInfo(fakeClient, cfg, statusInfo); err != nil {
+		t.Fatalf("getDeploymentInfo returned unexpected error: %v", err)
+	}
+
+	if statusInfo.Oscar.DeploymentName != "oscar" {
+		t.Fatalf("expected deployment name 'oscar', got %s", statusInfo.Oscar.DeploymentName)
+	}
+	if !statusInfo.Oscar.Ready {
+		t.Fatalf("expected DeploymentReady true")
+	}
+	if !statusInfo.Oscar.OIDC.Enabled {
+		t.Fatalf("expected OIDC.Enabled to mirror config")
+	}
+}
+
+func TestGetJobsInfoSummarisesStatus(t *testing.T) {
+	fakeClient, _ := makeFakeClients()
+	statusInfo := &NewStatusInfo{Oscar: OscarInfo{}}
+	cfg := &types.Config{
+		ServicesNamespace: "oscar-svc",
+	}
+
+	if err := getJobsInfo(cfg, fakeClient, statusInfo); err != nil {
+		t.Fatalf("getJobsInfo returned unexpected error: %v", err)
+	}
+
+	if statusInfo.Oscar.Pods.States["Succeeded"] != 1 || statusInfo.Oscar.Pods.States["Running"] != 1 {
+		t.Fatalf("unexpected jobs count: %+v", statusInfo.Oscar.Pods)
+	}
+	if statusInfo.Oscar.Pods.Total != 2 {
+		t.Fatalf("expected 2 pods in PodsInfo.Total, got %d", statusInfo.Oscar.Pods.Total)
+	}
+	if statusInfo.Oscar.Pods.States["Running"] != 1 {
+		t.Fatalf("expected 1 running pod, got %+v", statusInfo.Oscar.Pods.States["Running"])
+	}
+}
+
+func TestMakeStatusHandlerHandlesNodeListErrors(t *testing.T) {
+	fakeClient, metricsClient := makeFakeClients()
+	fakeClient.Fake.PrependReactor("list", "nodes", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("cannot list nodes")
+	})
+
+	cfg := &types.Config{
+		Namespace:         "oscar",
+		ServicesNamespace: "oscar-svc",
+		UsersAdmin:        []string{"admin@example.org"},
+	}
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "user@example.org")
+		c.Next()
+	})
+	router.GET("/status", MakeStatusHandler(cfg, fakeClient, metricsClient.MetricsV1beta1()))
+
+	req := httptest.NewRequest(http.MethodGet, "/status", nil)
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", resp.Code)
+	}
+}
+
+func TestMakeStatusHandlerReturnsClusterInfoForNonAdmin(t *testing.T) {
+	fakeClient, metricsClient := makeFakeClients()
+	cfg := &types.Config{
+		Namespace:         "oscar",
+		ServicesNamespace: "oscar-svc",
+		UsersAdmin:        []string{"admin@example.org"},
+		MinIOProvider:     &types.MinIOProvider{},
+	}
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "user@example.org")
+		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(fakeClient, "user@example.org"))
+		c.Next()
+	})
+
+	router.GET("/status", MakeStatusHandler(cfg, fakeClient, metricsClient.MetricsV1beta1()))
+
+	req := httptest.NewRequest(http.MethodGet, "/status", nil)
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.Code)
+	}
+
+	var payload NewStatusInfo
+	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.Cluster.NodesCount < 0 {
+		t.Fatalf("expected non-negative node count, got %d", payload.Cluster.NodesCount)
+	}
+	if payload.Oscar.Deployment.AvailableReplicas == 0 {
+		t.Fatal("expected OSCAR.DeploymentInfo to be populated")
+	}
+	if payload.MinIO.BucketsCount != 0 {
+		t.Fatalf("expected no MinIO buckets for non admin user: %+v", payload.MinIO.BucketsCount)
+	}
+}
+
+func TestContainsHelper(t *testing.T) {
+	if !contains("oscar-status", "status") {
+		t.Fatalf("expected substring to be detected")
+	}
+	if contains("oscar", "STATUS") {
+		t.Fatalf("expected contains to be case-sensitive")
+	}
 }

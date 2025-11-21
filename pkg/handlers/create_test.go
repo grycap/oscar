@@ -17,14 +17,20 @@ limitations under the License.
 package handlers
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/base64"
 	"fmt"
+	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	"net/http"
 	"net/http/httptest"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/grycap/oscar/v3/pkg/backends"
 	"github.com/grycap/oscar/v3/pkg/testsupport"
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -238,6 +244,56 @@ func TestMakeCreateHandler(t *testing.T) {
 	defer server.Close()
 }
 
+func TestMakeCreateHandlerWebhookError(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+	back := backends.MakeFakeBackend()
+	kubeClientset := testclient.NewSimpleClientset()
+
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		// Simulate MinIO info ok, but webhook restart error
+		if hreq.URL.Path == "/minio/admin/v3/info" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			return
+		}
+		if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/service") {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"Status": "success"}`))
+	}))
+	defer server.Close()
+
+	cfg := types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "ak",
+			SecretKey: "sk",
+			Verify:    false,
+		},
+	}
+
+	r := gin.Default()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "owner@example.com")
+		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "owner@example.com"))
+		c.Next()
+	})
+	r.POST("/system/services", MakeCreateHandler(&cfg, back))
+
+	body := strings.NewReader(`{"name":"svc","image":"img","script":"echo","mount":{"storage_provider":"minio","path":"test/mount"},"visibility":"public"}`)
+	req := httptest.NewRequest(http.MethodPost, "/system/services", body)
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 on webhook failure, got %d", resp.Code)
+	}
+}
+
 func TestCheckValuesDefaults(t *testing.T) {
 	cfg := types.Config{
 		MinIOProvider: &types.MinIOProvider{
@@ -320,4 +376,76 @@ func TestIsStorageProviderDefined(t *testing.T) {
 			t.Fatalf("unexpected result for %s.%s", tt.name, tt.id)
 		}
 	}
+}
+
+func TestMakeCreateHandlerInvalidBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	cfg := &types.Config{MinIOProvider: &types.MinIOProvider{}}
+
+	r := gin.New()
+	r.POST("/system/services", MakeCreateHandler(cfg, back))
+
+	req := httptest.NewRequest(http.MethodPost, "/system/services", strings.NewReader("{invalid json"))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid body, got %d", resp.Code)
+	}
+}
+
+func TestCheckIdentity(t *testing.T) {
+	priv, _ := rsa.GenerateKey(rand.Reader, 1024)
+	jwk := buildRSAJWK(&priv.PublicKey)
+
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/.well-known/openid-configuration":
+			w.Write([]byte(`{"issuer":"` + server.URL + `","userinfo_endpoint":"` + server.URL + `/userinfo","jwks_uri":"` + server.URL + `/keys"}`))
+		case "/userinfo":
+			w.Write([]byte(`{"sub":"user@example.com","group_membership":["/group/test-vo"]}`))
+		case "/keys":
+			w.Write([]byte(jwk))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	manager, err := auth.NewOIDCManager(server.URL, "user@example.com", []string{"test-vo"})
+	if err != nil {
+		t.Fatalf("unexpected error creating oidc manager: %v", err)
+	}
+	auth.ClusterOidcManagers[server.URL] = manager
+
+	claims := jwt.MapClaims{
+		"iss":              server.URL,
+		"sub":              "user@example.com",
+		"exp":              time.Now().Add(1 * time.Hour).Unix(),
+		"iat":              time.Now().Unix(),
+		"group_membership": []string{"/group/test-vo"},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	rawToken, _ := token.SignedString(priv)
+
+	service := &types.Service{
+		VO:     "test-vo",
+		Labels: map[string]string{},
+	}
+
+	if err := checkIdentity(service, "Bearer "+rawToken); err != nil {
+		t.Fatalf("expected identity check to pass, got %v", err)
+	}
+	if service.Labels["vo"] != service.VO {
+		t.Fatalf("expected service labels to include vo %q, got %q", service.VO, service.Labels["vo"])
+	}
+}
+
+func buildRSAJWK(pub *rsa.PublicKey) string {
+	n := base64.RawURLEncoding.EncodeToString(pub.N.Bytes())
+	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(pub.E)).Bytes())
+	return `{"keys":[{"kty":"RSA","alg":"RS256","use":"sig","kid":"test","n":"` + n + `","e":"` + e + `"}]}`
 }

@@ -152,6 +152,42 @@ func TestSetMinIOEnvVars(t *testing.T) {
 	}
 }
 
+func TestSetS3Vars(t *testing.T) {
+	service := types.Service{
+		Mount: types.StorageIOConfig{
+			Path: "s3-bucket",
+		},
+		StorageProviders: &types.StorageProviders{
+			S3: map[string]*types.S3Provider{
+				types.DefaultProvider: {
+					Region:    "eu-west-1",
+					AccessKey: "ak",
+					SecretKey: "sk",
+				},
+			},
+		},
+	}
+	cfg := &types.Config{}
+
+	vars := setS3Vars(service, types.DefaultProvider, cfg)
+	if len(vars) != 4 {
+		t.Fatalf("expected four S3 env vars, got %d", len(vars))
+	}
+
+	expected := map[string]string{
+		"S3_BUCKET":             "s3-bucket",
+		"S3_REGION":             "eu-west-1",
+		"AWS_ACCESS_KEY_ID":     "ak",
+		"AWS_SECRET_ACCESS_KEY": "sk",
+	}
+
+	for _, ev := range vars {
+		if expected[ev.Name] != ev.Value {
+			t.Fatalf("unexpected value for %s: %s", ev.Name, ev.Value)
+		}
+	}
+}
+
 func TestSetWebDavEnvVars(t *testing.T) {
 	service := types.Service{
 		Mount: types.StorageIOConfig{

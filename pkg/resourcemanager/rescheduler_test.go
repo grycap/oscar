@@ -191,3 +191,26 @@ func TestStartReScheduler(t *testing.T) {
 		t.Fatalf("error starting rescheduler: %v", buf.String())
 	}
 }
+
+func TestGetEventEnvVar(t *testing.T) {
+	podSpec := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name: types.ContainerName,
+				Env: []v1.EnvVar{
+					{Name: "other", Value: "x"},
+					{Name: types.EventVariable, Value: "payload"},
+				},
+			},
+		},
+	}
+
+	if ev := getEvent(podSpec); ev != "payload" {
+		t.Fatalf("expected payload event, got %s", ev)
+	}
+
+	emptySpec := v1.PodSpec{Containers: []v1.Container{{Name: "faas-container"}}}
+	if ev := getEvent(emptySpec); ev != "" {
+		t.Fatalf("expected empty event, got %s", ev)
+	}
+}

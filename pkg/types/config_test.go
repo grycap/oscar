@@ -18,6 +18,11 @@ package types
 
 import (
 	"testing"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestParseSeconds(t *testing.T) {
@@ -45,6 +50,40 @@ func TestParseSeconds(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCheckAvailableResources(t *testing.T) {
+	cfg := &Config{}
+	nodeWithGPU := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "gpu-node",
+		},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				"nvidia.com/gpu": *resource.NewQuantity(1, resource.DecimalSI),
+			},
+		},
+	}
+	virtualNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "vk-node",
+			Labels: map[string]string{
+				"type": "virtual-kubelet",
+			},
+		},
+	}
+
+	client := fake.NewSimpleClientset(nodeWithGPU, virtualNode)
+
+	cfg.CheckAvailableGPUs(client)
+	if !cfg.GPUAvailable {
+		t.Fatalf("expected GPU availability to be detected")
+	}
+
+	cfg.CheckAvailableInterLink(client)
+	if !cfg.InterLinkAvailable {
+		t.Fatalf("expected InterLink availability to be detected")
 	}
 }
 
