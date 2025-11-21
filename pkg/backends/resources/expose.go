@@ -287,9 +287,14 @@ func getPodTemplateSpec(service types.Service, cfg *types.Config) v1.PodTemplate
 			podSpec.Containers[i].Args = []string{"-c", fmt.Sprintf("%s/%s", types.ConfigPath, types.ScriptFileName)}
 		}
 
+		probePath := "/"
+		if service.Expose.RewriteTarget {
+			probePath = getAPIPath(service.Name)
+		}
+
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
-				Path: getAPIPath(service.Name),
+				Path: probePath,
 				Port: intstr.FromString(podPortName),
 			},
 		}
