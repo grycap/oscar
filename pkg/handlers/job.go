@@ -177,6 +177,9 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				c.Set("uidOrigin", "nil")
 			}
 		} else {
+			if service.Labels == nil {
+				service.Labels = make(map[string]string)
+			}
 			service.Labels[types.JobOwnerExecutionAnnotation] = requestUserUID
 			c.Set("IPAddress", sourceIPAddress)
 			c.Set("uidOrigin", requestUserUID)
