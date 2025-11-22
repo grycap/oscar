@@ -38,7 +38,6 @@ OSCAR_HELM_IMAGE_OVERRIDES=""
 OSCAR_POST_DEPLOYMENT_IMAGE=""
 OSCAR_TARGET_REPLICAS=1
 SKIP_PROMPTS="false"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage(){
     cat <<EOF
