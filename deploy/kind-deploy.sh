@@ -38,6 +38,7 @@ OSCAR_HELM_IMAGE_OVERRIDES=""
 OSCAR_POST_DEPLOYMENT_IMAGE=""
 OSCAR_TARGET_REPLICAS=1
 SKIP_PROMPTS="false"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage(){
     cat <<EOF
@@ -680,48 +681,175 @@ fi
 checkOSCARDeploy
 
 echo -e "[*] Configuring RBAC permissions ..."
-cat <<EOF | kubectl apply -f -
+cat <<'EOF' | kubectl apply -f -
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: oscar-sa
+  namespace: oscar
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
-  name: oscar-cluster-role
+  name: oscar-controller
+  namespace: oscar-svc
 rules:
 - apiGroups:
   - ""
   resources:
-  - nodes
   - pods
-  - deployments
+  - pods/log
+  - podtemplates
+  - configmaps
+  - secrets
+  - services
+  - persistentvolumeclaims
   verbs:
   - get
   - list
   - watch
+  - create
+  - delete
+  - update
 - apiGroups:
   - apps
   resources:
+  - daemonsets
   - deployments
   verbs:
   - get
   - list
   - watch
+  - create
+  - delete
+  - update 
 - apiGroups:
-  - metrics.k8s.io
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - deletecollection
+  - update
+- apiGroups:
+  - autoscaling
+  resources:
+  - horizontalpodautoscalers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+- apiGroups:
+  - serving.knative.dev
+  resources:
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: oscar-controller-binding
+  namespace: oscar-svc
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: oscar-controller
+subjects:
+- kind: ServiceAccount
+  name: oscar-sa
+  namespace: oscar
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: oscar-controller-global
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - create
+  - update
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  verbs:
+  - get
+  - list
+  - create
+  - update
+- apiGroups:
+  - ""
   resources:
   - nodes
   verbs:
   - get
   - list
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/log
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes
+  verbs:
+  - get
+  - list
+  - create
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: oscar-cluster-role-binding
+  name: oscar-controller-global-binding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: oscar-cluster-role
+  name: oscar-controller-global
 subjects:
 - kind: ServiceAccount
   name: oscar-sa
