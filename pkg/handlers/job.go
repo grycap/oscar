@@ -130,8 +130,8 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				return
 			}
 			uid := auth.FormatUID(uidFromToken)
-			if len(uid) > 63 {
-				uid = uid[:63]
+			if len(uid) > 62 {
+				uid = uid[:62]
 			}
 			service.Labels[types.JobOwnerExecutionAnnotation] = uid
 			if !oidcManager.IsAuthorised(rawToken) {
