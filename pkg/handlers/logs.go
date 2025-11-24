@@ -53,8 +53,8 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.
 			labelSelector = fmt.Sprintf("%s=%s", types.ServiceLabel, serviceName)
 		} else {
 			uidParsed := auth.FormatUID(uid)
-			if len(uidParsed) > 63 {
-				uidParsed = uidParsed[:63]
+			if len(uidParsed) > 62 {
+				uidParsed = uidParsed[:62]
 			}
 			labelSelector = fmt.Sprintf("%s=%s,%s=%s", types.ServiceLabel, serviceName, types.JobOwnerExecutionAnnotation, uidParsed)
 		}
