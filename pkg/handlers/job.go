@@ -142,7 +142,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				c.String(http.StatusInternalServerError, err.Error())
 				return
 			}
-			service.Labels[types.JobOwnerExecutionAnnotation] = uidFromToken
+			service.Labels[types.JobOwnerExecutionAnnotation] = auth.FormatUID(uidFromToken)
 			if !oidcManager.IsAuthorised(rawToken) {
 				c.Status(http.StatusUnauthorized)
 				return
@@ -193,7 +193,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			if service.Labels == nil {
 				service.Labels = make(map[string]string)
 			}
-			service.Labels[types.JobOwnerExecutionAnnotation] = requestUserUID
+			service.Labels[types.JobOwnerExecutionAnnotation] = auth.FormatUID(requestUserUID)
 			c.Set("IPAddress", sourceIPAddress)
 			c.Set("uidOrigin", requestUserUID)
 			minIOSecretKey = requestUserUID
