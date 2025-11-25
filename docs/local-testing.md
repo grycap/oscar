@@ -30,7 +30,7 @@ access them.
 
 ## Automated local deployment
 
-To set up the enviroment for the platform testing you can run the following
+To set up the environment for platform testing you can run the following
 command. This script automatically executes all the necessary steps to deploy
 the local cluster and the OSCAR platform along with all the required tools. 
 
@@ -57,7 +57,7 @@ This flag auto-enables Knative Serving and the local Docker registry so you can 
 
 ## Steps for manual local deployment
 
-If you want to do it manualy you can follow the listed steps.
+If you want to do it manually you can follow the listed steps.
 
 ### Create the cluster
 
