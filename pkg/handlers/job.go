@@ -197,7 +197,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			if service.Labels == nil {
 				service.Labels = make(map[string]string)
 			}
-			uid := auth.FormatUID(uidFromToken)
+			uid := auth.FormatUID(requestUserUID)
 			if len(uid) > 62 {
 				uid = uid[:62]
 			}
