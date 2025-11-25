@@ -63,7 +63,7 @@ In this step, you must first choose the paths of the storage provider to be
 used as source of events, i.e. the input bucket and/or folder that will
 trigger the service.
 
-***Only the `minio.default` provider can be used as input storage provider.***
+***Only the `minio.default` provider can be used as input storage provider through the Dashboard UI.*** For additional input providers (e.g., WebDAV/dCache or Rucio), use an FDL file with [OSCAR CLI](oscar-cli.md).
 
 After filling in each path, remember to click on the "Save" button.
 
