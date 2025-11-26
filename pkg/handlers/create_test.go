@@ -399,14 +399,14 @@ func TestMakeCreateHandlerInvalidBody(t *testing.T) {
 func TestCheckIdentity(t *testing.T) {
 	priv, _ := rsa.GenerateKey(rand.Reader, 1024)
 	jwk := buildRSAJWK(&priv.PublicKey)
-
+	vo := "/group/test-vo"
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
 			w.Write([]byte(`{"issuer":"` + server.URL + `","userinfo_endpoint":"` + server.URL + `/userinfo","jwks_uri":"` + server.URL + `/keys"}`))
 		case "/userinfo":
-			w.Write([]byte(`{"sub":"user@example.com","group_membership":["/group/test-vo"]}`))
+			w.Write([]byte(`{"sub":"user@example.com","group_membership":["` + vo + `"]}`))
 		case "/keys":
 			w.Write([]byte(jwk))
 		default:
@@ -415,7 +415,7 @@ func TestCheckIdentity(t *testing.T) {
 	}))
 	defer server.Close()
 
-	manager, err := auth.NewOIDCManager(server.URL, "user@example.com", []string{"test-vo"})
+	manager, err := auth.NewOIDCManager(server.URL, "user@example.com", []string{vo})
 	if err != nil {
 		t.Fatalf("unexpected error creating oidc manager: %v", err)
 	}
@@ -426,21 +426,22 @@ func TestCheckIdentity(t *testing.T) {
 		"sub":              "user@example.com",
 		"exp":              time.Now().Add(1 * time.Hour).Unix(),
 		"iat":              time.Now().Unix(),
-		"group_membership": []string{"/group/test-vo"},
+		"group_membership": []string{vo},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	rawToken, _ := token.SignedString(priv)
 
 	service := &types.Service{
-		VO:     "test-vo",
+		VO:     vo,
+		Token:  rawToken,
 		Labels: map[string]string{},
 	}
 
 	if err := checkIdentity(service, "Bearer "+rawToken); err != nil {
 		t.Fatalf("expected identity check to pass, got %v", err)
 	}
-	if service.Labels["vo"] != service.VO {
-		t.Fatalf("expected service labels to include vo %q, got %q", service.VO, service.Labels["vo"])
+	if vo != service.VO {
+		t.Fatalf("expected service labels to include vo %q, got %q", vo, service.VO)
 	}
 }
 
