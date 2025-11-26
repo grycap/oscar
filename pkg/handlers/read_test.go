@@ -8,7 +8,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/backends"
+	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestMakeReadHandler(t *testing.T) {
@@ -59,5 +62,68 @@ func TestMakeReadHandler(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMakeReadHandlerVisibility(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cases := []struct {
+		name       string
+		visibility string
+		uid        string
+		status     int
+	}{
+		{"public_with_bearer", utils.PUBLIC, "any", http.StatusOK},
+		{"private_owner", utils.PRIVATE, "owner", http.StatusOK},
+		{"restricted_allowed", utils.RESTRICTED, "friend", http.StatusOK},
+		{"no_token_defaults", utils.RESTRICTED, "", http.StatusOK},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := backends.MakeFakeBackend()
+			svc.Service = &types.Service{
+				Name:         "svc",
+				Owner:        "owner",
+				AllowedUsers: []string{"friend"},
+				Visibility:   tt.visibility,
+			}
+
+			r := gin.New()
+			r.Use(func(c *gin.Context) {
+				if tt.uid != "" {
+					c.Set("uidOrigin", tt.uid)
+					c.Request.Header.Set("Authorization", "Bearer token")
+				}
+				c.Next()
+			})
+			r.GET("/system/services/:serviceName", MakeReadHandler(svc))
+
+			req := httptest.NewRequest(http.MethodGet, "/system/services/svc", nil)
+			resp := httptest.NewRecorder()
+			r.ServeHTTP(resp, req)
+
+			if resp.Code != tt.status {
+				t.Fatalf("expected status %d, got %d", tt.status, resp.Code)
+			}
+		})
+	}
+}
+
+func TestMakeReadHandlerNotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	back.AddError("ReadService", k8serr.NewNotFound(schema.GroupResource{Group: "test", Resource: "services"}, "missing"))
+
+	r := gin.New()
+	r.GET("/system/services/:serviceName", MakeReadHandler(back))
+
+	req := httptest.NewRequest(http.MethodGet, "/system/services/missing", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for missing service, got %d", resp.Code)
 	}
 }
