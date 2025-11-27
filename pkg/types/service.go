@@ -291,7 +291,7 @@ type Expose struct {
 	NodePort       int32  `json:"nodePort" default:"0" `
 	DefaultCommand bool   `json:"default_command" `
 	SetAuth        bool   `json:"set_auth" `
-	HealthPath     string `json:"health_path" default:"" `
+	HealthPath     string `json:"health_path" default:"/" `
 }
 
 // ToPodSpec returns a k8s podSpec from the Service

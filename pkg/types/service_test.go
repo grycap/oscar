@@ -247,7 +247,7 @@ expose:
   nodePort: 0
   default_command: false
   set_auth: false
-  health_path: ""
+  health_path: "/"
 environment:
   variables:
     TEST_VAR: testvalue
