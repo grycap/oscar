@@ -302,9 +302,9 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 			podSpec.Containers[i].Args = []string{"-c", fmt.Sprintf("%s/%s", types.ConfigPath, types.ScriptFileName)}
 		}
 
-		probePath := "/"
+		probePath := service.Expose.HealthPath
 		if service.Expose.RewriteTarget {
-			probePath = getAPIPath(service.Name)
+			probePath = getAPIPath(service.Name) + service.Expose.HealthPath
 		}
 
 		probeHandler := v1.ProbeHandler{
