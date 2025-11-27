@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -198,8 +199,16 @@ func MakeGetSystemLogsHandler(kubeClientset kubernetes.Interface, cfg *types.Con
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
-			c.String(http.StatusForbidden, "OIDC tokens are not allowed for system logs")
-			return
+			uid, err := auth.GetUIDFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+				return
+			}
+			if !slices.Contains(cfg.UsersAdmin, uid) {
+				c.String(http.StatusForbidden, "OIDC tokens are not allowed for system logs")
+				return
+			}
+
 		}
 
 		timestamps, err := strconv.ParseBool(c.DefaultQuery("timestamps", "false"))
