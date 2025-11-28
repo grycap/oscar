@@ -36,6 +36,7 @@ import (
 
 var ALL_USERS_GROUP = "all_users_group"
 var allUserGroupNotExist = "unable to remove bucket from policy \"" + ALL_USERS_GROUP + "\", policy '" + ALL_USERS_GROUP + "' does not exist"
+var bucketNotExist = "NoSuchBucket: The specified bucket does not exist"
 var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
 
 // MakeDeleteHandler godoc
@@ -128,7 +129,9 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Delete service buckets
 		err = deleteBuckets(service, cfg, minIOAdminClient)
-		if err != nil && !strings.Contains(err.Error(), allUserGroupNotExist) {
+		fmt.Println(err)
+		//NoSuchBucket: The specified bucket does not exist
+		if err != nil && !strings.Contains(err.Error(), allUserGroupNotExist) && !strings.Contains(err.Error(), bucketNotExist) {
 			c.String(http.StatusInternalServerError, "Error deleting service buckets: ", err)
 		}
 
