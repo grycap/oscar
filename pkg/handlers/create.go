@@ -253,9 +253,12 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			if derr != nil {
 				log.Printf("Error deleting service: %v\n", derr)
 			}
-			bderr := deleteBuckets(&service, cfg, minIOAdminClient)
-			if bderr != nil {
-				log.Printf("Error deleting buckets: %v\n", bderr)
+
+			if !strings.Contains(err.Error(), " already exists") {
+				bderr := deleteBuckets(&service, cfg, minIOAdminClient)
+				if bderr != nil {
+					log.Printf("Error deleting buckets: %v\n", bderr)
+				}
 			}
 			return
 		}
