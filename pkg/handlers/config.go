@@ -31,20 +31,30 @@ var (
 	getMultitenancyConfigFromContextFn = auth.GetMultitenancyConfigFromContext
 )
 
-type configForUser struct {
+type ConfigForUser struct {
 	Cfg           *types.Config        `json:"config"`
 	MinIOProvider *types.MinIOProvider `json:"minio_provider"`
 }
 
-// MakeConfigHandler makes a handler for getting server's configuration
+// MakeConfigHandler godoc
+// @Summary Get configuration
+// @Description Retrieve cluster configuration and MinIO credentials for the authenticated user.
+// @Tags config
+// @Produce json
+// @Success 200 {object} handlers.ConfigForUser
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/config [get]
 func MakeConfigHandler(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Return configForUser
-		var conf configForUser
+		var conf ConfigForUser
 		minIOProvider := cfg.MinIOProvider
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
-			conf = configForUser{cfg, minIOProvider}
+			conf = ConfigForUser{cfg, minIOProvider}
 		} else {
 
 			// Get MinIO credentials from k8s secret for user
@@ -72,7 +82,7 @@ func MakeConfigHandler(cfg *types.Config) gin.HandlerFunc {
 				Region:    minIOProvider.Region,
 			}
 
-			conf = configForUser{cfg, userMinIOProvider}
+			conf = ConfigForUser{cfg, userMinIOProvider}
 		}
 
 		c.JSON(http.StatusOK, conf)

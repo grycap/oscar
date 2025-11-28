@@ -1,3 +1,5 @@
+//go:generate swag init --parseDependency --parseInternal --generalInfo main.go --output pkg/apidocs
+
 /*
 Copyright (C) GRyCAP - I3M - UPV
 
@@ -13,6 +15,19 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
+// @title OSCAR API
+// @version v2.0.0
+// @description Secure REST API to manage OSCAR services, storage and executions.
+// @contact.name GRyCAP
+// @contact.email products@grycap.upv.es
+// @BasePath /
+// @schemes https http
+// @securityDefinitions.basic BasicAuth
+// @securityDefinitions.apikey BearerAuth
+// @description OIDC Bearer token (e.g. Authorization: Bearer <token>)
+// @in header
+// @name Authorization
 
 package main
 
@@ -64,10 +79,10 @@ func main() {
 	back := backends.MakeServerlessBackend(kubeClientset, kubeConfig, cfg)
 
 	// Start OpenFaaS Scaler
-	if cfg.ServerlessBackend == "openfaas" && cfg.OpenfaasScalerEnable {
+	/*if cfg.ServerlessBackend == "openfaas" && cfg.OpenfaasScalerEnable {
 		ofBack := back.(*backends.OpenfaasBackend)
 		go ofBack.StartScaler()
-	}
+	}*/
 
 	// Create the ResourceManager and start it if enabled
 	resMan := resourcemanager.MakeResourceManager(cfg, kubeClientset)
@@ -82,6 +97,9 @@ func main() {
 
 	// Create the router
 	r := gin.Default()
+
+	// Swagger UI endpoint (disabled in production)
+	// r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Define system group with basic auth middleware
 	system := r.Group("/system", auth.GetAuthMiddleware(cfg, kubeClientset))
@@ -99,6 +117,7 @@ func main() {
 	// CRUD Buckets
 	system.POST("/buckets", buckets.MakeCreateHandler(cfg))
 	system.GET("/buckets", buckets.MakeListHandler(cfg))
+	system.GET("/buckets/:bucket", buckets.MakeGetHandler(cfg))
 	system.PUT("/buckets", buckets.MakeUpdateHandler(cfg))
 	system.DELETE("/buckets/:bucket", buckets.MakeDeleteHandler(cfg))
 	system.POST("/buckets/:bucket/presign", buckets.MakePresignHandler(cfg))

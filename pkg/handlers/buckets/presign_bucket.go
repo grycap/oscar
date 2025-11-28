@@ -62,7 +62,7 @@ type presignSimpleClient interface {
 	PresignHeader(ctx context.Context, method string, bucketName string, objectName string, expires time.Duration, reqParams url.Values, extraHeaders http.Header) (*url.URL, error)
 }
 
-type presignRequest struct {
+type PresignRequest struct {
 	ObjectKey    string            `json:"object_key" binding:"required"`
 	Operation    string            `json:"operation" binding:"required"`
 	ExpiresIn    int64             `json:"expires_in"`
@@ -70,7 +70,7 @@ type presignRequest struct {
 	ExtraHeaders map[string]string `json:"extra_headers"`
 }
 
-type presignResponse struct {
+type PresignResponse struct {
 	ObjectKey string            `json:"object_key"`
 	Operation string            `json:"operation"`
 	Method    string            `json:"method"`
@@ -79,10 +79,26 @@ type presignResponse struct {
 	Headers   map[string]string `json:"headers,omitempty"`
 }
 
-// MakePresignHandler makes a handler that generates MinIO presigned URLs for bucket objects.
+// MakePresignHandler godoc
+// @Summary Generate presigned URL
+// @Description Create a short-lived MinIO presigned URL to upload or download an object.
+// @Tags buckets
+// @Accept json
+// @Produce json
+// @Param bucket path string true "Bucket name"
+// @Param request body buckets.PresignRequest true "Presign parameters"
+// @Success 200 {object} buckets.PresignResponse
+// @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 403 {string} string "Forbidden"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/buckets/{bucket}/presign [post]
 func MakePresignHandler(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var req presignRequest
+		var req PresignRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("Invalid presign request: %v", err))
 			return
@@ -223,7 +239,7 @@ func MakePresignHandler(cfg *types.Config) gin.HandlerFunc {
 		respHeaders := flattenHeaders(headers)
 		expiresAt := time.Now().UTC().Add(time.Duration(expires) * time.Second).Format(time.RFC3339)
 
-		c.JSON(http.StatusOK, presignResponse{
+		c.JSON(http.StatusOK, PresignResponse{
 			ObjectKey: objectKey,
 			Operation: operation,
 			Method:    method,

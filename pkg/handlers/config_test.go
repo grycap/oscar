@@ -36,13 +36,14 @@ import (
 func createExpectedBody(access_key string, secret_key string, cfg *types.Config) map[string]interface{} {
 	return map[string]interface{}{
 		"config": map[string]interface{}{
-			"name":                "",
-			"namespace":           "",
-			"services_namespace":  "",
-			"gpu_available":       false,
-			"interLink_available": false,
-			"yunikorn_enable":     false,
-			"oidc_groups":         nil,
+			"name":                       "",
+			"namespace":                  "",
+			"services_namespace":         "",
+			"controller_service_account": "",
+			"gpu_available":              false,
+			"interLink_available":        false,
+			"yunikorn_enable":            false,
+			"oidc_groups":                nil,
 		},
 		"minio_provider": map[string]interface{}{
 			"endpoint":   cfg.MinIOProvider.Endpoint,

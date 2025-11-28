@@ -27,6 +27,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
 	"github.com/grycap/oscar/v3/pkg/types"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -36,7 +37,6 @@ const ConfigMapNameOSCAR = "additional-oscar-config"
 // KubeBackend struct to represent a Kubernetes client to store services as podTemplates
 type KubeBackend struct {
 	kubeClientset kubernetes.Interface
-	namespace     string
 	config        *types.Config
 }
 
@@ -44,7 +44,6 @@ type KubeBackend struct {
 func MakeKubeBackend(kubeClientset kubernetes.Interface, cfg *types.Config) *KubeBackend {
 	return &KubeBackend{
 		kubeClientset: kubeClientset,
-		namespace:     cfg.ServicesNamespace,
 		config:        cfg,
 	}
 }
@@ -57,9 +56,9 @@ func (k *KubeBackend) GetInfo() *types.ServerlessBackendInfo {
 }
 
 // ListServices returns a slice with all services registered in the provided namespace
-func (k *KubeBackend) ListServices() ([]*types.Service, error) {
-	// Get the list with all Knative services
-	configmaps, err := getAllServicesConfigMaps(k.namespace, k.kubeClientset)
+func (k *KubeBackend) ListServices(namespaces ...string) ([]*types.Service, error) {
+	// Get the list with all OSCAR services
+	configmaps, err := getAllServicesConfigMaps(k.kubeClientset, namespaces...)
 	if err != nil {
 		log.Printf("WARNING: %v\n", err)
 		return nil, err
@@ -71,6 +70,7 @@ func (k *KubeBackend) ListServices() ([]*types.Service, error) {
 		if err != nil {
 			return nil, err
 		}
+		service.Namespace = cm.Namespace
 		services = append(services, service)
 	}
 	return services, nil
@@ -78,15 +78,19 @@ func (k *KubeBackend) ListServices() ([]*types.Service, error) {
 
 // CreateService creates a new service as a k8s podTemplate
 func (k *KubeBackend) CreateService(service types.Service) error {
+	namespace := service.Namespace
+	if namespace == "" {
+		namespace = k.config.ServicesNamespace
+	}
 
 	// Check if there is some user defined settings for OSCAR
-	err := checkAdditionalConfig(ConfigMapNameOSCAR, k.namespace, service, k.config, k.kubeClientset)
+	err := checkAdditionalConfig(ConfigMapNameOSCAR, k.config.ServicesNamespace, service, k.config, k.kubeClientset)
 	if err != nil {
 		return err
 	}
 
 	// Create the configMap with FDL and user-script
-	err = createServiceConfigMap(&service, k.namespace, k.kubeClientset)
+	err = createServiceConfigMap(&service, namespace, k.kubeClientset)
 	if err != nil {
 		return err
 	}
@@ -95,7 +99,7 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 	podSpec, err := service.ToPodSpec(k.config)
 	if err != nil {
 		// Delete the previously created configMap
-		if delErr := deleteServiceConfigMap(service.Name, k.namespace, k.kubeClientset); delErr != nil {
+		if delErr := deleteServiceConfigMap(service.Name, namespace, k.kubeClientset); delErr != nil {
 			log.Println(delErr.Error())
 		}
 		return err
@@ -105,7 +109,7 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 	podTemplate := &v1.PodTemplate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        service.Name,
-			Namespace:   k.namespace,
+			Namespace:   namespace,
 			Labels:      service.Labels,
 			Annotations: service.Annotations,
 		},
@@ -113,10 +117,10 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 			Spec: *podSpec,
 		},
 	}
-	_, err = k.kubeClientset.CoreV1().PodTemplates(k.namespace).Create(context.TODO(), podTemplate, metav1.CreateOptions{})
+	_, err = k.kubeClientset.CoreV1().PodTemplates(namespace).Create(context.TODO(), podTemplate, metav1.CreateOptions{})
 	if err != nil {
 		// Delete the previously created configMap
-		if delErr := deleteServiceConfigMap(service.Name, k.namespace, k.kubeClientset); delErr != nil {
+		if delErr := deleteServiceConfigMap(service.Name, namespace, k.kubeClientset); delErr != nil {
 			log.Println(delErr.Error())
 		}
 		return err
@@ -124,14 +128,14 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 
 	//Create an expose service
 	if service.Expose.APIPort != 0 {
-		err = resources.CreateExpose(service, k.kubeClientset, k.config)
+		err = resources.CreateExpose(service, namespace, k.kubeClientset, k.config)
 		if err != nil {
 			return err
 		}
 	}
 	//Create deaemonset to cache the service image on all the nodes
 	if service.ImagePrefetch {
-		err = imagepuller.CreateDaemonset(k.config, service, k.kubeClientset)
+		err = imagepuller.CreateDaemonset(k.config, service, namespace, k.kubeClientset)
 		if err != nil {
 			return err
 		}
@@ -141,14 +145,23 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 }
 
 // ReadService returns a Service
-func (k *KubeBackend) ReadService(name string) (*types.Service, error) {
+func (k *KubeBackend) ReadService(namespace, name string) (*types.Service, error) {
+	serviceNamespace := namespace
+	var err error
+	if serviceNamespace == "" {
+		serviceNamespace, err = k.resolveServiceNamespace(name)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Check if service exists
-	if _, err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
+	if _, err := k.kubeClientset.CoreV1().PodTemplates(serviceNamespace).Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
 		return nil, err
 	}
 
 	// Get the configMap of the Service
-	cm, err := k.kubeClientset.CoreV1().ConfigMaps(k.namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	cm, err := k.kubeClientset.CoreV1().ConfigMaps(serviceNamespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", name)
 	}
@@ -159,19 +172,31 @@ func (k *KubeBackend) ReadService(name string) (*types.Service, error) {
 		return nil, err
 	}
 
+	svc.Namespace = serviceNamespace
+
 	return svc, nil
 }
 
 // UpdateService updates an existent service
 func (k *KubeBackend) UpdateService(service types.Service) error {
+	namespace := service.Namespace
+	if namespace == "" {
+		namespace = k.config.ServicesNamespace
+	}
+
+	// Check if there is some user defined settings for OSCAR
+	if err := checkAdditionalConfig(ConfigMapNameOSCAR, k.config.ServicesNamespace, service, k.config, k.kubeClientset); err != nil {
+		return err
+	}
+
 	// Get the old service's configMap
-	oldCm, err := k.kubeClientset.CoreV1().ConfigMaps(k.namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
+	oldCm, err := k.kubeClientset.CoreV1().ConfigMaps(namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", service.Name)
 	}
 
 	// Update the configMap with FDL and user-script
-	if err := updateServiceConfigMap(&service, k.namespace, k.kubeClientset); err != nil {
+	if err := updateServiceConfigMap(&service, namespace, k.kubeClientset); err != nil {
 		return err
 	}
 
@@ -179,7 +204,7 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 	podSpec, err := service.ToPodSpec(k.config)
 	if err != nil {
 		// Restore the old configMap
-		_, resErr := k.kubeClientset.CoreV1().ConfigMaps(k.namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
+		_, resErr := k.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
 		if resErr != nil {
 			log.Println(resErr.Error())
 		}
@@ -190,7 +215,7 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 	podTemplate := &v1.PodTemplate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      service.Name,
-			Namespace: k.namespace,
+			Namespace: namespace,
 			Labels: map[string]string{
 				types.ServiceLabel: service.Name,
 			},
@@ -199,10 +224,10 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 			Spec: *podSpec,
 		},
 	}
-	_, err = k.kubeClientset.CoreV1().PodTemplates(k.namespace).Update(context.TODO(), podTemplate, metav1.UpdateOptions{})
+	_, err = k.kubeClientset.CoreV1().PodTemplates(namespace).Update(context.TODO(), podTemplate, metav1.UpdateOptions{})
 	if err != nil {
 		// Restore the old configMap
-		_, resErr := k.kubeClientset.CoreV1().ConfigMaps(k.namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
+		_, resErr := k.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
 		if resErr != nil {
 			log.Println(resErr.Error())
 		}
@@ -211,7 +236,7 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 
 	// If the service is exposed update its configuration
 	if service.Expose.APIPort != 0 {
-		err = resources.UpdateExpose(service, k.kubeClientset, k.config)
+		err = resources.UpdateExpose(service, namespace, k.kubeClientset, k.config)
 		if err != nil {
 			return err
 		}
@@ -219,7 +244,7 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 
 	//Create deaemonset to cache the service image on all the nodes
 	if service.ImagePrefetch {
-		err = imagepuller.CreateDaemonset(k.config, service, k.kubeClientset)
+		err = imagepuller.CreateDaemonset(k.config, service, namespace, k.kubeClientset)
 		if err != nil {
 			return err
 		}
@@ -231,28 +256,52 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 // DeleteService deletes a service
 func (k *KubeBackend) DeleteService(service types.Service) error {
 	name := service.Name
-	if err := k.kubeClientset.CoreV1().PodTemplates(k.namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
+	namespace := service.Namespace
+	if namespace == "" {
+		namespace = k.config.ServicesNamespace
+	}
+	if err := k.kubeClientset.CoreV1().PodTemplates(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		return err
 	}
 
 	// Delete the service's configMap
-	if delErr := deleteServiceConfigMap(name, k.namespace, k.kubeClientset); delErr != nil {
+	if delErr := deleteServiceConfigMap(name, namespace, k.kubeClientset); delErr != nil {
 		log.Println(delErr.Error())
 	}
 
 	// Delete all the service's jobs
-	if err := deleteServiceJobs(name, k.namespace, k.kubeClientset); err != nil {
+	if err := deleteServiceJobs(name, namespace, k.kubeClientset); err != nil {
 		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
 	}
 
 	// If service is exposed delete the exposed k8s components
 	if service.Expose.APIPort != 0 {
-		if err := resources.DeleteExpose(name, k.kubeClientset, k.config); err != nil {
+		if err := resources.DeleteExpose(name, namespace, k.kubeClientset, k.config); err != nil {
 			log.Printf("Error deleting all associated kubernetes component of the expose config \"%s\": %v\n", name, err)
 		}
 	}
 
 	return nil
+}
+
+func (k *KubeBackend) resolveServiceNamespace(name string) (string, error) {
+	listOpts := metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", types.ServiceLabel, name),
+	}
+	configmaps, err := k.kubeClientset.CoreV1().ConfigMaps("").List(context.TODO(), listOpts)
+	if err != nil {
+		return "", err
+	}
+
+	if len(configmaps.Items) == 0 {
+		return "", apierrors.NewNotFound(v1.Resource("configmap"), name)
+	}
+
+	if len(configmaps.Items) > 1 {
+		return "", fmt.Errorf("service \"%s\" found in multiple namespaces", name)
+	}
+
+	return configmaps.Items[0].Namespace, nil
 }
 
 func getServiceFromConfigMap(cm *v1.ConfigMap) (*types.Service, error) {
@@ -373,15 +422,37 @@ func deleteServiceConfigMap(name string, namespace string, kubeClientset kuberne
 	return nil
 }
 
-func getAllServicesConfigMaps(namespace string, kubeClientset kubernetes.Interface) (*v1.ConfigMapList, error) {
+func getAllServicesConfigMaps(kubeClientset kubernetes.Interface, namespaces ...string) (*v1.ConfigMapList, error) {
 	listOpts := metav1.ListOptions{
-		LabelSelector: "oscar_service",
+		LabelSelector: types.ServiceLabel,
 	}
-	configMapsList, err := kubeClientset.CoreV1().ConfigMaps(namespace).List(context.TODO(), listOpts)
+	configMapsList, err := kubeClientset.CoreV1().ConfigMaps("").List(context.TODO(), listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return configMapsList, nil
+
+	if len(namespaces) == 0 {
+		return configMapsList, nil
+	}
+
+	allowed := map[string]struct{}{}
+	for _, ns := range namespaces {
+		if ns != "" {
+			allowed[ns] = struct{}{}
+		}
+	}
+
+	filtered := &v1.ConfigMapList{}
+	for _, cm := range configMapsList.Items {
+		if len(allowed) > 0 {
+			if _, ok := allowed[cm.Namespace]; !ok {
+				continue
+			}
+		}
+		filtered.Items = append(filtered.Items, *cm.DeepCopy()) // #nosec G601
+	}
+
+	return filtered, nil
 }
 
 func deleteServiceJobs(name string, namespace string, kubeClientset kubernetes.Interface) error {

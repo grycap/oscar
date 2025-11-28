@@ -38,29 +38,60 @@ var ALL_USERS_GROUP = "all_users_group"
 var allUserGroupNotExist = "unable to remove bucket from policy \"" + ALL_USERS_GROUP + "\", policy '" + ALL_USERS_GROUP + "' does not exist"
 var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
 
-// MakeDeleteHandler makes a handler for deleting services
+// MakeDeleteHandler godoc
+// @Summary Delete service
+// @Description Delete an existing service by name.
+// @Tags services
+// @Produce json
+// @Param serviceName path string true "Service name"
+// @Success 204 {string} string "No Content"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 403 {string} string "Forbidden"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/services/{serviceName} [delete]
 func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// First get the Service
 		var service *types.Service
 		var uid string
 		var err error
-		service, _ = back.ReadService(c.Param("serviceName"))
+		serviceName := c.Param("serviceName")
+		namespaceArg := ""
 		authHeader := c.GetHeader("Authorization")
 
-		if len(strings.Split(authHeader, "Bearer")) > 1 {
+		isOIDC := len(strings.Split(authHeader, "Bearer")) > 1
+		if isOIDC {
 			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-			}
-
-			if service.Owner != uid {
-				c.String(http.StatusForbidden, "User %s doesn't have permision to delete this service", uid)
 				return
 			}
+			namespaceArg = utils.BuildUserNamespace(cfg, uid)
 		}
-		if utils.SecretExists(service.Name, cfg.ServicesNamespace, back.GetKubeClientset()) {
-			secretsErr := utils.DeleteSecret(service.Name, cfg.ServicesNamespace, back.GetKubeClientset())
+
+		service, err = back.ReadService(namespaceArg, serviceName)
+		if err != nil {
+			if errors.IsNotFound(err) || errors.IsGone(err) {
+				c.Status(http.StatusNotFound)
+			} else {
+				c.String(http.StatusInternalServerError, err.Error())
+			}
+			return
+		}
+
+		if isOIDC && service.Owner != uid {
+			c.String(http.StatusForbidden, "User %s doesn't have permision to delete this service", uid)
+			return
+		}
+		if service.Namespace == "" {
+			service.Namespace = cfg.ServicesNamespace
+		}
+
+		if utils.SecretExists(service.Name, service.Namespace, back.GetKubeClientset()) {
+			secretsErr := utils.DeleteSecret(service.Name, service.Namespace, back.GetKubeClientset())
 			if secretsErr != nil {
 				c.String(http.StatusInternalServerError, "Error deleting asociated secret: %v", secretsErr)
 			}

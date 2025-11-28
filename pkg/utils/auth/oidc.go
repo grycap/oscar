@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"slices"
 
 	"net/http"
 	"strings"
@@ -195,7 +194,7 @@ func (om *oidcManager) GetUserInfo(rawToken string) (*userInfo, error) {
 	} else {
 		var claims KeycloakClaims
 		cerr = ui.Claims(&claims)
-		groups = getGroupsKeycloak(claims.GroupMembership)
+		groups = claims.GroupMembership
 	}
 
 	if cerr != nil {
@@ -223,23 +222,6 @@ func getGroupsEGI(urns []string) []string {
 			}
 		}
 	}
-	return groups
-}
-
-func getGroupsKeycloak(memberships []string) []string {
-	groups := []string{}
-
-	for _, v := range memberships {
-		m := strings.Split(v, "/")
-		if len(m) >= 3 {
-			vo := m[2]
-			if !slices.Contains(groups, vo) {
-				groups = append(groups, vo)
-			}
-		}
-
-	}
-
 	return groups
 }
 

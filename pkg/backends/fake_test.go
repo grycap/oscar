@@ -17,6 +17,7 @@ limitations under the License.
 package backends
 
 import (
+	"net/http/httptest"
 	"testing"
 
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -77,6 +78,25 @@ func TestFakeListServices(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMakeFakeSyncBackend(t *testing.T) {
+	back := MakeFakeSyncBackend()
+	if _, ok := back.errors["GetProxyDirector"]; !ok {
+		t.Fatalf("expected GetProxyDirector entry to be initialized")
+	}
+}
+
+func TestFakeGetProxyDirector(t *testing.T) {
+	back := MakeFakeSyncBackend()
+	req := httptest.NewRequest("GET", "http://example.com/initial", nil)
+
+	director := back.GetProxyDirector("svc")
+	director(req)
+
+	if req.URL.Host != "httpbin.org" || req.URL.Path != "/status/200" {
+		t.Fatalf("unexpected proxy target: %s%s", req.URL.Host, req.URL.Path)
 	}
 }
 
@@ -141,7 +161,7 @@ func TestFakeReadService(t *testing.T) {
 				back.AddError("ReadService", errFake)
 			}
 
-			_, err := back.ReadService("test")
+			_, err := back.ReadService("", "test")
 
 			if s.returnError {
 				if err == nil {

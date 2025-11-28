@@ -1,7 +1,3 @@
-[submodule "ui"]
-	path = ui
-	url = https://github.com/grycap/oscar-ui.git
-	branch = master
 [submodule "dashboard"]
 	path = dashboard
 	url = https://github.com/grycap/oscar-dashboard.git
