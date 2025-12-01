@@ -326,6 +326,10 @@ func TestMakeGetSystemLogsHandlerRejectsOIDC(t *testing.T) {
 	kubeClientset := testclient.NewSimpleClientset(kubeObjects...)
 
 	r := gin.Default()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "some-uid-value")
+		c.Next()
+	})
 	r.GET("/system/logs", MakeGetSystemLogsHandler(kubeClientset, &cfg))
 
 	w := httptest.NewRecorder()
