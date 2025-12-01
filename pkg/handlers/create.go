@@ -278,6 +278,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				ownerName := "oscar"
 				if !isAdminUser {
 					ownerName = auth.GetUserNameFromContext(c)
+					ownerName = utils.RemoveAccents(ownerName)
 				}
 				// Bucket metadata for filtering
 				tags := map[string]string{
