@@ -678,7 +678,7 @@ fi
 
 #Wait for OSCAR deployment
 checkOSCARDeploy
-
+ 
 echo -e "[*] Configuring RBAC permissions ..."
 cat <<'EOF' | kubectl apply -f -
 ---
