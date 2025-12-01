@@ -23,7 +23,29 @@ After a correct login, you should see the main view:
 
 ## Deploying services
 
-In order to create a new service, you must click on the "Create service"
+To create a new service, you have two options: using OSCAR-Hub, a catalog of predefined services, or the manual way using an [FDL](fdl.md) definition or the creation form provided by the dashboard.
+
+### OSCAR-Hub
+
+In order to create a new service using OSCAR-Hub, you need to navigate to the corresponding menu in the dashboard. There you will see the catalog of predefined services that you can deploy and use out of the box. You can find all the definitions on its dedicated [GitHub repository](https://github.com/grycap/oscar-hub).
+
+You also can contribute to it following our [contribution guide](https://hub.oscar.grycap.net/guide/) and view the [catalog](https://hub.oscar.grycap.net/) independently from the OSCAR.
+
+![oscar hub](images/usage/oscar-hub-01.png)
+
+Then you can view the description of the service and deploy it.
+
+![oscar hub cowsay info](images/usage/oscar-hub-02.png)
+
+Before deploying it, you can adjust the resources or other parameters depending on the service.
+
+![oscar hub cowsay config](images/usage/oscar-hub-03.png)
+
+For the invocation you can see the [synchronous invocation via dashboard](invoking-sync.md#synchronous-invocations-via-oscar-dashboard) example, it use the same service.
+
+## Manual deployment
+
+To do the manual deployment, you need to click on "New" on the Service page, which is the first page you see after you log in.
 button and follow the wizard. For an [OSCAR Service](oscar-service.md) a script must be provided for the
 processing of files. This script must use the environment variables
 `INPUT_FILE_PATH` and `TMP_OUTPUT_DIR` to refer to the input file and the
