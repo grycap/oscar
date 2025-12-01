@@ -17,14 +17,18 @@ limitations under the License.
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -250,6 +254,192 @@ func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset kubernetes.I
 	}
 }
 
+// MakeGetLogsHandler godoc
+// @Summary Get job from logs
+// @Description Stream logs of a specific job execution.
+// @Tags logs
+// @Produce plain
+// @Success 200 {string} string "Logs"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/logs/ [get]
+// MakeGetSystemLogsHandler makes a handler for getting OSCAR manager logs (Basic Auth only)
+func MakeGetSystemLogsHandler(kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			uid, err := auth.GetUIDFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+				return
+			}
+			if !slices.Contains(cfg.UsersAdmin, uid) {
+				c.String(http.StatusForbidden, "OIDC tokens are not allowed for system logs")
+				return
+			}
+
+		}
+
+		timestamps, err := strconv.ParseBool(c.DefaultQuery("timestamps", "false"))
+		if err != nil {
+			timestamps = false
+		}
+
+		appLabel := cfg.Name
+		if appLabel == "" {
+			appLabel = "oscar"
+		}
+
+		listOpts := metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("app=%s", appLabel),
+		}
+		pods, err := kubeClientset.CoreV1().Pods(cfg.Namespace).List(context.TODO(), listOpts)
+		if err != nil {
+			if !errors.IsNotFound(err) && !errors.IsGone(err) {
+				c.String(http.StatusInternalServerError, err.Error())
+			} else {
+				c.Status(http.StatusNotFound)
+			}
+			return
+		}
+
+		if len(pods.Items) == 0 {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		targetPod := pods.Items[0]
+		for _, pod := range pods.Items[1:] {
+			if pod.CreationTimestamp.After(targetPod.CreationTimestamp.Time) {
+				targetPod = pod
+			}
+		}
+
+		containerName := ""
+		if len(targetPod.Spec.Containers) > 0 {
+			containerName = targetPod.Spec.Containers[0].Name
+			for _, container := range targetPod.Spec.Containers {
+				if container.Name == cfg.Name {
+					containerName = container.Name
+					break
+				}
+			}
+		}
+
+		podLogOpts := &v1.PodLogOptions{
+			Timestamps: timestamps,
+		}
+		if containerName != "" {
+			podLogOpts.Container = containerName
+		}
+
+		if prev, err := strconv.ParseBool(c.DefaultQuery("previous", "false")); err == nil && prev {
+			podLogOpts.Previous = true
+		}
+
+		req := kubeClientset.CoreV1().Pods(cfg.Namespace).GetLogs(targetPod.Name, podLogOpts)
+
+		stream, err := req.Stream(context.TODO())
+		if err != nil {
+			if statusErr, ok := err.(*errors.StatusError); ok {
+				code := int(statusErr.Status().Code)
+				if code == 0 {
+					code = http.StatusInternalServerError
+				}
+				c.String(code, statusErr.Error())
+				return
+			}
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+		defer stream.Close()
+
+		buf := new(bytes.Buffer)
+		if _, err = buf.ReadFrom(stream); err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		logEntries := parseExecutionLogs(buf.String())
+
+		c.JSON(http.StatusOK, gin.H{
+			"logs": logEntries,
+		})
+	}
+}
+
+type executionLogEntry struct {
+	Timestamp string `json:"timestamp"`
+	Status    int    `json:"status"`
+	Latency   string `json:"latency"`
+	ClientIP  string `json:"client_ip"`
+	Method    string `json:"method"`
+	Path      string `json:"path"`
+	User      string `json:"user"`
+	Raw       string `json:"raw"`
+}
+
+// parseExecutionLogs filters OSCAR execution log lines and structures them.
+func parseExecutionLogs(raw string) []executionLogEntry {
+	const prefix = "[GIN-EXECUTIONS-LOGGER]"
+
+	logText := utils.NormalizeLineEndings(raw)
+	lines := strings.Split(logText, "\n")
+	filtered := make([]executionLogEntry, 0, len(lines))
+
+	for _, line := range lines {
+		rawLine := strings.TrimSpace(line)
+		if len(rawLine) == 0 || !strings.Contains(rawLine, prefix) {
+			continue
+		}
+
+		entry := executionLogEntry{Raw: rawLine}
+
+		withoutPrefix := strings.TrimSpace(strings.TrimPrefix(rawLine, prefix))
+		parts := strings.Split(withoutPrefix, "|")
+		if len(parts) < 6 {
+			continue
+		}
+
+		rawTimestamp := strings.TrimSpace(parts[0])
+		if parsedTime, err := time.ParseInLocation("2006/01/02 - 15:04:05", rawTimestamp, time.Local); err == nil {
+			entry.Timestamp = parsedTime.UTC().Format(time.RFC3339)
+		} else {
+			entry.Timestamp = rawTimestamp
+		}
+		if status, err := strconv.Atoi(strings.TrimSpace(parts[1])); err == nil {
+			entry.Status = status
+		}
+		entry.Latency = strings.TrimSpace(parts[2])
+		entry.ClientIP = strings.TrimSpace(parts[3])
+		methodPath := strings.TrimSpace(parts[4])
+		user := strings.TrimSpace(parts[5])
+
+		methodPathFields := strings.Fields(methodPath)
+		if len(methodPathFields) < 2 {
+			continue
+		}
+		entry.Method = methodPathFields[0]
+		entry.Path = methodPathFields[1]
+		entry.User = user
+
+		if entry.Method != "POST" {
+			continue
+		}
+		if !strings.HasPrefix(entry.Path, "/run") && !strings.HasPrefix(entry.Path, "/job") {
+			continue
+		}
+
+		filtered = append(filtered, entry)
+	}
+
+	return filtered
+}
+
+// MakeDeleteJobHandler makes a handler for removing a job
 // MakeDeleteJobHandler godoc
 // @Summary Delete job
 // @Description Delete a specific job and its pod.
