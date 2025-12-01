@@ -121,7 +121,6 @@ func GetUIDFromContext(c *gin.Context) (string, error) {
 
 func GetUserNameFromContext(c *gin.Context) string {
 	userName := c.GetString("userName")
-	userName = utils.RemoveAccents(userName)
 	return userName
 }
 
