@@ -283,14 +283,15 @@ type Service struct {
 }
 
 type Expose struct {
-	MinScale       int32 `json:"min_scale" default:"1"`
-	MaxScale       int32 `json:"max_scale" default:"10"`
-	APIPort        int   `json:"api_port,omitempty" `
-	CpuThreshold   int32 `json:"cpu_threshold" default:"80" `
-	RewriteTarget  bool  `json:"rewrite_target" default:"false" `
-	NodePort       int32 `json:"nodePort" default:"0" `
-	DefaultCommand bool  `json:"default_command" `
-	SetAuth        bool  `json:"set_auth" `
+	MinScale       int32  `json:"min_scale" default:"1"`
+	MaxScale       int32  `json:"max_scale" default:"10"`
+	APIPort        int    `json:"api_port,omitempty" `
+	CpuThreshold   int32  `json:"cpu_threshold" default:"80" `
+	RewriteTarget  bool   `json:"rewrite_target" default:"false" `
+	NodePort       int32  `json:"nodePort" default:"0" `
+	DefaultCommand bool   `json:"default_command" `
+	SetAuth        bool   `json:"set_auth" `
+	HealthPath     string `json:"health_path" default:"/" `
 }
 
 // ToPodSpec returns a k8s podSpec from the Service
