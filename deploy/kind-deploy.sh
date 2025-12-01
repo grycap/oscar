@@ -792,10 +792,19 @@ rules:
   - ""
   resources:
   - configmaps
+  - pods
+  - pods/log
+  - podtemplates
+  - persistentvolumeclaims
+  - secrets
+  - services
   verbs:
   - get
   - list
   - watch
+  - create
+  - delete
+  - update
 - apiGroups:
   - ""
   resources:
@@ -826,20 +835,68 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - pods
-  - pods/log
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - persistentvolumes
   verbs:
   - get
   - list
   - create
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update 
+- apiGroups:
+  - autoscaling
+  resources:
+  - horizontalpodautoscalers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update 
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update 
+  - deletecollection
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+- apiGroups:
+  - serving.knative.dev
+  resources:
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
