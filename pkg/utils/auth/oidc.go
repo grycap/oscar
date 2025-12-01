@@ -57,6 +57,7 @@ type oidcManager struct {
 type userInfo struct {
 	Subject string
 	Groups  []string
+	Name    string
 }
 
 type KeycloakClaims struct {
@@ -158,6 +159,7 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 			}
 		}
 		c.Set("uidOrigin", uid)
+		c.Set("userName", ui.Name)
 		c.Set("multitenancyConfig", mc)
 		c.Next()
 	}
@@ -201,10 +203,20 @@ func (om *oidcManager) GetUserInfo(rawToken string) (*userInfo, error) {
 		return nil, cerr
 	}
 
+	// Extract name claim in a type-safe way
+	name := ""
+	var allClaims map[string]interface{}
+	if err := ui.Claims(&allClaims); err == nil {
+		if n, ok := allClaims["name"].(string); ok {
+			name = n
+		}
+	}
+
 	// Create "userInfo" struct and add the groups
 	return &userInfo{
 		Subject: ui.Subject,
 		Groups:  groups,
+		Name:    name,
 	}, nil
 }
 
