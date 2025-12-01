@@ -46,6 +46,7 @@ functions:
         set_auth: true
         rewrite_target: true
         default_command: true
+        health_path: "/"
       input:
       - storage_provider: minio.default
         path: example-workflow/med
@@ -149,6 +150,7 @@ storage_providers:
 | `set_auth` </br> *bool* | Create credentials for the service, composed of the service name as the user and the service token as the password. (default: false). Optional.  |
 | `rewrite_target` </br> *bool* | Target the URI where the traffic is redirected. (default: false). Optional.  |
 | `default_command` </br> *bool* | Select between executing the container's default command and executing the script inside the container. (default: false). Optional.  |
+| `health_path` </br> *string* | Change the service readiness and liveness check path/endpoint. (default: "/"). Optional.  |
 
 ## MountSettings
 | Field                        | Description                                 |
