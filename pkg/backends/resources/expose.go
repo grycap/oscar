@@ -53,18 +53,23 @@ An exposed service can be of to types:
 - Ingress */
 
 // CreateExpose creates all the kubernetes components
-func CreateExpose(service types.Service, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+func CreateExpose(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
 	//ExposeLogger.Printf("Creating exposed service: \n%v\n", service)
-	err := createDeployment(service, kubeClientset, cfg)
+	targetNamespace := namespace
+	if targetNamespace == "" {
+		targetNamespace = cfg.ServicesNamespace
+	}
+
+	err := createDeployment(service, targetNamespace, kubeClientset, cfg)
 	if err != nil {
 		return fmt.Errorf("error creating deployment for exposed service '%s': %v", service.Name, err)
 	}
-	err = createService(service, kubeClientset, cfg)
+	err = createService(service, targetNamespace, kubeClientset, cfg)
 	if err != nil {
 		return fmt.Errorf("error creating svc for exposed service '%s': %v", service.Name, err)
 	}
 	if service.Expose.NodePort == 0 {
-		err = createIngress(service, kubeClientset, cfg)
+		err = createIngress(service, targetNamespace, kubeClientset, cfg)
 		if err != nil {
 			return fmt.Errorf("error creating ingress for exposed service '%s': %v", service.Name, err)
 		}
@@ -73,21 +78,26 @@ func CreateExpose(service types.Service, kubeClientset kubernetes.Interface, cfg
 }
 
 // DeleteExpose removes all the components of the exposed service from the cluster
-func DeleteExpose(name string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
-	err := deleteDeployment(name, kubeClientset, cfg)
+func DeleteExpose(name string, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	targetNamespace := namespace
+	if targetNamespace == "" {
+		targetNamespace = cfg.ServicesNamespace
+	}
+
+	err := deleteDeployment(name, targetNamespace, kubeClientset, cfg)
 	if err != nil {
 		return fmt.Errorf("error deleting deployment for exposed service '%s': %v", name, err)
 	}
-	err = deleteService(name, kubeClientset, cfg)
+	err = deleteService(name, targetNamespace, kubeClientset, cfg)
 	if err != nil {
 		return fmt.Errorf("error deleting service for exposed service '%s': %v", name, err)
 	}
 
-	ingressType := existsIngress(name, cfg.ServicesNamespace, kubeClientset)
+	ingressType := existsIngress(name, targetNamespace, kubeClientset)
 	if ingressType {
-		err = deleteIngress(getIngressName(name), kubeClientset, cfg)
-		if existsSecret(name, kubeClientset, cfg) {
-			err = deleteSecret(name, kubeClientset, cfg)
+		err = deleteIngress(getIngressName(name), targetNamespace, kubeClientset, cfg)
+		if existsSecret(name, targetNamespace, kubeClientset, cfg) {
+			err = deleteSecret(name, targetNamespace, kubeClientset, cfg)
 			if err != nil {
 				return err
 			}
@@ -105,7 +115,7 @@ func DeleteExpose(name string, kubeClientset kubernetes.Interface, cfg *types.Co
 	listOpts := metav1.ListOptions{
 		LabelSelector: "app=oscar-svc-exp-" + name,
 	}
-	err = kubeClientset.CoreV1().Pods(cfg.ServicesNamespace).DeleteCollection(context.TODO(), delete, listOpts)
+	err = kubeClientset.CoreV1().Pods(targetNamespace).DeleteCollection(context.TODO(), delete, listOpts)
 	if err != nil {
 		return fmt.Errorf("error deleting pods of exposed service '%s': %v", name, err)
 	}
@@ -113,28 +123,32 @@ func DeleteExpose(name string, kubeClientset kubernetes.Interface, cfg *types.Co
 }
 
 // UpdateExpose updates all the components of the exposed service on the cluster
-func UpdateExpose(service types.Service, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+func UpdateExpose(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	targetNamespace := namespace
+	if targetNamespace == "" {
+		targetNamespace = cfg.ServicesNamespace
+	}
 
 	// If the deployment exist, and keep continue it will upload.
-	err := updateDeployment(service, kubeClientset, cfg)
+	err := updateDeployment(service, targetNamespace, kubeClientset, cfg)
 	if err != nil {
 		ExposeLogger.Printf("error updating exposed service deployment: %v\n", err)
 		return err
 	}
-	err = updateService(service, kubeClientset, cfg)
+	err = updateService(service, targetNamespace, kubeClientset, cfg)
 	if err != nil {
 		ExposeLogger.Printf("error updating exposed service: %v\n", err)
 		return err
 	}
 
-	ingressType := existsIngress(service.Name, cfg.ServicesNamespace, kubeClientset)
+	ingressType := existsIngress(service.Name, targetNamespace, kubeClientset)
 	// Old service config was Ingress type
 	if ingressType {
 		// New service config if NodePort
 		if service.Expose.NodePort != 0 {
-			err = deleteIngress(getIngressName(service.Name), kubeClientset, cfg)
-			if existsSecret(service.Name, kubeClientset, cfg) {
-				err := deleteSecret(service.Name, kubeClientset, cfg)
+			err = deleteIngress(getIngressName(service.Name), targetNamespace, kubeClientset, cfg)
+			if existsSecret(service.Name, targetNamespace, kubeClientset, cfg) {
+				err := deleteSecret(service.Name, targetNamespace, kubeClientset, cfg)
 				if err != nil {
 					return err
 				}
@@ -144,7 +158,7 @@ func UpdateExpose(service types.Service, kubeClientset kubernetes.Interface, cfg
 				return err
 			}
 		} else {
-			err = updateIngress(service, kubeClientset, cfg)
+			err = updateIngress(service, targetNamespace, kubeClientset, cfg)
 			if err != nil {
 				log.Printf("error updating ingress service: %v\n", err)
 				return err
@@ -153,7 +167,7 @@ func UpdateExpose(service types.Service, kubeClientset kubernetes.Interface, cfg
 	} else {
 		// Old service config is NodeType and the new one is Ingress type
 		if service.Expose.NodePort == 0 {
-			err = createIngress(service, kubeClientset, cfg)
+			err = createIngress(service, targetNamespace, kubeClientset, cfg)
 			if err != nil {
 				log.Printf("error creating ingress service: %v\n", err)
 				return err
@@ -168,10 +182,11 @@ func UpdateExpose(service types.Service, kubeClientset kubernetes.Interface, cfg
 // Main function that list all the kubernetes components
 // This function is not used, in the future could be useful
 func ListExpose(kubeClientset kubernetes.Interface, cfg *types.Config) error {
-	deploy, hpa, err := listDeployments(kubeClientset, cfg)
+	targetNamespace := cfg.ServicesNamespace
+	deploy, hpa, err := listDeployments(targetNamespace, kubeClientset, cfg)
 
-	services, err2 := listServices(kubeClientset, cfg)
-	ingress, err3 := listIngress(kubeClientset, cfg)
+	services, err2 := listServices(targetNamespace, kubeClientset, cfg)
+	ingress, err3 := listIngress(targetNamespace, kubeClientset, cfg)
 	if err != nil {
 		ExposeLogger.Printf("WARNING: %v\n", err)
 		return err
@@ -193,9 +208,9 @@ func ListExpose(kubeClientset kubernetes.Interface, cfg *types.Config) error {
 
 /// Create deployment and horizontal autoscale
 
-func createDeployment(service types.Service, kubeClientset kubernetes.Interface, cfg *types.Config) error {
-	deployment := getDeploymentSpec(service, cfg)
-	if utils.SecretExists(service.Name, cfg.ServicesNamespace, kubeClientset) {
+func createDeployment(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	deployment := getDeploymentSpec(service, namespace, cfg)
+	if utils.SecretExists(service.Name, namespace, kubeClientset) {
 		deployment.Spec.Template.Spec.Containers[0].EnvFrom = []v1.EnvFromSource{
 			{
 				SecretRef: &v1.SecretEnvSource{
@@ -206,13 +221,13 @@ func createDeployment(service types.Service, kubeClientset kubernetes.Interface,
 			},
 		}
 	}
-	_, err := kubeClientset.AppsV1().Deployments(cfg.ServicesNamespace).Create(context.TODO(), deployment, metav1.CreateOptions{})
+	_, err := kubeClientset.AppsV1().Deployments(namespace).Create(context.TODO(), deployment, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
 
-	hpa := getHortizontalAutoScaleSpec(service, cfg)
-	_, err = kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(cfg.ServicesNamespace).Create(context.TODO(), hpa, metav1.CreateOptions{})
+	hpa := getHortizontalAutoScaleSpec(service, namespace, cfg)
+	_, err = kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(namespace).Create(context.TODO(), hpa, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -220,12 +235,12 @@ func createDeployment(service types.Service, kubeClientset kubernetes.Interface,
 }
 
 // Return the component deployment, ready to create or update
-func getDeploymentSpec(service types.Service, cfg *types.Config) *apps.Deployment {
+func getDeploymentSpec(service types.Service, namespace string, cfg *types.Config) *apps.Deployment {
 	deployName := getDeploymentName(service.Name)
 	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deployName,
-			Namespace: cfg.ServicesNamespace,
+			Namespace: namespace,
 		},
 		Spec: apps.DeploymentSpec{
 			Replicas: &service.Expose.MinScale,
@@ -234,7 +249,7 @@ func getDeploymentSpec(service types.Service, cfg *types.Config) *apps.Deploymen
 					keyLabelApp: prefixLabelApp + service.Name,
 				},
 			},
-			Template: getPodTemplateSpec(service, cfg),
+			Template: getPodTemplateSpec(service, namespace, cfg),
 		},
 		Status: apps.DeploymentStatus{},
 	}
@@ -243,13 +258,13 @@ func getDeploymentSpec(service types.Service, cfg *types.Config) *apps.Deploymen
 }
 
 // Return the component HorizontalAutoScale, ready to create or update
-func getHortizontalAutoScaleSpec(service types.Service, cfg *types.Config) *autos.HorizontalPodAutoscaler {
+func getHortizontalAutoScaleSpec(service types.Service, namespace string, cfg *types.Config) *autos.HorizontalPodAutoscaler {
 	hpaName := getHPAName(service.Name)
 	deployName := getDeploymentName(service.Name)
 	hpa := &autos.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      hpaName,
-			Namespace: cfg.ServicesNamespace,
+			Namespace: namespace,
 		},
 		Spec: autos.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autos.CrossVersionObjectReference{
@@ -268,7 +283,7 @@ func getHortizontalAutoScaleSpec(service types.Service, cfg *types.Config) *auto
 
 // Return the Pod spec inside of deployment, ready to create or update
 
-func getPodTemplateSpec(service types.Service, cfg *types.Config) v1.PodTemplateSpec {
+func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Config) v1.PodTemplateSpec {
 	podSpec, _ := service.ToPodSpec(cfg)
 
 	for i := range podSpec.Containers {
@@ -287,19 +302,29 @@ func getPodTemplateSpec(service types.Service, cfg *types.Config) v1.PodTemplate
 			podSpec.Containers[i].Args = []string{"-c", fmt.Sprintf("%s/%s", types.ConfigPath, types.ScriptFileName)}
 		}
 
+		probePath := service.Expose.HealthPath
+		if service.Expose.RewriteTarget {
+			probePath = getAPIPath(service.Name) + service.Expose.HealthPath
+		}
+
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
-				Path: getAPIPath(service.Name),
+				Path: probePath,
 				Port: intstr.FromString(podPortName),
 			},
 		}
+
 		podSpec.Containers[i].LivenessProbe = &v1.Probe{
-			InitialDelaySeconds: 5,
+			InitialDelaySeconds: 30,
+			PeriodSeconds:       10,
 			ProbeHandler:        probeHandler,
+			TimeoutSeconds:      2,
 		}
 		podSpec.Containers[i].ReadinessProbe = &v1.Probe{
-			PeriodSeconds: 5,
-			ProbeHandler:  probeHandler,
+			InitialDelaySeconds: 10,
+			PeriodSeconds:       5,
+			ProbeHandler:        probeHandler,
+			TimeoutSeconds:      2,
 		}
 	}
 	var num int32 = 0777
@@ -310,7 +335,7 @@ func getPodTemplateSpec(service types.Service, cfg *types.Config) v1.PodTemplate
 	template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      service.Name,
-			Namespace: service.Image,
+			Namespace: namespace,
 			Labels: map[string]string{
 				keyLabelApp: prefixLabelApp + service.Name,
 			},
@@ -321,13 +346,13 @@ func getPodTemplateSpec(service types.Service, cfg *types.Config) v1.PodTemplate
 }
 
 // / List deployment and the horizontal auto scale
-func listDeployments(kubeClientset kubernetes.Interface, cfg *types.Config) (*apps.DeploymentList, *autos.HorizontalPodAutoscalerList, error) {
-	deployment, err := kubeClientset.AppsV1().Deployments(cfg.ServicesNamespace).List(context.TODO(), metav1.ListOptions{})
+func listDeployments(namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) (*apps.DeploymentList, *autos.HorizontalPodAutoscalerList, error) {
+	deployment, err := kubeClientset.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
 
-	hpa, err2 := kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(cfg.ServicesNamespace).List(context.TODO(), metav1.ListOptions{})
+	hpa, err2 := kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err2 != nil {
 		return nil, nil, err2
 	}
@@ -335,14 +360,14 @@ func listDeployments(kubeClientset kubernetes.Interface, cfg *types.Config) (*ap
 }
 
 // Delete Deployment and HPA
-func deleteDeployment(name string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+func deleteDeployment(name string, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
 	name_hpa := getHPAName(name)
-	err := kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(cfg.ServicesNamespace).Delete(context.TODO(), name_hpa, metav1.DeleteOptions{})
+	err := kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(namespace).Delete(context.TODO(), name_hpa, metav1.DeleteOptions{})
 	if err != nil {
 		return err
 	}
 	deployment := getDeploymentName(name)
-	err = kubeClientset.AppsV1().Deployments(cfg.ServicesNamespace).Delete(context.TODO(), deployment, metav1.DeleteOptions{})
+	err = kubeClientset.AppsV1().Deployments(namespace).Delete(context.TODO(), deployment, metav1.DeleteOptions{})
 	if err != nil {
 		return err
 	}
@@ -351,14 +376,14 @@ func deleteDeployment(name string, kubeClientset kubernetes.Interface, cfg *type
 
 ///Update Deployment and HPA
 
-func updateDeployment(service types.Service, kubeClientset kubernetes.Interface, cfg *types.Config) error {
-	_, err := kubeClientset.AppsV1().Deployments(cfg.ServicesNamespace).Get(context.TODO(), getDeploymentName(service.Name), metav1.GetOptions{})
+func updateDeployment(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	_, err := kubeClientset.AppsV1().Deployments(namespace).Get(context.TODO(), getDeploymentName(service.Name), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
-	deployment := getDeploymentSpec(service, cfg)
-	if utils.SecretExists(service.Name, cfg.ServicesNamespace, kubeClientset) {
+	deployment := getDeploymentSpec(service, namespace, cfg)
+	if utils.SecretExists(service.Name, namespace, kubeClientset) {
 		deployment.Spec.Template.Spec.Containers[0].EnvFrom = []v1.EnvFromSource{
 			{
 				SecretRef: &v1.SecretEnvSource{
@@ -369,17 +394,17 @@ func updateDeployment(service types.Service, kubeClientset kubernetes.Interface,
 			},
 		}
 	}
-	_, err = kubeClientset.AppsV1().Deployments(cfg.ServicesNamespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
+	_, err = kubeClientset.AppsV1().Deployments(namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
 
-	_, err = kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(cfg.ServicesNamespace).Get(context.TODO(), getHPAName(service.Name), metav1.GetOptions{})
+	_, err = kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(namespace).Get(context.TODO(), getHPAName(service.Name), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	hpa := getHortizontalAutoScaleSpec(service, cfg)
-	_, err = kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(cfg.ServicesNamespace).Update(context.TODO(), hpa, metav1.UpdateOptions{})
+	hpa := getHortizontalAutoScaleSpec(service, namespace, cfg)
+	_, err = kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(namespace).Update(context.TODO(), hpa, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
@@ -389,9 +414,9 @@ func updateDeployment(service types.Service, kubeClientset kubernetes.Interface,
 /////////// Service
 
 // Create a kubernetes service component
-func createService(service types.Service, kubeClientset kubernetes.Interface, cfg *types.Config) error {
-	service_spec := getServiceSpec(service, cfg)
-	_, err := kubeClientset.CoreV1().Services(cfg.ServicesNamespace).Create(context.TODO(), service_spec, metav1.CreateOptions{})
+func createService(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	service_spec := getServiceSpec(service, namespace, cfg)
+	_, err := kubeClientset.CoreV1().Services(namespace).Create(context.TODO(), service_spec, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -399,7 +424,7 @@ func createService(service types.Service, kubeClientset kubernetes.Interface, cf
 }
 
 // Return a kubernetes service component, ready to deploy or update
-func getServiceSpec(service types.Service, cfg *types.Config) *v1.Service {
+func getServiceSpec(service types.Service, namespace string, cfg *types.Config) *v1.Service {
 	name_service := getServiceName(service.Name)
 	var port v1.ServicePort = v1.ServicePort{
 		Name: servicePortName,
@@ -417,7 +442,7 @@ func getServiceSpec(service types.Service, cfg *types.Config) *v1.Service {
 	service_spec := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name_service,
-			Namespace: cfg.ServicesNamespace,
+			Namespace: namespace,
 		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{port},
@@ -433,8 +458,8 @@ func getServiceSpec(service types.Service, cfg *types.Config) *v1.Service {
 
 /// List services in a certain namespace
 
-func listServices(kubeClientset kubernetes.Interface, cfg *types.Config) (*v1.ServiceList, error) {
-	services, err := kubeClientset.CoreV1().Services(cfg.ServicesNamespace).List(context.TODO(), metav1.ListOptions{})
+func listServices(namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) (*v1.ServiceList, error) {
+	services, err := kubeClientset.CoreV1().Services(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -442,9 +467,9 @@ func listServices(kubeClientset kubernetes.Interface, cfg *types.Config) (*v1.Se
 }
 
 // / Update a kubernete service
-func updateService(service types.Service, kubeClientset kubernetes.Interface, cfg *types.Config) error {
-	kube_service := getServiceSpec(service, cfg)
-	_, err := kubeClientset.CoreV1().Services(cfg.ServicesNamespace).Update(context.TODO(), kube_service, metav1.UpdateOptions{})
+func updateService(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	kube_service := getServiceSpec(service, namespace, cfg)
+	_, err := kubeClientset.CoreV1().Services(namespace).Update(context.TODO(), kube_service, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
@@ -453,9 +478,9 @@ func updateService(service types.Service, kubeClientset kubernetes.Interface, cf
 
 /// Delete kubernetes service
 
-func deleteService(name string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+func deleteService(name string, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
 	kube_service := getServiceName(name)
-	err := kubeClientset.CoreV1().Services(cfg.ServicesNamespace).Delete(context.TODO(), kube_service, metav1.DeleteOptions{})
+	err := kubeClientset.CoreV1().Services(namespace).Delete(context.TODO(), kube_service, metav1.DeleteOptions{})
 	if err != nil {
 		return err
 	}
@@ -465,16 +490,16 @@ func deleteService(name string, kubeClientset kubernetes.Interface, cfg *types.C
 /////////// Ingress
 
 // / Create an ingress component
-func createIngress(service types.Service, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+func createIngress(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
 	// Create Secret
 
-	ingress := getIngressSpec(service, cfg)
-	_, err := kubeClientset.NetworkingV1().Ingresses(cfg.ServicesNamespace).Create(context.TODO(), ingress, metav1.CreateOptions{})
+	ingress := getIngressSpec(service, namespace, cfg)
+	_, err := kubeClientset.NetworkingV1().Ingresses(namespace).Create(context.TODO(), ingress, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
 	if service.Expose.SetAuth {
-		cerr := createSecret(service, kubeClientset, cfg)
+		cerr := createSecret(service, namespace, kubeClientset, cfg)
 		if cerr != nil {
 			return cerr
 		}
@@ -483,34 +508,34 @@ func createIngress(service types.Service, kubeClientset kubernetes.Interface, cf
 }
 
 // / Update a kubernete service
-func updateIngress(service types.Service, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+func updateIngress(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
 
 	serviceName := service.Name
 	//if exist continue and need -> Update
 	//if exist and not need -> delete
 	//if not  exist create
-	kube_ingress := getIngressSpec(service, cfg)
-	_, err := kubeClientset.NetworkingV1().Ingresses(cfg.ServicesNamespace).Update(context.TODO(), kube_ingress, metav1.UpdateOptions{})
+	kube_ingress := getIngressSpec(service, namespace, cfg)
+	_, err := kubeClientset.NetworkingV1().Ingresses(namespace).Update(context.TODO(), kube_ingress, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
 
-	secret := existsSecret(serviceName, kubeClientset, cfg)
+	secret := existsSecret(serviceName, namespace, kubeClientset, cfg)
 	if secret {
 		if service.Expose.SetAuth {
-			uerr := updateSecret(service, kubeClientset, cfg)
+			uerr := updateSecret(service, namespace, kubeClientset, cfg)
 			if uerr != nil {
 				return uerr
 			}
 		} else {
-			derr := deleteSecret(service.Name, kubeClientset, cfg)
+			derr := deleteSecret(service.Name, namespace, kubeClientset, cfg)
 			if derr != nil {
 				return derr
 			}
 		}
 	} else {
 		if service.Expose.SetAuth {
-			cerr := createSecret(service, kubeClientset, cfg)
+			cerr := createSecret(service, namespace, kubeClientset, cfg)
 			if cerr != nil {
 				return cerr
 			}
@@ -521,7 +546,7 @@ func updateIngress(service types.Service, kubeClientset kubernetes.Interface, cf
 }
 
 // Return a kubernetes ingress component, ready to deploy or update
-func getIngressSpec(service types.Service, cfg *types.Config) *net.Ingress {
+func getIngressSpec(service types.Service, namespace string, cfg *types.Config) *net.Ingress {
 	name_ingress := getIngressName(service.Name)
 	pathofapi := getAPIPath(service.Name)
 	name_service := getServiceName(service.Name)
@@ -593,7 +618,7 @@ func getIngressSpec(service types.Service, cfg *types.Config) *net.Ingress {
 	ingress := &net.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name_ingress,
-			Namespace:   cfg.ServicesNamespace,
+			Namespace:   namespace,
 			Annotations: annotation,
 		},
 		Spec:   specification,
@@ -604,8 +629,8 @@ func getIngressSpec(service types.Service, cfg *types.Config) *net.Ingress {
 
 /// List the kuberntes ingress
 
-func listIngress(kubeClientset kubernetes.Interface, cfg *types.Config) (*net.IngressList, error) {
-	ingress, err := kubeClientset.NetworkingV1().Ingresses(cfg.ServicesNamespace).List(context.TODO(), metav1.ListOptions{})
+func listIngress(namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) (*net.IngressList, error) {
+	ingress, err := kubeClientset.NetworkingV1().Ingresses(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -613,9 +638,9 @@ func listIngress(kubeClientset kubernetes.Interface, cfg *types.Config) (*net.In
 }
 
 // Delete a kubernetes ingress
-func deleteIngress(name string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+func deleteIngress(name string, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
 	// if secret exist, delete
-	err := kubeClientset.NetworkingV1().Ingresses(cfg.ServicesNamespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	err := kubeClientset.NetworkingV1().Ingresses(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		return err
 	}
@@ -624,33 +649,33 @@ func deleteIngress(name string, kubeClientset kubernetes.Interface, cfg *types.C
 
 // Secret
 
-func createSecret(service types.Service, kubeClientset kubernetes.Interface, cfg *types.Config) error {
-	secret := getSecretSpec(service, cfg)
-	_, err := kubeClientset.CoreV1().Secrets(cfg.ServicesNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+func createSecret(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	secret := getSecretSpec(service, namespace, cfg)
+	_, err := kubeClientset.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func updateSecret(service types.Service, kubeClientset kubernetes.Interface, cfg *types.Config) error {
-	secret := getSecretSpec(service, cfg)
-	_, err := kubeClientset.CoreV1().Secrets(cfg.ServicesNamespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
+func updateSecret(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	secret := getSecretSpec(service, namespace, cfg)
+	_, err := kubeClientset.CoreV1().Secrets(namespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func deleteSecret(name string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+func deleteSecret(name string, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
 	secret := getSecretName(name)
-	err := kubeClientset.CoreV1().Secrets(cfg.ServicesNamespace).Delete(context.TODO(), secret, metav1.DeleteOptions{})
+	err := kubeClientset.CoreV1().Secrets(namespace).Delete(context.TODO(), secret, metav1.DeleteOptions{})
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func getSecretSpec(service types.Service, cfg *types.Config) *v1.Secret {
+func getSecretSpec(service types.Service, namespace string, cfg *types.Config) *v1.Secret {
 	//setPassword
 	hash := make(htpasswd.HashedPasswords)
 	err := hash.SetPassword(service.Name, service.Token, htpasswd.HashAPR1)
@@ -662,7 +687,7 @@ func getSecretSpec(service types.Service, cfg *types.Config) *v1.Secret {
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getSecretName(service.Name),
-			Namespace: cfg.ServicesNamespace,
+			Namespace: namespace,
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
@@ -677,9 +702,9 @@ func getSecretSpec(service types.Service, cfg *types.Config) *v1.Secret {
 	return secret
 }
 
-func existsSecret(serviceName string, kubeClientset kubernetes.Interface, cfg *types.Config) bool {
+func existsSecret(serviceName string, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) bool {
 	secret := getSecretName(serviceName)
-	exist, err := kubeClientset.CoreV1().Secrets(cfg.ServicesNamespace).Get(context.TODO(), secret, metav1.GetOptions{})
+	exist, err := kubeClientset.CoreV1().Secrets(namespace).Get(context.TODO(), secret, metav1.GetOptions{})
 	if err != nil {
 		return false
 	}

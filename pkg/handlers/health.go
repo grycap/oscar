@@ -22,7 +22,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// HealthHandler health handler for kubernetes deployment
+// HealthHandler godoc
+// @Summary Health check
+// @Description Kubernetes liveness probe endpoint.
+// @Tags health
+// @Produce plain
+// @Success 200 {string} string "Ok"
+// @Router /health [get]
 func HealthHandler(c *gin.Context) {
 	c.String(http.StatusOK, "Ok")
 }

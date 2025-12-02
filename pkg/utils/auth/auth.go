@@ -119,6 +119,11 @@ func GetUIDFromContext(c *gin.Context) (string, error) {
 	return uid, nil
 }
 
+func GetUserNameFromContext(c *gin.Context) string {
+	userName := c.GetString("userName")
+	return userName
+}
+
 func GetMultitenancyConfigFromContext(c *gin.Context) (*MultitenancyConfig, error) {
 	mcUntyped, mcExists := c.Get("multitenancyConfig")
 	if !mcExists {

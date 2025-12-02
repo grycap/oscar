@@ -93,10 +93,6 @@ func TestMakeKubeBackend(t *testing.T) {
 		t.Error("error setting the kubernetes clientset")
 	}
 
-	if back.namespace != testConfig.ServicesNamespace {
-		t.Errorf("invalid servicesNamespace. Expected: %s, got: %s", testConfig.ServicesNamespace, back.namespace)
-	}
-
 	if back.config != testConfig {
 		t.Error("error setting the config")
 	}
@@ -340,7 +336,7 @@ func TestKubeReadService(t *testing.T) {
 		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Call
-		_, err := back.ReadService("test")
+		_, err := back.ReadService(testConfig.ServicesNamespace, "test")
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -355,7 +351,7 @@ func TestKubeReadService(t *testing.T) {
 		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "podtemplates", errorReaction)
 
 		// Call
-		_, err := back.ReadService("test")
+		_, err := back.ReadService(testConfig.ServicesNamespace, "test")
 		if err == nil {
 			t.Error("expecting error, got: nil")
 		}
@@ -373,7 +369,7 @@ func TestKubeReadService(t *testing.T) {
 		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("create", "configmaps", errorReaction)
 
 		// Call
-		_, err := back.ReadService("test")
+		_, err := back.ReadService(testConfig.ServicesNamespace, "test")
 		if err == nil {
 			t.Error("expecting error, got: nil")
 		}

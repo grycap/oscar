@@ -6,7 +6,7 @@ audio files from plain text.
 
 *Note: If you're going to invoke the service
 [synchronously](https://docs.oscar.grycap.net/invoking/#synchronous-invocations),
-you must enable a ServerlessBackend in OSCAR (Knative or OpenFaaS).*
+you must enable the Knative serverless backend in OSCAR.*
 
 You can specify the language of the resulting voice in the `language`
 environment variable of the FDL YAML file. If you don't know the code

@@ -2,15 +2,20 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/backends"
+	"github.com/grycap/oscar/v3/pkg/testsupport"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	testclient "k8s.io/client-go/kubernetes/fake"
 )
 
 var (
@@ -23,25 +28,9 @@ var (
 	}
 
 	testConfigValidRun types.Config = types.Config{
-		MinIOProvider:        &testMinIOProviderRun,
-		WatchdogMaxInflight:  20,
-		WatchdogWriteDebug:   true,
-		WatchdogExecTimeout:  60,
-		WatchdogReadTimeout:  60,
-		WatchdogWriteTimeout: 60,
+		MinIOProvider: &testMinIOProviderRun,
 	}
 )
-
-type GinResponseRecorder struct {
-	http.ResponseWriter
-}
-
-func (GinResponseRecorder) CloseNotify() <-chan bool {
-	return nil
-}
-
-func (GinResponseRecorder) Flush() {
-}
 
 func TestMakeRunHandler(t *testing.T) {
 
@@ -83,7 +72,7 @@ func TestMakeRunHandler(t *testing.T) {
 				}
 			}
 
-			r.ServeHTTP(GinResponseRecorder{w}, req)
+			r.ServeHTTP(w, req)
 			if s.returnError {
 
 				if s.errType == "splitErr" || s.errType == "diffErr" {
@@ -107,4 +96,181 @@ func TestMakeRunHandler(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMakeRunHandlerOIDCPath(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	back := backends.MakeFakeBackend()
+	kubeClientset := testclient.NewSimpleClientset()
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		fmt.Println("hreq.URL.Path:", hreq.URL.Path)
+		if hreq.URL.Path != "/input" && hreq.URL.Path != "/output" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
+			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
+		}
+		if hreq.URL.Path == "/minio/admin/v3/info" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+		} else {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"status": "success"}`))
+		}
+	}))
+	rawToken := "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf"
+	svc := &types.Service{
+		Name:  "hello",
+		Token: rawToken,
+		CPU:   "2.0",
+		StorageProviders: &types.StorageProviders{
+			MinIO: map[string]*types.MinIOProvider{types.DefaultProvider: {
+				Region:    "us-east-1",
+				Endpoint:  server.URL,
+				AccessKey: "ak",
+				SecretKey: "sk"}},
+		},
+		Owner:        "somelonguid@egi.eu",
+		AllowedUsers: []string{}}
+	back.Service = svc
+	cfg := types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Region:    "us-east-1",
+			Endpoint:  server.URL,
+			AccessKey: "ak",
+			SecretKey: "sk",
+		},
+	}
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "somelonguid@egi.eu")
+		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "somelonguid@egi.eu"))
+	})
+	r.POST("/run/:serviceName", MakeRunHandler(&cfg, back))
+
+	req := httptest.NewRequest(http.MethodPost, "/run/hello", nil)
+	req.Header.Set("Authorization", "Bearer "+rawToken)
+
+	resp := &closeNotifierRecorder{ResponseRecorder: httptest.NewRecorder()}
+	r.ServeHTTP(resp, req)
+	defer server.Close()
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200 from proxied request, got %d", resp.Code)
+	}
+}
+
+func TestMakeRunHandlerUnauthorized(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	back := backends.MakeFakeBackend()
+	kubeClientset := testclient.NewSimpleClientset()
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		if hreq.URL.Path != "/input" && hreq.URL.Path != "/output" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
+			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
+		}
+		if hreq.URL.Path == "/minio/admin/v3/info" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+		} else {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"status": "success"}`))
+		}
+	}))
+	svc := &types.Service{
+		Token: "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf",
+		CPU:   "2.0",
+		StorageProviders: &types.StorageProviders{
+			MinIO: map[string]*types.MinIOProvider{types.DefaultProvider: {
+				Region:    "us-east-1",
+				Endpoint:  server.URL,
+				AccessKey: "ak",
+				SecretKey: "sk"}},
+		},
+		Owner:        "somelonguid@egi.eu",
+		AllowedUsers: []string{}}
+	back.Service = svc
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "somelonguid@egi.eu")
+		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "somelonguid@egi.eu"))
+		c.Next()
+	})
+
+	r.POST("/run/:serviceName", MakeRunHandler(&testConfigValidRun, back))
+
+	req := httptest.NewRequest(http.MethodPost, "/run/hello", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+	defer server.Close()
+
+	if resp.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unauthorized status, got %d", resp.Code)
+	}
+}
+
+func TestMakeRunHandlerWithServiceToken(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	back := backends.MakeFakeBackend()
+	kubeClientset := testclient.NewSimpleClientset()
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		if hreq.URL.Path != "/input" && hreq.URL.Path != "/output" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
+			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
+		}
+		if hreq.URL.Path == "/minio/admin/v3/info" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+		} else {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"status": "success"}`))
+		}
+	}))
+	svc := &types.Service{
+		Token: "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf",
+		CPU:   "2.0",
+		StorageProviders: &types.StorageProviders{
+			MinIO: map[string]*types.MinIOProvider{types.DefaultProvider: {
+				Region:    "us-east-1",
+				Endpoint:  server.URL,
+				AccessKey: "ak",
+				SecretKey: "sk"}},
+		},
+		Owner:        "somelonguid@egi.eu",
+		AllowedUsers: []string{}}
+	back.Service = svc
+	cfg := types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Region:    "us-east-1",
+			Endpoint:  server.URL,
+			AccessKey: "ak",
+			SecretKey: "sk",
+		},
+	}
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "somelonguid@egi.eu")
+		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "somelonguid@egi.eu"))
+	})
+	r.POST("/run/:serviceName", MakeRunHandler(&cfg, back))
+
+	req := httptest.NewRequest(http.MethodPost, "/run/hello", nil)
+	req.Header.Set("Authorization", "Bearer "+svc.Token)
+
+	resp := &closeNotifierRecorder{ResponseRecorder: httptest.NewRecorder()}
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200 from proxied request, got %d", resp.Code)
+	}
+}
+
+type closeNotifierRecorder struct {
+	*httptest.ResponseRecorder
+}
+
+func (c *closeNotifierRecorder) CloseNotify() <-chan bool {
+	ch := make(chan bool, 1)
+	return ch
 }

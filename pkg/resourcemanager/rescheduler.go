@@ -117,11 +117,12 @@ func getReScheduleInfos(pods []v1.Pod, back types.ServerlessBackend) []reSchedul
 
 	for _, pod := range pods {
 		serviceName := pod.Labels[types.ServiceLabel]
+		serviceKey := fmt.Sprintf("%s/%s", pod.Namespace, serviceName)
 
 		// Check if service is already in svcPtrs
-		if _, ok := svcPtrs[serviceName]; !ok {
+		if _, ok := svcPtrs[serviceKey]; !ok {
 			var err error
-			svcPtrs[serviceName], err = back.ReadService(serviceName)
+			svcPtrs[serviceKey], err = back.ReadService(pod.Namespace, serviceName)
 			if err != nil {
 				reSchedulerLogger.Printf("error getting service: %v\n", err)
 			}
@@ -130,7 +131,7 @@ func getReScheduleInfos(pods []v1.Pod, back types.ServerlessBackend) []reSchedul
 		// Check if pod has the "job-name" label
 		if jobName, ok := pod.Labels["job-name"]; ok {
 			rsi = append(rsi, reScheduleInfo{
-				service: svcPtrs[serviceName],
+				service: svcPtrs[serviceKey],
 				event:   getEvent(pod.Spec),
 				jobName: jobName,
 			})

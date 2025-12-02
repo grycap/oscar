@@ -25,9 +25,9 @@ import (
 // ServerlessBackend define an interface for OSCAR's backends
 type ServerlessBackend interface {
 	GetInfo() *ServerlessBackendInfo
-	ListServices() ([]*Service, error)
+	ListServices(namespaces ...string) ([]*Service, error)
 	CreateService(service Service) error
-	ReadService(name string) (*Service, error)
+	ReadService(namespace, name string) (*Service, error)
 	UpdateService(service Service) error
 	DeleteService(service Service) error
 	GetKubeClientset() kubernetes.Interface
