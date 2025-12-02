@@ -283,6 +283,13 @@ func (kn *KnativeBackend) DeleteService(service types.Service) error {
 		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
 	}
 
+	if utils.SecretExists(name, namespace, kn.kubeClientset) {
+		secretsErr := utils.DeleteSecret(name, namespace, kn.kubeClientset)
+		if secretsErr != nil {
+			log.Printf("Error deleting asociated secret: %v", secretsErr)
+		}
+	}
+
 	// If service is exposed delete the exposed k8s components
 	if service.Expose.APIPort != 0 {
 		if err := resources.DeleteExpose(name, namespace, kn.kubeClientset, kn.config); err != nil {

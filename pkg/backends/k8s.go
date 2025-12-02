@@ -26,6 +26,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/backends/resources"
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -272,6 +273,13 @@ func (k *KubeBackend) DeleteService(service types.Service) error {
 	// Delete all the service's jobs
 	if err := deleteServiceJobs(name, namespace, k.kubeClientset); err != nil {
 		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
+	}
+
+	if utils.SecretExists(name, namespace, k.kubeClientset) {
+		secretsErr := utils.DeleteSecret(name, namespace, k.kubeClientset)
+		if secretsErr != nil {
+			log.Printf("Error deleting asociated secret: %v", secretsErr)
+		}
 	}
 
 	// If service is exposed delete the exposed k8s components
