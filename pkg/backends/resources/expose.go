@@ -313,6 +313,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 				Port: intstr.FromString(podPortName),
 			},
 		}
+
 		podSpec.Containers[i].LivenessProbe = &v1.Probe{
 			InitialDelaySeconds: 30,
 			PeriodSeconds:       10,
