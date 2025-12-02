@@ -41,12 +41,12 @@ Before deploying it, you can adjust the resources or other parameters depending 
 
 ![oscar hub cowsay config](images/usage/oscar-hub-03.png)
 
-For the invocation you can see the [synchronous invocation via dashboard](invoking-sync.md#synchronous-invocations-via-oscar-dashboard) example, it use the same service.
+For the invocation you can see the [synchronous invocation via dashboard](invoking-sync.md#synchronous-invocations-via-oscar-dashboard) example. It uses the same service.
 
 ## Manual deployment
 
 To do the manual deployment, you need to click on "New" on the Service page, which is the first page you see after you log in.
-button and follow the wizard. For an [OSCAR Service](oscar-service.md) a script must be provided for the
+Press the button and follow the wizard. For an [OSCAR Service](oscar-service.md) a script must be provided for the
 processing of files. This script must use the environment variables
 `INPUT_FILE_PATH` and `TMP_OUTPUT_DIR` to refer to the input file and the
 folder where to save the results respectively:
