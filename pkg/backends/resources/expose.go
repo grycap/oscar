@@ -313,13 +313,18 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 				Port: intstr.FromString(podPortName),
 			},
 		}
+
 		podSpec.Containers[i].LivenessProbe = &v1.Probe{
-			InitialDelaySeconds: 5,
+			InitialDelaySeconds: 30,
+			PeriodSeconds:       10,
 			ProbeHandler:        probeHandler,
+			TimeoutSeconds:      2,
 		}
 		podSpec.Containers[i].ReadinessProbe = &v1.Probe{
-			PeriodSeconds: 5,
-			ProbeHandler:  probeHandler,
+			InitialDelaySeconds: 10,
+			PeriodSeconds:       5,
+			ProbeHandler:        probeHandler,
+			TimeoutSeconds:      2,
 		}
 	}
 	var num int32 = 0777
