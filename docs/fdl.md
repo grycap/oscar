@@ -174,7 +174,7 @@ storage_providers:
 
 | Field                        | Description                                 |
 |------------------------------| --------------------------------------------|
-| `storage_provider` </br> *string* | Reference to the storage provider defined in [storage_providers](#storage_providers). This string is composed by the provider's name (minio, s3, onedata, webdav, rucio) and the identifier (defined by the user), separated by a point (e.g. "minio.myidentifier") |
+| `storage_provider` </br> *string* | Reference to the storage provider defined in [storage_providers](#storageproviders). This string is composed by the provider's name (minio, s3, onedata, webdav, rucio) and the identifier (defined by the user), separated by a point (e.g. "minio.myidentifier") |
 | `path` </br> *string*             | Path in the storage provider. In MinIO and S3 the first directory of the specified path is translated into the bucket's name (e.g. "bucket/folder/subfolder")                                                                                    |
 | `suffix` </br> *string array*     | Array of suffixes for filtering the files to be uploaded. Only used in the `output` field. Optional                                                                                                                                              |
 | `prefix` </br> *string array*     | Array of prefixes for filtering the files to be uploaded. Only used in the `output` field. Optional                                                                                                                                              |

@@ -218,7 +218,7 @@ EOF
 
 OSCAR supports [Knative Serving](https://knative.dev/docs/serving/) as
 Serverless Backend to process
-[synchronous invocations](invoking.md#synchronous-invocations). If you want
+[synchronous invocations](invoking-sync.md). If you want
 to deploy it in the kind cluster, first you must deploy the
 [Knative Operator](https://knative.dev/docs/install/operator/knative-with-operators/)
 

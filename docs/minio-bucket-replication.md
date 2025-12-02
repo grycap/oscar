@@ -24,7 +24,7 @@ Here is in more detail the data flow between the buckets:
 
 When you create the service on the remote OSCAR cluster, the `intermediate` bucket which is both the replica and input of the OSCAR service will have the webhook event for PUT actions enabled so it can trigger the OSCAR service.
 
-Because, as explained below on [Event handling on replication events](#Event-handling-on-replication-events), there are some specific events for replicated buckets, it is important to delete this event webhook to avoid getting both events every time.
+Because, as explained below on [Event handling on replication events](#event-handling-on-replication-events), there are some specific events for replicated buckets, it is important to delete this event webhook to avoid getting both events every time.
 
 ```
 mc event remove originminio/intermediate arn:aws:sqs::intermediate:webhook --event put
