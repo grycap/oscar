@@ -232,6 +232,12 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
+		if cfg.KueueEnable {
+			if err := utils.EnsureKueueUserQueues(c.Request.Context(), cfg, service.Namespace, service.Owner, service.Name); err != nil {
+				createLogger.Printf("error ensuring Kueue queues for service %s: %v\n", service.Name, err)
+			}
+		}
+
 		// Register minio webhook and restart the server
 		if err := registerMinIOWebhook(service.Name, service.Token, service.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
 			derr := back.DeleteService(service)
