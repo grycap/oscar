@@ -95,7 +95,7 @@ func TestFakeGetProxyDirector(t *testing.T) {
 	director := back.GetProxyDirector("svc")
 	director(req)
 
-	if req.URL.Host != "httpbin.org" || req.URL.Path != "/status/200" {
+	if req.URL.Path != "/" || req.URL.Host == "" {
 		t.Fatalf("unexpected proxy target: %s%s", req.URL.Host, req.URL.Path)
 	}
 }

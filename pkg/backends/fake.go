@@ -19,6 +19,7 @@ package backends
 import (
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"runtime"
 	"strings"
 
@@ -36,6 +37,7 @@ type FakeBackend struct {
 	// UpdatedService stores the last service received through UpdateService.
 	UpdatedService *types.Service
 	kubeClientset  kubernetes.Interface
+	proxyServer    *httptest.Server
 }
 
 // MakeFakeBackend returns the pointer of a new FakeBackend struct
@@ -121,13 +123,17 @@ func (f *FakeBackend) SetKubeClientset(client kubernetes.Interface) {
 
 // GetProxyDirector returns the ProxyDirector (fake)
 func (f *FakeBackend) GetProxyDirector(serviceName string) func(req *http.Request) {
+	if f.proxyServer == nil {
+		f.proxyServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+	}
+	target := f.proxyServer.URL
 	return func(req *http.Request) {
-		host := "httpbin.org"
-		req.Host = host
-
-		req.URL.Scheme = "https"
-		req.URL.Host = host
-		req.URL.Path = "/status/200"
+		req.Host = strings.TrimPrefix(target, "http://")
+		req.URL.Scheme = "http"
+		req.URL.Host = req.Host
+		req.URL.Path = "/"
 	}
 }
 

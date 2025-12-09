@@ -171,7 +171,7 @@ func TestMakeCreateHandler(t *testing.T) {
 		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "somelonguid@egi.eu"))
 		c.Next()
 	})
-	r.POST("/system/services", MakeCreateHandler(&cfg, back))
+	r.POST("/system/services", MakeCreateHandler(&cfg, back, nil))
 
 	scenarios := []struct {
 		name           string
@@ -281,7 +281,7 @@ func TestMakeCreateHandlerWebhookError(t *testing.T) {
 		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "owner@example.com"))
 		c.Next()
 	})
-	r.POST("/system/services", MakeCreateHandler(&cfg, back))
+	r.POST("/system/services", MakeCreateHandler(&cfg, back, nil))
 
 	body := strings.NewReader(`{"name":"svc","image":"img","script":"echo","mount":{"storage_provider":"minio","path":"test/mount"},"visibility":"public"}`)
 	req := httptest.NewRequest(http.MethodPost, "/system/services", body)
@@ -384,7 +384,7 @@ func TestMakeCreateHandlerInvalidBody(t *testing.T) {
 	cfg := &types.Config{MinIOProvider: &types.MinIOProvider{}}
 
 	r := gin.New()
-	r.POST("/system/services", MakeCreateHandler(cfg, back))
+	r.POST("/system/services", MakeCreateHandler(cfg, back, nil))
 
 	req := httptest.NewRequest(http.MethodPost, "/system/services", strings.NewReader("{invalid json"))
 	req.Header.Set("Content-Type", "application/json")

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -28,8 +29,10 @@ type quotaValues struct {
 }
 
 type quotaUpdateRequest struct {
-	CPU    string `json:"cpu"`
-	Memory string `json:"memory"`
+	CPU                  string `json:"cpu"`
+	Memory               string `json:"memory"`
+	BucketMaxPerUser     *int   `json:"bucket_max_per_user"`
+	BucketDefaultMaxSize string `json:"bucket_default_max_size"`
 }
 
 // MakeGetOwnQuotaHandler handles GET /system/quotas/user for the bearer user.
@@ -49,7 +52,7 @@ func MakeGetOwnQuotaHandler(cfg *types.Config, kubeConfig *rest.Config) gin.Hand
 			c.String(http.StatusUnauthorized, fmt.Sprintf("missing user identificator: %v", err))
 			return
 		}
-		resp, err := fetchQuota(c.Request.Context(), kubeConfig, uid)
+		resp, err := fetchQuota(c.Request.Context(), cfg, kubeConfig, uid)
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
@@ -79,7 +82,7 @@ func MakeGetUserQuotaHandler(cfg *types.Config, kubeConfig *rest.Config) gin.Han
 			return
 		}
 
-		resp, err := fetchQuota(c.Request.Context(), kubeConfig, user)
+		resp, err := fetchQuota(c.Request.Context(), cfg, kubeConfig, user)
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
@@ -117,15 +120,15 @@ func MakeUpdateUserQuotaHandler(cfg *types.Config, kubeConfig *rest.Config) gin.
 			c.String(http.StatusBadRequest, fmt.Sprintf("invalid payload: %v", err))
 			return
 		}
-		if req.CPU == "" && req.Memory == "" {
-			c.String(http.StatusBadRequest, "cpu or memory must be provided")
+		if req.CPU == "" && req.Memory == "" && req.BucketMaxPerUser == nil && req.BucketDefaultMaxSize == "" {
+			c.String(http.StatusBadRequest, "at least one quota field must be provided")
 			return
 		}
-		if err := updateQuota(c.Request.Context(), kubeConfig, user, req); err != nil {
+		if err := updateQuota(c.Request.Context(), cfg, kubeConfig, user, req); err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
-		resp, err := fetchQuota(c.Request.Context(), kubeConfig, user)
+		resp, err := fetchQuota(c.Request.Context(), cfg, kubeConfig, user)
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
@@ -134,7 +137,7 @@ func MakeUpdateUserQuotaHandler(cfg *types.Config, kubeConfig *rest.Config) gin.
 	}
 }
 
-func fetchQuota(ctx context.Context, kubeConfig *rest.Config, user string) (*quotaResponse, error) {
+func fetchQuota(ctx context.Context, cfg *types.Config, kubeConfig *rest.Config, user string) (*quotaResponse, error) {
 	client, err := kueueclientset.NewForConfig(kubeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("creating kueue client: %w", err)
@@ -179,10 +182,30 @@ func fetchQuota(ctx context.Context, kubeConfig *rest.Config, user string) (*quo
 
 	resp.Resources["cpu"] = quotaValues{Max: maxCPU, Used: usedCPU}
 	resp.Resources["memory"] = quotaValues{Max: maxMem, Used: usedMem}
+
+	bucketMax, bucketSizeMax, err := utils.GetEffectiveBucketQuota(ctx, cfg, kubeConfig, user)
+	if err != nil {
+		return nil, fmt.Errorf("getting bucket quotas: %w", err)
+	}
+	bucketMaxStr := ""
+	if bucketMax > 0 {
+		bucketMaxStr = strconv.Itoa(bucketMax)
+	}
+	bucketUsed := ""
+	if bucketMax > 0 && cfg.MinIOProvider != nil {
+		minioAdmin, err := utils.MakeMinIOAdminClient(cfg)
+		if err == nil {
+			if count, err := minioAdmin.CountBucketsByOwner(cfg.MinIOProvider.GetS3Client(), user); err == nil {
+				bucketUsed = strconv.Itoa(count)
+			}
+		}
+	}
+	resp.Resources["bucket_count"] = quotaValues{Max: bucketMaxStr, Used: bucketUsed}
+	resp.Resources["bucket_size"] = quotaValues{Max: bucketSizeMax, Used: "-"}
 	return resp, nil
 }
 
-func updateQuota(ctx context.Context, kubeConfig *rest.Config, user string, req quotaUpdateRequest) error {
+func updateQuota(ctx context.Context, cfg *types.Config, kubeConfig *rest.Config, user string, req quotaUpdateRequest) error {
 	client, err := kueueclientset.NewForConfig(kubeConfig)
 	if err != nil {
 		return fmt.Errorf("creating kueue client: %w", err)
@@ -199,6 +222,7 @@ func updateQuota(ctx context.Context, kubeConfig *rest.Config, user string, req 
 	}
 
 	flavor := &cq.Spec.ResourceGroups[0].Flavors[0]
+	changedCQ := false
 	for i, res := range flavor.Resources {
 		switch res.Name {
 		case corev1.ResourceCPU:
@@ -208,6 +232,7 @@ func updateQuota(ctx context.Context, kubeConfig *rest.Config, user string, req 
 					return fmt.Errorf("invalid cpu quantity: %w", err)
 				}
 				flavor.Resources[i].NominalQuota = q
+				changedCQ = true
 			}
 		case corev1.ResourceMemory:
 			if req.Memory != "" {
@@ -216,10 +241,33 @@ func updateQuota(ctx context.Context, kubeConfig *rest.Config, user string, req 
 					return fmt.Errorf("invalid memory quantity: %w", err)
 				}
 				flavor.Resources[i].NominalQuota = q
+				changedCQ = true
 			}
 		}
 	}
 
-	_, err = client.KueueV1beta2().ClusterQueues().Update(ctx, cq, metav1.UpdateOptions{})
-	return err
+	if changedCQ {
+		if _, err = client.KueueV1beta2().ClusterQueues().Update(ctx, cq, metav1.UpdateOptions{}); err != nil {
+			return err
+		}
+	}
+
+	if req.BucketMaxPerUser != nil || req.BucketDefaultMaxSize != "" {
+		if kubeConfig == nil {
+			return fmt.Errorf("bucket quotas cannot be stored without kube config")
+		}
+		if req.BucketDefaultMaxSize != "" {
+			if _, err := resource.ParseQuantity(req.BucketDefaultMaxSize); err != nil {
+				return fmt.Errorf("invalid bucket_default_max_size: %w", err)
+			}
+		}
+		spec := utils.BucketQuotaSpec{}
+		if req.BucketMaxPerUser != nil {
+			spec.BucketMaxPerUser = req.BucketMaxPerUser
+		}
+		spec.BucketDefaultMaxSize = req.BucketDefaultMaxSize
+		return utils.SetBucketQuotaOverride(ctx, cfg, kubeConfig, user, spec)
+	}
+
+	return nil
 }

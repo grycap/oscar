@@ -39,6 +39,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/minio/minio-go/v7/pkg/tags"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -545,6 +546,28 @@ func (minIOAdminClient *MinIOAdminClient) SetTags(bucket string, newtags map[str
 	return nil
 }
 
+// SetBucketQuota sets a hard size quota for a bucket.
+func (minIOAdminClient *MinIOAdminClient) SetBucketQuota(bucket string, size string) error {
+	q, err := resource.ParseQuantity(size)
+	if err != nil {
+		return fmt.Errorf("invalid bucket quota %q: %w", size, err)
+	}
+	quotaBytes := uint64(q.Value())
+	err = minIOAdminClient.adminClient.SetBucketQuota(context.TODO(), bucket, &madmin.BucketQuota{
+		Type:  madmin.HardQuota,
+		Quota: quotaBytes,
+	})
+	if err != nil {
+		// Some MinIO deployments (mode-server-fs) do not support bucket quotas; log and continue.
+		if strings.Contains(strings.ToLower(err.Error()), "not supported") {
+			minioLogger.Printf("bucket quota not applied to %s: %v", bucket, err)
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
 func (minIOAdminClient *MinIOAdminClient) GetTaggedMetadata(bucket string) (map[string]string, error) {
 	btags, err := minIOAdminClient.simpleClient.GetBucketTagging(context.TODO(), bucket)
 	if err != nil {
@@ -560,6 +583,26 @@ func (minIOAdminClient *MinIOAdminClient) GetBucketMembers(bucket string) ([]str
 		return []string{}, fmt.Errorf("error getting group description for %s: %v", bucket, err)
 	}
 	return groupDescription.Members, nil
+}
+
+// CountBucketsByOwner returns how many buckets are tagged with the given owner.
+func (minIOAdminClient *MinIOAdminClient) CountBucketsByOwner(s3Client *s3.S3, owner string) (int, error) {
+	resp, err := s3Client.ListBuckets(&s3.ListBucketsInput{})
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	for _, b := range resp.Buckets {
+		md, err := minIOAdminClient.GetTaggedMetadata(*b.Name)
+		if err != nil {
+			continue
+		}
+		if mdOwner, ok := md["owner"]; ok && mdOwner == owner {
+			count++
+		}
+	}
+	return count, nil
 }
 
 // CreateAddPolicy creates a policy asociated to a bucket to set its visibility

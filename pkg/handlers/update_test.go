@@ -63,7 +63,7 @@ func TestMakeUpdateHandler(t *testing.T) {
 		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "somelonguid@egi.eu"))
 		c.Next()
 	})
-	r.PUT("/system/services", MakeUpdateHandler(&cfg, back))
+	r.PUT("/system/services", MakeUpdateHandler(&cfg, back, nil))
 
 	w := httptest.NewRecorder()
 	body := strings.NewReader(`
@@ -135,7 +135,7 @@ func TestMakeUpdateHandlerUnauthorizedVO(t *testing.T) {
 		c.Set("uidOrigin", "owner")
 		c.Next()
 	})
-	r.PUT("/system/services", MakeUpdateHandler(&cfg, back))
+	r.PUT("/system/services", MakeUpdateHandler(&cfg, back, nil))
 
 	body := `{"name":"svc","vo":"vo1","token":"t","visibility":"private"}`
 	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
@@ -160,7 +160,7 @@ func TestMakeUpdateHandlerForbiddenOwner(t *testing.T) {
 		c.Set("uidOrigin", "other")
 		c.Next()
 	})
-	r.PUT("/system/services", MakeUpdateHandler(cfg, back))
+	r.PUT("/system/services", MakeUpdateHandler(cfg, back, nil))
 
 	body := `{"name":"svc","token":"t","visibility":"private"}`
 	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))

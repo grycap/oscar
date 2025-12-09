@@ -166,6 +166,13 @@ type Config struct {
 	// KueueDefaultFlavor default ResourceFlavor name used for ClusterQueues
 	KueueDefaultFlavor string `json:"-"`
 
+	// BucketQuotaEnable toggles setting a hard quota on newly created buckets
+	BucketQuotaEnable bool `json:"-"`
+	// BucketDefaultMaxSize max size per bucket when BucketQuotaEnable is true (e.g. "50Gi")
+	BucketDefaultMaxSize string `json:"-"`
+	// BucketMaxPerUser maximum number of buckets a non-admin user can own
+	BucketMaxPerUser int `json:"-"`
+
 	// ResourceManagerEnable option to enable the Resource Manager to delegate jobs
 	// when there are no available resources in the cluster (if the service has replicas)
 	ResourceManagerEnable bool `json:"-"`
@@ -265,6 +272,9 @@ var configVars = []configVar{
 	{"KueueDefaultCPU", "KUEUE_DEFAULT_CPU", false, stringType, "2"},
 	{"KueueDefaultMemory", "KUEUE_DEFAULT_MEMORY", false, stringType, "2Gi"},
 	{"KueueDefaultFlavor", "KUEUE_DEFAULT_FLAVOR", false, stringType, "oscar-default-flavor"},
+	{"BucketQuotaEnable", "BUCKET_QUOTA_ENABLE", false, boolType, "true"},
+	{"BucketDefaultMaxSize", "BUCKET_DEFAULT_MAX_SIZE", false, stringType, "1Gi"},
+	{"BucketMaxPerUser", "BUCKET_MAX_PER_USER", false, intType, "5"},
 	{"ResourceManagerEnable", "RESOURCE_MANAGER_ENABLE", false, boolType, "false"},
 	//{"ResourceManager", "RESOURCE_MANAGER", false, resourceManagerType, "kubernetes"},
 	{"ResourceManagerInterval", "RESOURCE_MANAGER_INTERVAL", false, intType, "15"},

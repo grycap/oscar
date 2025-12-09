@@ -29,6 +29,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/rest"
 )
 
 // Custom logger
@@ -50,7 +51,7 @@ var updateLogger = log.New(os.Stdout, "[UPDATE-HANDLER] ", log.Flags())
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/services [put]
-func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
+func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend, kubeConfig *rest.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var provName string
 		var newService types.Service
@@ -210,8 +211,14 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Use create buckets function to create new inputs/outputs if needed
+		bucketMax, bucketSize, err := utils.GetEffectiveBucketQuota(c.Request.Context(), cfg, kubeConfig, newService.Owner)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error reading bucket quotas: %v", err))
+			return
+		}
+
 		var newServiceBuckets []utils.MinIOBucket
-		if newServiceBuckets, err = createBuckets(&newService, cfg, minIOAdminClient, true); err != nil {
+		if newServiceBuckets, err = createBuckets(&newService, cfg, minIOAdminClient, true, bucketMax, bucketSize); err != nil {
 			if err == errInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {

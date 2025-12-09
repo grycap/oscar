@@ -32,6 +32,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -61,7 +62,7 @@ var isAdminUser = false
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/services [post]
-func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
+func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend, kubeConfig *rest.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var service types.Service
 		isAdminUser = false
@@ -248,8 +249,14 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
+		bucketMax, bucketSize, err := utils.GetEffectiveBucketQuota(c.Request.Context(), cfg, kubeConfig, service.Owner)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error reading bucket quotas: %v", err))
+			return
+		}
+
 		var buckets []utils.MinIOBucket
-		if buckets, err = createBuckets(&service, cfg, minIOAdminClient, false); err != nil {
+		if buckets, err = createBuckets(&service, cfg, minIOAdminClient, false, bucketMax, bucketSize); err != nil {
 			if err == errInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {
@@ -374,11 +381,31 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	service.Token = utils.GenerateToken()
 }
 
-func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient, isUpdate bool) ([]utils.MinIOBucket, error) {
+func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient, isUpdate bool, bucketMax int, bucketSize string) ([]utils.MinIOBucket, error) {
 	var s3Client *s3.S3
 	var cdmiClient *cdmi.Client
 	var provName, provID string
 	var minIOBuckets []utils.MinIOBucket
+
+	existingBuckets := map[string]bool{}
+	if bucketMax > 0 && !isAdminUser {
+		adminS3 := cfg.MinIOProvider.GetS3Client()
+		bucketList, err := adminS3.ListBuckets(&s3.ListBucketsInput{})
+		if err != nil {
+			return nil, fmt.Errorf("listing buckets: %v", err)
+		}
+		for _, b := range bucketList.Buckets {
+			existingBuckets[*b.Name] = true
+		}
+		owned, err := minIOAdminClient.CountBucketsByOwner(adminS3, service.Owner)
+		if err != nil {
+			return nil, fmt.Errorf("checking bucket ownership: %v", err)
+		}
+		newNeeded := countNewBuckets(service, existingBuckets)
+		if owned+newNeeded > bucketMax {
+			return nil, fmt.Errorf("creating service would exceed bucket limit: current=%d, new=%d, max=%d", owned, newNeeded, bucketMax)
+		}
+	}
 
 	// ========== CREATE INPUT BUCKETS ==========
 	for _, in := range service.Input {
@@ -419,6 +446,11 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		if err != nil && !isUpdate {
 			return nil, err
 		}
+		if err == nil {
+			if err := applyBucketQuotaIfEnabled(cfg, bucketSize, minIOAdminClient, splitPath[0]); err != nil {
+				return nil, err
+			}
+		}
 
 		minIOBuckets = append(minIOBuckets, utils.MinIOBucket{
 			BucketName:   splitPath[0],
@@ -437,6 +469,9 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 					if err != nil {
 						return nil, err
 					}
+				}
+				if err := applyBucketQuotaIfEnabled(cfg, bucketSize, minIOAdminClient, b); err != nil {
+					return nil, err
 				}
 				// Create bucket policy
 				if !isAdminUser {
@@ -494,6 +529,11 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				if err != nil && !isUpdate {
 					return nil, err
 				}
+				if err == nil {
+					if err := applyBucketQuotaIfEnabled(cfg, bucketSize, minIOAdminClient, splitPath[0]); err != nil {
+						return nil, err
+					}
+				}
 			} else {
 				// If the bucket is created on the previous loop, add output folders
 				err := minIOAdminClient.CreateS3Path(s3Client, splitPath, true)
@@ -506,6 +546,9 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				for _, b := range service.BucketList {
 					err := minIOAdminClient.CreateS3Path(s3Client, []string{b, folderKey}, true)
 					if err != nil && !isUpdate {
+						return nil, err
+					}
+					if err := applyBucketQuotaIfEnabled(cfg, bucketSize, minIOAdminClient, b); err != nil {
 						return nil, err
 					}
 				}
@@ -616,6 +659,58 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	}
 
 	return minIOBuckets, nil
+}
+
+func applyBucketQuotaIfEnabled(cfg *types.Config, bucketSize string, minIOAdminClient *utils.MinIOAdminClient, bucket string) error {
+	if !cfg.BucketQuotaEnable || bucketSize == "" {
+		return nil
+	}
+	return minIOAdminClient.SetBucketQuota(bucket, bucketSize)
+}
+
+func countNewBuckets(service *types.Service, existing map[string]bool) int {
+	newBuckets := map[string]struct{}{}
+	addBucket := func(name string) {
+		if name == "" {
+			return
+		}
+		if existing[name] {
+			return
+		}
+		newBuckets[name] = struct{}{}
+	}
+
+	for _, in := range service.Input {
+		provID, provName := getProviderInfo(in.Provider)
+		if provName != types.MinIOName || provID != types.DefaultProvider {
+			continue
+		}
+		path := strings.Trim(in.Path, " /")
+		splitPath := strings.SplitN(path, "/", 2)
+		addBucket(splitPath[0])
+		if strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser {
+			for _, b := range service.BucketList {
+				addBucket(b)
+			}
+		}
+	}
+
+	for _, out := range service.Output {
+		provID, provName := getProviderInfo(out.Provider)
+		if provName != types.MinIOName || provID != types.DefaultProvider {
+			continue
+		}
+		path := strings.Trim(out.Path, " /")
+		splitPath := strings.SplitN(path, "/", 2)
+		addBucket(splitPath[0])
+		if strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser {
+			for _, b := range service.BucketList {
+				addBucket(b)
+			}
+		}
+	}
+
+	return len(newBuckets)
 }
 
 func isStorageProviderDefined(storageName string, storageID string, providers *types.StorageProviders) bool {

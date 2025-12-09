@@ -27,6 +27,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -53,7 +54,7 @@ var isAdminUser = false
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/buckets [post]
-func MakeCreateHandler(cfg *types.Config) gin.HandlerFunc {
+func MakeCreateHandler(cfg *types.Config, kubeConfig *rest.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var uid string
 		var bucket utils.MinIOBucket
@@ -92,13 +93,41 @@ func MakeCreateHandler(cfg *types.Config) gin.HandlerFunc {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", err))
 			return
 		}
+		bucketMax, bucketSize, err := utils.GetEffectiveBucketQuota(c.Request.Context(), cfg, kubeConfig, uid)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error reading bucket quotas: %v", err))
+			return
+		}
 
 		path := strings.Trim(bucket.BucketName, " /")
+		if path == "" {
+			c.String(http.StatusBadRequest, "bucket_name is required")
+			return
+		}
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
+
+		if bucketMax > 0 && !isAdminUser {
+			owned, err := minIOAdminClient.CountBucketsByOwner(s3Client, uid)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error checking bucket limits: %v", err))
+				return
+			}
+			if owned >= bucketMax {
+				c.String(http.StatusForbidden, fmt.Sprintf("Maximum number of buckets reached (%d)", bucketMax))
+				return
+			}
+		}
 		if err := minIOAdminClient.CreateS3Path(s3Client, splitPath, false); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("Error creating bucket with name '%s': %v", splitPath[0], err))
 			return
+		}
+
+		if cfg.BucketQuotaEnable && bucketSize != "" {
+			if err := minIOAdminClient.SetBucketQuota(splitPath[0], bucketSize); err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error setting bucket quota: %v", err))
+				return
+			}
 		}
 
 		ownerName := "oscar"

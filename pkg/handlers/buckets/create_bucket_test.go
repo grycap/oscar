@@ -137,7 +137,7 @@ func TestMakeCreateBucketHandler(t *testing.T) {
 			}
 
 			router := gin.New()
-			router.POST("/system/buckets", MakeCreateHandler(cfg))
+			router.POST("/system/buckets", MakeCreateHandler(cfg, nil))
 
 			req, err := http.NewRequest(http.MethodPost, "/system/buckets", strings.NewReader(tt.body))
 			if err != nil {
@@ -181,7 +181,7 @@ func TestMakeCreateBucketHandlerMissingUID(t *testing.T) {
 	router := gin.New()
 	router.POST("/system/buckets", func(c *gin.Context) {
 		c.Set("uidOrigin", "")
-		MakeCreateHandler(cfg)(c)
+	MakeCreateHandler(cfg, nil)(c)
 	})
 
 	body := `{"bucket_path":"user-bucket"}`

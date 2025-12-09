@@ -108,14 +108,14 @@ func main() {
 	system.GET("/config", handlers.MakeConfigHandler(cfg))
 
 	// CRUD Services
-	system.POST("/services", handlers.MakeCreateHandler(cfg, back))
+	system.POST("/services", handlers.MakeCreateHandler(cfg, back, kubeConfig))
 	system.GET("/services", handlers.MakeListHandler(back))
 	system.GET("/services/:serviceName", handlers.MakeReadHandler(back))
-	system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
+	system.PUT("/services", handlers.MakeUpdateHandler(cfg, back, kubeConfig))
 	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
 
 	// CRUD Buckets
-	system.POST("/buckets", buckets.MakeCreateHandler(cfg))
+	system.POST("/buckets", buckets.MakeCreateHandler(cfg, kubeConfig))
 	system.GET("/buckets", buckets.MakeListHandler(cfg))
 	system.GET("/buckets/:bucket", buckets.MakeGetHandler(cfg))
 	system.PUT("/buckets", buckets.MakeUpdateHandler(cfg))
