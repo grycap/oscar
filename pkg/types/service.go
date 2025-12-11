@@ -89,6 +89,9 @@ const (
 	// YunikornDefaultPartition name of the default Yunikorn partition
 	YunikornDefaultPartition = "default"
 
+	// KueueOwnerLabel label used to tag Kueue objects owned by OSCAR
+	KueueOwnerLabel = "oscar.grycap/owner"
+
 	// KnativeVisibilityLabel name of the knative visibility label
 	KnativeVisibilityLabel = "networking.knative.dev/visibility"
 

@@ -306,6 +306,10 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 
 		// Create job definition
 		ttl := int32(cfg.TTLJob) // #nosec
+		suspend := false
+		if cfg.KueueEnable {
+			suspend = true
+		}
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				// UUID used as a name for jobs
@@ -316,6 +320,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				Annotations: service.Annotations,
 			},
 			Spec: batchv1.JobSpec{
+				Suspend:                 &suspend,
 				BackoffLimit:            &backoffLimit,
 				TTLSecondsAfterFinished: &ttl,
 				Template: v1.PodTemplateSpec{
@@ -335,6 +340,17 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			} else {
 				job.Labels[types.ReSchedulerLabelKey] = strconv.Itoa(cfg.ReSchedulerThreshold)
 			}
+		}
+
+		// Point the job to the service's LocalQueue so Kueue can admit it.
+		if cfg.KueueEnable {
+			if job.Labels == nil {
+				job.Labels = make(map[string]string)
+			}
+			if job.Annotations == nil {
+				job.Annotations = make(map[string]string)
+			}
+			job.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 		}
 
 		_, err = kubeClientset.BatchV1().Jobs(serviceNamespace).Create(context.TODO(), job, metav1.CreateOptions{})
