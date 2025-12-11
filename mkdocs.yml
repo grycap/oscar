@@ -24,6 +24,12 @@ nav:
   - api.md
   - MinIO: minio-usage.md
 
+- Service Deployment:
+  - deployment-api.md
+  - deployment-oscar-cli.md
+  - deployment-oscar-dashboard.md
+  - deployment-python.md
+
 - Service Execution: 
   - invoking.md
   - invoking-sync.md
