@@ -18,7 +18,7 @@ deployed on multi-Clouds, and even on low-powered devices, to create highly-para
 data-processing serverless applications along the computing continuum. These applications execute on customized runtime
 environments provided by Docker containers that run on elastic Kubernetes clusters.
 
-Information on how to deploy an OSCAR cluster using the Infrastucture Manager can be found at: https://grycap.github.io/oscar/deploy-im-dashboard/
+Information on how to deploy an OSCAR cluster using the Infrastructure Manager can be found at: https://grycap.github.io/oscar/deploy-im-dashboard/
 
 For more documentation visit https://docs.oscar.grycap.net
 
@@ -35,7 +35,7 @@ For more documentation visit https://docs.oscar.grycap.net
 
 FaaS platforms are typically oriented to the execution of short-lived functions,
 coded in a certain programming language, in response to events. Scientific
-application can greatly benefit from this event-driven computing paradigm in
+applications can greatly benefit from this event-driven computing paradigm in
 order to trigger on demand the execution of a resource-intensive application
 that requires processing a certain file that was just uploaded to a storage
 service. This requires additional support for the execution of generic
@@ -79,7 +79,7 @@ The following components are deployed inside the Kubernetes cluster to support t
     container-based applications for synchronous invocations (default Serverless
     Backend).
 - [OSCAR Manager](https://docs.oscar.grycap.net/api/), the main API, responsible for the management of the services and the integration of the different components. 
-- [OSCAR UI](https://github.com/grycap/oscar-ui), an easy-to-use web-based graphical user interface aimed at end users.
+- [OSCAR Dashboard](https://github.com/grycap/oscar-dashboard), an easy-to-use web-based graphical user interface aimed at end users.
 
 
 As external storage providers, the following services can be used:
@@ -100,7 +100,7 @@ on any major public and on-premises Cloud provider, including the EGI Federated 
 ## Licensing
 
 OSCAR is licensed under the Apache License, Version 2.0. See
-[LICENSE](https://github.com/grycap/scar/blob/master/LICENSE) for the full
+[LICENSE](LICENSE) for the full
 license text.
 
 ## Acknowledgements

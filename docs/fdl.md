@@ -46,6 +46,7 @@ functions:
         set_auth: true
         rewrite_target: true
         default_command: true
+        health_path: "/"
       input:
       - storage_provider: minio.default
         path: example-workflow/med
@@ -102,11 +103,11 @@ storage_providers:
 | `cluster_id` </br> *string*                                       | Identifier for the current cluster, used to specify the cluster's StorageProvider in job delegations. OSCAR-CLI sets it using the _cluster_id_ from the FDL. Optional. (default: "")                                                                            |
 | `image` </br> *string*                                            | Docker image for the service                                                                                                    |
 | `vo` </br> *string*                                               | Virtual Organization (VO) in which the user creating the service is enrolled. (Required for multitenancy)                                                             |
-| `allowed_users` </br> *string array*                    | Array of EGI UIDs to grant specific user permissions on the service. If empty, the service is considered as accesible to all the users with access to the OSCAR cluster. (Enabled since OSCAR version v3.0.0).                                                                                                                                                                |
+| `allowed_users` </br> *string array*                    | Array of EGI UIDs to grant specific user permissions on the service. If empty, the service is considered as accessible to all the users with access to the OSCAR cluster. (Enabled since OSCAR version v3.0.0).                                                                                                                                                                |
 | `alpine` </br> *boolean*                                          | Set if the Docker image is based on Alpine. If `true`, a custom release of the [faas-supervisor](https://github.com/grycap/faas-supervisor) will be used. Optional (default: false)                                                                                                                   |
 | `script` </br> *string*                                           | Local path to the user script to be executed inside the container created out of the service invocation                                                                                                                                                                                        |
 | `file_stage_in` </br> *bool*                                      | Skip the download of the input files by the [faas-supervisor](https://github.com/grycap/faas-supervisor) (default: false)                                   |
-| `image_pull_secrets` </br> *string array*                         | Array of Kubernetes secrets. Only needed to use private images located on private registries.                                                                                            | `allowed_users` </br> *string array*                         | Array of EGI UIDS to allow specific users to interact with the service. (Can be used since version of OSCAR v3.0.0)                                                                        |
+| `image_pull_secrets` </br> *string array*                         | Array of Kubernetes secrets. Only needed to use private images located on private registries.                                                                                            |
 | `memory` </br> *string*                                           | Memory limit for the service following the [kubernetes format](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory). Optional (default: 256Mi)                                                           |
 | `cpu` </br> *string*                                              | CPU limit for the service following the [kubernetes format](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu). Optional (default: 0.2)                                                                   |
 | `enable_gpu` </br> *bool*                                         | Enable the use of GPU. Requires a device plugin deployed on the cluster (More info: [Kubernetes device plugins](https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/#using-device-plugins)). Optional (default: false) |
@@ -114,10 +115,11 @@ storage_providers:
 | `image_prefetch` </br> *bool*                                         | Enable the use of image prefetching (retrieve the container image in the nodes when creating the service). Optional (default: false) |
 | `total_memory` </br> *string*                                     | Limit for the memory used by all the service's jobs running simultaneously. [Apache YuniKorn](https://yunikorn.apache.org)'s' scheduler is required to work. Same format as Memory, but internally translated to MB (integer). Optional (default: "")                                          |
 | `total_cpu` </br> *string*                                        | Limit for the virtual CPUs used by all the service's jobs running simultaneously. [Apache YuniKorn](https://yunikorn.apache.org)'s' scheduler is required to work. Same format as CPU, but internally translated to millicores (integer). Optional (default: "")                               |
+| `delegation` </br> *string*                                       | Mode of job delegation for replicas. Optional. Values: `static` (default), `random`, `load-based`, `topsis`.                                                                                                                    |
 | `synchronous` </br> *[SynchronousSettings](#synchronoussettings)* | Struct to configure specific sync parameters. This settings are only applied on Knative ServerlessBackend. Optional.                                                                                                                                         |
 | `expose` </br> *[ExposeSettings](#exposesettings)* | Allows to expose the API or UI of the application run in the OSCAR service outside of the Kubernetes cluster. Optional.                                                                                                                                         |
 | `replicas` </br> *[Replica](#replica) array*                      | List of replicas to delegate jobs. Optional.                                                                                                                                                                                                                 |
-| `rescheduler_threshold` </br> *string*                            | Time (in seconds) that a job (with replicas) can be queued before delegating it. Optional.                                                                                                                                                                   |
+| `rescheduler_threshold` </br> *integer*                            | Time (in seconds) that a job (with replicas) can be queued before delegating it. Optional.                                                                                                                                                                   |
 | `log_level` </br> *string*                                        | Log level for the [faas-supervisor](https://github.com/grycap/faas-supervisor). Available levels: NOTSET, DEBUG, INFO, WARNING, ERROR and CRITICAL. Optional (default: INFO)                                                                                                                              |
 | `input` </br> *[StorageIOConfig](#storageioconfig) array*         | Array with the input configuration for the service. Optional                                                                                                                                                                                                 |
 | `output` </br> *[StorageIOConfig](#storageioconfig) array*        | Array with the output configuration for the service. Optional                                                                                                                                                                                                |
@@ -127,6 +129,7 @@ storage_providers:
 | `interlink_node_name` </br> *string*                              | Name of the virtual kubelet node (if you are using InterLink nodes) Optional 
 | `isolation_level` </br> *string*                              |  Select the isolation level of the MinIO buckets: `SERVICE` or `USER` (`SERVICE` by default) Optional 
 | `visibility` </br> *string*                              |  Select the visibility level of service: `private`, `restricted` or `public` (`private` by default) Optional 
+| `mount` </br> *[MountSettings](#mountsettings)*                   | Configuration to mount a storage provider path inside the service container. Optional. 
 
 ## SynchronousSettings
 
@@ -141,12 +144,13 @@ storage_providers:
 |------------------------------| --------------------------------------------|
 | `min_scale` </br> *integer*  | Minimum number of active replicas (pods) for the service. Optional. (default: 1)             |
 | `max_scale` </br> *integer*  | Maximum number of active replicas (pods) for the service. Optional. (default: 10 (Unlimited)) |
-| `port` </br> *integer*       | Port inside the container where the API is exposed. (value: 0 , the service wont be exposed.)             |
+| `api_port` </br> *integer*   | Port inside the container where the API is exposed. (value: 0 , the service will not be exposed.)             |
 | `cpu_threshold` </br> *integer* | Percent of use of CPU before creating other pod (default: 80 max:100). Optional.  |
 | `nodePort` </br> *integer* | Change the access method from the domain name to the public ip. Optional.   |
 | `set_auth` </br> *bool* | Create credentials for the service, composed of the service name as the user and the service token as the password. (default: false). Optional.  |
 | `rewrite_target` </br> *bool* | Target the URI where the traffic is redirected. (default: false). Optional.  |
 | `default_command` </br> *bool* | Select between executing the container's default command and executing the script inside the container. (default: false). Optional.  |
+| `health_path` </br> *string* | Change the service readiness and liveness check path/endpoint. (default: "/"). Optional.  |
 
 ## MountSettings
 | Field                        | Description                                 |
@@ -170,7 +174,7 @@ storage_providers:
 
 | Field                        | Description                                 |
 |------------------------------| --------------------------------------------|
-| `storage_provider` </br> *string* | Reference to the storage provider defined in [storage_providers](#storage_providers). This string is composed by the provider's name (minio, s3, onedata) and the identifier (defined by the user), separated by a point (e.g. "minio.myidentifier") |
+| `storage_provider` </br> *string* | Reference to the storage provider defined in [storage_providers](#storageproviders). This string is composed by the provider's name (minio, s3, onedata, webdav, rucio) and the identifier (defined by the user), separated by a point (e.g. "minio.myidentifier") |
 | `path` </br> *string*             | Path in the storage provider. In MinIO and S3 the first directory of the specified path is translated into the bucket's name (e.g. "bucket/folder/subfolder")                                                                                    |
 | `suffix` </br> *string array*     | Array of suffixes for filtering the files to be uploaded. Only used in the `output` field. Optional                                                                                                                                              |
 | `prefix` </br> *string array*     | Array of prefixes for filtering the files to be uploaded. Only used in the `output` field. Optional                                                                                                                                              |
@@ -189,7 +193,7 @@ storage_providers:
 | `minio` </br> *map[string][MinIOProvider](#minioprovider)*       | Map to define the credentials for a MinIO storage provider, being the key the user-defined identifier for the provider                         |
 | `s3` </br> *map[string][S3Provider](#s3provider)*                | Map to define the credentials for an Amazon S3 storage provider, being the key the user-defined identifier for the provider                     |
 | `onedata` </br> *map[string][OnedataProvider](#onedataprovider)* | Map to define the credentials for a Onedata storage provider, being the key the user-defined identifier for the provider                       |
-| `webdav` </br> *map[string][WebDavProvider](#webdavprovider)*    | Map to define the credentials for a storage provider accesible via WebDAV protocol, being the key the user-defined identifier for the provider |
+| `webdav` </br> *map[string][WebDavProvider](#webdavprovider)*    | Map to define the credentials for a storage provider accessible via WebDAV protocol, being the key the user-defined identifier for the provider |
 | `rucio` </br> *map[string][RucioProvider](#rucioprovider)*    | Map to define the credentials for a Rucio storage provider, being the key the user-defined identifier for the provider |
 
 ## Cluster
