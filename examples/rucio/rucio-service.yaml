@@ -1,0 +1,26 @@
+functions:
+  oscar:
+    - oscar-cluster:
+        name: rucio-example
+        memory: 1Gi
+        cpu: "1.0"
+        log_level: DEBUG
+        image: ghcr.io/grycap/fish-detector:1.0.0 # docker image
+        file_stage_in: false
+        input:
+          - storage_provider: rucio.rucio
+            path: rucio/input
+        output:
+          - storage_provider: minio.default
+            path: rucio/output
+        vo: <vo> # e.g., dev.intertwin.eu
+storage_providers:
+  rucio:
+    rucio:
+      host: <rucio-endpoint> #e.g., rucio-intertwin-messaging.desy.de
+      auth_host: https://<rucio-endpoint> #e.g., https://rucio-intertwin-messaging.desy.de
+      account: <rucio-account> #i.e., scope-user
+      rse: <rse> #e.g., DESY-DCACHE
+      refresh_token: <oidc-token> 
+      oidc_audience: <oidc-audience> #e.g., rucio-testbed
+      token_endpoint: https://aai-demo.egi.eu/auth/realms/egi/protocol/openid-connect/token # OIDC token issuer
