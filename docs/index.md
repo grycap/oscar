@@ -61,19 +61,17 @@ As external storage providers, the following services can be used:
 
 - External [MinIO](https://min.io) servers, which may be in clusters other
     than the platform.
-- Amazon [S3](https://aws.amazon.com/s3/), AWS's object storage
+- [Amazon S3](https://aws.amazon.com/s3/), AWS's object storage
     service that offers industry-leading scalability, data availability,
     security, and performance in the public Cloud.
 - [Onedata](https://onedata.org/), the global data access solution for science
     used in the [EGI Federated Cloud](https://datahub.egi.eu/).
-- Any storage provider that can be accessible through
+- Any storage provider that can be accessed through
     [WebDAV](http://www.webdav.org/) protocol. An example of a storage provider
-    supporting this protocol is [dCache](https://dcache.org/), a storage
-    middleware system capable of managing the storage and exchange of large data
-    quantities.
+    supporting this protocol is [dCache](https://dcache.org/) (input via WebDAV).
+- [Rucio](https://rucio.cern.ch/).
 
-***Note**: All of the mentioned storage providers can be used as output, but
-only MinIO can be used as input. Amazon S3 and dCache  need [DCNiOS](https://intertwin-eu.github.io/dcnios/) as output.*
+***Note**: Currently, inputs are supported from MinIO, WebDAV/dCache, and Rucio. Outputs are supported to MinIO, S3, Onedata and Rucio. Use MinIO as the default input provider for most use cases. Amazon S3, dCache, Kafka and Rucio as input sources of events need [DCNiOS](https://intertwin-eu.github.io/dcnios/)*
 
 
 An OSCAR cluster can be easily deployed via the [IM Dashboard](http://im.egi.eu)
