@@ -38,105 +38,11 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 )
 
-// NEW STRUCTURES (CLUSTER)
-
-type CPUMetrics struct {
-	TotalFreeCores     int64 `json:"total_free_cores"`
-	MaxFreeOnNodeCores int64 `json:"max_free_on_node_cores"`
-}
-
-type MemoryMetrics struct {
-	TotalFreeBytes     int64 `json:"total_free_bytes"`
-	MaxFreeOnNodeBytes int64 `json:"max_free_on_node_bytes"`
-}
-
-type GPUMetrics struct {
-	TotalGPU int64 `json:"total_gpu"`
-}
-
-type ClusterMetrics struct {
-	CPU    CPUMetrics    `json:"cpu"`
-	Memory MemoryMetrics `json:"memory"`
-	GPU    GPUMetrics    `json:"gpu"`
-}
-
-type NodeResource struct {
-	CapacityCores int64 `json:"capacity_cores,omitempty"`
-	UsageCores    int64 `json:"usage_cores,omitempty"`
-	CapacityBytes int64 `json:"capacity_bytes,omitempty"`
-	UsageBytes    int64 `json:"usage_bytes,omitempty"`
-}
-
-type NodeConditionSimple struct {
-	Type   string `json:"type"`
-	Status bool   `json:"status"`
-}
-
-type NodeDetail struct {
-	Name        string                `json:"name"`
-	CPU         NodeResource          `json:"cpu"`
-	Memory      NodeResource          `json:"memory"`
-	GPU         int64                 `json:"gpu"`
-	IsInterlink bool                  `json:"is_interlink"`
-	Status      string                `json:"status"`
-	Conditions  []NodeConditionSimple `json:"conditions"`
-}
-
-type ClusterInfo struct {
-	NodesCount int64          `json:"nodes_count"`
-	Metrics    ClusterMetrics `json:"metrics"`
-	Nodes      []NodeDetail   `json:"nodes"`
-}
-
-// NEW STRUCTURES (OSCAR)
-
-type OscarDeployment struct {
-	AvailableReplicas int32             `json:"available_replicas"`
-	ReadyReplicas     int32             `json:"ready_replicas"`
-	Replicas          int32             `json:"replicas"`
-	CreationTimestamp metav1.Time       `json:"creation_timestamp"`
-	Strategy          string            `json:"strategy"`
-	Labels            map[string]string `json:"labels"`
-}
-
-type OIDCInfo struct {
-	Enabled bool     `json:"enabled"`
-	Issuers []string `json:"issuers"`
-	Groups  []string `json:"groups"`
-}
-
-type PodStates struct {
-	Total  int            `json:"total"`
-	States map[string]int `json:"states"`
-}
-
-type OscarInfo struct {
-	DeploymentName string          `json:"deployment_name"`
-	Ready          bool            `json:"ready"`
-	Deployment     OscarDeployment `json:"deployment"`
-	JobsCount      int             `json:"jobs_count"` // Total jobs (Active + Succeeded + Failed)
-	Pods           PodStates       `json:"pods"`
-	OIDC           OIDCInfo        `json:"oidc"`
-}
-
-//  NEW STRUCTURES (MINIO)
-
-type MinioInfo struct {
-	BucketsCount int `json:"buckets_count"`
-	TotalObjects int `json:"total_objects"`
-}
-
 //  ROOT STRUCTURE
-
-type NewStatusInfo struct {
-	Cluster ClusterInfo `json:"cluster"`
-	Oscar   OscarInfo   `json:"oscar"`
-	MinIO   MinioInfo   `json:"minio"`
-}
 
 // Enhanced struct to store both display strings and int64 values
 type NodeInfoWithAllocatable struct {
-	NodeDetail        NodeDetail
+	NodeDetail        types.NodeDetail
 	CPUAllocatable    int64
 	MemoryAllocatable int64
 	GPUAllocatable    int64
@@ -151,7 +57,7 @@ func contains(s, substr string) bool {
 // @Description Retrieve cluster, OSCAR deployment and MinIO status data.
 // @Tags status
 // @Produce json
-// @Success 200 {object} handlers.NewStatusInfo
+// @Success 200 {object} types.StatusInfo
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
@@ -160,7 +66,7 @@ func contains(s, substr string) bool {
 func MakeStatusHandler(cfg *types.Config, kubeClientset kubernetes.Interface, metricsClientset versioned.MetricsV1beta1Interface) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
-		clusterInfo := NewStatusInfo{}
+		clusterInfo := types.StatusInfo{}
 		var isAdmin bool = false
 		if len(strings.Split(authHeader, "Bearer")) > 1 {
 			uid, err := auth.GetUIDFromContext(c)
@@ -177,7 +83,7 @@ func MakeStatusHandler(cfg *types.Config, kubeClientset kubernetes.Interface, me
 		}
 
 		// Initialize ClusterInfo
-		clusterInfo.Cluster.Nodes = make([]NodeDetail, 0)
+		clusterInfo.Cluster.Nodes = make([]types.NodeDetail, 0)
 		clusterInfo.Cluster.Metrics.GPU.TotalGPU = 0
 
 		nodeInfoMap, err := getNodesInfo(kubeClientset, &clusterInfo)
@@ -239,7 +145,7 @@ func isControlPlaneNode(node v1.Node) bool {
 	return false
 }
 
-func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *NewStatusInfo) (map[string]*NodeInfoWithAllocatable, error) {
+func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *types.StatusInfo) (map[string]*NodeInfoWithAllocatable, error) {
 	nodes, err := kubeClientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -268,14 +174,14 @@ func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *NewStatusInfo
 
 		// 2. Status
 		nodeStatus := "Unknown"
-		var conditions []NodeConditionSimple
+		var conditions []types.NodeConditionSimple
 		for _, cond := range node.Status.Conditions {
 			isReady := (cond.Type == v1.NodeReady)
 
 			// Map k8s status (True/False/Unknown) to bool (true/false)
 			conditionStatus := cond.Status == v1.ConditionTrue
 
-			conditions = append(conditions, NodeConditionSimple{
+			conditions = append(conditions, types.NodeConditionSimple{
 				Type:   string(cond.Type),
 				Status: conditionStatus,
 			})
@@ -291,13 +197,13 @@ func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *NewStatusInfo
 
 		// Create NodeDetail and NodeInfoWithAllocatable
 		nodeInfoMap[nodeName] = &NodeInfoWithAllocatable{
-			NodeDetail: NodeDetail{
+			NodeDetail: types.NodeDetail{
 				Name: nodeName,
-				CPU: NodeResource{
+				CPU: types.NodeResource{
 					CapacityCores: cpu_alloc, // Use CapacityCores
 					UsageCores:    0,         // Will be updated in getMetricsInfo
 				},
-				Memory: NodeResource{
+				Memory: types.NodeResource{
 					CapacityBytes: memory_alloc, // Use CapacityBytes
 					UsageBytes:    0,            // Will be updated in getMetricsInfo
 				},
@@ -320,7 +226,7 @@ func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *NewStatusInfo
 
 // getMetricsInfo
 
-func getMetricsInfo(kubeClientset kubernetes.Interface, metricsClientset versioned.MetricsV1beta1Interface, nodeInfoMap map[string]*NodeInfoWithAllocatable, clusterInfo *NewStatusInfo) error {
+func getMetricsInfo(kubeClientset kubernetes.Interface, metricsClientset versioned.MetricsV1beta1Interface, nodeInfoMap map[string]*NodeInfoWithAllocatable, clusterInfo *types.StatusInfo) error {
 	nodeMetricsList, err := metricsClientset.NodeMetricses().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error getting metrics nodes: %v\n", err)
@@ -333,7 +239,7 @@ func getMetricsInfo(kubeClientset kubernetes.Interface, metricsClientset version
 	var memory_max_free int64 = 0
 	var number_nodes int64 = 0
 
-	var nodeDetailList []NodeDetail
+	var nodeDetailList []types.NodeDetail
 	for _, metrics := range nodeMetricsList.Items {
 		nodeName := metrics.Name
 		if nodeInfo, exists := nodeInfoMap[nodeName]; exists {
@@ -388,7 +294,7 @@ func getMetricsInfo(kubeClientset kubernetes.Interface, metricsClientset version
 
 // getDeploymentInfo
 
-func getDeploymentInfo(kubeClientset kubernetes.Interface, cfg *types.Config, clusterInfo *NewStatusInfo) (err error) {
+func getDeploymentInfo(kubeClientset kubernetes.Interface, cfg *types.Config, clusterInfo *types.StatusInfo) (err error) {
 	// Get OSCAR deployment status
 	deploymentsClient := kubeClientset.AppsV1().Deployments(cfg.Namespace)
 	deployment, err := deploymentsClient.Get(context.Background(), cfg.Namespace, metav1.GetOptions{})
@@ -399,7 +305,7 @@ func getDeploymentInfo(kubeClientset kubernetes.Interface, cfg *types.Config, cl
 	deploymentReady := deployment.Status.ReadyReplicas == *deployment.Spec.Replicas
 
 	/// Map to the new OscarDeployment structure
-	deploymentInfo := OscarDeployment{
+	deploymentInfo := types.OscarDeployment{
 		Replicas:          *deployment.Spec.Replicas,
 		ReadyReplicas:     deployment.Status.ReadyReplicas,
 		AvailableReplicas: deployment.Status.AvailableReplicas,
@@ -408,18 +314,18 @@ func getDeploymentInfo(kubeClientset kubernetes.Interface, cfg *types.Config, cl
 		CreationTimestamp: deployment.CreationTimestamp,
 	}
 
-	clusterInfo.Oscar = OscarInfo{
+	clusterInfo.Oscar = types.OscarInfo{
 		DeploymentName: deployment.Name,
 		Ready:          deploymentReady,
 		Deployment:     deploymentInfo,
-		OIDC: OIDCInfo{
+		OIDC: types.OIDCInfo{
 			Enabled: cfg.OIDCEnable,
 			Issuers: cfg.OIDCValidIssuers,
 			Groups:  cfg.OIDCGroups,
 		},
 		// JobsCount and Pods are initialized to zero, they will be filled in getJobsInfo
 		JobsCount: 0,
-		Pods: PodStates{
+		Pods: types.PodStates{
 			Total:  0,
 			States: make(map[string]int),
 		},
@@ -427,7 +333,7 @@ func getDeploymentInfo(kubeClientset kubernetes.Interface, cfg *types.Config, cl
 	return nil
 }
 
-func getMinioInfo(cfg *types.Config, clusterInfo *NewStatusInfo) (err error) {
+func getMinioInfo(cfg *types.Config, clusterInfo *types.StatusInfo) (err error) {
 	// S3 client to list all buckets in the cluster
 	s3Client := cfg.MinIOProvider.GetS3Client()
 	bucketList, err := s3Client.ListBuckets(&s3.ListBucketsInput{})
@@ -453,7 +359,7 @@ func getMinioInfo(cfg *types.Config, clusterInfo *NewStatusInfo) (err error) {
 		}
 	}
 
-	clusterInfo.MinIO = MinioInfo{
+	clusterInfo.MinIO = types.MinioInfo{
 		BucketsCount: bucketCount,
 		TotalObjects: totalObjectCount,
 	}
@@ -462,7 +368,7 @@ func getMinioInfo(cfg *types.Config, clusterInfo *NewStatusInfo) (err error) {
 
 // getJobsInfo
 
-func getJobsInfo(cfg *types.Config, kubeClientset kubernetes.Interface, clusterInfo *NewStatusInfo) (err error) {
+func getJobsInfo(cfg *types.Config, kubeClientset kubernetes.Interface, clusterInfo *types.StatusInfo) (err error) {
 	jobs, err := kubeClientset.BatchV1().Jobs(cfg.ServicesNamespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -493,7 +399,7 @@ func getJobsInfo(cfg *types.Config, kubeClientset kubernetes.Interface, clusterI
 		podStates[state]++
 	}
 
-	podInfo := PodStates{
+	podInfo := types.PodStates{
 		Total:  len(pods.Items),
 		States: podStates,
 	}
