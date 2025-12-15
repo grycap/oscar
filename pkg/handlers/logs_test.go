@@ -242,3 +242,140 @@ func TestMakeDeleteJobHandler(t *testing.T) {
 		t.Errorf("expecting delete jobs, got %s %s", actions[1].GetVerb(), actions[1].GetResource().Resource)
 	}
 }
+
+func TestMakeGetSystemLogsHandlerBasicAuth(t *testing.T) {
+	cfg := types.Config{
+		Name:      "oscar",
+		Namespace: "oscar",
+	}
+	now := metav1.Time{Time: time.Now()}
+	kubeObjects := []runtime.Object{
+		&corev1.PodList{
+			Items: []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "oscar-123",
+						Namespace:         "oscar",
+						Labels:            map[string]string{"app": "oscar"},
+						CreationTimestamp: now,
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{Name: "oscar"},
+						},
+					},
+				},
+			},
+		},
+	}
+	kubeClientset := testclient.NewSimpleClientset(kubeObjects...)
+
+	r := gin.Default()
+	r.GET("/system/logs", MakeGetSystemLogsHandler(kubeClientset, &cfg))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/system/logs", nil)
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expecting code %d, got %d (body: %s)", http.StatusOK, w.Code, w.Body.String())
+	}
+	var response struct {
+		Logs []struct {
+			Raw string `json:"raw"`
+		} `json:"logs"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("response is not valid JSON: %v", err)
+	}
+	if len(response.Logs) != 0 {
+		t.Errorf("expected empty logs, got %v", response.Logs)
+	}
+
+	actions := kubeClientset.Actions()
+	if len(actions) != 2 {
+		t.Errorf("expecting 2 actions, got %d", len(actions))
+	}
+	if actions[0].GetVerb() != "list" || actions[0].GetResource().Resource != "pods" {
+		t.Errorf("expecting list pods, got %s %s", actions[0].GetVerb(), actions[0].GetResource().Resource)
+	}
+	if actions[1].GetVerb() != "get" || actions[1].GetResource().Resource != "pods" {
+		t.Errorf("expecting get pods, got %s %s", actions[1].GetVerb(), actions[1].GetResource().Resource)
+	}
+}
+
+func TestMakeGetSystemLogsHandlerRejectsOIDC(t *testing.T) {
+	cfg := types.Config{
+		Name:      "oscar",
+		Namespace: "oscar",
+	}
+	kubeObjects := []runtime.Object{
+		&corev1.PodList{
+			Items: []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "oscar-123",
+						Namespace: "oscar",
+						Labels:    map[string]string{"app": "oscar"},
+					},
+				},
+			},
+		},
+	}
+	kubeClientset := testclient.NewSimpleClientset(kubeObjects...)
+
+	r := gin.Default()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "some-uid-value")
+		c.Next()
+	})
+	r.GET("/system/logs", MakeGetSystemLogsHandler(kubeClientset, &cfg))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/system/logs", nil)
+	req.Header.Set("Authorization", "Bearer token")
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expecting code %d, got %d", http.StatusForbidden, w.Code)
+	}
+}
+
+func TestParseExecutionLogs(t *testing.T) {
+	raw := `
+[GIN-EXECUTIONS-LOGGER] 2025/10/28 - 16:53:34 | 200 |  347.805334ms | 172.25.0.1 | POST    /run/simple-test | oscar
+[GIN-EXECUTIONS-LOGGER] 2025/10/28 - 16:55:12 | 201 |   14.219292ms | 127.0.0.1 | POST    /job/simple-test | minio
+[GIN-EXECUTIONS-LOGGER] 2025/10/28 - 16:55:20 | 200 |   10.000000ms | 127.0.0.1 | GET     /health | oscar
+`
+
+	entries := parseExecutionLogs(raw)
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+
+	layout := "2006/01/02 - 15:04:05"
+	first := entries[0]
+	firstExpected, err := time.ParseInLocation(layout, "2025/10/28 - 16:53:34", time.Local)
+	if err != nil {
+		t.Fatalf("unable to parse expected timestamp: %v", err)
+	}
+	if first.Timestamp != firstExpected.UTC().Format(time.RFC3339) {
+		t.Fatalf("unexpected first timestamp: %s", first.Timestamp)
+	}
+	if first.Method != "POST" || first.Path != "/run/simple-test" || first.User != "oscar" {
+		t.Fatalf("unexpected first entry: %+v", first)
+	}
+	second := entries[1]
+	secondExpected, err := time.ParseInLocation(layout, "2025/10/28 - 16:55:12", time.Local)
+	if err != nil {
+		t.Fatalf("unable to parse expected timestamp: %v", err)
+	}
+	if second.Timestamp != secondExpected.UTC().Format(time.RFC3339) {
+		t.Fatalf("unexpected second timestamp: %s", second.Timestamp)
+	}
+	if second.Path != "/job/simple-test" || second.Status != 201 {
+		t.Fatalf("unexpected second entry: %+v", second)
+	}
+}

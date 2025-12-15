@@ -100,9 +100,16 @@ func MakeCreateHandler(cfg *types.Config) gin.HandlerFunc {
 			c.String(http.StatusBadRequest, fmt.Sprintf("Error creating bucket with name '%s': %v", splitPath[0], err))
 			return
 		}
+
+		ownerName := "oscar"
+		if !isAdminUser {
+			ownerName = auth.GetUserNameFromContext(c)
+			ownerName = utils.RemoveAccents(ownerName)
+		}
 		// Bucket metadata for filtering
 		tags := map[string]string{
-			"owner": uid,
+			"owner":      uid,
+			"owner_name": ownerName,
 		}
 
 		if err := minIOAdminClient.SetTags(splitPath[0], tags); err != nil {

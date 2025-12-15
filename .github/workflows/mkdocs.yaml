@@ -36,11 +36,10 @@ jobs:
         latest=$(curl -s https://api.github.com/repos/grycap/oscar/releases/latest | jq -r .tag_name)
         echo "Last release tag: $latest"
         echo "tag_name=$latest" >> $GITHUB_OUTPUT
+    - name: Install swag
+      run: go install github.com/swaggo/swag/cmd/swag@v1.16.4
     - name: Generate SWAG file
-      uses: yegorrybchenko/go-swag-action@v0.1
-      with:
-        command: swag init -g main.go -o docs --outputTypes yaml
-        swagVersion: 1.16.4
+      run: ~/go/bin/swag init -g main.go -o docs --outputTypes yaml
     - name: Build and deploy to gh-pages
       run: |
         git fetch origin gh-pages:gh-pages

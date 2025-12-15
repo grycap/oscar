@@ -57,6 +57,7 @@ type oidcManager struct {
 type userInfo struct {
 	Subject string
 	Groups  []string
+	Name    string
 }
 
 type KeycloakClaims struct {
@@ -64,7 +65,7 @@ type KeycloakClaims struct {
 }
 
 type EGIClaims struct {
-	EdupersonEntitlement []string `json:"eduperson_entitlement"`
+	Entitlements []string `json:"entitlements"`
 }
 
 // newOIDCManager returns a new oidcManager or error if the oidc.Provider can't be created
@@ -158,6 +159,7 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 			}
 		}
 		c.Set("uidOrigin", uid)
+		c.Set("userName", ui.Name)
 		c.Set("multitenancyConfig", mc)
 		c.Next()
 	}
@@ -190,7 +192,7 @@ func (om *oidcManager) GetUserInfo(rawToken string) (*userInfo, error) {
 	if strings.Contains(providerAuth, EGIIssuer) {
 		var claims EGIClaims
 		cerr = ui.Claims(&claims)
-		groups = getGroupsEGI(claims.EdupersonEntitlement)
+		groups = getGroupsEGI(claims.Entitlements)
 	} else {
 		var claims KeycloakClaims
 		cerr = ui.Claims(&claims)
@@ -201,14 +203,24 @@ func (om *oidcManager) GetUserInfo(rawToken string) (*userInfo, error) {
 		return nil, cerr
 	}
 
+	// Extract name claim in a type-safe way
+	name := ""
+	var allClaims map[string]interface{}
+	if err := ui.Claims(&allClaims); err == nil {
+		if n, ok := allClaims["name"].(string); ok {
+			name = n
+		}
+	}
+
 	// Create "userInfo" struct and add the groups
 	return &userInfo{
 		Subject: ui.Subject,
 		Groups:  groups,
+		Name:    name,
 	}, nil
 }
 
-// getGroups transforms "eduperson_entitlement" EGI URNs to a slice of group fields
+// getGroups transforms "entitlements" EGI URNs to a slice of group fields
 
 func getGroupsEGI(urns []string) []string {
 	groups := []string{}

@@ -253,9 +253,12 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			if derr != nil {
 				log.Printf("Error deleting service: %v\n", derr)
 			}
-			bderr := deleteBuckets(&service, cfg, minIOAdminClient)
-			if bderr != nil {
-				log.Printf("Error deleting buckets: %v\n", bderr)
+
+			if !strings.Contains(err.Error(), " already exists") {
+				bderr := deleteBuckets(&service, cfg, minIOAdminClient)
+				if bderr != nil {
+					log.Printf("Error deleting buckets: %v\n", bderr)
+				}
 			}
 			return
 		}
@@ -272,10 +275,16 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					}
 				}
 
+				ownerName := "oscar"
+				if !isAdminUser {
+					ownerName = auth.GetUserNameFromContext(c)
+					ownerName = utils.RemoveAccents(ownerName)
+				}
 				// Bucket metadata for filtering
 				tags := map[string]string{
 					"owner":        uid,
 					"from_service": service.Name,
+					"owner_name":   ownerName,
 				}
 				if err := minIOAdminClient.SetTags(b.BucketName, tags); err != nil {
 					c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
@@ -409,7 +418,8 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			BucketName:   splitPath[0],
 			AllowedUsers: service.AllowedUsers,
 			Visibility:   service.Visibility,
-			Owner:        service.Owner})
+			Owner:        service.Owner,
+		})
 		// Create buckets for services with isolation level
 		if strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser && len(service.BucketList) > 0 {
 			for i, b := range service.BucketList {
