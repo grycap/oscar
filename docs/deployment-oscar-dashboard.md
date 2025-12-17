@@ -3,9 +3,9 @@
 Implementing an OSCAR cluster dashboard greatly improves interaction with all elements within the cluster. This interface makes deploying a service on an OSCAR cluster much faster and more intuitive.
 
 > ❗️
-> In the `Interface` section there is a much more detailed description of how to use all the elements within the [Dashboard](usage-dashboard.md)
+> In the `Interface` section there is a much more detailed description of how to use all the elements within the [Dashboard](usage-dashboard.md).
 
-There are several ways to deploy a service from the OSCAR dashboard. One is by starting with an FDL file (fdl.md) that contains the configured service and the corresponding script.
+There are several ways to deploy a service from the OSCAR dashboard. One is by starting with an [FDL file](fdl.md) that contains the configured service and the corresponding script.  In this case, we will deploy the [cowsay service](https://github.com/grycap/oscar/tree/master/examples/cowsay).
 
 In `services`, under `New`, go to the `FDL` option.
 
@@ -32,3 +32,5 @@ Next, fill out the form with the necessary information for deploying the service
 In a few moments the service will be created and ready to use.
 
 ![dashboard-form-service](images/deployment-service/dashboard-form-deployment.png)
+
+With this, the service is deployed and ready to run (see [Service Execution](invoking.md) section)

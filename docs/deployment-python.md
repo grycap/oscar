@@ -1,4 +1,4 @@
-# OSCAR PYTHON
+# OSCAR Python
 
 From Python, you can deploy a service using the [OSCAR API](deployment-api.md). However, a client has also been developed that can interact with OSCAR more easily.
 
@@ -30,7 +30,7 @@ options_oidc_auth = {'cluster_id':'cluster-id',
 client = Client(options = options_oidc_auth)
 
 ```
-Then we use the `client.create_service` function to deploy the service. The only parameter to keep in mind is the location of the FDL file containing the service configuration. After that, everything is ready to invoke the deployed service.
+Then we use the `client.create_service` function to deploy the service. The only parameter to keep in mind is the location of the FDL file containing the service configuration. In this case, we'll use the [cowsay service](https://github.com/grycap/oscar/tree/master/examples/cowsay) as an example. After that, everything is ready to invoke the deployed service.
 
 ```
 try:
@@ -39,3 +39,5 @@ except Exception as err:
     print("Failed with: ", err)
 
 ```
+
+With this, the service is deployed and ready to run (see [Service Execution](invoking.md) section)
