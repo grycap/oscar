@@ -55,6 +55,12 @@ sh oscar/deploy/kind-deploy.sh --devel
 ```
 This flag auto-enables Knative Serving and the local Docker registry so you can test the full development stack without manual input.
 
+To enable OIDC authentication support in the deployed OSCAR (disabled by default), add:
+
+```sh
+sh oscar/deploy/kind-deploy.sh --oidc
+```
+
 ## Steps for manual local deployment
 
 If you want to do it manually you can follow the listed steps.
