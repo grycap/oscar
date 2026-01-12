@@ -38,19 +38,36 @@ headers = {
     }
 
 # D. Prepare Headers (Basic Auth)
+
+# Function to encode Basic Auth credentials ---
+def create_basic_auth_header(username, password):
+    """Encodes username:password into Base64 format for Basic Auth header."""
+    # Format: username:password
+    credentials = f"{username}:{password}"
+    # Encode to Base64 (requires converting string to bytes first)
+    encoded_bytes = base64.b64encode(credentials.encode('utf-8'))
+    # Convert bytes back to string and prepend "Basic "
+    return f"Basic {encoded_bytes.decode('utf-8')}"
+
 auth_header_value = create_basic_auth_header(USERNAME, PASSWORD)
-    
+
 headers = {
         'Content-Type': 'application/json',
         # Use the Base64 encoded credentials here
         'Authorization': auth_header_value 
     }
-
 ```
 Then you would need to make the request to the API
 
 ```
 # Send the POST request to create the service
+
+# IMPORTANT: The OSCAR API expects the payload to be the 'service' dictionary itself, 
+# not the entire nested structure found in the initial YAML file.
+     
+# Convert the updated service dictionary into a JSON string for the body
+json_payload = json.dumps(service)
+
 response = requests.post(
         URL_COMPLETE,
         headers=headers,
