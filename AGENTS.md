@@ -57,3 +57,10 @@ For docs-only changes, tests may be skipped but must be stated explicitly.
 - The change affects external interfaces or deployment behavior.
 - Tests cannot be run or consistently fail.
 If AGENTS.md and OpenSpec instructions conflict, follow AGENTS.md unless a maintainer says otherwise.
+
+## Active Technologies
+- Go 1.25 + gin-gonic, client-go, metrics.k8s.io clien (001-metrics-collection)
+- N/A (aggregation from existing data sources) (001-metrics-collection)
+
+## Recent Changes
+- 001-metrics-collection: Added Go 1.25 + gin-gonic, client-go, metrics.k8s.io clien

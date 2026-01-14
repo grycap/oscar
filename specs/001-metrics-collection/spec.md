@@ -1,0 +1,175 @@
+# Feature Specification: Metrics Collection Improvements
+
+**Feature Branch**: `001-metrics-collection`  
+**Created**: 2026-01-13  
+**Status**: Draft  
+**Input**: "User description: I want to improve the metrics collection system for OSCAR. For each OSCAR cluster, we need to account for: 
+
+ - Number of OSCAR services deployed.  
+ - OSCAR service usage cycles, measured in CPU/GPU hours.
+ - Number of synchronous/asynchronous requests to an OSCAR service.
+ - Number of requests per user and per OSCAR service.
+ - Country of origin for each user request. 
+ - Names/number of the countries from which requests where received"
+
+## Clarifications
+
+### Session 2026-01-14
+
+- Q: What user identifier should be used? → A: OIDC user id.
+- Q: What roster source defines member vs external? → A: OIDC-authenticated requests are members; service-token executions are external.
+- Q: How is the time range interpreted? → A: Inclusive start and end.
+- Q: How long must data remain available for reporting? → A: At least 6 months to cover 3/6 month reports.
+- Q: When should membership be included in breakdowns? → A: Only when group_by=user.
+
+## User Scenarios & Testing *(mandatory)*
+
+### User Story 1 - Generate platform metrics summary (Priority: P1)
+
+As a platform reporting owner, I want a consolidated metrics summary so I can
+report platform impact and usage for an OSCAR cluster.
+
+**Why this priority**: This is the primary reporting output required by the
+platform.
+
+**Independent Test**: Request a specific metric for a given OSCAR service and
+time range, then verify the value against known source data for that range.
+
+**Acceptance Scenarios**:
+
+1. **Given** a valid time range and OSCAR service, **When** I request a specific
+   metric, **Then** the report returns only that metric and its value for the
+   range.
+2. **Given** no data exists for a time range, **When** I request a summary,
+   **Then** the report clearly indicates zero values and data source status.
+
+---
+
+### User Story 2 - Drill down and export metrics (Priority: P2)
+
+As a reporting analyst, I want to break down metrics by OSCAR service and/or user
+so I can prepare detailed summaries for stakeholders.
+
+**Why this priority**: Stakeholders need detailed breakdowns beyond the summary.
+
+**Independent Test**: Request a breakdown by service for a fixed range and verify
+that totals match the summary output.
+
+**Acceptance Scenarios**:
+
+1. **Given** a time range, **When** I request a per-service breakdown,
+   **Then** each OSCAR service shows total executions, unique users, and
+   associated countries.
+2. **Given** a time range and breakdown selection, **When** I request an export,
+   **Then** the system returns the breakdown in the requested export format.
+
+---
+
+### User Story 3 - Validate data completeness (Priority: P3)
+
+As a platform operator, I want to see data completeness flags so I can detect
+missing inputs that could skew reporting.
+
+**Why this priority**: Incomplete inputs reduce trust in reporting outcomes.
+
+**Independent Test**: Remove one data source for a known period and verify the
+report marks the source as missing and flags affected metrics.
+
+**Acceptance Scenarios**:
+
+1. **Given** one or more data sources are unavailable, **When** I request a
+   report, **Then** the report lists missing sources and identifies impacted
+   metrics.
+
+---
+
+### Edge Cases
+
+- A user has no geolocation data available (label as `unknown` and exclude from
+  country attribution percentage).
+- A service is deleted but still appears in historical usage data (retain
+  historical metric data for at least 6 months).
+- A report spans a period with partial data source coverage (surface completeness
+  flags and partial counts).
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+
+- **FR-001**: System MUST allow querying a specific metric for a requested time
+  range and OSCAR service.
+- **FR-002**: System MUST generate a metrics summary for a requested time range.
+- **FR-003**: Summary MUST include the count of unique services hosted during the
+  range.
+- **FR-004**: Summary MUST include total CPU hours and GPU hours used during the
+  range.
+- **FR-005**: Summary MUST include the list and count of countries from where
+  user requests are coming.
+- **FR-006**: Summary MUST include the number of requests processed, with
+  synchronous and asynchronous requests included.
+- **FR-007**: System MUST report executions per user and users per OSCAR service
+  for the range.
+- **FR-008**: System MUST classify users as project members or external based on
+  authentication method (OIDC = member, OSCAR service token = external).
+- **FR-009**: System MUST flag missing or incomplete data sources for the
+  requested range.
+- **FR-010**: System MUST attribute requests to a country when request metadata
+  is available.
+- **FR-011**: Summary and breakdown outputs MUST include per-country request
+  totals.
+- **FR-012**: System MUST support export of breakdown outputs in CSV format.
+- **FR-013**: System MUST retain and report metric data for at least 6 months.
+
+### Metric Catalog (initial)
+
+- `services-count`
+- `cpu-hours`
+- `gpu-hours`
+- `requests-sync-per-service`
+- `requests-async-per-service`
+- `requests-per-user`
+- `users-per-service`
+- `countries-count`
+- `countries-list`
+
+Metric scope: `requests-sync-per-service` and `requests-async-per-service` are
+per-service when used with `/metrics/value`.
+
+### Key Entities *(include if feature involves data)*
+
+- **Service**: OSCAR service identified by the service ID and Docker image.
+- **Usage Summary**: Aggregated metrics for a time range.
+- **Usage Breakdown**: Per-service, per-user, and per-country totals.
+- **User**: Actor who triggers executions, including membership classification
+  by authentication method (OIDC = member, service token = external); identified
+  by OIDC user id when OIDC-authenticated.
+- **Country**: Derived location label for usage attribution.
+
+### Definitions
+
+- **OSCAR service**: Deployed service instance.
+- **Execution**: A single request (synchronous or asynchronous) processed by an
+  OSCAR service during the requested time range.
+- **User identifier**: OIDC user id from the IdP.
+- **Time range**: Both start and end timestamps are inclusive.
+- **Breakdown membership**: Include membership only when `group_by=user`.
+
+### Assumptions
+
+- Existing service inventory, execution logs, resource usage metrics, and OIDC
+  group membership data are available and can be queried for the requested time
+  range.
+- Metric data is retained for at least 6 months to support 3/6 month reporting
+  windows.
+- Country attribution can be derived from request metadata when available.
+
+## Success Criteria *(mandatory)*
+
+### Measurable Outcomes
+
+- **SC-002**: Summary totals match breakdown totals for the same time range in
+  100% of verification samples.
+- **SC-003**: At least 95% of usage records include a country attribution when
+  request metadata is present.
+- **SC-004**: Reporting stakeholders confirm the summary meets their monthly
+  reporting needs in a review session.

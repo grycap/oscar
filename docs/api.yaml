@@ -13,6 +13,131 @@ externalDocs:
   description: More documentation available on GitHub
   url: 'https://github.com/grycap/oscar'
 paths:
+  /metrics/value:
+    get:
+      summary: Get a single metric value for a service and time range
+      operationId: GetMetricValue
+      tags:
+        - metrics
+      security:
+        - basicAuth: []
+        - token: []
+      parameters:
+        - name: service_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: metric
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/MetricKey'
+        - name: start
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Metric value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricValue'
+        '400':
+          description: Invalid parameters
+        '500':
+          description: Metrics computation failed
+  /metrics/summary:
+    get:
+      summary: Get metrics summary for a time range
+      operationId: GetMetricsSummary
+      tags:
+        - metrics
+      security:
+        - basicAuth: []
+        - token: []
+      parameters:
+        - name: start
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Metrics summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsSummary'
+        '400':
+          description: Invalid time range
+        '500':
+          description: Metrics computation failed
+  /metrics/breakdown:
+    get:
+      summary: Get metrics breakdown by dimension
+      operationId: GetMetricsBreakdown
+      tags:
+        - metrics
+      security:
+        - basicAuth: []
+        - token: []
+      parameters:
+        - name: start
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: group_by
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [service, user, country]
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [json, csv]
+            default: json
+      responses:
+        '200':
+          description: Metrics breakdown
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsBreakdown'
+            text/csv:
+              schema:
+                type: string
+        '400':
+          description: Invalid parameters
+        '500':
+          description: Metrics computation failed
   /system/services:
     get:
       summary: List services
@@ -1222,6 +1347,161 @@ components:
           type: integer
         total_objects:
           type: integer
+    MetricValue:
+      title: MetricValue
+      type: object
+      required: [service_id, metric, start, end, value, sources]
+      properties:
+        service_id:
+          type: string
+        metric:
+          $ref: '#/components/schemas/MetricKey'
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+        value:
+          type: number
+        unit:
+          type: string
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceStatus'
+    MetricsSummary:
+      title: MetricsSummary
+      type: object
+      required: [start, end, totals, sources]
+      properties:
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+        totals:
+          type: object
+          required:
+            - services_count
+            - cpu_hours_total
+            - gpu_hours_total
+            - request_count_total
+            - request_count_sync
+            - request_count_async
+            - countries_count
+            - countries
+            - users_count
+          properties:
+            services_count:
+              type: integer
+              minimum: 0
+            cpu_hours_total:
+              type: number
+              minimum: 0
+            gpu_hours_total:
+              type: number
+              minimum: 0
+            request_count_total:
+              type: integer
+              minimum: 0
+            request_count_sync:
+              type: integer
+              minimum: 0
+            request_count_async:
+              type: integer
+              minimum: 0
+            countries_count:
+              type: integer
+              minimum: 0
+            countries:
+              type: array
+              items:
+                $ref: '#/components/schemas/CountryCount'
+            users_count:
+              type: integer
+              minimum: 0
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceStatus'
+    MetricsBreakdown:
+      title: MetricsBreakdown
+      type: object
+      required: [start, end, group_by, items]
+      properties:
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+        group_by:
+          type: string
+          enum: [service, user, country]
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BreakdownItem'
+    BreakdownItem:
+      title: BreakdownItem
+      type: object
+      required: [key, executions_count, unique_users_count, countries]
+      properties:
+        key:
+          type: string
+        membership:
+          type: string
+          enum: [member, external, unknown]
+        executions_count:
+          type: integer
+          minimum: 0
+        unique_users_count:
+          type: integer
+          minimum: 0
+        countries:
+          type: array
+          items:
+            $ref: '#/components/schemas/CountryCount'
+    CountryCount:
+      title: CountryCount
+      type: object
+      required: [country, request_count]
+      properties:
+        country:
+          type: string
+        request_count:
+          type: integer
+          minimum: 0
+    SourceStatus:
+      title: SourceStatus
+      type: object
+      required: [name, status]
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [ok, partial, missing]
+        last_updated:
+          type: string
+          format: date-time
+        notes:
+          type: string
+    MetricKey:
+      title: MetricKey
+      type: string
+      enum:
+        - services-count
+        - cpu-hours
+        - gpu-hours
+        - requests-sync-per-service
+        - requests-async-per-service
+        - requests-per-user
+        - users-per-service
+        - countries-count
+        - countries-list
   securitySchemes:
     basicAuth:
       type: http
@@ -1241,6 +1521,7 @@ tags:
   - name: status
   - name: config
   - name: buckets
+  - name: metrics
 servers:
   - url: 'https://localhost'
     description: 'Local testing'
