@@ -221,6 +221,13 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 
+		if !isAdminUser && cfg.KueueEnable {
+			if err := utils.EnsureKueueUserQueues(c.Request.Context(), cfg, service.Namespace, service.Owner, service.Name); err != nil {
+				createLogger.Printf("error ensuring Kueue queues for service %s: %v\n", service.Name, err)
+			}
+			service.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
+		}
+
 		// Create service
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
@@ -230,12 +237,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 			}
 			return
-		}
-
-		if cfg.KueueEnable {
-			if err := utils.EnsureKueueUserQueues(c.Request.Context(), cfg, service.Namespace, service.Owner, service.Name); err != nil {
-				createLogger.Printf("error ensuring Kueue queues for service %s: %v\n", service.Name, err)
-			}
 		}
 
 		// Register minio webhook and restart the server

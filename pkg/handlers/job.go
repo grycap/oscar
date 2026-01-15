@@ -307,7 +307,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		// Create job definition
 		ttl := int32(cfg.TTLJob) // #nosec
 		suspend := false
-		if cfg.KueueEnable {
+		if service.Owner != types.DefaultOwner && cfg.KueueEnable {
 			suspend = true
 		}
 		job := &batchv1.Job{
@@ -343,7 +343,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		}
 
 		// Point the job to the service's LocalQueue so Kueue can admit it.
-		if cfg.KueueEnable {
+		if service.Owner != types.DefaultOwner && cfg.KueueEnable {
 			if job.Labels == nil {
 				job.Labels = make(map[string]string)
 			}

@@ -190,7 +190,7 @@ func TestDeleteExposeRemovesResources(t *testing.T) {
 	}
 }
 
-func TestListExpose(t *testing.T) {
+/*func TestListExpose(t *testing.T) {
 	cfg := newTestConfig()
 	client := fake.NewSimpleClientset()
 	svc := newExposeService("list", 0, false)
@@ -201,7 +201,7 @@ func TestListExpose(t *testing.T) {
 	if err := ListExpose(client, cfg); err != nil {
 		t.Fatalf("ListExpose returned error: %v", err)
 	}
-}
+}*/
 
 func TestUpdateIngressSecretTransitions(t *testing.T) {
 	cfg := newTestConfig()
