@@ -38,6 +38,9 @@ OSCAR_HELM_IMAGE_OVERRIDES=""
 OSCAR_POST_DEPLOYMENT_IMAGE=""
 OSCAR_TARGET_REPLICAS=1
 SKIP_PROMPTS="false"
+ENABLE_OIDC="false"
+OIDC_ISSUERS_DEFAULT="https://keycloak.grycap.net/realms/grycap"
+OIDC_GROUPS_DEFAULT="/oscar-staff, /oscar-test"
 
 usage(){
     cat <<EOF
@@ -45,6 +48,7 @@ Usage: $(basename "$0") [options]
 
 Options:
   --devel        Deploy using the OSCAR devel branch without interactive prompts.
+  --oidc         Enable OIDC support for OSCAR (default: disabled).
   -h, --help     Show this help message and exit.
 EOF
 }
@@ -425,6 +429,10 @@ while [ "$#" -gt 0 ]; do
             OSCAR_IMAGE_BRANCH="devel"
             shift
             ;;
+        --oidc)
+            ENABLE_OIDC="true"
+            shift
+            ;;
         -h|--help)
             usage
             exit 0
@@ -449,16 +457,28 @@ echo -e "\n"
 use_knative="y"
 local_reg="y"
 use_devel_branch="y"
+use_oidc="n"
 if [ "$SKIP_PROMPTS" == "true" ]; then
     echo "[*] Running in non-interactive mode: Knative, local registry, and OSCAR devel branch enabled."
 else
     read -p "Do you want to use Knative Serving as Serverless Backend? [y/n] " use_knative </dev/tty
     read -p "Do you want suport for local docker images? [y/n] " local_reg </dev/tty
     read -p "Do you want to install OSCAR from the devel branch? [y/n] (default uses master) " use_devel_branch </dev/tty
+    if [ "$ENABLE_OIDC" != "true" ]; then
+        echo -e "\n[*] OIDC defaults to be applied if enabled:"
+        echo -e "  - OIDC_ENABLE=true"
+        echo -e "  - OIDC_ISSUERS=$OIDC_ISSUERS_DEFAULT"
+        echo -e "  - OIDC_GROUPS=$OIDC_GROUPS_DEFAULT"
+        read -p "Do you want to enable OIDC authentication support with these defaults? [y/n] " use_oidc </dev/tty
+    fi
 fi
 
 if [ `echo $use_devel_branch | tr '[:upper:]' '[:lower:]'` == "y" ]; then
     OSCAR_IMAGE_BRANCH="devel"
+fi
+
+if [ `echo $use_oidc | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+    ENABLE_OIDC="true"
 fi
 if [ "$OSCAR_IMAGE_BRANCH" == "devel" ]; then
     OSCAR_HELM_IMAGE_OVERRIDES="--set replicas=0"
@@ -672,6 +692,17 @@ if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
     echo -e "\n[*] Scaling OSCAR deployment to $OSCAR_TARGET_REPLICAS replica(s) ..."
     if ! kubectl -n oscar scale deployment/oscar --replicas="$OSCAR_TARGET_REPLICAS"; then
         echo -e "$RED[!]$END_COLOR Failed to scale OSCAR deployment"
+        exit 1
+    fi
+fi
+
+if [ "$ENABLE_OIDC" == "true" ]; then
+    echo -e "\n[*] Enabling OIDC support in OSCAR deployment ..."
+    if ! kubectl -n oscar set env deployment/oscar \
+        OIDC_ENABLE="true" \
+        OIDC_ISSUERS="$OIDC_ISSUERS_DEFAULT" \
+        OIDC_GROUPS="$OIDC_GROUPS_DEFAULT"; then
+        echo -e "$RED[!]$END_COLOR Failed to set OIDC environment variables in OSCAR deployment"
         exit 1
     fi
 fi
