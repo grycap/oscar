@@ -211,6 +211,10 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			minIOSecretKey = service.Owner
 		}
 
+		if minIOSecretKey == service.Owner {
+			minIOSecretKey = "minio"
+		}
+
 		if err := ensureMinIOSecret(kubeClientset, minIOSecretKey, serviceNamespace); err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", minIOSecretKey, err))
 			return

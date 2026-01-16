@@ -10,7 +10,6 @@ import (
 
 	"github.com/grycap/oscar/v3/pkg/types"
 	apps "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -115,17 +114,17 @@ func ensureClusterQueue(ctx context.Context, kueueClient *kueueclientset.Clients
 			},
 			ResourceGroups: []kueuev1.ResourceGroup{
 				{
-					CoveredResources: []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory},
+					CoveredResources: []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
 					Flavors: []kueuev1.FlavorQuotas{
 						{
 							Name: kueuev1.ResourceFlavorReference(flavorName),
 							Resources: []kueuev1.ResourceQuota{
 								{
-									Name:         corev1.ResourceCPU,
+									Name:         v1.ResourceCPU,
 									NominalQuota: cpuQuota,
 								},
 								{
-									Name:         corev1.ResourceMemory,
+									Name:         v1.ResourceMemory,
 									NominalQuota: memoryQuota,
 								},
 							},
