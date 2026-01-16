@@ -38,6 +38,9 @@ OSCAR_HELM_IMAGE_OVERRIDES=""
 OSCAR_POST_DEPLOYMENT_IMAGE=""
 OSCAR_TARGET_REPLICAS=1
 SKIP_PROMPTS="false"
+ENABLE_OIDC="false"
+OIDC_ISSUERS_DEFAULT="https://keycloak.grycap.net/realms/grycap"
+OIDC_GROUPS_DEFAULT="/oscar-staff, /oscar-test"
 
 usage(){
     cat <<EOF
@@ -45,6 +48,7 @@ Usage: $(basename "$0") [options]
 
 Options:
   --devel        Deploy using the OSCAR devel branch without interactive prompts.
+  --oidc         Enable OIDC support for OSCAR (default: disabled).
   -h, --help     Show this help message and exit.
 EOF
 }
@@ -425,6 +429,10 @@ while [ "$#" -gt 0 ]; do
             OSCAR_IMAGE_BRANCH="devel"
             shift
             ;;
+        --oidc)
+            ENABLE_OIDC="true"
+            shift
+            ;;
         -h|--help)
             usage
             exit 0
@@ -449,16 +457,28 @@ echo -e "\n"
 use_knative="y"
 local_reg="y"
 use_devel_branch="y"
+use_oidc="n"
 if [ "$SKIP_PROMPTS" == "true" ]; then
     echo "[*] Running in non-interactive mode: Knative, local registry, and OSCAR devel branch enabled."
 else
     read -p "Do you want to use Knative Serving as Serverless Backend? [y/n] " use_knative </dev/tty
     read -p "Do you want suport for local docker images? [y/n] " local_reg </dev/tty
     read -p "Do you want to install OSCAR from the devel branch? [y/n] (default uses master) " use_devel_branch </dev/tty
+    if [ "$ENABLE_OIDC" != "true" ]; then
+        echo -e "\n[*] OIDC defaults to be applied if enabled:"
+        echo -e "  - OIDC_ENABLE=true"
+        echo -e "  - OIDC_ISSUERS=$OIDC_ISSUERS_DEFAULT"
+        echo -e "  - OIDC_GROUPS=$OIDC_GROUPS_DEFAULT"
+        read -p "Do you want to enable OIDC authentication support with these defaults? [y/n] " use_oidc </dev/tty
+    fi
 fi
 
 if [ `echo $use_devel_branch | tr '[:upper:]' '[:lower:]'` == "y" ]; then
     OSCAR_IMAGE_BRANCH="devel"
+fi
+
+if [ `echo $use_oidc | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+    ENABLE_OIDC="true"
 fi
 if [ "$OSCAR_IMAGE_BRANCH" == "devel" ]; then
     OSCAR_HELM_IMAGE_OVERRIDES="--set replicas=0"
@@ -658,9 +678,9 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 echo -e "\n[*] Deploying OSCAR ..."
 helm repo add --force-update grycap https://grycap.github.io/helm-charts/
 if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative --set resourceManager.enable=true $OSCAR_HELM_IMAGE_OVERRIDES
 else
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set resourceManager.enable=true $OSCAR_HELM_IMAGE_OVERRIDES
 fi
 
 if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
@@ -676,262 +696,20 @@ if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
     fi
 fi
 
+if [ "$ENABLE_OIDC" == "true" ]; then
+    echo -e "\n[*] Enabling OIDC support in OSCAR deployment ..."
+    if ! kubectl -n oscar set env deployment/oscar \
+        OIDC_ENABLE="true" \
+        OIDC_ISSUERS="$OIDC_ISSUERS_DEFAULT" \
+        OIDC_GROUPS="$OIDC_GROUPS_DEFAULT"; then
+        echo -e "$RED[!]$END_COLOR Failed to set OIDC environment variables in OSCAR deployment"
+        exit 1
+    fi
+fi
+
 #Wait for OSCAR deployment
 checkOSCARDeploy
  
-echo -e "[*] Configuring RBAC permissions ..."
-cat <<'EOF' | kubectl apply -f -
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: oscar-sa
-  namespace: oscar
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: oscar-controller
-  namespace: oscar-svc
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  - pods/log
-  - podtemplates
-  - configmaps
-  - secrets
-  - services
-  - persistentvolumeclaims
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
-- apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  - deployments
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update 
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - deletecollection
-  - update
-- apiGroups:
-  - autoscaling
-  resources:
-  - horizontalpodautoscalers
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
-- apiGroups:
-  - networking.k8s.io
-  resources:
-  - ingresses
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
-- apiGroups:
-  - serving.knative.dev
-  resources:
-  - services
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: oscar-controller-binding
-  namespace: oscar-svc
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: oscar-controller
-subjects:
-- kind: ServiceAccount
-  name: oscar-sa
-  namespace: oscar
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: oscar-controller-global
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  - pods
-  - pods/log
-  - podtemplates
-  - persistentvolumeclaims
-  - secrets
-  - services
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - namespaces
-  verbs:
-  - get
-  - list
-  - create
-  - update
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - roles
-  - rolebindings
-  verbs:
-  - get
-  - list
-  - create
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - nodes
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumes
-  verbs:
-  - get
-  - list
-  - create
-- apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  - deployments
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update 
-- apiGroups:
-  - autoscaling
-  resources:
-  - horizontalpodautoscalers
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update 
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update 
-  - deletecollection
-- apiGroups:
-  - networking.k8s.io
-  resources:
-  - ingresses
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
-- apiGroups:
-  - serving.knative.dev
-  resources:
-  - services
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update 
-- apiGroups:
-  - metrics.k8s.io
-  resources:
-  - nodes
-  verbs:
-  - list
-- apiGroups:
-  - kueue.x-k8s.io
-  resources:
-  - resourceflavors
-  - clusterqueues
-  - localqueues
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: oscar-controller-global-binding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: oscar-controller-global
-subjects:
-- kind: ServiceAccount
-  name: oscar-sa
-  namespace: oscar
-EOF
-
 echo -e "\n[*] Deployment details:"
 echo "  - Kind cluster name: $CLUSTER_NAME"
 echo "  - Kind context: $KIND_CONTEXT"

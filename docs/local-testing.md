@@ -44,16 +44,22 @@ You can deploy the "devel" version of OSCAR to access the latest development ver
 
 ```sh
 git clone https://github.com/grycap/oscar
-sh oscar/deploy/kind-deploy.sh
+bash oscar/deploy/kind-deploy.sh
 ```
 The wizard will instruct you to choose the "devel" version.
 
 To skip the wizard prompts and automatically install from the `devel` branch, run:
 
 ```sh
-sh oscar/deploy/kind-deploy.sh --devel
+bash oscar/deploy/kind-deploy.sh --devel
 ```
 This flag auto-enables Knative Serving and the local Docker registry so you can test the full development stack without manual input.
+
+To enable OIDC authentication support in the deployed OSCAR (disabled by default), add:
+
+```sh
+bash oscar/deploy/kind-deploy.sh --oidc
+```
 
 ## Steps for manual local deployment
 
