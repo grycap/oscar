@@ -364,10 +364,14 @@ func CheckWorkloadAdmited(service types.Service, namespace string, cfg *types.Co
 	factory := kueueinformers.NewSharedInformerFactory(kueueClient, 0)
 	workloadsInformer := factory.Kueue().V1beta2().Workloads().Informer()
 
-	workloadsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	resource, err := workloadsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			newWL := newObj.(*kueuev1.Workload)
-			if newWL.Status.Conditions != nil && newWL.Status.Conditions[0].Status == "True" {
+			newWL, ok := newObj.(*kueuev1.Workload)
+			if !ok {
+				KueueLogger.Printf("error: unexpected type in workload informer")
+				return
+			}
+			if newWL.Status.Conditions != nil && len(newWL.Status.Conditions) > 0 && newWL.Status.Conditions[0].Status == "True" {
 				KueueLogger.Printf("workload for exposed service '%s' admitted to run", service.Name)
 				deployment := templateFunction(service, namespace, cfg) //getDeploymentSpec
 				deployment.Spec.Replicas = &service.Expose.MinScale
@@ -375,7 +379,7 @@ func CheckWorkloadAdmited(service types.Service, namespace string, cfg *types.Co
 				if err != nil {
 					KueueLogger.Printf("error updating deployment for exposed service '%s': %v", service.Name, err)
 				}
-			} else if newWL.Status.Conditions != nil && newWL.Status.Conditions[0].Status != "True" {
+			} else if newWL.Status.Conditions != nil && len(newWL.Status.Conditions) > 0 && newWL.Status.Conditions[0].Status != "True" {
 				KueueLogger.Printf("workload for exposed service '%s' NOT admitted to run", service.Name)
 				deployment := templateFunction(service, namespace, cfg)
 				var zero int32 = 0
@@ -389,6 +393,9 @@ func CheckWorkloadAdmited(service types.Service, namespace string, cfg *types.Co
 			}
 		},
 	})
+	if err != nil {
+		KueueLogger.Printf("error adding event handler to workload informer: %v, %v", err, resource)
+	}
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -473,7 +480,7 @@ func onlyCheckWorkloadAdmited() bool {
 	workloadsInformer := factory.Kueue().V1beta2().Workloads().Informer()
 	valueReturn := false
 
-	workloadsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	resource, err := workloadsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newWL := newObj.(*kueuev1.Workload)
 			if newWL.Status.Conditions != nil && newWL.Status.Conditions[0].Status == "True" {
@@ -483,6 +490,9 @@ func onlyCheckWorkloadAdmited() bool {
 			}
 		},
 	})
+	if err != nil {
+		KueueLogger.Printf("error adding event handler to workload informer: %v, %v", err, resource)
+	}
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
