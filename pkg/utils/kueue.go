@@ -349,14 +349,17 @@ func getWorkloadSpec(service types.Service, namespace string, cfg *types.Config,
 	return workload
 }
 
-func CheckWorkloadAdmited(service types.Service, namespace string, cfg *types.Config, kubeClientset kubernetes.Interface, templateFunction func(types.Service, string, *types.Config) *apps.Deployment) {
+func CheckWorkloadAdmited(service types.Service, namespace string, cfg *types.Config, kubeClientset kubernetes.Interface, templateFunction func(types.Service, string, *types.Config) *apps.Deployment) error {
 	restCfg, err := rest.InClusterConfig()
 	if err != nil {
 		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
+		return err
 	}
+
 	kueueClient, err := kueueclientset.NewForConfig(restCfg)
 	if err != nil {
 		KueueLogger.Printf("error building kueue clientset: %v", err)
+		return err
 	}
 	factory := kueueinformers.NewSharedInformerFactory(kueueClient, 0)
 	workloadsInformer := factory.Kueue().V1beta2().Workloads().Informer()
@@ -385,8 +388,33 @@ func CheckWorkloadAdmited(service types.Service, namespace string, cfg *types.Co
 	defer close(stopCh)
 
 	factory.Start(stopCh)
-	factory.WaitForCacheSync(stopCh)
 
+	if !cache.WaitForCacheSync(stopCh, workloadsInformer.HasSynced) {
+		return fmt.Errorf("failed to sync workload informer")
+	}
+	obj, exists, err := workloadsInformer.GetIndexer().GetByKey(namespace + "/" + service.Name)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("workload not found")
+	}
+
+	wl := obj.(*kueuev1.Workload)
+	admitted := false
+	for _, c := range wl.Status.Conditions {
+		if c.Type == kueuev1.WorkloadAdmitted &&
+			c.Status == metav1.ConditionTrue {
+			admitted = true
+			break
+		}
+	}
+	if !admitted {
+		DeleteWorkload(service.Name, namespace, cfg)
+		return fmt.Errorf("workload is NOT admitted")
+	}
+
+	return nil
 }
 
 //------------Knative--------------------------
@@ -429,6 +457,7 @@ func onlyCheckWorkloadAdmited() bool {
 	restCfg, err := rest.InClusterConfig()
 	if err != nil {
 		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
+		return false
 	}
 	kueueClient, err := kueueclientset.NewForConfig(restCfg)
 	if err != nil {

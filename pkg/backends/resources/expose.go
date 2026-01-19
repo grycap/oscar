@@ -179,8 +179,12 @@ func UpdateExpose(service types.Service, namespace string, kubeClientset kuberne
 	}
 
 	utils.UpdateWorkload(service, targetNamespace, cfg, getPodTemplateSpec)
-	go utils.CheckWorkloadAdmited(service, targetNamespace, cfg, kubeClientset, getDeploymentSpec)
-
+	if cfg.KueueEnable {
+		err = utils.CheckWorkloadAdmited(service, namespace, cfg, kubeClientset, getDeploymentSpec)
+		if err != nil {
+			return fmt.Errorf("Invalid workload after update: %v", err)
+		}
+	}
 	return nil
 }
 
@@ -238,7 +242,13 @@ func createDeployment(service types.Service, namespace string, kubeClientset kub
 	if err != nil {
 		return err
 	}
-	go utils.CheckWorkloadAdmited(service, namespace, cfg, kubeClientset, getDeploymentSpec)
+	if cfg.KueueEnable {
+		err = utils.CheckWorkloadAdmited(service, namespace, cfg, kubeClientset, getDeploymentSpec)
+		if err != nil {
+			ExposeLogger.Printf("error checking workload admission: %v\n", err)
+			return err
+		}
+	}
 
 	return nil
 }
