@@ -1,9 +1,29 @@
 # OSCAR Python
 
-From Python, you can deploy a service using the [OSCAR API](deployment-api.md). However, a client has also been developed that can interact with OSCAR more easily.
+From Python, you can deploy a service using the [OSCAR API](deployment-api.md). However, a client has also been developed that can interact with OSCAR cluster more easily.
 
-> ❗️
->All customer information is described in the following repositories: [OSCAR-Python](https://github.com/grycap/oscar_python) and [oscar client](https://pypi.org/project/oscar-python/). 
+OSCAR-Python is an official Python client designed to facilitate interaction with clusters and services of an OSCAR cluster, allowing developers to programmatically manage the lifecycle of serverless applications for event-driven data processing. This package, available on PyPI ([oscar-python client](https://pypi.org/project/oscar-python/)) and developed by the GRyCAP group ([OSCAR-Python repository](https://github.com/grycap/oscar_python)), enables critical operations such as creating and updating services using Function Definition Language (FDL) files, synchronous and asynchronous function invocation, job log management, and file manipulation across various storage providers (such as MinIO, S3, and OneData), all while supporting multiple authentication methods, including Basic Auth and OpenID Connect (OIDC).
+
+To interact with [OSCAR-Python](https://github.com/grycap/oscar_python), you can do so from any computer where Python is installed. However, you can also do it from the OSCAR cluster itself, as it allows the deployment of a [Jupyter Notebook](https://jupyter.org/) instance. The following shows how to perform this deployment.
+
+First, in the left-hand menu, go to `Notebooks` and create a `NEW` (New Notebook Instance).
+
+![Jupyter-OSCAR-Create](images/deployment-service/juno-python-create.png)
+
+Next, assign the instance configuration values.
+
+![Jupyter-OSCAR-Configuration](images/deployment-service/juno-python-config.png)
+
+>!
+>You can use a new bucket or one created previously.
+
+After a few minutes, the notebook will be deployed and accessible.
+
+![Jupyter-OSCAR-Deployment](images/deployment-service/juno-python-deploy.png)
+
+From here, you have a deployed Jupyter Notebook that can be used to interact with OSCAR cluster.
+
+![Jupyter-OSCAR-Interface](images/deployment-service/juno-python-dashboard.png)
 
 Once the library is installed (`pip install oscar-python`), you can begin developing and deploying a service. First, you must initialize the client using some form of authentication.
 
