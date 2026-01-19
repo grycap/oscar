@@ -235,7 +235,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			if k8sErrors.IsAlreadyExists(err) {
 				c.String(http.StatusConflict, "A service with the provided name already exists")
 			} else {
-				back.DeleteService(service)
+				errDelete := back.DeleteService(service)
+				if errDelete != nil {
+					log.Printf("Error deleting service: %v\n", errDelete)
+				}
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 			}
 			return
