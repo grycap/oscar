@@ -410,7 +410,7 @@ EOF
 
 createKindCluster(){
     echo -e "\n[*] Creating kind cluster"
-    kind create cluster --config=$CONFIG_FILEPATH --name="$CLUSTER_NAME"
+    kind create cluster --image kindest/node:v1.33.1 --config=$CONFIG_FILEPATH --name="$CLUSTER_NAME"
 
     if ! kubectl cluster-info --context "$KIND_CONTEXT" &> /dev/null; then
         echo -e "$RED[*]$END_COLOR Kind cluster not found."
@@ -456,7 +456,7 @@ checkKind
 echo -e "\n"
 use_knative="y"
 local_reg="y"
-use_devel_branch="y"
+use_devel_branch="n"
 use_oidc="n"
 if [ "$SKIP_PROMPTS" == "true" ]; then
     echo "[*] Running in non-interactive mode: Knative, local registry, and OSCAR devel branch enabled."
