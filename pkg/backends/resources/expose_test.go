@@ -2,6 +2,8 @@ package resources
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -9,6 +11,22 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
+type kueueMock struct {
+	KUBERNETES_SERVICE_HOST string
+	KUBERNETES_SERVICE_PORT string
+}
+
+func newKueueMock() *kueueMock {
+	return &kueueMock{
+		KUBERNETES_SERVICE_HOST: "localhost",
+		KUBERNETES_SERVICE_PORT: "8080",
+	}
+}
+func (k *kueueMock) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"Status":"success"}`))
+	return
+}
 func newTestConfig() *types.Config {
 	return &types.Config{
 		ServicesNamespace:                 "oscar-svc",
@@ -18,6 +36,7 @@ func newTestConfig() *types.Config {
 		IngressServicesCORSAllowedOrigins: "*",
 		IngressServicesCORSAllowedMethods: "GET,POST",
 		IngressServicesCORSAllowedHeaders: "*",
+		KueueEnable:                       false,
 	}
 }
 
@@ -27,6 +46,7 @@ func newExposeService(name string, nodePort int32, setAuth bool) types.Service {
 		Image:  "ghcr.io/grycap/test",
 		Script: "echo test",
 		Token:  "s3cr3t",
+		Owner:  types.DefaultOwner,
 		Expose: types.Expose{
 			MinScale:      1,
 			MaxScale:      3,
@@ -43,6 +63,9 @@ func newExposeService(name string, nodePort int32, setAuth bool) types.Service {
 }
 
 func TestCreateExposeWithIngressAndAuth(t *testing.T) {
+	mock := newKueueMock()
+	server := httptest.NewServer(mock)
+	defer server.Close()
 	cfg := newTestConfig()
 	svc := newExposeService("ingress-service", 0, true)
 	svc.Namespace = cfg.ServicesNamespace
