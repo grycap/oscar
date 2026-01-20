@@ -1,6 +1,6 @@
 # OSCAR CLI
 
-To deploy a service on an OSCAR cluster using the [OSCAR-CLI](oscar-cli.md), the first step is to add a cluster so you can then manage it. To do this, use the [add](oscar-cli.md/#add) command. In this case, we will call it `oscar-cluster`, so from now on, when working with our cluster using OSCAR-CLI, we will refer to it as `oscar-cluster`. Use the username and password you obtained when creating the OSCAR cluster. To use the OSCAR-CLI in a local deployment, you must set the `--disable-ssl` flag at the end to disable the verification of self-signed certificates.
+To deploy a service on an OSCAR cluster using the [OSCAR CLI](oscar-cli.md), the first step is to add a cluster so you can then manage it. To do this, use the [add](oscar-cli.md/#add) command. In this case, we will call it `oscar-cluster`, so from now on, when working with our cluster using OSCAR-CLI, we will refer to it as `oscar-cluster`. Use the username and password you obtained when deploying the OSCAR cluster. To use the OSCAR-CLI in a local deployment, you must set the `--disable-ssl` flag at the end to disable the verification of self-signed certificates.
 
 ``` bash
 oscar-cli cluster add oscar-cluster https://localhost $OSCARuser $OSCARpass
@@ -26,6 +26,7 @@ The next step is to create the [FDL](fdl.md) file, which contains all the servic
 oscar-cli apply $yaml_file
 ```
 
+Note that there are many other available options, documented in [OSCAR CLI's GitHub repository](https://github.com/grycap/oscar-cli).
 Using the [list](oscar-cli.md/#list) command, you can verify if the service was deployed correctly to the cluster.
 
 ``` bash

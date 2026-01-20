@@ -1,10 +1,8 @@
 # OSCAR Python
 
-From Python, you can deploy a service using the [OSCAR API](deployment-api.md). However, a client has also been developed that can interact with OSCAR cluster more easily.
+[OSCAR-Python](https://github.com/grycap/oscar_python) is an open-source Python client for the [OSCAR API](api.md) designed to facilitate interaction with clusters and services of an OSCAR cluster. It is available on PyPI ([oscar-python client](https://pypi.org/project/oscar-python/)).
 
-OSCAR-Python is an official Python client designed to facilitate interaction with clusters and services of an OSCAR cluster, allowing developers to programmatically manage the lifecycle of serverless applications for event-driven data processing. This package, available on PyPI ([oscar-python client](https://pypi.org/project/oscar-python/)) and developed by the GRyCAP group ([OSCAR-Python repository](https://github.com/grycap/oscar_python)), enables critical operations such as creating and updating services using Function Definition Language (FDL) files, synchronous and asynchronous function invocation, job log management, and file manipulation across various storage providers (such as MinIO, S3, and OneData), all while supporting multiple authentication methods, including Basic Auth and OpenID Connect (OIDC).
-
-To interact with [OSCAR-Python](https://github.com/grycap/oscar_python), you can do so from any computer where Python is installed. However, you can also do it from the OSCAR cluster itself, as it allows the deployment of a [Jupyter Notebook](https://jupyter.org/) instance. The following shows how to perform this deployment.
+To interact with [OSCAR-Python](https://github.com/grycap/oscar_python), you can do so from any computer where Python is installed. Alternatively, you can also do it from the OSCAR cluster itself, as it allows the deployment of a [Jupyter Notebook](https://jupyter.org/) instance. The following shows how to perform this deployment.
 
 First, in the left-hand menu, go to `Notebooks` and create a `NEW` (New Notebook Instance).
 

@@ -11,11 +11,11 @@ In `services`, under `New`, go to the `FDL` option.
 
 ![dashboard-new-service](images/deployment-service/dashboard.png)
 
-Next, we load both the fdl file and the script and click on `Create Service`.
+Next, we load both the FDL file and the script and click on `Create Service`.
 
 ![dashboard-create-service](images/deployment-service/dashboard-fdl.png)
 
-In a few moments the service is created and ready to use. 
+In a few moments the service is created and ready to be used. 
 
 ![dashboard-service](images/deployment-service/dashboard-deployment.png)
 
@@ -25,11 +25,11 @@ In `services`, under `New`, go to the `Form` option.
 
 ![dashboard-new-service](images/deployment-service/dashboard-form.png)
 
-Next, fill out the form with the necessary information for deploying the service. This information can be found in the FDL file used previously. Once everything is complete, go to the `Create` option to deploy the service.
+Next, fill out the form with the necessary information for deploying the service. Once everything is complete, go to the `Create` option to deploy the service.
 
 ![dashboard-new-service](images/deployment-service/dashboard-form-write.png)
 
-In a few moments the service will be created and ready to use.
+In a few moments the service will be created.
 
 ![dashboard-form-service](images/deployment-service/dashboard-form-deployment.png)
 

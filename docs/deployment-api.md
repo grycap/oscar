@@ -1,8 +1,6 @@
 # OSCAR API
 
-To facilitate interaction and integration with OSCAR services, a high-performance and secure [REST API](api.md) is available. This API can be used with any programming language (Python, C, Java, etc.) or API interaction tool such as Postman, cURL, etc.
-
-To create a service, the POST method is used as shown in the following figure:
+To create an [OSCAR service](oscar-service.md) via the [REST API](api.md), the POST method is used as shown in the following figure:
 
 ![API-create-service](images/deployment-service/api-service.png)
 
@@ -10,13 +8,13 @@ Two simple alternatives will be given on how to interact with the API to deploy 
 
 - `cURL`
 
-[cURL](https://curl.se/), a well-known tool in technical circles, sits at the intersection of web development and system administration. This powerful command allows users to query URLs from the command line, offering a quick and efficient way to interact with websites and web services without the need for a graphical interface.
+[cURL](https://curl.se/), a command-line interface based HTTP client.
 
 To deploy a service, you must have the [FDL](fdl.md) file that defines the service and the script that will be executed on it.
 
 First, you need the credentials to access the cluster. This can be via an [OIDC Token](integration-egi.md) or basic authentication.
 
-In that case, we give an example of creating the [cowsay service](https://github.com/grycap/oscar/tree/master/examples/cowsay) using a cURL request with an [OIDC Token](integration-egi.md). Basically, it involves putting the FDL file and the script inside a simple POST request.
+In that case, we give an example of creating the [cowsay service](https://github.com/grycap/oscar/tree/master/examples/cowsay) using a cURL request with an [OIDC Token](integration-egi.md). Basically, it involves embedding the FDL document as JSON-based document and the script inside a simple POST request.
 
 ```bash
 curl -X POST "https://oscar-cluster-remote/system/services" \
