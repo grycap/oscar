@@ -154,6 +154,18 @@ type Config struct {
 	// YunikornConfigFileName
 	YunikornConfigFileName string `json:"-"`
 
+	// KueueEnable option to configure Kueue admission queues
+	KueueEnable bool `json:"kueue_enable"`
+
+	// KueueDefaultCPU default per-user ClusterQueue CPU quota
+	KueueDefaultCPU string `json:"-"`
+
+	// KueueDefaultMemory default per-user ClusterQueue memory quota
+	KueueDefaultMemory string `json:"-"`
+
+	// KueueDefaultFlavor default ResourceFlavor name used for ClusterQueues
+	KueueDefaultFlavor string `json:"-"`
+
 	// ResourceManagerEnable option to enable the Resource Manager to delegate jobs
 	// when there are no available resources in the cluster (if the service has replicas)
 	ResourceManagerEnable bool `json:"-"`
@@ -249,6 +261,10 @@ var configVars = []configVar{
 	{"YunikornNamespace", "YUNIKORN_NAMESPACE", false, stringType, "yunikorn"},
 	{"YunikornConfigMap", "YUNIKORN_CONFIGMAP", false, stringType, "yunikorn-configs"},
 	{"YunikornConfigFileName", "YUNIKORN_CONFIG_FILENAME", false, stringType, "queues.yaml"},
+	{"KueueEnable", "KUEUE_ENABLE", false, boolType, "true"},
+	{"KueueDefaultCPU", "KUEUE_DEFAULT_CPU", false, stringType, "2"},
+	{"KueueDefaultMemory", "KUEUE_DEFAULT_MEMORY", false, stringType, "2Gi"},
+	{"KueueDefaultFlavor", "KUEUE_DEFAULT_FLAVOR", false, stringType, "oscar-default-flavor"},
 	{"ResourceManagerEnable", "RESOURCE_MANAGER_ENABLE", false, boolType, "false"},
 	//{"ResourceManager", "RESOURCE_MANAGER", false, resourceManagerType, "kubernetes"},
 	{"ResourceManagerInterval", "RESOURCE_MANAGER_INTERVAL", false, intType, "15"},

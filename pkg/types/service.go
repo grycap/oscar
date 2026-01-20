@@ -89,6 +89,9 @@ const (
 	// YunikornDefaultPartition name of the default Yunikorn partition
 	YunikornDefaultPartition = "default"
 
+	// KueueOwnerLabel label used to tag Kueue objects owned by OSCAR
+	KueueOwnerLabel = "oscar.grycap/owner"
+
 	// KnativeVisibilityLabel name of the knative visibility label
 	KnativeVisibilityLabel = "networking.knative.dev/visibility"
 
@@ -296,7 +299,7 @@ type Expose struct {
 
 // ToPodSpec returns a k8s podSpec from the Service
 func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
-	resources, err := createResources(service)
+	resources, err := CreateResources(service)
 	if err != nil {
 		return nil, err
 	}
@@ -423,7 +426,7 @@ func SetSecurityContext(podSpec *v1.PodSpec) {
 	podSpec.Containers[0].SecurityContext = &ctx
 }
 
-func createResources(service *Service) (v1.ResourceRequirements, error) {
+func CreateResources(service *Service) (v1.ResourceRequirements, error) {
 	resources := v1.ResourceRequirements{
 		Limits: v1.ResourceList{},
 	}

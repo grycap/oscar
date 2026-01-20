@@ -125,7 +125,7 @@ func TestCreateResources(t *testing.T) {
 			svc.Memory = s.memory
 			svc.CPU = s.cpu
 
-			_, err := createResources(&svc)
+			_, err := CreateResources(&svc)
 
 			if s.returnError {
 				if err == nil {
