@@ -366,30 +366,10 @@ func CheckWorkloadAdmited(service types.Service, namespace string, cfg *types.Co
 
 	resource, err := workloadsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			newWL, ok := newObj.(*kueuev1.Workload)
+			_, ok := newObj.(*kueuev1.Workload)
 			if !ok {
 				KueueLogger.Printf("error: unexpected type in workload informer")
 				return
-			}
-			if newWL.Status.Conditions != nil && len(newWL.Status.Conditions) > 0 && newWL.Status.Conditions[0].Status == "True" {
-				KueueLogger.Printf("workload for exposed service '%s' admitted to run", service.Name)
-				deployment := templateFunction(service, namespace, cfg) //getDeploymentSpec
-				deployment.Spec.Replicas = &service.Expose.MinScale
-				_, err := kubeClientset.AppsV1().Deployments(namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
-				if err != nil {
-					KueueLogger.Printf("error updating deployment for exposed service '%s': %v", service.Name, err)
-				}
-			} else if newWL.Status.Conditions != nil && len(newWL.Status.Conditions) > 0 && newWL.Status.Conditions[0].Status != "True" {
-				KueueLogger.Printf("workload for exposed service '%s' NOT admitted to run", service.Name)
-				deployment := templateFunction(service, namespace, cfg)
-				var zero int32 = 0
-				if deployment.Spec.Replicas != &zero {
-					deployment.Spec.Replicas = &zero
-					_, err := kubeClientset.AppsV1().Deployments(namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
-					if err != nil {
-						KueueLogger.Printf("error updating deployment for exposed service '%s': %v", service.Name, err)
-					}
-				}
 			}
 		},
 	})
@@ -424,7 +404,15 @@ func CheckWorkloadAdmited(service types.Service, namespace string, cfg *types.Co
 	}
 	if !admitted {
 		DeleteWorkload(service.Name, namespace, cfg)
-		return fmt.Errorf("workload is NOT admitted")
+		return fmt.Errorf("workload for exposed service '%s' is NOT admitted", service.Name)
+	} else {
+		KueueLogger.Printf("workload for exposed service '%s' is admitted", service.Name)
+		deployment := templateFunction(service, namespace, cfg) //getDeploymentSpec
+		deployment.Spec.Replicas = &service.Expose.MinScale
+		_, err := kubeClientset.AppsV1().Deployments(namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
+		if err != nil {
+			KueueLogger.Printf("error updating deployment for exposed service '%s': %v", service.Name, err)
+		}
 	}
 
 	return nil
