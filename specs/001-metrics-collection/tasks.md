@@ -26,9 +26,9 @@ description: "Task list template for feature implementation"
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create metrics types file in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/types/metrics.go
-- [ ] T002 Create metrics aggregation package files in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators.go and /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/sources.go
-- [ ] T003 Create metrics handlers file in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/handlers/metrics.go
+- [X] T001 Create metrics types file in pkg/types/metrics.go
+- [X] T002 Create metrics aggregation package files in pkg/metrics/aggregators.go and pkg/metrics/sources.go
+- [X] T003 Create metrics handlers file in pkg/handlers/metrics.go
 
 ---
 
@@ -38,10 +38,10 @@ description: "Task list template for feature implementation"
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Define source interfaces and base structs in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/sources.go
-- [ ] T005 Add shared request validation helpers in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/handlers/metrics.go
-- [ ] T045 Define supported metric keys and validation in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/types/metrics.go and /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/handlers/metrics.go
-- [ ] T006 Wire metrics routes into the router in /Users/gmolto/Documents/GitHub/grycap/oscar/main.go
+- [X] T004 Define source interfaces and base structs in pkg/metrics/sources.go
+- [X] T005 Add shared request validation helpers in pkg/handlers/metrics.go
+- [X] T045 Define supported metric keys and validation in pkg/types/metrics.go and pkg/handlers/metrics.go
+- [X] T006 Wire metrics routes into the router in main.go
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -55,21 +55,30 @@ description: "Task list template for feature implementation"
 
 ### Tests for User Story 1 ⚠️
 
-- [ ] T007 [P] [US1] Add aggregator unit tests in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators_test.go
-- [ ] T008 [P] [US1] Add handler tests for metric value and summary in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/handlers/metrics_test.go
-- [ ] T032 [P] [US1] Add unit tests for country attribution and summary totals in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators_test.go
+- [X] T007 [P] [US1] Add aggregator unit tests in pkg/metrics/aggregators_test.go
+- [X] T008 [P] [US1] Add handler tests for metric value and summary in pkg/handlers/metrics_test.go
+- [X] T032 [P] [US1] Add unit tests for country attribution and summary totals in pkg/metrics/aggregators_test.go
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] Implement per-service metric value aggregation in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators.go
-- [ ] T010 [US1] Implement summary aggregation in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators.go
-- [ ] T011 [US1] Implement service inventory source in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/sources.go
-- [ ] T012 [US1] Implement CPU/GPU usage source in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/sources.go
-- [ ] T013 [US1] Implement request activity source (sync/async counts) in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/sources.go
-- [ ] T028 [US1] Implement country attribution source (from request metadata) in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/sources.go
-- [ ] T014 [US1] Implement metric value endpoint handler in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/handlers/metrics.go
-- [ ] T015 [US1] Implement summary endpoint handler in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/handlers/metrics.go
-- [ ] T029 [US1] Extend summary aggregation with country list/counts in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators.go
+- [X] T009 [US1] Implement per-service metric value aggregation in pkg/metrics/aggregators.go
+- [X] T010 [US1] Implement summary aggregation in pkg/metrics/aggregators.go
+- [X] T011 [US1] Implement service inventory source in pkg/metrics/sources.go
+- [X] T012 [US1] Implement CPU/GPU usage source in pkg/metrics/sources.go
+- [X] T048 [US1] Add Prometheus config fields and env vars in pkg/types/config.go
+- [X] T049 [US1] Implement Prometheus usage metrics source in pkg/metrics/sources.go
+- [X] T050 [US1] Wire Prometheus usage source when PROMETHEUS_URL is set in pkg/metrics/sources.go and main.go
+- [X] T013 [US1] Implement request activity source (sync/async counts) in pkg/metrics/sources.go
+- [X] T028 [US1] Implement country attribution source (from request metadata) in pkg/metrics/sources.go
+- [X] T053 [US1] Plan Loki + Grafana Alloy deployment for durable request logs (retention >= 6 months) in specs/001-metrics-collection/research.md
+- [X] T054 [US1] Add Loki query configuration (base URL, query templates) in pkg/types/config.go
+- [X] T055 [US1] Implement Loki request log source (LogQL query + parsing) in pkg/metrics/sources.go
+- [X] T056 [US1] Wire Loki request log source when configured (fallback to pod logs) in pkg/metrics/sources.go and main.go
+- [X] T057 [US1] Add request log source tests for Loki queries in pkg/metrics/aggregators_test.go
+- [ ] T047 [US1] Verify 6-month retention guarantees for all data sources and document retention ownership in specs/001-metrics-collection/spec.md
+- [X] T014 [US1] Implement metric value endpoint handler in pkg/handlers/metrics.go
+- [X] T015 [US1] Implement summary endpoint handler in pkg/handlers/metrics.go
+- [X] T029 [US1] Extend summary aggregation with country list/counts in pkg/metrics/aggregators.go
 
 **Checkpoint**: User Story 1 is fully functional and independently testable
 
@@ -83,22 +92,22 @@ description: "Task list template for feature implementation"
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T016 [US2] Add breakdown handler tests in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/handlers/metrics_test.go
-- [ ] T037 [US2] Add member/external classification tests in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators_test.go
-- [ ] T038 [US2] Add CSV export handler tests in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/handlers/metrics_test.go
+- [X] T016 [US2] Add breakdown handler tests in pkg/handlers/metrics_test.go
+- [X] T037 [US2] Add member/external classification tests in pkg/metrics/aggregators_test.go
+- [X] T038 [US2] Add CSV export handler tests in pkg/handlers/metrics_test.go
 
 ### Implementation for User Story 2
 
-- [ ] T017 [US2] Implement breakdown aggregation in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators.go
-- [ ] T030 [US2] Add per-country breakdown aggregation in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators.go
-- [ ] T018 [US2] Extend sources with per-user execution counts in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/sources.go
-- [ ] T033 [US2] Implement user roster source lookup in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/sources.go
-- [ ] T034 [US2] Add member/external classification in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators.go
-- [ ] T035 [US2] Extend response types with membership classification in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/types/metrics.go
-- [ ] T019 [US2] Implement breakdown endpoint handler in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/handlers/metrics.go
-- [ ] T031 [US2] Update breakdown handler to include countries in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/handlers/metrics.go
-- [ ] T036 [US2] Update breakdown handler to include membership classification in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/handlers/metrics.go
-- [ ] T039 [US2] Implement CSV export for breakdown outputs in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/handlers/metrics.go
+- [X] T017 [US2] Implement breakdown aggregation in pkg/metrics/aggregators.go
+- [X] T030 [US2] Add per-country breakdown aggregation in pkg/metrics/aggregators.go
+- [X] T018 [US2] Extend sources with per-user execution counts in pkg/metrics/sources.go
+- [X] T033 [US2] Implement user roster source lookup in pkg/metrics/sources.go
+- [X] T034 [US2] Add member/external classification in pkg/metrics/aggregators.go
+- [X] T035 [US2] Extend response types with membership classification in pkg/types/metrics.go
+- [X] T019 [US2] Implement breakdown endpoint handler in pkg/handlers/metrics.go
+- [X] T031 [US2] Update breakdown handler to include countries in pkg/handlers/metrics.go
+- [X] T036 [US2] Update breakdown handler to include membership classification in pkg/handlers/metrics.go
+- [X] T039 [US2] Implement CSV export for breakdown outputs in pkg/handlers/metrics.go
 
 **Checkpoint**: User Story 2 is functional and independently testable
 
@@ -112,13 +121,13 @@ description: "Task list template for feature implementation"
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T020 [US3] Add completeness tests in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators_test.go
+- [X] T020 [US3] Add completeness tests in pkg/metrics/aggregators_test.go
 
 ### Implementation for User Story 3
 
-- [ ] T021 [US3] Add source status evaluation in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators.go
-- [ ] T022 [US3] Extend response types with source status in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/types/metrics.go
-- [ ] T023 [US3] Update handlers to return source status in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/handlers/metrics.go
+- [X] T021 [US3] Add source status evaluation in pkg/metrics/aggregators.go
+- [X] T022 [US3] Extend response types with source status in pkg/types/metrics.go
+- [X] T023 [US3] Update handlers to return source status in pkg/handlers/metrics.go
 
 **Checkpoint**: User Story 3 is functional and independently testable
 
@@ -128,15 +137,32 @@ description: "Task list template for feature implementation"
 
 **Purpose**: Documentation updates and cleanup
 
-- [ ] T024 Update API documentation for metrics endpoints in /Users/gmolto/Documents/GitHub/grycap/oscar/docs/api.yaml
-- [ ] T025 Update API documentation narrative in /Users/gmolto/Documents/GitHub/grycap/oscar/docs/api.md
-- [ ] T040 Update metrics contract definitions for breakdown export and new fields in /Users/gmolto/Documents/GitHub/grycap/oscar/specs/001-metrics-collection/contracts/metrics.yaml
-- [ ] T026 Run gofmt on new/updated files in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/handlers/metrics.go, /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators.go, /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/sources.go, /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/types/metrics.go
-- [ ] T027 Run Go tests for touched packages (e.g., ./...) from /Users/gmolto/Documents/GitHub/grycap/oscar
-- [ ] T041 Add summary-vs-breakdown reconciliation tests in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators_test.go
-- [ ] T042 Add country attribution percentage validation tests in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators_test.go
-- [ ] T043 Add a benchmark for monthly summary aggregation in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators_test.go
-- [ ] T044 Conduct stakeholder review of summary output and record notes in /Users/gmolto/Documents/GitHub/grycap/oscar/specs/001-metrics-collection/research.md
+- [X] T024 Update API documentation for metrics endpoints in docs/api.yaml
+- [X] T025 Update API documentation narrative in docs/api.md
+- [X] T051 Document Prometheus metrics configuration in docs/api.md
+- [ ] T046 Validate documentation changes with mkdocs serve (or record why infeasible) in repo root
+- [X] T040 Update metrics contract definitions for breakdown export and new fields in specs/001-metrics-collection/contracts/metrics.yaml
+- [X] T026 Run gofmt on new/updated files in pkg/handlers/metrics.go, pkg/metrics/aggregators.go, pkg/metrics/sources.go, pkg/types/metrics.go
+- [ ] T027 Run Go tests for touched packages (e.g., ./...) from repo root
+- [X] T041 Add summary-vs-breakdown reconciliation tests in pkg/metrics/aggregators_test.go
+- [X] T042 Add country attribution percentage validation tests in pkg/metrics/aggregators_test.go
+- [X] T043 Add a benchmark for monthly summary aggregation in pkg/metrics/aggregators_test.go
+- [ ] T052 Add benchmark for breakdown CSV export generation in pkg/handlers/metrics_test.go
+- [X] T058 Document Loki + Alloy deployment steps in docs/local-testing.md
+- [X] T059 Document Loki configuration env vars in docs/api.md
+- [ ] T044 Conduct stakeholder review of summary output and record notes in specs/001-metrics-collection/research.md
+- [X] T060 Update Alloy log collection to only include OSCAR manager pods in docs/snippets/alloy-values.kind.yaml
+- [X] T061 Update local testing docs to note OSCAR-only log filtering in docs/local-testing.md
+- [X] T062 Apply Alloy configuration update in the local kind cluster (helm upgrade) from repo root
+- [X] T063 Add minimal Prometheus values file to collect only OSCAR CPU/GPU metrics in docs/snippets/prometheus-values.kind.yaml
+- [X] T064 Update local testing docs to use minimal Prometheus values in docs/local-testing.md
+- [X] T065 Apply minimal Prometheus configuration in the local kind cluster (helm upgrade) from repo root
+- [X] T066 Add Grafana values and dashboard snippets in docs/snippets/grafana-values.kind.yaml and docs/snippets/oscar-metrics-dashboard.json
+- [X] T067 Document Grafana deployment and dashboard notes in specs/001-metrics-collection/monitoring-docs.md
+- [X] T068 Apply Grafana deployment in the local kind cluster (helm upgrade) from repo root
+- [X] T069 Update Alloy config to enrich logs with GeoIP labels in docs/snippets/alloy-values.kind.yaml
+- [X] T070 Populate request country from Loki stream labels in pkg/metrics/sources.go
+- [X] T071 Document GeoIP enrichment requirements in specs/001-metrics-collection/monitoring-docs.md
 
 ---
 
@@ -176,8 +202,8 @@ description: "Task list template for feature implementation"
 
 ```bash
 # Run unit tests for aggregators in parallel with handler test scaffolding:
-Task: "Add aggregator unit tests in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/metrics/aggregators_test.go"
-Task: "Add handler tests for metric value and summary in /Users/gmolto/Documents/GitHub/grycap/oscar/pkg/handlers/metrics_test.go"
+Task: "Add aggregator unit tests in pkg/metrics/aggregators_test.go"
+Task: "Add handler tests for metric value and summary in pkg/handlers/metrics_test.go"
 ```
 
 ---

@@ -1,0 +1,22 @@
+.git/
+.gitignore
+.dockerignore
+Dockerfile*
+
+# Common build/test outputs
+**/node_modules/
+**/dist/
+!dashboard/dist/
+!dashboard/dist/**
+**/build/
+coverage/
+*.log*
+
+# Environment files
+.env*
+
+# Editor/OS artifacts
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

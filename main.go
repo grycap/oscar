@@ -40,6 +40,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/backends"
 	"github.com/grycap/oscar/v3/pkg/handlers"
 	"github.com/grycap/oscar/v3/pkg/handlers/buckets"
+	"github.com/grycap/oscar/v3/pkg/metrics"
 	"github.com/grycap/oscar/v3/pkg/resourcemanager"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
@@ -131,6 +132,14 @@ func main() {
 
 	// Status path for cluster status (Memory and CPU) checks
 	system.GET("/status", handlers.MakeStatusHandler(cfg, kubeClientset, metricsClientset))
+
+	// Metrics reporting endpoints
+	metricsSources := metrics.DefaultSources(cfg, back, kubeClientset)
+	metricsAgg := &metrics.Aggregator{Sources: metricsSources}
+	metricsGroup := r.Group("/system/metrics", auth.GetAuthMiddleware(cfg, kubeClientset))
+	metricsGroup.GET("/value", handlers.MakeMetricValueHandler(metricsAgg))
+	metricsGroup.GET("/summary", handlers.MakeMetricsSummaryHandler(metricsAgg))
+	metricsGroup.GET("/breakdown", handlers.MakeMetricsBreakdownHandler(metricsAgg))
 
 	// Job path for async invocations
 	r.POST("/job/:serviceName", auth.GetLoggerMiddleware(), handlers.MakeJobHandler(cfg, kubeClientset, back, resMan))

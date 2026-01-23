@@ -1,0 +1,86 @@
+alloy:
+  configMap:
+    content: |
+      logging {
+        level = "info"
+      }
+
+      discovery.kubernetes "pods" {
+        role = "pod"
+      }
+
+      discovery.relabel "pod_logs" {
+        targets = discovery.kubernetes.pods.targets
+
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          regex         = "oscar"
+          action        = "keep"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app"]
+          regex         = "oscar"
+          action        = "keep"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app"]
+          target_label  = "app"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+      }
+
+      loki.source.kubernetes "pods" {
+        targets    = discovery.relabel.pod_logs.output
+        forward_to = [loki.process.oscar.receiver]
+      }
+
+      loki.process "oscar" {
+        forward_to = [loki.write.default.receiver]
+
+        stage.regex {
+          expression = ".*\\|\\s*[^|]+\\|\\s*[^|]+\\|\\s*(?P<ip>[0-9a-fA-F:.]+)(?::\\d+)?\\s*\\|.*"
+        }
+
+        stage.geoip {
+          source  = "ip"
+          db      = "/var/lib/alloy/geoip/GeoLite2-Country.mmdb"
+          db_type = "country"
+        }
+
+        stage.labels {
+          values = {
+            geoip_country_name = "",
+            geoip_country_code = "",
+          }
+        }
+      }
+
+      loki.write "default" {
+        endpoint {
+          url = "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push"
+        }
+      }
+
+  mounts:
+    extra:
+      - name: geoip-db
+        mountPath: /var/lib/alloy/geoip
+        readOnly: true
+
+controller:
+  volumes:
+    extra:
+      - name: geoip-db
+        persistentVolumeClaim:
+          claimName: geoip-db

@@ -1,0 +1,225 @@
+{
+  "uid": "oscar-metrics",
+  "title": "OSCAR Metrics (Spec)",
+  "schemaVersion": 37,
+  "version": 1,
+  "refresh": "1m",
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "CPU Hours (Total)",
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(container_cpu_usage_seconds_total{namespace=~\"oscar-svc.*\"}[$__range])) / 3600",
+          "refId": "A"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "GPU Hours (Total)",
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(container_gpu_usage_seconds_total{namespace=~\"oscar-svc.*\"}[$__range])) / 3600",
+          "refId": "A"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Services Count (Active in Range)",
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "count(count by (pod) (container_cpu_usage_seconds_total{namespace=~\"oscar-svc.*\"}))",
+          "refId": "A"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      }
+    },
+    {
+      "type": "bargauge",
+      "title": "CPU Hours by Service",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "targets": [
+        {
+          "expr": "sum by (service) (label_replace(label_replace(label_replace(sum by (pod) (increase(container_cpu_usage_seconds_total{namespace=~\"oscar-svc.*\"}[$__range])) / 3600, \"service\", \"$1\", \"pod\", \"^(.*)$\"), \"service\", \"$1\", \"service\", \"(.*)-[0-9a-f]{8}-[0-9a-f-]{4,}.*\"), \"service\", \"$1\", \"service\", \"(.*)-[0-9]{5}-deployment-.*\")))",
+          "refId": "A",
+          "legendFormat": "{{service}}",
+          "instant": true
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "min": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "bargauge",
+      "title": "GPU Hours by Service",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "targets": [
+        {
+          "expr": "sum by (service) (label_replace(label_replace(label_replace(sum by (pod) (increase(container_gpu_usage_seconds_total{namespace=~\"oscar-svc.*\"}[$__range])) / 3600, \"service\", \"$1\", \"pod\", \"^(.*)$\"), \"service\", \"$1\", \"service\", \"(.*)-[0-9a-f]{8}-[0-9a-f-]{4,}.*\"), \"service\", \"$1\", \"service\", \"(.*)-[0-9]{5}-deployment-.*\")))",
+          "refId": "A",
+          "legendFormat": "{{service}}",
+          "instant": true
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "min": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Requests (Sync vs Async)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({namespace=\"oscar\", app=\"oscar\"} |~ \"/run/\" [$__interval]))",
+          "refId": "A",
+          "legendFormat": "sync"
+        },
+        {
+          "expr": "sum(count_over_time({namespace=\"oscar\", app=\"oscar\"} |~ \"/job/\" [$__interval]))",
+          "refId": "B",
+          "legendFormat": "async"
+        }
+      ],
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Requests by Service (LogQL)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
+      "targets": [
+        {
+          "expr": "sum by (service) (count_over_time({namespace=\"oscar\", app=\"oscar\"} |~ \"/(run|job)/\" | regexp \"\\/(run|job)\\/(?P<service>[^\\s\\?]+)\" [$__range]))",
+          "refId": "A"
+        }
+      ],
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "Requests per Service (Total in Range)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "targets": [
+        {
+          "expr": "sum by (service) (count_over_time({namespace=\"oscar\", app=\"oscar\"} |~ \"/(run|job)/\" | regexp \"\\/(run|job)\\/(?P<service>[^\\s\\?]+)\" [$__range]))",
+          "refId": "A",
+          "legendFormat": "{{service}}",
+          "instant": true
+        }
+      ],
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      }
+    }
+  ]
+}

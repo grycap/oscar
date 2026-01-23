@@ -3,7 +3,7 @@ info:
   title: OSCAR Metrics Reporting
   version: 1.2.0
 paths:
-  /metrics/value:
+  /system/metrics/value:
     get:
       summary: Get a single metric value for a service and time range
       parameters:
@@ -40,7 +40,7 @@ paths:
           description: Invalid parameters
         "500":
           description: Metrics computation failed
-  /metrics/summary:
+  /system/metrics/summary:
     get:
       summary: Get metrics summary for a time range
       parameters:
@@ -67,7 +67,7 @@ paths:
           description: Invalid time range
         "500":
           description: Metrics computation failed
-  /metrics/breakdown:
+  /system/metrics/breakdown:
     get:
       summary: Get metrics breakdown by dimension
       parameters:
@@ -156,6 +156,7 @@ components:
             - countries_count
             - countries
             - users_count
+            - users
           properties:
             services_count:
               type: integer
@@ -185,6 +186,10 @@ components:
             users_count:
               type: integer
               minimum: 0
+            users:
+              type: array
+              items:
+                type: string
         sources:
           type: array
           items:
@@ -208,7 +213,7 @@ components:
             $ref: "#/components/schemas/BreakdownItem"
     BreakdownItem:
       type: object
-      required: [key, executions_count, unique_users_count, countries]
+      required: [key, executions_count, countries]
       properties:
         key:
           type: string
@@ -221,6 +226,7 @@ components:
         unique_users_count:
           type: integer
           minimum: 0
+          description: Omitted when group_by=user.
         countries:
           type: array
           items:

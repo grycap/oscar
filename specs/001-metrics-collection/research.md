@@ -36,6 +36,15 @@ without introducing new dependencies or storage.
 - **Prometheus retention**: The CPU/GPU usage history depends on the cluster's
   Prometheus retention settings. Confirm the configured retention time and
   storage policies for the OSCAR deployment.
+- **Prometheus scrape interval**: Short-lived executions can be under-sampled
+  when scrapes are infrequent (for example, 60s). CPU usage metrics derived from
+  `increase()` over short windows may appear near zero if the workload does not
+  overlap a scrape or consumes little CPU.
+- **cgroup accounting accuracy**: cgroup CPU accounting can capture precise CPU
+  time for short runs (microsecond/nanosecond resolution), but it must be read
+  at execution start/end to avoid scrape-interval gaps. Prometheus/cAdvisor
+  still sample at the configured scrape interval unless a higher-frequency
+  collector is used.
 - **Log retention**: Request-based metrics rely on the current logging stack's
   retention policy and query access. Confirm where logs are stored and the
   retention window for production clusters.
@@ -115,6 +124,22 @@ Prometheus config to refine the estimate and verify storage capacity for a
 - Reduces report usefulness for stakeholders.
 - Requires future rework to introduce attribution.
 
+**Option D: Log-ingestion GeoIP enrichment (Grafana Alloy `loki.process`)**
+
+**Advantages**:
+- Centralized enrichment without adding latency to OSCAR requests.
+- Keeps application layer simple; no new app dependencies.
+- Works with existing Loki pipeline; can add country as labels once.
+
+**Disadvantages**:
+- Requires GeoIP database distribution and updates.
+- Requires log parsing rules in Alloy (format coupling to log lines).
+- Adds CPU/memory cost to the log shipper.
+
+**Preferred approach**: Option D (log-ingestion GeoIP enrichment via Alloy),
+because it avoids per-request latency and aligns with the resource-minimization
+goal while keeping the application code unchanged.
+
 ## Decision 2: Report interface shape
 
 **Decision**: Provide endpoints for per-service, per-metric queries plus summary
@@ -151,3 +176,68 @@ roster integrations.
 
 **Alternatives considered**:
 - Add new user tagging fields (rejected: schema/config changes not required).
+
+## Decision 5: Durable request logs (retention compliance)
+
+**Decision**: Use Loki for log storage and Grafana Alloy for log shipping to meet
+the 6-month retention requirement for request-derived metrics.
+
+**Rationale**: Loki + Alloy provides durable, queryable logs with a lightweight
+operational footprint and integrates well with the existing Prometheus stack.
+
+**Alternatives considered**:
+- OpenSearch/Elasticsearch (heavier operational footprint).
+- Object storage archive (durable but higher query latency and custom tooling).
+
+## Log persistence options (retention compliance)
+
+The metrics breakdown and request counts depend on request logs. Pod logs alone
+are not durable across restarts, so they cannot satisfy the 6-month retention
+requirement. To meet FR-013, request logs must be stored in a durable backend.
+
+### Option 1: Loki + Grafana Alloy (recommended)
+
+**Summary**: Deploy Loki for log storage and Grafana Alloy to ship Kubernetes
+logs. Alloy is the recommended successor to Promtail and receives ongoing
+feature development.
+
+**Advantages**:
+- Lightweight compared to Elasticsearch/OpenSearch.
+- Fits well with the existing Prometheus stack.
+- Kubernetes-native, easy to deploy via Helm.
+- Supports label-based queries by namespace/service.
+
+**Disadvantages**:
+- Requires a new logging stack component and retention configuration.
+- Query language (LogQL) is different from Elasticsearch.
+
+### Option 2: OpenSearch/Elasticsearch
+
+**Summary**: Centralized log storage with full-text search and rich query
+capabilities.
+
+**Advantages**:
+- Powerful search and aggregation.
+- Widely used with large ecosystem.
+
+**Disadvantages**:
+- Heavier operational footprint (CPU/memory/storage).
+- More complex to run in small clusters.
+
+### Option 3: Object storage archive (S3/MinIO)
+
+**Summary**: Stream request logs to object storage and query from there.
+
+**Advantages**:
+- Durable, inexpensive storage.
+- Fits environments already using MinIO/S3.
+
+**Disadvantages**:
+- Custom ingestion and query tooling required.
+- Higher latency for queries unless indexed.
+
+### Recommendation
+
+Use Loki + Grafana Alloy for the shortest path to retention compliance, unless
+the environment already runs OpenSearch/Elasticsearch or has strict requirements
+to archive logs in object storage.

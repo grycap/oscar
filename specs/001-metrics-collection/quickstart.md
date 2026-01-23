@@ -14,28 +14,28 @@ range to support reporting.
 
 ```bash
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  "https://YOUR_OSCAR_MANAGER/metrics/value?service_id=service-123&metric=cpu-hours&start=2026-01-01T00:00:00Z&end=2026-01-31T23:59:59Z"
+  "https://YOUR_OSCAR_MANAGER/system/metrics/value?service_id=service-123&metric=cpu-hours&start=2026-01-01T00:00:00Z&end=2026-01-31T23:59:59Z"
 ```
 
 ## Example: Summary report
 
 ```bash
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  "https://YOUR_OSCAR_MANAGER/metrics/summary?start=2026-01-01T00:00:00Z&end=2026-01-31T23:59:59Z"
+  "https://YOUR_OSCAR_MANAGER/system/metrics/summary?start=2026-01-01T00:00:00Z&end=2026-01-31T23:59:59Z"
 ```
 
 ## Example: Breakdown by service
 
 ```bash
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  "https://YOUR_OSCAR_MANAGER/metrics/breakdown?start=2026-01-01T00:00:00Z&end=2026-01-31T23:59:59Z&group_by=service"
+  "https://YOUR_OSCAR_MANAGER/system/metrics/breakdown?start=2026-01-01T00:00:00Z&end=2026-01-31T23:59:59Z&group_by=service"
 ```
 
 ## Example: Breakdown export (CSV)
 
 ```bash
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  "https://YOUR_OSCAR_MANAGER/metrics/breakdown?start=2026-01-01T00:00:00Z&end=2026-01-31T23:59:59Z&group_by=service&format=csv"
+  "https://YOUR_OSCAR_MANAGER/system/metrics/breakdown?start=2026-01-01T00:00:00Z&end=2026-01-31T23:59:59Z&group_by=service&format=csv"
 ```
 
 ## Expected Output

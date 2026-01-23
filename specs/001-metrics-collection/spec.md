@@ -103,22 +103,35 @@ report marks the source as missing and flags affected metrics.
   range.
 - **FR-004**: Summary MUST include total CPU hours and GPU hours used during the
   range.
-- **FR-005**: Summary MUST include the list and count of countries from where
-  user requests are coming.
-- **FR-006**: Summary MUST include the number of requests processed, with
-  synchronous and asynchronous requests included.
-- **FR-007**: System MUST report executions per user and users per OSCAR service
-  for the range.
+- **FR-005**: Summary MUST include the list and count of countries for the
+  range.
+- **FR-006**: Summary MUST include total requests plus separate synchronous and
+  asynchronous counts for the range.
+- **FR-007**: System MUST provide (a) executions per user (total executions per
+  user) and (b) users per OSCAR service (unique users per service) in breakdown
+  outputs.
 - **FR-008**: System MUST classify users as project members or external based on
   authentication method (OIDC = member, OSCAR service token = external).
 - **FR-009**: System MUST flag missing or incomplete data sources for the
   requested range.
 - **FR-010**: System MUST attribute requests to a country when request metadata
   is available.
-- **FR-011**: Summary and breakdown outputs MUST include per-country request
-  totals.
+- **FR-011**: Breakdown outputs MUST include per-country request totals for the
+  range.
 - **FR-012**: System MUST support export of breakdown outputs in CSV format.
-- **FR-013**: System MUST retain and report metric data for at least 6 months.
+- **FR-013**: System MUST report on metric data retained for at least 6 months.
+- **FR-014**: Summary outputs MUST include the list of unique users (OIDC `sub`
+  values) observed in the requested time range.
+
+### Non-Functional Requirements
+
+- **NFR-001**: Monthly summary aggregation SHOULD complete within 5 seconds for a
+  typical cluster.
+- **NFR-002**: Breakdown export generation SHOULD complete within 10 seconds for
+  a typical cluster.
+- **NFR-003**: Metrics collection components MUST minimize resource consumption
+  (CPU, RAM, and storage) and avoid cluster-wide log ingestion when only OSCAR
+  manager logs are required.
 
 ### Metric Catalog (initial)
 
@@ -133,7 +146,7 @@ report marks the source as missing and flags affected metrics.
 - `countries-list`
 
 Metric scope: `requests-sync-per-service` and `requests-async-per-service` are
-per-service when used with `/metrics/value`.
+per-service when used with `/system/metrics/value`.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -152,7 +165,16 @@ per-service when used with `/metrics/value`.
   OSCAR service during the requested time range.
 - **User identifier**: OIDC user id from the IdP.
 - **Time range**: Both start and end timestamps are inclusive.
+- **Metrics base path**: All metrics endpoints are served under `/system/metrics`.
 - **Breakdown membership**: Include membership only when `group_by=user`.
+- **OSCAR manager log scope**: Grafana Alloy MUST only collect logs from OSCAR
+  manager pods (expected labels: `namespace=oscar`, `app=oscar`) to keep
+  resource usage minimal.
+- **Prometheus metric scope**: Prometheus MUST only retain CPU/GPU usage metrics
+  for OSCAR service namespaces (expected prefix: `oscar-svc`) and avoid
+  cluster-wide scrape jobs to minimize storage and CPU usage.
+- **Users list**: Summary outputs include the list of unique OIDC `sub` values
+  observed in the requested time range.
 
 ### Assumptions
 

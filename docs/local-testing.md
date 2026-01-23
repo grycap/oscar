@@ -158,6 +158,11 @@ kubectl -n kube-system patch deployment metrics-server --type='json' -p='[{"op":
 
 > Note that the local testing environment uses Kind, therefore the metrics will not work as expected.
 
+### Monitoring stack (Prometheus + Loki + Alloy)
+
+Monitoring deployment and verification steps were moved to
+`specs/001-metrics-collection/monitoring-docs.md`.
+
 ## Configure RBAC permissions
 
 Once we have deployed Metrics server we must configure RBAC permissions for OSCAR in order to allow it to interact with Metrics server.
@@ -177,6 +182,7 @@ rules:
   resources:
   - nodes
   - pods
+  - pods/log
   - deployments
   verbs:
   - get
