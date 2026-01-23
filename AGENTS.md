@@ -46,6 +46,12 @@ For docs-only changes, tests may be skipped but must be stated explicitly.
 - For documentation changes, validate with `mkdocs serve` when feasible.
 - Keep documentation concise and aligned with actual behavior.
 
+## Local Testing (kind)
+- If you need to manually update the deployment image, run: `kubectl set image deployment/oscar -n oscar oscar=localhost:5001/oscar:devel`.
+- To rebuild and redeploy the OSCAR manager image for local testing, run `make deploy`.
+- This builds and pushes `localhost:5001/oscar:devel` and restarts the `oscar` deployment.
+- Ensure your kind cluster is running and the local registry is reachable.
+
 ## Commit & PR Expectations (if applicable)
 - Follow short, imperative commit messages; use `fix:`/`docs:` prefixes when appropriate.
 - PRs MUST include a clear description and any relevant links to issues.
