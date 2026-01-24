@@ -90,43 +90,43 @@ alloy:
       loki.process "ingress" {
         forward_to = [loki.write.default.receiver]
 
-        stage.drop {
-          expression = ".*\\/system\\/services\\/.+\\/exposed.*"
-          drop       = "false"
-        }
+        stage.match {
+          selector = "{namespace!=\"\"} |~ \"/system/services/.+/exposed\""
+          action   = "keep"
 
-        stage.label_drop {
-          values = ["pod"]
+          stage.label_drop {
+            values = ["pod"]
+          }
         }
       }
 
       loki.process "oscar" {
         forward_to = [loki.write.default.receiver]
 
-        stage.drop {
-          expression = ".*\\/(job|run)\\/.*"
-          drop       = "false"
-        }
+        stage.match {
+          selector = "{namespace!=\"\"} |~ \"/(job|run)/\""
+          action   = "keep"
 
-        stage.regex {
-          expression = ".*\\|\\s*[^|]+\\|\\s*[^|]+\\|\\s*(?P<ip>[0-9a-fA-F:.]+)(?::\\d+)?\\s*\\|.*"
-        }
-
-        stage.geoip {
-          source  = "ip"
-          db      = "/var/lib/alloy/geoip/GeoLite2-Country.mmdb"
-          db_type = "country"
-        }
-
-        stage.labels {
-          values = {
-            geoip_country_name = "",
-            geoip_country_code = "",
+          stage.regex {
+            expression = ".*\\|\\s*[^|]+\\|\\s*[^|]+\\|\\s*(?P<ip>[0-9a-fA-F:.]+)(?::\\d+)?\\s*\\|.*"
           }
-        }
 
-        stage.label_drop {
-          values = ["pod", "geoip_country_name"]
+          stage.geoip {
+            source  = "ip"
+            db      = "/var/lib/alloy/geoip/GeoLite2-Country.mmdb"
+            db_type = "country"
+          }
+
+          stage.labels {
+            values = {
+              geoip_country_name = "",
+              geoip_country_code = "",
+            }
+          }
+
+          stage.label_drop {
+            values = ["pod", "geoip_country_name"]
+          }
         }
       }
 

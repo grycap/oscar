@@ -93,6 +93,21 @@ overhead for index/metadata.
 Prometheus config to refine the estimate and verify storage capacity for a
 6-month retention window.
 
+## Prometheus ingestion optimization
+
+**Decision**: Reduce label cardinality by deriving a `service` label from the
+pod name and dropping the `pod` label. Also reduce `scrape_timeout` from 10s to
+5s for the cAdvisor job.
+
+**Rationale**: The reporting queries are per-service; the `pod` label creates
+high cardinality without providing value once a stable `service` label exists.
+A shorter scrape timeout caps scrape resource usage without affecting the
+2-minute scrape interval.
+
+**Implementation**: In the Prometheus values file, add a `metric_relabel`
+rule to set `service` from `pod` (strip the deployment hash suffix), then drop
+`pod` in `labeldrop`. Set `server.global.scrape_timeout` to `5s`.
+
 ### Country Attribution Options (when logging lacks GeoIP)
 
 **Option A: In-service GeoIP lookup (library + GeoLite2 database)**

@@ -49,8 +49,8 @@ export PROMETHEUS_URL="http://127.0.0.1:9090"
 You can override the default Prometheus queries with:
 
 ```sh
-export PROMETHEUS_CPU_QUERY='sum(increase(container_cpu_usage_seconds_total{namespace=~"{{services_namespace}}.*",pod=~"{{service}}.*"}[{{range}}])) / 3600'
-export PROMETHEUS_GPU_QUERY='sum(increase(container_gpu_usage_seconds_total{namespace=~"{{services_namespace}}.*",pod=~"{{service}}.*"}[{{range}}])) / 3600'
+export PROMETHEUS_CPU_QUERY='sum(increase(container_cpu_usage_seconds_total{namespace=~"{{services_namespace}}.*",service=~"{{service}}"}[{{range}}])) / 3600'
+export PROMETHEUS_GPU_QUERY='sum(increase(container_gpu_usage_seconds_total{namespace=~"{{services_namespace}}.*",service=~"{{service}}"}[{{range}}])) / 3600'
 ```
 
 Verify the minimal Prometheus config is active and only the kubelet cAdvisor
