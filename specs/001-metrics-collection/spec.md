@@ -140,6 +140,10 @@ report marks the source as missing and flags affected metrics.
 - **NFR-003**: Metrics collection components MUST minimize resource consumption
   (CPU, RAM, and storage) and avoid cluster-wide log ingestion when only OSCAR
   manager logs are required.
+- **NFR-004**: Log ingestion MUST be restricted to the minimum set of log lines
+  required for metrics. Request logs MUST be filtered to only the execution
+  paths required for metrics, and exposed-service requests MUST be sourced from
+  the ingress layer rather than the OSCAR manager logs.
 
 ### Metric Catalog (initial)
 

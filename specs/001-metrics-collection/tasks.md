@@ -170,6 +170,7 @@ description: "Task list template for feature implementation"
 - [X] T069 Update Alloy config to enrich logs with GeoIP labels in docs/snippets/alloy-values.kind.yaml
 - [X] T070 Populate request country from Loki stream labels in pkg/metrics/sources.go
 - [X] T071 Document GeoIP enrichment requirements in specs/001-metrics-collection/monitoring-docs.md
+- [X] T079 Restrict Loki ingestion to OSCAR manager /job and /run log lines in docs/snippets/alloy-values.kind.yaml
 
 ---
 

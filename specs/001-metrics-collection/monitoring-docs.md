@@ -149,6 +149,33 @@ Use the gateway service for Loki queries if enabled:
 export LOKI_URL="http://loki-gateway.monitoring.svc.cluster.local"
 ```
 
+## Query Loki logs (examples)
+
+LogQL queries must be URL-encoded. In zsh, `{}` can be expanded, so use
+`--data-urlencode` when calling the Loki API.
+
+If you are running locally, port-forward Loki first:
+
+```sh
+kubectl -n monitoring port-forward svc/loki 3100:3100
+```
+
+List log lines (last 10 entries) for OSCAR manager logs:
+
+```sh
+curl -sG "http://127.0.0.1:3100/loki/api/v1/query_range" \
+  --data-urlencode 'query={namespace="oscar"}' \
+  --data-urlencode 'limit=10' | jq .
+```
+
+If you get `jq: parse error`, retry without `jq` to inspect the raw output:
+
+```sh
+curl -sG "http://127.0.0.1:3100/loki/api/v1/query_range" \
+  --data-urlencode 'query={namespace="oscar"}' \
+  --data-urlencode 'limit=10'
+```
+
 Expose request counts for exposed services with these optional overrides:
 
 ```sh

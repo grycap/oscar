@@ -84,11 +84,29 @@ alloy:
 
       loki.source.kubernetes "ingress" {
         targets    = discovery.relabel.ingress_logs.output
+        forward_to = [loki.process.ingress.receiver]
+      }
+
+      loki.process "ingress" {
         forward_to = [loki.write.default.receiver]
+
+        stage.drop {
+          expression = ".*\\/system\\/services\\/.+\\/exposed.*"
+          drop       = "false"
+        }
+
+        stage.label_drop {
+          values = ["pod"]
+        }
       }
 
       loki.process "oscar" {
         forward_to = [loki.write.default.receiver]
+
+        stage.drop {
+          expression = ".*\\/(job|run)\\/.*"
+          drop       = "false"
+        }
 
         stage.regex {
           expression = ".*\\|\\s*[^|]+\\|\\s*[^|]+\\|\\s*(?P<ip>[0-9a-fA-F:.]+)(?::\\d+)?\\s*\\|.*"
@@ -105,6 +123,10 @@ alloy:
             geoip_country_name = "",
             geoip_country_code = "",
           }
+        }
+
+        stage.label_drop {
+          values = ["pod", "geoip_country_name"]
         }
       }
 

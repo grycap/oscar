@@ -40,6 +40,14 @@ without introducing new dependencies or storage.
   when scrapes are infrequent (for example, 60s). CPU usage metrics derived from
   `increase()` over short windows may appear near zero if the workload does not
   overlap a scrape or consumes little CPU.
+- **cAdvisor housekeeping intervals**: cAdvisor now discovers new containers
+  via kernel events; the *global* housekeeping interval is mostly a backup for
+  missed events, so changing it has limited impact on CPU accounting accuracy.
+  The *per-container* housekeeping interval controls how frequently cAdvisor
+  collects container stats. Lowering it can improve accuracy for short-lived
+  workloads but increases cAdvisor CPU overhead. For long-running workloads, the
+  benefit is marginal compared to adjusting the Prometheus scrape interval.
+  Reference: https://github.com/google/cadvisor/blob/master/docs/runtime_options.md
 - **cgroup accounting accuracy**: cgroup CPU accounting can capture precise CPU
   time for short runs (microsecond/nanosecond resolution), but it must be read
   at execution start/end to avoid scrape-interval gaps. Prometheus/cAdvisor
@@ -153,6 +161,27 @@ a wildcard service selector (e.g., `{{service}} = ".*"`) instead of iterating
 current services. This preserves historic totals for the requested time range
 as long as Prometheus retention still covers it.
 
+## Data ingestion optimization (Loki)
+
+**Decision**: Reduce log ingestion to the minimum required for metrics
+aggregation. For OSCAR manager logs, ingest only lines that include `/job/` or
+`/run/` (the request paths used for sync/async service executions). Exposed
+service requests are sourced from ingress controller logs, so they do not
+require OSCAR manager log ingestion.
+
+**Rationale**: This minimizes Loki storage and query costs while preserving all
+data needed for metrics reporting.
+
+**Implementation**: Grafana Alloy `loki.process` drop filter retains only
+`/job` and `/run` log lines for the OSCAR manager pipeline.
+
+**Further optimizations**:
+- Ingress controller logs are filtered to only `/system/services/<service>/exposed`
+  requests, since other ingress traffic is irrelevant to metrics.
+- Drop high-cardinality labels (e.g., `pod`) from both OSCAR and ingress logs.
+- Drop `geoip_country_name` and keep only `geoip_country_code` to reduce label
+  cardinality while preserving country attribution.
+
 ## Exposed service request counting options
 
 **Context**: Exposed services bypass the OSCAR manager API and are routed by the
@@ -200,6 +229,14 @@ traffic.
 **Preferred approach**: Option A (ingress-nginx logs via Loki/Alloy), because it
 requires minimal changes, keeps resource usage low, and aligns with the
 existing log-retention strategy.
+
+## Loki storage and query engine
+
+- **Storage**: Loki stores logs in a time-series database (TSDB) layout, backed
+  by its configured storage backend (filesystem in the local kind setup). This
+  stores log chunks plus an index optimized for time-range queries.
+- **Query engine**: Loki uses its built-in querier with LogQL to filter and
+  aggregate log streams over time ranges.
 
 ## Decision 2: Report interface shape
 
