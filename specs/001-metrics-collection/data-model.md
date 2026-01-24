@@ -37,10 +37,11 @@
 
 ### UsageSummary
 
-- **Fields**: start_time, end_time, generated_at, services_count,
-  cpu_hours_total, gpu_hours_total, request_count_total,
-  request_count_sync, request_count_async, countries_count,
-  users_count, users, completeness
+- **Fields**: start_time, end_time, generated_at,
+  cpu_hours_total, gpu_hours_total, requests_count_total,
+  requests_count_sync, requests_count_async, requests_count_exposed,
+  countries_count, users_count, users, services_count_active,
+  services_count_total, completeness
 - **Validation**: start_time/end_time required; generated_at required; counts
   >= 0
 - **Relationships**: has many UsageBreakdownEntry; references MetricSourceStatus

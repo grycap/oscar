@@ -75,6 +75,8 @@ description: "Task list template for feature implementation"
 - [X] T055 [US1] Implement Loki request log source (LogQL query + parsing) in pkg/metrics/sources.go
 - [X] T056 [US1] Wire Loki request log source when configured (fallback to pod logs) in pkg/metrics/sources.go and main.go
 - [X] T057 [US1] Add request log source tests for Loki queries in pkg/metrics/aggregators_test.go
+- [X] T072 [US1] Add exposed request log source (ingress controller logs) in pkg/metrics/sources.go
+- [X] T073 [US1] Add requests_count_exposed to summary totals in pkg/types/metrics.go and pkg/metrics/aggregators.go
 - [ ] T047 [US1] Verify 6-month retention guarantees for all data sources and document retention ownership in specs/001-metrics-collection/spec.md
 - [X] T014 [US1] Implement metric value endpoint handler in pkg/handlers/metrics.go
 - [X] T015 [US1] Implement summary endpoint handler in pkg/handlers/metrics.go
@@ -137,7 +139,7 @@ description: "Task list template for feature implementation"
 
 **Purpose**: Documentation updates and cleanup
 
-- [X] T024 Update API documentation for metrics endpoints in docs/api.yaml
+- [X] T024 Update API documentation for metrics endpoints in docs/api.yaml (removed; now swaggo)
 - [X] T025 Update API documentation narrative in docs/api.md
 - [X] T051 Document Prometheus metrics configuration in docs/api.md
 - [ ] T046 Validate documentation changes with mkdocs serve (or record why infeasible) in repo root
@@ -152,6 +154,11 @@ description: "Task list template for feature implementation"
 - [X] T059 Document Loki configuration env vars in docs/api.md
 - [ ] T044 Conduct stakeholder review of summary output and record notes in specs/001-metrics-collection/research.md
 - [X] T060 Update Alloy log collection to only include OSCAR manager pods in docs/snippets/alloy-values.kind.yaml
+- [X] T074 Update summary contracts/spec/data-model for exposed requests in specs/001-metrics-collection/spec.md, specs/001-metrics-collection/data-model.md, and specs/001-metrics-collection/contracts/metrics.yaml
+- [X] T075 Update Alloy log collection to include ingress-nginx controller logs in docs/snippets/alloy-values.kind.yaml
+- [X] T076 Allow optional start/end with 24h default range in pkg/handlers/metrics.go and update specs/001-metrics-collection/spec.md
+- [X] T077 Rename metrics endpoints to /system/metrics and /system/metrics/{serviceName} in main.go, handlers, and specs/docs/tests
+- [X] T078 Allow /system/metrics/{serviceName} without metric to return all per-service metrics in pkg/handlers/metrics.go and docs/specs/contracts
 - [X] T061 Update local testing docs to note OSCAR-only log filtering in docs/local-testing.md
 - [X] T062 Apply Alloy configuration update in the local kind cluster (helm upgrade) from repo root
 - [X] T063 Add minimal Prometheus values file to collect only OSCAR CPU/GPU metrics in docs/snippets/prometheus-values.kind.yaml

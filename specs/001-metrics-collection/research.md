@@ -130,6 +130,9 @@ Prometheus config to refine the estimate and verify storage capacity for a
 - Centralized enrichment without adding latency to OSCAR requests.
 - Keeps application layer simple; no new app dependencies.
 - Works with existing Loki pipeline; can add country as labels once.
+- Avoids embedding Loki client logic and credentials in the OSCAR manager.
+- Provides batching/retry/backpressure handling in the logging layer.
+- Scales uniformly for all pods/services with consistent policy.
 
 **Disadvantages**:
 - Requires GeoIP database distribution and updates.
@@ -139,6 +142,64 @@ Prometheus config to refine the estimate and verify storage capacity for a
 **Preferred approach**: Option D (log-ingestion GeoIP enrichment via Alloy),
 because it avoids per-request latency and aligns with the resource-minimization
 goal while keeping the application code unchanged.
+
+## Summary CPU/GPU totals vs deleted services
+
+**Issue**: Totals based on current service inventory drop to zero after services
+are deleted, even if Prometheus still has historic usage for the time range.
+
+**Approach**: When the usage source is Prometheus, compute summary totals with
+a wildcard service selector (e.g., `{{service}} = ".*"`) instead of iterating
+current services. This preserves historic totals for the requested time range
+as long as Prometheus retention still covers it.
+
+## Exposed service request counting options
+
+**Context**: Exposed services bypass the OSCAR manager API and are routed by the
+ingress controller (`ingress-nginx`). Their request volume is not present in
+OSCAR manager logs.
+
+**Option A: Ingress-nginx access logs via Loki/Alloy (recommended)**  
+Ship `ingress-nginx` controller logs to Loki with Alloy and parse requests that
+match `/system/services/<service>/exposed`. This reuses the existing logging
+stack and avoids changes to OSCAR manager request handling.
+
+**Advantages**:
+- Minimal application changes (parsing only).
+- Counts exposed requests without adding per-request latency.
+- Keeps metrics collection within existing log pipeline.
+- Scopes log collection to ingress controller only (low overhead).
+
+**Disadvantages**:
+- Requires enabling ingestion of ingress controller logs (additional source).
+- Depends on ingress log format stability.
+
+**Option B: Ingress-nginx Prometheus metrics**  
+Use NGINX ingress controller Prometheus metrics (per-ingress request counters)
+and query them for exposed-service paths.
+
+**Advantages**:
+- Avoids parsing log lines.
+- Efficient counters for large volumes.
+
+**Disadvantages**:
+- Requires enabling and scraping ingress metrics (higher Prometheus scope).
+- Harder to map requests to OSCAR service IDs if paths are rewritten.
+
+**Option C: Application-level instrumentation**  
+Instrument exposed services (or OSCAR manager) to emit counters for exposed
+traffic.
+
+**Advantages**:
+- Precise attribution and custom labels.
+
+**Disadvantages**:
+- Requires changes to service images or OSCAR request routing logic.
+- Increases maintenance burden and breaks minimal-change requirement.
+
+**Preferred approach**: Option A (ingress-nginx logs via Loki/Alloy), because it
+requires minimal changes, keeps resource usage low, and aligns with the
+existing log-retention strategy.
 
 ## Decision 2: Report interface shape
 

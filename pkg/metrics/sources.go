@@ -76,29 +76,45 @@ type CountryAttributionSource interface {
 }
 
 type Sources struct {
-	ServiceInventory ServiceInventorySource
-	UsageMetrics     UsageMetricsSource
-	RequestLogs      RequestLogSource
-	UserRoster       UserRosterSource
-	CountrySource    CountryAttributionSource
+	ServiceInventory   ServiceInventorySource
+	UsageMetrics       UsageMetricsSource
+	RequestLogs        RequestLogSource
+	ExposedRequestLogs RequestLogSource
+	UserRoster         UserRosterSource
+	CountrySource      CountryAttributionSource
 }
 
 func DefaultSources(cfg *types.Config, back types.ServerlessBackend, kubeClientset kubernetes.Interface) Sources {
 	sources := Sources{
-		ServiceInventory: &BackendServiceInventorySource{Back: back},
-		UsageMetrics:     &NoopUsageMetricsSource{},
-		RequestLogs:      &NoopRequestLogSource{},
-		UserRoster:       &NoopUserRosterSource{},
-		CountrySource:    &RequestCountrySource{},
+		ServiceInventory:   &BackendServiceInventorySource{Back: back},
+		UsageMetrics:       &NoopUsageMetricsSource{},
+		RequestLogs:        &NoopRequestLogSource{SourceName: "request-logs"},
+		ExposedRequestLogs: &NoopRequestLogSource{SourceName: "exposed-request-logs"},
+		UserRoster:         &NoopUserRosterSource{},
+		CountrySource:      &RequestCountrySource{},
 	}
 	if cfg != nil {
 		if cfg.LokiBaseURL != "" {
 			sources.RequestLogs = &LokiRequestLogSource{
-				BaseURL:       cfg.LokiBaseURL,
-				QueryTemplate: cfg.LokiQuery,
-				Namespace:     cfg.Namespace,
-				AppLabel:      "oscar",
-				Client:        &http.Client{Timeout: 10 * time.Second},
+				BaseURL:               cfg.LokiBaseURL,
+				QueryTemplate:         cfg.LokiQuery,
+				Namespace:             cfg.Namespace,
+				AppLabel:              "oscar",
+				Client:                &http.Client{Timeout: 10 * time.Second},
+				ServiceFilterTemplate: "/(job|run)/%s",
+			}
+			if cfg.LokiExposedQuery != "" {
+				sources.ExposedRequestLogs = &LokiRequestLogSource{
+					BaseURL:               cfg.LokiBaseURL,
+					QueryTemplate:         cfg.LokiExposedQuery,
+					Namespace:             cfg.LokiExposedNamespace,
+					AppLabel:              cfg.LokiExposedAppLabel,
+					Client:                &http.Client{Timeout: 10 * time.Second},
+					ParseFunc:             parseIngressAccessLog,
+					SourceName:            "exposed-request-logs",
+					ServiceFilterTemplate: "/system/services/%s/exposed",
+					ServiceFilterAll:      "/system/services/.+/exposed",
+				}
 			}
 		} else if kubeClientset != nil {
 			sources.RequestLogs = &KubeRequestLogSource{
@@ -106,6 +122,14 @@ func DefaultSources(cfg *types.Config, back types.ServerlessBackend, kubeClients
 				Namespace:  cfg.Namespace,
 				LabelKey:   "app",
 				LabelValue: "oscar",
+			}
+			sources.ExposedRequestLogs = &KubeRequestLogSource{
+				Client:     kubeClientset,
+				Namespace:  "ingress-nginx",
+				LabelKey:   "app.kubernetes.io/name",
+				LabelValue: "ingress-nginx",
+				ParseFunc:  parseIngressAccessLog,
+				SourceName: "exposed-request-logs",
 			}
 		}
 	}
@@ -279,9 +303,14 @@ func joinErrors(errs ...error) string {
 	return strings.Join(parts, "; ")
 }
 
-type NoopRequestLogSource struct{}
+type NoopRequestLogSource struct {
+	SourceName string
+}
 
 func (s *NoopRequestLogSource) Name() string {
+	if s.SourceName != "" {
+		return s.SourceName
+	}
 	return "request-logs"
 }
 
@@ -292,14 +321,21 @@ func (s *NoopRequestLogSource) ListRequests(ctx context.Context, tr TimeRange, s
 }
 
 type LokiRequestLogSource struct {
-	BaseURL       string
-	QueryTemplate string
-	Namespace     string
-	AppLabel      string
-	Client        *http.Client
+	BaseURL               string
+	QueryTemplate         string
+	Namespace             string
+	AppLabel              string
+	Client                *http.Client
+	ParseFunc             func(string) (RequestRecord, bool)
+	SourceName            string
+	ServiceFilterTemplate string
+	ServiceFilterAll      string
 }
 
 func (s *LokiRequestLogSource) Name() string {
+	if s.SourceName != "" {
+		return s.SourceName
+	}
 	return "loki"
 }
 
@@ -308,7 +344,7 @@ func (s *LokiRequestLogSource) ListRequests(ctx context.Context, tr TimeRange, s
 		err := errors.New("loki base URL not configured")
 		return nil, missingStatus(s.Name(), err), err
 	}
-	query := buildLokiQuery(s.QueryTemplate, s.Namespace, s.AppLabel, serviceID)
+	query := s.buildQuery(serviceID)
 	if query == "" {
 		err := errors.New("loki query template not configured")
 		return nil, missingStatus(s.Name(), err), err
@@ -347,11 +383,16 @@ func (s *LokiRequestLogSource) ListRequests(ctx context.Context, tr TimeRange, s
 		return nil, missingStatus(s.Name(), err), err
 	}
 
+	parseFn := s.ParseFunc
+	if parseFn == nil {
+		parseFn = parseGinExecutionLog
+	}
+
 	records := make([]RequestRecord, 0)
 	for _, stream := range result {
 		for _, entry := range stream.Values {
 			lokiTime := time.Unix(0, entry.Timestamp)
-			record, ok := parseGinExecutionLog(entry.Line)
+			record, ok := parseFn(entry.Line)
 			if !ok {
 				continue
 			}
@@ -375,6 +416,29 @@ func (s *LokiRequestLogSource) ListRequests(ctx context.Context, tr TimeRange, s
 
 	status := okStatus(s.Name(), "")
 	return records, status, nil
+}
+
+func (s *LokiRequestLogSource) buildQuery(serviceID string) string {
+	if s.QueryTemplate == "" {
+		return ""
+	}
+	query := strings.ReplaceAll(s.QueryTemplate, "{{namespace}}", s.Namespace)
+	query = strings.ReplaceAll(query, "{{app}}", s.AppLabel)
+	if strings.Contains(query, "{{service}}") {
+		serviceReplacement := serviceID
+		if serviceReplacement == "" {
+			serviceReplacement = ".*"
+		}
+		query = strings.ReplaceAll(query, "{{service}}", serviceReplacement)
+		return query
+	}
+
+	if serviceID != "" && s.ServiceFilterTemplate != "" {
+		query += fmt.Sprintf(" |~ \"%s\"", fmt.Sprintf(s.ServiceFilterTemplate, regexp.QuoteMeta(serviceID)))
+	} else if serviceID == "" && s.ServiceFilterAll != "" {
+		query += fmt.Sprintf(" |~ \"%s\"", s.ServiceFilterAll)
+	}
+	return query
 }
 
 type lokiStreamEntry struct {
@@ -445,33 +509,19 @@ func countryFromLokiLabels(labels map[string]string) string {
 	return ""
 }
 
-func buildLokiQuery(template, namespace, app, serviceID string) string {
-	if template == "" {
-		return ""
-	}
-	query := strings.ReplaceAll(template, "{{namespace}}", namespace)
-	query = strings.ReplaceAll(query, "{{app}}", app)
-	if strings.Contains(query, "{{service}}") {
-		serviceReplacement := serviceID
-		if serviceReplacement == "" {
-			serviceReplacement = ".*"
-		}
-		query = strings.ReplaceAll(query, "{{service}}", serviceReplacement)
-	}
-	if serviceID != "" && !strings.Contains(query, "{{service}}") {
-		query += fmt.Sprintf(" |~ \"/(job|run)/%s\"", regexp.QuoteMeta(serviceID))
-	}
-	return query
-}
-
 type KubeRequestLogSource struct {
 	Client     kubernetes.Interface
 	Namespace  string
 	LabelKey   string
 	LabelValue string
+	ParseFunc  func(string) (RequestRecord, bool)
+	SourceName string
 }
 
 func (s *KubeRequestLogSource) Name() string {
+	if s.SourceName != "" {
+		return s.SourceName
+	}
 	return "request-logs"
 }
 
@@ -540,9 +590,13 @@ func (s *KubeRequestLogSource) readPodLogs(ctx context.Context, pod corev1.Pod, 
 	records := make([]RequestRecord, 0)
 	scanner := bufio.NewScanner(stream)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	parseFn := s.ParseFunc
+	if parseFn == nil {
+		parseFn = parseGinExecutionLog
+	}
 	for scanner.Scan() {
 		line := scanner.Text()
-		record, ok := parseGinExecutionLog(line)
+		record, ok := parseFn(line)
 		if !ok {
 			continue
 		}
@@ -615,6 +669,74 @@ func parseServiceFromPath(path string) (string, RequestType) {
 		return strings.TrimPrefix(path, "/run/"), RequestSync
 	}
 	return "", ""
+}
+
+func parseExposedServiceFromPath(path string) (string, bool) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "", false
+	}
+	path = strings.SplitN(path, "?", 2)[0]
+	const prefix = "/system/services/"
+	if !strings.HasPrefix(path, prefix) {
+		return "", false
+	}
+	rest := strings.TrimPrefix(path, prefix)
+	parts := strings.SplitN(rest, "/", 3)
+	if len(parts) < 2 {
+		return "", false
+	}
+	if parts[0] == "" || parts[1] != "exposed" {
+		return "", false
+	}
+	return parts[0], true
+}
+
+func parseIngressAccessLog(line string) (RequestRecord, bool) {
+	fields := strings.Fields(line)
+	if len(fields) == 0 {
+		return RequestRecord{}, false
+	}
+
+	var timestamp time.Time
+	openIdx := strings.Index(line, "[")
+	closeIdx := strings.Index(line, "]")
+	if openIdx != -1 && closeIdx > openIdx+1 {
+		raw := line[openIdx+1 : closeIdx]
+		parsed, err := time.Parse("02/Jan/2006:15:04:05 -0700", raw)
+		if err == nil {
+			timestamp = parsed
+		}
+	}
+
+	firstQuote := strings.Index(line, "\"")
+	if firstQuote == -1 {
+		return RequestRecord{}, false
+	}
+	rest := line[firstQuote+1:]
+	secondQuote := strings.Index(rest, "\"")
+	if secondQuote == -1 {
+		return RequestRecord{}, false
+	}
+	requestLine := rest[:secondQuote]
+	reqParts := strings.Fields(requestLine)
+	if len(reqParts) < 2 {
+		return RequestRecord{}, false
+	}
+	path := reqParts[1]
+	serviceID, ok := parseExposedServiceFromPath(path)
+	if !ok {
+		return RequestRecord{}, false
+	}
+
+	return RequestRecord{
+		ServiceID:  serviceID,
+		UserID:     "",
+		Country:    "",
+		AuthMethod: "",
+		Type:       "",
+		Timestamp:  timestamp,
+	}, true
 }
 
 type NoopUserRosterSource struct{}

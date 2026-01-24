@@ -62,6 +62,16 @@ func (a *Aggregator) MetricValue(ctx context.Context, tr TimeRange, serviceID st
 				resp.Value = float64(uniqueUsers(records))
 			}
 		}
+	case types.MetricRequestsExposed:
+		if a.Sources.ExposedRequestLogs == nil {
+			resp.Sources = append(resp.Sources, *missingStatus("exposed-request-logs", errors.New("exposed request log source missing")))
+		} else {
+			records, status, _ := a.Sources.ExposedRequestLogs.ListRequests(ctx, tr, serviceID)
+			if status != nil {
+				resp.Sources = append(resp.Sources, *status)
+			}
+			resp.Value = float64(len(records))
+		}
 	default:
 		return types.MetricValueResponse{}, errUnsupportedMetric
 	}
@@ -81,7 +91,7 @@ func (a *Aggregator) Summary(ctx context.Context, tr TimeRange) (types.MetricsSu
 	if status != nil {
 		resp.Sources = append(resp.Sources, *status)
 	}
-	resp.Totals.ServicesCount = len(services)
+	resp.Totals.ServicesCountActive = len(services)
 
 	cpuTotal, gpuTotal, usageStatus := a.sumUsage(ctx, tr, services)
 	if usageStatus != nil {
@@ -90,6 +100,7 @@ func (a *Aggregator) Summary(ctx context.Context, tr TimeRange) (types.MetricsSu
 	resp.Totals.CPUHoursTotal = cpuTotal
 	resp.Totals.GPUHoursTotal = gpuTotal
 
+	var requestRecords []RequestRecord
 	if a.Sources.RequestLogs == nil {
 		resp.Sources = append(resp.Sources, *missingStatus("request-logs", errors.New("request log source missing")))
 	} else {
@@ -97,11 +108,26 @@ func (a *Aggregator) Summary(ctx context.Context, tr TimeRange) (types.MetricsSu
 		if requestStatus != nil {
 			resp.Sources = append(resp.Sources, *requestStatus)
 		}
+		requestRecords = records
 		countryStatus := a.processSummaryFromRecords(ctx, records, &resp)
 		if countryStatus != nil {
 			resp.Sources = append(resp.Sources, *countryStatus)
 		}
 	}
+
+	var exposedRecords []RequestRecord
+	if a.Sources.ExposedRequestLogs == nil {
+		resp.Sources = append(resp.Sources, *missingStatus("exposed-request-logs", errors.New("exposed request log source missing")))
+	} else {
+		records, exposedStatus, _ := a.Sources.ExposedRequestLogs.ListRequests(ctx, tr, "")
+		if exposedStatus != nil {
+			resp.Sources = append(resp.Sources, *exposedStatus)
+		}
+		exposedRecords = records
+		resp.Totals.RequestsCountExposed = len(records)
+	}
+
+	resp.Totals.ServicesCountTotal = uniqueServices(requestRecords, exposedRecords)
 
 	return resp, nil
 }
@@ -114,21 +140,28 @@ func (a *Aggregator) Breakdown(ctx context.Context, tr TimeRange, groupBy string
 		Items:   []types.BreakdownItem{},
 	}
 
-	if a.Sources.RequestLogs == nil {
-		return resp, nil
-	}
-	records, _, _ := a.Sources.RequestLogs.ListRequests(ctx, tr, "")
-	if len(records) == 0 {
-		return resp, nil
+	var records []RequestRecord
+	if a.Sources.RequestLogs != nil {
+		records, _, _ = a.Sources.RequestLogs.ListRequests(ctx, tr, "")
 	}
 
 	groupBy = strings.ToLower(groupBy)
 	switch groupBy {
 	case "service":
-		resp.Items = breakdownByService(records)
+		var exposedRecords []RequestRecord
+		if a.Sources.ExposedRequestLogs != nil {
+			exposedRecords, _, _ = a.Sources.ExposedRequestLogs.ListRequests(ctx, tr, "")
+		}
+		resp.Items = breakdownByService(records, exposedRecords)
 	case "user":
+		if len(records) == 0 {
+			return resp, nil
+		}
 		resp.Items = breakdownByUser(ctx, records, a.Sources.UserRoster)
 	case "country":
+		if len(records) == 0 {
+			return resp, nil
+		}
 		resp.Items = breakdownByCountry(records)
 	default:
 		return types.MetricsBreakdownResponse{}, errors.New("unsupported group_by")
@@ -140,6 +173,14 @@ func (a *Aggregator) Breakdown(ctx context.Context, tr TimeRange, groupBy string
 func (a *Aggregator) sumUsage(ctx context.Context, tr TimeRange, services []ServiceDescriptor) (float64, float64, *types.SourceStatus) {
 	if a.Sources.UsageMetrics == nil {
 		return 0, 0, missingStatus("usage-metrics", errors.New("usage source missing"))
+	}
+
+	if promSource, ok := a.Sources.UsageMetrics.(*PrometheusUsageMetricsSource); ok {
+		cpuTotal, gpuTotal, status, err := promSource.UsageHours(ctx, tr, ".*")
+		if err != nil {
+			return 0, 0, status
+		}
+		return cpuTotal, gpuTotal, status
 	}
 
 	var cpuTotal float64
@@ -180,9 +221,9 @@ func (a *Aggregator) processSummaryFromRecords(ctx context.Context, records []Re
 		return nil
 	}
 	requestTotals := countRequests(records, "")
-	resp.Totals.RequestCountTotal = requestTotals
-	resp.Totals.RequestCountSync = countRequests(records, RequestSync)
-	resp.Totals.RequestCountAsync = countRequests(records, RequestAsync)
+	resp.Totals.RequestsCountTotal = requestTotals
+	resp.Totals.RequestsCountSync = countRequests(records, RequestSync)
+	resp.Totals.RequestsCountAsync = countRequests(records, RequestAsync)
 
 	userSet := make(map[string]struct{})
 	countryCounts := make(map[string]int)
@@ -231,6 +272,19 @@ func uniqueUsers(records []RequestRecord) int {
 	return len(users)
 }
 
+func uniqueServices(recordSets ...[]RequestRecord) int {
+	services := map[string]struct{}{}
+	for _, records := range recordSets {
+		for _, record := range records {
+			if record.ServiceID == "" {
+				continue
+			}
+			services[record.ServiceID] = struct{}{}
+		}
+	}
+	return len(services)
+}
+
 func mapToCountryList(counts map[string]int) []types.CountryCount {
 	items := make([]types.CountryCount, 0, len(counts))
 	for country, count := range counts {
@@ -257,9 +311,12 @@ func mapToUserList(users map[string]struct{}) []string {
 	return items
 }
 
-func breakdownByService(records []RequestRecord) []types.BreakdownItem {
+func breakdownByService(records []RequestRecord, exposedRecords []RequestRecord) []types.BreakdownItem {
 	type agg struct {
 		executions int
+		sync       int
+		async      int
+		exposed    int
 		users      map[string]struct{}
 		countries  map[string]int
 	}
@@ -271,6 +328,12 @@ func breakdownByService(records []RequestRecord) []types.BreakdownItem {
 			index[record.ServiceID] = entry
 		}
 		entry.executions++
+		switch record.Type {
+		case RequestSync:
+			entry.sync++
+		case RequestAsync:
+			entry.async++
+		}
 		if record.UserID != "" {
 			entry.users[record.UserID] = struct{}{}
 		}
@@ -278,14 +341,30 @@ func breakdownByService(records []RequestRecord) []types.BreakdownItem {
 			entry.countries[record.Country]++
 		}
 	}
+	for _, record := range exposedRecords {
+		if record.ServiceID == "" {
+			continue
+		}
+		entry := index[record.ServiceID]
+		if entry == nil {
+			entry = &agg{users: map[string]struct{}{}, countries: map[string]int{}}
+			index[record.ServiceID] = entry
+		}
+		entry.exposed++
+		entry.executions++
+	}
 
 	items := make([]types.BreakdownItem, 0, len(index))
 	for key, entry := range index {
 		items = append(items, types.BreakdownItem{
-			Key:              key,
-			ExecutionsCount:  entry.executions,
-			UniqueUsersCount: len(entry.users),
-			Countries:        mapToCountryList(entry.countries),
+			Key:                  key,
+			ExecutionsCount:      entry.executions,
+			RequestsCountTotal:   entry.sync + entry.async,
+			RequestsCountSync:    entry.sync,
+			RequestsCountAsync:   entry.async,
+			RequestsCountExposed: entry.exposed,
+			UniqueUsersCount:     len(entry.users),
+			Countries:            mapToCountryList(entry.countries),
 		})
 	}
 	sort.Slice(items, func(i, j int) bool {

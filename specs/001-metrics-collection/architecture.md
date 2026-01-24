@@ -10,8 +10,8 @@ flowchart LR
 
   %% OSCAR API
   subgraph OSCAR["OSCAR API (Gin)"]
-    R1[/GET /system/metrics/value/]
-    R2[/GET /system/metrics/summary/]
+    R1[/GET /system/metrics/{serviceName}/]
+    R2[/GET /system/metrics/]
     R3[/GET /system/metrics/breakdown/]
     H1[MetricValueHandler]
     H2[MetricsSummaryHandler]
@@ -44,6 +44,7 @@ flowchart LR
     S1[ServiceInventorySource]
     S2[UsageMetricsSource]
     S3[RequestLogSource]
+    S6[ExposedRequestLogSource]
     S4[CountryAttributionSource]
     S5[UserRosterSource]
   end
@@ -52,6 +53,7 @@ flowchart LR
   A2 --> S1
   A2 --> S2
   A2 --> S3
+  A2 --> S6
   A2 --> S4
   A3 --> S3
   A3 --> S4
@@ -64,6 +66,7 @@ flowchart LR
     Loki[Loki HTTP API]
     GeoIPDB["GeoIP DB (GeoLite2)"]
     PodLogs["Pod logs fallback"]
+    IngressLogs["Ingress controller logs"]
     OIDC[OIDC / request metadata]
     Roster[User roster source]
   end
@@ -71,7 +74,9 @@ flowchart LR
   S1 --> K8s
   S2 --> Prom
   S3 --> Loki
+  S6 --> Loki
   S3 -.fallback .-> PodLogs
+  S6 -.fallback .-> IngressLogs
   S4 --> OIDC
   S5 --> Roster
 
@@ -80,9 +85,11 @@ flowchart LR
     LP1[loki.source.kubernetes]
     LP2["loki.process: regex + geoip"]
     LP3[loki.write]
+    LP4[loki.source.kubernetes ingress]
   end
 
   PodLogs --> LP1 --> LP2 --> LP3 --> Loki
+  IngressLogs --> LP4 --> LP3
   GeoIPDB --> LP2
 
   %% Config
@@ -92,6 +99,9 @@ flowchart LR
     C3[PROMETHEUS_GPU_QUERY]
     C4[LOKI_URL]
     C5[LOKI_QUERY]
+    C6[LOKI_EXPOSED_QUERY]
+    C7[LOKI_EXPOSED_NAMESPACE]
+    C8[LOKI_EXPOSED_APP]
   end
 
   C1 --> S2
@@ -99,6 +109,10 @@ flowchart LR
   C3 --> S2
   C4 --> S3
   C5 --> S3
+  C4 --> S6
+  C6 --> S6
+  C7 --> S6
+  C8 --> S6
 
   %% Outputs
   subgraph Outputs["Responses"]

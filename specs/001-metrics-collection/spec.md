@@ -97,16 +97,24 @@ report marks the source as missing and flags affected metrics.
 ### Functional Requirements
 
 - **FR-001**: System MUST allow querying a specific metric for a requested time
-  range and OSCAR service.
+  range and OSCAR service. If no metric is specified, the system MUST return
+  all supported per-service metrics in a single response.
 - **FR-002**: System MUST generate a metrics summary for a requested time range.
-- **FR-003**: Summary MUST include the count of unique services hosted during the
-  range.
+- **FR-003**: Summary MUST include the count of services currently deployed at
+  query time (`services_count_active`). This reflects the live service
+  inventory and is not time-range aware.
 - **FR-004**: Summary MUST include total CPU hours and GPU hours used during the
   range.
 - **FR-005**: Summary MUST include the list and count of countries for the
   range.
-- **FR-006**: Summary MUST include total requests plus separate synchronous and
-  asynchronous counts for the range.
+- **FR-006**: Summary MUST include total requests plus separate synchronous,
+  asynchronous, and exposed counts for the range (`requests_count_total`,
+  `requests_count_sync`, `requests_count_async`, `requests_count_exposed`).
+- **FR-015**: Summary MUST include the count of services that had activity
+  during the requested range, even if they were deleted later
+  (`services_count_total`).
+- **FR-016**: Summary MUST include the count of requests to exposed OSCAR
+  services during the requested range (`requests_count_exposed`).
 - **FR-007**: System MUST provide (a) executions per user (total executions per
   user) and (b) users per OSCAR service (unique users per service) in breakdown
   outputs.
@@ -140,18 +148,20 @@ report marks the source as missing and flags affected metrics.
 - `gpu-hours`
 - `requests-sync-per-service`
 - `requests-async-per-service`
+- `requests-exposed-per-service`
 - `requests-per-user`
 - `users-per-service`
 - `countries-count`
 - `countries-list`
 
 Metric scope: `requests-sync-per-service` and `requests-async-per-service` are
-per-service when used with `/system/metrics/value`.
+per-service when used with `/system/metrics/{serviceName}`.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Service**: OSCAR service identified by the service ID and Docker image.
-- **Usage Summary**: Aggregated metrics for a time range.
+- **Usage Summary**: Aggregated metrics for a time range, including the current
+  deployed service count and total services seen in logs.
 - **Usage Breakdown**: Per-service, per-user, and per-country totals.
 - **User**: Actor who triggers executions, including membership classification
   by authentication method (OIDC = member, service token = external); identified
@@ -164,11 +174,14 @@ per-service when used with `/system/metrics/value`.
 - **Execution**: A single request (synchronous or asynchronous) processed by an
   OSCAR service during the requested time range.
 - **User identifier**: OIDC user id from the IdP.
-- **Time range**: Both start and end timestamps are inclusive.
+- **Time range**: Both start and end timestamps are inclusive. If omitted,
+  the system defaults to the last 24 hours (end = now, start = end - 24h).
 - **Metrics base path**: All metrics endpoints are served under `/system/metrics`.
 - **Breakdown membership**: Include membership only when `group_by=user`.
 - **OSCAR manager log scope**: Grafana Alloy MUST only collect logs from OSCAR
-  manager pods (expected labels: `namespace=oscar`, `app=oscar`) to keep
+  manager pods (expected labels: `namespace=oscar`, `app=oscar`) unless exposed
+  service request counts are enabled, in which case it MAY also collect logs
+  from the ingress controller pods responsible for exposed services to keep
   resource usage minimal.
 - **Prometheus metric scope**: Prometheus MUST only retain CPU/GPU usage metrics
   for OSCAR service namespaces (expected prefix: `oscar-svc`) and avoid

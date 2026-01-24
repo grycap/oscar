@@ -10,9 +10,14 @@ through an Ingress Controller. This API has been described following the
 
 ## Metrics reporting
 
-Metrics reporting endpoints include `/system/metrics/value`, `/system/metrics/summary`, and
-`/system/metrics/breakdown`. The breakdown endpoint supports CSV output by setting
+Metrics reporting endpoints include `/system/metrics/{serviceName}`, `/system/metrics`, and
+`/system/metrics/breakdown`. If the `metric` query parameter is omitted from
+`/system/metrics/{serviceName}`, the API returns all supported per-service metrics.
+The breakdown endpoint supports CSV output by setting
 `format=csv` and grouping with `group_by` (service, user, country).
+
+The `start`/`end` query parameters are optional. If omitted, the API defaults to
+the last 24 hours (end = now, start = end - 24h).
 
 ### Prometheus usage metrics
 
@@ -31,5 +36,8 @@ to Kubernetes pod logs.
 
 - `LOKI_URL` (e.g., `http://loki.monitoring.svc.cluster.local:3100`)
 - `LOKI_QUERY` (default uses `{{namespace}}` and `{{app}}`; if you add `{{service}}`, prefer a regex matcher like `service=~"{{service}}"` so summary queries can expand to `.*`)
+- `LOKI_EXPOSED_QUERY` (LogQL query for exposed-service requests; default filters `/system/services/.+/exposed`)
+- `LOKI_EXPOSED_NAMESPACE` (default `ingress-nginx`)
+- `LOKI_EXPOSED_APP` (default `ingress-nginx`)
 
 !!swagger swagger.yaml!!

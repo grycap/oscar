@@ -23,11 +23,12 @@
 - Keep packages short and lowercase (e.g., `pkg/utils`, `pkg/handlers`).
 - Prefer clear function names and avoid overly clever abstractions.
 - Update comments only when behavior changes or when clarity improves.
+- Metrics naming MUST use plural prefixes and consistent suffixes: summary totals as `services_count_*`, `requests_count_*`, `users_count`, and per-service metrics as `requests-*-per-service`.
 
 ## Change Scope & Discipline
 - Stay within the scope of the request; avoid opportunistic cleanup.
 - If a refactor is needed, ask before doing it unless the change is trivial and isolated.
-- Do not alter public APIs or configuration formats unless explicitly requested. See `docs/api.md`, `docs/api.yaml`, and `docs/additional-config.md` for references.
+- Do not alter public APIs or configuration formats unless explicitly requested. See `docs/api.md` and `docs/additional-config.md` for references.
 
 ## Testing & Validation
 - You MUST run tests for touched Go packages when feasible (e.g., `go test ./...`).

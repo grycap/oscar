@@ -27,17 +27,45 @@ type userBreakdownResponse struct {
 	Items   []userBreakdownItem `json:"items"`
 }
 
+type serviceBreakdownItem struct {
+	Key                  string               `json:"key"`
+	Membership           string               `json:"membership,omitempty"`
+	RequestsCountTotal   int                  `json:"requests_count_total"`
+	RequestsCountSync    int                  `json:"requests_count_sync"`
+	RequestsCountAsync   int                  `json:"requests_count_async"`
+	RequestsCountExposed int                  `json:"requests_count_exposed"`
+	UniqueUsersCount     int                  `json:"unique_users_count"`
+	Countries            []types.CountryCount `json:"countries"`
+}
+
+type serviceBreakdownResponse struct {
+	Start   time.Time              `json:"start"`
+	End     time.Time              `json:"end"`
+	GroupBy string                 `json:"group_by"`
+	Items   []serviceBreakdownItem `json:"items"`
+}
+
+// MakeMetricValueHandler godoc
+// @Summary Get metrics for a service
+// @Description When metric is omitted, returns all supported per-service metrics.
+// @Tags metrics
+// @Produce json
+// @Param serviceName path string true "Service name"
+// @Param metric query string false "Metric key"
+// @Param start query string false "RFC3339 start timestamp (defaults to end-24h)"
+// @Param end query string false "RFC3339 end timestamp (defaults to now)"
+// @Success 200 {object} types.MetricValueResponse
+// @Success 200 {object} types.ServiceMetricsResponse
+// @Failure 400 {string} string "Invalid parameters"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/metrics/{serviceName} [get]
 func MakeMetricValueHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		serviceID := strings.TrimSpace(c.Query("service_id"))
-		if serviceID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "service_id is required"})
-			return
-		}
-
-		metricKey := types.MetricKey(strings.TrimSpace(c.Query("metric")))
-		if !types.IsMetricKeyValid(metricKey) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid metric key"})
+		serviceName := strings.TrimSpace(c.Param("serviceName"))
+		if serviceName == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "serviceName is required"})
 			return
 		}
 
@@ -46,7 +74,29 @@ func MakeMetricValueHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 			return
 		}
 
-		resp, err := agg.MetricValue(c.Request.Context(), tr, serviceID, metricKey)
+		metricRaw := strings.TrimSpace(c.Query("metric"))
+		if metricRaw == "" {
+			metricsList, err := loadAllServiceMetrics(c, agg, tr, serviceName)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, types.ServiceMetricsResponse{
+				ServiceName: serviceName,
+				Start:       tr.Start,
+				End:         tr.End,
+				Metrics:     metricsList,
+			})
+			return
+		}
+
+		metricKey := types.MetricKey(metricRaw)
+		if !types.IsMetricKeyValid(metricKey) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid metric key"})
+			return
+		}
+
+		resp, err := agg.MetricValue(c.Request.Context(), tr, serviceName, metricKey)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -55,6 +105,43 @@ func MakeMetricValueHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 	}
 }
 
+func loadAllServiceMetrics(c *gin.Context, agg *metrics.Aggregator, tr metrics.TimeRange, serviceName string) ([]types.ServiceMetricValue, error) {
+	keys := []types.MetricKey{
+		types.MetricCPUHours,
+		types.MetricGPUHours,
+		types.MetricRequestsSync,
+		types.MetricRequestsAsync,
+		types.MetricRequestsExposed,
+		types.MetricUsersPerService,
+	}
+	items := make([]types.ServiceMetricValue, 0, len(keys))
+	for _, key := range keys {
+		resp, err := agg.MetricValue(c.Request.Context(), tr, serviceName, key)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, types.ServiceMetricValue{
+			Metric:  resp.Metric,
+			Value:   resp.Value,
+			Unit:    resp.Unit,
+			Sources: resp.Sources,
+		})
+	}
+	return items, nil
+}
+
+// MakeMetricsSummaryHandler godoc
+// @Summary Get metrics summary
+// @Tags metrics
+// @Produce json
+// @Param start query string false "RFC3339 start timestamp (defaults to end-24h)"
+// @Param end query string false "RFC3339 end timestamp (defaults to now)"
+// @Success 200 {object} types.MetricsSummaryResponse
+// @Failure 400 {string} string "Invalid parameters"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/metrics [get]
 func MakeMetricsSummaryHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tr, ok := parseTimeRange(c)
@@ -71,6 +158,22 @@ func MakeMetricsSummaryHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 	}
 }
 
+// MakeMetricsBreakdownHandler godoc
+// @Summary Get metrics breakdown
+// @Tags metrics
+// @Produce json
+// @Produce csv
+// @Param start query string false "RFC3339 start timestamp (defaults to end-24h)"
+// @Param end query string false "RFC3339 end timestamp (defaults to now)"
+// @Param group_by query string true "Breakdown dimension" Enums(service,user,country)
+// @Param format query string false "Response format" Enums(json,csv) default(json)
+// @Success 200 {object} types.MetricsBreakdownResponse
+// @Success 200 {string} string "CSV response"
+// @Failure 400 {string} string "Invalid parameters"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/metrics/breakdown [get]
 func MakeMetricsBreakdownHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tr, ok := parseTimeRange(c)
@@ -124,6 +227,28 @@ func MakeMetricsBreakdownHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 			})
 			return
 		}
+		if strings.EqualFold(resp.GroupBy, "service") {
+			items := make([]serviceBreakdownItem, 0, len(resp.Items))
+			for _, item := range resp.Items {
+				items = append(items, serviceBreakdownItem{
+					Key:                  item.Key,
+					Membership:           item.Membership,
+					RequestsCountTotal:   item.RequestsCountTotal,
+					RequestsCountSync:    item.RequestsCountSync,
+					RequestsCountAsync:   item.RequestsCountAsync,
+					RequestsCountExposed: item.RequestsCountExposed,
+					UniqueUsersCount:     item.UniqueUsersCount,
+					Countries:            item.Countries,
+				})
+			}
+			c.JSON(http.StatusOK, serviceBreakdownResponse{
+				Start:   resp.Start,
+				End:     resp.End,
+				GroupBy: resp.GroupBy,
+				Items:   items,
+			})
+			return
+		}
 
 		c.JSON(http.StatusOK, resp)
 	}
@@ -132,21 +257,28 @@ func MakeMetricsBreakdownHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 func parseTimeRange(c *gin.Context) (metrics.TimeRange, bool) {
 	startRaw := strings.TrimSpace(c.Query("start"))
 	endRaw := strings.TrimSpace(c.Query("end"))
-	if startRaw == "" || endRaw == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "start and end are required"})
-		return metrics.TimeRange{}, false
+
+	now := time.Now().UTC()
+	end := now
+	if endRaw != "" {
+		parsedEnd, err := time.Parse(time.RFC3339, endRaw)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid end timestamp"})
+			return metrics.TimeRange{}, false
+		}
+		end = parsedEnd
 	}
 
-	start, err := time.Parse(time.RFC3339, startRaw)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid start timestamp"})
-		return metrics.TimeRange{}, false
+	start := end.Add(-24 * time.Hour)
+	if startRaw != "" {
+		parsedStart, err := time.Parse(time.RFC3339, startRaw)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid start timestamp"})
+			return metrics.TimeRange{}, false
+		}
+		start = parsedStart
 	}
-	end, err := time.Parse(time.RFC3339, endRaw)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid end timestamp"})
-		return metrics.TimeRange{}, false
-	}
+
 	if end.Before(start) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "end must be after start"})
 		return metrics.TimeRange{}, false
@@ -160,6 +292,10 @@ func renderBreakdownCSV(resp types.MetricsBreakdownResponse) ([]byte, error) {
 	writer := csv.NewWriter(&buf)
 	if strings.EqualFold(resp.GroupBy, "user") {
 		if err := writer.Write([]string{"key", "membership", "executions_count", "countries"}); err != nil {
+			return nil, err
+		}
+	} else if strings.EqualFold(resp.GroupBy, "service") {
+		if err := writer.Write([]string{"key", "membership", "requests_count_total", "requests_count_sync", "requests_count_async", "requests_count_exposed", "unique_users_count", "countries"}); err != nil {
 			return nil, err
 		}
 	} else {
@@ -177,6 +313,19 @@ func renderBreakdownCSV(resp types.MetricsBreakdownResponse) ([]byte, error) {
 				item.Key,
 				item.Membership,
 				itoa(item.ExecutionsCount),
+				strings.Join(countries, "|"),
+			}); err != nil {
+				return nil, err
+			}
+		} else if strings.EqualFold(resp.GroupBy, "service") {
+			if err := writer.Write([]string{
+				item.Key,
+				item.Membership,
+				itoa(item.RequestsCountTotal),
+				itoa(item.RequestsCountSync),
+				itoa(item.RequestsCountAsync),
+				itoa(item.RequestsCountExposed),
+				itoa(item.UniqueUsersCount),
 				strings.Join(countries, "|"),
 			}); err != nil {
 				return nil, err

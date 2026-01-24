@@ -10,6 +10,7 @@ const (
 	MetricGPUHours        MetricKey = "gpu-hours"
 	MetricRequestsSync    MetricKey = "requests-sync-per-service"
 	MetricRequestsAsync   MetricKey = "requests-async-per-service"
+	MetricRequestsExposed MetricKey = "requests-exposed-per-service"
 	MetricRequestsPerUser MetricKey = "requests-per-user"
 	MetricUsersPerService MetricKey = "users-per-service"
 	MetricCountriesCount  MetricKey = "countries-count"
@@ -22,6 +23,7 @@ var MetricKeySet = map[MetricKey]struct{}{
 	MetricGPUHours:        {},
 	MetricRequestsSync:    {},
 	MetricRequestsAsync:   {},
+	MetricRequestsExposed: {},
 	MetricRequestsPerUser: {},
 	MetricUsersPerService: {},
 	MetricCountriesCount:  {},
@@ -50,22 +52,38 @@ type MetricValueResponse struct {
 	Sources   []SourceStatus `json:"sources"`
 }
 
+type ServiceMetricValue struct {
+	Metric  MetricKey      `json:"metric"`
+	Value   float64        `json:"value"`
+	Unit    string         `json:"unit,omitempty"`
+	Sources []SourceStatus `json:"sources"`
+}
+
+type ServiceMetricsResponse struct {
+	ServiceName string               `json:"service_name"`
+	Start       time.Time            `json:"start"`
+	End         time.Time            `json:"end"`
+	Metrics     []ServiceMetricValue `json:"metrics"`
+}
+
 type CountryCount struct {
 	Country      string `json:"country"`
 	RequestCount int    `json:"request_count"`
 }
 
 type SummaryTotals struct {
-	ServicesCount     int            `json:"services_count"`
-	CPUHoursTotal     float64        `json:"cpu_hours_total"`
-	GPUHoursTotal     float64        `json:"gpu_hours_total"`
-	RequestCountTotal int            `json:"request_count_total"`
-	RequestCountSync  int            `json:"request_count_sync"`
-	RequestCountAsync int            `json:"request_count_async"`
-	CountriesCount    int            `json:"countries_count"`
-	Countries         []CountryCount `json:"countries"`
-	UsersCount        int            `json:"users_count"`
-	Users             []string       `json:"users"`
+	ServicesCountActive  int            `json:"services_count_active"`
+	ServicesCountTotal   int            `json:"services_count_total"`
+	CPUHoursTotal        float64        `json:"cpu_hours_total"`
+	GPUHoursTotal        float64        `json:"gpu_hours_total"`
+	RequestsCountTotal   int            `json:"requests_count_total"`
+	RequestsCountSync    int            `json:"requests_count_sync"`
+	RequestsCountAsync   int            `json:"requests_count_async"`
+	RequestsCountExposed int            `json:"requests_count_exposed"`
+	CountriesCount       int            `json:"countries_count"`
+	Countries            []CountryCount `json:"countries"`
+	UsersCount           int            `json:"users_count"`
+	Users                []string       `json:"users"`
 }
 
 type MetricsSummaryResponse struct {
@@ -76,11 +94,15 @@ type MetricsSummaryResponse struct {
 }
 
 type BreakdownItem struct {
-	Key              string         `json:"key"`
-	Membership       string         `json:"membership,omitempty"`
-	ExecutionsCount  int            `json:"executions_count"`
-	UniqueUsersCount int            `json:"unique_users_count"`
-	Countries        []CountryCount `json:"countries"`
+	Key                  string         `json:"key"`
+	Membership           string         `json:"membership,omitempty"`
+	ExecutionsCount      int            `json:"executions_count,omitempty"`
+	RequestsCountTotal   int            `json:"requests_count_total,omitempty"`
+	RequestsCountSync    int            `json:"requests_count_sync,omitempty"`
+	RequestsCountAsync   int            `json:"requests_count_async,omitempty"`
+	RequestsCountExposed int            `json:"requests_count_exposed,omitempty"`
+	UniqueUsersCount     int            `json:"unique_users_count"`
+	Countries            []CountryCount `json:"countries"`
 }
 
 type MetricsBreakdownResponse struct {

@@ -229,6 +229,15 @@ type Config struct {
 
 	// LokiQuery query template for request logs (use {{namespace}}, {{app}})
 	LokiQuery string `json:"-"`
+
+	// LokiExposedQuery query template for exposed-service request logs (use {{namespace}}, {{app}})
+	LokiExposedQuery string `json:"-"`
+
+	// LokiExposedNamespace namespace label for exposed-service logs
+	LokiExposedNamespace string `json:"-"`
+
+	// LokiExposedAppLabel app label for exposed-service logs
+	LokiExposedAppLabel string `json:"-"`
 }
 
 var configVars = []configVar{
@@ -288,6 +297,9 @@ var configVars = []configVar{
 	{"PrometheusGPUQuery", "PROMETHEUS_GPU_QUERY", false, stringType, "sum(increase(container_gpu_usage_seconds_total{namespace=~\"{{services_namespace}}.*\",pod=~\"{{service}}.*\"}[{{range}}])) / 3600"},
 	{"LokiBaseURL", "LOKI_URL", false, urlType, ""},
 	{"LokiQuery", "LOKI_QUERY", false, stringType, "{namespace=\"{{namespace}}\", app=\"{{app}}\"} |~ \"/(job|run)/\""},
+	{"LokiExposedQuery", "LOKI_EXPOSED_QUERY", false, stringType, "{namespace=\"{{namespace}}\", app=\"{{app}}\"} |~ \"/system/services/.+/exposed\""},
+	{"LokiExposedNamespace", "LOKI_EXPOSED_NAMESPACE", false, stringType, "ingress-nginx"},
+	{"LokiExposedAppLabel", "LOKI_EXPOSED_APP", false, stringType, "ingress-nginx"},
 }
 
 func readConfigVar(cfgVar configVar) (string, error) {

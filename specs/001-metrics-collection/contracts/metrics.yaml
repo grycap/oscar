@@ -3,59 +3,66 @@ info:
   title: OSCAR Metrics Reporting
   version: 1.2.0
 paths:
-  /system/metrics/value:
+  /system/metrics/{serviceName}:
     get:
       summary: Get a single metric value for a service and time range
       parameters:
-        - name: service_id
-          in: query
+        - name: serviceName
+          in: path
           required: true
           schema:
             type: string
         - name: metric
           in: query
-          required: true
+          required: false
           schema:
             $ref: "#/components/schemas/MetricKey"
+          description: If omitted, returns all supported per-service metrics.
         - name: start
           in: query
-          required: true
+          required: false
           schema:
             type: string
             format: date-time
+          description: Defaults to 24 hours before end (or now) if omitted.
         - name: end
           in: query
-          required: true
+          required: false
           schema:
             type: string
             format: date-time
+          description: Defaults to now if omitted.
       responses:
         "200":
           description: Metric value
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MetricValue"
+                oneOf:
+                  - $ref: "#/components/schemas/MetricValue"
+                  - $ref: "#/components/schemas/ServiceMetrics"
         "400":
           description: Invalid parameters
         "500":
           description: Metrics computation failed
-  /system/metrics/summary:
+  /system/metrics:
     get:
       summary: Get metrics summary for a time range
       parameters:
         - name: start
           in: query
-          required: true
+          required: false
           schema:
             type: string
             format: date-time
+          description: Defaults to 24 hours before end (or now) if omitted.
         - name: end
           in: query
-          required: true
+          required: false
           schema:
             type: string
             format: date-time
+          description: Defaults to now if omitted.
       responses:
         "200":
           description: Metrics summary
@@ -73,16 +80,18 @@ paths:
       parameters:
         - name: start
           in: query
-          required: true
+          required: false
           schema:
             type: string
             format: date-time
+          description: Defaults to 24 hours before end (or now) if omitted.
         - name: end
           in: query
-          required: true
+          required: false
           schema:
             type: string
             format: date-time
+          description: Defaults to now if omitted.
         - name: group_by
           in: query
           required: true
@@ -134,6 +143,36 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SourceStatus"
+    ServiceMetrics:
+      type: object
+      required: [service_name, start, end, metrics]
+      properties:
+        service_name:
+          type: string
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+        metrics:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceMetricValue"
+    ServiceMetricValue:
+      type: object
+      required: [metric, value, sources]
+      properties:
+        metric:
+          $ref: "#/components/schemas/MetricKey"
+        value:
+          type: number
+        unit:
+          type: string
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceStatus"
     MetricsSummary:
       type: object
       required: [start, end, totals, sources]
@@ -147,18 +186,23 @@ components:
         totals:
           type: object
           required:
-            - services_count
+            - services_count_active
+            - services_count_total
             - cpu_hours_total
             - gpu_hours_total
-            - request_count_total
-            - request_count_sync
-            - request_count_async
+            - requests_count_total
+            - requests_count_sync
+            - requests_count_async
+            - requests_count_exposed
             - countries_count
             - countries
             - users_count
             - users
           properties:
-            services_count:
+            services_count_active:
+              type: integer
+              minimum: 0
+            services_count_total:
               type: integer
               minimum: 0
             cpu_hours_total:
@@ -167,13 +211,16 @@ components:
             gpu_hours_total:
               type: number
               minimum: 0
-            request_count_total:
+            requests_count_total:
               type: integer
               minimum: 0
-            request_count_sync:
+            requests_count_sync:
               type: integer
               minimum: 0
-            request_count_async:
+            requests_count_async:
+              type: integer
+              minimum: 0
+            requests_count_exposed:
               type: integer
               minimum: 0
             countries_count:
@@ -213,7 +260,7 @@ components:
             $ref: "#/components/schemas/BreakdownItem"
     BreakdownItem:
       type: object
-      required: [key, executions_count, countries]
+      required: [key, countries]
       properties:
         key:
           type: string
@@ -221,6 +268,19 @@ components:
           type: string
           enum: [member, external, unknown]
         executions_count:
+          type: integer
+          minimum: 0
+          description: Omitted when group_by=service.
+        requests_count_total:
+          type: integer
+          minimum: 0
+        requests_count_sync:
+          type: integer
+          minimum: 0
+        requests_count_async:
+          type: integer
+          minimum: 0
+        requests_count_exposed:
           type: integer
           minimum: 0
         unique_users_count:
@@ -248,6 +308,7 @@ components:
         - gpu-hours
         - requests-sync-per-service
         - requests-async-per-service
+        - requests-exposed-per-service
         - requests-per-user
         - users-per-service
         - countries-count

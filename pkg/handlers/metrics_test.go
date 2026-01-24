@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/metrics"
@@ -66,9 +67,10 @@ func (f *fakeCountrySource) CountryForRecord(ctx context.Context, record metrics
 func setupMetricsRouter(agg *metrics.Aggregator) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.GET("/system/metrics/value", MakeMetricValueHandler(agg))
-	router.GET("/system/metrics/summary", MakeMetricsSummaryHandler(agg))
+	router.GET("/system/metrics", MakeMetricsSummaryHandler(agg))
+	router.GET("/system/metrics/", MakeMetricsSummaryHandler(agg))
 	router.GET("/system/metrics/breakdown", MakeMetricsBreakdownHandler(agg))
+	router.GET("/system/metrics/:serviceName", MakeMetricValueHandler(agg))
 	return router
 }
 
@@ -80,7 +82,7 @@ func TestMetricValueHandler(t *testing.T) {
 	}
 	router := setupMetricsRouter(agg)
 
-	req := httptest.NewRequest(http.MethodGet, "/system/metrics/value?service_id=svc-a&metric=cpu-hours&start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z", nil)
+	req := httptest.NewRequest(http.MethodGet, "/system/metrics/svc-a?metric=cpu-hours&start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -93,6 +95,47 @@ func TestMetricValueHandler(t *testing.T) {
 	}
 	if resp.Value != 2.5 {
 		t.Fatalf("expected cpu value 2.5, got %v", resp.Value)
+	}
+}
+
+func TestMetricValueHandlerAllMetrics(t *testing.T) {
+	agg := &metrics.Aggregator{
+		Sources: metrics.Sources{
+			UsageMetrics: &fakeUsageMetrics{cpu: 2.5, gpu: 1.0},
+			RequestLogs: &fakeRequestLogs{records: []metrics.RequestRecord{
+				{ServiceID: "svc-a", UserID: "u1", Type: metrics.RequestSync},
+				{ServiceID: "svc-a", UserID: "u2", Type: metrics.RequestAsync},
+			}},
+		},
+	}
+	router := setupMetricsRouter(agg)
+
+	req := httptest.NewRequest(http.MethodGet, "/system/metrics/svc-a?start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var resp types.ServiceMetricsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unexpected json error: %v", err)
+	}
+	if resp.ServiceName != "svc-a" {
+		t.Fatalf("expected service_name svc-a, got %s", resp.ServiceName)
+	}
+	if len(resp.Metrics) == 0 {
+		t.Fatalf("expected metrics list to be populated")
+	}
+	foundCPU := false
+	for _, metric := range resp.Metrics {
+		if metric.Metric == types.MetricCPUHours {
+			foundCPU = true
+		}
+	}
+	if !foundCPU {
+		t.Fatalf("expected cpu-hours metric in response")
 	}
 }
 
@@ -109,7 +152,7 @@ func TestMetricsSummaryHandler(t *testing.T) {
 	}
 	router := setupMetricsRouter(agg)
 
-	req := httptest.NewRequest(http.MethodGet, "/system/metrics/summary?start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z", nil)
+	req := httptest.NewRequest(http.MethodGet, "/system/metrics?start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -121,8 +164,42 @@ func TestMetricsSummaryHandler(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unexpected json error: %v", err)
 	}
-	if resp.Totals.ServicesCount != 1 {
-		t.Fatalf("expected services_count 1, got %d", resp.Totals.ServicesCount)
+	if resp.Totals.ServicesCountActive != 1 {
+		t.Fatalf("expected services_count_active 1, got %d", resp.Totals.ServicesCountActive)
+	}
+}
+
+func TestMetricsSummaryDefaultsToLastDay(t *testing.T) {
+	agg := &metrics.Aggregator{
+		Sources: metrics.Sources{
+			ServiceInventory: &fakeServiceInventory{services: []metrics.ServiceDescriptor{{ID: "svc-a"}}},
+			UsageMetrics:     &fakeUsageMetrics{cpu: 1.0, gpu: 0.5},
+			RequestLogs:      &fakeRequestLogs{records: []metrics.RequestRecord{}},
+			CountrySource:    &fakeCountrySource{},
+		},
+	}
+	router := setupMetricsRouter(agg)
+
+	before := time.Now().UTC()
+	req := httptest.NewRequest(http.MethodGet, "/system/metrics", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var resp types.MetricsSummaryResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unexpected json error: %v", err)
+	}
+
+	after := time.Now().UTC()
+	if resp.End.Before(before) || resp.End.After(after.Add(2*time.Second)) {
+		t.Fatalf("unexpected end timestamp: %s", resp.End.Format(time.RFC3339))
+	}
+	if resp.End.Sub(resp.Start) < 23*time.Hour || resp.End.Sub(resp.Start) > 25*time.Hour {
+		t.Fatalf("unexpected default range: %s", resp.End.Sub(resp.Start))
 	}
 }
 
@@ -166,7 +243,7 @@ func TestMetricsBreakdownInvalidTimeRange(t *testing.T) {
 func TestMetricsValueMissingServiceID(t *testing.T) {
 	agg := &metrics.Aggregator{}
 	router := setupMetricsRouter(agg)
-	req := httptest.NewRequest(http.MethodGet, "/system/metrics/value?metric=cpu-hours&start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z", nil)
+	req := httptest.NewRequest(http.MethodGet, "/system/metrics/%20?metric=cpu-hours&start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {
@@ -177,7 +254,7 @@ func TestMetricsValueMissingServiceID(t *testing.T) {
 func TestMetricsSummaryTimeRangeOrder(t *testing.T) {
 	agg := &metrics.Aggregator{}
 	router := setupMetricsRouter(agg)
-	req := httptest.NewRequest(http.MethodGet, "/system/metrics/summary?start=2026-01-02T00:00:00Z&end=2026-01-01T00:00:00Z", nil)
+	req := httptest.NewRequest(http.MethodGet, "/system/metrics?start=2026-01-02T00:00:00Z&end=2026-01-01T00:00:00Z", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {

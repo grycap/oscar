@@ -98,9 +98,10 @@ helm upgrade --install loki grafana/loki --namespace monitoring --values /tmp/lo
 > default query-range limit, which helps with month-long reports during testing.
 
 Create an Alloy values file (example) and install Alloy. The kind example
-filters logs to the OSCAR manager pods (`namespace=oscar` and `app=oscar`) to
-keep resource usage low. It also shows how to enrich logs with GeoIP data via
-`loki.process` (requires a GeoIP database file mounted into the pod):
+filters logs to the OSCAR manager pods (`namespace=oscar` and `app=oscar`) and
+the ingress-nginx controller pods (for exposed-service request counts) to keep
+resource usage low. It also shows how to enrich OSCAR manager logs with GeoIP
+data via `loki.process` (requires a GeoIP database file mounted into the pod):
 
 ```sh
 kubectl apply -f docs/snippets/geoip-pvc.yaml
@@ -133,7 +134,7 @@ kubectl -n monitoring delete pod geoip-loader
 API verification (countries in summary):
 
 ```sh
-curl -s "http://127.0.0.1:8080/system/metrics/summary?start=2026-01-01T00:00:00Z&end=2026-01-31T23:59:59Z" | jq .totals.countries
+curl -s "http://127.0.0.1:8080/system/metrics?start=2026-01-01T00:00:00Z&end=2026-01-31T23:59:59Z" | jq .totals.countries
 ```
 
 Configure OSCAR to use Loki:
@@ -146,6 +147,14 @@ Use the gateway service for Loki queries if enabled:
 
 ```sh
 export LOKI_URL="http://loki-gateway.monitoring.svc.cluster.local"
+```
+
+Expose request counts for exposed services with these optional overrides:
+
+```sh
+export LOKI_EXPOSED_QUERY='{namespace="{{namespace}}", app="{{app}}"} |~ "/system/services/.+/exposed"'
+export LOKI_EXPOSED_NAMESPACE="ingress-nginx"
+export LOKI_EXPOSED_APP="ingress-nginx"
 ```
 
 ## Deploy Grafana (optional, for visualization)
@@ -191,7 +200,7 @@ Notes:
   expressions if your log format differs.
 - The "Services Count" panel uses active pod counts as a proxy for services.
   If you need exact service inventory counts, consider adding a Grafana JSON
-  datasource panel backed by the OSCAR `/system/metrics/summary` endpoint.
+  datasource panel backed by the OSCAR `/system/metrics` endpoint.
 
 ## Check Prometheus/Loki disk usage (kind)
 

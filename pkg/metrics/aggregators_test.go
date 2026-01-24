@@ -47,9 +47,13 @@ func (f *fakeUsageMetrics) UsageHours(ctx context.Context, tr TimeRange, service
 type fakeRequestLogs struct {
 	records []RequestRecord
 	err     error
+	name    string
 }
 
 func (f *fakeRequestLogs) Name() string {
+	if f.name != "" {
+		return f.name
+	}
 	return "request-logs"
 }
 
@@ -127,13 +131,16 @@ func TestSummaryAggregationTotals(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if resp.Totals.ServicesCount != 2 {
-		t.Fatalf("expected services_count 2, got %d", resp.Totals.ServicesCount)
+	if resp.Totals.ServicesCountActive != 2 {
+		t.Fatalf("expected services_count_active 2, got %d", resp.Totals.ServicesCountActive)
+	}
+	if resp.Totals.ServicesCountTotal != 2 {
+		t.Fatalf("expected services_count_total 2, got %d", resp.Totals.ServicesCountTotal)
 	}
 	if resp.Totals.CPUHoursTotal != 3.5 || resp.Totals.GPUHoursTotal != 1.5 {
 		t.Fatalf("unexpected CPU/GPU totals: %v/%v", resp.Totals.CPUHoursTotal, resp.Totals.GPUHoursTotal)
 	}
-	if resp.Totals.RequestCountTotal != 4 || resp.Totals.RequestCountSync != 3 || resp.Totals.RequestCountAsync != 1 {
+	if resp.Totals.RequestsCountTotal != 4 || resp.Totals.RequestsCountSync != 3 || resp.Totals.RequestsCountAsync != 1 {
 		t.Fatalf("unexpected request totals: %+v", resp.Totals)
 	}
 	if resp.Totals.UsersCount != 3 {
@@ -147,6 +154,38 @@ func TestSummaryAggregationTotals(t *testing.T) {
 	}
 	if len(resp.Totals.Countries) != 2 {
 		t.Fatalf("expected 2 countries, got %d", len(resp.Totals.Countries))
+	}
+}
+
+func TestSummaryIncludesExposedRequests(t *testing.T) {
+	tr := TimeRange{Start: time.Now().Add(-time.Hour), End: time.Now()}
+	requests := []RequestRecord{
+		{ServiceID: "svc-a", UserID: "u1", Type: RequestSync},
+	}
+	exposed := []RequestRecord{
+		{ServiceID: "svc-b"},
+		{ServiceID: "svc-a"},
+	}
+
+	agg := Aggregator{
+		Sources: Sources{
+			ServiceInventory:   &fakeServiceInventory{services: []ServiceDescriptor{{ID: "svc-a"}, {ID: "svc-b"}}},
+			UsageMetrics:       &fakeUsageMetrics{cpuByService: map[string]float64{}, gpuByService: map[string]float64{}},
+			RequestLogs:        &fakeRequestLogs{records: requests},
+			ExposedRequestLogs: &fakeRequestLogs{records: exposed, name: "exposed-request-logs"},
+			CountrySource:      &fakeCountrySource{},
+		},
+	}
+
+	resp, err := agg.Summary(context.Background(), tr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.Totals.RequestsCountExposed != 2 {
+		t.Fatalf("expected requests_count_exposed 2, got %d", resp.Totals.RequestsCountExposed)
+	}
+	if resp.Totals.ServicesCountTotal != 2 {
+		t.Fatalf("expected services_count_total 2, got %d", resp.Totals.ServicesCountTotal)
 	}
 }
 
@@ -231,7 +270,13 @@ func TestMetricValueSyncCount(t *testing.T) {
 }
 
 func TestBuildLokiQuery(t *testing.T) {
-	query := buildLokiQuery("{namespace=\"{{namespace}}\", app=\"{{app}}\"}", "oscar", "oscar", "svc-a")
+	source := LokiRequestLogSource{
+		QueryTemplate:         "{namespace=\"{{namespace}}\", app=\"{{app}}\"}",
+		Namespace:             "oscar",
+		AppLabel:              "oscar",
+		ServiceFilterTemplate: "/(job|run)/%s",
+	}
+	query := source.buildQuery("svc-a")
 	if !strings.Contains(query, "namespace=\"oscar\"") || !strings.Contains(query, "app=\"oscar\"") {
 		t.Fatalf("expected namespace/app labels in query, got %s", query)
 	}
@@ -254,6 +299,20 @@ func TestParseGinExecutionLogFromGinPrefix(t *testing.T) {
 	}
 	if record.UserID != "user@example.com" {
 		t.Fatalf("expected user@example.com, got %s", record.UserID)
+	}
+}
+
+func TestParseIngressAccessLog(t *testing.T) {
+	line := "172.18.0.1 - - [23/Jan/2026:18:13:07 +0000] \"GET /system/services/gmolto-nginx/exposed/ HTTP/1.1\" 200 17 \"-\" \"curl/8.7.1\" 109 0.003 [oscar-svc-gmolto-nginx-svc-80] [] 10.244.0.223:80 17 0.002 200 a72c147a794286b864361ecca7a31075"
+	record, ok := parseIngressAccessLog(line)
+	if !ok {
+		t.Fatal("expected ingress log line to parse")
+	}
+	if record.ServiceID != "gmolto-nginx" {
+		t.Fatalf("expected serviceID gmolto-nginx, got %s", record.ServiceID)
+	}
+	if record.Timestamp.IsZero() {
+		t.Fatal("expected timestamp to be parsed")
 	}
 }
 
@@ -314,8 +373,8 @@ func TestSummaryBreakdownReconciliation(t *testing.T) {
 	for _, item := range breakdown.Items {
 		breakdownTotal += item.ExecutionsCount
 	}
-	if breakdownTotal != summary.Totals.RequestCountTotal {
-		t.Fatalf("expected summary total %d to match breakdown total %d", summary.Totals.RequestCountTotal, breakdownTotal)
+	if breakdownTotal != summary.Totals.RequestsCountTotal {
+		t.Fatalf("expected summary total %d to match breakdown total %d", summary.Totals.RequestsCountTotal, breakdownTotal)
 	}
 }
 
