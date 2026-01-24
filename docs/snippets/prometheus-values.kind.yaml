@@ -10,7 +10,7 @@ pushgateway:
 server:
   global:
     scrape_interval: 2m
-    scrape_timeout: 10s
+    scrape_timeout: 5s
     evaluation_interval: 1m
 
 scrapeConfigs:
@@ -45,8 +45,18 @@ scrapeConfigs:
       - source_labels: [namespace]
         regex: oscar-svc.*
         action: keep
+      - source_labels: [pod]
+        regex: ^(.+)-dlp-[a-z0-9]{9,}-[a-z0-9]{5}$
+        target_label: service
+        replacement: $1
+        action: replace
+      - source_labels: [pod]
+        regex: ^(.+?)(?:-[0-9]{5}-deployment)?-[a-z0-9]{9,}-[a-z0-9]{5}$
+        target_label: service
+        replacement: $1
+        action: replace
       - action: labeldrop
-        regex: (image|id|name|instance|node)
+        regex: (image|id|name|instance|node|pod)
   kubernetes-service-endpoints:
     enabled: false
   kubernetes-service-endpoints-slow:

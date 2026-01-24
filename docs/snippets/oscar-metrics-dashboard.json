@@ -1,12 +1,30 @@
 {
   "uid": "oscar-metrics",
-  "title": "OSCAR Metrics (Spec)",
+  "title": "OSCAR Metrics (Prometheus + Loki)",
   "schemaVersion": 37,
-  "version": 1,
+  "version": 2,
   "refresh": "1m",
   "time": {
     "from": "now-30d",
     "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "Prometheus"
+        },
+        "refresh": 1,
+        "query": "label_values(container_cpu_usage_seconds_total{namespace=~\"oscar-svc.*\"}, service)",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
+        "regex": "^(?!.*-dlp$).*$"
+      }
+    ]
   },
   "panels": [
     {
@@ -14,13 +32,13 @@
       "title": "CPU Hours (Total)",
       "gridPos": {
         "h": 5,
-        "w": 8,
+        "w": 6,
         "x": 0,
         "y": 0
       },
       "targets": [
         {
-          "expr": "sum(increase(container_cpu_usage_seconds_total{namespace=~\"oscar-svc.*\"}[$__range])) / 3600",
+          "expr": "sum(increase(container_cpu_usage_seconds_total{namespace=~\"oscar-svc.*\",service=~\"${service:regex}\"}[$__range])) / 3600",
           "refId": "A"
         }
       ],
@@ -34,13 +52,13 @@
       "title": "GPU Hours (Total)",
       "gridPos": {
         "h": 5,
-        "w": 8,
-        "x": 8,
+        "w": 6,
+        "x": 6,
         "y": 0
       },
       "targets": [
         {
-          "expr": "sum(increase(container_gpu_usage_seconds_total{namespace=~\"oscar-svc.*\"}[$__range])) / 3600",
+          "expr": "sum(increase(container_gpu_usage_seconds_total{namespace=~\"oscar-svc.*\",service=~\"${service:regex}\"}[$__range])) / 3600",
           "refId": "A"
         }
       ],
@@ -51,16 +69,16 @@
     },
     {
       "type": "stat",
-      "title": "Services Count (Active in Range)",
+      "title": "Services Count (Active)",
       "gridPos": {
         "h": 5,
-        "w": 8,
-        "x": 16,
+        "w": 6,
+        "x": 12,
         "y": 0
       },
       "targets": [
         {
-          "expr": "count(count by (pod) (container_cpu_usage_seconds_total{namespace=~\"oscar-svc.*\"}))",
+          "expr": "count(count by (service) (container_cpu_usage_seconds_total{namespace=~\"oscar-svc.*\",service=~\"${service:regex}\"}))",
           "refId": "A"
         }
       ],
@@ -70,17 +88,80 @@
       }
     },
     {
+      "type": "stat",
+      "title": "Requests (Total)",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({namespace=\"oscar\"} |~ \"GIN-EXECUTIONS-LOGGER\" |~ \"/(run|job)/${service:regex}[^/ ]*\" | regexp \"/(run|job)/(?P<service>[^/ ]+)\" [$__range]))",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({namespace=\"ingress-nginx\"} |~ \"/system/services/${service:regex}[^/ ]*/exposed\" | regexp \"/system/services/(?P<service>[^/ ]+)/exposed\" [$__range]))",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "expression": "$A + $B",
+          "refId": "C"
+        }
+      ],
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Requests (Sync / Async / Exposed)",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "targets": [
+        {
+          "expr": "sum by (service) (count_over_time({namespace=\"oscar\"} |~ \"GIN-EXECUTIONS-LOGGER\" |~ \"/run/${service:regex}[^/ ]*\" | regexp \"(/run)/(?P<service>[^/ ]+)\" [$__interval]))",
+          "refId": "A",
+          "legendFormat": "{{service}} sync"
+        },
+        {
+          "expr": "sum by (service) (count_over_time({namespace=\"oscar\"} |~ \"GIN-EXECUTIONS-LOGGER\" |~ \"/job/${service:regex}[^/ ]*\" | regexp \"(/job)/(?P<service>[^/ ]+)\" [$__interval]))",
+          "refId": "B",
+          "legendFormat": "{{service}} async"
+        },
+        {
+          "expr": "sum by (service) (count_over_time({namespace=\"ingress-nginx\"} |~ \"/system/services/${service:regex}[^/ ]*/exposed\" | regexp \"/system/services/(?P<service>[^/ ]+)/exposed\" [$__interval]))",
+          "refId": "C",
+          "legendFormat": "{{service}} exposed"
+        }
+      ],
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      }
+    },
+    {
       "type": "bargauge",
       "title": "CPU Hours by Service",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 5
+        "y": 13
       },
       "targets": [
         {
-          "expr": "sum by (service) (label_replace(label_replace(label_replace(sum by (pod) (increase(container_cpu_usage_seconds_total{namespace=~\"oscar-svc.*\"}[$__range])) / 3600, \"service\", \"$1\", \"pod\", \"^(.*)$\"), \"service\", \"$1\", \"service\", \"(.*)-[0-9a-f]{8}-[0-9a-f-]{4,}.*\"), \"service\", \"$1\", \"service\", \"(.*)-[0-9]{5}-deployment-.*\")))",
+          "expr": "sum by (service) (increase(container_cpu_usage_seconds_total{namespace=~\"oscar-svc.*\",service=~\"${service:regex}\"}[$__range])) / 3600",
           "refId": "A",
           "legendFormat": "{{service}}",
           "instant": true
@@ -118,11 +199,11 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 5
+        "y": 13
       },
       "targets": [
         {
-          "expr": "sum by (service) (label_replace(label_replace(label_replace(sum by (pod) (increase(container_gpu_usage_seconds_total{namespace=~\"oscar-svc.*\"}[$__range])) / 3600, \"service\", \"$1\", \"pod\", \"^(.*)$\"), \"service\", \"$1\", \"service\", \"(.*)-[0-9a-f]{8}-[0-9a-f-]{4,}.*\"), \"service\", \"$1\", \"service\", \"(.*)-[0-9]{5}-deployment-.*\")))",
+          "expr": "sum by (service) (increase(container_gpu_usage_seconds_total{namespace=~\"oscar-svc.*\",service=~\"${service:regex}\"}[$__range])) / 3600",
           "refId": "A",
           "legendFormat": "{{service}}",
           "instant": true
@@ -154,44 +235,20 @@
       }
     },
     {
-      "type": "timeseries",
-      "title": "Requests (Sync vs Async)",
+      "type": "barchart",
+      "title": "Requests Sync by Service",
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 8,
         "x": 0,
-        "y": 13
+        "y": 21
       },
       "targets": [
         {
-          "expr": "sum(count_over_time({namespace=\"oscar\", app=\"oscar\"} |~ \"/run/\" [$__interval]))",
+          "expr": "sum by (service) (count_over_time({namespace=\"oscar\"} |~ \"GIN-EXECUTIONS-LOGGER\" |~ \"/run/${service:regex}[^/ ]*\" | regexp \"(/run)/(?P<service>[^/ ]+)\" [$__range]))",
           "refId": "A",
-          "legendFormat": "sync"
-        },
-        {
-          "expr": "sum(count_over_time({namespace=\"oscar\", app=\"oscar\"} |~ \"/job/\" [$__interval]))",
-          "refId": "B",
-          "legendFormat": "async"
-        }
-      ],
-      "datasource": {
-        "type": "loki",
-        "uid": "Loki"
-      }
-    },
-    {
-      "type": "table",
-      "title": "Requests by Service (LogQL)",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 13
-      },
-      "targets": [
-        {
-          "expr": "sum by (service) (count_over_time({namespace=\"oscar\", app=\"oscar\"} |~ \"/(run|job)/\" | regexp \"\\/(run|job)\\/(?P<service>[^\\s\\?]+)\" [$__range]))",
-          "refId": "A"
+          "legendFormat": "{{service}}",
+          "instant": true
         }
       ],
       "datasource": {
@@ -201,16 +258,38 @@
     },
     {
       "type": "barchart",
-      "title": "Requests per Service (Total in Range)",
+      "title": "Requests Async by Service",
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 0,
+        "w": 8,
+        "x": 8,
         "y": 21
       },
       "targets": [
         {
-          "expr": "sum by (service) (count_over_time({namespace=\"oscar\", app=\"oscar\"} |~ \"/(run|job)/\" | regexp \"\\/(run|job)\\/(?P<service>[^\\s\\?]+)\" [$__range]))",
+          "expr": "sum by (service) (count_over_time({namespace=\"oscar\"} |~ \"GIN-EXECUTIONS-LOGGER\" |~ \"/job/${service:regex}[^/ ]*\" | regexp \"(/job)/(?P<service>[^/ ]+)\" [$__range]))",
+          "refId": "A",
+          "legendFormat": "{{service}}",
+          "instant": true
+        }
+      ],
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "Requests Exposed by Service",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 21
+      },
+      "targets": [
+        {
+          "expr": "sum by (service) (count_over_time({namespace=\"ingress-nginx\"} |~ \"/system/services/${service:regex}[^/ ]*/exposed\" | regexp \"/system/services/(?P<service>[^/ ]+)/exposed\" [$__range]))",
           "refId": "A",
           "legendFormat": "{{service}}",
           "instant": true
