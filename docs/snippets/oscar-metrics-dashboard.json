@@ -88,38 +88,6 @@
       }
     },
     {
-      "type": "stat",
-      "title": "Requests (Total)",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 18,
-        "y": 0
-      },
-      "targets": [
-        {
-          "expr": "sum(count_over_time({namespace=\"oscar\"} |~ \"GIN-EXECUTIONS-LOGGER\" |~ \"/(run|job)/${service:regex}[^/ ]*\" | regexp \"/(run|job)/(?P<service>[^/ ]+)\" [$__range]))",
-          "refId": "A"
-        },
-        {
-          "expr": "sum(count_over_time({namespace=\"ingress-nginx\"} |~ \"/system/services/${service:regex}[^/ ]*/exposed\" | regexp \"/system/services/(?P<service>[^/ ]+)/exposed\" [$__range]))",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "expression": "$A + $B",
-          "refId": "C"
-        }
-      ],
-      "datasource": {
-        "type": "loki",
-        "uid": "Loki"
-      }
-    },
-    {
       "type": "timeseries",
       "title": "Requests (Sync / Async / Exposed)",
       "gridPos": {
