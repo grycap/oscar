@@ -132,7 +132,7 @@ func (a *Aggregator) Summary(ctx context.Context, tr TimeRange) (types.MetricsSu
 	return resp, nil
 }
 
-func (a *Aggregator) Breakdown(ctx context.Context, tr TimeRange, groupBy string) (types.MetricsBreakdownResponse, error) {
+func (a *Aggregator) Breakdown(ctx context.Context, tr TimeRange, groupBy string, includeUsers bool) (types.MetricsBreakdownResponse, error) {
 	resp := types.MetricsBreakdownResponse{
 		Start:   tr.Start,
 		End:     tr.End,
@@ -152,7 +152,7 @@ func (a *Aggregator) Breakdown(ctx context.Context, tr TimeRange, groupBy string
 		if a.Sources.ExposedRequestLogs != nil {
 			exposedRecords, _, _ = a.Sources.ExposedRequestLogs.ListRequests(ctx, tr, "")
 		}
-		resp.Items = breakdownByService(records, exposedRecords)
+		resp.Items = breakdownByService(records, exposedRecords, includeUsers)
 	case "user":
 		if len(records) == 0 {
 			return resp, nil
@@ -311,7 +311,7 @@ func mapToUserList(users map[string]struct{}) []string {
 	return items
 }
 
-func breakdownByService(records []RequestRecord, exposedRecords []RequestRecord) []types.BreakdownItem {
+func breakdownByService(records []RequestRecord, exposedRecords []RequestRecord, includeUsers bool) []types.BreakdownItem {
 	type agg struct {
 		executions int
 		sync       int
@@ -356,6 +356,10 @@ func breakdownByService(records []RequestRecord, exposedRecords []RequestRecord)
 
 	items := make([]types.BreakdownItem, 0, len(index))
 	for key, entry := range index {
+		users := []string(nil)
+		if includeUsers {
+			users = mapToUserList(entry.users)
+		}
 		items = append(items, types.BreakdownItem{
 			Key:                  key,
 			ExecutionsCount:      entry.executions,
@@ -364,6 +368,7 @@ func breakdownByService(records []RequestRecord, exposedRecords []RequestRecord)
 			RequestsCountAsync:   entry.async,
 			RequestsCountExposed: entry.exposed,
 			UniqueUsersCount:     len(entry.users),
+			Users:                users,
 			Countries:            mapToCountryList(entry.countries),
 		})
 	}

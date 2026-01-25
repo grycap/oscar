@@ -105,6 +105,13 @@ paths:
             type: string
             enum: [json, csv]
             default: json
+        - name: include_users
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: When true and group_by=service, include the list of users (JSON only).
       responses:
         "200":
           description: Metrics breakdown
@@ -287,6 +294,11 @@ components:
           type: integer
           minimum: 0
           description: Omitted when group_by=user.
+        users:
+          type: array
+          items:
+            type: string
+          description: Present when group_by=service and include_users=true.
         countries:
           type: array
           items:

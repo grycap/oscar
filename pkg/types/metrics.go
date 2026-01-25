@@ -102,6 +102,7 @@ type BreakdownItem struct {
 	RequestsCountAsync   int            `json:"requests_count_async,omitempty"`
 	RequestsCountExposed int            `json:"requests_count_exposed,omitempty"`
 	UniqueUsersCount     int            `json:"unique_users_count"`
+	Users                []string       `json:"users,omitempty"`
 	Countries            []CountryCount `json:"countries"`
 }
 

@@ -49,7 +49,8 @@
 ### UsageBreakdownEntry
 
 - **Fields**: start_time, end_time, service_id, user_id, country_code,
-  executions_count, unique_users_count
+  executions_count, unique_users_count, users (optional list when
+  group_by=service and include_users=true)
 - **Validation**: start_time/end_time required; executions_count >= 0
 - **Relationships**: belongs to Service, User, Country
 

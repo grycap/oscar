@@ -19,7 +19,19 @@ scrapeConfigs:
   kubernetes-api-servers:
     enabled: false
   kubernetes-nodes:
-    enabled: false
+    enabled: true
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: kubelet_volume_stats_used_bytes|kubelet_volume_stats_capacity_bytes
+        action: keep
+      - source_labels: [namespace]
+        regex: monitoring
+        action: keep
+      - source_labels: [persistentvolumeclaim]
+        regex: prometheus-server|storage-loki-0
+        action: keep
+      - action: labeldrop
+        regex: (instance|node|job)
   kubernetes-nodes-cadvisor:
     enabled: true
     job_name: ""

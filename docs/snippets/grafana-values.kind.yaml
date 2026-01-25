@@ -153,6 +153,12 @@ dashboards:
               "datasource": {
                 "type": "loki",
                 "uid": "Loki"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "decimals": 0,
+                  "unit": "none"
+                }
               }
             },
             {
@@ -259,6 +265,11 @@ dashboards:
               "datasource": {
                 "type": "loki",
                 "uid": "Loki"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "decimals": 0
+                }
               }
             },
             {
@@ -281,6 +292,11 @@ dashboards:
               "datasource": {
                 "type": "loki",
                 "uid": "Loki"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "decimals": 0
+                }
               }
             },
             {
@@ -303,6 +319,11 @@ dashboards:
               "datasource": {
                 "type": "loki",
                 "uid": "Loki"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "decimals": 0
+                }
               }
             }
           ]

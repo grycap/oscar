@@ -14,7 +14,8 @@ Metrics reporting endpoints include `/system/metrics/{serviceName}`, `/system/me
 `/system/metrics/breakdown`. If the `metric` query parameter is omitted from
 `/system/metrics/{serviceName}`, the API returns all supported per-service metrics.
 The breakdown endpoint supports CSV output by setting
-`format=csv` and grouping with `group_by` (service, user, country).
+`format=csv` and grouping with `group_by` (service, user, country). To include
+the list of users per service, set `include_users=true` (JSON only).
 
 The `start`/`end` query parameters are optional. If omitted, the API defaults to
 the last 24 hours (end = now, start = end - 24h).

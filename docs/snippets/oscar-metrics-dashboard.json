@@ -116,6 +116,12 @@
       "datasource": {
         "type": "loki",
         "uid": "Loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "unit": "none"
+        }
       }
     },
     {
@@ -222,6 +228,11 @@
       "datasource": {
         "type": "loki",
         "uid": "Loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0
+        }
       }
     },
     {
@@ -244,6 +255,11 @@
       "datasource": {
         "type": "loki",
         "uid": "Loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0
+        }
       }
     },
     {
@@ -266,6 +282,11 @@
       "datasource": {
         "type": "loki",
         "uid": "Loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0
+        }
       }
     }
   ]

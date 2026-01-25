@@ -130,6 +130,9 @@ report marks the source as missing and flags affected metrics.
 - **FR-013**: System MUST report on metric data retained for at least 6 months.
 - **FR-014**: Summary outputs MUST include the list of unique users (OIDC `sub`
   values) observed in the requested time range.
+- **FR-017**: Breakdown requests with `group_by=service` MUST support an optional
+  `include_users=true` flag that returns the list of users per service in JSON
+  responses (CSV export excludes the user list).
 
 ### Non-Functional Requirements
 
@@ -182,6 +185,8 @@ per-service when used with `/system/metrics/{serviceName}`.
   the system defaults to the last 24 hours (end = now, start = end - 24h).
 - **Metrics base path**: All metrics endpoints are served under `/system/metrics`.
 - **Breakdown membership**: Include membership only when `group_by=user`.
+- **Breakdown user list**: Include per-service user lists only when
+  `group_by=service` and `include_users=true`.
 - **OSCAR manager log scope**: Grafana Alloy MUST only collect logs from OSCAR
   manager pods (expected labels: `namespace=oscar`, `app=oscar`) unless exposed
   service request counts are enabled, in which case it MAY also collect logs

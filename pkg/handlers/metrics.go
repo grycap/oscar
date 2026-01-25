@@ -35,6 +35,7 @@ type serviceBreakdownItem struct {
 	RequestsCountAsync   int                  `json:"requests_count_async"`
 	RequestsCountExposed int                  `json:"requests_count_exposed"`
 	UniqueUsersCount     int                  `json:"unique_users_count"`
+	Users                []string             `json:"users,omitempty"`
 	Countries            []types.CountryCount `json:"countries"`
 }
 
@@ -166,6 +167,7 @@ func MakeMetricsSummaryHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 // @Param start query string false "RFC3339 start timestamp (defaults to end-24h)"
 // @Param end query string false "RFC3339 end timestamp (defaults to now)"
 // @Param group_by query string true "Breakdown dimension" Enums(service,user,country)
+// @Param include_users query bool false "Include user list when group_by=service"
 // @Param format query string false "Response format" Enums(json,csv) default(json)
 // @Success 200 {object} types.MetricsBreakdownResponse
 // @Success 200 {string} string "CSV response"
@@ -193,13 +195,18 @@ func MakeMetricsBreakdownHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 			return
 		}
 
-		resp, err := agg.Breakdown(c.Request.Context(), tr, groupBy)
+		includeUsers := strings.ToLower(strings.TrimSpace(c.DefaultQuery("include_users", "false"))) == "true"
+		resp, err := agg.Breakdown(c.Request.Context(), tr, groupBy, includeUsers)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
 		if format == "csv" {
+			if strings.EqualFold(groupBy, "service") && includeUsers {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "include_users is not supported for csv"})
+				return
+			}
 			payload, err := renderBreakdownCSV(resp)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "csv export failed"})
@@ -238,6 +245,7 @@ func MakeMetricsBreakdownHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 					RequestsCountAsync:   item.RequestsCountAsync,
 					RequestsCountExposed: item.RequestsCountExposed,
 					UniqueUsersCount:     item.UniqueUsersCount,
+					Users:                item.Users,
 					Countries:            item.Countries,
 				})
 			}

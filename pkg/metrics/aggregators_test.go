@@ -228,7 +228,7 @@ func TestBreakdownMembershipClassification(t *testing.T) {
 		},
 	}
 
-	resp, err := agg.Breakdown(context.Background(), tr, "user")
+	resp, err := agg.Breakdown(context.Background(), tr, "user", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -364,7 +364,7 @@ func TestSummaryBreakdownReconciliation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	breakdown, err := agg.Breakdown(context.Background(), tr, "service")
+	breakdown, err := agg.Breakdown(context.Background(), tr, "service", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

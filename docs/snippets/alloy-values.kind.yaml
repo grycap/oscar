@@ -91,7 +91,17 @@ alloy:
         forward_to = [loki.write.default.receiver]
 
         stage.match {
-          selector = "{namespace!=\"\"} |~ \"/system/services/.+/exposed\""
+          selector = "{namespace!=\"\"} |~ \"/(run|job)/\""
+          action   = "drop"
+        }
+
+        stage.match {
+          selector = "{namespace!=\"\"} |~ \"/system/services/\" !~ \"/exposed/\""
+          action   = "drop"
+        }
+
+        stage.match {
+          selector = "{namespace!=\"\"} |~ \"/system/services/.+/exposed/\""
           action   = "keep"
 
           stage.label_drop {
@@ -104,7 +114,12 @@ alloy:
         forward_to = [loki.write.default.receiver]
 
         stage.match {
-          selector = "{namespace!=\"\"} |~ \"/(job|run)/\""
+          selector = "{namespace!=\"\"} |= \"[GIN]\""
+          action   = "drop"
+        }
+
+        stage.match {
+          selector = "{namespace!=\"\"} |~ \"GIN-EXECUTIONS-LOGGER\" |~ \"/(job|run)/\""
           action   = "keep"
 
           stage.regex {
