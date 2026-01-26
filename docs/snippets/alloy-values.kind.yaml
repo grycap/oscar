@@ -91,22 +91,17 @@ alloy:
         forward_to = [loki.write.default.receiver]
 
         stage.match {
-          selector = "{namespace!=\"\"} |~ \"/(run|job)/\""
-          action   = "drop"
-        }
-
-        stage.match {
-          selector = "{namespace!=\"\"} |~ \"/system/services/\" !~ \"/exposed/\""
-          action   = "drop"
-        }
-
-        stage.match {
           selector = "{namespace!=\"\"} |~ \"/system/services/.+/exposed/\""
           action   = "keep"
 
           stage.label_drop {
             values = ["pod"]
           }
+        }
+
+        stage.match {
+          selector = "{namespace!=\"\"} !~ \"/system/services/.+/exposed/\""
+          action   = "drop"
         }
       }
 
