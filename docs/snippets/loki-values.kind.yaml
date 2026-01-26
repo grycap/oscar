@@ -22,6 +22,12 @@ loki:
     max_query_length: 0h
 singleBinary:
   replicas: 1
+  persistence:
+    enabled: true
+    whenScaled: Retain
+    whenDeleted: Retain
+    enableStatefulSetAutoDeletePVC: true
+    storageClass: nfs
 read:
   replicas: 0
 write:

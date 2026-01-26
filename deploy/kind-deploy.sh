@@ -418,6 +418,7 @@ deployMetrics(){
     helm upgrade --install prometheus prometheus-community/prometheus \
         --namespace monitoring \
         --set server.service.type=ClusterIP \
+        --set server.persistentVolume.storageClass=nfs \
         --set alertmanager.enabled=false \
         --set pushgateway.enabled=false \
         --set kubeStateMetrics.enabled=true \
@@ -454,6 +455,12 @@ loki:
     max_query_length: 0h
 singleBinary:
   replicas: 1
+  persistence:
+    enabled: true
+    whenScaled: Retain
+    whenDeleted: Retain
+    enableStatefulSetAutoDeletePVC: true
+    storageClass: nfs
 read:
   replicas: 0
 write:

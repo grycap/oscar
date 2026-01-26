@@ -11,7 +11,6 @@ need_cmd() {
 }
 
 need_cmd kubectl
-need_cmd docker
 
 prom_pod=$(kubectl -n "$ns" get pods -l app.kubernetes.io/name=prometheus,app.kubernetes.io/component=server -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
 if [ -z "$prom_pod" ]; then
@@ -37,21 +36,45 @@ if [ -z "$loki_pvc" ]; then
   exit 1
 fi
 
-loki_path=$(kubectl get pv "$loki_pvc" -o jsonpath='{.spec.hostPath.path}' 2>/dev/null || true)
-if [ -z "$loki_path" ]; then
-  echo "Unable to locate hostPath for PV $loki_pvc" >&2
-  exit 1
-fi
+loki_host_path=$(kubectl get pv "$loki_pvc" -o jsonpath='{.spec.hostPath.path}' 2>/dev/null || true)
+loki_nfs_server=$(kubectl get pv "$loki_pvc" -o jsonpath='{.spec.nfs.server}' 2>/dev/null || true)
+loki_nfs_path=$(kubectl get pv "$loki_pvc" -o jsonpath='{.spec.nfs.path}' 2>/dev/null || true)
 
-node=$(kubectl -n "$ns" get pod loki-0 -o jsonpath='{.spec.nodeName}' 2>/dev/null || true)
-if [ -z "$node" ]; then
-  echo "Unable to determine node for loki-0 pod" >&2
-  exit 1
-fi
+if [ -n "$loki_host_path" ]; then
+  need_cmd docker
+  node=$(kubectl -n "$ns" get pod loki-0 -o jsonpath='{.spec.nodeName}' 2>/dev/null || true)
+  if [ -z "$node" ]; then
+    echo "Unable to determine node for loki-0 pod" >&2
+    exit 1
+  fi
 
-printf '\nLoki data usage (PV %s on node %s):\n' "$loki_pvc" "$node"
-if ! docker exec "$node" sh -c "du -sh '$loki_path' 2>/dev/null"; then
-  echo "Failed to read Loki data usage from node container $node" >&2
+  printf '\nLoki data usage (PV %s on node %s):\n' "$loki_pvc" "$node"
+  if ! docker exec "$node" sh -c "du -sh '$loki_host_path' 2>/dev/null"; then
+    echo "Failed to read Loki data usage from node container $node" >&2
+  fi
+else
+  loki_pod=$(kubectl -n "$ns" get pod -l app.kubernetes.io/name=loki,app.kubernetes.io/component=single-binary -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+  if [ -z "$loki_pod" ]; then
+    echo "Loki pod not found in namespace $ns" >&2
+    exit 1
+  fi
+
+  printf '\nLoki data usage (from pod %s):\n' "$loki_pod"
+  if ! kubectl -n "$ns" exec "$loki_pod" -c loki -- du -sh /var/loki 2>/dev/null; then
+    echo "Loki image missing shell/du; using a temporary debug pod to read usage."
+    tmp_pod="loki-du-$$"
+    kubectl -n "$ns" run "$tmp_pod" \
+      --image=busybox:1.36 \
+      --restart=Never \
+      --rm \
+      --quiet \
+      -i \
+      --overrides="{\"apiVersion\":\"v1\",\"spec\":{\"volumes\":[{\"name\":\"loki-storage\",\"persistentVolumeClaim\":{\"claimName\":\"storage-loki-0\"}}],\"containers\":[{\"name\":\"loki-du\",\"image\":\"busybox:1.36\",\"command\":[\"sh\",\"-c\",\"du -sh /var/loki\"],\"volumeMounts\":[{\"name\":\"loki-storage\",\"mountPath\":\"/var/loki\"}]}],\"restartPolicy\":\"Never\"}}"
+  fi
+
+  if [ -n "$loki_nfs_server" ] || [ -n "$loki_nfs_path" ]; then
+    echo "Loki PV NFS location: ${loki_nfs_server}:${loki_nfs_path}"
+  fi
 fi
 loki_cap=$(kubectl get pv "$loki_pvc" -o jsonpath='{.spec.capacity.storage}' 2>/dev/null || true)
 if [ -n "$loki_cap" ]; then

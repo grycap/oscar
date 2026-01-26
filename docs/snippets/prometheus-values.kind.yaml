@@ -12,6 +12,8 @@ server:
     scrape_interval: 2m
     scrape_timeout: 5s
     evaluation_interval: 1m
+  persistentVolume:
+    storageClass: nfs
 
 scrapeConfigs:
   prometheus:

@@ -324,6 +324,17 @@ feature development.
 - Requires a new logging stack component and retention configuration.
 - Query language (LogQL) is different from Elasticsearch.
 
+**Storage class considerations (Loki PVC)**:
+- `standard` (local-path on kind and many dev clusters) is node-local. It is
+  fast and simple, but data is tied to a specific node and can be lost if the
+  node is deleted or the cluster is rebuilt. Best for local testing only.
+- `nfs` is network-backed and keeps data independent of a single node, so Loki
+  can be rescheduled without losing logs. This better supports retention
+  requirements, at the cost of higher latency and reliance on the NFS service.
+- For production, prefer a durable networked StorageClass (e.g., NFS or a CSI
+  provisioner). Keep PVC retention set to `Retain` to avoid data loss when the
+  StatefulSet is scaled down or recreated.
+
 ### Option 2: OpenSearch/Elasticsearch
 
 **Summary**: Centralized log storage with full-text search and rich query
