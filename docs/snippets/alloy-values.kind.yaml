@@ -140,7 +140,7 @@ alloy:
           }
 
           stage.label_drop {
-            values = ["pod", "geoip_country_name"]
+            values = ["pod", "geoip_country_name", "detected_level"]
           }
         }
       }
