@@ -246,7 +246,7 @@ func createDeployment(service types.Service, namespace string, kubeClientset kub
 		err = utils.CheckWorkloadAdmited(service, namespace, cfg, kubeClientset, getDeploymentSpec)
 		if err != nil {
 			if err := utils.DeleteKueueLocalQueue(context.TODO(), cfg, service.Namespace, service.Name); err != nil {
-				ExposeLogger.Printf(err.Error())
+				ExposeLogger.Printf("Error deleting Kueue local queue: %v", err)
 			}
 			ExposeLogger.Printf("Error checking workload admission: change the cpu/memory requests\n")
 			return err
