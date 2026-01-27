@@ -182,7 +182,7 @@ func UpdateExpose(service types.Service, namespace string, kubeClientset kuberne
 	if cfg.KueueEnable {
 		err = utils.CheckWorkloadAdmited(service, namespace, cfg, kubeClientset, getDeploymentSpec)
 		if err != nil {
-			return fmt.Errorf("Invalid workload after update: %v", err)
+			return fmt.Errorf("Invalid workload after update: Error checking workload admission: change the cpu/memory requests")
 		}
 	}
 	return nil
@@ -245,7 +245,10 @@ func createDeployment(service types.Service, namespace string, kubeClientset kub
 	if cfg.KueueEnable {
 		err = utils.CheckWorkloadAdmited(service, namespace, cfg, kubeClientset, getDeploymentSpec)
 		if err != nil {
-			ExposeLogger.Printf("error checking workload admission: %v\n", err)
+			if err := utils.DeleteKueueLocalQueue(context.TODO(), cfg, service.Namespace, service.Name); err != nil {
+				ExposeLogger.Printf("Error deleting Kueue local queue: %v", err)
+			}
+			ExposeLogger.Printf("Error checking workload admission: change the cpu/memory requests\n")
 			return err
 		}
 	}
