@@ -1,0 +1,1648 @@
+basePath: /
+definitions:
+  buckets.BucketListResponse:
+    properties:
+      allowed_users:
+        items:
+          type: string
+        type: array
+      bucket_name:
+        type: string
+      is_truncated:
+        type: boolean
+      metadata:
+        additionalProperties:
+          type: string
+        type: object
+      next_page:
+        type: string
+      objects:
+        items:
+          $ref: '#/definitions/utils.MinIOObject'
+        type: array
+      owner:
+        type: string
+      returned_items:
+        type: integer
+      visibility:
+        type: string
+    type: object
+  buckets.PresignRequest:
+    properties:
+      content_type:
+        type: string
+      expires_in:
+        type: integer
+      extra_headers:
+        additionalProperties:
+          type: string
+        type: object
+      object_key:
+        type: string
+      operation:
+        type: string
+    required:
+    - object_key
+    - operation
+    type: object
+  buckets.PresignResponse:
+    properties:
+      expires_at:
+        type: string
+      headers:
+        additionalProperties:
+          type: string
+        type: object
+      method:
+        type: string
+      object_key:
+        type: string
+      operation:
+        type: string
+      url:
+        type: string
+    type: object
+  handlers.ConfigForUser:
+    properties:
+      config:
+        $ref: '#/definitions/types.Config'
+      minio_provider:
+        $ref: '#/definitions/types.MinIOProvider'
+    type: object
+  handlers.quotaResponse:
+    properties:
+      cluster_queue:
+        type: string
+      resources:
+        additionalProperties:
+          $ref: '#/definitions/handlers.quotaValues'
+        type: object
+      user_id:
+        type: string
+    type: object
+  handlers.quotaUpdateRequest:
+    properties:
+      cpu:
+        type: string
+      memory:
+        type: string
+    type: object
+  handlers.quotaValues:
+    properties:
+      max:
+        type: string
+      used:
+        type: string
+    type: object
+  types.CPUMetrics:
+    properties:
+      max_free_on_node_cores:
+        type: integer
+      total_free_cores:
+        type: integer
+    type: object
+  types.Cluster:
+    properties:
+      auth_password:
+        description: AuthPassword password to connect to the cluster (basic auth)
+        type: string
+      auth_user:
+        description: AuthUser username to connect to the cluster (basic auth)
+        type: string
+      endpoint:
+        description: Endpoint endpoint of the OSCAR cluster API
+        type: string
+      ssl_verify:
+        description: SSLVerify parameter to enable or disable the verification of
+          SSL certificates
+        type: boolean
+    type: object
+  types.ClusterInfo:
+    properties:
+      metrics:
+        $ref: '#/definitions/types.ClusterMetrics'
+      nodes:
+        items:
+          $ref: '#/definitions/types.NodeDetail'
+        type: array
+      nodes_count:
+        type: integer
+    type: object
+  types.ClusterMetrics:
+    properties:
+      cpu:
+        $ref: '#/definitions/types.CPUMetrics'
+      gpu:
+        $ref: '#/definitions/types.GPUMetrics'
+      memory:
+        $ref: '#/definitions/types.MemoryMetrics'
+    type: object
+  types.Config:
+    properties:
+      controller_service_account:
+        description: 'Kubernetes service account used by the OSCAR controller to manage
+          user namespaces (default: oscar-sa)'
+        type: string
+      gpu_available:
+        description: Parameter used to check if the cluster have GPUs
+        type: boolean
+      interLink_available:
+        description: Parameter used to check if the cluster have vega nodes
+        type: boolean
+      kueue_enable:
+        description: KueueEnable option to configure Kueue admission queues
+        type: boolean
+      name:
+        description: 'Kubernetes name for the deployment and service (default: oscar)'
+        type: string
+      namespace:
+        description: 'Kubernetes namespace for the deployment and service (default:
+          oscar)'
+        type: string
+      oidc_groups:
+        description: |-
+          OIDCGroups OpenID comma-separated group list to grant access in the cluster.
+          Groups defined in the "eduperson_entitlement" OIDC scope,
+          as described here: https://docs.egi.eu/providers/check-in/sp/#10-groups
+        items:
+          type: string
+        type: array
+      serverless_backend:
+        description: |-
+          Serverless framework used to deploy services (Openfaas | Knative)
+          If not defined only async invocations allowed (Using KubeBackend)
+        type: string
+      services_namespace:
+        description: 'Kubernetes namespace for services and jobs (default: oscar-svc)'
+        type: string
+      yunikorn_enable:
+        description: YunikornEnable option to configure Apache Yunikorn
+        type: boolean
+    type: object
+  types.Expose:
+    properties:
+      api_port:
+        type: integer
+      cpu_threshold:
+        default: 80
+        type: integer
+      default_command:
+        type: boolean
+      health_path:
+        default: /
+        type: string
+      max_scale:
+        default: 10
+        type: integer
+      min_scale:
+        default: 1
+        type: integer
+      nodePort:
+        default: 0
+        type: integer
+      rewrite_target:
+        default: false
+        type: boolean
+      set_auth:
+        type: boolean
+    type: object
+  types.GPUMetrics:
+    properties:
+      total_gpu:
+        type: integer
+    type: object
+  types.Info:
+    properties:
+      architecture:
+        type: string
+      git_commit:
+        type: string
+      kubernetes_version:
+        type: string
+      serverless_backend:
+        $ref: '#/definitions/types.ServerlessBackendInfo'
+      version:
+        type: string
+    type: object
+  types.JobInfo:
+    properties:
+      creation_time:
+        type: string
+      finish_time:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+    type: object
+  types.JobsResponse:
+    properties:
+      jobs:
+        additionalProperties:
+          $ref: '#/definitions/types.JobInfo'
+        type: object
+      next_page:
+        type: string
+      remaining_jobs:
+        type: integer
+    type: object
+  types.MemoryMetrics:
+    properties:
+      max_free_on_node_bytes:
+        type: integer
+      total_free_bytes:
+        type: integer
+    type: object
+  types.MinIOProvider:
+    properties:
+      access_key:
+        type: string
+      endpoint:
+        type: string
+      region:
+        type: string
+      secret_key:
+        type: string
+      verify:
+        type: boolean
+    type: object
+  types.MinioInfo:
+    properties:
+      buckets_count:
+        type: integer
+      total_objects:
+        type: integer
+    type: object
+  types.NodeConditionSimple:
+    properties:
+      status:
+        type: boolean
+      type:
+        type: string
+    type: object
+  types.NodeDetail:
+    properties:
+      conditions:
+        items:
+          $ref: '#/definitions/types.NodeConditionSimple'
+        type: array
+      cpu:
+        $ref: '#/definitions/types.NodeResource'
+      gpu:
+        type: integer
+      is_interlink:
+        type: boolean
+      memory:
+        $ref: '#/definitions/types.NodeResource'
+      name:
+        type: string
+      status:
+        type: string
+    type: object
+  types.NodeResource:
+    properties:
+      capacity_bytes:
+        type: integer
+      capacity_cores:
+        type: integer
+      usage_bytes:
+        type: integer
+      usage_cores:
+        type: integer
+    type: object
+  types.OIDCInfo:
+    properties:
+      enabled:
+        type: boolean
+      groups:
+        items:
+          type: string
+        type: array
+      issuers:
+        items:
+          type: string
+        type: array
+    type: object
+  types.OnedataProvider:
+    properties:
+      oneprovider_host:
+        type: string
+      space:
+        type: string
+      token:
+        type: string
+    type: object
+  types.OscarDeployment:
+    properties:
+      available_replicas:
+        type: integer
+      creation_timestamp:
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      ready_replicas:
+        type: integer
+      replicas:
+        type: integer
+      strategy:
+        type: string
+    type: object
+  types.OscarInfo:
+    properties:
+      deployment:
+        $ref: '#/definitions/types.OscarDeployment'
+      deployment_name:
+        type: string
+      jobs_count:
+        description: Total jobs (Active + Succeeded + Failed)
+        type: integer
+      oidc:
+        $ref: '#/definitions/types.OIDCInfo'
+      pods:
+        $ref: '#/definitions/types.PodStates'
+      ready:
+        type: boolean
+    type: object
+  types.PodStates:
+    properties:
+      states:
+        additionalProperties:
+          type: integer
+        type: object
+      total:
+        type: integer
+    type: object
+  types.Replica:
+    properties:
+      cluster_id:
+        description: |-
+          ClusterID identifier of the cluster as defined in the "clusters" FDL field
+          Only used if Type is "oscar"
+        type: string
+      headers:
+        additionalProperties:
+          type: string
+        description: |-
+          Headers headers to send in delegation requests
+          Optional
+        type: object
+      priority:
+        description: |-
+          Priority value to define delegation priority. Highest priority is defined as 0.
+          If a delegation fails, OSCAR will try to delegate to another replica with lower priority
+          Optional. (default: 0)
+        type: integer
+      service_name:
+        description: |-
+          ServiceName name of the service in the replica cluster.
+          Only used if Type is "oscar"
+        type: string
+      ssl_verify:
+        description: |-
+          SSLVerify parameter to enable or disable the verification of SSL certificates.
+          Only used if Type is "endpoint"
+          Optional. (default: true)
+        type: boolean
+      type:
+        description: Type of the replica to re-send events (can be "oscar" or "endpoint")
+        type: string
+      url:
+        description: |-
+          URL url of the endpoint to re-send events (HTTP POST).
+          Only used if Type is "endpoint"
+        type: string
+    type: object
+  types.Rucio:
+    properties:
+      account:
+        type: string
+      auth_host:
+        type: string
+      host:
+        type: string
+      oidc_audience:
+        type: string
+      refresh_token:
+        type: string
+      rse:
+        type: string
+      token_endpoint:
+        type: string
+    type: object
+  types.S3Provider:
+    properties:
+      access_key:
+        type: string
+      region:
+        type: string
+      secret_key:
+        type: string
+    type: object
+  types.ServerlessBackendInfo:
+    properties:
+      name:
+        type: string
+      version:
+        type: string
+    type: object
+  types.Service:
+    properties:
+      allowed_users:
+        description: |-
+          AllowedUsers list of EGI UID's identifying the users that will have visibility of the service and its MinIO storage provider
+          Optional - only used if Visibility is set to "restricted"
+        items:
+          type: string
+        type: array
+      alpine:
+        description: |-
+          Alpine parameter to set if image is based on Alpine
+          A custom release of faas-supervisor will be used
+          Optional. (default: false)
+        type: boolean
+      annotations:
+        additionalProperties:
+          type: string
+        description: |-
+          Annotations user-defined Kubernetes annotations to be set in job's definition
+          https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+          Optional
+        type: object
+      bucket_list:
+        description: BucketList autogenerated list of private buckets based on the
+          allowed_users of the service
+        items:
+          type: string
+        type: array
+      cluster_id:
+        description: |-
+          ClusterID identifier for the current cluster, used to specify the cluster's StorageProvider in job delegations
+          Optional. (default: ""). OSCAR-CLI sets it using the ClusterID from the FDL
+        type: string
+      clusters:
+        additionalProperties:
+          $ref: '#/definitions/types.Cluster'
+        description: |-
+          Clusters configuration for the OSCAR clusters that can be used as service's replicas
+          Optional
+        type: object
+      cpu:
+        description: |-
+          CPU cpu limit for the service following the kubernetes format
+          https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
+          Optional. (default: 0.2)
+        type: string
+      delegation:
+        description: |-
+          Delegation Mode of job delegation for replicas
+          Opcional (default: manual)
+          "static" The user select the priority to delegate jobs to the replicas.
+          "random" The job delegation priority is generated randomly among the clusters of the available replicas.
+          "load-based" The job delegation priority is generated depending on the CPU and Memory available in the replica clusters.
+        type: string
+      enable_gpu:
+        description: |-
+          EnableGPU parameter to request gpu usage in service's executions (synchronous and asynchronous)
+          Optional. (default: false)
+        type: boolean
+      enable_sgx:
+        description: |-
+          EnableSGX parameter to use the SCONE k8s plugin
+          Optional. (default: false)
+        type: boolean
+      environment:
+        description: |-
+          The user-defined environment variables assigned to the service
+          Optional
+        properties:
+          secrets:
+            additionalProperties:
+              type: string
+            type: object
+          variables:
+            additionalProperties:
+              type: string
+            type: object
+        type: object
+      expose:
+        $ref: '#/definitions/types.Expose'
+      file_stage_in:
+        description: |-
+          A parameter to disable the download of input files by the FaaS Supervisor
+          Optional. (default: false)
+        type: boolean
+      image:
+        description: Image Docker image for the service
+        type: string
+      image_prefetch:
+        description: |-
+          ImagePrefetch parameter to enable the image cache functionality
+          Optional. (default: false)
+        type: boolean
+      image_pull_secrets:
+        description: |-
+          ImagePullSecrets list of Kubernetes secrets to login to a private registry
+          Optional
+        items:
+          type: string
+        type: array
+      input:
+        description: |-
+          Input StorageIOConfig slice with the input service configuration
+          Optional
+        items:
+          $ref: '#/definitions/types.StorageIOConfig'
+        type: array
+      interlink_node_name:
+        type: string
+      isolation_level:
+        default: SERVICE
+        description: IsolationLevel level of isolation for the buckets of the service
+          (default:service)
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        description: |-
+          Labels user-defined Kubernetes labels to be set in job's definition
+          https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+          Optional
+        type: object
+      log_level:
+        description: |-
+          LogLevel log level for the FaaS Supervisor
+          Optional. (default: INFO)
+        type: string
+      memory:
+        description: |-
+          Memory memory limit for the service following the kubernetes format
+          https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
+          Optional. (default: 256Mi)
+        type: string
+      mount:
+        allOf:
+        - $ref: '#/definitions/types.StorageIOConfig'
+        description: |-
+          Mount configuration to create a storage provider as a volume inside the service container
+          Optional
+      name:
+        description: Name the name of the service
+        maxLength: 39
+        minLength: 1
+        type: string
+      namespace:
+        description: Namespace where the service resources are deployed. Internal
+          use only, not part of FDL.
+        type: string
+      output:
+        description: |-
+          Output StorageIOConfig slice with the output service configuration
+          Optional
+        items:
+          $ref: '#/definitions/types.StorageIOConfig'
+        type: array
+      owner:
+        description: |-
+          EGI UID of the user that created the service
+          If the service is created through basic auth the default owner is "cluster_admin"
+        type: string
+      replicas:
+        description: |-
+          Replicas list of replicas to delegate jobs
+          Optional
+        items:
+          $ref: '#/definitions/types.Replica'
+        type: array
+      rescheduler_threshold:
+        description: |-
+          ReSchedulerThreshold time (in seconds) that a job (with replicas) can be queued before delegating it
+          Optional
+        type: integer
+      script:
+        description: Script the user script to execute when the service is invoked
+        type: string
+      storage_providers:
+        allOf:
+        - $ref: '#/definitions/types.StorageProviders'
+        description: |-
+          StorageProviders configuration for the storage providers used by the service
+          Optional. (default: MinIOProvider["default"] with the server's config credentials)
+      synchronous:
+        description: |-
+          Synchronous struct to configure specific sync parameters
+          Only Knative ServerlessBackend applies this settings
+          Optional.
+        properties:
+          max_scale:
+            description: |-
+              MaxScale maximum number of active replicas (pods) for the service
+              Optional. (default: 0 [Unlimited])
+            type: integer
+          min_scale:
+            description: |-
+              MinScale minimum number of active replicas (pods) for the service
+              Optional. (default: 0)
+            type: integer
+        type: object
+      token:
+        description: |-
+          Token token for sync and async invocations
+          Read only. This field is automatically generated by OSCAR
+        type: string
+      total_cpu:
+        description: |-
+          TotalCPU limit for the virtual CPUs used by all the service's jobs running simultaneously
+          Apache YuniKorn scheduler is required to work
+          Same format as CPU, but internally translated to millicores (integer)
+          Optional. (default: "")
+        type: string
+      total_memory:
+        description: |-
+          TotalMemory limit for the memory used by all the service's jobs running simultaneously
+          Apache YuniKorn scheduler is required to work
+          Same format as Memory, but internally translated to MB (integer)
+          Optional. (default: "")
+        type: string
+      visibility:
+        description: |-
+          Visibility sets which users will be able to interact with the service
+          "private" The default state of the service, which means only the owner of the same can interact with it
+          "public"  Every user can see the service and its buckets
+          "restricted" A list of users, set on the "allowed_users" variable are able to interact with the service
+        type: string
+      vo:
+        description: |-
+          Parameter to specify the VO from the user creating the service
+          Optional
+        type: string
+    required:
+    - image
+    - name
+    - script
+    type: object
+  types.StatusInfo:
+    properties:
+      cluster:
+        $ref: '#/definitions/types.ClusterInfo'
+      minio:
+        $ref: '#/definitions/types.MinioInfo'
+      oscar:
+        $ref: '#/definitions/types.OscarInfo'
+    type: object
+  types.StorageIOConfig:
+    properties:
+      path:
+        type: string
+      prefix:
+        items:
+          type: string
+        type: array
+      storage_provider:
+        description: |-
+          Provider reference to the provider's name and identifier specified in StorageProviders
+          The provider's name is separated from the ID by a point (e.g. "minio.myidentifier")
+        type: string
+      suffix:
+        items:
+          type: string
+        type: array
+    type: object
+  types.StorageProviders:
+    properties:
+      minio:
+        additionalProperties:
+          $ref: '#/definitions/types.MinIOProvider'
+        type: object
+      onedata:
+        additionalProperties:
+          $ref: '#/definitions/types.OnedataProvider'
+        type: object
+      rucio:
+        additionalProperties:
+          $ref: '#/definitions/types.Rucio'
+        type: object
+      s3:
+        additionalProperties:
+          $ref: '#/definitions/types.S3Provider'
+        type: object
+      webdav:
+        additionalProperties:
+          $ref: '#/definitions/types.WebDavProvider'
+        type: object
+    type: object
+  types.WebDavProvider:
+    properties:
+      hostname:
+        type: string
+      login:
+        type: string
+      password:
+        type: string
+    type: object
+  utils.MinIOBucket:
+    properties:
+      allowed_users:
+        items:
+          type: string
+        type: array
+      bucket_name:
+        type: string
+      metadata:
+        additionalProperties:
+          type: string
+        type: object
+      objects:
+        items:
+          $ref: '#/definitions/utils.MinIOObject'
+        type: array
+      owner:
+        type: string
+      visibility:
+        type: string
+    type: object
+  utils.MinIOObject:
+    properties:
+      last_modified:
+        type: string
+      object_name:
+        type: string
+      owner:
+        type: string
+      size_bytes:
+        type: integer
+    type: object
+info:
+  contact:
+    email: products@grycap.upv.es
+    name: GRyCAP
+  description: Secure REST API to manage OSCAR services, storage and executions.
+  title: OSCAR API
+  version: v2.0.0
+paths:
+  /health:
+    get:
+      description: Kubernetes liveness probe endpoint.
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Ok
+          schema:
+            type: string
+      summary: Health check
+      tags:
+      - health
+  /job/{serviceName}:
+    post:
+      consumes:
+      - application/json
+      - application/octet-stream
+      description: Invoke a service asynchronously creating a Kubernetes Job.
+      parameters:
+      - description: Service name
+        in: path
+        name: serviceName
+        required: true
+        type: string
+      - description: Event payload
+        in: body
+        name: payload
+        schema:
+          type: string
+      responses:
+        "201":
+          description: Created
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Invoke service asynchronously
+      tags:
+      - async
+  /run/{serviceName}:
+    post:
+      consumes:
+      - application/json
+      - application/octet-stream
+      description: Invoke a service synchronously using the configured Serverless
+        backend.
+      parameters:
+      - description: Service name
+        in: path
+        name: serviceName
+        required: true
+        type: string
+      - description: Event payload
+        in: body
+        name: payload
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Invoke service synchronously
+      tags:
+      - sync
+  /system/buckets:
+    get:
+      description: List MinIO buckets visible to the authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/utils.MinIOBucket'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: List buckets
+      tags:
+      - buckets
+    post:
+      consumes:
+      - application/json
+      description: Create a user MinIO bucket with the desired visibility.
+      parameters:
+      - description: Bucket definition
+        in: body
+        name: bucket
+        required: true
+        schema:
+          $ref: '#/definitions/utils.MinIOBucket'
+      responses:
+        "201":
+          description: Created
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: Create bucket
+      tags:
+      - buckets
+    put:
+      consumes:
+      - application/json
+      description: Change bucket visibility or allowed users.
+      parameters:
+      - description: Bucket definition
+        in: body
+        name: bucket
+        required: true
+        schema:
+          $ref: '#/definitions/utils.MinIOBucket'
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: Update bucket
+      tags:
+      - buckets
+  /system/buckets/{bucket}:
+    delete:
+      description: Delete a MinIO bucket owned by the authenticated user.
+      parameters:
+      - description: Bucket name
+        in: path
+        name: bucket
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: Delete bucket
+      tags:
+      - buckets
+    get:
+      description: Retrieve metadata and objects for a specific bucket.
+      parameters:
+      - description: Bucket name
+        in: path
+        name: bucket
+        required: true
+        type: string
+      - description: Continuation token
+        in: query
+        name: page
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/buckets.BucketListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: Get bucket details
+      tags:
+      - buckets
+  /system/buckets/{bucket}/presign:
+    post:
+      consumes:
+      - application/json
+      description: Create a short-lived MinIO presigned URL to upload or download
+        an object.
+      parameters:
+      - description: Bucket name
+        in: path
+        name: bucket
+        required: true
+        type: string
+      - description: Presign parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/buckets.PresignRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/buckets.PresignResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: Generate presigned URL
+      tags:
+      - buckets
+  /system/config:
+    get:
+      description: Retrieve cluster configuration and MinIO credentials for the authenticated
+        user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ConfigForUser'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: Get configuration
+      tags:
+      - config
+  /system/info:
+    get:
+      description: Retrieve OSCAR deployment information.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Info'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: Get system info
+      tags:
+      - info
+  /system/logs/:
+    get:
+      description: Stream logs of a specific job execution.
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Logs
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: Get job from logs
+      tags:
+      - logs
+  /system/logs/{serviceName}:
+    delete:
+      description: Delete jobs created by the provided service. If `all` is true pending,
+        running and failed jobs are also removed.
+      parameters:
+      - description: Service name
+        in: path
+        name: serviceName
+        required: true
+        type: string
+      - description: Delete running and failed jobs as well
+        in: query
+        name: all
+        type: boolean
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: Delete jobs
+      tags:
+      - logs
+    get:
+      description: List jobs created by a service including their status and timestamps.
+      parameters:
+      - description: Service name
+        in: path
+        name: serviceName
+        required: true
+        type: string
+      - description: Continuation token
+        in: query
+        name: page
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.JobsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: List jobs
+      tags:
+      - logs
+  /system/logs/{serviceName}/{jobName}:
+    delete:
+      description: Delete a specific job and its pod.
+      parameters:
+      - description: Service name
+        in: path
+        name: serviceName
+        required: true
+        type: string
+      - description: Job name
+        in: path
+        name: jobName
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: Delete job
+      tags:
+      - logs
+    get:
+      description: Stream logs of a specific job execution.
+      parameters:
+      - description: Service name
+        in: path
+        name: serviceName
+        required: true
+        type: string
+      - description: Job name
+        in: path
+        name: jobName
+        required: true
+        type: string
+      - description: Include timestamps
+        in: query
+        name: timestamps
+        type: boolean
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Logs
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: Get job logs
+      tags:
+      - logs
+  /system/quotas/user:
+    get:
+      description: Return CPU and memory quotas and current usage for the authenticated
+        user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.quotaResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get own quotas
+      tags:
+      - quotas
+  /system/quotas/user/{userId}:
+    get:
+      description: GET returns CPU/memory quotas and usage for the specified user
+        (admin only).
+      parameters:
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.quotaResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      summary: Get user quotas
+      tags:
+      - quotas
+    put:
+      consumes:
+      - application/json
+      description: PUT updates CPU/memory nominal quotas for the specified user (admin
+        only). At least one of cpu or memory must be provided.
+      parameters:
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: Quota update payload (at least one of cpu or memory)
+        in: body
+        name: quotas
+        schema:
+          $ref: '#/definitions/handlers.quotaUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.quotaResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      summary: Update user quotas
+      tags:
+      - quotas
+  /system/services:
+    get:
+      description: List all created services.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/types.Service'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: List services
+      tags:
+      - services
+    post:
+      consumes:
+      - application/json
+      description: Create a new OSCAR service definition.
+      parameters:
+      - description: Service definition
+        in: body
+        name: service
+        required: true
+        schema:
+          $ref: '#/definitions/types.Service'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: Create service
+      tags:
+      - services
+    put:
+      consumes:
+      - application/json
+      description: Update an existing service definition.
+      parameters:
+      - description: Service definition
+        in: body
+        name: service
+        required: true
+        schema:
+          $ref: '#/definitions/types.Service'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: Update service
+      tags:
+      - services
+  /system/services/{serviceName}:
+    delete:
+      description: Delete an existing service by name.
+      parameters:
+      - description: Service name
+        in: path
+        name: serviceName
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: Delete service
+      tags:
+      - services
+    get:
+      description: Get details of a specific service.
+      parameters:
+      - description: Service name
+        in: path
+        name: serviceName
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Service'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: Read service
+      tags:
+      - services
+  /system/status:
+    get:
+      description: Retrieve cluster, OSCAR deployment and MinIO status data.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.StatusInfo'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      - BearerAuth: []
+      summary: Get status
+      tags:
+      - status
+schemes:
+- https
+- http
+securityDefinitions:
+  BasicAuth:
+    type: basic
+  BearerAuth:
+    description: 'OIDC Bearer token (e.g. Authorization: Bearer <token>)'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
