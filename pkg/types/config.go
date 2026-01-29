@@ -116,7 +116,7 @@ type Config struct {
 	OpenfaasScalerInterval string `json:"-"`
 
 	// OpenfaasScalerInactivityDuration
-	OpenfaasScalerInactivityDuration string `json:"-"`
+	OpenfaasScalerInactivityDuration string `json:"-"`*/
 
 	// WatchdogMaxInflight
 	WatchdogMaxInflight int `json:"-"`
@@ -131,7 +131,7 @@ type Config struct {
 	WatchdogReadTimeout int `json:"-"`
 
 	// WatchdogWriteTimeout
-	WatchdogWriteTimeout int `json:"-"`*/
+	WatchdogWriteTimeout int `json:"-"`
 
 	// WatchdogHealthCheckInterval
 	WatchdogHealthCheckInterval int `json:"-"`
@@ -153,6 +153,18 @@ type Config struct {
 
 	// YunikornConfigFileName
 	YunikornConfigFileName string `json:"-"`
+
+	// KueueEnable option to configure Kueue admission queues
+	KueueEnable bool `json:"kueue_enable"`
+
+	// KueueDefaultCPU default per-user ClusterQueue CPU quota
+	KueueDefaultCPU string `json:"-"`
+
+	// KueueDefaultMemory default per-user ClusterQueue memory quota
+	KueueDefaultMemory string `json:"-"`
+
+	// KueueDefaultFlavor default ResourceFlavor name used for ClusterQueues
+	KueueDefaultFlavor string `json:"-"`
 
 	// ResourceManagerEnable option to enable the Resource Manager to delegate jobs
 	// when there are no available resources in the cluster (if the service has replicas)
@@ -236,11 +248,11 @@ var configVars = []configVar{
 	//{"OpenfaasScalerEnable", "OPENFAAS_SCALER_ENABLE", false, boolType, "false"},
 	//{"OpenfaasScalerInterval", "OPENFAAS_SCALER_INTERVAL", false, stringType, "2m"},
 	//{"OpenfaasScalerInactivityDuration", "OPENFAAS_SCALER_INACTIVITY_DURATION", false, stringType, "10m"},
-	//{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
-	//{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
-	//{"WatchdogExecTimeout", "WATCHDOG_EXEC_TIMEOUT", false, intType, "0"},
-	//{"WatchdogReadTimeout", "WATCHDOG_READ_TIMEOUT", false, intType, "300"},
-	//{"WatchdogWriteTimeout", "WATCHDOG_WRITE_TIMEOUT", false, intType, "300"},
+	{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
+	{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
+	{"WatchdogExecTimeout", "WATCHDOG_EXEC_TIMEOUT", false, intType, "0"},
+	{"WatchdogReadTimeout", "WATCHDOG_READ_TIMEOUT", false, intType, "300"},
+	{"WatchdogWriteTimeout", "WATCHDOG_WRITE_TIMEOUT", false, intType, "300"},
 	{"WatchdogHealthCheckInterval", "WATCHDOG_HEALTHCHECK_INTERVAL", false, intType, "5"},
 	{"ReadTimeout", "READ_TIMEOUT", false, secondsType, "300"},
 	{"WriteTimeout", "WRITE_TIMEOUT", false, secondsType, "300"},
@@ -249,6 +261,10 @@ var configVars = []configVar{
 	{"YunikornNamespace", "YUNIKORN_NAMESPACE", false, stringType, "yunikorn"},
 	{"YunikornConfigMap", "YUNIKORN_CONFIGMAP", false, stringType, "yunikorn-configs"},
 	{"YunikornConfigFileName", "YUNIKORN_CONFIG_FILENAME", false, stringType, "queues.yaml"},
+	{"KueueEnable", "KUEUE_ENABLE", false, boolType, "true"},
+	{"KueueDefaultCPU", "KUEUE_DEFAULT_CPU", false, stringType, "2"},
+	{"KueueDefaultMemory", "KUEUE_DEFAULT_MEMORY", false, stringType, "2Gi"},
+	{"KueueDefaultFlavor", "KUEUE_DEFAULT_FLAVOR", false, stringType, "oscar-default-flavor"},
 	{"ResourceManagerEnable", "RESOURCE_MANAGER_ENABLE", false, boolType, "false"},
 	//{"ResourceManager", "RESOURCE_MANAGER", false, resourceManagerType, "kubernetes"},
 	{"ResourceManagerInterval", "RESOURCE_MANAGER_INTERVAL", false, intType, "15"},

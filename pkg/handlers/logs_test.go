@@ -102,12 +102,15 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 	}
 
 	actions := kubeClientset.Actions()
-	if len(actions) != 1 {
-		t.Errorf("expecting 1 actions, got %d", len(actions))
+	if len(actions) != 2 {
+		t.Errorf("expecting 2 actions, got %d", len(actions))
 	}
 
-	if actions[0].GetVerb() != "list" || actions[0].GetResource().Resource != "pods" {
-		t.Errorf("expecting list pods, got %s %s", actions[0].GetVerb(), actions[0].GetResource().Resource)
+	if actions[0].GetVerb() != "list" || actions[0].GetResource().Resource != "jobs" {
+		t.Errorf("expecting list jobs, got %s %s", actions[0].GetVerb(), actions[0].GetResource().Resource)
+	}
+	if actions[1].GetVerb() != "list" || actions[1].GetResource().Resource != "pods" {
+		t.Errorf("expecting list pods, got %s %s", actions[1].GetVerb(), actions[1].GetResource().Resource)
 	}
 }
 

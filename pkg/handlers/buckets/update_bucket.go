@@ -30,7 +30,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 )
 
-var updateLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
+var updateLogger = log.New(os.Stdout, "[UPDATE-HANDLER] ", log.Flags())
 
 // MakeUpdateHandler godoc
 // @Summary Update bucket

@@ -332,6 +332,10 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Update the service
 		if err := back.UpdateService(newService); err != nil {
+			uerr := back.UpdateService(*oldService)
+			if uerr != nil {
+				log.Println(uerr.Error())
+			}
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
 			return
 		}

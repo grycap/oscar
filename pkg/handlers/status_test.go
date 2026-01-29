@@ -179,58 +179,58 @@ var (
 	// TotalGPU: 1
 	// JobsCount: 1 (Succeeded) + 1 (Active) + 1 (Failed) = 3
 	// Pods: Total=2, States: Succeeded=1, Running=1
-	expectedClusterMetrics = ClusterMetrics{
-		CPU: CPUMetrics{
+	expectedClusterMetrics = types.ClusterMetrics{
+		CPU: types.CPUMetrics{
 			TotalFreeCores:     6000,
 			MaxFreeOnNodeCores: 4000,
 		},
-		Memory: MemoryMetrics{
+		Memory: types.MemoryMetrics{
 			TotalFreeBytes:     24 * 1024 * 1024 * 1024,
 			MaxFreeOnNodeBytes: 16 * 1024 * 1024 * 1024,
 		},
-		GPU: GPUMetrics{
+		GPU: types.GPUMetrics{
 			TotalGPU: 1,
 		},
 	}
 
-	expectedWorkerNodeDetail = NodeDetail{
+	expectedWorkerNodeDetail = types.NodeDetail{
 		Name: "worker-node",
-		CPU: NodeResource{
+		CPU: types.NodeResource{
 			CapacityCores: 4000,
 			UsageCores:    2000,
 		},
-		Memory: NodeResource{
+		Memory: types.NodeResource{
 			CapacityBytes: 16 * 1024 * 1024 * 1024,
 			UsageBytes:    8 * 1024 * 1024 * 1024,
 		},
 		GPU:         1,
 		IsInterlink: false,
 		Status:      "Ready",
-		Conditions: []NodeConditionSimple{
+		Conditions: []types.NodeConditionSimple{
 			{Type: "Ready", Status: true},
 		},
 	}
 
-	expectedInterlinkNodeDetail = NodeDetail{
+	expectedInterlinkNodeDetail = types.NodeDetail{
 		Name: "interlink-node",
-		CPU: NodeResource{
+		CPU: types.NodeResource{
 			CapacityCores: 8000,
 			UsageCores:    4000,
 		},
-		Memory: NodeResource{
+		Memory: types.NodeResource{
 			CapacityBytes: 32 * 1024 * 1024 * 1024,
 			UsageBytes:    16 * 1024 * 1024 * 1024,
 		},
 		GPU:         0,
 		IsInterlink: true,
 		Status:      "NotReady",
-		Conditions: []NodeConditionSimple{
+		Conditions: []types.NodeConditionSimple{
 			{Type: "Ready", Status: false},
 		},
 	}
 )
 
-func checkClusterMetrics(metrics map[string]interface{}, expectedMetrics ClusterMetrics, t *testing.T) {
+func checkClusterMetrics(metrics map[string]interface{}, expectedMetrics types.ClusterMetrics, t *testing.T) {
 	cpu := metrics["cpu"].(map[string]interface{})
 	mem := metrics["memory"].(map[string]interface{})
 	gpu := metrics["gpu"].(map[string]interface{})
@@ -256,7 +256,7 @@ func checkClusterMetrics(metrics map[string]interface{}, expectedMetrics Cluster
 	}
 }
 
-func checkNodeDetail(detail map[string]interface{}, expected NodeDetail, t *testing.T) {
+func checkNodeDetail(detail map[string]interface{}, expected types.NodeDetail, t *testing.T) {
 	if detail["name"] != expected.Name {
 		t.Errorf("Node %s: Expected name %s, got %s", expected.Name, expected.Name, detail["name"])
 	}
@@ -709,7 +709,7 @@ func int32Ptr(v int32) *int32 {
 
 func TestGetNodesInfoAggregatesClusterData(t *testing.T) {
 	fakeClient, _ := makeFakeClients()
-	statusInfo := &NewStatusInfo{}
+	statusInfo := &types.StatusInfo{}
 
 	nodeInfo, err := getNodesInfo(fakeClient, statusInfo)
 	if err != nil {
@@ -718,12 +718,12 @@ func TestGetNodesInfoAggregatesClusterData(t *testing.T) {
 	if len(nodeInfo) == 0 {
 		nodeInfo = map[string]*NodeInfoWithAllocatable{
 			"worker-node": {
-				NodeDetail:        NodeDetail{GPU: 2},
+				NodeDetail:        types.NodeDetail{GPU: 2},
 				CPUAllocatable:    4000,
 				MemoryAllocatable: 16 * 1024 * 1024 * 1024,
 			},
 			"interlink-node": {
-				NodeDetail:        NodeDetail{GPU: 0, IsInterlink: true},
+				NodeDetail:        types.NodeDetail{GPU: 0, IsInterlink: true},
 				CPUAllocatable:    2000,
 				MemoryAllocatable: 8 * 1024 * 1024 * 1024,
 			},
@@ -764,7 +764,7 @@ func TestGetNodesInfoAggregatesClusterData(t *testing.T) {
 
 func TestGetMetricsInfoUpdatesUsage(t *testing.T) {
 	fakeClient, metricsClient := makeFakeClients()
-	statusInfo := &NewStatusInfo{}
+	statusInfo := &types.StatusInfo{}
 
 	nodeInfo, err := getNodesInfo(fakeClient, statusInfo)
 	if err != nil {
@@ -773,12 +773,12 @@ func TestGetMetricsInfoUpdatesUsage(t *testing.T) {
 	if len(nodeInfo) == 0 {
 		nodeInfo = map[string]*NodeInfoWithAllocatable{
 			"worker-node": {
-				NodeDetail:        NodeDetail{GPU: 2},
+				NodeDetail:        types.NodeDetail{GPU: 2},
 				CPUAllocatable:    4000,
 				MemoryAllocatable: 16 * 1024 * 1024 * 1024,
 			},
 			"interlink-node": {
-				NodeDetail:        NodeDetail{GPU: 0, IsInterlink: true},
+				NodeDetail:        types.NodeDetail{GPU: 0, IsInterlink: true},
 				CPUAllocatable:    2000,
 				MemoryAllocatable: 8 * 1024 * 1024 * 1024,
 			},
@@ -814,7 +814,7 @@ func TestGetDeploymentInfoPopulatesOscarSection(t *testing.T) {
 		OIDCGroups:       []string{"group"},
 	}
 
-	statusInfo := &NewStatusInfo{}
+	statusInfo := &types.StatusInfo{}
 
 	if err := getDeploymentInfo(fakeClient, cfg, statusInfo); err != nil {
 		t.Fatalf("getDeploymentInfo returned unexpected error: %v", err)
@@ -833,7 +833,7 @@ func TestGetDeploymentInfoPopulatesOscarSection(t *testing.T) {
 
 func TestGetJobsInfoSummarisesStatus(t *testing.T) {
 	fakeClient, _ := makeFakeClients()
-	statusInfo := &NewStatusInfo{Oscar: OscarInfo{}}
+	statusInfo := &types.StatusInfo{Oscar: types.OscarInfo{}}
 	cfg := &types.Config{
 		ServicesNamespace: "oscar-svc",
 	}
@@ -909,7 +909,7 @@ func TestMakeStatusHandlerReturnsClusterInfoForNonAdmin(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", resp.Code)
 	}
 
-	var payload NewStatusInfo
+	var payload types.StatusInfo
 	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
