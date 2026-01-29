@@ -672,7 +672,8 @@ fi
 
 echo -e "\n[*] Creating namespaces ..."
 #Create namespaces
-kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/yaml/oscar-namespaces.yaml
+kubectl create namespace oscar
+kubectl create namespace oscar-svc
 
 #Deploy oscar using helm
 echo -e "\n[*] Deploying OSCAR ..."

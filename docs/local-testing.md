@@ -215,7 +215,8 @@ EOF
 First, create the `oscar` and `oscar-svc` namespaces by executing:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/yaml/oscar-namespaces.yaml
+kubectl create namespace oscar
+kubectl create namespace oscar-svc
 ```
 
 Then, add the [grycap helm repo](https://github.com/grycap/helm-charts) and
