@@ -116,7 +116,7 @@ type Config struct {
 	OpenfaasScalerInterval string `json:"-"`
 
 	// OpenfaasScalerInactivityDuration
-	OpenfaasScalerInactivityDuration string `json:"-"`
+	OpenfaasScalerInactivityDuration string `json:"-"`*/
 
 	// WatchdogMaxInflight
 	WatchdogMaxInflight int `json:"-"`
@@ -131,7 +131,7 @@ type Config struct {
 	WatchdogReadTimeout int `json:"-"`
 
 	// WatchdogWriteTimeout
-	WatchdogWriteTimeout int `json:"-"`*/
+	WatchdogWriteTimeout int `json:"-"`
 
 	// WatchdogHealthCheckInterval
 	WatchdogHealthCheckInterval int `json:"-"`
@@ -248,11 +248,11 @@ var configVars = []configVar{
 	//{"OpenfaasScalerEnable", "OPENFAAS_SCALER_ENABLE", false, boolType, "false"},
 	//{"OpenfaasScalerInterval", "OPENFAAS_SCALER_INTERVAL", false, stringType, "2m"},
 	//{"OpenfaasScalerInactivityDuration", "OPENFAAS_SCALER_INACTIVITY_DURATION", false, stringType, "10m"},
-	//{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
-	//{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
-	//{"WatchdogExecTimeout", "WATCHDOG_EXEC_TIMEOUT", false, intType, "0"},
-	//{"WatchdogReadTimeout", "WATCHDOG_READ_TIMEOUT", false, intType, "300"},
-	//{"WatchdogWriteTimeout", "WATCHDOG_WRITE_TIMEOUT", false, intType, "300"},
+	{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
+	{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
+	{"WatchdogExecTimeout", "WATCHDOG_EXEC_TIMEOUT", false, intType, "0"},
+	{"WatchdogReadTimeout", "WATCHDOG_READ_TIMEOUT", false, intType, "300"},
+	{"WatchdogWriteTimeout", "WATCHDOG_WRITE_TIMEOUT", false, intType, "300"},
 	{"WatchdogHealthCheckInterval", "WATCHDOG_HEALTHCHECK_INTERVAL", false, intType, "5"},
 	{"ReadTimeout", "READ_TIMEOUT", false, secondsType, "300"},
 	{"WriteTimeout", "WRITE_TIMEOUT", false, secondsType, "300"},
