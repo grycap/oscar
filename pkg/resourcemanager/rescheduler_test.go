@@ -177,7 +177,7 @@ func TestStartReScheduler(t *testing.T) {
 
 	// Mock the Delegate function using test hook variable
 	origDelegate := delegateJobFunc
-	delegateJobFunc = func(*types.Service, string, *log.Logger) error {
+	delegateJobFunc = func(*types.Service, string, string, *log.Logger) error {
 		return nil
 	}
 	t.Cleanup(func() { delegateJobFunc = origDelegate })

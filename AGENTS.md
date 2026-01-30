@@ -68,6 +68,7 @@ If AGENTS.md and OpenSpec instructions conflict, follow AGENTS.md unless a maint
 ## Active Technologies
 - Go 1.25 + gin-gonic, client-go, metrics.k8s.io clien (001-metrics-collection)
 - N/A (aggregation from existing data sources) (001-metrics-collection)
+- Kubernetes API resources; output storage via MinIO/external providers (002-federation)
 
 ## Recent Changes
 - 001-metrics-collection: Added Go 1.25 + gin-gonic, client-go, metrics.k8s.io clien

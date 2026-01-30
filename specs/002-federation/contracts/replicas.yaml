@@ -1,0 +1,193 @@
+openapi: 3.0.3
+info:
+  title: OSCAR Replicas API
+  version: 0.1.0
+paths:
+  /system/replicas/{serviceName}:
+    get:
+      summary: Get replicas for a service
+      parameters:
+        - name: serviceName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Replica list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReplicasResponse'
+    post:
+      summary: Add replica(s) to a service federation
+      parameters:
+        - name: serviceName
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplicasAddRequest'
+      responses:
+        '200':
+          description: Replica(s) added
+    put:
+      summary: Update replica(s) for a service federation
+      parameters:
+        - name: serviceName
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplicasUpdateRequest'
+      responses:
+        '200':
+          description: Replica(s) updated
+    delete:
+      summary: Remove replica(s) from a service federation
+      parameters:
+        - name: serviceName
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplicasDeleteRequest'
+      responses:
+        '200':
+          description: Replica(s) removed
+  /system/status:
+    get:
+      summary: Get cluster status for delegation
+      responses:
+        '200':
+          description: Cluster status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterStatus'
+
+components:
+  schemas:
+    ReplicaRef:
+      type: object
+      properties:
+        type:
+          type: string
+          example: oscar
+        cluster_id:
+          type: string
+        service_name:
+          type: string
+        priority:
+          type: integer
+      required: [type, cluster_id, service_name]
+
+    ReplicasResponse:
+      type: object
+      properties:
+        topology:
+          type: string
+          enum: [none, tree, mesh]
+        replicas:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReplicaRef'
+      required: [topology, replicas]
+
+    ReplicasAddRequest:
+      type: object
+      properties:
+        replicas:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReplicaRef'
+        clusters:
+          type: array
+          items:
+            type: object
+        storage_providers:
+          type: array
+          items:
+            type: object
+      required: [replicas]
+
+    ReplicasUpdateRequest:
+      type: object
+      properties:
+        replicas:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReplicaRef'
+        update:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReplicaRef'
+        clusters:
+          type: array
+          items:
+            type: object
+        storage_providers:
+          type: array
+          items:
+            type: object
+      required: [replicas, update]
+
+    ReplicasDeleteRequest:
+      type: object
+      properties:
+        replicas:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReplicaRef'
+      required: [replicas]
+
+    ClusterStatus:
+      type: object
+      properties:
+        cluster:
+          type: object
+          properties:
+            nodes_count:
+              type: integer
+            has_gpu_nodes:
+              type: boolean
+            metrics:
+              type: object
+              properties:
+                cpu:
+                  type: object
+                  properties:
+                    total_free:
+                      type: integer
+                    max_free_on_node:
+                      type: integer
+                memory:
+                  type: object
+                  properties:
+                    total_free_bytes:
+                      type: integer
+                    max_free_on_node_bytes:
+                      type: integer
+            nodes:
+              type: array
+              items:
+                type: object
+        oscar:
+          type: object
+        minio:
+          type: object

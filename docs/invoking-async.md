@@ -13,6 +13,12 @@ These jobs will be queued up in the Kubernetes scheduler and will be processed w
 
 If you want to process a large number of data files, consider using [OSCAR Batch](https://github.com/grycap/oscar-batch), a tool designed to perform batch-based processing in OSCAR clusters. It includes a coordinator tool where the user provides a MinIO bucket containing files for processing. This service calculates the optimal number of parallel service invocations that can be accommodated within the cluster, according to its current status, and distributes the image processing workload accordingly among the service invocations. This is mainly intended to process large amounts of files, for example, historical data.
 
+## Federated replicas
+
+When a job is delegated to another OSCAR cluster, the request includes the
+user's bearer token. The target cluster uses that token to call `/system/config`
+and obtain MinIO credentials required to access the origin cluster inputs.
+
 ## Log information
 
 Each asynchronous invocation within OSCAR generates logs that include execution details, errors, and the service's output, which are essential for tracking job status and debugging. These logs can be accessed through the [OSCAR CLI](https://docs.oscar.grycap.net/oscar-cli/), [OSCAR Dashboard](https://docs.oscar.grycap.net/usage-dashboard/) or [OSCAR API](https://docs.oscar.grycap.net/api/), allowing you to view all the jobs created for a service, as well as their status (`Pending`, `Running`, `Succeeded` or `Failed`) and their creation, start, and finish times. 

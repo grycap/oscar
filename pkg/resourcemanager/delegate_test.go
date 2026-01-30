@@ -89,7 +89,7 @@ func TestDelegateJob(t *testing.T) {
 	}
 
 	t.Run("Replica type oscar", func(t *testing.T) {
-		err := DelegateJob(service, event, logger)
+		err := DelegateJob(service, event, "", logger)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
@@ -97,7 +97,7 @@ func TestDelegateJob(t *testing.T) {
 
 	t.Run("Replica type oscar with delegation random", func(t *testing.T) {
 		service.Delegation = "random"
-		err := DelegateJob(service, event, logger)
+		err := DelegateJob(service, event, "", logger)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
@@ -105,7 +105,7 @@ func TestDelegateJob(t *testing.T) {
 
 	t.Run("Replica type oscar with delegation load-based", func(t *testing.T) {
 		service.Delegation = "load-based"
-		err := DelegateJob(service, event, logger)
+		err := DelegateJob(service, event, "", logger)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
@@ -114,7 +114,7 @@ func TestDelegateJob(t *testing.T) {
 	t.Run("Replica type endpoint", func(t *testing.T) {
 		service.Replicas[0].Type = "endpoint"
 		service.Replicas[0].URL = server.URL
-		err := DelegateJob(service, event, logger)
+		err := DelegateJob(service, event, "", logger)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}

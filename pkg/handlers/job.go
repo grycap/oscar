@@ -161,6 +161,11 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
 				return
 			}
+			mc := auth.NewMultitenancyConfig(kubeClientset, cfg.OIDCSubject)
+			if !mc.UserExists(uidFromToken) {
+				c.String(http.StatusForbidden, fmt.Sprintf("MinIO user not provisioned for %s; submit a direct request first", uidFromToken))
+				return
+			}
 		}
 		// Add secrets as environment variables if defined
 		if utils.SecretExists(service.Name, serviceNamespace, back.GetKubeClientset()) {
@@ -294,7 +299,8 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		// Delegate job if can't be scheduled and has defined replicas
 		if rm != nil && service.HasReplicas() {
 			if !rm.IsSchedulable(podSpec.Containers[0].Resources) {
-				err := resourcemanager.DelegateJob(service, event.Value, resourcemanager.ResourceManagerLogger)
+				authHeader := c.GetHeader("Authorization")
+				err := resourcemanager.DelegateJob(service, event.Value, authHeader, resourcemanager.ResourceManagerLogger)
 				if err == nil {
 					// TODO: check if another status code suits better
 					c.Status(http.StatusCreated)

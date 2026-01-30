@@ -221,6 +221,8 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 
+		utils.ApplyFederation(&service)
+
 		// Create service
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
@@ -299,6 +301,17 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 
+		var federationErrors []error
+		if service.HasFederationMembers() {
+			authHeader := c.GetHeader("Authorization")
+			federationErrors = utils.ExpandFederation(&service, authHeader, http.MethodPost)
+		}
+
+		if len(federationErrors) > 0 {
+			c.String(http.StatusCreated, fmt.Sprintf("Created with federation warnings: %v", federationErrors))
+			return
+		}
+
 		createLogger.Printf("%s | %v | %s | %s | %s", "POST", 200, createPath, service.Name, uid)
 		c.Status(http.StatusCreated)
 	}
@@ -361,6 +374,15 @@ func checkValues(service *types.Service, cfg *types.Config) {
 			MinIO: map[string]*types.MinIOProvider{
 				types.DefaultProvider: defaultMinIOInstanceInfo,
 			},
+		}
+	}
+
+	if service.Federation != nil {
+		if service.Federation.Topology == "" {
+			service.Federation.Topology = "none"
+		}
+		if service.Delegation == "" && service.Federation.Delegation != "" {
+			service.Delegation = service.Federation.Delegation
 		}
 	}
 

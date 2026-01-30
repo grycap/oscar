@@ -65,6 +65,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Check service values and set defaults
 		checkValues(&newService, cfg)
+		utils.ApplyFederation(&newService)
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
@@ -334,6 +335,14 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		if err := back.UpdateService(newService); err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
 			return
+		}
+
+		if newService.HasFederationMembers() {
+			authHeader := c.GetHeader("Authorization")
+			if errs := utils.ExpandFederation(&newService, authHeader, http.MethodPut); len(errs) > 0 {
+				c.String(http.StatusOK, fmt.Sprintf("Updated with federation warnings: %v", errs))
+				return
+			}
 		}
 
 		c.Status(http.StatusNoContent)

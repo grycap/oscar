@@ -59,3 +59,17 @@ func (rl ReplicaList) Swap(i, j int) {
 func (rl ReplicaList) Less(i, j int) bool {
 	return rl[i].Priority < rl[j].Priority
 }
+
+// ReplicasResponse response payload for replicas API.
+type ReplicasResponse struct {
+	Topology string      `json:"topology"`
+	Replicas ReplicaList `json:"replicas"`
+}
+
+// ReplicasRequest payload for replicas API.
+type ReplicasRequest struct {
+	Replicas         ReplicaList        `json:"replicas"`
+	Update           ReplicaList        `json:"update,omitempty"`
+	Clusters         map[string]Cluster `json:"clusters,omitempty"`
+	StorageProviders *StorageProviders  `json:"storage_providers,omitempty"`
+}

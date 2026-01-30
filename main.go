@@ -115,6 +115,12 @@ func main() {
 	system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
 	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
 
+	// CRUD Replicas (federation)
+	system.GET("/replicas/:serviceName", handlers.MakeReplicasGetHandler(back))
+	system.POST("/replicas/:serviceName", handlers.MakeReplicasPostHandler(back))
+	system.PUT("/replicas/:serviceName", handlers.MakeReplicasPutHandler(back))
+	system.DELETE("/replicas/:serviceName", handlers.MakeReplicasDeleteHandler(back))
+
 	// CRUD Buckets
 	system.POST("/buckets", buckets.MakeCreateHandler(cfg))
 	system.GET("/buckets", buckets.MakeListHandler(cfg))

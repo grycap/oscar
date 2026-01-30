@@ -8,6 +8,13 @@ through an Ingress Controller. This API has been described following the
 >
 > The bearer token used to run a service can be either the OSCAR [service access token](invoking-sync.md#service-access-tokens) or the [user's Access Token](integration-egi.md#obtaining-an-access-token) if the OSCAR cluster is integrated with EGI Check-in.
 
+## Service replicas (federation)
+
+Federated replicas are managed through `/system/replicas/{serviceName}` with
+GET/POST/PUT/DELETE operations. Updates apply to the whole federation topology
+(tree/mesh), and the API uses bearer tokens that are valid across federation
+clusters.
+
 ## Metrics reporting
 
 Metrics reporting endpoints include `/system/metrics/{serviceName}`, `/system/metrics`, and

@@ -257,7 +257,7 @@ func reorganizeIfNearby(alternatives []Alternative, distances []float64, thresho
 }
 
 // DelegateJob sends the event to a service's replica
-func DelegateJob(service *types.Service, event string, logger *log.Logger) error {
+func DelegateJob(service *types.Service, event string, authHeader string, logger *log.Logger) error {
 
 	//Block access before executing the function
 	//mutex.Lock()
@@ -281,12 +281,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			}
 
 			// Get token
-			token, err := getServiceToken(cred, cluster)
-			if err != nil {
-				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": %v\n", service.Name, replica.ClusterID, err)
-				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
-				continue
-			}
+			token := getBearerToken(authHeader)
 
 			// Parse the cluster's endpoint URL and add the service's path
 			JobURL, err := url.Parse(cluster.Endpoint)
@@ -311,8 +306,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 				req2.Header.Add(k, v)
 			}
 
-			// Add service token to the request
-			req2.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
+			addAuthHeader(req2, authHeader, token, cluster)
 
 			// Make HTTP client
 			// #nosec
@@ -373,8 +367,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 				req1.Header.Add(k, v)
 			}
 
-			// Add service token to the request
-			req1.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
+			addAuthHeader(req1, authHeader, token, cluster)
 
 			// Make the HTTP request
 			start := time.Now()
@@ -427,7 +420,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 
 		//fmt.Println("Priority ", service.Replicas[id].Priority, " with ", service.Delegation, " delegation")
 	} else {
-		getClusterStatus(service)
+		getClusterStatus(service, authHeader)
 		fmt.Println("Replicas: ", service.Replicas)
 
 		// Check if replicas are sorted by priority and sort it if needed
@@ -468,11 +461,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			}
 
 			// Get token
-			token, err := getServiceToken(replica, cluster)
-			if err != nil {
-				logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": %v\n", service.Name, replica.ClusterID, err)
-				continue
-			}
+			token := getBearerToken(authHeader)
 
 			// Parse the cluster's endpoint URL and add the service's path
 			postJobURL, err := url.Parse(cluster.Endpoint)
@@ -496,8 +485,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 				req.Header.Add(k, v)
 			}
 
-			// Add service token to the request
-			req.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
+			addAuthHeader(req, authHeader, token, cluster)
 
 			// Make HTTP client
 			// #nosec
@@ -604,6 +592,27 @@ func WrapEvent(providerID string, event string) DelegatedEvent {
 	}
 }
 
+func getBearerToken(authHeader string) string {
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		return strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+	}
+	return ""
+}
+
+func addAuthHeader(req *http.Request, authHeader string, token string, cluster types.Cluster) {
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+		return
+	}
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		req.Header.Set("Authorization", strings.TrimSpace(authHeader))
+		return
+	}
+	if cluster.AuthUser != "" || cluster.AuthPassword != "" {
+		req.SetBasicAuth(cluster.AuthUser, cluster.AuthPassword)
+	}
+}
+
 func getServiceToken(replica types.Replica, cluster types.Cluster) (string, error) {
 	endpoint := strings.Trim(cluster.Endpoint, " /")
 	_, ok := tokenCache[endpoint]
@@ -684,8 +693,9 @@ func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, e
 	return svc.Token, nil
 }
 
-func getClusterStatus(service *types.Service) {
+func getClusterStatus(service *types.Service, authHeader string) {
 	fmt.Println("Process to getClusterStatus function.")
+	token := getBearerToken(authHeader)
 	for id, replica := range service.Replicas {
 		// Manage if replica.Type is "oscar"
 		if strings.ToLower(replica.Type) == oscarReplicaType {
@@ -721,8 +731,7 @@ func getClusterStatus(service *types.Service) {
 				fmt.Printf("Error making request to ClusterID \"%s\": unable to make request: %v\n", replica.ClusterID, err)
 				continue
 			}
-			// Add cluster's basic auth credentials
-			req.SetBasicAuth(cluster.AuthUser, cluster.AuthPassword)
+			addAuthHeader(req, authHeader, token, cluster)
 
 			// Make HTTP client
 			fmt.Println("SSLVerify :", cluster.SSLVerify)

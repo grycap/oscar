@@ -55,7 +55,7 @@ func StartReScheduler(cfg *types.Config, back types.ServerlessBackend, kubeClien
 
 		// Delegate jobs
 		for _, rsi := range reScheduleInfos {
-			err := delegateJobFunc(rsi.service, rsi.event, reSchedulerLogger)
+			err := delegateJobFunc(rsi.service, rsi.event, "", reSchedulerLogger)
 			if err != nil {
 				reSchedulerLogger.Println(err.Error())
 			} else {

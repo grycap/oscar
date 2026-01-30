@@ -175,6 +175,10 @@ type Service struct {
 	// Optional
 	Replicas ReplicaList `json:"replicas,omitempty"`
 
+	// Federation defines a service federation across clusters
+	// Optional
+	Federation *Federation `json:"federation,omitempty"`
+
 	//Delegation Mode of job delegation for replicas
 	// Opcional (default: manual)
 	//"static" The user select the priority to delegate jobs to the replicas.
@@ -516,4 +520,9 @@ func (service *Service) GetSupervisorPath() string {
 // HasReplicas checks if the service has replicas defined
 func (service *Service) HasReplicas() bool {
 	return len(service.Replicas) > 0
+}
+
+// HasFederationMembers checks if the service defines federation members.
+func (service *Service) HasFederationMembers() bool {
+	return service.Federation != nil && len(service.Federation.Members) > 0
 }
