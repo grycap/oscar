@@ -60,6 +60,10 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
+		if err := normalizeStoragePaths(&newService); err != nil {
+			c.String(http.StatusBadRequest, err.Error())
+			return
+		}
 		newService.AllowedUsers = sanitizeUsers(newService.AllowedUsers)
 		newService.Script = utils.NormalizeLineEndings(newService.Script)
 

@@ -75,6 +75,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
+		if err := normalizeStoragePaths(&service); err != nil {
+			c.String(http.StatusBadRequest, err.Error())
+			return
+		}
 		service.AllowedUsers = sanitizeUsers(service.AllowedUsers)
 		service.Script = utils.NormalizeLineEndings(service.Script)
 
@@ -388,6 +392,42 @@ func checkValues(service *types.Service, cfg *types.Config) {
 
 	// Generate a new access token
 	service.Token = utils.GenerateToken()
+}
+
+func normalizeStoragePaths(service *types.Service) error {
+	if service == nil {
+		return nil
+	}
+
+	for i := range service.Input {
+		path := strings.Trim(service.Input[i].Path, " /")
+		if path == "" {
+			return fmt.Errorf("input path cannot be empty")
+		}
+		_, provName := getProviderInfo(service.Input[i].Provider)
+		if provName == types.MinIOName || provName == types.S3Name {
+			if !strings.Contains(path, "/") {
+				path = fmt.Sprintf("%s/%s", service.Name, path)
+			}
+		}
+		service.Input[i].Path = path
+	}
+
+	for i := range service.Output {
+		path := strings.Trim(service.Output[i].Path, " /")
+		if path == "" {
+			return fmt.Errorf("output path cannot be empty")
+		}
+		_, provName := getProviderInfo(service.Output[i].Provider)
+		if provName == types.MinIOName || provName == types.S3Name {
+			if !strings.Contains(path, "/") {
+				path = fmt.Sprintf("%s/%s", service.Name, path)
+			}
+		}
+		service.Output[i].Path = path
+	}
+
+	return nil
 }
 
 func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient, isUpdate bool) ([]utils.MinIOBucket, error) {

@@ -126,6 +126,9 @@ multiple jobs, and verify that delegation targets vary across available clusters
   storage as defined in the federation configuration.
 - **FR-011**: System MUST preserve per-service input storage configuration as
   defined in the FDL.
+- **FR-011a**: For MinIO/S3 inputs and outputs, if `path` omits the bucket (no
+  `/` present), the system MUST default the bucket to the service name (e.g.,
+  `input` → `<service-name>/input`).
 
 *Example of marking unclear requirements:*
 
