@@ -6,6 +6,9 @@ IMAGE_TAG ?= devel
 NAMESPACE ?= oscar
 DEPLOYMENT ?= $(IMAGE_NAME)
 BUILD_CONTEXT ?= ../oscar
+KUBE_CONTEXT ?=
+
+KUBECTL_CONTEXT_FLAG := $(if $(KUBE_CONTEXT),--context $(KUBE_CONTEXT),)
 
 IMAGE := $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
 
@@ -14,6 +17,7 @@ help:
 	@echo "  build    - Build Docker image $(IMAGE)"
 	@echo "  push     - Push image $(IMAGE) to registry"
 	@echo "  rollout  - Restart Kubernetes deployment $(DEPLOYMENT) in namespace $(NAMESPACE)"
+	@echo "            Optional: set KUBE_CONTEXT to target a specific kube context"
 	@echo "  deploy   - Build, push, and rollout (default pipeline)"
 
 build:
@@ -23,6 +27,6 @@ push: build
 	docker push $(IMAGE)
 
 rollout:
-	kubectl rollout restart deployment/$(DEPLOYMENT) -n $(NAMESPACE)
+	kubectl $(KUBECTL_CONTEXT_FLAG) rollout restart deployment/$(DEPLOYMENT) -n $(NAMESPACE)
 
 deploy: push rollout
