@@ -300,7 +300,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		if rm != nil && service.HasReplicas() {
 			if !rm.IsSchedulable(podSpec.Containers[0].Resources) {
 				authHeader := c.GetHeader("Authorization")
-				err := resourcemanager.DelegateJob(service, event.Value, authHeader, resourcemanager.ResourceManagerLogger)
+				err := resourcemanager.DelegateJob(service, event.Value, authHeader, resourcemanager.ResourceManagerLogger, cfg, back.GetKubeClientset())
 				if err == nil {
 					// TODO: check if another status code suits better
 					c.Status(http.StatusCreated)

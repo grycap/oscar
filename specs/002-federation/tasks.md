@@ -88,6 +88,10 @@ description: "Task list for federated OSCAR service replicas (topology: tree/mes
 - [x] T018 [US3] Use `/system/status` metrics during delegation in `pkg/resourcemanager/delegate.go`
 - [x] T019 [US3] Ensure delegated async jobs use bearer token to call `/system/config` for MinIO creds in `pkg/handlers/job.go`
 - [x] T020 [P] [US3] Extend status payload if needed for delegation metrics in `pkg/handlers/status.go`
+- [x] T021 [US3] Exchange refresh-token secret for fresh OIDC bearer token during delegation in `pkg/resourcemanager/delegate.go`
+- [x] T022 [US3] Validate `secrets.refresh_token` in FDL and store it as a Secret in the user namespace in `pkg/handlers/create.go`
+- [x] T023 [US3] Enforce RBAC so only OSCAR Manager can read refresh-token Secrets (service pods must not mount) in `deploy/` or `pkg/utils/auth`
+- [x] T024 [US3] Document refresh-token requirement and rotation/revocation behavior in `docs/api.md` and `docs/invoking-async.md`
 
 **Checkpoint**: All user stories should now be independently functional
 
@@ -97,8 +101,9 @@ description: "Task list for federated OSCAR service replicas (topology: tree/mes
 
 **Purpose**: Documentation and cross-cutting updates
 
-- [x] T021 Update API docs for replicas and delegation in `docs/api.md`
-- [x] T022 Update async invocation docs for delegated MinIO access in `docs/invoking-async.md`
+- [x] T025 Update API docs for replicas and delegation in `docs/api.md`
+- [x] T026 Update async invocation docs for delegated MinIO access in `docs/invoking-async.md`
+- [x] T027 Document federated refresh-token requirement in `docs/fdl.md`
 
 ---
 

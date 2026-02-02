@@ -59,6 +59,12 @@ const (
 	// WatchdogProcess name of the environment variable used by the watchdog to handle requests
 	WatchdogProcess = "fprocess"
 
+	// RefreshTokenSecretKey secret key used for federation refresh tokens
+	RefreshTokenSecretKey = "refresh_token"
+
+	// RefreshTokenSecretSuffix suffix for per-service refresh token secrets
+	RefreshTokenSecretSuffix = "refresh-token"
+
 	// SupervisorName name of the FaaS Supervisor binary
 	SupervisorName = "supervisor"
 

@@ -189,6 +189,12 @@ type Config struct {
 	// as described here: https://docs.egi.eu/providers/check-in/sp/#10-groups
 	OIDCGroups []string `json:"oidc_groups"`
 
+	// OIDCClientID OpenID Connect client ID used for token exchange
+	OIDCClientID string `json:"-"`
+
+	// OIDCClientSecret OpenID Connect client secret used for token exchange
+	OIDCClientSecret string `json:"-"`
+
 	UsersAdmin []string `json:"-"`
 
 	//
@@ -283,6 +289,8 @@ var configVars = []configVar{
 	{"OIDCValidIssuers", "OIDC_ISSUERS", false, stringSliceType, ""},
 	{"OIDCSubject", "OIDC_SUBJECT", false, stringType, ""},
 	{"OIDCGroups", "OIDC_GROUPS", false, stringSliceType, ""},
+	{"OIDCClientID", "OIDC_CLIENT_ID", false, stringType, ""},
+	{"OIDCClientSecret", "OIDC_CLIENT_SECRET", false, stringType, ""},
 	{"UsersAdmin", "USERS_ADMIN", false, stringSliceType, ""},
 	{"IngressHost", "INGRESS_HOST", false, stringType, ""},
 	{"SupervisorKitImage", "SUPERVISOR_KIT_IMAGE", false, stringType, ""},

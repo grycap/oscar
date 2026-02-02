@@ -44,6 +44,8 @@ spec:
           value: minio123
         - name: MINIO_TLS_VERIFY
           value: "false"
+        - name: OIDC_CLIENT_ID
+          value: oscar-keycloak-client
         ports:
         - name: http
           containerPort: 8080

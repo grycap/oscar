@@ -75,6 +75,8 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
+		rawInput := cloneStorageIOConfigs(service.Input)
+		rawOutput := cloneStorageIOConfigs(service.Output)
 		if err := normalizeStoragePaths(&service); err != nil {
 			c.String(http.StatusBadRequest, err.Error())
 			return
@@ -210,6 +212,19 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				return
 			}
 		}
+
+		refreshToken := extractRefreshTokenSecret(&service)
+		if service.HasFederationMembers() && refreshToken == "" {
+			c.String(http.StatusBadRequest, "refresh_token secret is required for federated services")
+			return
+		}
+		if refreshToken != "" {
+			if err := upsertRefreshTokenSecret(&service, service.Namespace, refreshToken, back.GetKubeClientset()); err != nil {
+				c.String(http.StatusInternalServerError, "Error creating refresh-token secret: %v", err)
+				return
+			}
+		}
+
 		if len(service.Environment.Secrets) > 0 {
 			if utils.SecretExists(service.Name, service.Namespace, back.GetKubeClientset()) {
 				c.String(http.StatusConflict, "A secret with the given name already exists")
@@ -233,6 +248,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			if k8sErrors.IsAlreadyExists(err) {
 				c.String(http.StatusConflict, "A service with the provided name already exists")
 			} else {
+				createLogger.Printf("Error creating service '%s': %v", service.Name, err)
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 			}
 			return
@@ -240,6 +256,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Register minio webhook and restart the server
 		if err := registerMinIOWebhook(service.Name, service.Token, service.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
+			createLogger.Printf("Error registering MinIO webhook for service '%s': %v", service.Name, err)
 			derr := back.DeleteService(service)
 			if derr != nil {
 				log.Printf("Error deleting service: %v\n", derr)
@@ -250,6 +267,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		var buckets []utils.MinIOBucket
 		if buckets, err = createBuckets(&service, cfg, minIOAdminClient, false); err != nil {
+			createLogger.Printf("Error creating buckets for service '%s': %v", service.Name, err)
 			if err == errInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {
@@ -308,7 +326,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		var federationErrors []error
 		if service.HasFederationMembers() {
 			authHeader := c.GetHeader("Authorization")
-			federationErrors = utils.ExpandFederation(&service, authHeader, http.MethodPost)
+			federated := service
+			federated.Input = rawInput
+			federated.Output = rawOutput
+			federationErrors = utils.ExpandFederation(&federated, authHeader, http.MethodPost)
 		}
 
 		if len(federationErrors) > 0 {
@@ -428,6 +449,13 @@ func normalizeStoragePaths(service *types.Service) error {
 	}
 
 	return nil
+}
+
+func cloneStorageIOConfigs(items []types.StorageIOConfig) []types.StorageIOConfig {
+	if len(items) == 0 {
+		return nil
+	}
+	return append([]types.StorageIOConfig(nil), items...)
 }
 
 func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient, isUpdate bool) ([]utils.MinIOBucket, error) {

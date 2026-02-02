@@ -54,9 +54,16 @@ func TestDelegateJob(t *testing.T) {
 		}
 		if r.Method == http.MethodGet && r.URL.Path == "/system/status" {
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(&GeneralInfo{
-				CPUMaxFree:   1000,
-				CPUFreeTotal: 2000,
+			json.NewEncoder(w).Encode(&types.StatusInfo{
+				Cluster: types.ClusterInfo{
+					NodesCount: 1,
+					Metrics: types.ClusterMetrics{
+						CPU: types.CPUMetrics{
+							TotalFreeCores:     2000,
+							MaxFreeOnNodeCores: 1000,
+						},
+					},
+				},
 			})
 			return
 		}
@@ -89,7 +96,7 @@ func TestDelegateJob(t *testing.T) {
 	}
 
 	t.Run("Replica type oscar", func(t *testing.T) {
-		err := DelegateJob(service, event, "", logger)
+		err := DelegateJob(service, event, "", logger, nil, nil)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
@@ -97,7 +104,7 @@ func TestDelegateJob(t *testing.T) {
 
 	t.Run("Replica type oscar with delegation random", func(t *testing.T) {
 		service.Delegation = "random"
-		err := DelegateJob(service, event, "", logger)
+		err := DelegateJob(service, event, "", logger, nil, nil)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
@@ -105,7 +112,7 @@ func TestDelegateJob(t *testing.T) {
 
 	t.Run("Replica type oscar with delegation load-based", func(t *testing.T) {
 		service.Delegation = "load-based"
-		err := DelegateJob(service, event, "", logger)
+		err := DelegateJob(service, event, "", logger, nil, nil)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
@@ -114,7 +121,7 @@ func TestDelegateJob(t *testing.T) {
 	t.Run("Replica type endpoint", func(t *testing.T) {
 		service.Replicas[0].Type = "endpoint"
 		service.Replicas[0].URL = server.URL
-		err := DelegateJob(service, event, "", logger)
+		err := DelegateJob(service, event, "", logger, nil, nil)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
@@ -288,7 +295,21 @@ func TestCountJobs(t *testing.T) {
 func TestCreateParameters(t *testing.T) {
 	var results [][]float64
 	duration := 2 * time.Minute
-	cluster := GeneralInfo{CPUMaxFree: 4000, CPUFreeTotal: 8000, MemoryMaxFree: 16 * 1024 * 1024 * 1024, MemoryFreeTotal: 32 * 1024 * 1024 * 1024}
+	cluster := types.StatusInfo{
+		Cluster: types.ClusterInfo{
+			NodesCount: 2,
+			Metrics: types.ClusterMetrics{
+				CPU: types.CPUMetrics{
+					MaxFreeOnNodeCores: 4000,
+					TotalFreeCores:     8000,
+				},
+				Memory: types.MemoryMetrics{
+					MaxFreeOnNodeBytes: 16 * 1024 * 1024 * 1024,
+					TotalFreeBytes:     32 * 1024 * 1024 * 1024,
+				},
+			},
+		},
+	}
 	params := createParameters(results, duration, cluster, 1.0, 30.0, 2)
 	if len(params) != 1 {
 		t.Fatalf("expected single parameter slice, got %d", len(params))
@@ -390,12 +411,38 @@ func TestCountJobsAggregation(t *testing.T) {
 }
 
 func TestCreateParametersConstraints(t *testing.T) {
-	results := createParameters(nil, 5*time.Second, GeneralInfo{CPUMaxFree: 2000, NumberNodes: 2, MemoryFreeTotal: 1024, CPUFreeTotal: 4000}, 0.5, 10, 0)
+	results := createParameters(nil, 5*time.Second, types.StatusInfo{
+		Cluster: types.ClusterInfo{
+			NodesCount: 2,
+			Metrics: types.ClusterMetrics{
+				CPU: types.CPUMetrics{
+					MaxFreeOnNodeCores: 2000,
+					TotalFreeCores:     4000,
+				},
+				Memory: types.MemoryMetrics{
+					TotalFreeBytes: 1024,
+				},
+			},
+		},
+	}, 0.5, 10, 0)
 	if len(results) == 0 || len(results[0]) != 6 {
 		t.Fatalf("expected populated parameter slice, got %v", results)
 	}
 
-	results = createParameters(nil, 5*time.Second, GeneralInfo{CPUMaxFree: 100, NumberNodes: 2, MemoryFreeTotal: 1024, CPUFreeTotal: 4000}, 2.0, 10, 0)
+	results = createParameters(nil, 5*time.Second, types.StatusInfo{
+		Cluster: types.ClusterInfo{
+			NodesCount: 2,
+			Metrics: types.ClusterMetrics{
+				CPU: types.CPUMetrics{
+					MaxFreeOnNodeCores: 100,
+					TotalFreeCores:     4000,
+				},
+				Memory: types.MemoryMetrics{
+					TotalFreeBytes: 1024,
+				},
+			},
+		},
+	}, 2.0, 10, 0)
 	if results[0][1] != 0 {
 		t.Fatalf("expected zeroed values when insufficient CPU, got %v", results)
 	}

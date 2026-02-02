@@ -41,6 +41,7 @@ OSCAR_TARGET_REPLICAS=1
 SKIP_PROMPTS="false"
 USE_METRICS="n"
 ENABLE_METRICS="false"
+KIND_NODE_IMAGE=""
 
 usage(){
     cat <<EOF
@@ -49,6 +50,7 @@ Usage: $(basename "$0") [options]
 Options:
   --devel        Deploy using the OSCAR devel branch without interactive prompts.
   --metrics      Deploy metrics stack (Prometheus + Loki + Alloy) for reporting.
+  --kind-image   Kind node image to use (e.g., kindest/node:v1.34.0).
   -h, --help     Show this help message and exit.
 EOF
 }
@@ -527,7 +529,11 @@ EOF
 
 createKindCluster(){
     echo -e "\n[*] Creating kind cluster"
-    kind create cluster --config=$CONFIG_FILEPATH --name="$CLUSTER_NAME"
+    if [ -n "$KIND_NODE_IMAGE" ]; then
+        kind create cluster --config=$CONFIG_FILEPATH --name="$CLUSTER_NAME" --image="$KIND_NODE_IMAGE"
+    else
+        kind create cluster --config=$CONFIG_FILEPATH --name="$CLUSTER_NAME"
+    fi
 
     if ! kubectl cluster-info --context "$KIND_CONTEXT" &> /dev/null; then
         echo -e "$RED[*]$END_COLOR Kind cluster not found."
@@ -549,6 +555,10 @@ while [ "$#" -gt 0 ]; do
         --metrics)
             USE_METRICS="y"
             shift
+            ;;
+        --kind-image)
+            KIND_NODE_IMAGE="$2"
+            shift 2
             ;;
         -h|--help)
             usage
@@ -575,6 +585,9 @@ use_knative="y"
 local_reg="y"
 use_devel_branch="y"
 use_metrics="$USE_METRICS"
+if [ -z "$KIND_NODE_IMAGE" ] && [ "$ARCH" == "arm64" ]; then
+    KIND_NODE_IMAGE="kindest/node:v1.34.0"
+fi
 if [ "$SKIP_PROMPTS" == "true" ]; then
     echo "[*] Running in non-interactive mode: Knative, local registry, and OSCAR devel branch enabled."
 else
@@ -819,6 +832,13 @@ if [ "$ENABLE_METRICS" == "true" ]; then
         echo -e "$RED[!]$END_COLOR Failed to configure OSCAR metrics endpoints"
         exit 1
     fi
+fi
+
+echo -e "\n[*] Configuring OSCAR OIDC client ID ..."
+if ! kubectl -n oscar set env deployment/oscar \
+    OIDC_CLIENT_ID="oscar-keycloak-client"; then
+    echo -e "$RED[!]$END_COLOR Failed to configure OSCAR OIDC client ID"
+    exit 1
 fi
 
 #Wait for OSCAR deployment

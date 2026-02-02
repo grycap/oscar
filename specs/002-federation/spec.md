@@ -119,11 +119,13 @@ multiple jobs, and verify that delegation targets vary across available clusters
 - **FR-007**: System MUST support delegation policies `static`, `random`, and
   `load-based`.
 - **FR-008**: For `load-based` delegation, system MUST query `/system/status`
-  for candidate clusters and rank them by a defined algorithm.
+  for candidate clusters and rank them by a defined algorithm using CPU/memory
+  availability and pending job counts.
 - **FR-009**: System MUST expose `/system/status` with cluster CPU/memory metrics
   and node details sufficient to evaluate delegation fitness.
 - **FR-010**: System MUST write all service outputs to a single shared output
-  storage as defined in the federation configuration.
+  storage as defined in the federation configuration (same bucket/path across
+  all replicas).
 - **FR-011**: System MUST preserve per-service input storage configuration as
   defined in the FDL.
 - **FR-011a**: For MinIO/S3 inputs and outputs, if `path` omits the bucket (no
@@ -137,15 +139,22 @@ multiple jobs, and verify that delegation targets vary across available clusters
 - **FR-013**: Replica add/update/delete MUST apply to the whole topology
   (all services in the federation) to keep replica graphs consistent.
 - **FR-014**: OSCAR Manager MUST perform FDL expansion for federated services.
-- **FR-015**: Inter-cluster delegation MUST use OIDC bearer tokens that are
-  valid across all clusters in the federation.
-- **FR-016**: Delegated jobs MUST retrieve MinIO credentials via `/system/config`
-  using the bearer token, then access input data in the origin cluster MinIO.
-- **FR-017**: Any authenticated user MUST be allowed to create federations
+- **FR-015**: Federated services MUST define a refresh token as a service
+  `secret` named `refresh_token`; OSCAR Manager MUST store it in the user's
+  service namespace (OSCAR uses one namespace per user) and MUST NOT mount it
+  into service pods.
+- **FR-016**: Inter-cluster delegation MUST obtain a fresh OIDC bearer token
+  using the refresh token before delegating a job.
+- **FR-017**: Delegated jobs MUST retrieve MinIO credentials via `/system/config`
+  using the fresh bearer token, then access input data in the origin cluster
+  MinIO.
+- **FR-018**: Any authenticated user MUST be allowed to create federations
   across clusters they are authenticated to.
-- **FR-018**: Deployment MUST be best-effort across target clusters; unreachable
+- **FR-019**: Deployment MUST be best-effort across target clusters; unreachable
   clusters MUST be reported as errors without blocking creation on reachable
   clusters.
+- **FR-020**: Refresh tokens MUST be rotatable and revocable on user request,
+  and delegation MUST fail safely if the token is missing or invalid.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -180,7 +189,7 @@ multiple jobs, and verify that delegation targets vary across available clusters
 - Q: What is the federation identifier name? → A: `group_id` (defaults to service name if omitted).
 - Q: Do replica add/update/delete operations apply to a single service or the whole topology? → A: Whole topology.
 - Q: Where is FDL expansion performed? → A: OSCAR Manager (expands only when `federation.members` is non-empty).
-- Q: How are inter-cluster credentials handled? → A: OIDC bearer tokens are valid across all clusters in the federation.
-- Q: How is input data handled for delegated jobs? → A: Use bearer token with `/system/config` to obtain MinIO credentials for origin cluster access.
+- Q: How are inter-cluster credentials handled? → A: Federated services define a `secrets.refresh_token`; OSCAR Manager exchanges it for fresh OIDC bearer tokens when delegating.
+- Q: How is input data handled for delegated jobs? → A: Use a fresh bearer token with `/system/config` to obtain MinIO credentials for origin cluster access.
 - Q: Who can create a federation across clusters? → A: Any authenticated user can create a federation across clusters they are authenticated to.
 - Q: How should unreachable target clusters be handled during deployment? → A: Best-effort deployment to reachable clusters with clear error reporting for failures.

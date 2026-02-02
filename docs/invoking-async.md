@@ -15,9 +15,11 @@ If you want to process a large number of data files, consider using [OSCAR Batch
 
 ## Federated replicas
 
-When a job is delegated to another OSCAR cluster, the request includes the
-user's bearer token. The target cluster uses that token to call `/system/config`
-and obtain MinIO credentials required to access the origin cluster inputs.
+When a job is delegated to another OSCAR cluster, OSCAR Manager exchanges the
+service's `refresh_token` secret for a fresh bearer token and includes it in
+the delegated request. The target cluster uses that token to call
+`/system/config` and obtain MinIO credentials required to access the origin
+cluster inputs.
 
 ## Log information
 

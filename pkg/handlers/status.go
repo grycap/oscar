@@ -153,12 +153,21 @@ func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *types.StatusI
 
 	nodeInfoMap := make(map[string]*NodeInfoWithAllocatable)
 	var totalGPUs int64 = 0
+	workerNodes := make([]v1.Node, 0, len(nodes.Items))
 
 	for _, node := range nodes.Items {
 		if isControlPlaneNode(node) {
 			continue
 		}
+		workerNodes = append(workerNodes, node)
+	}
 
+	eligibleNodes := nodes.Items
+	if len(workerNodes) > 0 {
+		eligibleNodes = workerNodes
+	}
+
+	for _, node := range eligibleNodes {
 		nodeName := node.Name
 
 		// Allocatable Resources

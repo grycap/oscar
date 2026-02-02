@@ -109,3 +109,32 @@
 - **Alternatives considered**:
   - Keep explicit `role` field (rejected: extra user-facing complexity).
   - Add `federation.expanded` flag (rejected: new field still required).
+
+## Delegation authentication and token expiry
+
+### Decision: Require a refresh token in service `secrets` for federated services
+- **Rationale**: Rescheduled jobs lack the original user bearer token. A refresh
+  token allows OSCAR Manager to mint fresh access tokens when delegating jobs to
+  replicas on behalf of the invoking user.
+- **Alternatives considered**:
+  - Short-lived delegation tokens (rejected: additional token-issuance
+    infrastructure and validation flow).
+  - Cluster basic auth (rejected: not user-scoped).
+  - Per-job access tokens (rejected: expire before reschedule).
+
+### Security implications (explicitly accepted)
+- Refresh tokens are long-lived and high-impact if exposed.
+- Service secrets are accessible to pods in the service namespace (OSCAR uses
+  one namespace per user); compromise of any service pod can leak the refresh
+  token.
+- Cluster admins can access secrets; this expands trust requirements.
+- Rotation and revocation are mandatory operational requirements.
+
+### Required mitigations
+- Store refresh tokens only in Kubernetes Secrets in the **user namespace**.
+- Strict RBAC: only OSCAR Manager (and service account used for delegation)
+  can read the refresh-token Secret.
+- Do not mount refresh tokens into service pods; read them only from OSCAR
+  Manager during delegation.
+- Define rotation policy (e.g., 30 days) and revocation on user request.
+- Audit access to the Secret (where supported).

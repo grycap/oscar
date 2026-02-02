@@ -12,8 +12,12 @@ through an Ingress Controller. This API has been described following the
 
 Federated replicas are managed through `/system/replicas/{serviceName}` with
 GET/POST/PUT/DELETE operations. Updates apply to the whole federation topology
-(tree/mesh), and the API uses bearer tokens that are valid across federation
-clusters.
+(tree/mesh). Federated services MUST provide `environment.secrets.refresh_token`;
+OSCAR Manager exchanges it for fresh OIDC bearer tokens when delegating jobs
+across clusters. This requires `OIDC_CLIENT_ID` (and optionally
+`OIDC_CLIENT_SECRET`) to be configured on the OSCAR Manager. When multiple
+issuers are configured in `OIDC_ISSUERS`, the token exchange uses the first
+issuer in the list, so ordering matters.
 
 ## Metrics reporting
 
@@ -26,6 +30,12 @@ the list of users per service, set `include_users=true` (JSON only).
 
 The `start`/`end` query parameters are optional. If omitted, the API defaults to
 the last 24 hours (end = now, start = end - 24h).
+
+### Status capacity note (single-node clusters)
+
+When `/system/status` reports cluster capacity, control-plane nodes are normally
+excluded. If a cluster has **no worker nodes**, OSCAR includes control-plane
+nodes so that capacity is still reported in single-node dev setups (e.g., kind).
 
 ### Prometheus usage metrics
 

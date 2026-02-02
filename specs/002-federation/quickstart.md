@@ -65,3 +65,12 @@ Updates apply to the whole topology and are propagated by OSCAR Manager.
 - Deployment is best-effort: unreachable clusters are reported but do not block
   successful deployments to reachable clusters.
 - Delegation uses bearer tokens that are valid across federation clusters.
+- Offloading only happens when the local cluster cannot schedule the job. To
+  force delegation during testing, set `rescheduler_threshold: 10` (seconds)
+  on the service and enable the rescheduler on the coordinator so pending jobs
+  are delegated after ~10s. Example:
+
+  ```bash
+  kubectl -n oscar set env deployment/oscar RESCHEDULER_ENABLE=true
+  kubectl -n oscar rollout status deployment/oscar
+  ```
