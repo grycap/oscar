@@ -103,6 +103,12 @@ func buildWorkerService(service *types.Service, member types.Replica) (*types.Se
 		Members:    nil,
 	}
 	worker.Clusters = stripClusterCredentials(service.Clusters)
+	if service.ClusterID != "" {
+		if worker.Annotations == nil {
+			worker.Annotations = make(map[string]string)
+		}
+		worker.Annotations[types.OriginClusterAnnotation] = service.ClusterID
+	}
 
 	switch strings.ToLower(service.Federation.Topology) {
 	case "mesh":

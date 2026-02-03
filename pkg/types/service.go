@@ -117,6 +117,8 @@ const (
 	DefaultOwner = "cluster_admin"
 
 	JobOwnerExecutionAnnotation = "oscar.grycap/job-owner"
+
+	OriginClusterAnnotation = "oscar.grycap/origin-cluster"
 )
 
 // YAMLMarshal package-level yaml marshal function

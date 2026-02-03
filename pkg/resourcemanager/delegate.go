@@ -421,7 +421,7 @@ func DelegateJob(service *types.Service, event string, authHeader string, logger
 		return fmt.Errorf("error marshalling delegated event: %v", err)
 	}*/
 
-	storage_provider := service.ClusterID
+	storage_provider := delegationStorageProvider(service)
 	//Create event depending on delegation level
 
 	eventJSON, provider := eventBuild(event, storage_provider)
@@ -563,12 +563,41 @@ func DelegateJob(service *types.Service, event string, authHeader string, logger
 	return fmt.Errorf("unable to delegate job from service \"%s\" to any replica, scheduling in the current cluster", service.Name)
 }
 
-// WrapEvent wraps an event adding the storage_provider field (from the service's cluster_id)
+// WrapEvent wraps an event adding the storage_provider field.
 func WrapEvent(providerID string, event string) DelegatedEvent {
 	return DelegatedEvent{
 		StorageProviderID: providerID,
 		Event:             event,
 	}
+}
+
+func delegationStorageProvider(service *types.Service) string {
+	if service == nil {
+		return ""
+	}
+
+	provider := ""
+	for _, output := range service.Output {
+		trimmed := strings.TrimSpace(output.Provider)
+		if trimmed != "" {
+			provider = trimmed
+			break
+		}
+	}
+
+	if provider == "" {
+		return strings.TrimSpace(service.ClusterID)
+	}
+
+	parts := strings.SplitN(provider, types.ProviderSeparator, 2)
+	providerName := strings.ToLower(strings.TrimSpace(parts[0]))
+	if providerName == "" {
+		return strings.TrimSpace(service.ClusterID)
+	}
+	if len(parts) == 1 || strings.TrimSpace(parts[1]) == "" {
+		return providerName + types.ProviderSeparator + types.DefaultProvider
+	}
+	return providerName + types.ProviderSeparator + strings.TrimSpace(parts[1])
 }
 
 func resolveDelegationToken(service *types.Service, authHeader string, logger *log.Logger, cfg *types.Config, kubeClientset kubernetes.Interface) string {

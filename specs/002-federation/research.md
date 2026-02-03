@@ -101,6 +101,18 @@
   - Signed URLs or service-token fetch (rejected: inconsistent with OIDC-based
     access model).
 
+### Decision: Keep `minio.default` semantics and override default MinIO endpoint for delegated jobs
+- **Rationale**: Preserve existing meaning of `minio.default` while allowing
+  explicit origin clusters to be defined in the service request. Delegated jobs
+  can write output to the origin MinIO by overriding the default MinIO endpoint
+  in worker services and injecting credentials at runtime.
+- **Alternatives considered**:
+  - Use explicit providers (e.g., `minio.oscar-primary`) and fetch credentials
+    per provider (rejected: requires faas-supervisor changes or embedding
+    credentials in ConfigMaps).
+  - Embed MinIO credentials directly in delegated events (rejected: security
+    risk and leakage via logs).
+
 ### Decision: Remove `role` and infer worker from empty members
 - **Rationale**: Avoids explicit `role` field while still preventing recursive
   expansion. OSCAR Manager will expand only when `federation.members` is

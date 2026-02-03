@@ -393,6 +393,39 @@ func TestEventBuild(t *testing.T) {
 	}
 }
 
+func TestDelegationStorageProviderFromOutput(t *testing.T) {
+	service := &types.Service{
+		ClusterID: "origin",
+		Output: []types.StorageIOConfig{
+			{Provider: "minio.default"},
+		},
+	}
+	if provider := delegationStorageProvider(service); provider != "minio.default" {
+		t.Fatalf("expected minio.default, got %q", provider)
+	}
+}
+
+func TestDelegationStorageProviderDefaults(t *testing.T) {
+	service := &types.Service{
+		ClusterID: "origin",
+		Output: []types.StorageIOConfig{
+			{Provider: "minio"},
+		},
+	}
+	if provider := delegationStorageProvider(service); provider != "minio.default" {
+		t.Fatalf("expected minio.default, got %q", provider)
+	}
+}
+
+func TestDelegationStorageProviderFallsBackToClusterID(t *testing.T) {
+	service := &types.Service{
+		ClusterID: "origin",
+	}
+	if provider := delegationStorageProvider(service); provider != "origin" {
+		t.Fatalf("expected origin, got %q", provider)
+	}
+}
+
 func TestCountJobsAggregation(t *testing.T) {
 	now := time.Now()
 	jobStatuses := map[string]JobStatus{

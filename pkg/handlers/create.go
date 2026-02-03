@@ -386,9 +386,23 @@ func checkValues(service *types.Service, cfg *types.Config) {
 		Region:    cfg.MinIOProvider.Region,
 	}
 
+	originMinIOOverride := false
+	if service.Annotations != nil {
+		if _, ok := service.Annotations[types.OriginClusterAnnotation]; ok {
+			originMinIOOverride = true
+		}
+	}
 	if service.StorageProviders != nil {
 		if service.StorageProviders.MinIO != nil {
-			service.StorageProviders.MinIO[types.DefaultProvider] = defaultMinIOInstanceInfo
+			if originMinIOOverride {
+				if existing := service.StorageProviders.MinIO[types.DefaultProvider]; existing != nil && strings.TrimSpace(existing.Endpoint) != "" {
+					// Keep origin MinIO endpoint for delegated services.
+				} else {
+					service.StorageProviders.MinIO[types.DefaultProvider] = defaultMinIOInstanceInfo
+				}
+			} else {
+				service.StorageProviders.MinIO[types.DefaultProvider] = defaultMinIOInstanceInfo
+			}
 		} else {
 			service.StorageProviders.MinIO = map[string]*types.MinIOProvider{
 				types.DefaultProvider: defaultMinIOInstanceInfo,

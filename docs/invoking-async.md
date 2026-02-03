@@ -19,7 +19,9 @@ When a job is delegated to another OSCAR cluster, OSCAR Manager exchanges the
 service's `refresh_token` secret for a fresh bearer token and includes it in
 the delegated request. The target cluster uses that token to call
 `/system/config` and obtain MinIO credentials required to access the origin
-cluster inputs.
+cluster inputs. Delegated jobs honor the service output storage provider as
+defined in the origin cluster, so outputs are written back to the origin
+storage (for example, `minio.default`).
 
 ## Log information
 
