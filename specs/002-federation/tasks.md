@@ -90,7 +90,7 @@ description: "Task list for federated OSCAR service replicas (topology: tree/mes
 - [x] T019a [US3] Preserve origin MinIO endpoint for delegated services by honoring `oscar.grycap/origin-cluster` in `pkg/handlers/create.go`
 - [x] T019b [US3] Store origin cluster id on worker services during federation expansion in `pkg/utils/federation.go`
 - [x] T019c [US3] Fetch origin MinIO credentials for delegated jobs and mount them at `minio.default` in `pkg/handlers/job.go`
-- [x] T019d [US3] Allow `minio.<cluster_id>` outputs for federated services without requiring `storage_providers` definition in `pkg/handlers/create.go`
+- [x] T019d [US3] Normalize replica output buckets to the origin service name for `minio.default` origin override in `pkg/handlers/create.go`
 - [x] T020 [P] [US3] Extend status payload if needed for delegation metrics in `pkg/handlers/status.go`
 - [x] T021 [US3] Exchange refresh-token secret for fresh OIDC bearer token during delegation in `pkg/resourcemanager/delegate.go`
 - [x] T022 [US3] Validate `secrets.refresh_token` in FDL and store it as a Secret in the user namespace in `pkg/handlers/create.go`

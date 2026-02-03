@@ -392,9 +392,10 @@ func checkValues(service *types.Service, cfg *types.Config) {
 			originMinIOOverride = true
 		}
 	}
+	allowFederatedDefaultOverride := service.HasFederationMembers()
 	if service.StorageProviders != nil {
 		if service.StorageProviders.MinIO != nil {
-			if originMinIOOverride {
+			if originMinIOOverride || allowFederatedDefaultOverride {
 				if existing := service.StorageProviders.MinIO[types.DefaultProvider]; existing != nil && strings.TrimSpace(existing.Endpoint) != "" {
 					// Keep origin MinIO endpoint for delegated services.
 				} else {
@@ -413,21 +414,6 @@ func checkValues(service *types.Service, cfg *types.Config) {
 			MinIO: map[string]*types.MinIOProvider{
 				types.DefaultProvider: defaultMinIOInstanceInfo,
 			},
-		}
-	}
-
-	if service.Federation != nil && strings.TrimSpace(service.ClusterID) != "" {
-		if service.StorageProviders.MinIO == nil {
-			service.StorageProviders.MinIO = map[string]*types.MinIOProvider{}
-		}
-		if service.StorageProviders.MinIO[service.ClusterID] == nil {
-			service.StorageProviders.MinIO[service.ClusterID] = &types.MinIOProvider{
-				Endpoint:  cfg.MinIOProvider.Endpoint,
-				Verify:    cfg.MinIOProvider.Verify,
-				AccessKey: "hidden",
-				SecretKey: "hidden",
-				Region:    cfg.MinIOProvider.Region,
-			}
 		}
 	}
 
@@ -481,7 +467,7 @@ func normalizeStoragePaths(service *types.Service) error {
 				if provName == types.MinIOName &&
 					originServiceName != "" &&
 					originClusterID != "" &&
-					strings.TrimSpace(provID) == originClusterID {
+					strings.TrimSpace(provID) == types.DefaultProvider {
 					bucketName = originServiceName
 				}
 				path = fmt.Sprintf("%s/%s", bucketName, path)
@@ -580,8 +566,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	for _, out := range service.Output {
 		provID, provName = getProviderInfo(out.Provider)
 		// Check if the provider identifier is defined in StorageProviders
-		isFederatedMinIO := isFederatedMinIOProvider(service, provName, provID)
-		if !isStorageProviderDefined(provName, provID, service.StorageProviders) && !isFederatedMinIO {
+		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
 			return nil, fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
 		}
 
@@ -594,11 +579,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		case types.MinIOName, types.S3Name:
 			// Use the appropriate client
 			if provName == types.MinIOName {
-				if isFederatedMinIO && strings.TrimSpace(service.ClusterID) != "" && strings.TrimSpace(provID) != "" && strings.TrimSpace(provID) != strings.TrimSpace(service.ClusterID) {
-					// Remote cluster output: skip local bucket creation.
-					continue
-				}
-				if provID == types.DefaultProvider || (isFederatedMinIO && strings.TrimSpace(provID) == strings.TrimSpace(service.ClusterID)) {
+				if provID == types.DefaultProvider {
 					s3Client = cfg.MinIOProvider.GetS3Client()
 				} else {
 					s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
@@ -747,23 +728,6 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	}
 
 	return minIOBuckets, nil
-}
-
-func isFederatedMinIOProvider(service *types.Service, provName string, provID string) bool {
-	if service == nil || service.Federation == nil {
-		return false
-	}
-	if provName != types.MinIOName {
-		return false
-	}
-	if strings.TrimSpace(provID) == "" {
-		return false
-	}
-	if service.Clusters == nil {
-		return false
-	}
-	_, ok := service.Clusters[provID]
-	return ok
 }
 
 func isStorageProviderDefined(storageName string, storageID string, providers *types.StorageProviders) bool {
