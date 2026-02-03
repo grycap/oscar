@@ -119,6 +119,7 @@ const (
 	JobOwnerExecutionAnnotation = "oscar.grycap/job-owner"
 
 	OriginClusterAnnotation = "oscar.grycap/origin-cluster"
+	OriginServiceAnnotation = "oscar.grycap/origin-service"
 )
 
 // YAMLMarshal package-level yaml marshal function

@@ -506,7 +506,8 @@ func DelegateJob(service *types.Service, event string, authHeader string, logger
 					continue
 				}
 			}
-			log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": Status code %d\n", service.Name, replica.ClusterID, res.StatusCode)
+			body, _ := io.ReadAll(res.Body)
+			log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": Status code %d, response: %s\n", service.Name, replica.ClusterID, res.StatusCode, strings.TrimSpace(string(body)))
 		}
 
 		// Manage if replica.Type is "endpoint"

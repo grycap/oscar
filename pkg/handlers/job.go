@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -219,36 +220,36 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			minIOSecretKey = requestUserUID
 		}
 
-	if minIOSecretKey == "" {
-		minIOSecretKey = service.Owner
-	}
+		if minIOSecretKey == "" {
+			minIOSecretKey = service.Owner
+		}
 
-	secretName := auth.FormatUID(minIOSecretKey)
-	originSecretName, err := ensureOriginMinIODefaultSecretIfNeeded(c, cfg, service, serviceNamespace, kubeClientset, authHeader)
-	if err != nil {
-		c.String(http.StatusInternalServerError, err.Error())
-		return
-	}
-	if originSecretName != "" {
-		secretName = originSecretName
-	} else {
-		if err := ensureMinIOSecret(kubeClientset, minIOSecretKey, serviceNamespace); err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", minIOSecretKey, err))
+		secretName := auth.FormatUID(minIOSecretKey)
+		originSecretName, err := ensureOriginMinIODefaultSecretIfNeeded(c, cfg, service, serviceNamespace, kubeClientset, authHeader)
+		if err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
-	}
+		if originSecretName != "" {
+			secretName = originSecretName
+		} else {
+			if err := ensureMinIOSecret(kubeClientset, minIOSecretKey, serviceNamespace); err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", minIOSecretKey, err))
+				return
+			}
+		}
 
-	c.Next()
+		c.Next()
 
-	// Mount user MinIO credentials
-	podSpec.Volumes = append(podSpec.Volumes, v1.Volume{
-		Name: MinIOSecretVolumeName,
-		VolumeSource: v1.VolumeSource{
-			Secret: &v1.SecretVolumeSource{
-				SecretName: secretName,
+		// Mount user MinIO credentials
+		podSpec.Volumes = append(podSpec.Volumes, v1.Volume{
+			Name: MinIOSecretVolumeName,
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: secretName,
+				},
 			},
-		},
-	})
+		})
 
 		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
 			Name:      MinIOSecretVolumeName,
@@ -439,7 +440,7 @@ func ensureOriginMinIODefaultSecretIfNeeded(c *gin.Context, cfg *types.Config, s
 		return "", fmt.Errorf("origin cluster %q endpoint is empty", originClusterID)
 	}
 
-	minIOProvider, err := fetchMinIOProvider(originEndpoint, authHeader)
+	minIOProvider, err := fetchMinIOProvider(originEndpoint, authHeader, cluster.SSLVerify)
 	if err != nil {
 		return "", fmt.Errorf("error fetching origin MinIO credentials: %v", err)
 	}
@@ -479,12 +480,25 @@ func configureDelegatedMinIOProvider(c *gin.Context, serviceNamespace string, se
 		return nil
 	}
 
-	minIOProvider, err := fetchMinIOProvider(endpoint, authHeader)
+	minIOProvider, err := fetchMinIOProvider(endpoint, authHeader, cluster.SSLVerify)
 	if err != nil {
 		return err
 	}
 	if minIOProvider.AccessKey == "" || minIOProvider.SecretKey == "" {
 		return fmt.Errorf("origin MinIO credentials are empty for provider %q", providerID)
+	}
+
+	if service.StorageProviders == nil {
+		service.StorageProviders = &types.StorageProviders{}
+	}
+	if service.StorageProviders.MinIO == nil {
+		service.StorageProviders.MinIO = map[string]*types.MinIOProvider{}
+	}
+	if _, ok := service.StorageProviders.MinIO[providerID]; !ok {
+		providerCopy := *minIOProvider
+		providerCopy.AccessKey = ""
+		providerCopy.SecretKey = ""
+		service.StorageProviders.MinIO[providerID] = &providerCopy
 	}
 
 	secretName := buildMinIOProviderSecretName(c, providerID)
@@ -544,7 +558,7 @@ func parseDelegatedStorageProvider(c *gin.Context) (string, string, bool) {
 	return providerType, providerID, true
 }
 
-func fetchMinIOProvider(originEndpoint string, authHeader string) (*types.MinIOProvider, error) {
+func fetchMinIOProvider(originEndpoint string, authHeader string, sslVerify bool) (*types.MinIOProvider, error) {
 	targetURL, err := url.Parse(originEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("invalid origin endpoint %q: %v", originEndpoint, err)
@@ -557,8 +571,12 @@ func fetchMinIOProvider(originEndpoint string, authHeader string) (*types.MinIOP
 	if strings.TrimSpace(authHeader) != "" {
 		req.Header.Set("Authorization", authHeader)
 	}
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: !sslVerify},
+	}
 	client := &http.Client{
-		Timeout: time.Second * 20,
+		Transport: transport,
+		Timeout:   time.Second * 20,
 	}
 	res, err := client.Do(req)
 	if err != nil {

@@ -125,7 +125,12 @@ multiple jobs, and verify that delegation targets vary across available clusters
   and node details sufficient to evaluate delegation fitness.
 - **FR-010**: System MUST write all service outputs to a single shared output
   storage as defined in the federation configuration (same bucket/path across
-  all replicas).
+  all replicas). For federated services, outputs MAY use `minio.<cluster_id>`
+  to route data to the origin cluster MinIO without embedding credentials in
+  the service definition.
+- **FR-010b**: When a federated service uses `minio.<origin_cluster_id>` for
+  outputs, OSCAR Manager MUST normalize the output bucket using the origin
+  service name (coordinator), not the replica service name.
 - **FR-011**: System MUST preserve per-service input storage configuration as
   defined in the FDL.
 - **FR-011a**: For MinIO/S3 inputs and outputs, if `path` omits the bucket (no
@@ -146,7 +151,8 @@ multiple jobs, and verify that delegation targets vary across available clusters
 - **FR-016**: Inter-cluster delegation MUST obtain a fresh OIDC bearer token
   using the refresh token before delegating a job.
 - **FR-017**: Delegated jobs MUST retrieve MinIO credentials via `/system/config`
-  using the fresh bearer token, then access input data in the origin cluster
+  using the fresh bearer token for the requested `storage_provider` (e.g.,
+  `minio.<cluster_id>`), then access input/output data in the origin cluster
   MinIO.
 - **FR-018**: Any authenticated user MUST be allowed to create federations
   across clusters they are authenticated to.
@@ -193,3 +199,4 @@ multiple jobs, and verify that delegation targets vary across available clusters
 - Q: How is input data handled for delegated jobs? → A: Use a fresh bearer token with `/system/config` to obtain MinIO credentials for origin cluster access.
 - Q: Who can create a federation across clusters? → A: Any authenticated user can create a federation across clusters they are authenticated to.
 - Q: How should unreachable target clusters be handled during deployment? → A: Best-effort deployment to reachable clusters with clear error reporting for failures.
+- Q: How are output buckets named for replicas using `minio.<origin_cluster_id>`? → A: Use the origin service name for bucket prefixing.

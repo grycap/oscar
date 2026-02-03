@@ -101,15 +101,18 @@
   - Signed URLs or service-token fetch (rejected: inconsistent with OIDC-based
     access model).
 
-### Decision: Keep `minio.default` semantics and override default MinIO endpoint for delegated jobs
-- **Rationale**: Preserve existing meaning of `minio.default` while allowing
-  explicit origin clusters to be defined in the service request. Delegated jobs
-  can write output to the origin MinIO by overriding the default MinIO endpoint
-  in worker services and injecting credentials at runtime.
+### Decision: Use explicit MinIO providers to route delegated outputs to origin
+- **Rationale**: Delegated jobs use the event `storage_provider` to resolve
+  MinIO credentials via `/system/config`. Setting the service output provider to
+  `minio.<cluster_id>` (e.g., `minio.oscar-primary`) forces replicas to fetch
+  credentials from the origin cluster and write outputs to the origin MinIO.
+- **Implementation note**: Worker services carry
+  `oscar.grycap/origin-service` and `oscar.grycap/origin-cluster` annotations.
+  When normalizing output paths for `minio.<origin_cluster_id>`, OSCAR Manager
+  uses the origin service name to keep the bucket consistent across replicas.
 - **Alternatives considered**:
-  - Use explicit providers (e.g., `minio.oscar-primary`) and fetch credentials
-    per provider (rejected: requires faas-supervisor changes or embedding
-    credentials in ConfigMaps).
+  - Keep `minio.default` and override default endpoint (rejected: ambiguous and
+    fragile across clusters).
   - Embed MinIO credentials directly in delegated events (rejected: security
     risk and leakage via logs).
 

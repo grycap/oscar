@@ -416,6 +416,21 @@ func checkValues(service *types.Service, cfg *types.Config) {
 		}
 	}
 
+	if service.Federation != nil && strings.TrimSpace(service.ClusterID) != "" {
+		if service.StorageProviders.MinIO == nil {
+			service.StorageProviders.MinIO = map[string]*types.MinIOProvider{}
+		}
+		if service.StorageProviders.MinIO[service.ClusterID] == nil {
+			service.StorageProviders.MinIO[service.ClusterID] = &types.MinIOProvider{
+				Endpoint:  cfg.MinIOProvider.Endpoint,
+				Verify:    cfg.MinIOProvider.Verify,
+				AccessKey: "hidden",
+				SecretKey: "hidden",
+				Region:    cfg.MinIOProvider.Region,
+			}
+		}
+	}
+
 	if service.Federation != nil {
 		if service.Federation.Topology == "" {
 			service.Federation.Topology = "none"
@@ -432,6 +447,12 @@ func checkValues(service *types.Service, cfg *types.Config) {
 func normalizeStoragePaths(service *types.Service) error {
 	if service == nil {
 		return nil
+	}
+	originServiceName := ""
+	originClusterID := ""
+	if service.Annotations != nil {
+		originServiceName = strings.TrimSpace(service.Annotations[types.OriginServiceAnnotation])
+		originClusterID = strings.TrimSpace(service.Annotations[types.OriginClusterAnnotation])
 	}
 
 	for i := range service.Input {
@@ -453,10 +474,17 @@ func normalizeStoragePaths(service *types.Service) error {
 		if path == "" {
 			return fmt.Errorf("output path cannot be empty")
 		}
-		_, provName := getProviderInfo(service.Output[i].Provider)
+		provID, provName := getProviderInfo(service.Output[i].Provider)
 		if provName == types.MinIOName || provName == types.S3Name {
 			if !strings.Contains(path, "/") {
-				path = fmt.Sprintf("%s/%s", service.Name, path)
+				bucketName := service.Name
+				if provName == types.MinIOName &&
+					originServiceName != "" &&
+					originClusterID != "" &&
+					strings.TrimSpace(provID) == originClusterID {
+					bucketName = originServiceName
+				}
+				path = fmt.Sprintf("%s/%s", bucketName, path)
 			}
 		}
 		service.Output[i].Path = path
@@ -552,7 +580,8 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	for _, out := range service.Output {
 		provID, provName = getProviderInfo(out.Provider)
 		// Check if the provider identifier is defined in StorageProviders
-		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
+		isFederatedMinIO := isFederatedMinIOProvider(service, provName, provID)
+		if !isStorageProviderDefined(provName, provID, service.StorageProviders) && !isFederatedMinIO {
 			return nil, fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
 		}
 
@@ -565,7 +594,11 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		case types.MinIOName, types.S3Name:
 			// Use the appropriate client
 			if provName == types.MinIOName {
-				if provID == types.DefaultProvider {
+				if isFederatedMinIO && strings.TrimSpace(service.ClusterID) != "" && strings.TrimSpace(provID) != "" && strings.TrimSpace(provID) != strings.TrimSpace(service.ClusterID) {
+					// Remote cluster output: skip local bucket creation.
+					continue
+				}
+				if provID == types.DefaultProvider || (isFederatedMinIO && strings.TrimSpace(provID) == strings.TrimSpace(service.ClusterID)) {
 					s3Client = cfg.MinIOProvider.GetS3Client()
 				} else {
 					s3Client = service.StorageProviders.MinIO[provID].GetS3Client()
@@ -714,6 +747,23 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	}
 
 	return minIOBuckets, nil
+}
+
+func isFederatedMinIOProvider(service *types.Service, provName string, provID string) bool {
+	if service == nil || service.Federation == nil {
+		return false
+	}
+	if provName != types.MinIOName {
+		return false
+	}
+	if strings.TrimSpace(provID) == "" {
+		return false
+	}
+	if service.Clusters == nil {
+		return false
+	}
+	_, ok := service.Clusters[provID]
+	return ok
 }
 
 func isStorageProviderDefined(storageName string, storageID string, providers *types.StorageProviders) bool {

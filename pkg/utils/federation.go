@@ -108,6 +108,7 @@ func buildWorkerService(service *types.Service, member types.Replica) (*types.Se
 			worker.Annotations = make(map[string]string)
 		}
 		worker.Annotations[types.OriginClusterAnnotation] = service.ClusterID
+		worker.Annotations[types.OriginServiceAnnotation] = service.Name
 	}
 
 	switch strings.ToLower(service.Federation.Topology) {

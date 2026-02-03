@@ -39,7 +39,29 @@ functions:
 Submit the FDL to the coordinator cluster (via existing OSCAR create service API
 or CLI). OSCAR Manager expands the FDL and deploys replicas to all clusters.
 
-## 2) Verify replicas
+## 2) Find the replica endpoint (kind)
+
+In kind, OSCAR is exposed via the ingress controller NodePort (not the `oscar`
+service ClusterIP). Use the replica cluster context and node IP:
+
+```bash
+kubectl --context <replica-context> get ingress -n oscar oscar
+kubectl --context <replica-context> get svc -n ingress-nginx ingress-nginx-controller
+kubectl --context <replica-context> get nodes -o wide
+```
+
+Build the endpoint as:
+
+- HTTPS: `https://<node-ip>:<ingress-https-nodeport>`
+- HTTP: `http://<node-ip>:<ingress-http-nodeport>`
+
+Example (kind):
+
+- node IP: `172.18.0.3`
+- ingress HTTPS NodePort: `31445`
+- endpoint: `https://172.18.0.3:31445`
+
+## 3) Verify replicas
 
 Use the replicas API to confirm topology and members:
 
@@ -48,7 +70,7 @@ curl -H "Authorization: Bearer <SERVICE_TOKEN>" \
   https://<cluster-endpoint>/system/replicas/grayifyr0
 ```
 
-## 3) Add or update replicas
+## 4) Add or update replicas
 
 Add a replica:
 
