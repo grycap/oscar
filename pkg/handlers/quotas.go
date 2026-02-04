@@ -23,8 +23,8 @@ type quotaResponse struct {
 }
 
 type quotaValues struct {
-	Max  string `json:"max"`
-	Used string `json:"used"`
+	Max  int64 `json:"max"`
+	Used int64 `json:"used"`
 }
 
 type quotaUpdateRequest struct {
@@ -34,7 +34,7 @@ type quotaUpdateRequest struct {
 
 // MakeGetOwnQuotaHandler handles GET /system/quotas/user for the bearer user.
 // @Summary Get own quotas
-// @Description Return CPU and memory quotas and current usage for the authenticated user.
+// @Description Return CPU and memory quotas and current usage for the authenticated user. CPU values are in millicores, memory values in bytes.
 // @Tags quotas
 // @Produce json
 // @Success 200 {object} quotaResponse
@@ -60,7 +60,7 @@ func MakeGetOwnQuotaHandler(cfg *types.Config, kubeConfig *rest.Config) gin.Hand
 
 // MakeGetUserQuotaHandler handles GET /system/quotas/user/{userId} for admin (basic auth).
 // @Summary Get user quotas
-// @Description GET returns CPU/memory quotas and usage for the specified user (admin only).
+// @Description GET returns CPU/memory quotas and usage for the specified user (admin only). CPU values are in millicores, memory values in bytes.
 // @Tags quotas
 // @Produce json
 // @Param userId path string true "User ID"
@@ -90,7 +90,7 @@ func MakeGetUserQuotaHandler(cfg *types.Config, kubeConfig *rest.Config) gin.Han
 
 // MakeUpdateUserQuotaHandler handles PUT /system/quotas/user/{userId} for admin (basic auth).
 // @Summary Update user quotas
-// @Description PUT updates CPU/memory nominal quotas for the specified user (admin only). At least one of cpu or memory must be provided.
+// @Description PUT updates CPU/memory nominal quotas for the specified user (admin only). At least one of cpu or memory must be provided. CPU values are in millicores, memory values in bytes.
 // @Tags quotas
 // @Accept json
 // @Produce json
@@ -151,28 +151,28 @@ func fetchQuota(ctx context.Context, kubeConfig *rest.Config, user string) (*quo
 		Resources:    map[string]quotaValues{},
 	}
 
-	maxCPU := ""
-	maxMem := ""
+	var maxCPU int64
+	var maxMem int64
 	if len(cq.Spec.ResourceGroups) > 0 && len(cq.Spec.ResourceGroups[0].Flavors) > 0 {
 		for _, res := range cq.Spec.ResourceGroups[0].Flavors[0].Resources {
 			switch res.Name {
 			case corev1.ResourceCPU:
-				maxCPU = res.NominalQuota.String()
+				maxCPU = res.NominalQuota.MilliValue()
 			case corev1.ResourceMemory:
-				maxMem = res.NominalQuota.String()
+				maxMem = res.NominalQuota.Value()
 			}
 		}
 	}
 
-	usedCPU := ""
-	usedMem := ""
+	var usedCPU int64
+	var usedMem int64
 	if len(cq.Status.FlavorsUsage) > 0 {
 		for _, res := range cq.Status.FlavorsUsage[0].Resources {
 			switch res.Name {
 			case corev1.ResourceCPU:
-				usedCPU = res.Total.String()
+				usedCPU = res.Total.MilliValue()
 			case corev1.ResourceMemory:
-				usedMem = res.Total.String()
+				usedMem = res.Total.Value()
 			}
 		}
 	}
