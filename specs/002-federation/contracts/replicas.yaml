@@ -102,7 +102,7 @@ components:
       properties:
         topology:
           type: string
-          enum: [none, tree, mesh]
+          enum: [none, star, mesh]
         replicas:
           type: array
           items:

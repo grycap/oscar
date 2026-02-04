@@ -1,4 +1,4 @@
-# Research: Federated OSCAR Service Replicas (Topology: tree/mesh)
+# Research: Federated OSCAR Service Replicas (Topology: star/mesh)
 
 ## Decisions
 
@@ -17,7 +17,7 @@
     risk for topology updates).
 
 ### Decision: Replica changes apply to whole topology
-- **Rationale**: Mesh/tree invariants require consistent replica graphs across
+- **Rationale**: Mesh/star invariants require consistent replica graphs across
   all services in the federation.
 - **Alternatives considered**:
   - Single-service updates (rejected: asymmetric replica graphs and drift).

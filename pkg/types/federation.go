@@ -20,7 +20,7 @@ package types
 type Federation struct {
 	// GroupID identifies the federation network.
 	GroupID string `json:"group_id"`
-	// Topology defines the federation topology: none, tree, mesh.
+	// Topology defines the federation topology: none, star, mesh.
 	Topology string `json:"topology"`
 	// Delegation defines the delegation policy: static, random, load-based.
 	Delegation string `json:"delegation,omitempty"`

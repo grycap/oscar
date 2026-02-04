@@ -1,9 +1,9 @@
 ---
 
-description: "Task list for federated OSCAR service replicas (topology: tree/mesh)"
+description: "Task list for federated OSCAR service replicas (topology: star/mesh)"
 ---
 
-# Tasks: Federated OSCAR Service Replicas (Topology: tree/mesh)
+# Tasks: Federated OSCAR Service Replicas (Topology: star/mesh)
 
 **Input**: Design documents from `/specs/002-federation/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
@@ -41,13 +41,13 @@ description: "Task list for federated OSCAR service replicas (topology: tree/mes
 
 ## Phase 3: User Story 1 - Deploy a federated replica network (Priority: P1) 🎯 MVP
 
-**Goal**: Deploy a federated service across multiple clusters with tree/mesh topology and expansion rules
+**Goal**: Deploy a federated service across multiple clusters with star/mesh topology and expansion rules
 
 **Independent Test**: Provide a valid federation FDL for 2+ clusters and confirm all services are created with correct topology and federation metadata
 
 ### Implementation for User Story 1
 
-- [x] T006 [US1] Implement tree topology expansion in `pkg/utils/federation.go`
+- [x] T006 [US1] Implement star topology expansion in `pkg/utils/federation.go`
 - [x] T007 [US1] Implement mesh topology expansion in `pkg/utils/federation.go`
 - [x] T008 [P] [US1] Integrate federation expansion into service creation in `pkg/handlers/create.go`
 - [x] T009 [P] [US1] Integrate federation expansion into service updates in `pkg/handlers/update.go`

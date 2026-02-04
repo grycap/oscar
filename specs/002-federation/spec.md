@@ -1,9 +1,9 @@
-# Feature Specification: Federated OSCAR Service Replicas (Topology: tree/mesh)
+# Feature Specification: Federated OSCAR Service Replicas (Topology: star/mesh)
 
 **Feature Branch**: `002-federation`  
 **Created**: 2026-01-29  
 **Status**: Draft  
-**Input**: User description: "Enable federated replicas for OSCAR services across multiple clusters, with tree/mesh topologies and delegation policies."
+**Input**: User description: "Enable federated replicas for OSCAR services across multiple clusters, with star/mesh topologies and delegation policies."
 
 **Federation definition**: A federation is a logical group of OSCAR services
 across multiple clusters that cooperate for delegated execution under shared
@@ -25,7 +25,7 @@ and confirm all services are created with correct topology and federation metada
 
 **Acceptance Scenarios**:
 
-1. **Given** a valid FDL with federation enabled and `topology=tree`, **When** I
+1. **Given** a valid FDL with federation enabled and `topology=star`, **When** I
    submit it to the coordinator cluster, **Then** OSCAR Manager creates the
    coordinator service and deploys worker replicas to the specified clusters
    with `federation.members` cleared and appropriate FDL rewrites.
@@ -103,11 +103,11 @@ multiple jobs, and verify that delegation targets vary across available clusters
 
 - **FR-001**: System MUST accept federation configuration in service FDLs and
   enable multi-cluster replica deployment.
-- **FR-002**: System MUST support `topology` values of `none`, `tree`, and `mesh`.
+- **FR-002**: System MUST support `topology` values of `none`, `star`, and `mesh`.
 - **FR-003**: OSCAR Manager MUST expand federation only when
   `federation.members` is non-empty; worker replicas MUST carry federation
   metadata with empty `members` to avoid recursive expansion.
-- **FR-004**: For `topology=tree`, OSCAR Manager MUST deploy worker services with
+- **FR-004**: For `topology=star`, OSCAR Manager MUST deploy worker services with
   `federation.members` cleared, remove replica definitions in worker FDLs, and
   avoid embedding other cluster credentials.
 - **FR-005**: For `topology=mesh`, OSCAR Manager MUST deploy worker services with

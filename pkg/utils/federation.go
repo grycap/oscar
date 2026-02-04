@@ -86,7 +86,7 @@ func setReplicasFromMembers(service *types.Service) {
 	}
 
 	switch strings.ToLower(service.Federation.Topology) {
-	case "mesh", "tree":
+	case "mesh", "star":
 		service.Replicas = append(types.ReplicaList{}, service.Federation.Members...)
 	default:
 	}
@@ -114,7 +114,7 @@ func buildWorkerService(service *types.Service, member types.Replica) (*types.Se
 	switch strings.ToLower(service.Federation.Topology) {
 	case "mesh":
 		worker.Replicas = buildFederationMeshReplicas(service, member)
-	case "tree":
+	case "star":
 		worker.Replicas = nil
 	default:
 		worker.Replicas = nil

@@ -13,7 +13,7 @@
 - **Description**: Logical group of services participating in a federation.
 - **Key fields**:
   - `group_id` (string, unique within a federation scope)
-  - `topology` (enum: none | tree | mesh)
+  - `topology` (enum: none | star | mesh)
   - `delegation` (enum: static | random | load-based)
   - `members` (list of ReplicaRef)
 - **Relationships**:
@@ -40,7 +40,7 @@
 
 ## Validation Rules
 - `group_id` defaults to the service name if omitted.
-- `topology` MUST be one of none/tree/mesh.
+- `topology` MUST be one of none/star/mesh.
 - Federation expansion occurs only when `federation.members` is non-empty.
 - Replica updates MUST apply to the whole topology.
 - Delegation MUST only target clusters where inputs are accessible.

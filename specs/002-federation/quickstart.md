@@ -32,8 +32,14 @@ functions:
         - storage_provider: minio.default
           path: grayifyr0/in
       output:
-        - storage_provider: minio.shared
+        - storage_provider: minio.default
           path: grayifyr0/out
+      storage_providers:
+        minio:
+          default:
+            endpoint: http://<origin-minio-nodeport>
+            verify: false
+            region: us-east-1
 ```
 
 Submit the FDL to the coordinator cluster (via existing OSCAR create service API

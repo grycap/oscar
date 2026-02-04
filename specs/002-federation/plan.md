@@ -1,11 +1,11 @@
-# Implementation Plan: Federated OSCAR Service Replicas (Topology: tree/mesh)
+# Implementation Plan: Federated OSCAR Service Replicas (Topology: star/mesh)
 
 **Branch**: `002-federation` | **Date**: 2026-01-29 | **Spec**: `/specs/002-federation/spec.md`
 **Input**: Feature specification from `/specs/002-federation/spec.md`
 
 ## Summary
 
-Enable federated OSCAR service replicas across multiple clusters with tree/mesh
+Enable federated OSCAR service replicas across multiple clusters with star/mesh
 topology support. OSCAR Manager expands coordinator FDLs into per-cluster
 services, and `/system/replicas` manages topology-wide replica updates. Job
 delegation follows static/random/load-based policies using `/system/status`

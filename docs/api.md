@@ -12,7 +12,7 @@ through an Ingress Controller. This API has been described following the
 
 Federated replicas are managed through `/system/replicas/{serviceName}` with
 GET/POST/PUT/DELETE operations. Updates apply to the whole federation topology
-(tree/mesh). Federated services MUST provide `environment.secrets.refresh_token`;
+(star/mesh). Federated services MUST provide `environment.secrets.refresh_token`;
 OSCAR Manager exchanges it for fresh OIDC bearer tokens when delegating jobs
 across clusters. This requires `OIDC_CLIENT_ID` (and optionally
 `OIDC_CLIENT_SECRET`) to be configured on the OSCAR Manager. When multiple
