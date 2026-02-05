@@ -144,8 +144,8 @@ func main() {
 	syncBack, ok := back.(types.SyncBackend)
 	if cfg.ServerlessBackend != "" && ok {
 		r.POST("/run/:serviceName", auth.GetLoggerMiddleware(), handlers.MakeRunHandler(cfg, syncBack))
-		r.POST("/inference/:serviceName/*path", handlers.MakeInferenceHandler(cfg, syncBack))
-		r.GET("/inference/:serviceName/*path", handlers.MakeInferenceHandler(cfg, syncBack))
+		r.POST("/inference/:serviceName/*path", auth.GetAuthMiddleware(cfg, kubeClientset), handlers.MakeInferenceHandler(cfg, syncBack))
+		r.GET("/inference/:serviceName/*path", auth.GetAuthMiddleware(cfg, kubeClientset), handlers.MakeInferenceHandler(cfg, syncBack))
 	}
 
 	// System info path

@@ -27,7 +27,6 @@ import (
 
 func MakeInferenceHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		fmt.Println("making call")
 		serviceName := c.Param("serviceName")
 		proxy := &httputil.ReverseProxy{
 			Director: func(req *http.Request) {
