@@ -8,7 +8,8 @@ description: "Task list for federated OSCAR service replicas (topology: star/mes
 **Input**: Design documents from `/specs/002-federation/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: Tests are optional; none are required by the spec at this stage.
+**Tests**: Tests are required for touched Go packages when feasible (e.g., `go test ./...`).
+If tests are skipped, the reason must be recorded in the task or execution notes.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -34,6 +35,7 @@ description: "Task list for federated OSCAR service replicas (topology: star/mes
 - [x] T003 Extend federation fields and validation in `pkg/types/service.go`
 - [x] T004 Align replica/federation structs with new semantics in `pkg/types/replica.go`
 - [x] T005 Add federation expansion helpers in `pkg/utils/federation.go`
+- [x] T005a [P] [US1] Validate input storage preservation and bucket defaulting for federated services in `pkg/handlers/create.go` (normalizeStoragePaths)
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -52,6 +54,7 @@ description: "Task list for federated OSCAR service replicas (topology: star/mes
 - [x] T008 [P] [US1] Integrate federation expansion into service creation in `pkg/handlers/create.go`
 - [x] T009 [P] [US1] Integrate federation expansion into service updates in `pkg/handlers/update.go`
 - [x] T010 [US1] Ensure worker replicas use empty `federation.members` and strip cluster creds in `pkg/utils/federation.go`
+- [ ] T010a [US1] Enforce transactional federation deployment on initial create only: on any replica creation failure, delete coordinator and already-created replicas; report rollback status in `pkg/handlers/create.go` and `pkg/utils/federation.go`. Replica updates via `/system/replicas` must be best-effort per replica.
 
 **Checkpoint**: User Story 1 should be fully functional and testable independently
 
@@ -70,6 +73,8 @@ description: "Task list for federated OSCAR service replicas (topology: star/mes
 - [x] T013 [US2] Register `/system/replicas` routes in `main.go`
 - [x] T014 [US2] Implement topology-wide replica update propagation in `pkg/utils/federation.go`
 - [x] T015 [US2] Add Swagger annotations for replicas endpoints in `pkg/handlers/replicas.go`
+- [ ] T015a [US2] Enforce authz for federation creation across clusters the user is authenticated to in `pkg/handlers/create.go` (define criteria: Bearer token issuer in `OIDC_ISSUERS` OR valid BasicAuth; document required issuer/scopes and BasicAuth expectations)
+- [ ] T015b [US2] Ensure replicas API operates on underlying service definitions without outbound HTTP calls (documented or asserted in tests)
 
 **Checkpoint**: User Stories 1 AND 2 should both work independently
 
@@ -95,7 +100,7 @@ description: "Task list for federated OSCAR service replicas (topology: star/mes
 - [x] T021 [US3] Exchange refresh-token secret for fresh OIDC bearer token during delegation in `pkg/resourcemanager/delegate.go`
 - [x] T022 [US3] Validate `secrets.refresh_token` in FDL and store it as a Secret in the user namespace in `pkg/handlers/create.go`
 - [x] T023 [US3] Enforce RBAC so only OSCAR Manager can read refresh-token Secrets (service pods must not mount) in `deploy/` or `pkg/utils/auth`
-- [x] T024 [US3] Document refresh-token requirement and rotation/revocation behavior in `docs/api.md` and `docs/invoking-async.md`
+- [x] T024 [US3] Document refresh-token requirement in `docs/api.md` and `docs/invoking-async.md`
 
 **Checkpoint**: All user stories should now be independently functional
 

@@ -10,7 +10,9 @@ topology support. OSCAR Manager expands coordinator FDLs into per-cluster
 services, and `/system/replicas` manages topology-wide replica updates. Job
 delegation follows static/random/load-based policies using `/system/status`
 metrics, with inter-cluster auth based on refresh-token exchange to mint fresh
-OIDC bearer tokens and best-effort deployment across clusters.
+OIDC bearer tokens and create-time transactional deployment across clusters
+(rollback on any replica failure during initial creation).
+Load-based ranking uses total free CPU only, with a per-node fit check.
 
 ## Technical Context
 

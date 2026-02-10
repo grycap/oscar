@@ -90,8 +90,9 @@ curl -X POST -H "Authorization: Bearer <SERVICE_TOKEN>" \
 Updates apply to the whole topology and are propagated by OSCAR Manager.
 
 ## Notes
-- Deployment is best-effort: unreachable clusters are reported but do not block
-  successful deployments to reachable clusters.
+- Initial deployment is transactional: if any replica fails to deploy, OSCAR
+  removes the coordinator service and any replicas that were created. Replica
+  updates via `/system/replicas` are best-effort per replica.
 - Delegation uses bearer tokens that are valid across federation clusters.
 - Offloading only happens when the local cluster cannot schedule the job. To
   force delegation during testing, set `rescheduler_threshold: 10` (seconds)

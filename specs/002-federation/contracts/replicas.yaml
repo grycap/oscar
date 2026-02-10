@@ -117,13 +117,11 @@ components:
           items:
             $ref: '#/components/schemas/ReplicaRef'
         clusters:
-          type: array
-          items:
+          type: object
+          additionalProperties:
             type: object
         storage_providers:
-          type: array
-          items:
-            type: object
+          type: object
       required: [replicas]
 
     ReplicasUpdateRequest:
@@ -138,13 +136,11 @@ components:
           items:
             $ref: '#/components/schemas/ReplicaRef'
         clusters:
-          type: array
-          items:
+          type: object
+          additionalProperties:
             type: object
         storage_providers:
-          type: array
-          items:
-            type: object
+          type: object
       required: [replicas, update]
 
     ReplicasDeleteRequest:

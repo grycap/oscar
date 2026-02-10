@@ -19,6 +19,26 @@ across clusters. This requires `OIDC_CLIENT_ID` (and optionally
 issuers are configured in `OIDC_ISSUERS`, the token exchange uses the first
 issuer in the list, so ordering matters.
 
+Replica update semantics:
+- `POST` appends `replicas` and propagates to the federation.
+- `PUT` updates matching replicas; if `update` has multiple entries, only the
+  first (`update[0]`) is applied to each matched replica.
+- `DELETE` removes matching replicas.
+- `clusters` merges into the service cluster map; `storage_providers` replaces
+  the service storage providers.
+
+Deployment semantics:
+- Initial federation deployment (service creation) is transactional: any replica
+  creation failure triggers rollback of the coordinator service and any replicas
+  already created.
+- Replica add/update/delete via `/system/replicas` is best-effort per replica and
+  MUST NOT delete existing healthy replicas on failure.
+
+Propagation warnings:
+- If federation propagation returns warnings, the API responds `200 OK` with a
+  plain text warning message (not JSON). Clients should treat this as a
+  successful update with warnings.
+
 ## Metrics reporting
 
 Metrics reporting endpoints include `/system/metrics/{serviceName}`, `/system/metrics`, and

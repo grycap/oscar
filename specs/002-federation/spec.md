@@ -76,8 +76,8 @@ multiple jobs, and verify that delegation targets vary across available clusters
    scheduled for delegation, **Then** the highest-priority reachable cluster is
    selected.
 2. **Given** `delegation=load-based`, **When** a job is delegated, **Then** the
-   system queries `/system/status` from candidate clusters and selects the
-   cluster with the best computed score.
+   system queries `/system/status` and selects the cluster with the lowest
+   CPU-based priority score (CPU-only ranking with per-node fit check).
 3. **Given** an async job delegated to another cluster, **When** the target
    replica executes the job, **Then** it uses the delegated bearer token to call
    `/system/config` and obtain MinIO credentials for reading the origin input.
@@ -86,16 +86,23 @@ multiple jobs, and verify that delegation targets vary across available clusters
 
 ### Edge Cases
 
-- A target cluster is unreachable during deployment (replica creation must fail
-  clearly or be retried; behavior must be defined).
-- A replica service does not yet exist in its cluster (system must decide
-  whether to create vs update). 
+- A target cluster is unreachable during deployment (see FR‑020).
+- A replica service does not yet exist in its cluster (see FR‑021). 
 - Delegation selects a cluster that lacks required CPU/memory (must be excluded
   or deprioritized).
 - Jobs are delegated but input data is not accessible in the target cluster
   (must use OIDC-backed bearer token to retrieve MinIO creds via `/system/config`).
 - Credential distribution for multi-cluster access must not require embedding
   all cluster secrets in every FDL (needs secure approach).
+
+### Additional Requirements (Edge Case Resolution)
+
+- **FR-020**: If a target cluster is unreachable or returns non‑2xx during
+  federation expansion on create, the operation MUST fail and trigger rollback
+  (per FR‑019). The API response MUST include failed replicas and rollback status.
+- **FR-021**: If a replica service does not exist in a target cluster during
+  expansion, OSCAR Manager MUST create it; if it exists, OSCAR Manager MUST
+  update it in-place.
 
 ## Requirements *(mandatory)*
 
@@ -119,8 +126,11 @@ multiple jobs, and verify that delegation targets vary across available clusters
 - **FR-007**: System MUST support delegation policies `static`, `random`, and
   `load-based`.
 - **FR-008**: For `load-based` delegation, system MUST query `/system/status`
-  for candidate clusters and rank them by a defined algorithm using CPU/memory
-  availability and pending job counts.
+  for candidate clusters and rank them using total free CPU only. The current
+  algorithm maps `total_free_cores` (millicores) to a priority in the range
+  0–100 using a linear scale from 0..32000 millicores; lower priority is better.
+  A cluster is eligible only if `max_free_on_node_cores` is sufficient for the
+  service CPU request.
 - **FR-009**: System MUST expose `/system/status` with cluster CPU/memory metrics
   and node details sufficient to evaluate delegation fitness.
 - **FR-010**: System MUST write all service outputs to a single shared output
@@ -143,7 +153,6 @@ multiple jobs, and verify that delegation targets vary across available clusters
   system MUST default it to the service name.
 - **FR-013**: Replica add/update/delete MUST apply to the whole topology
   (all services in the federation) to keep replica graphs consistent.
-- **FR-014**: OSCAR Manager MUST perform FDL expansion for federated services.
 - **FR-015**: Federated services MUST define a refresh token as a service
   `secret` named `refresh_token`; OSCAR Manager MUST store it in the user's
   service namespace (OSCAR uses one namespace per user) and MUST NOT mount it
@@ -154,12 +163,21 @@ multiple jobs, and verify that delegation targets vary across available clusters
   using the fresh bearer token for the origin MinIO (via `minio.default`),
   then access input/output data in the origin cluster MinIO.
 - **FR-018**: Any authenticated user MUST be allowed to create federations
-  across clusters they are authenticated to.
-- **FR-019**: Deployment MUST be best-effort across target clusters; unreachable
-  clusters MUST be reported as errors without blocking creation on reachable
-  clusters.
-- **FR-020**: Refresh tokens MUST be rotatable and revocable on user request,
-  and delegation MUST fail safely if the token is missing or invalid.
+  across clusters they are authenticated to. For federation creation, the
+  request MUST use either (a) a Bearer token whose issuer is listed in
+  `OIDC_ISSUERS`, or (b) BasicAuth credentials. OSCAR Manager MUST treat
+  clusters as "authenticated to" only if the provided credentials are accepted
+  by the target cluster during federation expansion. Acceptance is defined as
+  a successful authenticated request to `GET /system/services/{serviceName}` on
+  the target cluster (HTTP 200). Failed authentication MUST block federation
+  creation.
+- **FR-019**: Deployment MUST be transactional across target clusters **only
+  during initial service creation**. If any target replica fails to deploy at
+  create-time, OSCAR Manager MUST roll back by removing the coordinator service
+  and any replicas that were already created. The API response MUST surface the
+  failure and rollback status. Replica add/update/remove operations via
+  `/system/replicas` MUST be best-effort per replica and MUST NOT delete
+  existing healthy replicas on failure.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -182,7 +200,7 @@ multiple jobs, and verify that delegation targets vary across available clusters
   and replica lists after add/update/delete operations.
 - **SC-003**: In `delegation=random`, at least two different clusters are chosen
   across 10 successive delegations when multiple clusters are available.
-- **SC-004**: `load-based` delegation selects a cluster that meets CPU/memory
+- **SC-004**: `load-based` delegation selects a cluster that meets CPU
   constraints in 100% of tested cases.
 - **SC-005**: Outputs from any cluster replica are written to the shared output
   storage and are accessible from all clusters.
@@ -196,6 +214,6 @@ multiple jobs, and verify that delegation targets vary across available clusters
 - Q: Where is FDL expansion performed? → A: OSCAR Manager (expands only when `federation.members` is non-empty).
 - Q: How are inter-cluster credentials handled? → A: Federated services define a `secrets.refresh_token`; OSCAR Manager exchanges it for fresh OIDC bearer tokens when delegating.
 - Q: How is input data handled for delegated jobs? → A: Use a fresh bearer token with `/system/config` to obtain MinIO credentials for origin cluster access.
-- Q: Who can create a federation across clusters? → A: Any authenticated user can create a federation across clusters they are authenticated to.
-- Q: How should unreachable target clusters be handled during deployment? → A: Best-effort deployment to reachable clusters with clear error reporting for failures.
+- Q: Who can create a federation across clusters? → A: Any authenticated user can create a federation across clusters they are authenticated to, provided the auth check defined in FR‑018 succeeds.
+- Q: How should unreachable target clusters be handled during deployment? → A: Deployment is transactional; any replica failure triggers rollback of the coordinator and created replicas, and the failure/rollback status is reported.
 - Q: How are output buckets named for replicas using origin MinIO? → A: Use the origin service name for bucket prefixing.
