@@ -571,6 +571,8 @@ EOF
             example.com: ""
     EOF
     echo "😀 Successfully installed Knative"
+    echo "[*] Enabling Knative features for PVCs ..."
+    kubectl patch configmap/config-features -n knative-serving --type merge -p '{"data":{"kubernetes.podspec-persistent-volume-claim":"enabled","kubernetes.podspec-persistent-volume-write":"enabled"}}'
     fi
 
     if [ "${installKserve}" = false ]; then
