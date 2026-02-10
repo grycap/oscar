@@ -35,11 +35,11 @@
   - Embed cluster credentials in FDL (rejected: security risk).
   - Service tokens for delegation (rejected: user context loss).
 
-### Decision: Best-effort deployment across clusters
-- **Rationale**: Cross-cluster reachability is variable; proceed with reachable
-  clusters while reporting failures.
+### Decision: Create-time transactional deployment across clusters
+- **Rationale**: Consistency during initial federation creation; partial
+  deployment is rolled back to avoid orphaned replicas.
 - **Alternatives considered**:
-  - Fail-fast on any unreachable cluster (rejected: partial outage blocks all).
+  - Best-effort deployment (rejected: inconsistent topology at creation time).
 
 ### Decision: Any authenticated user can create federations across clusters
 - **Rationale**: Matches requirement that any user can deploy a replicated
@@ -147,7 +147,8 @@
   one namespace per user); compromise of any service pod can leak the refresh
   token.
 - Cluster admins can access secrets; this expands trust requirements.
-- Rotation and revocation are mandatory operational requirements.
+- Rotation and revocation are operational concerns and are out of scope for this
+  feature; they may be addressed in a future scope.
 
 ### Required mitigations
 - Store refresh tokens only in Kubernetes Secrets in the **user namespace**.

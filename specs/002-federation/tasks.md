@@ -54,7 +54,7 @@ If tests are skipped, the reason must be recorded in the task or execution notes
 - [x] T008 [P] [US1] Integrate federation expansion into service creation in `pkg/handlers/create.go`
 - [x] T009 [P] [US1] Integrate federation expansion into service updates in `pkg/handlers/update.go`
 - [x] T010 [US1] Ensure worker replicas use empty `federation.members` and strip cluster creds in `pkg/utils/federation.go`
-- [ ] T010a [US1] Enforce transactional federation deployment on initial create only: on any replica creation failure, delete coordinator and already-created replicas; report rollback status in `pkg/handlers/create.go` and `pkg/utils/federation.go`. Replica updates via `/system/replicas` must be best-effort per replica.
+- [x] T010a [US1] Enforce transactional federation deployment on initial create only: on any replica creation failure, delete coordinator and already-created replicas; report rollback status in `pkg/handlers/create.go` and `pkg/utils/federation.go`. Replica updates via `/system/replicas` must be best-effort per replica.
 
 **Checkpoint**: User Story 1 should be fully functional and testable independently
 
@@ -73,8 +73,8 @@ If tests are skipped, the reason must be recorded in the task or execution notes
 - [x] T013 [US2] Register `/system/replicas` routes in `main.go`
 - [x] T014 [US2] Implement topology-wide replica update propagation in `pkg/utils/federation.go`
 - [x] T015 [US2] Add Swagger annotations for replicas endpoints in `pkg/handlers/replicas.go`
-- [ ] T015a [US2] Enforce authz for federation creation across clusters the user is authenticated to in `pkg/handlers/create.go` (define criteria: Bearer token issuer in `OIDC_ISSUERS` OR valid BasicAuth; document required issuer/scopes and BasicAuth expectations)
-- [ ] T015b [US2] Ensure replicas API operates on underlying service definitions without outbound HTTP calls (documented or asserted in tests)
+- [x] T015a [US2] Enforce authz for federation creation across clusters the user is authenticated to in `pkg/handlers/create.go` (define criteria: Bearer token issuer in `OIDC_ISSUERS` OR valid BasicAuth; document required issuer/scopes and BasicAuth expectations)
+- [x] T015b [US2] Ensure replicas API operates on underlying service definitions without outbound HTTP calls (add unit test in `pkg/handlers/replicas_test.go`)
 
 **Checkpoint**: User Stories 1 AND 2 should both work independently
 

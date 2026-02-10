@@ -35,6 +35,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 )
 
@@ -130,21 +131,6 @@ func checkIfInterLinkNode(node v1.Node) bool {
 	return false
 }
 
-// Helper function to check if a node is a control plane node
-func isControlPlaneNode(node v1.Node) bool {
-	// Check for control-plane role label (Kubernetes 1.20+)
-	if _, exists := node.Labels["node-role.kubernetes.io/control-plane"]; exists {
-		return true
-	}
-
-	// Check for master role label (older Kubernetes versions)
-	if _, exists := node.Labels["node-role.kubernetes.io/master"]; exists {
-		return true
-	}
-
-	return false
-}
-
 func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *types.StatusInfo) (map[string]*NodeInfoWithAllocatable, error) {
 	nodes, err := kubeClientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
@@ -153,19 +139,7 @@ func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *types.StatusI
 
 	nodeInfoMap := make(map[string]*NodeInfoWithAllocatable)
 	var totalGPUs int64 = 0
-	workerNodes := make([]v1.Node, 0, len(nodes.Items))
-
-	for _, node := range nodes.Items {
-		if isControlPlaneNode(node) {
-			continue
-		}
-		workerNodes = append(workerNodes, node)
-	}
-
-	eligibleNodes := nodes.Items
-	if len(workerNodes) > 0 {
-		eligibleNodes = workerNodes
-	}
+	eligibleNodes := utils.SelectEligibleNodes(nodes.Items)
 
 	for _, node := range eligibleNodes {
 		nodeName := node.Name

@@ -218,6 +218,13 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, "refresh_token secret is required for federated services")
 			return
 		}
+		if service.HasFederationMembers() {
+			authErrors := utils.VerifyFederationAuth(&service, authHeader)
+			if len(authErrors) > 0 {
+				c.String(http.StatusUnauthorized, fmt.Sprintf("federation auth failed: %v", authErrors))
+				return
+			}
+		}
 		if refreshToken != "" {
 			if err := upsertRefreshTokenSecret(&service, service.Namespace, refreshToken, back.GetKubeClientset()); err != nil {
 				c.String(http.StatusInternalServerError, "Error creating refresh-token secret: %v", err)
@@ -324,16 +331,23 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		var federationErrors []error
+		federated := service
 		if service.HasFederationMembers() {
-			authHeader := c.GetHeader("Authorization")
-			federated := service
 			federated.Input = rawInput
 			federated.Output = rawOutput
 			federationErrors = utils.ExpandFederation(&federated, authHeader, http.MethodPost)
 		}
 
 		if len(federationErrors) > 0 {
-			c.String(http.StatusCreated, fmt.Sprintf("Created with federation warnings: %v", federationErrors))
+			rollbackErrors := utils.RollbackFederationCreate(&federated, authHeader)
+			if err := back.DeleteService(service); err != nil {
+				rollbackErrors = append(rollbackErrors, fmt.Errorf("local rollback failed: %v", err))
+			}
+			if len(rollbackErrors) > 0 {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Federation failed: %v; rollback errors: %v", federationErrors, rollbackErrors))
+				return
+			}
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Federation failed; rollback completed: %v", federationErrors))
 			return
 		}
 
@@ -522,9 +536,12 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		s3Client = cfg.MinIOProvider.GetS3Client()
 
 		path := strings.Trim(in.Path, " /")
-		// Split buckets and folders from path
-		splitPath := strings.SplitN(path, "/", 2)
-		folderKey := fmt.Sprintf("%s/", splitPath[1])
+			// Split buckets and folders from path
+			splitPath := strings.SplitN(path, "/", 2)
+			folderKey := ""
+			if len(splitPath) > 1 && strings.TrimSpace(splitPath[1]) != "" {
+				folderKey = fmt.Sprintf("%s/", splitPath[1])
+			}
 
 		err := minIOAdminClient.CreateS3PathWithWebhook(s3Client, splitPath, service.GetMinIOWebhookARN(), false)
 
@@ -542,7 +559,11 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		if strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser && len(service.BucketList) > 0 {
 			for i, b := range service.BucketList {
 				// Create a bucket for each allowed user if allowed_users is not empty
-				err = minIOAdminClient.CreateS3PathWithWebhook(s3Client, []string{b, folderKey}, service.GetMinIOWebhookARN(), false)
+				if folderKey == "" {
+					err = minIOAdminClient.CreateS3PathWithWebhook(s3Client, []string{b}, service.GetMinIOWebhookARN(), false)
+				} else {
+					err = minIOAdminClient.CreateS3PathWithWebhook(s3Client, []string{b, folderKey}, service.GetMinIOWebhookARN(), false)
+				}
 				if err != nil && isUpdate {
 					continue
 				} else {
@@ -571,9 +592,12 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		}
 
 		path := strings.Trim(out.Path, " /")
-		// Split buckets and folders from path
-		splitPath := strings.SplitN(path, "/", 2)
-		folderKey := fmt.Sprintf("%s/", splitPath[1])
+			// Split buckets and folders from path
+			splitPath := strings.SplitN(path, "/", 2)
+			folderKey := ""
+			if len(splitPath) > 1 && strings.TrimSpace(splitPath[1]) != "" {
+				folderKey = fmt.Sprintf("%s/", splitPath[1])
+			}
 
 		switch provName {
 		case types.MinIOName, types.S3Name:
