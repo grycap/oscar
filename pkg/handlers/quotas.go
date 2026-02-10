@@ -51,8 +51,18 @@ func MakeGetOwnQuotaHandler(cfg *types.Config, kubeConfig *rest.Config) gin.Hand
 		}
 		resp, err := fetchQuota(c.Request.Context(), kubeConfig, uid)
 		if err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
-			return
+			// If the error is due to missing ClusterQueue, create it and try fetching again
+			err = utils.CreateKueueUserQueues(c.Request.Context(), cfg, uid)
+			if err != nil {
+				c.String(http.StatusInternalServerError, err.Error())
+				return
+			}
+			// Retry fetching quota after creating ClusterQueue
+			resp, err = fetchQuota(c.Request.Context(), kubeConfig, uid)
+			if err != nil {
+				c.String(http.StatusInternalServerError, err.Error())
+				return
+			}
 		}
 		c.JSON(http.StatusOK, resp)
 	}
