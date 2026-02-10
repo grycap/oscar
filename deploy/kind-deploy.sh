@@ -47,6 +47,7 @@ KIND_NODE_IMAGE=""
 ENABLE_OIDC="false"
 OIDC_ISSUERS_DEFAULT="https://keycloak.grycap.net/realms/grycap"
 OIDC_GROUPS_DEFAULT="/oscar-staff, /oscar-test"
+OIDC_CLIENT_ID="oscar-keycloak-client"
 if [ -z "$GEOIP_DB_PATH" ]; then
     GEOIP_DB_PATH="$GEOIP_DB_PATH_DEFAULT"
 fi
@@ -624,6 +625,7 @@ local_reg="y"
 use_devel_branch="n"
 use_metrics="$USE_METRICS"
 use_oidc="n"
+use_rescheduler="n"
 if [ -z "$KIND_NODE_IMAGE" ]; then
     KIND_NODE_IMAGE="kindest/node:v1.33.1"
 fi
@@ -634,12 +636,19 @@ else
     read -p "Do you want suport for local docker images? [y/n] " local_reg </dev/tty
     read -p "Do you want to install OSCAR from the devel branch? [y/n] (default uses master) " use_devel_branch </dev/tty
     read -p "Do you want to deploy the metrics stack (Prometheus + Loki + Alloy)? [y/n] " use_metrics </dev/tty
+    read -p "Do you want to enable the rescheduler for services with replicas? [y/n] " use_rescheduler </dev/tty
     if [ "$ENABLE_OIDC" != "true" ]; then
         echo -e "\n[*] OIDC defaults to be applied if enabled:"
         echo -e "  - OIDC_ENABLE=true"
         echo -e "  - OIDC_ISSUERS=$OIDC_ISSUERS_DEFAULT"
         echo -e "  - OIDC_GROUPS=$OIDC_GROUPS_DEFAULT"
         read -p "Do you want to enable OIDC authentication support with these defaults? [y/n] " use_oidc </dev/tty
+    fi
+    if [ `echo $use_oidc | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+        read -p "Enter OIDC client ID (required for federation offload) [${OIDC_CLIENT_ID}]: " oidc_client_id_input </dev/tty
+        if [ -n "$oidc_client_id_input" ]; then
+            OIDC_CLIENT_ID="$oidc_client_id_input"
+        fi
     fi
 fi
 
@@ -651,6 +660,13 @@ if [ `echo $use_metrics | tr '[:upper:]' '[:lower:]'` == "y" ]; then
 fi
 if [ `echo $use_oidc | tr '[:upper:]' '[:lower:]'` == "y" ]; then
     ENABLE_OIDC="true"
+fi
+if [ `echo $use_rescheduler | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+    ENABLE_RESCHEDULER="true"
+fi
+if [ "$ENABLE_OIDC" == "true" ] && [ -z "$OIDC_CLIENT_ID" ]; then
+    echo -e "$RED[!]$END_COLOR OIDC is enabled but OIDC_CLIENT_ID is empty. This is required for federation offload."
+    exit 1
 fi
 if [ "$OSCAR_IMAGE_BRANCH" == "devel" ]; then
     OSCAR_HELM_IMAGE_OVERRIDES="--set replicas=0"
@@ -886,6 +902,17 @@ if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
     fi
 fi
 
+if [ "$ENABLE_RESCHEDULER" == "true" ]; then
+    echo -e "\n[*] Enabling OSCAR rescheduler ..."
+    if ! kubectl -n oscar set env deployment/oscar \
+        RESCHEDULER_ENABLE="true" \
+        RESCHEDULER_INTERVAL="15" \
+        RESCHEDULER_THRESHOLD="30"; then
+        echo -e "$RED[!]$END_COLOR Failed to enable OSCAR rescheduler"
+        exit 1
+    fi
+fi
+
 if [ "$ENABLE_METRICS" == "true" ]; then
     echo -e "\n[*] Configuring OSCAR to use Prometheus and Loki ..."
     if ! kubectl -n oscar set env deployment/oscar \
@@ -901,7 +928,8 @@ if [ "$ENABLE_OIDC" == "true" ]; then
     if ! kubectl -n oscar set env deployment/oscar \
         OIDC_ENABLE="true" \
         OIDC_ISSUERS="$OIDC_ISSUERS_DEFAULT" \
-        OIDC_GROUPS="$OIDC_GROUPS_DEFAULT"; then
+        OIDC_GROUPS="$OIDC_GROUPS_DEFAULT" \
+        OIDC_CLIENT_ID="$OIDC_CLIENT_ID"; then
         echo -e "$RED[!]$END_COLOR Failed to set OIDC environment variables in OSCAR deployment"
         exit 1
     fi
@@ -929,6 +957,15 @@ echo "  - OSCAR HTTP port: $HOST_HTTP_PORT ($oscar_http_url)"
 echo "  - OSCAR HTTPS port: $HOST_HTTPS_PORT ($oscar_https_url)"
 echo "  - MinIO API NodePort/host port: $HOST_MINIO_API_PORT ($minio_api_url)"
 echo "  - MinIO console NodePort/host port: $HOST_MINIO_CONSOLE_PORT ($minio_console_url)"
+node_internal_ip=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null)
+ingress_http_nodeport=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null)
+ingress_https_nodeport=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null)
+if [ -n "$node_internal_ip" ] && [ -n "$ingress_http_nodeport" ] && [ -n "$ingress_https_nodeport" ]; then
+    echo "  - Test-only OSCAR HTTP endpoint (kind node IP + NodePort): http://${node_internal_ip}:${ingress_http_nodeport}"
+    echo "  - Test-only OSCAR HTTPS endpoint (kind node IP + NodePort): https://${node_internal_ip}:${ingress_https_nodeport}"
+    echo "  - Test-only MinIO API endpoint (kind node IP + NodePort): http://${node_internal_ip}:${HOST_MINIO_API_PORT}"
+    echo "  - Test-only MinIO console endpoint (kind node IP + NodePort): http://${node_internal_ip}:${HOST_MINIO_CONSOLE_PORT}"
+fi
 echo "  - OSCAR image branch: $OSCAR_IMAGE_BRANCH"
 echo "  - OSCAR credentials: username='oscar', password='$OSCAR_PASSWORD'"
 echo "  - MinIO credentials: username='minio', password='$MINIO_PASSWORD'"
