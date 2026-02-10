@@ -64,6 +64,35 @@ func EnsureKueueUserQueues(ctx context.Context, cfg *types.Config, serviceNamesp
 	return nil
 }
 
+// CreateKueueUserQueues only creates the user ClusterQueue
+func CreateKueueUserQueues(ctx context.Context, cfg *types.Config, owner string) error {
+	if !cfg.KueueEnable {
+		return nil
+	}
+
+	restCfg, err := rest.InClusterConfig()
+	if err != nil {
+		return fmt.Errorf("unable to build in-cluster config for kueue: %w", err)
+	}
+
+	kueueClient, err := kueueclientset.NewForConfig(restCfg)
+	if err != nil {
+		return fmt.Errorf("unable to create kueue client: %w", err)
+	}
+
+	flavorName := sanitizeKueueName(cfg.KueueDefaultFlavor)
+	if err := ensureResourceFlavor(ctx, kueueClient, flavorName); err != nil {
+		return fmt.Errorf("ensuring kueue ResourceFlavor: %w", err)
+	}
+
+	clusterQueueName := buildClusterQueueName(owner)
+	if err := ensureClusterQueue(ctx, kueueClient, cfg, clusterQueueName, flavorName, owner); err != nil {
+		return fmt.Errorf("ensuring kueue ClusterQueue: %w", err)
+	}
+
+	return nil
+}
+
 func ensureResourceFlavor(ctx context.Context, kueueClient *kueueclientset.Clientset, flavorName string) error {
 	_, err := kueueClient.KueueV1beta2().ResourceFlavors().Get(ctx, flavorName, metav1.GetOptions{})
 	if err == nil {
