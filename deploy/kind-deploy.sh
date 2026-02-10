@@ -11,6 +11,8 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 MINIO_HELM_NAME="minio"
 NFS_HELM_NAME="nfs-server-provisioner"
 OSCAR_HELM_NAME="oscar"
+GEOIP_DB_URL_DEFAULT="https://raw.githubusercontent.com/P3TERX/GeoLite.mmdb/download/GeoLite2-Country.mmdb"
+GEOIP_DB_PATH_DEFAULT="/tmp/GeoLite2-Country.mmdb"
 
 ARCH=`uname -m`
 SO=`uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]'`
@@ -42,6 +44,15 @@ SKIP_PROMPTS="false"
 USE_METRICS="n"
 ENABLE_METRICS="false"
 KIND_NODE_IMAGE=""
+ENABLE_OIDC="false"
+OIDC_ISSUERS_DEFAULT="https://keycloak.grycap.net/realms/grycap"
+OIDC_GROUPS_DEFAULT="/oscar-staff, /oscar-test"
+if [ -z "$GEOIP_DB_PATH" ]; then
+    GEOIP_DB_PATH="$GEOIP_DB_PATH_DEFAULT"
+fi
+if [ -z "$GEOIP_DB_URL" ]; then
+    GEOIP_DB_URL="$GEOIP_DB_URL_DEFAULT"
+fi
 
 usage(){
     cat <<EOF
@@ -51,6 +62,7 @@ Options:
   --devel        Deploy using the OSCAR devel branch without interactive prompts.
   --metrics      Deploy metrics stack (Prometheus + Loki + Alloy) for reporting.
   --kind-image   Kind node image to use (e.g., kindest/node:v1.34.0).
+  --oidc         Enable OIDC support for OSCAR (default: disabled).
   -h, --help     Show this help message and exit.
 EOF
 }
@@ -344,8 +356,8 @@ checkOSCARDeploy(){
         sleep 5
     done
 
-    if ! kubectl wait --namespace oscar --for=condition=Ready pod -l app=oscar --timeout="${readiness_timeout}s"; then
-        echo -e "\n$RED[!]$END_COLOR Error: OSCAR pods did not become ready after ${readiness_timeout}s."
+    if ! kubectl rollout status deployment/oscar -n oscar --timeout="${readiness_timeout}s"; then
+        echo -e "\n$RED[!]$END_COLOR Error: OSCAR deployment did not become available after ${readiness_timeout}s."
         kubectl get pods -n oscar
         failing_pods=$(kubectl get pods -n oscar -l app=oscar --no-headers | awk '{
             split($2, ready, "/");
@@ -478,6 +490,28 @@ EOF
     helm upgrade --install loki grafana/loki --namespace monitoring --values /tmp/loki-values.yaml
 
     echo -e "\n[*] Deploying Grafana Alloy ..."
+    if [ -f "$SCRIPT_DIR/../docs/snippets/geoip-pvc.yaml" ]; then
+        kubectl apply -f "$SCRIPT_DIR/../docs/snippets/geoip-pvc.yaml"
+    fi
+    echo -e "\n[*] Preparing GeoIP database for Alloy ..."
+    if [ ! -f "$GEOIP_DB_PATH" ]; then
+        if command -v curl &> /dev/null; then
+            curl -L --retry 3 --retry-delay 2 --max-time 30 -o "$GEOIP_DB_PATH" "$GEOIP_DB_URL"
+        elif command -v wget &> /dev/null; then
+            wget -O "$GEOIP_DB_PATH" "$GEOIP_DB_URL"
+        else
+            echo -e "$RED[!]$END_COLOR Neither curl nor wget is available to download GeoIP DB."
+            exit 1
+        fi
+    fi
+    if [ -f "$SCRIPT_DIR/../docs/snippets/geoip-loader-pod.yaml" ]; then
+        kubectl -n monitoring delete pod geoip-loader --ignore-not-found
+        kubectl apply -f "$SCRIPT_DIR/../docs/snippets/geoip-loader-pod.yaml"
+        kubectl -n monitoring wait --for=condition=Ready pod/geoip-loader --timeout=120s
+        kubectl -n monitoring cp "$GEOIP_DB_PATH" \
+            geoip-loader:/var/lib/geoip/GeoLite2-Country.mmdb
+        kubectl -n monitoring delete pod geoip-loader
+    fi
     if [ -f "$SCRIPT_DIR/../docs/snippets/alloy-values.kind.yaml" ]; then
         cp "$SCRIPT_DIR/../docs/snippets/alloy-values.kind.yaml" /tmp/alloy-values.yaml
     else
@@ -560,6 +594,10 @@ while [ "$#" -gt 0 ]; do
             KIND_NODE_IMAGE="$2"
             shift 2
             ;;
+        --oidc)
+            ENABLE_OIDC="true"
+            shift
+            ;;
         -h|--help)
             usage
             exit 0
@@ -583,10 +621,11 @@ checkKind
 echo -e "\n"
 use_knative="y"
 local_reg="y"
-use_devel_branch="y"
+use_devel_branch="n"
 use_metrics="$USE_METRICS"
-if [ -z "$KIND_NODE_IMAGE" ] && [ "$ARCH" == "arm64" ]; then
-    KIND_NODE_IMAGE="kindest/node:v1.34.0"
+use_oidc="n"
+if [ -z "$KIND_NODE_IMAGE" ]; then
+    KIND_NODE_IMAGE="kindest/node:v1.33.1"
 fi
 if [ "$SKIP_PROMPTS" == "true" ]; then
     echo "[*] Running in non-interactive mode: Knative, local registry, and OSCAR devel branch enabled."
@@ -595,6 +634,13 @@ else
     read -p "Do you want suport for local docker images? [y/n] " local_reg </dev/tty
     read -p "Do you want to install OSCAR from the devel branch? [y/n] (default uses master) " use_devel_branch </dev/tty
     read -p "Do you want to deploy the metrics stack (Prometheus + Loki + Alloy)? [y/n] " use_metrics </dev/tty
+    if [ "$ENABLE_OIDC" != "true" ]; then
+        echo -e "\n[*] OIDC defaults to be applied if enabled:"
+        echo -e "  - OIDC_ENABLE=true"
+        echo -e "  - OIDC_ISSUERS=$OIDC_ISSUERS_DEFAULT"
+        echo -e "  - OIDC_GROUPS=$OIDC_GROUPS_DEFAULT"
+        read -p "Do you want to enable OIDC authentication support with these defaults? [y/n] " use_oidc </dev/tty
+    fi
 fi
 
 if [ `echo $use_devel_branch | tr '[:upper:]' '[:lower:]'` == "y" ]; then
@@ -602,6 +648,9 @@ if [ `echo $use_devel_branch | tr '[:upper:]' '[:lower:]'` == "y" ]; then
 fi
 if [ `echo $use_metrics | tr '[:upper:]' '[:lower:]'` == "y" ]; then
     ENABLE_METRICS="true"
+fi
+if [ `echo $use_oidc | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+    ENABLE_OIDC="true"
 fi
 if [ "$OSCAR_IMAGE_BRANCH" == "devel" ]; then
     OSCAR_HELM_IMAGE_OVERRIDES="--set replicas=0"
@@ -778,9 +827,22 @@ helm install minio minio/minio --namespace minio --set rootUser=minio,rootPasswo
 echo -e "\n[*] Deploying NFS server provider ..."
 helm repo add --force-update nfs-ganesha-server-and-external-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
 if [ $ARCH == "arm64" ]; then
-    helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner --set image.repository=ghcr.io/grycap/nfs-provisioner-arm64 --set image.tag=latest
+    helm upgrade --install "$NFS_HELM_NAME" \
+        nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner \
+        --namespace nfs-provisioner --create-namespace \
+        --set image.repository=ghcr.io/grycap/nfs-provisioner-arm64 \
+        --set image.tag=latest \
+        --wait --timeout 5m
 else
-    helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner --set image.tag=v3.0.1
+    helm upgrade --install "$NFS_HELM_NAME" \
+        nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner \
+        --namespace nfs-provisioner --create-namespace \
+        --set image.tag=v3.0.1 \
+        --wait --timeout 5m
+fi
+if ! kubectl get storageclass nfs >/dev/null 2>&1; then
+    echo -e "$RED[!]$END_COLOR NFS StorageClass not found after install."
+    exit 1
 fi
 
 #Deploy metrics-server
@@ -806,9 +868,9 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 echo -e "\n[*] Deploying OSCAR ..."
 helm repo add --force-update grycap https://grycap.github.io/helm-charts/
 if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative --set resourceManager.enable=true $OSCAR_HELM_IMAGE_OVERRIDES
 else
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set resourceManager.enable=true $OSCAR_HELM_IMAGE_OVERRIDES
 fi
 
 if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
@@ -834,254 +896,19 @@ if [ "$ENABLE_METRICS" == "true" ]; then
     fi
 fi
 
-echo -e "\n[*] Configuring OSCAR OIDC client ID ..."
-if ! kubectl -n oscar set env deployment/oscar \
-    OIDC_CLIENT_ID="oscar-keycloak-client"; then
-    echo -e "$RED[!]$END_COLOR Failed to configure OSCAR OIDC client ID"
-    exit 1
+if [ "$ENABLE_OIDC" == "true" ]; then
+    echo -e "\n[*] Enabling OIDC support in OSCAR deployment ..."
+    if ! kubectl -n oscar set env deployment/oscar \
+        OIDC_ENABLE="true" \
+        OIDC_ISSUERS="$OIDC_ISSUERS_DEFAULT" \
+        OIDC_GROUPS="$OIDC_GROUPS_DEFAULT"; then
+        echo -e "$RED[!]$END_COLOR Failed to set OIDC environment variables in OSCAR deployment"
+        exit 1
+    fi
 fi
 
 #Wait for OSCAR deployment
 checkOSCARDeploy
- 
-echo -e "[*] Configuring RBAC permissions ..."
-cat <<'EOF' | kubectl apply -f -
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: oscar-sa
-  namespace: oscar
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: oscar-controller
-  namespace: oscar-svc
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  - pods/log
-  - podtemplates
-  - configmaps
-  - secrets
-  - services
-  - persistentvolumeclaims
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
-- apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  - deployments
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update 
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - deletecollection
-  - update
-- apiGroups:
-  - autoscaling
-  resources:
-  - horizontalpodautoscalers
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
-- apiGroups:
-  - networking.k8s.io
-  resources:
-  - ingresses
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
-- apiGroups:
-  - serving.knative.dev
-  resources:
-  - services
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: oscar-controller-binding
-  namespace: oscar-svc
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: oscar-controller
-subjects:
-- kind: ServiceAccount
-  name: oscar-sa
-  namespace: oscar
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: oscar-controller-global
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  - pods
-  - pods/log
-  - podtemplates
-  - persistentvolumeclaims
-  - secrets
-  - services
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - namespaces
-  verbs:
-  - get
-  - list
-  - create
-  - update
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - roles
-  - rolebindings
-  verbs:
-  - get
-  - list
-  - create
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - nodes
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumes
-  verbs:
-  - get
-  - list
-  - create
-- apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  - deployments
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update 
-- apiGroups:
-  - autoscaling
-  resources:
-  - horizontalpodautoscalers
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update 
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update 
-  - deletecollection
-- apiGroups:
-  - networking.k8s.io
-  resources:
-  - ingresses
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
-- apiGroups:
-  - serving.knative.dev
-  resources:
-  - services
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update 
-- apiGroups:
-  - metrics.k8s.io
-  resources:
-  - nodes
-  verbs:
-  - list
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: oscar-controller-global-binding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: oscar-controller-global
-subjects:
-- kind: ServiceAccount
-  name: oscar-sa
-  namespace: oscar
-EOF
 
 echo -e "\n[*] Deployment details:"
 echo "  - Kind cluster name: $CLUSTER_NAME"
