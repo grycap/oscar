@@ -27,19 +27,19 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
-// MakeReplicasGetHandler godoc
-// @Summary Get replicas for a service
-// @Description Get replicas and topology for a service federation.
-// @Tags replicas
+// MakeFederationGetHandler godoc
+// @Summary Get federation members for a service
+// @Description Get federation members and topology for a service.
+// @Tags federation
 // @Produce json
 // @Param serviceName path string true "Service name"
-// @Success 200 {object} types.ReplicasResponse
+// @Success 200 {object} types.FederationResponse
 // @Failure 404 {string} string "Not Found"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
 // @Security BearerAuth
-// @Router /system/replicas/{serviceName} [get]
-func MakeReplicasGetHandler(back types.ServerlessBackend) gin.HandlerFunc {
+// @Router /system/federation/{serviceName} [get]
+func MakeFederationGetHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		service, err := back.ReadService("", c.Param("serviceName"))
 		if err != nil {
@@ -55,36 +55,40 @@ func MakeReplicasGetHandler(back types.ServerlessBackend) gin.HandlerFunc {
 		if service.Federation != nil && service.Federation.Topology != "" {
 			topology = service.Federation.Topology
 		}
-		resp := types.ReplicasResponse{
+		var replicas types.ReplicaList
+		if service.Federation != nil && len(service.Federation.Members) > 0 {
+			replicas = service.Federation.Members
+		}
+		resp := types.FederationResponse{
 			Topology: topology,
-			Replicas: service.Replicas,
+			Members:  replicas,
 		}
 		c.JSON(http.StatusOK, resp)
 	}
 }
 
-// MakeReplicasPostHandler godoc
-// @Summary Add replicas to a federation
-// @Description Add replicas to a service federation and propagate to the topology.
-// @Tags replicas
+// MakeFederationPostHandler godoc
+// @Summary Add federation members to a service
+// @Description Add federation members to a service and propagate to the topology.
+// @Tags federation
 // @Accept json
 // @Produce json
 // @Param serviceName path string true "Service name"
-// @Param payload body types.ReplicasRequest true "Replicas add payload"
+// @Param payload body types.FederationRequest true "Federation members add payload"
 // @Success 200 {string} string "OK"
 // @Failure 400 {string} string "Bad Request"
 // @Failure 404 {string} string "Not Found"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
 // @Security BearerAuth
-// @Router /system/replicas/{serviceName} [post]
-func MakeReplicasPostHandler(back types.ServerlessBackend) gin.HandlerFunc {
+// @Router /system/federation/{serviceName} [post]
+func MakeFederationPostHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		updated, err := updateReplicasFromRequest(c, back, func(service *types.Service, req *types.ReplicasRequest) {
-			service.Replicas = append(service.Replicas, req.Replicas...)
-			if service.Federation != nil {
-				service.Federation.Members = append(service.Federation.Members, req.Replicas...)
+		updated, err := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) {
+			if service.Federation == nil {
+				service.Federation = &types.Federation{}
 			}
+			service.Federation.Members = append(service.Federation.Members, req.Members...)
 		})
 		if err != nil {
 			return
@@ -93,37 +97,31 @@ func MakeReplicasPostHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	}
 }
 
-// MakeReplicasPutHandler godoc
-// @Summary Update replicas in a federation
-// @Description Update replicas for a service federation and propagate to the topology.
-// @Tags replicas
+// MakeFederationPutHandler godoc
+// @Summary Update federation members in a service
+// @Description Update federation members for a service and propagate to the topology.
+// @Tags federation
 // @Accept json
 // @Produce json
 // @Param serviceName path string true "Service name"
-// @Param payload body types.ReplicasRequest true "Replicas update payload"
+// @Param payload body types.FederationRequest true "Federation members update payload"
 // @Success 200 {string} string "OK"
 // @Failure 400 {string} string "Bad Request"
 // @Failure 404 {string} string "Not Found"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
 // @Security BearerAuth
-// @Router /system/replicas/{serviceName} [put]
-func MakeReplicasPutHandler(back types.ServerlessBackend) gin.HandlerFunc {
+// @Router /system/federation/{serviceName} [put]
+func MakeFederationPutHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		updated, err := updateReplicasFromRequest(c, back, func(service *types.Service, req *types.ReplicasRequest) {
-			for _, target := range req.Replicas {
-				for i, replica := range service.Replicas {
+		updated, err := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) {
+			if service.Federation == nil {
+				service.Federation = &types.Federation{}
+			}
+			for _, target := range req.Members {
+				for i, replica := range service.Federation.Members {
 					if sameReplica(replica, target) && len(req.Update) > 0 {
-						service.Replicas[i] = req.Update[0]
-					}
-				}
-			}
-			if service.Federation != nil {
-				for _, target := range req.Replicas {
-					for i, replica := range service.Federation.Members {
-						if sameReplica(replica, target) && len(req.Update) > 0 {
-							service.Federation.Members[i] = req.Update[0]
-						}
+						service.Federation.Members[i] = req.Update[0]
 					}
 				}
 			}
@@ -135,28 +133,28 @@ func MakeReplicasPutHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	}
 }
 
-// MakeReplicasDeleteHandler godoc
-// @Summary Delete replicas from a federation
-// @Description Remove replicas from a service federation and propagate to the topology.
-// @Tags replicas
+// MakeFederationDeleteHandler godoc
+// @Summary Delete federation members from a service
+// @Description Remove federation members from a service and propagate to the topology.
+// @Tags federation
 // @Accept json
 // @Produce json
 // @Param serviceName path string true "Service name"
-// @Param payload body types.ReplicasRequest true "Replicas delete payload"
+// @Param payload body types.FederationRequest true "Federation members delete payload"
 // @Success 200 {string} string "OK"
 // @Failure 400 {string} string "Bad Request"
 // @Failure 404 {string} string "Not Found"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
 // @Security BearerAuth
-// @Router /system/replicas/{serviceName} [delete]
-func MakeReplicasDeleteHandler(back types.ServerlessBackend) gin.HandlerFunc {
+// @Router /system/federation/{serviceName} [delete]
+func MakeFederationDeleteHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		updated, err := updateReplicasFromRequest(c, back, func(service *types.Service, req *types.ReplicasRequest) {
-			service.Replicas = filterReplicas(service.Replicas, req.Replicas)
-			if service.Federation != nil {
-				service.Federation.Members = filterReplicas(service.Federation.Members, req.Replicas)
+		updated, err := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) {
+			if service.Federation == nil {
+				service.Federation = &types.Federation{}
 			}
+			service.Federation.Members = filterReplicas(service.Federation.Members, req.Members)
 		})
 		if err != nil {
 			return
@@ -165,8 +163,8 @@ func MakeReplicasDeleteHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	}
 }
 
-func updateReplicasFromRequest(c *gin.Context, back types.ServerlessBackend, mutator func(service *types.Service, req *types.ReplicasRequest)) (*types.ReplicasResponse, error) {
-	var req types.ReplicasRequest
+func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, mutator func(service *types.Service, req *types.FederationRequest)) (*types.FederationResponse, error) {
+	var req types.FederationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.String(http.StatusBadRequest, fmt.Sprintf("Invalid payload: %v", err))
 		return nil, err
@@ -213,9 +211,13 @@ func updateReplicasFromRequest(c *gin.Context, back types.ServerlessBackend, mut
 	if service.Federation != nil && service.Federation.Topology != "" {
 		topology = service.Federation.Topology
 	}
-	resp := &types.ReplicasResponse{
+	var replicas types.ReplicaList
+	if service.Federation != nil && len(service.Federation.Members) > 0 {
+		replicas = service.Federation.Members
+	}
+	resp := &types.FederationResponse{
 		Topology: topology,
-		Replicas: service.Replicas,
+		Members:  replicas,
 	}
 	return resp, nil
 }

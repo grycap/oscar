@@ -35,26 +35,26 @@ and confirm all services are created with correct topology and federation metada
 
 ---
 
-### User Story 2 - Manage replicas via API (Priority: P2)
+### User Story 2 - Manage federation members via API (Priority: P2)
 
-As a user, I want to add, update, or remove replicas for a service via the
-`/system/replicas` API so that I can maintain the federation without
+As a user, I want to add, update, or remove federation members for a service via the
+`/system/federation` API so that I can maintain the federation without
 re-deploying everything.
 
 **Why this priority**: Operational changes must be possible after initial
 creation.
 
-**Independent Test**: Use the replicas API to add a replica and verify the
-service replica list changes accordingly.
+**Independent Test**: Use the federation API to add a member and verify the
+service member list changes accordingly.
 
 **Acceptance Scenarios**:
 
 1. **Given** an existing federated service, **When** I call
-   `POST /system/replicas/{serviceName}` with a new replica definition,
-   **Then** the replica is added and reflected in `GET /system/replicas/{serviceName}`.
-2. **Given** an existing replica, **When** I call
-   `PUT /system/replicas/{serviceName}` with an update payload,
-   **Then** the replica’s attributes (e.g., priority) are updated.
+   `POST /system/federation/{serviceName}` with a new member definition,
+   **Then** the member is added and reflected in `GET /system/federation/{serviceName}`.
+2. **Given** an existing member, **When** I call
+   `PUT /system/federation/{serviceName}` with an update payload,
+   **Then** the member’s attributes (e.g., priority) are updated.
 
 ---
 
@@ -115,13 +115,13 @@ multiple jobs, and verify that delegation targets vary across available clusters
   `federation.members` is non-empty; worker replicas MUST carry federation
   metadata with empty `members` to avoid recursive expansion.
 - **FR-004**: For `topology=star`, OSCAR Manager MUST deploy worker services with
-  `federation.members` cleared, remove replica definitions in worker FDLs, and
+  `federation.members` cleared, remove member definitions in worker FDLs, and
   avoid embedding other cluster credentials.
 - **FR-005**: For `topology=mesh`, OSCAR Manager MUST deploy worker services with
-  replicas referencing all other clusters in the federation.
-- **FR-006**: System MUST provide a replicas API at `/system/replicas/{serviceName}`
-  with GET, POST, PUT, and DELETE operations for replica management.
-- **FR-006a**: The replicas API MUST operate on the same underlying service
+  members referencing all other clusters in the federation.
+- **FR-006**: System MUST provide a federation API at `/system/federation/{serviceName}`
+  with GET, POST, PUT, and DELETE operations for member management.
+- **FR-006a**: The federation API MUST operate on the same underlying service
   definitions used by `/system/services` (no HTTP round-trips required).
 - **FR-007**: System MUST support delegation policies `static`, `random`, and
   `load-based`.
@@ -176,7 +176,7 @@ multiple jobs, and verify that delegation targets vary across available clusters
   create-time, OSCAR Manager MUST roll back by removing the coordinator service
   and any replicas that were already created. The API response MUST surface the
   failure and rollback status. Replica add/update/remove operations via
-  `/system/replicas` MUST be best-effort per replica and MUST NOT delete
+  `/system/federation` MUST be best-effort per replica and MUST NOT delete
   existing healthy replicas on failure.
 
 ### Key Entities *(include if feature involves data)*
@@ -196,8 +196,8 @@ multiple jobs, and verify that delegation targets vary across available clusters
 
 - **SC-001**: Deploying a federation across N clusters results in N services
   created with correct topology within a single create request.
-- **SC-002**: `GET /system/replicas/{serviceName}` returns consistent topology
-  and replica lists after add/update/delete operations.
+- **SC-002**: `GET /system/federation/{serviceName}` returns consistent topology
+  and member lists after add/update/delete operations.
 - **SC-003**: In `delegation=random`, at least two different clusters are chosen
   across 10 successive delegations when multiple clusters are available.
 - **SC-004**: `load-based` delegation selects a cluster that meets CPU

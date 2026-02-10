@@ -1,11 +1,11 @@
 openapi: 3.0.3
 info:
-  title: OSCAR Replicas API
+  title: OSCAR Federation API
   version: 0.1.0
 paths:
-  /system/replicas/{serviceName}:
+  /system/federation/{serviceName}:
     get:
-      summary: Get replicas for a service
+      summary: Get federation members for a service
       parameters:
         - name: serviceName
           in: path
@@ -14,13 +14,13 @@ paths:
             type: string
       responses:
         '200':
-          description: Replica list
+          description: Federation member list
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReplicasResponse'
+                $ref: '#/components/schemas/FederationResponse'
     post:
-      summary: Add replica(s) to a service federation
+      summary: Add member(s) to a service federation
       parameters:
         - name: serviceName
           in: path
@@ -31,13 +31,13 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/ReplicasAddRequest'
+              schema:
+                $ref: '#/components/schemas/FederationAddRequest'
       responses:
         '200':
-          description: Replica(s) added
+          description: Member(s) added
     put:
-      summary: Update replica(s) for a service federation
+      summary: Update member(s) for a service federation
       parameters:
         - name: serviceName
           in: path
@@ -48,13 +48,13 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/ReplicasUpdateRequest'
+              schema:
+                $ref: '#/components/schemas/FederationUpdateRequest'
       responses:
         '200':
-          description: Replica(s) updated
+          description: Member(s) updated
     delete:
-      summary: Remove replica(s) from a service federation
+      summary: Remove member(s) from a service federation
       parameters:
         - name: serviceName
           in: path
@@ -65,11 +65,11 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/ReplicasDeleteRequest'
+              schema:
+                $ref: '#/components/schemas/FederationDeleteRequest'
       responses:
         '200':
-          description: Replica(s) removed
+          description: Member(s) removed
   /system/status:
     get:
       summary: Get cluster status for delegation
@@ -97,22 +97,22 @@ components:
           type: integer
       required: [type, cluster_id, service_name]
 
-    ReplicasResponse:
+    FederationResponse:
       type: object
       properties:
         topology:
           type: string
           enum: [none, star, mesh]
-        replicas:
+        members:
           type: array
           items:
             $ref: '#/components/schemas/ReplicaRef'
-      required: [topology, replicas]
+      required: [topology, members]
 
-    ReplicasAddRequest:
+    FederationAddRequest:
       type: object
       properties:
-        replicas:
+        members:
           type: array
           items:
             $ref: '#/components/schemas/ReplicaRef'
@@ -122,12 +122,12 @@ components:
             type: object
         storage_providers:
           type: object
-      required: [replicas]
+      required: [members]
 
-    ReplicasUpdateRequest:
+    FederationUpdateRequest:
       type: object
       properties:
-        replicas:
+        members:
           type: array
           items:
             $ref: '#/components/schemas/ReplicaRef'
@@ -141,16 +141,16 @@ components:
             type: object
         storage_providers:
           type: object
-      required: [replicas, update]
+      required: [members, update]
 
-    ReplicasDeleteRequest:
+    FederationDeleteRequest:
       type: object
       properties:
-        replicas:
+        members:
           type: array
           items:
             $ref: '#/components/schemas/ReplicaRef'
-      required: [replicas]
+      required: [members]
 
     ClusterStatus:
       type: object

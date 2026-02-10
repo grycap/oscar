@@ -24,6 +24,8 @@ type Federation struct {
 	Topology string `json:"topology"`
 	// Delegation defines the delegation policy: static, random, load-based.
 	Delegation string `json:"delegation,omitempty"`
+	// ReschedulerThreshold time (in seconds) that a job (with replicas) can be queued before delegating it.
+	ReschedulerThreshold int `json:"rescheduler_threshold,omitempty"`
 	// Members list of replica references in the federation.
 	Members ReplicaList `json:"members,omitempty"`
 }

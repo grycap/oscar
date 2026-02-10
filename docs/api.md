@@ -10,7 +10,7 @@ through an Ingress Controller. This API has been described following the
 
 ## Service replicas (federation)
 
-Federated replicas are managed through `/system/replicas/{serviceName}` with
+Federated members are managed through `/system/federation/{serviceName}` with
 GET/POST/PUT/DELETE operations. Updates apply to the whole federation topology
 (star/mesh). Federated services MUST provide `environment.secrets.refresh_token`;
 OSCAR Manager exchanges it for fresh OIDC bearer tokens when delegating jobs
@@ -19,11 +19,11 @@ across clusters. This requires `OIDC_CLIENT_ID` (and optionally
 issuers are configured in `OIDC_ISSUERS`, the token exchange uses the first
 issuer in the list, so ordering matters.
 
-Replica update semantics:
-- `POST` appends `replicas` and propagates to the federation.
-- `PUT` updates matching replicas; if `update` has multiple entries, only the
-  first (`update[0]`) is applied to each matched replica.
-- `DELETE` removes matching replicas.
+Federation update semantics:
+- `POST` appends `members` and propagates to the federation.
+- `PUT` updates matching members; if `update` has multiple entries, only the
+  first (`update[0]`) is applied to each matched member.
+- `DELETE` removes matching members.
 - `clusters` merges into the service cluster map; `storage_providers` replaces
   the service storage providers.
 
@@ -31,7 +31,7 @@ Deployment semantics:
 - Initial federation deployment (service creation) is transactional: any replica
   creation failure triggers rollback of the coordinator service and any replicas
   already created.
-- Replica add/update/delete via `/system/replicas` is best-effort per replica and
+- Member add/update/delete via `/system/federation` is best-effort per replica and
   MUST NOT delete existing healthy replicas on failure.
 
 Propagation warnings:

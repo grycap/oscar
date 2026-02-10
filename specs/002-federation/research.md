@@ -9,7 +9,7 @@
   - CLI/SDK expansion (rejected: more client complexity and drift risk).
   - Dual-mode expansion (rejected: validation ambiguity and higher maintenance).
 
-### Decision: Use `/system/replicas` API for replica lifecycle
+### Decision: Use `/system/federation` API for replica lifecycle
 - **Rationale**: Replica operations require topology-aware changes and targeted
   updates without full service spec replacement.
 - **Alternatives considered**:
@@ -120,10 +120,10 @@
   - Embed MinIO credentials directly in delegated events (rejected: security
     risk and leakage via logs).
 
-### Decision: Remove `role` and infer worker from empty members
+### Decision: Remove `role` and infer worker from empty replicas
 - **Rationale**: Avoids explicit `role` field while still preventing recursive
   expansion. OSCAR Manager will expand only when `federation.members` is
-  non-empty; worker replicas carry federation metadata with an empty members
+  non-empty; worker replicas carry federation metadata with an empty replicas
   list.
 - **Alternatives considered**:
   - Keep explicit `role` field (rejected: extra user-facing complexity).

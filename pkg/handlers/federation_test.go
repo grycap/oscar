@@ -27,20 +27,19 @@ import (
 	"github.com/grycap/oscar/v3/pkg/types"
 )
 
-func TestReplicasPostUpdatesServiceWithoutFederation(t *testing.T) {
+func TestFederationPostUpdatesServiceWithoutFederation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	back := backends.MakeFakeBackend()
 	back.Service = &types.Service{
-		Name:     "svc",
-		Replicas: types.ReplicaList{},
+		Name: "svc",
 	}
 
 	r := gin.New()
-	r.POST("/system/replicas/:serviceName", MakeReplicasPostHandler(back))
+	r.POST("/system/federation/:serviceName", MakeFederationPostHandler(back))
 
-	body := `{"replicas":[{"type":"oscar","cluster_id":"cluster-a","service_name":"svc-a"}]}`
-	req := httptest.NewRequest(http.MethodPost, "/system/replicas/svc", strings.NewReader(body))
+	body := `{"members":[{"type":"oscar","cluster_id":"cluster-a","service_name":"svc-a"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/system/federation/svc", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -51,7 +50,7 @@ func TestReplicasPostUpdatesServiceWithoutFederation(t *testing.T) {
 	if back.UpdatedService == nil {
 		t.Fatalf("expected service update via backend")
 	}
-	if len(back.UpdatedService.Replicas) != 1 {
-		t.Fatalf("expected 1 replica, got %d", len(back.UpdatedService.Replicas))
+	if back.UpdatedService.Federation == nil || len(back.UpdatedService.Federation.Members) != 1 {
+		t.Fatalf("expected 1 federation member, got %d", len(back.UpdatedService.Federation.Members))
 	}
 }

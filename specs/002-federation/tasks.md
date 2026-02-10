@@ -54,7 +54,7 @@ If tests are skipped, the reason must be recorded in the task or execution notes
 - [x] T008 [P] [US1] Integrate federation expansion into service creation in `pkg/handlers/create.go`
 - [x] T009 [P] [US1] Integrate federation expansion into service updates in `pkg/handlers/update.go`
 - [x] T010 [US1] Ensure worker replicas use empty `federation.members` and strip cluster creds in `pkg/utils/federation.go`
-- [x] T010a [US1] Enforce transactional federation deployment on initial create only: on any replica creation failure, delete coordinator and already-created replicas; report rollback status in `pkg/handlers/create.go` and `pkg/utils/federation.go`. Replica updates via `/system/replicas` must be best-effort per replica.
+- [x] T010a [US1] Enforce transactional federation deployment on initial create only: on any replica creation failure, delete coordinator and already-created replicas; report rollback status in `pkg/handlers/create.go` and `pkg/utils/federation.go`. Replica updates via `/system/federation` must be best-effort per replica.
 
 **Checkpoint**: User Story 1 should be fully functional and testable independently
 
@@ -62,19 +62,19 @@ If tests are skipped, the reason must be recorded in the task or execution notes
 
 ## Phase 4: User Story 2 - Manage replicas via API (Priority: P2)
 
-**Goal**: Add topology-wide replica management through `/system/replicas`
+**Goal**: Add topology-wide replica management through `/system/federation`
 
-**Independent Test**: Add a replica via API and confirm it appears in `GET /system/replicas/{serviceName}` across the topology
+**Independent Test**: Add a replica via API and confirm it appears in `GET /system/federation/{serviceName}` across the topology
 
 ### Implementation for User Story 2
 
-- [x] T011 [P] [US2] Add replicas request/response models in `pkg/types/replica.go`
-- [x] T012 [P] [US2] Implement replicas handlers (GET/POST/PUT/DELETE) in `pkg/handlers/replicas.go`
-- [x] T013 [US2] Register `/system/replicas` routes in `main.go`
+- [x] T011 [P] [US2] Add federation request/response models in `pkg/types/replica.go`
+- [x] T012 [P] [US2] Implement federation handlers (GET/POST/PUT/DELETE) in `pkg/handlers/federation.go`
+- [x] T013 [US2] Register `/system/federation` routes in `main.go`
 - [x] T014 [US2] Implement topology-wide replica update propagation in `pkg/utils/federation.go`
-- [x] T015 [US2] Add Swagger annotations for replicas endpoints in `pkg/handlers/replicas.go`
+- [x] T015 [US2] Add Swagger annotations for federation endpoints in `pkg/handlers/federation.go`
 - [x] T015a [US2] Enforce authz for federation creation across clusters the user is authenticated to in `pkg/handlers/create.go` (define criteria: Bearer token issuer in `OIDC_ISSUERS` OR valid BasicAuth; document required issuer/scopes and BasicAuth expectations)
-- [x] T015b [US2] Ensure replicas API operates on underlying service definitions without outbound HTTP calls (add unit test in `pkg/handlers/replicas_test.go`)
+- [x] T015b [US2] Ensure federation API operates on underlying service definitions without outbound HTTP calls (add unit test in `pkg/handlers/federation_test.go`)
 
 **Checkpoint**: User Stories 1 AND 2 should both work independently
 
@@ -110,7 +110,7 @@ If tests are skipped, the reason must be recorded in the task or execution notes
 
 **Purpose**: Documentation and cross-cutting updates
 
-- [x] T025 Update API docs for replicas and delegation in `docs/api.md`
+- [x] T025 Update API docs for federation and delegation in `docs/api.md`
 - [x] T026 Update async invocation docs for delegated MinIO access in `docs/invoking-async.md`
 - [x] T027 Document federated refresh-token requirement in `docs/fdl.md`
 
@@ -151,7 +151,7 @@ If tests are skipped, the reason must be recorded in the task or execution notes
 
 ## Parallel Example: User Story 2
 
-- T011 and T012 can be implemented in parallel (`pkg/types/replica.go` vs `pkg/handlers/replicas.go`)
+- T011 and T012 can be implemented in parallel (`pkg/types/replica.go` vs `pkg/handlers/federation.go`)
 
 ## Parallel Example: User Story 3
 

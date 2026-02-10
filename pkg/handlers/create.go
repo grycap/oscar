@@ -435,9 +435,6 @@ func checkValues(service *types.Service, cfg *types.Config) {
 		if service.Federation.Topology == "" {
 			service.Federation.Topology = "none"
 		}
-		if service.Delegation == "" && service.Federation.Delegation != "" {
-			service.Delegation = service.Federation.Delegation
-		}
 	}
 
 	// Generate a new access token
@@ -536,12 +533,12 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		s3Client = cfg.MinIOProvider.GetS3Client()
 
 		path := strings.Trim(in.Path, " /")
-			// Split buckets and folders from path
-			splitPath := strings.SplitN(path, "/", 2)
-			folderKey := ""
-			if len(splitPath) > 1 && strings.TrimSpace(splitPath[1]) != "" {
-				folderKey = fmt.Sprintf("%s/", splitPath[1])
-			}
+		// Split buckets and folders from path
+		splitPath := strings.SplitN(path, "/", 2)
+		folderKey := ""
+		if len(splitPath) > 1 && strings.TrimSpace(splitPath[1]) != "" {
+			folderKey = fmt.Sprintf("%s/", splitPath[1])
+		}
 
 		err := minIOAdminClient.CreateS3PathWithWebhook(s3Client, splitPath, service.GetMinIOWebhookARN(), false)
 
@@ -592,12 +589,12 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		}
 
 		path := strings.Trim(out.Path, " /")
-			// Split buckets and folders from path
-			splitPath := strings.SplitN(path, "/", 2)
-			folderKey := ""
-			if len(splitPath) > 1 && strings.TrimSpace(splitPath[1]) != "" {
-				folderKey = fmt.Sprintf("%s/", splitPath[1])
-			}
+		// Split buckets and folders from path
+		splitPath := strings.SplitN(path, "/", 2)
+		folderKey := ""
+		if len(splitPath) > 1 && strings.TrimSpace(splitPath[1]) != "" {
+			folderKey = fmt.Sprintf("%s/", splitPath[1])
+		}
 
 		switch provName {
 		case types.MinIOName, types.S3Name:

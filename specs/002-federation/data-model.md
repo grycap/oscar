@@ -7,7 +7,7 @@
 - **Key fields**: name, image, script, resources, input[], output[], federation.
 - **Relationships**:
   - One Service can belong to one Federation.
-  - One Service can have many Replicas (references to other services).
+  - One Service can have many federation members (references to other services).
 
 ### Federation
 - **Description**: Logical group of services participating in a federation.
@@ -15,6 +15,7 @@
   - `group_id` (string, unique within a federation scope)
   - `topology` (enum: none | star | mesh)
   - `delegation` (enum: static | random | load-based)
+  - `rescheduler_threshold` (int, seconds)
   - `members` (list of ReplicaRef)
 - **Relationships**:
   - Federation groups multiple Services.
@@ -48,4 +49,4 @@
 ## State/Transitions (conceptual)
 - Service lifecycle: create → update → delete (existing OSCAR flow).
 - Federation lifecycle: create (via coordinator FDL) → expand → maintain via
-  /system/replicas → delete.
+  /system/federation → delete.

@@ -320,7 +320,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		}
 
 		// Delegate job if can't be scheduled and has defined replicas
-		if rm != nil && service.HasReplicas() {
+		if rm != nil && service.HasFederationMembers() {
 			if !rm.IsSchedulable(podSpec.Containers[0].Resources) {
 				authHeader := c.GetHeader("Authorization")
 				err := resourcemanager.DelegateJob(service, event.Value, authHeader, resourcemanager.ResourceManagerLogger, cfg, back.GetKubeClientset())
@@ -358,9 +358,9 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		}
 
 		// Add ReScheduler label if there are replicas defined and the cfg.ReSchedulerEnable is true
-		if service.HasReplicas() && cfg.ReSchedulerEnable {
-			if service.ReSchedulerThreshold != 0 {
-				job.Labels[types.ReSchedulerLabelKey] = strconv.Itoa(service.ReSchedulerThreshold)
+		if service.HasFederationMembers() && cfg.ReSchedulerEnable {
+			if service.Federation != nil && service.Federation.ReschedulerThreshold != 0 {
+				job.Labels[types.ReSchedulerLabelKey] = strconv.Itoa(service.Federation.ReschedulerThreshold)
 			} else {
 				job.Labels[types.ReSchedulerLabelKey] = strconv.Itoa(cfg.ReSchedulerThreshold)
 			}

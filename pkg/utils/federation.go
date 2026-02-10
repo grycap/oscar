@@ -37,7 +37,6 @@ func ExpandFederation(service *types.Service, authHeader string, method string) 
 	}
 
 	defaultGroupID(service)
-	setReplicasFromMembers(service)
 
 	var errs []error
 	for _, member := range service.Federation.Members {
@@ -112,7 +111,6 @@ func ApplyFederation(service *types.Service) {
 		return
 	}
 	defaultGroupID(service)
-	setReplicasFromMembers(service)
 }
 
 func defaultGroupID(service *types.Service) {
@@ -124,30 +122,16 @@ func defaultGroupID(service *types.Service) {
 	}
 }
 
-func setReplicasFromMembers(service *types.Service) {
-	if service.Federation == nil {
-		return
-	}
-	if len(service.Federation.Members) == 0 {
-		return
-	}
-
-	switch strings.ToLower(service.Federation.Topology) {
-	case "mesh", "star":
-		service.Replicas = append(types.ReplicaList{}, service.Federation.Members...)
-	default:
-	}
-}
-
 func buildWorkerService(service *types.Service, member types.Replica) (*types.Service, error) {
 	worker := *service
 	worker.Name = member.ServiceName
 	worker.ClusterID = member.ClusterID
 	worker.Federation = &types.Federation{
-		GroupID:    service.Federation.GroupID,
-		Topology:   service.Federation.Topology,
-		Delegation: service.Federation.Delegation,
-		Members:    nil,
+		GroupID:              service.Federation.GroupID,
+		Topology:             service.Federation.Topology,
+		Delegation:           service.Federation.Delegation,
+		ReschedulerThreshold: service.Federation.ReschedulerThreshold,
+		Members:              nil,
 	}
 	worker.Clusters = stripClusterCredentials(service.Clusters)
 	if service.ClusterID != "" {
@@ -160,11 +144,11 @@ func buildWorkerService(service *types.Service, member types.Replica) (*types.Se
 
 	switch strings.ToLower(service.Federation.Topology) {
 	case "mesh":
-		worker.Replicas = buildFederationMeshReplicas(service, member)
+		worker.Federation.Members = buildFederationMeshReplicas(service, member)
 	case "star":
-		worker.Replicas = nil
+		worker.Federation.Members = nil
 	default:
-		worker.Replicas = nil
+		worker.Federation.Members = nil
 	}
 
 	return &worker, nil

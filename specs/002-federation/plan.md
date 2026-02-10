@@ -7,7 +7,7 @@
 
 Enable federated OSCAR service replicas across multiple clusters with star/mesh
 topology support. OSCAR Manager expands coordinator FDLs into per-cluster
-services, and `/system/replicas` manages topology-wide replica updates. Job
+services, and `/system/federation` manages topology-wide replica updates. Job
 delegation follows static/random/load-based policies using `/system/status`
 metrics, with inter-cluster auth based on refresh-token exchange to mint fresh
 OIDC bearer tokens and create-time transactional deployment across clusters

@@ -67,24 +67,24 @@ Example (kind):
 - ingress HTTPS NodePort: `31445`
 - endpoint: `https://172.18.0.3:31445`
 
-## 3) Verify replicas
+## 3) Verify federation members
 
-Use the replicas API to confirm topology and members:
+Use the federation API to confirm topology and members:
 
 ```bash
 curl -H "Authorization: Bearer <SERVICE_TOKEN>" \
-  https://<cluster-endpoint>/system/replicas/grayifyr0
+  https://<cluster-endpoint>/system/federation/grayifyr0
 ```
 
-## 4) Add or update replicas
+## 4) Add or update federation members
 
 Add a replica:
 
 ```bash
 curl -X POST -H "Authorization: Bearer <SERVICE_TOKEN>" \
   -H "Content-Type: application/json" \
-  -d '{"replicas":[{"type":"oscar","cluster_id":"oscar-cluster-c","service_name":"grayifyr3"}]}' \
-  https://<cluster-endpoint>/system/replicas/grayifyr0
+  -d '{"members":[{"type":"oscar","cluster_id":"oscar-cluster-c","service_name":"grayifyr3"}]}' \
+  https://<cluster-endpoint>/system/federation/grayifyr0
 ```
 
 Updates apply to the whole topology and are propagated by OSCAR Manager.
@@ -92,10 +92,10 @@ Updates apply to the whole topology and are propagated by OSCAR Manager.
 ## Notes
 - Initial deployment is transactional: if any replica fails to deploy, OSCAR
   removes the coordinator service and any replicas that were created. Replica
-  updates via `/system/replicas` are best-effort per replica.
+  updates via `/system/federation` are best-effort per member.
 - Delegation uses bearer tokens that are valid across federation clusters.
 - Offloading only happens when the local cluster cannot schedule the job. To
-  force delegation during testing, set `rescheduler_threshold: 10` (seconds)
+  force delegation during testing, set `federation.rescheduler_threshold: 10` (seconds)
   on the service and enable the rescheduler on the coordinator so pending jobs
   are delegated after ~10s. Example:
 

@@ -72,17 +72,19 @@ func TestDelegateJob(t *testing.T) {
 	defer server.Close()
 
 	service := &types.Service{
-		Name:       "test-service",
-		ClusterID:  "test-cluster",
-		CPU:        "1",
-		Delegation: "static",
-		Replicas: []types.Replica{
-			{
-				Type:        "oscar",
-				ClusterID:   "test-cluster",
-				ServiceName: "test-service",
-				Priority:    50,
-				Headers:     map[string]string{"Content-Type": "application/json"},
+		Name:      "test-service",
+		ClusterID: "test-cluster",
+		CPU:       "1",
+		Federation: &types.Federation{
+			Delegation: "static",
+			Members: []types.Replica{
+				{
+					Type:        "oscar",
+					ClusterID:   "test-cluster",
+					ServiceName: "test-service",
+					Priority:    50,
+					Headers:     map[string]string{"Content-Type": "application/json"},
+				},
 			},
 		},
 		Clusters: map[string]types.Cluster{
@@ -103,7 +105,7 @@ func TestDelegateJob(t *testing.T) {
 	})
 
 	t.Run("Replica type oscar with delegation random", func(t *testing.T) {
-		service.Delegation = "random"
+		service.Federation.Delegation = "random"
 		err := DelegateJob(service, event, "", logger, nil, nil)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
@@ -111,7 +113,7 @@ func TestDelegateJob(t *testing.T) {
 	})
 
 	t.Run("Replica type oscar with delegation load-based", func(t *testing.T) {
-		service.Delegation = "load-based"
+		service.Federation.Delegation = "load-based"
 		err := DelegateJob(service, event, "", logger, nil, nil)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
@@ -119,8 +121,8 @@ func TestDelegateJob(t *testing.T) {
 	})
 
 	t.Run("Replica type endpoint", func(t *testing.T) {
-		service.Replicas[0].Type = "endpoint"
-		service.Replicas[0].URL = server.URL
+		service.Federation.Members[0].Type = "endpoint"
+		service.Federation.Members[0].URL = server.URL
 		err := DelegateJob(service, event, "", logger, nil, nil)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)

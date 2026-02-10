@@ -60,15 +60,15 @@ func (rl ReplicaList) Less(i, j int) bool {
 	return rl[i].Priority < rl[j].Priority
 }
 
-// ReplicasResponse response payload for replicas API.
-type ReplicasResponse struct {
+// FederationResponse response payload for federation API.
+type FederationResponse struct {
 	Topology string      `json:"topology"`
-	Replicas ReplicaList `json:"replicas"`
+	Members  ReplicaList `json:"members"`
 }
 
-// ReplicasRequest payload for replicas API.
-type ReplicasRequest struct {
-	Replicas         ReplicaList        `json:"replicas"`
+// FederationRequest payload for federation API.
+type FederationRequest struct {
+	Members          ReplicaList        `json:"members"`
 	Update           ReplicaList        `json:"update,omitempty"`
 	Clusters         map[string]Cluster `json:"clusters,omitempty"`
 	StorageProviders *StorageProviders  `json:"storage_providers,omitempty"`

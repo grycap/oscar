@@ -115,11 +115,9 @@ storage_providers:
 | `image_prefetch` </br> *bool*                                         | Enable the use of image prefetching (retrieve the container image in the nodes when creating the service). Optional (default: false) |
 | `total_memory` </br> *string*                                     | Limit for the memory used by all the service's jobs running simultaneously. [Apache YuniKorn](https://yunikorn.apache.org)'s' scheduler is required to work. Same format as Memory, but internally translated to MB (integer). Optional (default: "")                                          |
 | `total_cpu` </br> *string*                                        | Limit for the virtual CPUs used by all the service's jobs running simultaneously. [Apache YuniKorn](https://yunikorn.apache.org)'s' scheduler is required to work. Same format as CPU, but internally translated to millicores (integer). Optional (default: "")                               |
-| `delegation` </br> *string*                                       | Mode of job delegation for replicas. Optional. Values: `static` (default), `random`, `load-based`, `topsis`.                                                                                                                    |
 | `synchronous` </br> *[SynchronousSettings](#synchronoussettings)* | Struct to configure specific sync parameters. This settings are only applied on Knative ServerlessBackend. Optional.                                                                                                                                         |
 | `expose` </br> *[ExposeSettings](#exposesettings)* | Allows to expose the API or UI of the application run in the OSCAR service outside of the Kubernetes cluster. Optional.                                                                                                                                         |
-| `replicas` </br> *[Replica](#replica) array*                      | List of replicas to delegate jobs. Optional.                                                                                                                                                                                                                 |
-| `rescheduler_threshold` </br> *integer*                            | Time (in seconds) that a job (with replicas) can be queued before delegating it. Optional.                                                                                                                                                                   |
+| `federation` </br> *[Federation](#federation)*                     | Federation configuration (topology, members, delegation, rescheduler threshold). Optional.                                                                                                                                                                  |
 | `log_level` </br> *string*                                        | Log level for the [faas-supervisor](https://github.com/grycap/faas-supervisor). Available levels: NOTSET, DEBUG, INFO, WARNING, ERROR and CRITICAL. Optional (default: INFO)                                                                                                                              |
 | `input` </br> *[StorageIOConfig](#storageioconfig) array*         | Array with the input configuration for the service. Optional                                                                                                                                                                                                 |
 | `output` </br> *[StorageIOConfig](#storageioconfig) array*        | Array with the output configuration for the service. Optional                                                                                                                                                                                                |
@@ -137,6 +135,16 @@ storage_providers:
 |------------------------------| --------------------------------------------|
 | `min_scale` </br> *integer* | Minimum number of active replicas (pods) for the service. Optional. (default: 0)             |
 | `max_scale` </br> *integer* | Maximum number of active replicas (pods) for the service. Optional. (default: 0 (Unlimited)) |
+
+## Federation
+
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
+| `group_id` </br> *string*                                       | Identifier for the federation group. Optional (default: service name). |
+| `topology` </br> *string*                                       | Federation topology: `none`, `star`, `mesh`. Optional. |
+| `delegation` </br> *string*                                     | Mode of job delegation for federation members. Optional. Values: `static` (default), `random`, `load-based`, `topsis`. |
+| `rescheduler_threshold` </br> *integer*                         | Time (in seconds) that a job (with members) can be queued before delegating it. Optional. |
+| `members` </br> *[Replica](#replica) array*                    | List of federation members to delegate jobs. Optional. |
 
 ## ExposeSettings
 

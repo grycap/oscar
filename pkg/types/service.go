@@ -180,24 +180,9 @@ type Service struct {
 		MaxScale int `json:"max_scale"`
 	} `json:"synchronous"`
 
-	// Replicas list of replicas to delegate jobs
-	// Optional
-	Replicas ReplicaList `json:"replicas,omitempty"`
-
 	// Federation defines a service federation across clusters
 	// Optional
 	Federation *Federation `json:"federation,omitempty"`
-
-	//Delegation Mode of job delegation for replicas
-	// Opcional (default: manual)
-	//"static" The user select the priority to delegate jobs to the replicas.
-	//"random" The job delegation priority is generated randomly among the clusters of the available replicas.
-	//"load-based" The job delegation priority is generated depending on the CPU and Memory available in the replica clusters.
-	Delegation string `json:"delegation"`
-
-	// ReSchedulerThreshold time (in seconds) that a job (with replicas) can be queued before delegating it
-	// Optional
-	ReSchedulerThreshold int `json:"rescheduler_threshold"`
 
 	// LogLevel log level for the FaaS Supervisor
 	// Optional. (default: INFO)
@@ -524,11 +509,6 @@ func (service *Service) GetSupervisorPath() string {
 		return fmt.Sprintf("%s/%s/%s", VolumePath, AlpineDirectory, SupervisorName)
 	}
 	return fmt.Sprintf("%s/%s", VolumePath, SupervisorName)
-}
-
-// HasReplicas checks if the service has replicas defined
-func (service *Service) HasReplicas() bool {
-	return len(service.Replicas) > 0
 }
 
 // HasFederationMembers checks if the service defines federation members.
