@@ -906,8 +906,8 @@ if [ "$ENABLE_RESCHEDULER" == "true" ]; then
     echo -e "\n[*] Enabling OSCAR rescheduler ..."
     if ! kubectl -n oscar set env deployment/oscar \
         RESCHEDULER_ENABLE="true" \
-        RESCHEDULER_INTERVAL="15" \
-        RESCHEDULER_THRESHOLD="30"; then
+        RESCHEDULER_INTERVAL="10" \
+        RESCHEDULER_THRESHOLD="10"; then
         echo -e "$RED[!]$END_COLOR Failed to enable OSCAR rescheduler"
         exit 1
     fi
