@@ -27,6 +27,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
+	kserveclient "github.com/kserve/kserve/pkg/client/clientset/versioned"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,9 +42,10 @@ import (
 
 // KnativeBackend struct to represent a Knative client
 type KnativeBackend struct {
-	kubeClientset kubernetes.Interface
-	knClientset   knclientset.Interface
-	config        *types.Config
+	kubeClientset   kubernetes.Interface
+	knClientset     knclientset.Interface
+	kserveClientset *kserveclient.Clientset
+	config          *types.Config
 }
 
 // MakeKnativeBackend makes a KnativeBackend from the provided k8S clientset and config
@@ -53,10 +55,19 @@ func MakeKnativeBackend(kubeClientset kubernetes.Interface, kubeConfig *rest.Con
 		log.Fatal(err)
 	}
 
+	var kserveClientset *kserveclient.Clientset
+	if cfg.KserveEnable {
+		kserveClientset, err = kserveclient.NewForConfig(kubeConfig)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	return &KnativeBackend{
-		kubeClientset: kubeClientset,
-		knClientset:   knClientset,
-		config:        cfg,
+		kubeClientset:   kubeClientset,
+		knClientset:     knClientset,
+		kserveClientset: kserveClientset,
+		config:          cfg,
 	}
 }
 
@@ -112,6 +123,16 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 	err = createServiceConfigMap(&service, namespace, kn.kubeClientset)
 	if err != nil {
 		return err
+	}
+
+	if kn.kserveClientset != nil && utils.IsKserveService(&service) {
+		err = utils.CreateKserveInferenceService(kn.kserveClientset, &service)
+		if err != nil {
+			if delErr := deleteServiceConfigMap(service.Name, namespace, kn.kubeClientset); delErr != nil {
+				log.Println(delErr.Error())
+			}
+			return err
+		}
 	}
 
 	// Create the Knative service definition

@@ -1,0 +1,48 @@
+apiVersion: serving.kserve.io/v1alpha1
+kind: LLMInferenceService
+metadata:
+  name: distilgpt2-vllm-cpu
+  namespace: kserve-test
+spec:
+  model:
+    uri: "hf://facebook/opt-125m"
+    name: distilbert/distilgpt2
+
+  replicas: 1
+
+  template:
+    containers:
+      - name: main
+        image: ghcr.io/rk181/vllm-cpu-env:latest
+        command:
+          - vllm
+          - serve
+          - facebook/opt-125m
+        args:
+          - --dtype=auto
+          - --max-model-len=1024
+          - --max-num-seqs=1
+          - --swap-space=0
+        securityContext:
+          runAsNonRoot: false
+        env:
+          - name: VLLM_LOGGING_LEVEL
+            value: DEBUG		
+          - name: VLLM_CPU_BINDING
+            value: "none"
+          - name: OMP_NUM_THREADS
+            value: "1"
+          - name: VLLM_CPU_KVCACHE_SPACE
+            value: "2"
+        resources:
+          limits:
+            cpu: "2"
+            memory: 4Gi
+          requests:
+            cpu: "2"
+            memory: 4Gi
+
+  router:
+    gateway: {}
+    route: {}
+    scheduler: {}
