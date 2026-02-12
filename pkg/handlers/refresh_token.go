@@ -17,11 +17,13 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -69,4 +71,23 @@ func upsertRefreshTokenSecret(service *types.Service, namespace string, refreshT
 	return utils.CreateSecret(secretName, namespace, map[string]string{
 		types.RefreshTokenSecretKey: refreshToken,
 	}, kubeClientset)
+}
+
+func readRefreshTokenSecretValue(serviceName string, namespace string, kubeClientset kubernetes.Interface) (string, error) {
+	if serviceName == "" || namespace == "" || kubeClientset == nil {
+		return "", fmt.Errorf("missing refresh-token secret context")
+	}
+
+	secretName := utils.RefreshTokenSecretName(serviceName)
+	secret, err := kubeClientset.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	tokenBytes, ok := secret.Data[types.RefreshTokenSecretKey]
+	if !ok {
+		return "", fmt.Errorf("refresh-token secret missing key %q", types.RefreshTokenSecretKey)
+	}
+
+	return strings.TrimSpace(string(tokenBytes)), nil
 }

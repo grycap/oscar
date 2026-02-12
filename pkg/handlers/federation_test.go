@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -25,6 +26,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/backends"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestFederationPostUpdatesServiceWithoutFederation(t *testing.T) {
@@ -32,8 +36,25 @@ func TestFederationPostUpdatesServiceWithoutFederation(t *testing.T) {
 
 	back := backends.MakeFakeBackend()
 	back.Service = &types.Service{
-		Name: "svc",
+		Name:      "svc",
+		Namespace: "oscar-svc-test",
+		Federation: &types.Federation{
+			Members: types.ReplicaList{},
+		},
 	}
+	kubeClient := back.GetKubeClientset()
+	_, _ = kubeClient.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: back.Service.Namespace},
+	}, metav1.CreateOptions{})
+	_, _ = kubeClient.CoreV1().Secrets(back.Service.Namespace).Create(context.TODO(), &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      utils.RefreshTokenSecretName(back.Service.Name),
+			Namespace: back.Service.Namespace,
+		},
+		Data: map[string][]byte{
+			types.RefreshTokenSecretKey: []byte("refresh-token"),
+		},
+	}, metav1.CreateOptions{})
 
 	r := gin.New()
 	r.POST("/system/federation/:serviceName", MakeFederationPostHandler(back))

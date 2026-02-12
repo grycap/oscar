@@ -272,28 +272,40 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
-		var buckets []utils.MinIOBucket
-		if buckets, err = createBuckets(&service, cfg, minIOAdminClient, false); err != nil {
-			createLogger.Printf("Error creating buckets for service '%s': %v", service.Name, err)
-			if err == errInput {
-				c.String(http.StatusBadRequest, err.Error())
-			} else {
-				c.String(http.StatusInternalServerError, err.Error())
-			}
-			derr := back.DeleteService(service)
-			if derr != nil {
-				log.Printf("Error deleting service: %v\n", derr)
-			}
-
-			if !strings.Contains(err.Error(), " already exists") {
-				bderr := deleteBuckets(&service, cfg, minIOAdminClient)
-				if bderr != nil {
-					log.Printf("Error deleting buckets: %v\n", bderr)
+		buckets := []utils.MinIOBucket{}
+		if !(service.Annotations != nil &&
+			strings.EqualFold(strings.TrimSpace(service.Annotations[types.FederationWorkerAnnotation]), "true") &&
+			service.Federation != nil &&
+			strings.EqualFold(strings.TrimSpace(service.Federation.Topology), "mesh")) {
+			if buckets, err = createBuckets(&service, cfg, minIOAdminClient, false); err != nil {
+				createLogger.Printf("Error creating buckets for service '%s': %v", service.Name, err)
+				if err == errInput {
+					c.String(http.StatusBadRequest, err.Error())
+				} else {
+					c.String(http.StatusInternalServerError, err.Error())
 				}
+				derr := back.DeleteService(service)
+				if derr != nil {
+					log.Printf("Error deleting service: %v\n", derr)
+				}
+
+				if !strings.Contains(err.Error(), " already exists") {
+					bderr := deleteBuckets(&service, cfg, minIOAdminClient)
+					if bderr != nil {
+						log.Printf("Error deleting buckets: %v\n", bderr)
+					}
+				}
+				return
 			}
-			return
 		}
 		if len(buckets) > 0 {
+			if service.Annotations != nil &&
+				strings.EqualFold(strings.TrimSpace(service.Annotations[types.FederationWorkerAnnotation]), "true") &&
+				service.Federation != nil &&
+				strings.EqualFold(strings.TrimSpace(service.Federation.Topology), "mesh") {
+				// Worker services should not manage origin buckets.
+				goto skipBucketTags
+			}
 			for _, b := range buckets {
 				// If not specified default visibility is PRIVATE
 				if strings.ToLower(service.Visibility) == "" {
@@ -322,6 +334,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 			}
 		}
+	skipBucketTags:
 
 		// Add Yunikorn queue if enabled
 		if cfg.YunikornEnable {
@@ -333,10 +346,17 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		var federationErrors []error
 		federated := service
 		if service.HasFederationMembers() {
+			if service.Annotations != nil &&
+				strings.EqualFold(strings.TrimSpace(service.Annotations[types.FederationWorkerAnnotation]), "true") &&
+				service.Federation != nil &&
+				strings.EqualFold(strings.TrimSpace(service.Federation.Topology), "mesh") {
+				goto skipFederationExpansion
+			}
 			federated.Input = rawInput
 			federated.Output = rawOutput
-			federationErrors = utils.ExpandFederation(&federated, authHeader, http.MethodPost)
+			federationErrors = utils.ExpandFederation(&federated, authHeader, http.MethodPost, refreshToken)
 		}
+	skipFederationExpansion:
 
 		if len(federationErrors) > 0 {
 			rollbackErrors := utils.RollbackFederationCreate(&federated, authHeader)

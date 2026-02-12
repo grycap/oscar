@@ -57,6 +57,10 @@ func StartReScheduler(cfg *types.Config, back types.ServerlessBackend, kubeClien
 
 		// Delegate jobs
 		for _, rsi := range reScheduleInfos {
+			if rsi.service == nil {
+				reSchedulerLogger.Printf("skip reschedule for job %q: service not found", rsi.jobName)
+				continue
+			}
 			err := delegateJobFunc(rsi.service, rsi.event, "", reSchedulerLogger, cfg, kubeClientset)
 			if err != nil {
 				reSchedulerLogger.Println(err.Error())
@@ -161,11 +165,15 @@ func getReScheduleInfos(pods []v1.Pod, back types.ServerlessBackend) []reSchedul
 			svcPtrs[serviceKey], err = back.ReadService(pod.Namespace, serviceName)
 			if err != nil {
 				reSchedulerLogger.Printf("error getting service: %v\n", err)
+				svcPtrs[serviceKey] = nil
 			}
 		}
 
 		// Check if pod has the "job-name" label
 		if jobName, ok := pod.Labels["job-name"]; ok {
+			if svcPtrs[serviceKey] == nil {
+				continue
+			}
 			rsi = append(rsi, reScheduleInfo{
 				service:   svcPtrs[serviceKey],
 				event:     getEvent(pod.Spec),

@@ -30,8 +30,8 @@ and confirm all services are created with correct topology and federation metada
    coordinator service and deploys worker replicas to the specified clusters
    with `federation.members` cleared and appropriate FDL rewrites.
 2. **Given** a valid FDL with federation enabled and `topology=mesh`, **When** I
-   submit it to the coordinator cluster, **Then** OSCAR Manager creates services
-   in all target clusters and each service has replicas for all other clusters.
+   submit it to the coordinator cluster, **Then** OSCAR Manager creates services in
+   all target clusters and each service has members for all other clusters.
 
 ---
 
@@ -119,6 +119,10 @@ multiple jobs, and verify that delegation targets vary across available clusters
   avoid embedding other cluster credentials.
 - **FR-005**: For `topology=mesh`, OSCAR Manager MUST deploy worker services with
   members referencing all other clusters in the federation.
+- **FR-005b**: For `topology=mesh`, OSCAR Manager MUST propagate the refresh
+  token to each federation member (stored in the member cluster Secret) so any
+  cluster can initiate updates or reschedule jobs. For `topology=star`, refresh
+  tokens MUST remain only on the coordinator cluster.
 - **FR-006**: System MUST provide a federation API at `/system/federation/{serviceName}`
   with GET, POST, PUT, and DELETE operations for member management.
 - **FR-006a**: The federation API MUST operate on the same underlying service

@@ -129,6 +129,15 @@
   - Keep explicit `role` field (rejected: extra user-facing complexity).
   - Add `federation.expanded` flag (rejected: new field still required).
 
+### Discussion: Avoid recursive expansion while keeping federation members
+- **Problem**: In mesh, workers must keep `federation.members` so any cluster can
+  later accept federation updates, but recursive expansion and bucket creation
+  must be avoided.
+- **Approach**: Add a service annotation (e.g., `oscar.grycap/federation-worker=true`)
+  on worker services created during federation expansion. Create/update handlers
+  use this marker to skip federation expansion and origin bucket creation on
+  workers. This preserves federation update capability without re-expanding.
+
 ## Delegation authentication and token expiry
 
 ### Decision: Require a refresh token in service `secrets` for federated services
@@ -139,7 +148,15 @@
   - Short-lived delegation tokens (rejected: additional token-issuance
     infrastructure and validation flow).
   - Cluster basic auth (rejected: not user-scoped).
-  - Per-job access tokens (rejected: expire before reschedule).
+- Per-job access tokens (rejected: expire before reschedule).
+
+**Mesh topology note**:
+- For `topology=mesh`, refresh tokens must be available in every member cluster
+  so any cluster can initiate federation updates or reschedule jobs. OSCAR
+  Manager propagates the refresh token to federation members during mesh
+  expansion and stores it in the local refresh-token Secret on each cluster.
+- For `topology=star`, refresh tokens remain only on the coordinator cluster;
+  worker services do not receive them.
 
 ### Security implications (explicitly accepted)
 - Refresh tokens are long-lived and high-impact if exposed.

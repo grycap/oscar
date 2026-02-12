@@ -55,6 +55,7 @@ If tests are skipped, the reason must be recorded in the task or execution notes
 - [x] T009 [P] [US1] Integrate federation expansion into service updates in `pkg/handlers/update.go`
 - [x] T010 [US1] Ensure worker replicas use empty `federation.members` and strip cluster creds in `pkg/utils/federation.go`
 - [x] T010a [US1] Enforce transactional federation deployment on initial create only: on any replica creation failure, delete coordinator and already-created replicas; report rollback status in `pkg/handlers/create.go` and `pkg/utils/federation.go`. Replica updates via `/system/federation` must be best-effort per replica.
+- [x] T010b [US1] Ensure refresh-token secrets are propagated only for `topology=mesh` during federation expansion in `pkg/utils/federation.go`
 
 **Checkpoint**: User Story 1 should be fully functional and testable independently
 

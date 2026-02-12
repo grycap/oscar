@@ -31,7 +31,7 @@ import (
 )
 
 // ExpandFederation propagates service definitions to federation members.
-func ExpandFederation(service *types.Service, authHeader string, method string) []error {
+func ExpandFederation(service *types.Service, authHeader string, method string, refreshToken string) []error {
 	if service == nil || service.Federation == nil || len(service.Federation.Members) == 0 {
 		return nil
 	}
@@ -40,7 +40,7 @@ func ExpandFederation(service *types.Service, authHeader string, method string) 
 
 	var errs []error
 	for _, member := range service.Federation.Members {
-		worker, err := buildWorkerService(service, member)
+		worker, err := buildWorkerService(service, member, refreshToken)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -122,7 +122,7 @@ func defaultGroupID(service *types.Service) {
 	}
 }
 
-func buildWorkerService(service *types.Service, member types.Replica) (*types.Service, error) {
+func buildWorkerService(service *types.Service, member types.Replica, refreshToken string) (*types.Service, error) {
 	worker := *service
 	worker.Name = member.ServiceName
 	worker.ClusterID = member.ClusterID
@@ -140,6 +140,13 @@ func buildWorkerService(service *types.Service, member types.Replica) (*types.Se
 		}
 		worker.Annotations[types.OriginClusterAnnotation] = service.ClusterID
 		worker.Annotations[types.OriginServiceAnnotation] = service.Name
+		worker.Annotations[types.FederationWorkerAnnotation] = "true"
+	}
+	if refreshToken != "" && strings.EqualFold(service.Federation.Topology, "mesh") {
+		if worker.Environment.Secrets == nil {
+			worker.Environment.Secrets = map[string]string{}
+		}
+		worker.Environment.Secrets[types.RefreshTokenSecretKey] = refreshToken
 	}
 
 	switch strings.ToLower(service.Federation.Topology) {

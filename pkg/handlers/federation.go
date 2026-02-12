@@ -201,7 +201,16 @@ func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, m
 
 	if service.HasFederationMembers() {
 		authHeader := c.GetHeader("Authorization")
-		if errs := utils.ExpandFederation(service, authHeader, http.MethodPut); len(errs) > 0 {
+		if service.Namespace == "" {
+			c.String(http.StatusInternalServerError, "error reading refresh-token secret: service namespace is empty")
+			return nil, fmt.Errorf("service namespace is empty")
+		}
+		refreshToken, err := readRefreshTokenSecretValue(service.Name, service.Namespace, back.GetKubeClientset())
+		if err != nil {
+			c.String(http.StatusInternalServerError, "error reading refresh-token secret: %v", err)
+			return nil, err
+		}
+		if errs := utils.ExpandFederation(service, authHeader, http.MethodPut, refreshToken); len(errs) > 0 {
 			c.String(http.StatusOK, fmt.Sprintf("Updated with federation warnings: %v", errs))
 			return nil, fmt.Errorf("federation propagation warnings")
 		}
