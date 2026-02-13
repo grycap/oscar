@@ -1,13 +1,17 @@
 functions:
   oscar:
   - oscar-cluster:
-      name: openclaw-gateway
+      name: openclaw-minio
       memory: 2Gi
       cpu: "1.0"
       image: ghcr.io/openclaw/openclaw:2026.2.9
       script: openclawscript.sh
       environment:
         Variables:
+          OPENCLAW_MOUNT_PATH: "openclaw-minio/state"
+          OPENCLAW_PERSIST_CONFIG_ONLY: "1"
+          OPENCLAW_LOCAL_STATE_DIR: "/tmp/openclaw-state"
+          OPENCLAW_CONFIG_SYNC_INTERVAL: "30"
           OPENCLAW_DISABLE_DEVICE_AUTH: "1"
           OPENCLAW_SKIP_CHANNELS: "0"
           OPENCLAW_SKIP_PROVIDERS: "0"
@@ -15,6 +19,9 @@ functions:
           OPENCLAW_SKIP_CANVAS_HOST: "1"
           OPENCLAW_SKIP_GMAIL_WATCHER: "1"
           OPENCLAW_SKIP_CRON: "1"
+      mount:
+        storage_provider: minio.default
+        path: openclaw-minio/state
       expose:
         min_scale: 1
         max_scale: 1

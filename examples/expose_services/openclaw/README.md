@@ -111,5 +111,6 @@ curl -i -u "openclaw-gateway:<SERVICE_TOKEN>" \
 - The startup script sets `NODE_OPTIONS=--max-old-space-size=768` by default to avoid Node.js heap OOM on small local clusters.
 - The startup script auto-configures `gateway.trustedProxies` to private proxy ranges so WebSocket clients behind OSCAR ingress are correctly identified. Override with `OPENCLAW_GATEWAY_TRUSTED_PROXIES` (JSON array string).
 - Device pairing for the Control UI is disabled by default in this example (`OPENCLAW_DISABLE_DEVICE_AUTH=1`) to avoid manual approvals after each redeploy. This removes OpenClaw per-device identity checks.
+- For MinIO-mounted deployments, the startup script auto-uses `/mnt` as `OPENCLAW_STATE_DIR` and `/mnt/openclaw.json` as `OPENCLAW_CONFIG_PATH` when available, so config/state are persisted even if custom FDL env vars are not propagated.
 - `health_path: "/"` is set so OSCAR readiness/liveness probes check a valid OpenClaw HTTP endpoint.
 - `rewrite_target: true` is enabled so the exposed service path is rewritten correctly when accessing the web UI behind OSCAR's `/system/services/<name>/exposed/` prefix.
