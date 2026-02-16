@@ -113,3 +113,7 @@ func deriveKserveName(serviceName string) string {
 	// TO DO
 	return serviceName
 }
+
+func KservePredictor(serviceName string) string {
+	return serviceName + "-predictor"
+}

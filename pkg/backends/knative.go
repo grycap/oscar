@@ -114,6 +114,15 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 	}
 	var isKserve bool = (kn.kserveClientset != nil && utils.IsKserveService(&service))
 
+	if isKserve {
+		if service.Environment.Vars == nil {
+			service.Environment.Vars = make(map[string]string)
+		}
+		// TODO: Replace value inyection method
+		service.Environment.Vars["KSERVE_MODEL_NAME"] = service.Name
+		service.Environment.Vars["KSERVE_HOST"] = fmt.Sprintf("%s.%s.svc.cluster.local", utils.KservePredictor(service.Name), namespace)
+	}
+
 	// Check if there is some user defined settings for OSCAR
 	err := checkAdditionalConfig(ConfigMapNameOSCAR, kn.config.ServicesNamespace, service, kn.config, kn.kubeClientset)
 	if err != nil {
@@ -124,14 +133,6 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 	err = createServiceConfigMap(&service, namespace, kn.kubeClientset)
 	if err != nil {
 		return err
-	}
-
-	if isKserve {
-		if service.Environment.Vars == nil {
-			service.Environment.Vars = make(map[string]string)
-		}
-		// TODO: Replace value inyection method
-		service.Environment.Vars["KSERVE_SERVICE_NAME"] = service.Name + "-predictor"
 	}
 
 	// Create the Knative service definition
