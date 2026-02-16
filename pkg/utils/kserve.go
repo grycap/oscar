@@ -9,6 +9,7 @@ import (
 	kserveclient "github.com/kserve/kserve/pkg/client/clientset/versioned"
 	"github.com/kserve/kserve/pkg/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	knv1 "knative.dev/serving/pkg/apis/serving/v1"
 )
 
 const (
@@ -16,7 +17,7 @@ const (
 	OSCAR_KSERVE_SERVICE_SCRIPT = ""
 )
 
-func NewKserveInferenceService(service *types.Service) (*servingv1beta1.InferenceService, error) {
+func NewKserveInferenceService(service *types.Service, knSvc *knv1.Service) (*servingv1beta1.InferenceService, error) {
 
 	if !IsKserveService(service) {
 		return nil, fmt.Errorf("service does not have KServe configuration")
@@ -34,12 +35,25 @@ func NewKserveInferenceService(service *types.Service) (*servingv1beta1.Inferenc
 		protocolV = constants.ProtocolV2
 	}
 	*/
+	controller := false
+	blockOwnerDeletion := true
 
 	// Define InferenceService
 	return &servingv1beta1.InferenceService{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deriveKserveName(service.Name),
 			Namespace: service.Namespace,
+
+			OwnerReferences: []metav1.OwnerReference{
+				metav1.OwnerReference{
+					APIVersion:         "serving.knative.dev/v1",
+					Kind:               "Service",
+					Name:               service.Name,
+					UID:                knSvc.UID,
+					Controller:         &controller,
+					BlockOwnerDeletion: &blockOwnerDeletion,
+				},
+			},
 		},
 		Spec: servingv1beta1.InferenceServiceSpec{
 			Predictor: servingv1beta1.PredictorSpec{
@@ -64,9 +78,12 @@ func NewKserveInferenceService(service *types.Service) (*servingv1beta1.Inferenc
 	}, nil
 }
 
-func CreateKserveInferenceService(kserveclient *kserveclient.Clientset, service *types.Service) (*servingv1beta1.InferenceService, error) {
+// CreateKserveInferenceService creates a KServe InferenceService based on the provided service and Knative service.
+// It set an OwnerReference to the Knative service, so if the Knative service is deleted the KServe InferenceService will be automatically deleted by Kubernetes garbage collection.
+// It returns the created InferenceService or an error if the creation fails.
+func CreateKserveInferenceService(kserveclient *kserveclient.Clientset, service *types.Service, knativeService *knv1.Service) (*servingv1beta1.InferenceService, error) {
 
-	isvc, err := NewKserveInferenceService(service)
+	isvc, err := NewKserveInferenceService(service, knativeService)
 	if err != nil {
 		return nil, err
 	}
