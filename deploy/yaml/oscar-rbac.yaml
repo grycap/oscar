@@ -27,6 +27,7 @@ rules:
   - watch
   - create
   - delete
+  - deletecollection
   - update
 - apiGroups:
   - apps
@@ -121,6 +122,7 @@ rules:
   - watch
   - create
   - delete
+  - deletecollection
   - update
 - apiGroups:
   - ""
