@@ -39,6 +39,7 @@ OSCAR_POST_DEPLOYMENT_IMAGE=""
 OSCAR_TARGET_REPLICAS=1
 SKIP_PROMPTS="false"
 ENABLE_OIDC="false"
+ENABLE_KUEUE="false"
 OIDC_ISSUERS_DEFAULT="https://keycloak.grycap.net/realms/grycap"
 OIDC_GROUPS_DEFAULT="/oscar-staff, /oscar-test"
 
@@ -49,6 +50,7 @@ Usage: $(basename "$0") [options]
 Options:
   --devel        Deploy using the OSCAR devel branch without interactive prompts.
   --oidc         Enable OIDC support for OSCAR (default: disabled).
+  --kueue        Enable Kueue support for OSCAR (default: disabled).
   -h, --help     Show this help message and exit.
 EOF
 }
@@ -365,15 +367,6 @@ checkOSCARDeploy(){
     else
         oscar_url="https://localhost:$HOST_HTTPS_PORT"
     fi
-    echo -e "\n > You can now acces to the OSCAR web interface through $oscar_url with the following credentials: "
-    echo "  - username: oscar"
-    echo "  - password: $OSCAR_PASSWORD"
-    minio_api_url="http://localhost:$HOST_MINIO_API_PORT"
-    minio_console_url="http://localhost:$HOST_MINIO_CONSOLE_PORT"
-    echo -e "\n > You can now access MinIO object storage through $minio_api_url and the console through $minio_console_url with the following credentials: "
-    echo "  - username: minio"
-    echo "  - password: $MINIO_PASSWORD"
-    echo -e "\n[*] Note: To delete the cluster type 'kind delete cluster --name=$CLUSTER_NAME'\n"
 }
 
 deployKnative(){
@@ -431,6 +424,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --oidc)
             ENABLE_OIDC="true"
+            shift
+            ;;
+        --kueue)
+            ENABLE_KUEUE="true"
             shift
             ;;
         -h|--help)
@@ -651,6 +648,7 @@ echo -e "\n[*] Deploying MinIO storage provider ..."
 helm repo add --force-update minio https://charts.min.io
 helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT --create-namespace --version 4.0.7
 
+
 #Deploy NFS server provisioner
 echo -e "\n[*] Deploying NFS server provider ..."
 helm repo add --force-update nfs-ganesha-server-and-external-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
@@ -678,9 +676,9 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 echo -e "\n[*] Deploying OSCAR ..."
 helm repo add --force-update grycap https://grycap.github.io/helm-charts/
 if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative --set resourceManager.enable=true $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative --set resourceManager.enable=true --set kueue.enable=$ENABLE_KUEUE $OSCAR_HELM_IMAGE_OVERRIDES
 else
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set resourceManager.enable=true $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set resourceManager.enable=true --set kueue.enable=$ENABLE_KUEUE $OSCAR_HELM_IMAGE_OVERRIDES
 fi
 
 if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
@@ -709,6 +707,11 @@ fi
 
 #Wait for OSCAR deployment
 checkOSCARDeploy
+
+if [ `echo $ENABLE_KUEUE | tr '[:upper:]' '[:lower:]'` == "true" ]; then
+    echo -e "\n[*] Deploying Kueue (workload admission) ..."
+    kubectl apply --server-side -k "github.com/kubernetes-sigs/kueue/config/default?ref=v0.15.0"
+fi
  
 echo -e "\n[*] Deployment details:"
 echo "  - Kind cluster name: $CLUSTER_NAME"
