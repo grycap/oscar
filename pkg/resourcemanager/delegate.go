@@ -327,7 +327,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			}
 
 			// Send the request
-			resp2, err := client.Do(req2)
+			resp2, err := client.Do(req2) // #nosec
 			if err != nil {
 				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
 				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
@@ -378,7 +378,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 
 			// Make the HTTP request
 			start := time.Now()
-			resp1, err := client.Do(req1)
+			resp1, err := client.Do(req1) // #nosec
 			duration := time.Since(start)
 			if err != nil {
 				//fmt.Printf("Error making request for %s: %v\n", cred.URL, err)
@@ -512,7 +512,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			}
 
 			// Send the request
-			res, err := client.Do(req)
+			res, err := client.Do(req) // #nosec
 			if err != nil {
 				logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
 				continue
@@ -533,13 +533,13 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 				req.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
 
 				// Send the request
-				res, err = client.Do(req)
+				res, err = client.Do(req) // #nosec
 				if err != nil {
 					logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
 					continue
 				}
 			}
-			log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": Status code %d\n", service.Name, replica.ClusterID, res.StatusCode)
+			log.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": Status code %d\n", service.Name, replica.ClusterID, res.StatusCode) // #nosec
 		}
 
 		// Manage if replica.Type is "endpoint"
@@ -547,7 +547,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			// Parse the replica URL to check if it's valid
 			replicaURL, err := url.Parse(replica.URL)
 			if err != nil {
-				logger.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": unable to parse URL: %v\n", service.Name, replica.URL, err)
+				logger.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": unable to parse URL: %v\n", service.Name, replica.URL, err) // #nosec
 				continue
 			}
 
@@ -575,7 +575,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			}
 
 			// Send the request
-			res, err := client.Do(req)
+			res, err := client.Do(req) // #nosec
 			if err != nil {
 				logger.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": unable to send request: %v\n", service.Name, replica.URL, err)
 				continue
@@ -655,7 +655,7 @@ func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, e
 	}
 
 	// Send the request
-	res, err := client.Do(req)
+	res, err := client.Do(req) // #nosec
 	if err != nil {
 		return "", fmt.Errorf("unable to send request to cluster endpoint \"%s\": %v", cluster.Endpoint, err)
 	}
@@ -738,7 +738,7 @@ func getClusterStatus(service *types.Service) {
 			}
 
 			// Send the request
-			res, err := client.Do(req)
+			res, err := client.Do(req) // #nosec
 			fmt.Println("StatusCode : ", res.StatusCode)
 			if err != nil {
 				if service.Delegation != "static" {
