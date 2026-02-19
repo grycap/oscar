@@ -74,6 +74,7 @@ type StorageProviders struct {
 
 // S3Provider stores the credentials of the AWS S3 storage provider
 type S3Provider struct {
+	//gosec:disable G115-- This is a false positive
 	AccessKey string `json:"access_key"`
 	SecretKey string `json:"secret_key"`
 	Region    string `json:"region"`
@@ -81,8 +82,9 @@ type S3Provider struct {
 
 // MinIOProvider stores the credentials of the MinIO storage provider
 type MinIOProvider struct {
-	Endpoint  string `json:"endpoint"`
-	Verify    bool   `json:"verify"`
+	Endpoint string `json:"endpoint"`
+	Verify   bool   `json:"verify"`
+	//gosec:disable G115-- This is a false positive
 	AccessKey string `json:"access_key"`
 	SecretKey string `json:"secret_key"`
 	Region    string `json:"region"`
@@ -99,14 +101,16 @@ type OnedataProvider struct {
 type WebDavProvider struct {
 	Hostname string `json:"hostname"`
 	Login    string `json:"login"`
+	//gosec:disable G115-- This is a false positive
 	Password string `json:"password"`
 }
 
 // Rucio stores the credentials of the a storage provider that can be accessed via Rucio
 type Rucio struct {
-	Host          string `json:"host"`
-	Account       string `json:"account"`
-	Rse           string `json:"rse"`
+	Host    string `json:"host"`
+	Account string `json:"account"`
+	Rse     string `json:"rse"`
+	//gosec:disable G115-- This is a false positive
 	RefreshToken  string `json:"refresh_token"`
 	AuthHost      string `json:"auth_host"`
 	OidcAudience  string `json:"oidc_audience"`

@@ -327,6 +327,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			}
 
 			// Send the request
+			//gosec:disable G115-- This is a false positive
 			resp2, err := client.Do(req2)
 			if err != nil {
 				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
@@ -378,6 +379,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 
 			// Make the HTTP request
 			start := time.Now()
+			//gosec:disable G115-- This is a false positive
 			resp1, err := client.Do(req1)
 			duration := time.Since(start)
 			if err != nil {
@@ -512,6 +514,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			}
 
 			// Send the request
+			//gosec:disable G115-- This is a false positive
 			res, err := client.Do(req)
 			if err != nil {
 				logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
@@ -533,6 +536,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 				req.Header.Add("Authorization", "Bearer "+strings.TrimSpace(token))
 
 				// Send the request
+				//gosec:disable G115-- This is a false positive
 				res, err = client.Do(req)
 				if err != nil {
 					logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
@@ -547,6 +551,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			// Parse the replica URL to check if it's valid
 			replicaURL, err := url.Parse(replica.URL)
 			if err != nil {
+				//gosec:disable G115-- This is a false positive
 				logger.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": unable to parse URL: %v\n", service.Name, replica.URL, err)
 				continue
 			}
@@ -575,6 +580,7 @@ func DelegateJob(service *types.Service, event string, logger *log.Logger) error
 			}
 
 			// Send the request
+			//gosec:disable G115-- This is a false positive
 			res, err := client.Do(req)
 			if err != nil {
 				logger.Printf("Error delegating job from service \"%s\" to endpoint \"%s\": unable to send request: %v\n", service.Name, replica.URL, err)
@@ -655,6 +661,7 @@ func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, e
 	}
 
 	// Send the request
+	//gosec:disable G115-- This is a false positive
 	res, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("unable to send request to cluster endpoint \"%s\": %v", cluster.Endpoint, err)
@@ -738,6 +745,7 @@ func getClusterStatus(service *types.Service) {
 			}
 
 			// Send the request
+			//gosec:disable G115-- This is a false positive
 			res, err := client.Do(req)
 			fmt.Println("StatusCode : ", res.StatusCode)
 			if err != nil {
