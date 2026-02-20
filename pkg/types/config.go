@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"net/url"
 	"os"
 	"reflect"
@@ -80,6 +81,9 @@ type Config struct {
 	// Kubernetes namespace for services and jobs (default: oscar-svc)
 	ServicesNamespace string `json:"services_namespace"`
 
+	// Kubernetes service account used by the OSCAR controller to manage user namespaces (default: oscar-sa)
+	ControllerServiceAccount string `json:"controller_service_account"`
+
 	// Parameter used to check if the cluster have GPUs
 	GPUAvailable bool `json:"gpu_available"`
 
@@ -94,7 +98,7 @@ type Config struct {
 	ServerlessBackend string `json:"serverless_backend,omitempty"`
 
 	// OpenfaasNamespace namespace where the OpenFaaS gateway is deployed
-	OpenfaasNamespace string `json:"-"`
+	/*OpenfaasNamespace string `json:"-"`
 
 	// OpenfaasPort service port where the OpenFaaS gateway is exposed
 	OpenfaasPort int `json:"-"`
@@ -112,7 +116,7 @@ type Config struct {
 	OpenfaasScalerInterval string `json:"-"`
 
 	// OpenfaasScalerInactivityDuration
-	OpenfaasScalerInactivityDuration string `json:"-"`
+	OpenfaasScalerInactivityDuration string `json:"-"`*/
 
 	// WatchdogMaxInflight
 	WatchdogMaxInflight int `json:"-"`
@@ -149,6 +153,18 @@ type Config struct {
 
 	// YunikornConfigFileName
 	YunikornConfigFileName string `json:"-"`
+
+	// KueueEnable option to configure Kueue admission queues
+	KueueEnable bool `json:"kueue_enable"`
+
+	// KueueDefaultCPU default per-user ClusterQueue CPU quota
+	KueueDefaultCPU string `json:"-"`
+
+	// KueueDefaultMemory default per-user ClusterQueue memory quota
+	KueueDefaultMemory string `json:"-"`
+
+	// KueueDefaultFlavor default ResourceFlavor name used for ClusterQueues
+	KueueDefaultFlavor string `json:"-"`
 
 	// ResourceManagerEnable option to enable the Resource Manager to delegate jobs
 	// when there are no available resources in the cluster (if the service has replicas)
@@ -223,14 +239,15 @@ var configVars = []configVar{
 	{"Name", "OSCAR_NAME", false, stringType, "oscar"},
 	{"Namespace", "OSCAR_NAMESPACE", false, stringType, "oscar"},
 	{"ServicesNamespace", "OSCAR_SERVICES_NAMESPACE", false, stringType, "oscar-svc"},
+	{"ControllerServiceAccount", "OSCAR_CONTROLLER_SERVICE_ACCOUNT", false, stringType, "oscar-sa"},
 	{"ServerlessBackend", "SERVERLESS_BACKEND", false, serverlessBackendType, ""},
-	{"OpenfaasNamespace", "OPENFAAS_NAMESPACE", false, stringType, "openfaas"},
-	{"OpenfaasPort", "OPENFAAS_PORT", false, intType, "8080"},
-	{"OpenfaasBasicAuthSecret", "OPENFAAS_BASIC_AUTH_SECRET", false, stringType, "basic-auth"},
-	{"OpenfaasPrometheusPort", "OPENFAAS_PROMETHEUS_PORT", false, intType, "9090"},
-	{"OpenfaasScalerEnable", "OPENFAAS_SCALER_ENABLE", false, boolType, "false"},
-	{"OpenfaasScalerInterval", "OPENFAAS_SCALER_INTERVAL", false, stringType, "2m"},
-	{"OpenfaasScalerInactivityDuration", "OPENFAAS_SCALER_INACTIVITY_DURATION", false, stringType, "10m"},
+	//{"OpenfaasNamespace", "OPENFAAS_NAMESPACE", false, stringType, "openfaas"},
+	//{"OpenfaasPort", "OPENFAAS_PORT", false, intType, "8080"},
+	//{"OpenfaasBasicAuthSecret", "OPENFAAS_BASIC_AUTH_SECRET", false, stringType, "basic-auth"},
+	//{"OpenfaasPrometheusPort", "OPENFAAS_PROMETHEUS_PORT", false, intType, "9090"},
+	//{"OpenfaasScalerEnable", "OPENFAAS_SCALER_ENABLE", false, boolType, "false"},
+	//{"OpenfaasScalerInterval", "OPENFAAS_SCALER_INTERVAL", false, stringType, "2m"},
+	//{"OpenfaasScalerInactivityDuration", "OPENFAAS_SCALER_INACTIVITY_DURATION", false, stringType, "10m"},
 	{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
 	{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
 	{"WatchdogExecTimeout", "WATCHDOG_EXEC_TIMEOUT", false, intType, "0"},
@@ -244,6 +261,10 @@ var configVars = []configVar{
 	{"YunikornNamespace", "YUNIKORN_NAMESPACE", false, stringType, "yunikorn"},
 	{"YunikornConfigMap", "YUNIKORN_CONFIGMAP", false, stringType, "yunikorn-configs"},
 	{"YunikornConfigFileName", "YUNIKORN_CONFIG_FILENAME", false, stringType, "queues.yaml"},
+	{"KueueEnable", "KUEUE_ENABLE", false, boolType, "true"},
+	{"KueueDefaultCPU", "KUEUE_DEFAULT_CPU", false, stringType, "2"},
+	{"KueueDefaultMemory", "KUEUE_DEFAULT_MEMORY", false, stringType, "2Gi"},
+	{"KueueDefaultFlavor", "KUEUE_DEFAULT_FLAVOR", false, stringType, "oscar-default-flavor"},
 	{"ResourceManagerEnable", "RESOURCE_MANAGER_ENABLE", false, boolType, "false"},
 	//{"ResourceManager", "RESOURCE_MANAGER", false, resourceManagerType, "kubernetes"},
 	{"ResourceManagerInterval", "RESOURCE_MANAGER_INTERVAL", false, intType, "15"},
@@ -311,9 +332,32 @@ func parseStringSlice(s string) []string {
 	return strs
 }
 
+func parseInt(s string) (int, error) {
+	s = strings.TrimSpace(s)
+	if val, err := strconv.Atoi(s); err == nil {
+		return val, nil
+	}
+
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	rounded := math.Round(f)
+	if math.Abs(f-rounded) > 1e-6 {
+		return 0, fmt.Errorf("the value must be an integer")
+	}
+
+	if rounded > float64(math.MaxInt) || rounded < float64(math.MinInt) {
+		return 0, fmt.Errorf("the value is out of range for int")
+	}
+
+	return int(rounded), nil
+}
+
 func parseSeconds(s string) (time.Duration, error) {
 	if len(s) > 0 {
-		parsed, err := strconv.Atoi(s)
+		parsed, err := parseInt(s)
 		if err == nil && parsed > 0 {
 			return time.Duration(parsed) * time.Second, nil
 		}
@@ -352,7 +396,7 @@ func ReadConfig() (*Config, error) {
 		case stringSliceType:
 			value = parseStringSlice(strValue)
 		case intType:
-			value, parseErr = strconv.Atoi(strValue)
+			value, parseErr = parseInt(strValue)
 		case boolType:
 			value, parseErr = strconv.ParseBool(strValue)
 		case secondsType:

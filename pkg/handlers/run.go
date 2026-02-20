@@ -24,6 +24,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
@@ -32,10 +33,24 @@ const (
 	tokenLength = 64
 )
 
-// MakeRunHandler makes a handler to manage sync invocations sending them to the gateway of the ServerlessBackend
+// MakeRunHandler godoc
+// @Summary Invoke service synchronously
+// @Description Invoke a service synchronously using the configured Serverless backend.
+// @Tags sync
+// @Accept json
+// @Accept octet-stream
+// @Param serviceName path string true "Service name"
+// @Param payload body string false "Event payload"
+// @Success 200 {string} string "OK"
+// @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BearerAuth
+// @Router /run/{serviceName} [post]
 func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		service, err := back.ReadService(c.Param("serviceName"))
+		service, err := back.ReadService("", c.Param("serviceName"))
 		if err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {
@@ -91,6 +106,11 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 			c.Set("uidOrigin", uid)
 			c.Next()
 
+		}
+
+		if service.Owner != types.DefaultOwner && cfg.KueueEnable && !utils.VerifyWorkload(*service, service.Namespace, cfg) {
+			c.String(http.StatusBadRequest, "invalid workload: try to reduce the service resource (cpu, memory, etc.)")
+			return
 		}
 
 		proxy := &httputil.ReverseProxy{

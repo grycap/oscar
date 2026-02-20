@@ -28,7 +28,17 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 )
 
-// MakeListHandler makes a handler for listing services
+// MakeListHandler godoc
+// @Summary List services
+// @Description List all created services.
+// @Tags services
+// @Produce json
+// @Success 200 {array} types.Service
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/services [get]
 func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 

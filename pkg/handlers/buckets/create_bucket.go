@@ -40,7 +40,19 @@ const (
 var createLogger = log.New(os.Stdout, "[CREATE-BUCKETS-HANDLER] ", log.Flags())
 var isAdminUser = false
 
-// MakeCreateHandler makes a handler for creating services
+// MakeCreateHandler godoc
+// @Summary Create bucket
+// @Description Create a user MinIO bucket with the desired visibility.
+// @Tags buckets
+// @Accept json
+// @Param bucket body utils.MinIOBucket true "Bucket definition"
+// @Success 201 {string} string "Created"
+// @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/buckets [post]
 func MakeCreateHandler(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var uid string
@@ -75,7 +87,11 @@ func MakeCreateHandler(cfg *types.Config) gin.HandlerFunc {
 		bucket.Owner = uid
 		// Use admin MinIO client for the bucket creation
 		s3Client := cfg.MinIOProvider.GetS3Client()
-		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+		minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", err))
+			return
+		}
 
 		path := strings.Trim(bucket.BucketName, " /")
 		// Split buckets and folders from path
@@ -84,9 +100,16 @@ func MakeCreateHandler(cfg *types.Config) gin.HandlerFunc {
 			c.String(http.StatusBadRequest, fmt.Sprintf("Error creating bucket with name '%s': %v", splitPath[0], err))
 			return
 		}
+
+		ownerName := "oscar"
+		if !isAdminUser {
+			ownerName = auth.GetUserNameFromContext(c)
+			ownerName = utils.RemoveAccents(ownerName)
+		}
 		// Bucket metadata for filtering
 		tags := map[string]string{
-			"owner": uid,
+			"owner":      uid,
+			"owner_name": ownerName,
 		}
 
 		if err := minIOAdminClient.SetTags(splitPath[0], tags); err != nil {

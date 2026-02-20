@@ -36,35 +36,61 @@ import (
 
 var ALL_USERS_GROUP = "all_users_group"
 var allUserGroupNotExist = "unable to remove bucket from policy \"" + ALL_USERS_GROUP + "\", policy '" + ALL_USERS_GROUP + "' does not exist"
+var bucketNotExist = "NoSuchBucket: The specified bucket does not exist"
 var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
 
-// MakeDeleteHandler makes a handler for deleting services
+// MakeDeleteHandler godoc
+// @Summary Delete service
+// @Description Delete an existing service by name.
+// @Tags services
+// @Produce json
+// @Param serviceName path string true "Service name"
+// @Success 204 {string} string "No Content"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 403 {string} string "Forbidden"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/services/{serviceName} [delete]
 func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// First get the Service
 		var service *types.Service
 		var uid string
 		var err error
-		service, _ = back.ReadService(c.Param("serviceName"))
+		serviceName := c.Param("serviceName")
+		namespaceArg := ""
 		authHeader := c.GetHeader("Authorization")
 
-		if len(strings.Split(authHeader, "Bearer")) > 1 {
+		isOIDC := len(strings.Split(authHeader, "Bearer")) > 1
+		if isOIDC {
 			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-			}
-
-			if service.Owner != uid {
-				c.String(http.StatusForbidden, "User %s doesn't have permision to delete this service", uid)
 				return
 			}
+			namespaceArg = utils.BuildUserNamespace(cfg, uid)
 		}
-		if utils.SecretExists(service.Name, cfg.ServicesNamespace, back.GetKubeClientset()) {
-			secretsErr := utils.DeleteSecret(service.Name, cfg.ServicesNamespace, back.GetKubeClientset())
-			if secretsErr != nil {
-				c.String(http.StatusInternalServerError, "Error deleting asociated secret: %v", secretsErr)
+
+		service, err = back.ReadService(namespaceArg, serviceName)
+		if err != nil {
+			if errors.IsNotFound(err) || errors.IsGone(err) {
+				c.Status(http.StatusNotFound)
+			} else {
+				c.String(http.StatusInternalServerError, err.Error())
 			}
+			return
 		}
+
+		if isOIDC && service.Owner != uid {
+			c.String(http.StatusForbidden, "User %s doesn't have permision to delete this service", uid)
+			return
+		}
+		if service.Namespace == "" {
+			service.Namespace = cfg.ServicesNamespace
+		}
+
 		if err := back.DeleteService(*service); err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {
@@ -97,7 +123,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Delete service buckets
 		err = deleteBuckets(service, cfg, minIOAdminClient)
-		if err != nil && !strings.Contains(err.Error(), allUserGroupNotExist) {
+		if err != nil && !strings.Contains(err.Error(), allUserGroupNotExist) && !strings.Contains(err.Error(), bucketNotExist) {
 			c.String(http.StatusInternalServerError, "Error deleting service buckets: ", err)
 		}
 
@@ -113,6 +139,11 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// Add Yunikorn queue if enabled
 		if cfg.YunikornEnable {
 			if err := utils.DeleteYunikornQueue(cfg, back.GetKubeClientset(), service); err != nil {
+				log.Println(err.Error())
+			}
+		}
+		if cfg.KueueEnable {
+			if err := utils.DeleteKueueLocalQueue(c.Request.Context(), cfg, service.Namespace, service.Name); err != nil {
 				log.Println(err.Error())
 			}
 		}

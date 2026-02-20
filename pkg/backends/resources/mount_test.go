@@ -23,7 +23,26 @@ import (
 )
 
 func TestSetMount(t *testing.T) {
-	podSpec := &v1.PodSpec{}
+	podSpec := &v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name:  rcloneContainerName,
+				Image: rcloneContainerImage,
+				Env:   []v1.EnvVar{},
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      rcloneVolumeName,
+						MountPath: rcloneFolderMount,
+					},
+					{
+						Name:      ephemeralVolumeName,
+						MountPath: ephemeralVolumeMount,
+					},
+				},
+			},
+		},
+		Volumes: []v1.Volume{},
+	}
 	service := types.Service{
 		Mount: types.StorageIOConfig{
 			Provider: "minio.provider",
@@ -129,6 +148,42 @@ func TestSetMinIOEnvVars(t *testing.T) {
 			}
 		} else {
 			t.Errorf("unexpected env var %s", envVar.Name)
+		}
+	}
+}
+
+func TestSetS3Vars(t *testing.T) {
+	service := types.Service{
+		Mount: types.StorageIOConfig{
+			Path: "s3-bucket",
+		},
+		StorageProviders: &types.StorageProviders{
+			S3: map[string]*types.S3Provider{
+				types.DefaultProvider: {
+					Region:    "eu-west-1",
+					AccessKey: "ak",
+					SecretKey: "sk",
+				},
+			},
+		},
+	}
+	cfg := &types.Config{}
+
+	vars := setS3Vars(service, types.DefaultProvider, cfg)
+	if len(vars) != 4 {
+		t.Fatalf("expected four S3 env vars, got %d", len(vars))
+	}
+
+	expected := map[string]string{
+		"S3_BUCKET":             "s3-bucket",
+		"S3_REGION":             "eu-west-1",
+		"AWS_ACCESS_KEY_ID":     "ak",
+		"AWS_SECRET_ACCESS_KEY": "sk",
+	}
+
+	for _, ev := range vars {
+		if expected[ev.Name] != ev.Value {
+			t.Fatalf("unexpected value for %s: %s", ev.Name, ev.Value)
 		}
 	}
 }

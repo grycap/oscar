@@ -72,7 +72,7 @@ const (
 	JobUUIDVariable = "JOB_UUID"
 
 	// OpenfaasZeroScalingLabel label to enable zero scaling in OpenFaaS functions
-	OpenfaasZeroScalingLabel = "com.openfaas.scale.zero"
+	//OpenfaasZeroScalingLabel = "com.openfaas.scale.zero"
 
 	// YunikornApplicationIDLabel label to define the Yunikorn's application ID
 	YunikornApplicationIDLabel = "applicationId"
@@ -88,6 +88,9 @@ const (
 
 	// YunikornDefaultPartition name of the default Yunikorn partition
 	YunikornDefaultPartition = "default"
+
+	// KueueOwnerLabel label used to tag Kueue objects owned by OSCAR
+	KueueOwnerLabel = "oscar.grycap/owner"
 
 	// KnativeVisibilityLabel name of the knative visibility label
 	KnativeVisibilityLabel = "networking.knative.dev/visibility"
@@ -109,6 +112,8 @@ const (
 	IsolationLevelService = "SERVICE"
 
 	DefaultOwner = "cluster_admin"
+
+	JobOwnerExecutionAnnotation = "oscar.grycap/job-owner"
 )
 
 // YAMLMarshal package-level yaml marshal function
@@ -254,6 +259,9 @@ type Service struct {
 	// If the service is created through basic auth the default owner is "cluster_admin"
 	Owner string `json:"owner"`
 
+	// Namespace where the service resources are deployed. Internal use only, not part of FDL.
+	Namespace string `json:"namespace,omitempty" yaml:"-"`
+
 	InterLinkNodeName string `json:"interlink_node_name"`
 
 	// Visibility sets which users will be able to interact with the service
@@ -263,7 +271,7 @@ type Service struct {
 	Visibility string `json:"visibility"`
 
 	// AllowedUsers list of EGI UID's identifying the users that will have visibility of the service and its MinIO storage provider
-	// Optional (If the list is empty we asume the visibility is public for all cluster users)
+	// Optional - only used if Visibility is set to "restricted"
 	AllowedUsers []string `json:"allowed_users"`
 
 	// IsolationLevel level of isolation for the buckets of the service (default:service)
@@ -278,19 +286,20 @@ type Service struct {
 }
 
 type Expose struct {
-	MinScale       int32 `json:"min_scale" default:"1"`
-	MaxScale       int32 `json:"max_scale" default:"10"`
-	APIPort        int   `json:"api_port,omitempty" `
-	CpuThreshold   int32 `json:"cpu_threshold" default:"80" `
-	RewriteTarget  bool  `json:"rewrite_target" default:"false" `
-	NodePort       int32 `json:"nodePort" default:"0" `
-	DefaultCommand bool  `json:"default_command" `
-	SetAuth        bool  `json:"set_auth" `
+	MinScale       int32  `json:"min_scale" default:"1"`
+	MaxScale       int32  `json:"max_scale" default:"10"`
+	APIPort        int    `json:"api_port,omitempty" `
+	CpuThreshold   int32  `json:"cpu_threshold" default:"80" `
+	RewriteTarget  bool   `json:"rewrite_target" default:"false" `
+	NodePort       int32  `json:"nodePort" default:"0" `
+	DefaultCommand bool   `json:"default_command" `
+	SetAuth        bool   `json:"set_auth" `
+	HealthPath     string `json:"health_path" default:"/" `
 }
 
 // ToPodSpec returns a k8s podSpec from the Service
 func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
-	resources, err := createResources(service)
+	resources, err := CreateResources(service)
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +426,7 @@ func SetSecurityContext(podSpec *v1.PodSpec) {
 	podSpec.Containers[0].SecurityContext = &ctx
 }
 
-func createResources(service *Service) (v1.ResourceRequirements, error) {
+func CreateResources(service *Service) (v1.ResourceRequirements, error) {
 	resources := v1.ResourceRequirements{
 		Limits: v1.ResourceList{},
 	}

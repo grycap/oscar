@@ -18,6 +18,11 @@ package types
 
 import (
 	"testing"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestParseSeconds(t *testing.T) {
@@ -45,6 +50,40 @@ func TestParseSeconds(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCheckAvailableResources(t *testing.T) {
+	cfg := &Config{}
+	nodeWithGPU := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "gpu-node",
+		},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				"nvidia.com/gpu": *resource.NewQuantity(1, resource.DecimalSI),
+			},
+		},
+	}
+	virtualNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "vk-node",
+			Labels: map[string]string{
+				"type": "virtual-kubelet",
+			},
+		},
+	}
+
+	client := fake.NewSimpleClientset(nodeWithGPU, virtualNode)
+
+	cfg.CheckAvailableGPUs(client)
+	if !cfg.GPUAvailable {
+		t.Fatalf("expected GPU availability to be detected")
+	}
+
+	cfg.CheckAvailableInterLink(client)
+	if !cfg.InterLinkAvailable {
+		t.Fatalf("expected InterLink availability to be detected")
 	}
 }
 
@@ -120,29 +159,25 @@ func TestRequiredValues(t *testing.T) {
 
 func TestCustomValues(t *testing.T) {
 	environment := map[string]string{
-		"OSCAR_USERNAME":                "testuser",
-		"OSCAR_PASSWORD":                "testpass",
-		"MINIO_ACCESS_KEY":              "testminioaccess",
-		"MINIO_SECRET_KEY":              "testminiosecret",
-		"MINIO_REGION":                  "testminioregion",
-		"MINIO_TLS_VERIFY":              "true",
-		"MINIO_ENDPOINT":                "https://test.minio.endpoint",
-		"OSCAR_NAME":                    "testname",
-		"OSCAR_NAMESPACE":               "testnamespace",
-		"OSCAR_SERVICES_NAMESPACE":      "testservicesnamespace",
-		"WATCHDOG_MAX_INFLIGHT":         "20",
-		"WATCHDOG_WRITE_DEBUG":          "false",
-		"WATCHDOG_EXEC_TIMEOUT":         "50",
-		"WATCHDOG_READ_TIMEOUT":         "50",
-		"WATCHDOG_WRITE_TIMEOUT":        "50",
-		"WATCHDOG_HEALTHCHECK_INTERVAL": "50",
-		"READ_TIMEOUT":                  "50",
-		"WRITE_TIMEOUT":                 "50",
-		"OSCAR_SERVICE_PORT":            "8000",
-		"YUNIKORN_ENABLE":               "true",
-		"YUNIKORN_NAMESPACE":            "testyunikornnamespace",
-		"YUNIKORN_CONFIGMAP":            "testyunikornconfigmap",
-		"YUNIKORN_CONFIG_FILENAME":      "testyunikornconfigfilename",
+		"OSCAR_USERNAME":                   "testuser",
+		"OSCAR_PASSWORD":                   "testpass",
+		"MINIO_ACCESS_KEY":                 "testminioaccess",
+		"MINIO_SECRET_KEY":                 "testminiosecret",
+		"MINIO_REGION":                     "testminioregion",
+		"MINIO_TLS_VERIFY":                 "true",
+		"MINIO_ENDPOINT":                   "https://test.minio.endpoint",
+		"OSCAR_NAME":                       "testname",
+		"OSCAR_NAMESPACE":                  "testnamespace",
+		"OSCAR_SERVICES_NAMESPACE":         "testservicesnamespace",
+		"OSCAR_CONTROLLER_SERVICE_ACCOUNT": "testserviceaccount",
+		"WATCHDOG_HEALTHCHECK_INTERVAL":    "50",
+		"READ_TIMEOUT":                     "50",
+		"WRITE_TIMEOUT":                    "50",
+		"OSCAR_SERVICE_PORT":               "8000",
+		"YUNIKORN_ENABLE":                  "true",
+		"YUNIKORN_NAMESPACE":               "testyunikornnamespace",
+		"YUNIKORN_CONFIGMAP":               "testyunikornconfigmap",
+		"YUNIKORN_CONFIG_FILENAME":         "testyunikornconfigfilename",
 	}
 
 	scenarios := []struct {
@@ -171,7 +206,7 @@ func TestCustomValues(t *testing.T) {
 		},
 		{
 			"Invalid int",
-			"WATCHDOG_MAX_INFLIGHT",
+			"OSCAR_SERVICE_PORT",
 			"test",
 			true,
 		},
@@ -219,8 +254,8 @@ func TestServerlessBackend(t *testing.T) {
 		returnError       bool
 	}{
 		{
-			"Valid \"openfaas\"",
-			"openfaas",
+			"Empty value",
+			"",
 			false,
 		},
 		{
@@ -229,15 +264,14 @@ func TestServerlessBackend(t *testing.T) {
 			false,
 		},
 		{
-			"Valid \"OPENFAAS\"",
-			"OPENFAAS",
+			"Valid uppercase",
+			"KNATIVE",
 
 			false,
 		},
 		{
 			"Invalid",
-			"test",
-
+			"legacy",
 			true,
 		},
 	}

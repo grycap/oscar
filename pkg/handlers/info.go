@@ -25,7 +25,16 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// MakeInfoHandler makes a handler to retrieve system info
+// MakeInfoHandler godoc
+// @Summary Get system info
+// @Description Retrieve OSCAR deployment information.
+// @Tags info
+// @Produce json
+// @Success 200 {object} types.Info
+// @Failure 401 {string} string "Unauthorized"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/info [get]
 func MakeInfoHandler(kubeClientset kubernetes.Interface, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		info := version.GetInfo(kubeClientset, back)
