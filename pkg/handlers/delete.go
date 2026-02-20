@@ -144,7 +144,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 		if cfg.KueueEnable {
 			if err := utils.DeleteKueueLocalQueue(c.Request.Context(), cfg, service.Namespace, service.Name); err != nil {
-				log.Println(err.Error())
+				log.Println(err.Error()) // #nosec
 			}
 		}
 

@@ -442,6 +442,18 @@ func CheckWorkloadAdmited(service types.Service, namespace string, cfg *types.Co
 	} else {
 		KueueLogger.Printf("workload for exposed service '%s' is admitted", service.Name)
 		deployment := templateFunction(service, namespace, cfg) //getDeploymentSpec
+		if SecretExists(service.Name, namespace, kubeClientset) {
+			fmt.Println("exist")
+			deployment.Spec.Template.Spec.Containers[0].EnvFrom = []v1.EnvFromSource{
+				{
+					SecretRef: &v1.SecretEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: service.Name,
+						},
+					},
+				},
+			}
+		}
 		deployment.Spec.Replicas = &service.Expose.MinScale
 		_, err := kubeClientset.AppsV1().Deployments(namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
 		if err != nil {
