@@ -102,8 +102,8 @@ func GetLoggerMiddleware() gin.HandlerFunc {
 			clientIP, _ = IPAddress.(string)
 		}
 
-		log.Printf("[GIN-EXECUTIONS-LOGGER] %s | %3d | %13v | %s | %-7s %s | %s",
-			logTime, status, latency, clientIP, method, path, user)
+		log.Printf("[GIN-EXECUTIONS-LOGGER] %s | %3d | %13v | %s | %-7s %s | %s", // #nosec
+			logTime, status, latency, clientIP, method, path, user) // #nosec
 	}
 }
 
@@ -117,6 +117,11 @@ func GetUIDFromContext(c *gin.Context) (string, error) {
 		return "", fmt.Errorf("error parsing uid origin: %v", uidParsed)
 	}
 	return uid, nil
+}
+
+func GetUserNameFromContext(c *gin.Context) string {
+	userName := c.GetString("userName")
+	return userName
 }
 
 func GetMultitenancyConfigFromContext(c *gin.Context) (*MultitenancyConfig, error) {

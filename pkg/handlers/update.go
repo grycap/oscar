@@ -34,7 +34,22 @@ import (
 // Custom logger
 var updateLogger = log.New(os.Stdout, "[UPDATE-HANDLER] ", log.Flags())
 
-// MakeUpdateHandler makes a handler for updating services
+// MakeUpdateHandler godoc
+// @Summary Update service
+// @Description Update an existing service definition.
+// @Tags services
+// @Accept json
+// @Produce json
+// @Param service body types.Service true "Service definition"
+// @Success 204 {string} string "No Content"
+// @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 403 {string} string "Forbidden"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/services [put]
 func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var provName string
@@ -45,6 +60,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
+		newService.AllowedUsers = sanitizeUsers(newService.AllowedUsers)
 		newService.Script = utils.NormalizeLineEndings(newService.Script)
 
 		// Check service values and set defaults
@@ -55,7 +71,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			createLogger.Printf("[*] Updating service as admin user")
 		}
 		// Read the current service
-		oldService, err := back.ReadService(newService.Name)
+		oldService, err := back.ReadService("", newService.Name)
 
 		if err != nil {
 			// Check if error is caused because the service is not found
@@ -66,6 +82,12 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			return
 		}
+
+		serviceNamespace := oldService.Namespace
+		if serviceNamespace == "" {
+			serviceNamespace = cfg.ServicesNamespace
+		}
+		newService.Namespace = serviceNamespace
 
 		if !isAdminUser {
 			uid, err = auth.GetUIDFromContext(c)
@@ -82,6 +104,11 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln("Couldn't get UID from context"))
+			}
+
+			if err := mc.EnsureSecretInNamespace(newService.Owner, serviceNamespace); err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", newService.Owner, err))
+				return
 			}
 
 			// Set the owner on the new service definition
@@ -140,6 +167,12 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						// Fill the list of private buckets to create
 						userBucket = splitPath[0] + "-" + u[:10]
 						newService.BucketList = append(newService.BucketList, userBucket)
+						if mc != nil {
+							if err := mc.EnsureSecretInNamespace(u, serviceNamespace); err != nil {
+								c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", u, err))
+								return
+							}
+						}
 					}
 
 					if !ownerOnList {
@@ -280,13 +313,13 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Update service secret data or create it
 		if len(newService.Environment.Secrets) > 0 {
-			if utils.SecretExists(newService.Name, cfg.ServicesNamespace, back.GetKubeClientset()) {
-				secretsErr := utils.UpdateSecretData(newService.Name, cfg.ServicesNamespace, newService.Environment.Secrets, back.GetKubeClientset())
+			if utils.SecretExists(newService.Name, serviceNamespace, back.GetKubeClientset()) {
+				secretsErr := utils.UpdateSecretData(newService.Name, serviceNamespace, newService.Environment.Secrets, back.GetKubeClientset())
 				if secretsErr != nil {
 					c.String(http.StatusInternalServerError, "error updating asociated secret: %v", secretsErr)
 				}
 			} else {
-				secretsErr := utils.CreateSecret(newService.Name, cfg.ServicesNamespace, newService.Environment.Secrets, back.GetKubeClientset())
+				secretsErr := utils.CreateSecret(newService.Name, serviceNamespace, newService.Environment.Secrets, back.GetKubeClientset())
 				if secretsErr != nil {
 					c.String(http.StatusInternalServerError, "error adding asociated secret: %v", secretsErr)
 				}
@@ -299,6 +332,10 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Update the service
 		if err := back.UpdateService(newService); err != nil {
+			uerr := back.UpdateService(*oldService)
+			if uerr != nil {
+				log.Println(uerr.Error())
+			}
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
 			return
 		}

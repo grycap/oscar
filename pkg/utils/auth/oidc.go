@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"slices"
 
 	"net/http"
 	"strings"
@@ -39,7 +38,9 @@ const (
 	// EGIGroupsURNPrefix prefix to identify EGI group URI
 	EGIGroupsURNPrefix = "urn:mace:egi.eu:group"
 	EGIIssuer          = "/realms/egi"
-	SecretKeyLength    = 10
+	AI4EOSCIssuer      = "/realms/ai4eosc"
+
+	SecretKeyLength = 10
 )
 
 var oidcLogger = log.New(os.Stdout, "[OIDC-AUTH] ", log.Flags())
@@ -58,6 +59,7 @@ type oidcManager struct {
 type userInfo struct {
 	Subject string
 	Groups  []string
+	Name    string
 }
 
 type KeycloakClaims struct {
@@ -65,7 +67,25 @@ type KeycloakClaims struct {
 }
 
 type EGIClaims struct {
-	EdupersonEntitlement []string `json:"eduperson_entitlement"`
+	Entitlements []string `json:"entitlements"`
+}
+
+type GroupAI4EOSC struct {
+	Sub            string `json:"sub"`
+	ResourceAccess struct {
+		Account struct {
+			Roles []string `json:"roles"`
+		} `json:"account"`
+	} `json:"resource_access"`
+	EmailVerified bool `json:"email_verified"`
+	RealmAccess   struct {
+		Roles []string `json:"roles"`
+	} `json:"realm_access"`
+	Name              string `json:"name"`
+	PreferredUsername string `json:"preferred_username"`
+	GivenName         string `json:"given_name"`
+	FamilyName        string `json:"family_name"`
+	Email             string `json:"email"`
 }
 
 // newOIDCManager returns a new oidcManager or error if the oidc.Provider can't be created
@@ -159,6 +179,7 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 			}
 		}
 		c.Set("uidOrigin", uid)
+		c.Set("userName", ui.Name)
 		c.Set("multitenancyConfig", mc)
 		c.Next()
 	}
@@ -191,25 +212,39 @@ func (om *oidcManager) GetUserInfo(rawToken string) (*userInfo, error) {
 	if strings.Contains(providerAuth, EGIIssuer) {
 		var claims EGIClaims
 		cerr = ui.Claims(&claims)
-		groups = getGroupsEGI(claims.EdupersonEntitlement)
+		groups = getGroupsEGI(claims.Entitlements)
+	} else if strings.Contains(providerAuth, AI4EOSCIssuer) {
+		var claims KeycloakClaims
+		cerr = ui.Claims(&claims)
+		groups = getGroupsKeycloak(ui)
 	} else {
 		var claims KeycloakClaims
 		cerr = ui.Claims(&claims)
-		groups = getGroupsKeycloak(claims.GroupMembership)
+		groups = claims.GroupMembership
 	}
 
 	if cerr != nil {
 		return nil, cerr
 	}
 
+	// Extract name claim in a type-safe way
+	name := ""
+	var allClaims map[string]interface{}
+	if err := ui.Claims(&allClaims); err == nil {
+		if n, ok := allClaims["name"].(string); ok {
+			name = n
+		}
+	}
+
 	// Create "userInfo" struct and add the groups
 	return &userInfo{
 		Subject: ui.Subject,
 		Groups:  groups,
+		Name:    name,
 	}, nil
 }
 
-// getGroups transforms "eduperson_entitlement" EGI URNs to a slice of group fields
+// getGroups transforms "entitlements" EGI URNs to a slice of group fields
 
 func getGroupsEGI(urns []string) []string {
 	groups := []string{}
@@ -226,21 +261,15 @@ func getGroupsEGI(urns []string) []string {
 	return groups
 }
 
-func getGroupsKeycloak(memberships []string) []string {
-	groups := []string{}
-
-	for _, v := range memberships {
-		m := strings.Split(v, "/")
-		if len(m) >= 3 {
-			vo := m[2]
-			if !slices.Contains(groups, vo) {
-				groups = append(groups, vo)
-			}
-		}
-
+func getGroupsKeycloak(ui *oidc.UserInfo) []string {
+	var claims GroupAI4EOSC
+	cerr := ui.Claims(&claims)
+	if cerr != nil {
+		return []string{}
 	}
+	memberships := claims.RealmAccess.Roles
+	return memberships
 
-	return groups
 }
 
 func GetIssuerFromToken(rawToken string) (string, error) {

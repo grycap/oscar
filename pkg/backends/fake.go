@@ -35,6 +35,7 @@ type FakeBackend struct {
 	Service *types.Service // service to be returned by the ReadService function
 	// UpdatedService stores the last service received through UpdateService.
 	UpdatedService *types.Service
+	kubeClientset  kubernetes.Interface
 }
 
 // MakeFakeBackend returns the pointer of a new FakeBackend struct
@@ -47,6 +48,7 @@ func MakeFakeBackend() *FakeBackend {
 			"UpdateService": {},
 			"DeleteService": {},
 		},
+		kubeClientset: testclient.NewSimpleClientset(),
 	}
 }
 
@@ -73,7 +75,7 @@ func (f *FakeBackend) GetInfo() *types.ServerlessBackendInfo {
 }
 
 // ListServices returns a slice with all services registered in the provided namespace (fake)
-func (f *FakeBackend) ListServices() ([]*types.Service, error) {
+func (f *FakeBackend) ListServices(namespaces ...string) ([]*types.Service, error) {
 	return []*types.Service{}, f.returnError(getCurrentFuncName())
 }
 
@@ -83,9 +85,9 @@ func (f *FakeBackend) CreateService(service types.Service) error {
 }
 
 // ReadService returns a Service (fake)
-func (f *FakeBackend) ReadService(name string) (*types.Service, error) {
+func (f *FakeBackend) ReadService(namespace, name string) (*types.Service, error) {
 	// default service returned by the function
-	service := &types.Service{Token: "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf"}
+	service := &types.Service{Token: "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf"} // #nosec
 	if f.Service != nil {
 		service = f.Service
 	}
@@ -106,7 +108,15 @@ func (f *FakeBackend) DeleteService(service types.Service) error {
 
 // GetKubeClientset returns the Kubernetes Clientset (fake)
 func (f *FakeBackend) GetKubeClientset() kubernetes.Interface {
-	return testclient.NewSimpleClientset()
+	if f.kubeClientset == nil {
+		f.kubeClientset = testclient.NewSimpleClientset()
+	}
+	return f.kubeClientset
+}
+
+// SetKubeClientset allows tests to set a custom clientset.
+func (f *FakeBackend) SetKubeClientset(client kubernetes.Interface) {
+	f.kubeClientset = client
 }
 
 // GetProxyDirector returns the ProxyDirector (fake)

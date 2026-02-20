@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/v3/pkg/testsupport"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
 )
@@ -46,7 +47,7 @@ func TestMakePresignHandler_AdminUpload(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", resp.Code, resp.Body.String())
 	}
 
-	var output presignResponse
+	var output PresignResponse
 	if err := json.Unmarshal(resp.Body.Bytes(), &output); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -143,7 +144,7 @@ func TestMakePresignHandler_RestrictedMemberDownload(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", resp.Code, resp.Body.String())
 	}
 
-	var output presignResponse
+	var output PresignResponse
 	if err := json.Unmarshal(resp.Body.Bytes(), &output); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -195,6 +196,35 @@ func (f *fakeAdminClient) GetCurrentResourceVisibility(bucket utils.MinIOBucket)
 	return f.visibility
 }
 
+type stubPresignAdmin struct {
+	simpleCalled     bool
+	metaCalled       bool
+	visibilityCalled bool
+	policyCalled     bool
+	membersCalled    bool
+}
+
+func (s *stubPresignAdmin) SimpleClient() presignSimpleClient {
+	s.simpleCalled = true
+	return &fakeSimpleClient{bucketExists: true, presignURL: "http://stub"}
+}
+func (s *stubPresignAdmin) GetTaggedMetadata(bucket string) (map[string]string, error) {
+	s.metaCalled = true
+	return map[string]string{"owner": "oscar"}, nil
+}
+func (s *stubPresignAdmin) GetCurrentResourceVisibility(bucket utils.MinIOBucket) string {
+	s.visibilityCalled = true
+	return utils.PRIVATE
+}
+func (s *stubPresignAdmin) ResourceInPolicy(policyName string, resource string) bool {
+	s.policyCalled = true
+	return false
+}
+func (s *stubPresignAdmin) GetBucketMembers(bucket string) ([]string, error) {
+	s.membersCalled = true
+	return []string{"user"}, nil
+}
+
 func (f *fakeAdminClient) ResourceInPolicy(policyName string, resource string) bool {
 	if f.policies == nil {
 		return false
@@ -229,4 +259,83 @@ func (f *fakeSimpleClient) PresignHeader(ctx context.Context, method string, buc
 	f.lastObject = objectName
 	f.lastReqParams = reqParams
 	return url.Parse(f.presignURL)
+}
+
+type presignMinioMock struct{}
+
+func (h *presignMinioMock) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch {
+	case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/info-canned-policy"):
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"PolicyName":"default","Policy":{"Version":"version","Statement":[{"Resource":["arn:aws:s3:::test-bucket/*"],"Effect":"Allow"}]}}`))
+	case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/group"):
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"name":"test-bucket","status":"enable","members":["oscar"],"policy":""}`))
+	default:
+		if r.Method == http.MethodHead {
+			w.Header().Set("Content-Length", "0")
+			w.Header().Set("x-amz-bucket-region", "us-east-1")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.RawQuery == "location=" {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
+			return
+		}
+		if r.URL.Query().Has("tagging") {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`<Tagging><TagSet><Tag><Key>owner</Key><Value>oscar</Value></Tag></TagSet></Tagging>`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"Status":"success"}`))
+	}
+}
+
+func TestMakePresignHandler_DefaultFactory(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+	gin.SetMode(gin.TestMode)
+
+	server := httptest.NewServer(&presignMinioMock{})
+	defer server.Close()
+
+	cfg := &types.Config{
+		Name: "oscar",
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+
+	router := gin.New()
+	router.POST("/system/buckets/:bucket/presign", MakePresignHandler(cfg))
+
+	reqBody := `{"object_key":"hello.txt","operation":"download","expires_in":60}`
+	req := httptest.NewRequest(http.MethodPost, "/system/buckets/test-bucket/presign", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d (%s)", resp.Code, resp.Body.String())
+	}
+
+	var output PresignResponse
+	if err := json.Unmarshal(resp.Body.Bytes(), &output); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if output.Method != http.MethodGet {
+		t.Fatalf("expected presign method GET, got %s", output.Method)
+	}
+	if output.URL == "" {
+		t.Fatalf("expected presigned URL in response")
+	}
+	if !strings.Contains(output.URL, "hello.txt") {
+		t.Fatalf("expected URL to include object key, got %s", output.URL)
+	}
 }

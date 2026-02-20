@@ -1,0 +1,27 @@
+nifi:
+  endpoint: https://<ip>
+  user: <user-nifi>
+  password: <pass-nifi>
+  Source:
+    RUCIO:
+      - name: rucio
+        queue_name: events
+        host: <rucio-endpoint> #e.g., rucio-intertwin-messaging.desy.de
+        port: <rucio-port> #e.g., 5671
+        virtual_host: <user-rabbitmq>
+        password: <pass-rabbitmq>
+        service_filter: rucio-example
+        ssl_client_auth: NONE
+        ssl_context:
+          Truststore_Filename: <truststore-path> #e.g., /opt/nifi/nifi-current/data/truststore.jks
+          Truststore_Password: <truststore-pass>
+  Destination:
+    OSCAR:
+      - name: invoke-rucio-example
+        endpoint: <oscar-endpoint> #e.g., https://oscar-ukri.intertwin.fedcloud.eu
+        service: rucio-example
+        token: <oscar-svc-token>
+
+  connection:
+    - from: rucio
+      to: invoke-rucio-example

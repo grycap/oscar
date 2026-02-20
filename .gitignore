@@ -38,3 +38,6 @@ ui/yarn-error.log*
 
 # mkdocs site
 /site
+
+# Generated Swagger docs
+pkg/apidocs/

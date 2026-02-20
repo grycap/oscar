@@ -19,7 +19,6 @@ package types
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"testing"
 
 	"github.com/barkimedes/go-deepcopy"
@@ -84,13 +83,7 @@ var (
 		},
 	}
 
-	testConfig Config = Config{
-		WatchdogMaxInflight:  20,
-		WatchdogWriteDebug:   true,
-		WatchdogExecTimeout:  60,
-		WatchdogReadTimeout:  60,
-		WatchdogWriteTimeout: 60,
-	}
+	testConfig Config = Config{}
 )
 
 func TestCreateResources(t *testing.T) {
@@ -132,7 +125,7 @@ func TestCreateResources(t *testing.T) {
 			svc.Memory = s.memory
 			svc.CPU = s.cpu
 
-			_, err := createResources(&svc)
+			_, err := CreateResources(&svc)
 
 			if s.returnError {
 				if err == nil {
@@ -254,6 +247,7 @@ expose:
   nodePort: 0
   default_command: false
   set_auth: false
+  health_path: ""
 environment:
   variables:
     TEST_VAR: testvalue
@@ -354,54 +348,57 @@ func TestToPodSpec(t *testing.T) {
 					t.Errorf("unexpected error: %v", err)
 				}
 
-				if err = checkEnvVars(&testConfig, podSpec); err != nil {
-					t.Error(err.Error())
+				if len(podSpec.Containers[0].Command) != 1 {
+					t.Fatalf("expected a single command entry, got %d", len(podSpec.Containers[0].Command))
 				}
+				if podSpec.Containers[0].Command[0] != fmt.Sprintf("%s/%s", VolumePath, WatchdogName) {
+					t.Fatalf("expected command to be supervisor path %s, got %s", fmt.Sprintf("%s/%s", VolumePath, WatchdogName), podSpec.Containers[0].Command[0])
+				}
+
 			}
 		})
 	}
 }
 
-func checkEnvVars(cfg *Config, podSpec *v1.PodSpec) error {
-	var expected string
-	var found = []string{}
 
-	for _, envVar := range podSpec.Containers[0].Env {
-		switch envVar.Name {
-		case "max_inflight":
-			expected = strconv.Itoa(cfg.WatchdogMaxInflight)
-			if envVar.Value != expected {
-				return fmt.Errorf("componenteax_inflight environment variable has not the correct value. Expected: %s, got: %s", expected, envVar.Value)
-			}
-		case "write_debug":
-			expected = strconv.FormatBool(cfg.WatchdogWriteDebug)
-			if envVar.Value != expected {
-				return fmt.Errorf("the write_debug environment variable has not the correct value. Expected: %s, got: %s", expected, envVar.Value)
-			}
-		case "exec_timeout":
-			expected = strconv.Itoa(cfg.WatchdogExecTimeout)
-			if envVar.Value != expected {
-				return fmt.Errorf("the exec_timeout environment variable has not the correct value. Expected: %s, got: %s", expected, envVar.Value)
-			}
-		case "read_timeout":
-			expected = strconv.Itoa(cfg.WatchdogReadTimeout)
-			if envVar.Value != expected {
-				return fmt.Errorf("the read_timeout environment variable has not the correct value. Expected: %s, got: %s", expected, envVar.Value)
-			}
-		case "write_timeout":
-			expected = strconv.Itoa(cfg.WatchdogWriteTimeout)
-			if envVar.Value != expected {
-				return fmt.Errorf("the write_timeout environment variable has not the correct value. Expected: %s, got: %s", expected, envVar.Value)
-			}
-		default:
-			continue
-		}
-		found = append(found, envVar.Name)
+func TestConvertSecretsEnvVars(t *testing.T) {
+	secretRefs := ConvertSecretsEnvVars("my-secret")
+	if len(secretRefs) != 1 {
+		t.Fatalf("expected a single secret ref, got %d", len(secretRefs))
+	}
+	if secretRefs[0].SecretRef == nil || secretRefs[0].SecretRef.Name != "my-secret" {
+		t.Fatalf("unexpected secret ref: %#v", secretRefs[0].SecretRef)
+	}
+}
+
+func TestSetSecurityContext(t *testing.T) {
+	pod := &v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: ContainerName},
+		},
 	}
 
-	if len(found) != 5 {
-		return fmt.Errorf("only the following watchdog environment variables are correctly defined: %v", found)
+	SetSecurityContext(pod)
+
+	if pod.Containers[0].SecurityContext == nil {
+		t.Fatalf("expected security context to be set")
+	}
+	if pod.Containers[0].SecurityContext.Capabilities == nil {
+		t.Fatalf("expected capabilities to be set")
+	}
+	if len(pod.Containers[0].SecurityContext.Capabilities.Add) == 0 || pod.Containers[0].SecurityContext.Capabilities.Add[0] != "SYS_RAWIO" {
+		t.Fatalf("unexpected capabilities: %#v", pod.Containers[0].SecurityContext.Capabilities.Add)
+	}
+}
+
+func TestHasReplicas(t *testing.T) {
+	svc := Service{}
+	if svc.HasReplicas() {
+		t.Fatalf("expected HasReplicas to be false with no replicas")
 	}
 
-	return nil
+	svc.Replicas = []Replica{{Type: "oscar", ClusterID: "a", ServiceName: "svc"}}
+	if !svc.HasReplicas() {
+		t.Fatalf("expected HasReplicas to be true when replicas are defined")
+	}
 }

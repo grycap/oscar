@@ -47,21 +47,36 @@ var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache
 var createLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
 var isAdminUser = false
 
-// MakeCreateHandler makes a handler for creating services
+// MakeCreateHandler godoc
+// @Summary Create service
+// @Description Create a new OSCAR service definition.
+// @Tags services
+// @Accept json
+// @Produce json
+// @Param service body types.Service true "Service definition"
+// @Success 201 {string} string "Created"
+// @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/services [post]
 func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var service types.Service
 		isAdminUser = false
 		authHeader := c.GetHeader("Authorization")
+
+		if err := c.ShouldBindJSON(&service); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+			return
+		}
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
 			service.Owner = types.DefaultOwner
 			createLogger.Printf("Creating service '%s' for user '%s'", service.Name, service.Owner)
 		}
-		if err := c.ShouldBindJSON(&service); err != nil {
-			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
-			return
-		}
+		service.AllowedUsers = sanitizeUsers(service.AllowedUsers)
 		service.Script = utils.NormalizeLineEndings(service.Script)
 
 		// Check service values and set defaults
@@ -72,6 +87,8 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// Service is created by an EGI user
 		var uid string
 		var err error
+		var mc *auth.MultitenancyConfig
+		namespace := cfg.ServicesNamespace
 		if !isAdminUser {
 			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {
@@ -86,7 +103,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			service.Owner = uid
 			createLogger.Printf("Creating service '%s' for user '%s'", service.Name, service.Owner)
 
-			mc, err := auth.GetMultitenancyConfigFromContext(c)
+			mc, err = auth.GetMultitenancyConfigFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 				return
@@ -125,6 +142,15 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 
 			ownerOnList := false
+			namespace, err = utils.EnsureUserNamespace(c.Request.Context(), back.GetKubeClientset(), cfg, uid)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring namespace for user %s: %v", uid, err))
+				return
+			}
+			if err := mc.EnsureSecretInNamespace(uid, namespace); err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", uid, err))
+				return
+			}
 
 			if len(service.AllowedUsers) > 0 && strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser {
 				for _, in := range service.Input {
@@ -159,6 +185,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 							// Fill the list of private buckets to create
 							userBucket = splitPath[0] + "-" + u[:10]
 							service.BucketList = append(service.BucketList, userBucket)
+							if err := mc.EnsureSecretInNamespace(u, namespace); err != nil {
+								c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", u, err))
+								return
+							}
 						}
 
 						if !ownerOnList {
@@ -168,11 +198,20 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 			}
 		}
+		if service.Namespace == "" {
+			service.Namespace = namespace
+		}
+		if !isAdminUser {
+			if err := mc.EnsureSecretInNamespace(service.Owner, service.Namespace); err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", service.Owner, err))
+				return
+			}
+		}
 		if len(service.Environment.Secrets) > 0 {
-			if utils.SecretExists(service.Name, cfg.ServicesNamespace, back.GetKubeClientset()) {
+			if utils.SecretExists(service.Name, service.Namespace, back.GetKubeClientset()) {
 				c.String(http.StatusConflict, "A secret with the given name already exists")
 			}
-			secretsErr := utils.CreateSecret(service.Name, cfg.ServicesNamespace, service.Environment.Secrets, back.GetKubeClientset())
+			secretsErr := utils.CreateSecret(service.Name, service.Namespace, service.Environment.Secrets, back.GetKubeClientset())
 			if secretsErr != nil {
 				c.String(http.StatusConflict, "Error creating secrets for service: %v", secretsErr)
 			}
@@ -183,12 +222,23 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 
+		if !isAdminUser && cfg.KueueEnable {
+			if err := utils.EnsureKueueUserQueues(c.Request.Context(), cfg, service.Namespace, service.Owner, service.Name); err != nil {
+				createLogger.Printf("error ensuring Kueue queues for service %s: %v\n", service.Name, err)
+			}
+			service.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
+		}
+
 		// Create service
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
 			if k8sErrors.IsAlreadyExists(err) {
 				c.String(http.StatusConflict, "A service with the provided name already exists")
 			} else {
+				errDelete := back.DeleteService(service)
+				if errDelete != nil {
+					log.Printf("Error deleting service: %v\n", errDelete)
+				}
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 			}
 			return
@@ -215,9 +265,12 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			if derr != nil {
 				log.Printf("Error deleting service: %v\n", derr)
 			}
-			bderr := deleteBuckets(&service, cfg, minIOAdminClient)
-			if bderr != nil {
-				log.Printf("Error deleting buckets: %v\n", bderr)
+
+			if !strings.Contains(err.Error(), " already exists") {
+				bderr := deleteBuckets(&service, cfg, minIOAdminClient)
+				if bderr != nil {
+					log.Printf("Error deleting buckets: %v\n", bderr)
+				}
 			}
 			return
 		}
@@ -234,10 +287,16 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					}
 				}
 
+				ownerName := "oscar"
+				if !isAdminUser {
+					ownerName = auth.GetUserNameFromContext(c)
+					ownerName = utils.RemoveAccents(ownerName)
+				}
 				// Bucket metadata for filtering
 				tags := map[string]string{
 					"owner":        uid,
 					"from_service": service.Name,
+					"owner_name":   ownerName,
 				}
 				if err := minIOAdminClient.SetTags(b.BucketName, tags); err != nil {
 					c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
@@ -371,7 +430,8 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			BucketName:   splitPath[0],
 			AllowedUsers: service.AllowedUsers,
 			Visibility:   service.Visibility,
-			Owner:        service.Owner})
+			Owner:        service.Owner,
+		})
 		// Create buckets for services with isolation level
 		if strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser && len(service.BucketList) > 0 {
 			for i, b := range service.BucketList {
@@ -615,8 +675,10 @@ func checkIdentity(service *types.Service, authHeader string) error {
 	if !hasVO {
 		return fmt.Errorf("this user isn't enrrolled on the vo: %v", service.VO)
 	}
-
-	service.Labels["vo"] = service.VO
+	voFirstReplace := strings.Replace(service.VO, "/", "", 1)
+	voParse := strings.ReplaceAll(voFirstReplace, "/", "--")
+	voParse = strings.ReplaceAll(voParse, " ", "__")
+	service.Labels["vo"] = voParse
 
 	return nil
 }
