@@ -117,15 +117,9 @@ func DeleteExpose(name string, namespace string, kubeClientset kubernetes.Interf
 	listOpts := metav1.ListOptions{
 		LabelSelector: "app=oscar-svc-exp-" + name,
 	}
-	pods, err := kubeClientset.CoreV1().Pods(targetNamespace).List(context.TODO(), listOpts)
-	if err = ignoreNotFound(err); err != nil {
-		return fmt.Errorf("error listing pods of exposed service '%s': %v", name, err)
-	}
-	for _, pod := range pods.Items {
-		err = kubeClientset.CoreV1().Pods(targetNamespace).Delete(context.TODO(), pod.Name, delete)
-		if err = ignoreNotFound(err); err != nil {
-			return fmt.Errorf("error deleting pod '%s' of exposed service '%s': %v", pod.Name, name, err)
-		}
+	err = kubeClientset.CoreV1().Pods(targetNamespace).DeleteCollection(context.TODO(), delete, listOpts)
+	if err != nil {
+		return fmt.Errorf("error deleting pods of exposed service '%s': %v", name, err)
 	}
 	utils.DeleteWorkload(name, targetNamespace, cfg)
 
