@@ -151,7 +151,7 @@ helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/
 [problems](https://github.com/kubernetes-sigs/kind/issues/1487#issuecomment-694920754)
 using the [NFS server provisioner](https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner)
 with kind due to its default configuration of kernel-limit file descriptors.
-To workaround it, please run `sudo sysctl -w fs.nr_open=1048576`.*
+As a workaround, please run `sudo sysctl -w fs.nr_open=1048576`.*
 
 ### Deploy Metrics server
 
