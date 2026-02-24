@@ -393,7 +393,7 @@ one of the three supported storage providers (MinIO, S3 or Onedata) and the
 STORAGE_PROVIDER_NAME is the identifier for the provider set in the service's
 definition.
 
-**_NOTE:_** This command can not be used in a [local testing deployment](https://docs.oscar.grycap.net/local-testing/).
+**_NOTE:_** This command cannot be used in a [local testing deployment](https://docs.oscar.grycap.net/local-testing/).
 
 ```
 Usage:

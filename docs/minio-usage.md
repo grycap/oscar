@@ -36,7 +36,7 @@ MinIO buckets can also be managed through [oscar-cli command-line](https://githu
   An example of a put-file operation:
 
   ``` bash
-  oscar-cli service put-file fish-detector.yaml minio .path/to/your/images ./fish-detector/input/
+  oscar-cli service put-file fish-detector minio /path/to/your/images ./fish-detector/input/
   ```
   
 - **mc**: If a user wants to use the MinIO client it needs to follow some previous steps.

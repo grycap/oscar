@@ -3,13 +3,13 @@
 
 The project [interLink](https://intertwin-eu.github.io/interLink/) is an open-source development that aims to provide an abstraction for executing a Kubernetes pod on any remote resource capable of managing a Container execution lifecycle.
 
-OSCAR uses the Kubernetes Virtual Node to translate a job request from the Kubernetes pod into a remote call. We have been using interLink to interact with an HPC cluster. For more infomation check this [video demo](https://youtu.be/NoVCfSxwtX0?si=emLcwTiUR897jFOg).
+OSCAR uses the Kubernetes Virtual Node to translate a job request from the Kubernetes pod into a remote call. We have been using interLink to interact with an HPC cluster. For more information, check this [video demo](https://youtu.be/NoVCfSxwtX0?si=emLcwTiUR897jFOg).
 
 ![Diagram](images/interlink.png)
 
 ## Installation and use of interLink Node in OSCAR cluster
 
-The cluster Kubernetes must have at least one virtual kubelet node. Those nodes will have tagged as `type=virtual-kubelet`. Follow the documentation in the [interLink homepage](https://intertwin-eu.github.io/interLink/) to deploy an interLink virtual node to the Kubernetes cluster. OSCAR detects these nodes automatically.
+The Kubernetes cluster must have at least one virtual kubelet node. Those nodes are tagged as `type=virtual-kubelet`. Follow the documentation in the [interLink homepage](https://intertwin-eu.github.io/interLink/) to deploy an interLink virtual node to the Kubernetes cluster. OSCAR detects these nodes automatically.
 
 Once the Virtual node and OSCAR are installed correctly, you can use this node to offload your job to the configured remote host. To offload the jobs created by a service to an interLink node the name of the virtual node has to be set in the `interlink_node_name` variable of the [service FDL](https://docs.oscar.grycap.net/fdl/#service).
 
@@ -25,9 +25,9 @@ Otherwise, if the variable is not set, i.e., `""`, the job will be executed in a
 - When the offloading is set to a SLURM job, it's possible to request some resources employing [slurm flags](https://curc.readthedocs.io/en/latest/running-jobs/job-resources.html#slurm-resource-flags). For example: 
     - To request CPU and memory, `slurm-job.vk.io/flags`( `--job-name`, `--time=02:30:00`, `--cpus-per-task`, `--nodes`, `--mem`) 
     - To mount a system folder in an HPC cluster `job.vk.io/singularity-mounts` and value pattern `"--bind <outside-container>:<inside-container>"`. 
-    - To  execute a command before each run `job.vk.io/pre-exec`.
+    - To execute a command before each run `job.vk.io/pre-exec`.
 
-- Any environment variable with a special character could create an error in the translation between the virtual node and the remote job. As a good practice, pass the environment variable encode in Base64 and decode it inside the execution of the script.
+- Any environment variable with a special character could create an error in the translation between the virtual node and the remote job. As a good practice, pass the environment variable encoded in Base64 and decode it inside the execution of the script.
 
 - Please note when the remote host is a SLURM cluster a docker container will be translated into a singularity one. There are some points to consider:
 
