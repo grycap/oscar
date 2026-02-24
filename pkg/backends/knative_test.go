@@ -621,70 +621,108 @@ func TestKnativeUpdateService(t *testing.T) {
 }
 
 func TestKnativeDeleteService(t *testing.T) {
-	testService := types.Service{
-		Name: "test",
-	}
-	scenarios := []knativeBackendTestScenario{
+	scenarios := []struct {
+		name        string
+		service     types.Service
+		k8sReactors []k8stesting.SimpleReactor
+		knReactors  []k8stesting.SimpleReactor
+		returnError bool
+	}{
 		{
-			"Error deleting knative service",
-			[]k8stesting.SimpleReactor{},
-			[]k8stesting.SimpleReactor{
+			name: "Error deleting knative service",
+			service: types.Service{
+				Name: "test",
+			},
+			k8sReactors: []k8stesting.SimpleReactor{},
+			knReactors: []k8stesting.SimpleReactor{
 				{
 					Verb:     "delete",
 					Resource: "services",
 					Reaction: errorReaction,
 				}},
-			true,
+			returnError: true,
 		},
 		{
-			"Knative service not found should not fail delete",
-			[]k8stesting.SimpleReactor{},
-			[]k8stesting.SimpleReactor{
+			name: "Knative service not found should not fail delete",
+			service: types.Service{
+				Name: "test",
+			},
+			k8sReactors: []k8stesting.SimpleReactor{},
+			knReactors: []k8stesting.SimpleReactor{
 				{
 					Verb:     "delete",
 					Resource: "services",
 					Reaction: func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, apierrors.NewNotFound(v1.Resource("services"), "test")
 					},
-				},
-			},
-			false,
+				}},
+			returnError: false,
 		},
 		{
-			"Error deleting configmap",
-			[]k8stesting.SimpleReactor{
+			name: "Error deleting configmap",
+			service: types.Service{
+				Name: "test",
+			},
+			k8sReactors: []k8stesting.SimpleReactor{
 				{
 					Verb:     "delete",
 					Resource: "configmaps",
 					Reaction: errorReaction,
 				},
 			},
-			[]k8stesting.SimpleReactor{
+			knReactors: []k8stesting.SimpleReactor{
 				{
 					Verb:     "delete",
 					Resource: "services",
 					Reaction: validDeleteReaction,
 				},
 			},
-			false,
+			returnError: false,
 		},
 		{
-			"Error deleting jobs",
-			[]k8stesting.SimpleReactor{
+			name: "Error deleting jobs",
+			service: types.Service{
+				Name: "test",
+			},
+			k8sReactors: []k8stesting.SimpleReactor{
 				{
 					Verb:     "delete-collection",
 					Resource: "jobs",
 					Reaction: errorReaction,
 				},
 			},
-			[]k8stesting.SimpleReactor{
+			knReactors: []k8stesting.SimpleReactor{
 				{
 					Verb:     "delete",
 					Resource: "services",
 					Reaction: validDeleteReaction,
 				},
 			},
-			false,
+			returnError: false,
+		},
+		{
+			name: "Error deleting exposed resources",
+			service: types.Service{
+				Name: "test",
+				Expose: types.Expose{
+					APIPort: 8080,
+				},
+			},
+			k8sReactors: []k8stesting.SimpleReactor{
+				{
+					Verb:     "delete",
+					Resource: "horizontalpodautoscalers",
+					Reaction: errorReaction,
+				},
+			},
+			knReactors: []k8stesting.SimpleReactor{
+				{
+					Verb:     "delete",
+					Resource: "services",
+					Reaction: validDeleteReaction,
+				},
+			},
+			returnError: true,
 		},
 	}
 
@@ -704,7 +742,7 @@ func TestKnativeDeleteService(t *testing.T) {
 			}
 
 			// Delete service
-			err := back.DeleteService(testService)
+			err := back.DeleteService(s.service)
 			if s.returnError {
 				if err == nil {
 					t.Error("expected error, got: nil")

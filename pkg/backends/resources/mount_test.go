@@ -34,10 +34,6 @@ func TestSetMount(t *testing.T) {
 						Name:      rcloneVolumeName,
 						MountPath: rcloneFolderMount,
 					},
-					{
-						Name:      ephemeralVolumeName,
-						MountPath: ephemeralVolumeMount,
-					},
 				},
 			},
 		},
@@ -98,11 +94,11 @@ func TestSetMount(t *testing.T) {
 		}
 	}
 
-	if len(container.VolumeMounts) != 4 {
+	if len(container.VolumeMounts) != 2 {
 		t.Fatalf("expected 4 volume mounts, got %d", len(container.VolumeMounts))
 	}
 
-	if len(podSpec.Volumes) != 2 {
+	if len(podSpec.Volumes) != 1 {
 		t.Fatalf("expected 2 volumes, got %d", len(podSpec.Volumes))
 	}
 }

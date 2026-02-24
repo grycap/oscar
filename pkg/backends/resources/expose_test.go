@@ -213,6 +213,25 @@ func TestDeleteExposeRemovesResources(t *testing.T) {
 	}
 }
 
+func TestDeleteExposeIsIdempotent(t *testing.T) {
+	cfg := newTestConfig()
+	client := fake.NewSimpleClientset()
+
+	svc := newExposeService("cleanup-idempotent", 0, true)
+	svc.Namespace = cfg.ServicesNamespace
+	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
+		t.Fatalf("failed to create expose: %v", err)
+	}
+
+	if err := DeleteExpose(svc.Name, svc.Namespace, client, cfg); err != nil {
+		t.Fatalf("first DeleteExpose returned error: %v", err)
+	}
+
+	if err := DeleteExpose(svc.Name, svc.Namespace, client, cfg); err != nil {
+		t.Fatalf("second DeleteExpose should be idempotent, got error: %v", err)
+	}
+}
+
 /*func TestListExpose(t *testing.T) {
 	cfg := newTestConfig()
 	client := fake.NewSimpleClientset()

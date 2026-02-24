@@ -700,6 +700,29 @@ func TestKubeDeleteService(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 	})
+
+	t.Run("error deleting exposed resources", func(t *testing.T) {
+		clientset := fake.NewSimpleClientset()
+
+		back := MakeKubeBackend(clientset, testConfig)
+
+		// Return no error deleting service resources before exposed resources.
+		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete-collection", "jobs", validDeleteReaction)
+
+		// Return error deleting HPA inside exposed resources cleanup.
+		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "horizontalpodautoscalers", errorReaction)
+
+		exposedService := testService
+		exposedService.Expose.APIPort = 8080
+
+		// Call
+		err := back.DeleteService(exposedService)
+		if err == nil {
+			t.Error("expecting error, got: nil")
+		}
+	})
 }
 
 func TestKubeGetKubeClientset(t *testing.T) {

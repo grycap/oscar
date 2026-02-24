@@ -30,6 +30,7 @@ import (
 	autos "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
@@ -86,11 +87,11 @@ func DeleteExpose(name string, namespace string, kubeClientset kubernetes.Interf
 	}
 
 	err := deleteDeployment(name, targetNamespace, kubeClientset, cfg)
-	if err != nil {
+	if err = ignoreNotFound(err); err != nil {
 		return fmt.Errorf("error deleting deployment for exposed service '%s': %v", name, err)
 	}
 	err = deleteService(name, targetNamespace, kubeClientset, cfg)
-	if err != nil {
+	if err = ignoreNotFound(err); err != nil {
 		return fmt.Errorf("error deleting service for exposed service '%s': %v", name, err)
 	}
 
@@ -99,19 +100,19 @@ func DeleteExpose(name string, namespace string, kubeClientset kubernetes.Interf
 		err = deleteIngress(getIngressName(name), targetNamespace, kubeClientset, cfg)
 		if existsSecret(name, targetNamespace, kubeClientset, cfg) {
 			err = deleteSecret(name, targetNamespace, kubeClientset, cfg)
-			if err != nil {
+			if err = ignoreNotFound(err); err != nil {
 				return err
 			}
 		}
-		if err != nil {
+		if err = ignoreNotFound(err); err != nil {
 			return fmt.Errorf("error deleting ingress for exposed service '%s': %v", name, err)
 		}
 	}
 	termination := int64(0)
-	back := metav1.DeletePropagationBackground
+	foreground := metav1.DeletePropagationForeground
 	delete := metav1.DeleteOptions{
 		GracePeriodSeconds: &termination,
-		PropagationPolicy:  &back,
+		PropagationPolicy:  &foreground,
 	}
 	listOpts := metav1.ListOptions{
 		LabelSelector: "app=oscar-svc-exp-" + name,
@@ -123,6 +124,13 @@ func DeleteExpose(name string, namespace string, kubeClientset kubernetes.Interf
 	utils.DeleteWorkload(name, targetNamespace, cfg)
 
 	return nil
+}
+
+func ignoreNotFound(err error) error {
+	if err == nil || apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 // UpdateExpose updates all the components of the exposed service on the cluster
@@ -407,12 +415,12 @@ func listDeployments(namespace string, kubeClientset kubernetes.Interface, cfg *
 func deleteDeployment(name string, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
 	name_hpa := getHPAName(name)
 	err := kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(namespace).Delete(context.TODO(), name_hpa, metav1.DeleteOptions{})
-	if err != nil {
+	if err = ignoreNotFound(err); err != nil {
 		return err
 	}
 	deployment := getDeploymentName(name)
 	err = kubeClientset.AppsV1().Deployments(namespace).Delete(context.TODO(), deployment, metav1.DeleteOptions{})
-	if err != nil {
+	if err = ignoreNotFound(err); err != nil {
 		return err
 	}
 	return nil
