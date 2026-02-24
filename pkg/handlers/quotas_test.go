@@ -74,12 +74,12 @@ func TestQuotaResponseStructures(t *testing.T) {
 			ClusterQueue: "oscar-cq-user123",
 			Resources: map[string]quotaValues{
 				"cpu": {
-					Max:  "1000m",
-					Used: "500m",
+					Max:  1000,
+					Used: 500,
 				},
 				"memory": {
-					Max:  "2Gi",
-					Used: "1Gi",
+					Max:  2 * 1024 * 1024 * 1024,
+					Used: 1 * 1024 * 1024 * 1024,
 				},
 			},
 		}
@@ -107,12 +107,12 @@ func TestQuotaResponseStructures(t *testing.T) {
 			t.Errorf("Expected %d resources, got %d", len(resp.Resources), len(unmarshaled.Resources))
 		}
 
-		if unmarshaled.Resources["cpu"].Max != "1000m" {
-			t.Errorf("Expected CPU Max 1000m, got %s", unmarshaled.Resources["cpu"].Max)
+		if unmarshaled.Resources["cpu"].Max != 1000 {
+			t.Errorf("Expected CPU Max 1000, got %d", unmarshaled.Resources["cpu"].Max)
 		}
 
-		if unmarshaled.Resources["memory"].Max != "2Gi" {
-			t.Errorf("Expected Memory Max 2Gi, got %s", unmarshaled.Resources["memory"].Max)
+		if unmarshaled.Resources["memory"].Max != 2*1024*1024*1024 {
+			t.Errorf("Expected Memory Max %d, got %d", 2*1024*1024*1024, unmarshaled.Resources["memory"].Max)
 		}
 	})
 
@@ -276,7 +276,7 @@ func TestQuotaJSONTags(t *testing.T) {
 			UserID:       "user123",
 			ClusterQueue: "oscar-cq-user123",
 			Resources: map[string]quotaValues{
-				"cpu": {Max: "1000m", Used: "500m"},
+				"cpu": {Max: 1000, Used: 500},
 			},
 		}
 

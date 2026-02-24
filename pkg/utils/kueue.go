@@ -64,6 +64,40 @@ func EnsureKueueUserQueues(ctx context.Context, cfg *types.Config, serviceNamesp
 	return nil
 }
 
+// CreateKueueUserQueuesIfDontExist creates the ClusterQueue for the user if it doesn't exist.
+// It is idempotent and will no-op if Kueue is disabled.
+func CreateKueueUserQueuesIfDontExist(cfg *types.Config, user string) error {
+	if !cfg.KueueEnable {
+		return nil
+	}
+	// Set empty Context
+	ctx := context.TODO()
+
+	restCfg, err := rest.InClusterConfig()
+	if err != nil {
+		return fmt.Errorf("unable to build in-cluster config for kueue: %v", err)
+	}
+
+	kueueClient, err := kueueclientset.NewForConfig(restCfg)
+	if err != nil {
+		return fmt.Errorf("unable to create kueue client: %v", err)
+	}
+	// Check if the ClusterQueue for the user already exists, if not create it
+	clusterQueueName := buildClusterQueueName(user)
+	_, err = kueueClient.KueueV1beta2().ClusterQueues().Get(ctx, clusterQueueName, metav1.GetOptions{})
+	if err != nil {
+		flavorName := sanitizeKueueName(cfg.KueueDefaultFlavor)
+		if err := ensureResourceFlavor(ctx, kueueClient, flavorName); err != nil {
+			return fmt.Errorf("unable to ensure kueue ResourceFlavor: %v", err)
+		}
+
+		if err := ensureClusterQueue(ctx, kueueClient, cfg, clusterQueueName, flavorName, user); err != nil {
+			return fmt.Errorf("unable to ensure kueue ClusterQueue: %v", err)
+		}
+	}
+	return nil
+}
+
 func ensureResourceFlavor(ctx context.Context, kueueClient *kueueclientset.Clientset, flavorName string) error {
 	_, err := kueueClient.KueueV1beta2().ResourceFlavors().Get(ctx, flavorName, metav1.GetOptions{})
 	if err == nil {
@@ -408,6 +442,18 @@ func CheckWorkloadAdmited(service types.Service, namespace string, cfg *types.Co
 	} else {
 		KueueLogger.Printf("workload for exposed service '%s' is admitted", service.Name)
 		deployment := templateFunction(service, namespace, cfg) //getDeploymentSpec
+		if SecretExists(service.Name, namespace, kubeClientset) {
+			fmt.Println("exist")
+			deployment.Spec.Template.Spec.Containers[0].EnvFrom = []v1.EnvFromSource{
+				{
+					SecretRef: &v1.SecretEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: service.Name,
+						},
+					},
+				},
+			}
+		}
 		deployment.Spec.Replicas = &service.Expose.MinScale
 		_, err := kubeClientset.AppsV1().Deployments(namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
 		if err != nil {
@@ -425,7 +471,7 @@ func VerifyWorkload(service types.Service, namespace string, cfg *types.Config) 
 		service.Expose.MinScale = 1
 	}
 	creation := CreateWorkload(service, namespace, cfg, getPodTemplateSpec)
-	check := onlyCheckWorkloadAdmited()
+	check := onlyCheckWorkloadAdmited(service.Name)
 	delete := DeleteWorkload(service.Name, namespace, cfg)
 	//return (creation && check)
 	return (creation && check && delete)
@@ -454,7 +500,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 	}
 }
 
-func onlyCheckWorkloadAdmited() bool {
+func onlyCheckWorkloadAdmited(serviceName string) bool {
 	restCfg, err := rest.InClusterConfig()
 	if err != nil {
 		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
@@ -466,15 +512,22 @@ func onlyCheckWorkloadAdmited() bool {
 	}
 	factory := kueueinformers.NewSharedInformerFactory(kueueClient, 0)
 	workloadsInformer := factory.Kueue().V1beta2().Workloads().Informer()
-	valueReturn := false
+	admissionChan := make(chan bool)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
 
 	resource, err := workloadsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newWL := newObj.(*kueuev1.Workload)
-			if newWL.Status.Conditions != nil && newWL.Status.Conditions[0].Status == "True" {
-				valueReturn = true
-			} else if newWL.Status.Conditions != nil && newWL.Status.Conditions[0].Status != "True" {
-				valueReturn = false
+			if newWL.Name != serviceName {
+				return
+			}
+			for _, cond := range newWL.Status.Conditions {
+				if cond.Type == "Admitted" && cond.Status == "True" {
+					KueueLogger.Printf("¡Workload %s admitted!", serviceName)
+					admissionChan <- true
+					return
+				}
 			}
 		},
 	})
@@ -482,10 +535,11 @@ func onlyCheckWorkloadAdmited() bool {
 		KueueLogger.Printf("error adding event handler to workload informer: %v, %v", err, resource)
 	}
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
 	factory.Start(stopCh)
 	factory.WaitForCacheSync(stopCh)
-	return valueReturn
+
+	select {
+	case admitted := <-admissionChan:
+		return admitted
+	}
 }

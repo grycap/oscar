@@ -286,7 +286,7 @@ func getDeploymentSpec(service types.Service, namespace string, cfg *types.Confi
 			Name:      deployName,
 			Namespace: namespace,
 			Labels: map[string]string{
-				types.KueueOwnerLabel: service.Owner,
+				types.KueueOwnerLabel: uid,
 			},
 		},
 		Spec: apps.DeploymentSpec{
