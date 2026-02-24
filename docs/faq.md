@@ -38,7 +38,7 @@ Apply the file through kubectl into the Kubernetes OSCAR cluster to create the s
 
 It could happen when an OSCAR cluster is deployed from an IM recipe that does not have certificates or the Let's Encrypt limit has been reached. Only [50 certificates per week can be issued](https://letsencrypt.org/docs/rate-limits/). Those certificates have a [90 days expiration lifetime](https://letsencrypt.org/2015/11/09/why-90-days.html). The certificates issued can be seen at https://crt.sh/?q=im.grycap.net.
 
-- **I do not have certificates. I can not see the buckets. What do I have to do?**
+- **I do not have certificates. I cannot see the buckets. What do I have to do?**
 
 If the OSCAR cluster has no certificate OSCAR Dashboard will not show the buckets.
 
@@ -49,7 +49,7 @@ You can fix this by entering in the MinIO endpoint `minio.<OSCAR-endpoint>`. The
 ![in-minio.png](images/faq/certificates/05.-in-minio.png)
 
 Return to OSCAR Dashboard and, then,  you can see the buckets.
-The buckets will be shown only in the browser you do this process.
+The buckets will be shown only in the browser where you do this process.
 The results may vary depending on the browser. For example, they will show up in Firefox but not in Chrome.
 
 ![got-buckets.png](images/faq/certificates/06.-got-buckets.png)

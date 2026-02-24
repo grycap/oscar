@@ -111,7 +111,7 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/mast
 
 OSCAR depends on [MinIO](https://min.io/) as a storage provider and function
 trigger. The easy way to run MinIO in a Kubernetes cluster is by installing
-its [helm chart](https://github.com/minio/helm). To  install the helm MinIO
+its [helm chart](https://github.com/minio/helm). To install the helm MinIO
 repo and install the chart, run the following commands replacing
 `<MINIO_PASSWORD>` with a password. It must have at least 8 characters:
 
