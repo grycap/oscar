@@ -4,7 +4,7 @@ echo "server {
 
     location / {  
         default_type text/plain;
-        return 200 'Welcome to nginx!';  
+        return 200 'Welcome to nginx! Message: ${MESSAGE:-missing-env}';  
     } 
 }" > /etc/nginx/conf.d/default.conf
 nginx -g 'daemon off;' 

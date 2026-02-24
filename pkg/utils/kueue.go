@@ -64,6 +64,40 @@ func EnsureKueueUserQueues(ctx context.Context, cfg *types.Config, serviceNamesp
 	return nil
 }
 
+// CreateKueueUserQueuesIfDontExist creates the ClusterQueue for the user if it doesn't exist.
+// It is idempotent and will no-op if Kueue is disabled.
+func CreateKueueUserQueuesIfDontExist(cfg *types.Config, user string) error {
+	if !cfg.KueueEnable {
+		return nil
+	}
+	// Set empty Context
+	ctx := context.TODO()
+
+	restCfg, err := rest.InClusterConfig()
+	if err != nil {
+		return fmt.Errorf("unable to build in-cluster config for kueue: %v", err)
+	}
+
+	kueueClient, err := kueueclientset.NewForConfig(restCfg)
+	if err != nil {
+		return fmt.Errorf("unable to create kueue client: %v", err)
+	}
+	// Check if the ClusterQueue for the user already exists, if not create it
+	clusterQueueName := buildClusterQueueName(user)
+	_, err = kueueClient.KueueV1beta2().ClusterQueues().Get(ctx, clusterQueueName, metav1.GetOptions{})
+	if err != nil {
+		flavorName := sanitizeKueueName(cfg.KueueDefaultFlavor)
+		if err := ensureResourceFlavor(ctx, kueueClient, flavorName); err != nil {
+			return fmt.Errorf("unable to ensure kueue ResourceFlavor: %v", err)
+		}
+
+		if err := ensureClusterQueue(ctx, kueueClient, cfg, clusterQueueName, flavorName, user); err != nil {
+			return fmt.Errorf("unable to ensure kueue ClusterQueue: %v", err)
+		}
+	}
+	return nil
+}
+
 func ensureResourceFlavor(ctx context.Context, kueueClient *kueueclientset.Clientset, flavorName string) error {
 	_, err := kueueClient.KueueV1beta2().ResourceFlavors().Get(ctx, flavorName, metav1.GetOptions{})
 	if err == nil {
@@ -408,6 +442,18 @@ func CheckWorkloadAdmited(service types.Service, namespace string, cfg *types.Co
 	} else {
 		KueueLogger.Printf("workload for exposed service '%s' is admitted", service.Name)
 		deployment := templateFunction(service, namespace, cfg) //getDeploymentSpec
+		if SecretExists(service.Name, namespace, kubeClientset) {
+			fmt.Println("exist")
+			deployment.Spec.Template.Spec.Containers[0].EnvFrom = []v1.EnvFromSource{
+				{
+					SecretRef: &v1.SecretEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: service.Name,
+						},
+					},
+				},
+			}
+		}
 		deployment.Spec.Replicas = &service.Expose.MinScale
 		_, err := kubeClientset.AppsV1().Deployments(namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
 		if err != nil {
