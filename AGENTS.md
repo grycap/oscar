@@ -3,7 +3,6 @@
 ## Purpose of This File
 - This file defines mandatory rules for AI agents and humans using AI while working in this repository.
 - Follow these rules unless a repository maintainer explicitly overrides them.
-- The OpenSpec block above applies only when OpenSpec triggers are met; otherwise follow the repository rules below.
 
 ## Agent Operating Principles
 - You MUST preserve existing behavior unless a change is explicitly requested.
@@ -56,4 +55,3 @@ For docs-only changes, tests may be skipped but must be stated explicitly.
 - The change requires new dependencies, CI/CD edits, or license changes.
 - The change affects external interfaces or deployment behavior.
 - Tests cannot be run or consistently fail.
-If AGENTS.md and OpenSpec instructions conflict, follow AGENTS.md unless a maintainer says otherwise.
