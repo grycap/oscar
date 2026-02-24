@@ -471,7 +471,7 @@ func VerifyWorkload(service types.Service, namespace string, cfg *types.Config) 
 		service.Expose.MinScale = 1
 	}
 	creation := CreateWorkload(service, namespace, cfg, getPodTemplateSpec)
-	check := onlyCheckWorkloadAdmited()
+	check := onlyCheckWorkloadAdmited(service.Name)
 	delete := DeleteWorkload(service.Name, namespace, cfg)
 	//return (creation && check)
 	return (creation && check && delete)
@@ -500,7 +500,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 	}
 }
 
-func onlyCheckWorkloadAdmited() bool {
+func onlyCheckWorkloadAdmited(serviceName string) bool {
 	restCfg, err := rest.InClusterConfig()
 	if err != nil {
 		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
@@ -512,15 +512,22 @@ func onlyCheckWorkloadAdmited() bool {
 	}
 	factory := kueueinformers.NewSharedInformerFactory(kueueClient, 0)
 	workloadsInformer := factory.Kueue().V1beta2().Workloads().Informer()
-	valueReturn := false
+	admissionChan := make(chan bool)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
 
 	resource, err := workloadsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newWL := newObj.(*kueuev1.Workload)
-			if newWL.Status.Conditions != nil && newWL.Status.Conditions[0].Status == "True" {
-				valueReturn = true
-			} else if newWL.Status.Conditions != nil && newWL.Status.Conditions[0].Status != "True" {
-				valueReturn = false
+			if newWL.Name != serviceName {
+				return
+			}
+			for _, cond := range newWL.Status.Conditions {
+				if cond.Type == "Admitted" && cond.Status == "True" {
+					KueueLogger.Printf("¡Workload %s admitted!", serviceName)
+					admissionChan <- true
+					return
+				}
 			}
 		},
 	})
@@ -528,10 +535,11 @@ func onlyCheckWorkloadAdmited() bool {
 		KueueLogger.Printf("error adding event handler to workload informer: %v, %v", err, resource)
 	}
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
 	factory.Start(stopCh)
 	factory.WaitForCacheSync(stopCh)
-	return valueReturn
+
+	select {
+	case admitted := <-admissionChan:
+		return admitted
+	}
 }
