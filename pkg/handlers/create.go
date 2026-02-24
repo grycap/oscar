@@ -66,7 +66,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		var service types.Service
 		isAdminUser = false
 		authHeader := c.GetHeader("Authorization")
-
+		//Error creating the service: Service.serving.knative.dev "cowsay-s" is invalid: metadata.labels:
+		//  Invalid value: "platform-access:vo.ai4eosc.eu": a valid label must be an empty string or
+		// consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character
+		// (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')
 		if err := c.ShouldBindJSON(&service); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
@@ -678,6 +681,7 @@ func checkIdentity(service *types.Service, authHeader string) error {
 	voFirstReplace := strings.Replace(service.VO, "/", "", 1)
 	voParse := strings.ReplaceAll(voFirstReplace, "/", "--")
 	voParse = strings.ReplaceAll(voParse, " ", "__")
+	voParse = strings.ReplaceAll(voParse, ":", "___")
 	service.Labels["vo"] = voParse
 
 	return nil

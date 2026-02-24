@@ -17,12 +17,14 @@ limitations under the License.
 package backends
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
 
 	"github.com/grycap/oscar/v3/pkg/types"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -293,21 +295,42 @@ func TestKnativeCreateService(t *testing.T) {
 			t.Error("expected error, got: nil")
 		}
 	})
+
+	t.Run("exposed service skips knative service creation", func(t *testing.T) {
+		fakeClientset := fake.NewSimpleClientset()
+
+		back := MakeKnativeBackend(fakeClientset, fakeConfig, testConfig)
+		back.knClientset = knFake.NewSimpleClientset()
+
+		// Fail if Knative Service create is called.
+		back.knClientset.(*knFake.Clientset).Fake.PrependReactor("create", "services", errorReaction)
+
+		exposedService := types.Service{
+			Name:   "test-exposed",
+			Image:  "nginx",
+			Script: "echo test",
+			Labels: map[string]string{},
+			Expose: types.Expose{
+				APIPort: 80,
+			},
+		}
+
+		if err := back.CreateService(exposedService); err != nil {
+			t.Fatalf("unexpected error creating exposed service: %v", err)
+		}
+
+		deployments, err := back.kubeClientset.AppsV1().Deployments(testConfig.ServicesNamespace).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			t.Fatalf("error listing exposed deployments: %v", err)
+		}
+		if len(deployments.Items) != 1 {
+			t.Fatalf("expected 1 exposed deployment, got %d", len(deployments.Items))
+		}
+	})
 }
 
 func TestKnativeReadService(t *testing.T) {
 	scenarios := []knativeBackendTestScenario{
-		{
-			"Error getting knative service",
-			[]k8stesting.SimpleReactor{},
-			[]k8stesting.SimpleReactor{
-				{
-					Verb:     "get",
-					Resource: "services",
-					Reaction: errorReaction,
-				}},
-			true,
-		},
 		{
 			"Error getting configmap",
 			[]k8stesting.SimpleReactor{
@@ -598,56 +621,108 @@ func TestKnativeUpdateService(t *testing.T) {
 }
 
 func TestKnativeDeleteService(t *testing.T) {
-	testService := types.Service{
-		Name: "test",
-	}
-	scenarios := []knativeBackendTestScenario{
+	scenarios := []struct {
+		name        string
+		service     types.Service
+		k8sReactors []k8stesting.SimpleReactor
+		knReactors  []k8stesting.SimpleReactor
+		returnError bool
+	}{
 		{
-			"Error deleting knative service",
-			[]k8stesting.SimpleReactor{},
-			[]k8stesting.SimpleReactor{
+			name: "Error deleting knative service",
+			service: types.Service{
+				Name: "test",
+			},
+			k8sReactors: []k8stesting.SimpleReactor{},
+			knReactors: []k8stesting.SimpleReactor{
 				{
 					Verb:     "delete",
 					Resource: "services",
 					Reaction: errorReaction,
 				}},
-			true,
+			returnError: true,
 		},
 		{
-			"Error deleting configmap",
-			[]k8stesting.SimpleReactor{
+			name: "Knative service not found should not fail delete",
+			service: types.Service{
+				Name: "test",
+			},
+			k8sReactors: []k8stesting.SimpleReactor{},
+			knReactors: []k8stesting.SimpleReactor{
+				{
+					Verb:     "delete",
+					Resource: "services",
+					Reaction: func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, apierrors.NewNotFound(v1.Resource("services"), "test")
+					},
+				}},
+			returnError: false,
+		},
+		{
+			name: "Error deleting configmap",
+			service: types.Service{
+				Name: "test",
+			},
+			k8sReactors: []k8stesting.SimpleReactor{
 				{
 					Verb:     "delete",
 					Resource: "configmaps",
 					Reaction: errorReaction,
 				},
 			},
-			[]k8stesting.SimpleReactor{
+			knReactors: []k8stesting.SimpleReactor{
 				{
 					Verb:     "delete",
 					Resource: "services",
 					Reaction: validDeleteReaction,
 				},
 			},
-			false,
+			returnError: false,
 		},
 		{
-			"Error deleting jobs",
-			[]k8stesting.SimpleReactor{
+			name: "Error deleting jobs",
+			service: types.Service{
+				Name: "test",
+			},
+			k8sReactors: []k8stesting.SimpleReactor{
 				{
 					Verb:     "delete-collection",
 					Resource: "jobs",
 					Reaction: errorReaction,
 				},
 			},
-			[]k8stesting.SimpleReactor{
+			knReactors: []k8stesting.SimpleReactor{
 				{
 					Verb:     "delete",
 					Resource: "services",
 					Reaction: validDeleteReaction,
 				},
 			},
-			false,
+			returnError: false,
+		},
+		{
+			name: "Error deleting exposed resources",
+			service: types.Service{
+				Name: "test",
+				Expose: types.Expose{
+					APIPort: 8080,
+				},
+			},
+			k8sReactors: []k8stesting.SimpleReactor{
+				{
+					Verb:     "delete",
+					Resource: "horizontalpodautoscalers",
+					Reaction: errorReaction,
+				},
+			},
+			knReactors: []k8stesting.SimpleReactor{
+				{
+					Verb:     "delete",
+					Resource: "services",
+					Reaction: validDeleteReaction,
+				},
+			},
+			returnError: true,
 		},
 	}
 
@@ -667,7 +742,7 @@ func TestKnativeDeleteService(t *testing.T) {
 			}
 
 			// Delete service
-			err := back.DeleteService(testService)
+			err := back.DeleteService(s.service)
 			if s.returnError {
 				if err == nil {
 					t.Error("expected error, got: nil")

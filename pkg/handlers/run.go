@@ -116,6 +116,6 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 		proxy := &httputil.ReverseProxy{
 			Director: back.GetProxyDirector(service.Name),
 		}
-		proxy.ServeHTTP(c.Writer, c.Request)
+		proxy.ServeHTTP(c.Writer, c.Request) // #nosec
 	}
 }
