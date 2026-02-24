@@ -6,6 +6,9 @@
 *.dylib
 .cache
 .gocache
+.codex
+config.toml
+
 
 # Test binary, built with `go test -c`
 *.test
