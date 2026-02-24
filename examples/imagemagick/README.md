@@ -12,7 +12,7 @@ software. The goal is to have:
 
 ## STEP 1: Deploy the OSCAR cluster on an IaaS Cloud
 
-Follow the [deployment instructions](https://o-scar.readthedocs.io/en/latest/deploy.html).
+Follow the [deployment instructions](https://docs.oscar.grycap.net/deploy-im-dashboard/).
 
 ## STEP 2: Log in the OSCAR UI
 
