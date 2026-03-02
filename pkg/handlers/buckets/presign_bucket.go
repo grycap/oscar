@@ -33,7 +33,7 @@ import (
 
 const (
 	defaultPresignExpirySeconds = 900
-	maxPresignExpirySeconds     = 3600
+	maxPresignExpirySeconds     = 3600 * 24 * 7 // 7 days
 	minPresignExpirySeconds     = 1
 	operationUpload             = "upload"
 	operationDownload           = "download"
