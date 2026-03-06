@@ -160,7 +160,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		// The Kserve service set an OwnerReference to the Knative service, so if the Knative service is deleted the KServe InferenceService will be automatically deleted by Kubernetes garbage collection
 		_, err := utils.CreateKserveInferenceService(kn.kserveClientset, &service, createdKnSvc)
 		if err != nil {
-			if knSvcDelErr := kn.knClientset.ServingV1().Services(namespace).Delete(context.TODO(), knSvc.Name, metav1.DeleteOptions{}); err != nil {
+			if knSvcDelErr := kn.knClientset.ServingV1().Services(namespace).Delete(context.TODO(), knSvc.Name, metav1.DeleteOptions{}); knSvcDelErr != nil {
 				log.Println(knSvcDelErr.Error())
 			}
 			if delErr := deleteServiceConfigMap(service.Name, namespace, kn.kubeClientset); delErr != nil {
