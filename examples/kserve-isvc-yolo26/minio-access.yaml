@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-s3-secret
+  namespace: oscar-svc
+  annotations:
+    serving.kserve.io/s3-endpoint: "minio.minio.svc.cluster.local:9000"
+    serving.kserve.io/s3-usehttps: "0"
+    serving.kserve.io/s3-region: "us-east-1"
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: minio
+  AWS_SECRET_ACCESS_KEY: Yjg0YjAz
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: minio-sa
+  namespace: oscar-svc
+secrets:
+  - name: minio-s3-secret
