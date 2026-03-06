@@ -1,0 +1,16 @@
+functions:
+  oscar:
+  - oscar-kserve-y2m:
+      name: isvc-sklearn-request
+      cpu: '1.0'
+      memory: 1Gi
+      image: docker.io/curlimages/curl:8.18.0
+      script: script.sh
+      alpine: true
+      log_level: DEBUG
+      input:
+      - storage_provider: minio
+        path: isvc-sklearn-request/input
+      output:
+      - storage_provider: minio
+        path: isvc-sklearn-request/output

@@ -36,6 +36,7 @@ OSCAR_POST_DEPLOYMENT_IMAGE=""
 OSCAR_TARGET_REPLICAS=1
 SKIP_PROMPTS="false"
 ENABLE_OIDC="false"
+APPLY_LIGHT_SYSTEM_PATCH="false"
 OIDC_ISSUERS_DEFAULT="https://keycloak.grycap.net/realms/grycap"
 OIDC_GROUPS_DEFAULT="/oscar-staff, /oscar-test"
 
@@ -48,6 +49,7 @@ Options:
   --devel        Deploy using the OSCAR devel branch without interactive prompts.
   --branch NAME  Deploy using the specified OSCAR git branch (default: master).
   --oidc         Enable OIDC support for OSCAR (default: disabled).
+  --light-system Apply a low-resource-friendly KServe patch for LLM model downloads.
   -h, --help     Show this help message and exit.
 EOF
 }
@@ -377,292 +379,102 @@ checkOSCARDeploy(){
 }
 
 deployKServe(){
-    echo -e "\n[*] Deploying KServe in standard mode ..."
-    #1. Install Cert Manager (using Helm like KServe's official quick install)
-    echo -e "\n[*] Installing cert-manager ..."
-    helm repo add jetstack https://charts.jetstack.io --force-update
-    helm install cert-manager jetstack/cert-manager \
-        --namespace cert-manager \
-        --create-namespace \
-        --version v1.16.1 \
-        --set crds.enabled=true \
-        --wait
-    echo -e "[$GREEN$CHECK$END_COLOR] cert-manager installed successfully"
-    
-    #2. Install Network Controller (Gateway API)
-    kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
+    local script_dir
+    local kserve_root
+    local kserve_repo_url
+    local kserve_parent_dir
 
-    #3. Create GatewayClass resource
-    echo -e "\n[*] Creating GatewayClass resource ..."
-    kubectl apply -f - <<EOF
-apiVersion: gateway.networking.k8s.io/v1
-kind: GatewayClass
-metadata:
-  name: envoy
-spec:
-  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    kserve_root="${KSERVE_ROOT:-${script_dir}/../../kserve}"
+    kserve_repo_url="${KSERVE_REPO_URL:-https://github.com/kserve/kserve.git}"
+    kserve_parent_dir="$(dirname "$kserve_root")"
+
+    if [ ! -d "$kserve_root" ]; then
+        echo -e "\n[*] KServe repository not found at: $kserve_root"
+        echo -e "[*] Cloning KServe repository from: $kserve_repo_url"
+        if ! command -v git &> /dev/null; then
+            echo -e "$RED[!]$END_COLOR git is required to clone KServe. Install git or set KSERVE_ROOT to an existing repository."
+            exit 1
+        fi
+        mkdir -p "$kserve_parent_dir"
+        if ! git clone "$kserve_repo_url" "$kserve_root"; then
+            echo -e "$RED[!]$END_COLOR Failed to clone KServe repository from $kserve_repo_url"
+            exit 1
+        fi
+        echo -e "[$GREEN$CHECK$END_COLOR] KServe repository cloned to $kserve_root"
+    fi
+
+    echo -e "\n[*] Deploying KServe from: $kserve_root"
+    (
+        cd "$kserve_root" || exit 1
+
+        if [ ! -x "./hack/setup/quick-install/kserve-standard-mode-dependency-install.sh" ]; then
+            echo -e "$RED[!]$END_COLOR Missing executable script: ./hack/setup/quick-install/kserve-standard-mode-dependency-install.sh"
+            exit 1
+        fi
+        if [ ! -x "./hack/setup/quick-install/llmisvc-dependency-install.sh" ]; then
+            echo -e "$RED[!]$END_COLOR Missing executable script: ./hack/setup/quick-install/llmisvc-dependency-install.sh"
+            exit 1
+        fi
+        if [ ! -x "./hack/setup/infra/manage.kserve-kustomize.sh" ]; then
+            echo -e "$RED[!]$END_COLOR Missing executable script: ./hack/setup/infra/manage.kserve-kustomize.sh"
+            exit 1
+        fi
+
+        ./hack/setup/quick-install/kserve-standard-mode-dependency-install.sh
+        ./hack/setup/quick-install/llmisvc-dependency-install.sh
+        DEPLOYMENT_MODE=Standard INSTALL_RUNTIMES=true ENABLE_LLMISVC=true INSTALL_LLMISVC_CONFIGS=true hack/setup/infra/manage.kserve-kustomize.sh
+    )
+
+    if [ $? -ne 0 ]; then
+        echo -e "$RED[!]$END_COLOR KServe deployment failed"
+        exit 1
+    fi
+
+    echo -e "\n[*] Verifying installed KServe runtimes ..."
+    kubectl get clusterservingruntime
+    runtime_count=$(kubectl get clusterservingruntime --no-headers 2>/dev/null | wc -l | tr -d ' ')
+    if [ "${runtime_count}" -eq 0 ]; then
+        echo -e "$RED[!]$END_COLOR No ClusterServingRuntime resources were installed"
+        exit 1
+    fi
+    echo -e "[$GREEN$CHECK$END_COLOR] Found ${runtime_count} ClusterServingRuntime resources"
+
+    echo -e "[$GREEN$CHECK$END_COLOR] KServe deployed successfully"
+
+}
+
+applyLightSystemPatch(){
+    echo -e "\n[*] Applying light-system KServe patch ..."
+    if ! kubectl -n kserve patch configmap inferenceservice-config --type merge --patch "$(cat <<'EOF'
+data:
+  storageInitializer: |
+    {
+        "image" : "kserve/storage-initializer:latest",
+        "memoryRequest": "1Gi",
+        "memoryLimit": "4Gi",
+        "cpuRequest": "100m",
+        "cpuLimit": "1",
+        "caBundleConfigMapName": "",
+        "caBundleVolumeMountPath": "/etc/ssl/custom-certs",
+        "enableModelcar": true,
+        "cpuModelcar": "10m",
+        "memoryModelcar": "15Mi",
+        "uidModelcar": 1010
+    }
 EOF
-
-    # Verify GatewayClass was created
-    if kubectl get gatewayclass envoy &> /dev/null; then
-        echo -e "[$GREEN$CHECK$END_COLOR] GatewayClass 'envoy' created successfully"
-    else
-        echo -e "$RED[!]$END_COLOR Failed to create GatewayClass 'envoy'"
+)"; then
+        echo -e "$RED[!]$END_COLOR Failed to patch kserve/inferenceservice-config"
         exit 1
     fi
 
-    #4. Install KServe
-    echo -e "\n[*] Installing KServe ..."
-
-    #!/bin/bash
-
-    set -eo pipefail
-    ############################################################
-    # Help                                                     #
-    ############################################################
-    Help() {
-    # Display Help
-    echo "KServe quick install script."
-    echo
-    echo "Syntax: [-s|-r]"
-    echo "options:"
-    echo "s Serverless Mode."
-    echo "r RawDeployment Mode."
-    echo "u Uninstall."
-    echo "d Install only dependencies."
-    echo "k Install KEDA."
-    echo
-    }
-
-    export ISTIO_VERSION=1.27.1
-    export KNATIVE_OPERATOR_VERSION=v1.15.7
-    export KNATIVE_SERVING_VERSION=1.15.2
-    export KSERVE_VERSION=v0.16.0
-    export CERT_MANAGER_VERSION=v1.16.1
-    export GATEWAY_API_VERSION=v1.2.1
-    export KEDA_VERSION=2.14.0
-    SCRIPT_DIR="$(dirname -- "${BASH_SOURCE[0]}")"
-    export SCRIPT_DIR
-
-    uninstall() {
-    helm uninstall --ignore-not-found istio-ingressgateway -n istio-system
-    helm uninstall --ignore-not-found istiod -n istio-system
-    helm uninstall --ignore-not-found istio-base -n istio-system
-    echo "😀 Successfully uninstalled Istio"
-
-    helm uninstall --ignore-not-found cert-manager -n cert-manager
-    echo "😀 Successfully uninstalled Cert Manager"
-
-    helm uninstall --ignore-not-found keda -n keda
-    echo "😀 Successfully uninstalled KEDA"
-    
-    kubectl delete --ignore-not-found=true KnativeServing knative-serving -n knative-serving --wait=True --timeout=300s
-    helm uninstall --ignore-not-found knative-operator -n knative-serving
-    echo "😀 Successfully uninstalled Knative"
-
-    helm uninstall --ignore-not-found kserve -n kserve
-    helm uninstall --ignore-not-found kserve-crd -n kserve
-    echo "😀 Successfully uninstalled KServe"
-
-    kubectl delete --ignore-not-found=true namespace istio-system
-    kubectl delete --ignore-not-found=true namespace cert-manager
-    kubectl delete --ignore-not-found=true namespace kserve
-    }
-
-    # Check if helm command is available
-    if ! command -v helm &>/dev/null; then
-    echo "😱 Helm command not found. Please install Helm."
-    exit 1
+    if kubectl -n kserve get deployment llmisvc-controller-manager >/dev/null 2>&1; then
+        echo -e "[*] Restarting llmisvc-controller-manager to reload KServe config ..."
+        kubectl -n kserve rollout restart deployment/llmisvc-controller-manager
+        kubectl -n kserve rollout status deployment/llmisvc-controller-manager --timeout=300s
     fi
 
-    deploymentMode="Serverless"
-    installKeda=false
-    while getopts ":hsrudk" option; do
-    case $option in
-    h) # display Help
-        Help
-        exit
-        ;;
-    r) # skip knative install
-        deploymentMode="RawDeployment" ;;
-    s) # install knative
-        deploymentMode="Serverless" ;;
-    u) # uninstall
-        uninstall
-        exit
-        ;;
-    d) # install only dependencies
-        installKserve=false ;;
-    k) # install KEDA
-        installKeda=true ;;
-    \?) # Invalid option
-        echo "Error: Invalid option"
-        exit
-        ;;
-    esac
-    done
-
-    get_kube_version() {
-    kubectl version --short=true 2>/dev/null || kubectl version | awk -F '.' '/Server Version/ {print $2}'
-    }
-
-    if [ "$(get_kube_version)" -lt 24 ]; then
-    echo "😱 install requires at least Kubernetes 1.24"
-    exit 1
-    fi
-
-    echo "Installing Gateway API CRDs ..."
-    kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/standard-install.yaml
-
-    helm repo add istio https://istio-release.storage.googleapis.com/charts --force-update
-    helm install istio-base istio/base -n istio-system --wait --set defaultRevision=default --create-namespace --version ${ISTIO_VERSION}
-    helm install istiod istio/istiod -n istio-system --wait --version ${ISTIO_VERSION} \
-    --set proxy.autoInject=disabled \
-    --set-string pilot.podAnnotations."cluster-autoscaler\.kubernetes\.io/safe-to-evict"=true
-    helm install istio-ingressgateway istio/gateway -n istio-system --version ${ISTIO_VERSION} \
-    --set-string podAnnotations."cluster-autoscaler\.kubernetes\.io/safe-to-evict"=true
-
-    # Wait for the istio ingressgateway pod to be created
-    sleep 10
-    # Wait for istio ingressgateway to be ready
-    kubectl wait --for=condition=Ready pod -l app=istio-ingressgateway -n istio-system --timeout=600s
-    echo "😀 Successfully installed Istio"
-
-    # Install Cert Manager
-    #helm repo add jetstack https://charts.jetstack.io --force-update
-    #helm install \
-    #   cert-manager jetstack/cert-manager \
-    #   --namespace cert-manager \
-    #   --create-namespace \
-    #   --version ${CERT_MANAGER_VERSION} \
-    #   --set crds.enabled=true
-    #echo "😀 Successfully installed Cert Manager"
-
-    if [ $installKeda = true ]; then
-    #Install KEDA
-    helm repo add kedacore https://kedacore.github.io/charts
-    helm install keda kedacore/keda --version ${KEDA_VERSION} --namespace keda --create-namespace --wait
-    echo "😀 Successfully installed KEDA"
-
-    helm install my-opentelemetry-operator open-telemetry/opentelemetry-operator -n opentelemetry-operator --create-namespace\
-    --set "manager.collectorImage.repository=otel/opentelemetry-collector-contrib"
-
-    
-    helm upgrade -i kedify-otel oci://ghcr.io/kedify/charts/otel-add-on --version=v0.0.6 --namespace keda --wait --set validatingAdmissionPolicy.enabled=false
-    echo "😀 Successfully installed KEDA"
-    fi
-
-
-    # Install Knative
-    if [ "${deploymentMode}" = "Serverless" ]; then
-    helm install knative-operator --namespace knative-serving --create-namespace --wait \
-        https://github.com/knative/operator/releases/download/knative-${KNATIVE_OPERATOR_VERSION}/knative-operator-${KNATIVE_OPERATOR_VERSION}.tgz
-    kubectl apply -f - <<EOF
-    apiVersion: operator.knative.dev/v1beta1
-    kind: KnativeServing
-    metadata:
-        name: knative-serving
-        namespace: knative-serving
-    spec:
-        version: "${KNATIVE_SERVING_VERSION}"
-        config:
-        domain:
-            # Patch the external domain as the default domain svc.cluster.local is not exposed on ingress (from knative 1.8)
-            example.com: ""
-    EOF
-    echo "😀 Successfully installed Knative"
-    echo "[*] Enabling Knative features for PVCs ..."
-    kubectl patch configmap/config-features -n knative-serving --type merge -p '{"data":{"kubernetes.podspec-persistent-volume-claim":"enabled","kubernetes.podspec-persistent-volume-write":"enabled"}}'
-    fi
-
-    if [ "${installKserve}" = false ]; then
-    exit
-    fi
-    # Install KServe
-    helm install kserve-crd oci://ghcr.io/kserve/charts/kserve-crd --version ${KSERVE_VERSION} --namespace kserve --create-namespace --wait
-    helm install kserve oci://ghcr.io/kserve/charts/kserve --version ${KSERVE_VERSION} --namespace kserve --create-namespace --wait \
-    --set-string kserve.controller.deploymentMode="${deploymentMode}"
-    echo "😀 Successfully installed KServe"  
-
-    #5. Verification steps
-    echo -e "\n[*] Verifying KServe installation ..."
-    
-    # Wait for KServe pods to be ready
-    echo -e "\n[*] Waiting for KServe pods to be ready (this may take several minutes for image pulling) ..."
-    kubectl wait --for=condition=Ready pod --all -n kserve --timeout=900s
-    
-    # Check KServe pods status
-    echo -e "\n[*] KServe pods status:"
-    kubectl get pods -n kserve
-    
-    # Verify all pods are running
-    non_running_pods=$(kubectl get pods -n kserve --no-headers | awk '$3 != "Running" && $3 != "Completed" {print $1}')
-    if [ -n "$non_running_pods" ]; then
-        echo -e "$RED[!]$END_COLOR Some KServe pods are not running:"
-        echo "$non_running_pods"
-        exit 1
-    fi
-    echo -e "[$GREEN$CHECK$END_COLOR] All KServe pods are running"
-    
-    # Check KServe CRDs
-    echo -e "\n[*] Verifying KServe CRDs ..."
-    kserve_crds=$(kubectl get crd | grep serving.kserve.io | wc -l)
-    if [ "$kserve_crds" -eq 0 ]; then
-        echo -e "$RED[!]$END_COLOR No KServe CRDs found"
-        exit 1
-    fi
-    echo -e "[$GREEN$CHECK$END_COLOR] Found $kserve_crds KServe CRDs:"
-    kubectl get crd | grep serving.kserve.io
-    
-    echo -e "\n[$GREEN$CHECK$END_COLOR] KServe deployed and verified successfully"
-
-    #6. Deploy test model
-    echo -e "\n[*] Deploying test InferenceService to verify KServe functionality ..."
-    
-    # Create test namespace
-    kubectl create namespace kserve-test
-    
-    # Deploy sklearn-iris test model
-    kubectl apply -n kserve-test -f - <<EOF
-apiVersion: "serving.kserve.io/v1beta1"
-kind: "InferenceService"
-metadata:
-  name: "sklearn-iris"
-  namespace: kserve-test
-spec:
-  predictor:
-    model:
-      modelFormat:
-        name: sklearn
-      storageUri: "gs://kfserving-examples/models/sklearn/1.0/model"
-      resources:
-        requests:
-          cpu: "100m"
-          memory: "512Mi"
-        limits:
-          cpu: "1"
-          memory: "1Gi"
-EOF
-
-    # Wait for InferenceService to be ready
-    echo -e "\n[*] Waiting for sklearn-iris InferenceService to be ready ..."
-    kubectl wait --for=condition=Ready inferenceservice/sklearn-iris -n kserve-test --timeout=300s
-    
-    # Display InferenceService status
-    echo -e "\n[*] InferenceService status:"
-    kubectl get inferenceservices sklearn-iris -n kserve-test
-    
-    # Verify InferenceService is ready
-    isvc_ready=$(kubectl get inferenceservices sklearn-iris -n kserve-test -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
-    if [ "$isvc_ready" != "True" ]; then
-        echo -e "$RED[!]$END_COLOR Test InferenceService is not ready"
-        kubectl describe inferenceservices sklearn-iris -n kserve-test
-        exit 1
-    fi
-    echo -e "[$GREEN$CHECK$END_COLOR] Test InferenceService deployed successfully"
-    
-    echo -e "\n[$GREEN$CHECK$END_COLOR] KServe is fully functional and ready to use"
-
+    echo -e "[$GREEN$CHECK$END_COLOR] Light-system patch applied"
 }
 
 createKindCluster(){
@@ -703,6 +515,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --oidc)
             ENABLE_OIDC="true"
+            shift
+            ;;
+        --light-system)
+            APPLY_LIGHT_SYSTEM_PATCH="true"
             shift
             ;;
         -h|--help)
@@ -936,6 +752,10 @@ kubectl -n kube-system patch deployment metrics-server --type='json' -p='[{"op":
 
 #Deploy KServe
 deployKServe
+
+if [ "$APPLY_LIGHT_SYSTEM_PATCH" == "true" ]; then
+    applyLightSystemPatch
+fi
 
 echo -e "\n[*] Creating namespaces ..."
 #Create namespaces
