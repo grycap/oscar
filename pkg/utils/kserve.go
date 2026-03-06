@@ -17,7 +17,7 @@ const (
 	OSCAR_KSERVE_SERVICE_SCRIPT = ""
 )
 
-func NewKserveInferenceService(service *types.Service, knSvc *knv1.Service) (*servingv1beta1.InferenceService, error) {
+func NewKserveInferenceServiceDefinition(service *types.Service, knSvc *knv1.Service) (*servingv1beta1.InferenceService, error) {
 
 	if !IsKserveService(service) {
 		return nil, fmt.Errorf("service does not have KServe configuration")
@@ -41,7 +41,7 @@ func NewKserveInferenceService(service *types.Service, knSvc *knv1.Service) (*se
 	// Define InferenceService
 	return &servingv1beta1.InferenceService{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      deriveKserveName(service.Name),
+			Name:      buildKserveName(service.Name),
 			Namespace: service.Namespace,
 
 			OwnerReferences: []metav1.OwnerReference{
@@ -78,12 +78,41 @@ func NewKserveInferenceService(service *types.Service, knSvc *knv1.Service) (*se
 	}, nil
 }
 
+func UpdateKserveInferenceServiceDefinition(service *types.Service, updatedKnSvc *knv1.Service, oldIsvc *servingv1beta1.InferenceService) (*servingv1beta1.InferenceService, error) {
+
+	if !IsKserveService(service) {
+		return nil, fmt.Errorf("service does not have KServe configuration")
+	}
+
+	resources, err := types.CreateResources(service)
+	if err != nil {
+		return nil, err
+	}
+
+	protocolV := constants.ProtocolV1
+	/* Disabled at the moment
+	switch service.Kserve.APIVersion {
+	case "v2":
+		protocolV = constants.ProtocolV2
+	}
+	*/
+
+	// Revise InferenceService
+	oldIsvc.Spec.Predictor.Model.ModelFormat.Name = service.Kserve.ModelFormat
+	oldIsvc.Spec.Predictor.Model.StorageURI = &service.Kserve.StorageUri
+	oldIsvc.Spec.Predictor.Model.ProtocolVersion = &protocolV
+	oldIsvc.Spec.Predictor.ComponentExtensionSpec.MinReplicas = &service.Kserve.MinScale
+	oldIsvc.Spec.Predictor.ComponentExtensionSpec.MaxReplicas = service.Kserve.MaxScale
+	oldIsvc.Spec.Predictor.PodSpec.Resources = &resources
+	return oldIsvc, nil
+}
+
 // CreateKserveInferenceService creates a KServe InferenceService based on the provided service and Knative service.
 // It set an OwnerReference to the Knative service, so if the Knative service is deleted the KServe InferenceService will be automatically deleted by Kubernetes garbage collection.
 // It returns the created InferenceService or an error if the creation fails.
 func CreateKserveInferenceService(kserveclient *kserveclient.Clientset, service *types.Service, knativeService *knv1.Service) (*servingv1beta1.InferenceService, error) {
 
-	isvc, err := NewKserveInferenceService(service, knativeService)
+	isvc, err := NewKserveInferenceServiceDefinition(service, knativeService)
 	if err != nil {
 		return nil, err
 	}
@@ -95,8 +124,30 @@ func CreateKserveInferenceService(kserveclient *kserveclient.Clientset, service 
 	return isvc, nil
 }
 
+func UpdateKserveInferenceService(kserveclient *kserveclient.Clientset, service *types.Service, knativeService *knv1.Service, oldIsvc *servingv1beta1.InferenceService) (*servingv1beta1.InferenceService, error) {
+	revisedIsvc, err := UpdateKserveInferenceServiceDefinition(service, knativeService, oldIsvc)
+	if err != nil {
+		return nil, err
+	}
+	// Update InferenceService
+	updatedIsvc, err := kserveclient.ServingV1beta1().InferenceServices(revisedIsvc.Namespace).Update(context.Background(), revisedIsvc, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to update InferenceService: %v", err)
+	}
+	return updatedIsvc, nil
+}
+
+func GetKserveInferenceService(kserveclient *kserveclient.Clientset, service *types.Service, namespace string) (*servingv1beta1.InferenceService, error) {
+	// Get InferenceService
+	isvc, err := kserveclient.ServingV1beta1().InferenceServices(namespace).Get(context.Background(), buildKserveName(service.Name), metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get InferenceService: %v", err)
+	}
+	return isvc, nil
+}
+
 func DeleteKserveInferenceService(kserveclient *kserveclient.Clientset, serviceName, namespace string) error {
-	name := deriveKserveName(serviceName)
+	name := buildKserveName(serviceName)
 	// Create InferenceService
 	return kserveclient.ServingV1beta1().InferenceServices(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
 }
@@ -109,7 +160,7 @@ func IsKserveService(service *types.Service) bool {
 	return true
 }
 
-func deriveKserveName(serviceName string) string {
+func buildKserveName(serviceName string) string {
 	// TO DO
 	return serviceName
 }
