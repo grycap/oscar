@@ -283,6 +283,23 @@ type Service struct {
 	// Mount configuration to create a storage provider as a volume inside the service container
 	// Optional
 	Mount StorageIOConfig `json:"mount"`
+
+	// Kserve configuration to deploy the service using KServe InferenceService CRD
+	Kserve Kserve `json:"kserve,omitempty"`
+}
+
+type Kserve struct {
+	ModelFormat string `json:"model_format"`
+	StorageUri  string `json:"storage_uri"`
+	// Can be used to specify the protocol version for KServe (e.g., "v1", "v2"). Default is "v1".
+	// APIVersion string `json:"api_version,omitempty"`
+
+	// MinScale minimum number of active replicas (pods) for the service
+	// Optional. (default: 0)
+	MinScale int32 `json:"min_scale,omitempty" default:"0"`
+	// MaxScale maximum number of active replicas (pods) for the service
+	// Optional. (default: 0 [Unlimited])
+	MaxScale int32 `json:"max_scale,omitempty" default:"0"`
 }
 
 type Expose struct {
