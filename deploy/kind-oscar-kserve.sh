@@ -37,6 +37,9 @@ OSCAR_TARGET_REPLICAS=1
 SKIP_PROMPTS="false"
 ENABLE_OIDC="false"
 APPLY_LIGHT_SYSTEM_PATCH="false"
+OSCAR_SERVERLESS_BACKEND="Knative"
+KNATIVE_OPERATOR_VERSION="v1.18.0"
+KNATIVE_SERVING_VERSION="1.18.0"
 OIDC_ISSUERS_DEFAULT="https://keycloak.grycap.net/realms/grycap"
 OIDC_GROUPS_DEFAULT="/oscar-staff, /oscar-test"
 
@@ -474,7 +477,69 @@ EOF
         kubectl -n kserve rollout status deployment/llmisvc-controller-manager --timeout=300s
     fi
 
+    if kubectl -n lws-system get deployment lws-controller-manager >/dev/null 2>&1; then
+        echo -e "[*] Scaling lws-controller-manager to 1 replica for light-system mode ..."
+        kubectl -n lws-system scale deployment/lws-controller-manager --replicas=1
+        kubectl -n lws-system rollout status deployment/lws-controller-manager --timeout=300s
+    fi
+
     echo -e "[$GREEN$CHECK$END_COLOR] Light-system patch applied"
+}
+
+deployKnativeServing(){
+    echo -e "\n[*] Deploying Knative Serving for OSCAR backend ..."
+    if ! kubectl apply -f "https://github.com/knative/operator/releases/download/knative-${KNATIVE_OPERATOR_VERSION}/operator.yaml"; then
+        echo -e "$RED[!]$END_COLOR Failed to install Knative operator (version ${KNATIVE_OPERATOR_VERSION})"
+        exit 1
+    fi
+
+    if ! kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: knative-serving
+---
+apiVersion: operator.knative.dev/v1beta1
+kind: KnativeServing
+metadata:
+  name: knative-serving
+  namespace: knative-serving
+spec:
+  version: "${KNATIVE_SERVING_VERSION}"
+  ingress:
+    kourier:
+      enabled: true
+      service-type: ClusterIP
+  config:
+    config-features:
+      kubernetes.podspec-persistent-volume-claim: enabled
+      kubernetes.podspec-persistent-volume-write: enabled
+    network:
+      ingress-class: "kourier.ingress.networking.knative.dev"
+    domain:
+      example.com: ""
+EOF
+    then
+        echo -e "$RED[!]$END_COLOR Failed to create KnativeServing custom resource (version ${KNATIVE_SERVING_VERSION})"
+        exit 1
+    fi
+
+    if ! kubectl wait --for=condition=Ready knativeserving/knative-serving -n knative-serving --timeout=900s; then
+        echo -e "$RED[!]$END_COLOR Knative Serving did not become ready"
+        kubectl get pods -n knative-serving
+        exit 1
+    fi
+
+    if ! kubectl get ns knative-serving >/dev/null 2>&1; then
+        echo -e "$RED[!]$END_COLOR Knative namespace knative-serving not found after installation"
+        exit 1
+    fi
+    if ! kubectl get crd services.serving.knative.dev >/dev/null 2>&1; then
+        echo -e "$RED[!]$END_COLOR Knative Serving CRD services.serving.knative.dev not found after installation"
+        exit 1
+    fi
+
+    echo -e "[$GREEN$CHECK$END_COLOR] Knative Serving deployed successfully"
 }
 
 createKindCluster(){
@@ -515,6 +580,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --oidc)
             ENABLE_OIDC="true"
+            shift
+            ;;
+        --knative-backend|--kubernetes-backend)
+            echo -e "$ORANGE[*]$END_COLOR Backend flags are ignored. OSCAR is always deployed with Knative backend."
             shift
             ;;
         --light-system)
@@ -734,15 +803,24 @@ checkIngressStatus
 #Deploy MinIO
 echo -e "\n[*] Deploying MinIO storage provider ..."
 helm repo add --force-update minio https://charts.min.io
-helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT --create-namespace --version 4.0.7
+if ! helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT --create-namespace --version 4.0.7; then
+    echo -e "$RED[!]$END_COLOR MinIO deployment failed"
+    exit 1
+fi
 
 #Deploy NFS server provisioner
 echo -e "\n[*] Deploying NFS server provider ..."
 helm repo add --force-update nfs-ganesha-server-and-external-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
 if [ $ARCH == "arm64" ]; then
-    helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner --set image.repository=ghcr.io/grycap/nfs-provisioner-arm64 --set image.tag=latest
+    if ! helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner --set image.repository=ghcr.io/grycap/nfs-provisioner-arm64 --set image.tag=latest; then
+        echo -e "$RED[!]$END_COLOR NFS server provisioner deployment failed"
+        exit 1
+    fi
 else
-    helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner --set image.tag=v3.0.1
+    if ! helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner --set image.tag=v3.0.1; then
+        echo -e "$RED[!]$END_COLOR NFS server provisioner deployment failed"
+        exit 1
+    fi
 fi
 
 #Deploy metrics-server
@@ -757,6 +835,8 @@ if [ "$APPLY_LIGHT_SYSTEM_PATCH" == "true" ]; then
     applyLightSystemPatch
 fi
 
+deployKnativeServing
+
 echo -e "\n[*] Creating namespaces ..."
 #Create namespaces
 kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/yaml/oscar-namespaces.yaml
@@ -764,7 +844,7 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 #Deploy oscar using helm
 echo -e "\n[*] Deploying OSCAR ..."
 helm repo add --force-update grycap https://grycap.github.io/helm-charts/
-helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative --set resourceManager.enable=true $OSCAR_HELM_IMAGE_OVERRIDES
+helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=$OSCAR_SERVERLESS_BACKEND --set resourceManager.enable=true $OSCAR_HELM_IMAGE_OVERRIDES
 
 if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
     echo -e "\n[*] Switching OSCAR deployment to use $OSCAR_POST_DEPLOYMENT_IMAGE ..."
@@ -815,7 +895,7 @@ echo "  - MinIO console NodePort/host port: $HOST_MINIO_CONSOLE_PORT ($minio_con
 echo "  - OSCAR image branch: $OSCAR_IMAGE_BRANCH"
 echo "  - OSCAR credentials: username='oscar', password='$OSCAR_PASSWORD'"
 echo "  - MinIO credentials: username='minio', password='$MINIO_PASSWORD'"
-echo "  - Serverless backend: KServe (via Knative)"
+echo "  - Serverless backend: Knative (KServe deployed in Standard mode)"
 if [ `echo $local_reg | tr '[:upper:]' '[:lower:]'` == "y" ]; then
     echo "  - Local registry: ${reg_name} (port ${reg_port}, ${registry_status})"
 else
