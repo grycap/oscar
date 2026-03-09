@@ -28,13 +28,8 @@ func NewKserveInferenceServiceDefinition(service *types.Service, knSvc *knv1.Ser
 		return nil, err
 	}
 
-	protocolV := constants.ProtocolV1
-	/* Disabled at the moment
-	switch service.Kserve.APIVersion {
-	case "v2":
-		protocolV = constants.ProtocolV2
-	}
-	*/
+	// Determine protocol version based on service configuration, default to v1 if not specified or invalid
+	protocolV := protocolVersion(service)
 	controller := false
 	blockOwnerDeletion := true
 
@@ -89,13 +84,8 @@ func UpdateKserveInferenceServiceDefinition(service *types.Service, updatedKnSvc
 		return nil, err
 	}
 
-	protocolV := constants.ProtocolV1
-	/* Disabled at the moment
-	switch service.Kserve.APIVersion {
-	case "v2":
-		protocolV = constants.ProtocolV2
-	}
-	*/
+	// Determine protocol version based on service configuration, default to v1 if not specified or invalid
+	protocolV := protocolVersion(service)
 
 	// Revise InferenceService
 	oldIsvc.Spec.Predictor.Model.ModelFormat.Name = service.Kserve.ModelFormat
@@ -167,4 +157,31 @@ func buildKserveName(serviceName string) string {
 
 func KservePredictor(serviceName string) string {
 	return serviceName + "-predictor"
+}
+
+// Helper function to determine the protocol version for KServe based on service configuration
+// Defaults to "v1" if not specified or invalid
+func protocolVersion(service *types.Service) constants.InferenceServiceProtocol {
+	switch {
+	case service.Kserve.APIVersion == "v1" && !onlyProtocolV2(service):
+		return constants.ProtocolV1
+	case service.Kserve.APIVersion == "v2" || onlyProtocolV2(service):
+		return constants.ProtocolV2
+	default:
+		return constants.ProtocolV1
+	}
+}
+
+// onlyProtocolV2 checks if the service runtime supports only Protocol V2
+func onlyProtocolV2(service *types.Service) bool {
+	return service.Kserve.ModelFormat == "onnx"
+}
+
+func validModelFormat(format string) bool {
+	switch format {
+	case "onnx", "sklearn", "xgboost", "pytorch", "tensorflow", "triton":
+		return true
+	default:
+		return false
+	}
 }

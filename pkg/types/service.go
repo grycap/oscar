@@ -291,9 +291,9 @@ type Service struct {
 type Kserve struct {
 	ModelFormat string `json:"model_format"`
 	StorageUri  string `json:"storage_uri"`
-	// Can be used to specify the protocol version for KServe (e.g., "v1", "v2"). Default is "v1".
-	// APIVersion string `json:"api_version,omitempty"`
-
+	// Can be used to specify the protocol version for KServe (e.g., "v1", "v2").
+	// Optional. (default: "v1")
+	APIVersion string `json:"api_version,omitempty" default:"v1"`
 	// MinScale minimum number of active replicas (pods) for the service
 	// Optional. (default: 0)
 	MinScale int32 `json:"min_scale,omitempty" default:"0"`
