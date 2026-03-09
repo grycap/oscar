@@ -1,5 +1,17 @@
 # Introduction
 
+<section class="oscar-hero">
+  <h1 class="oscar-hero__title">Open Source Serverless Computing for Data-Processing Applications</h1>
+  <p class="oscar-hero__body">
+    OSCAR helps you deploy scalable data-processing services on Kubernetes and multi-cloud environments with a clean serverless model.
+  </p>
+  <div class="oscar-hero__actions">
+    <a class="oscar-pill" href="deploy-im-dashboard/">Deploy OSCAR</a>
+    <a class="oscar-pill" href="fdl/">Define your first service</a>
+    <a class="oscar-pill" href="oscar-cli/">Use OSCAR CLI</a>
+  </div>
+</section>
+
 ![OSCAR logo](images/oscar3.png)
 
 OSCAR is an open-source platform to support the event-driven serverless computing model for data-processing applications. It can be automatically deployed on multi-Clouds, and even on low-powered devices, to create highly-parallel event-driven data-processing serverless applications along the computing continuum. These applications execute on customized runtime environments provided by Docker containers that run on elastic Kubernetes clusters. It is also integrated with the 
