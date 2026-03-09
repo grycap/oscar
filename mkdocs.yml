@@ -56,13 +56,32 @@ theme:
   favicon: images/logo.png
   logo: images/logo.png
   name: material
+  font:
+    text: Lato
+    code: Roboto Mono
   palette:
-    primary: teal
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
   features:
     - instant
     - versioning
     - toc.integrate
     - content.code.copy
+
+extra_css:
+  - stylesheets/oscar-theme.css
 
 plugins:
 - search
