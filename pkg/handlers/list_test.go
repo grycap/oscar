@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/backends"
+	"github.com/grycap/oscar/v3/pkg/types"
 )
 
 func TestMakeListHandler(t *testing.T) {
@@ -62,5 +64,36 @@ func TestMakeListHandler(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMakeListHandlerWorkspaceStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	back.Services = []*types.Service{
+		{
+			Name: "svc",
+			Workspace: &types.WorkspaceConfig{
+				Size:      "1Gi",
+				MountPath: "/data",
+			},
+		},
+	}
+
+	r := gin.New()
+	r.GET("/system/services", MakeListHandler(back))
+
+	req := httptest.NewRequest(http.MethodGet, "/system/services", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var got []types.Service
+	if err := json.Unmarshal(resp.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+	if len(got) != 1 || !got[0].WorkspaceStatus.Enabled {
+		t.Fatalf("expected workspace status enabled in list response")
 	}
 }

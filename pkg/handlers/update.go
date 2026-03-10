@@ -65,6 +65,10 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Check service values and set defaults
 		checkValues(&newService, cfg)
+		if err := validateWorkspaceConfig(newService.Name, newService.Workspace); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+			return
+		}
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
@@ -80,6 +84,11 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			} else {
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
 			}
+			return
+		}
+
+		if !sameWorkspaceConfig(oldService.Workspace, newService.Workspace) {
+			c.String(http.StatusBadRequest, "workspace updates are not supported after service creation")
 			return
 		}
 

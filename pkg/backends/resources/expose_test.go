@@ -283,3 +283,78 @@ func TestUpdateIngressSecretTransitions(t *testing.T) {
 		t.Fatalf("expected secret to exist after re-enabling auth")
 	}
 }
+
+func TestGetProbePath(t *testing.T) {
+	tests := []struct {
+		name    string
+		service types.Service
+		want    string
+	}{
+		{
+			name: "legacy default with rewrite target true",
+			service: types.Service{
+				Name: "svc",
+				Expose: types.Expose{
+					RewriteTarget: true,
+					HealthPath:    "/",
+				},
+			},
+			want: "/system/services/svc/exposed/",
+		},
+		{
+			name: "legacy explicit with rewrite target true and custom health path",
+			service: types.Service{
+				Name: "svc",
+				Expose: types.Expose{
+					RewriteTarget: true,
+					HealthPath:    "/healthz",
+					ProbeMode:     "legacy",
+				},
+			},
+			want: "/system/services/svc/exposed/healthz",
+		},
+		{
+			name: "direct mode with rewrite target true and custom health path",
+			service: types.Service{
+				Name: "svc",
+				Expose: types.Expose{
+					RewriteTarget: true,
+					HealthPath:    "/healthz",
+					ProbeMode:     "direct",
+				},
+			},
+			want: "/healthz",
+		},
+		{
+			name: "direct mode normalizes missing leading slash",
+			service: types.Service{
+				Name: "svc",
+				Expose: types.Expose{
+					HealthPath: "healthz",
+					ProbeMode:  "direct",
+				},
+			},
+			want: "/healthz",
+		},
+		{
+			name: "legacy behavior when rewrite target false",
+			service: types.Service{
+				Name: "svc",
+				Expose: types.Expose{
+					RewriteTarget: false,
+					HealthPath:    "/ready",
+				},
+			},
+			want: "/ready",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getProbePath(tt.service)
+			if got != tt.want {
+				t.Fatalf("expected probe path %q, got %q", tt.want, got)
+			}
+		})
+	}
+}

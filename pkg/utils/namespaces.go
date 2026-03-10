@@ -193,8 +193,21 @@ func EnsureUserNamespace(ctx context.Context, kubeClientset kubernetes.Interface
 
 func ensureControllerRole(ctx context.Context, kubeClientset kubernetes.Interface, namespace string) error {
 	roleClient := kubeClientset.RbacV1().Roles(namespace)
-	if _, err := roleClient.Get(ctx, controllerRoleName, metav1.GetOptions{}); err == nil {
-		return nil
+	if role, err := roleClient.Get(ctx, controllerRoleName, metav1.GetOptions{}); err == nil {
+		updated := false
+		for i := range role.Rules {
+			rule := &role.Rules[i]
+			if containsString(rule.APIGroups, "") && containsString(rule.Resources, "pods") && !containsString(rule.Verbs, "deletecollection") {
+				rule.Verbs = append(rule.Verbs, "deletecollection")
+				updated = true
+				break
+			}
+		}
+		if !updated {
+			return nil
+		}
+		_, err = roleClient.Update(ctx, role, metav1.UpdateOptions{})
+		return err
 	} else if !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -208,7 +221,7 @@ func ensureControllerRole(ctx context.Context, kubeClientset kubernetes.Interfac
 			{
 				APIGroups: []string{""},
 				Resources: []string{"pods", "pods/log", "podtemplates", "configmaps", "secrets", "services", "persistentvolumeclaims"},
-				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
+				Verbs:     []string{"get", "list", "watch", "create", "delete", "deletecollection", "update"},
 			},
 			{
 				APIGroups: []string{"apps"},

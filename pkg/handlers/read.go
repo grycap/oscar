@@ -61,6 +61,7 @@ func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
+			setWorkspaceStatus(service)
 
 			switch service.Visibility {
 			case utils.PUBLIC:
@@ -81,7 +82,19 @@ func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 				return
 			}
 		} else {
+			setWorkspaceStatus(service)
 			c.JSON(http.StatusOK, service)
 		}
 	}
+}
+
+func setWorkspaceStatus(service *types.Service) {
+	if service == nil {
+		return
+	}
+	if service.Workspace == nil {
+		service.WorkspaceStatus = types.WorkspaceStatus{Enabled: false}
+		return
+	}
+	service.WorkspaceStatus = types.WorkspaceStatus{Enabled: true}
 }

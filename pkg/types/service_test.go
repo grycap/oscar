@@ -360,7 +360,6 @@ func TestToPodSpec(t *testing.T) {
 	}
 }
 
-
 func TestConvertSecretsEnvVars(t *testing.T) {
 	secretRefs := ConvertSecretsEnvVars("my-secret")
 	if len(secretRefs) != 1 {
@@ -400,5 +399,54 @@ func TestHasReplicas(t *testing.T) {
 	svc.Replicas = []Replica{{Type: "oscar", ClusterID: "a", ServiceName: "svc"}}
 	if !svc.HasReplicas() {
 		t.Fatalf("expected HasReplicas to be true when replicas are defined")
+	}
+}
+
+func TestGetWorkspacePVCName(t *testing.T) {
+	svc := Service{Name: "demo"}
+	expected := "demo" + WorkspacePVCNameSuffix
+	if got := svc.GetWorkspacePVCName(); got != expected {
+		t.Fatalf("expected workspace pvc name %s, got %s", expected, got)
+	}
+
+	svc.Workspace = &WorkspaceConfig{
+		MountPath:        "/data",
+		ReuseFromService: "openclaw-workspace",
+	}
+	expected = "openclaw-workspace" + WorkspacePVCNameSuffix
+	if got := svc.GetWorkspacePVCName(); got != expected {
+		t.Fatalf("expected reused workspace pvc name %s, got %s", expected, got)
+	}
+}
+
+func TestToPodSpecWithWorkspace(t *testing.T) {
+	copy, err := deepcopy.Anything(testService)
+	if err != nil {
+		t.Fatalf("unable to deep copy test service: %v", err)
+	}
+	svc := copy.(Service)
+	svc.Workspace = &WorkspaceConfig{
+		Size:      "1Gi",
+		MountPath: "/data",
+	}
+
+	podSpec, err := svc.ToPodSpec(&testConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var foundVolume, foundMount bool
+	for _, v := range podSpec.Volumes {
+		if v.Name == WorkspaceVolumeName && v.PersistentVolumeClaim != nil && v.PersistentVolumeClaim.ClaimName == svc.GetWorkspacePVCName() {
+			foundVolume = true
+		}
+	}
+	for _, vm := range podSpec.Containers[0].VolumeMounts {
+		if vm.Name == WorkspaceVolumeName && vm.MountPath == "/data" {
+			foundMount = true
+		}
+	}
+	if !foundVolume || !foundMount {
+		t.Fatalf("expected workspace volume and mount to be present")
 	}
 }

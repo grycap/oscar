@@ -24,7 +24,9 @@ import (
 
 	"github.com/grycap/oscar/v3/pkg/types"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -518,4 +520,80 @@ func TestNamespaceConstants(t *testing.T) {
 	if namespaceHashPaddingDivider != "-" {
 		t.Errorf("Expected namespaceHashPaddingDivider '-', got '%s'", namespaceHashPaddingDivider)
 	}
+}
+
+func TestEnsureControllerRoleIncludesPodDeleteCollectionOnCreate(t *testing.T) {
+	ctx := context.Background()
+	namespace := "test-ns"
+
+	clientset := fake.NewSimpleClientset(&corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: namespace},
+	})
+
+	if err := ensureControllerRole(ctx, clientset, namespace); err != nil {
+		t.Fatalf("Unexpected error creating controller role: %v", err)
+	}
+
+	role, err := clientset.RbacV1().Roles(namespace).Get(ctx, controllerRoleName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Unable to retrieve controller role: %v", err)
+	}
+
+	found := false
+	for _, rule := range role.Rules {
+		if containsString(rule.APIGroups, "") && containsString(rule.Resources, "pods") {
+			found = true
+			if !containsString(rule.Verbs, "deletecollection") {
+				t.Fatalf("Expected pods rule to include deletecollection verb. Verbs: %v", rule.Verbs)
+			}
+		}
+	}
+
+	if !found {
+		t.Fatal("Expected a core API rule with pods resource")
+	}
+}
+
+func TestEnsureControllerRoleReconcilesMissingPodDeleteCollection(t *testing.T) {
+	ctx := context.Background()
+	namespace := "test-ns"
+
+	existingRole := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      controllerRoleName,
+			Namespace: namespace,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"pods", "services"},
+				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
+			},
+		},
+	}
+
+	clientset := fake.NewSimpleClientset(
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}},
+		existingRole,
+	)
+
+	if err := ensureControllerRole(ctx, clientset, namespace); err != nil {
+		t.Fatalf("Unexpected error reconciling controller role: %v", err)
+	}
+
+	role, err := clientset.RbacV1().Roles(namespace).Get(ctx, controllerRoleName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Unable to retrieve controller role: %v", err)
+	}
+
+	for _, rule := range role.Rules {
+		if containsString(rule.APIGroups, "") && containsString(rule.Resources, "pods") {
+			if !containsString(rule.Verbs, "deletecollection") {
+				t.Fatalf("Expected reconciled pods rule to include deletecollection verb. Verbs: %v", rule.Verbs)
+			}
+			return
+		}
+	}
+
+	t.Fatal("Expected a core API rule with pods resource")
 }

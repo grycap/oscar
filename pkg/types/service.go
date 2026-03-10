@@ -65,6 +65,12 @@ const (
 	// ServiceLabel label for deploying services in all backs
 	ServiceLabel = "oscar_service"
 
+	// WorkspacePVCNameSuffix suffix used to build per-service workspace PVC names.
+	WorkspacePVCNameSuffix = "-workspace-pvc"
+
+	// WorkspaceVolumeName name for the workspace volume in pod specs.
+	WorkspaceVolumeName = "workspace-volume"
+
 	// EventVariable name used by the environment variable where events are stored
 	EventVariable = "EVENT"
 
@@ -283,6 +289,30 @@ type Service struct {
 	// Mount configuration to create a storage provider as a volume inside the service container
 	// Optional
 	Mount StorageIOConfig `json:"mount"`
+
+	// Workspace configuration to create a managed persistent workspace volume.
+	// Optional
+	Workspace *WorkspaceConfig `json:"workspace,omitempty"`
+
+	// WorkspaceStatus exposes basic workspace state information in API responses.
+	// Internal/API use only, not part of FDL.
+	WorkspaceStatus WorkspaceStatus `json:"workspace_status,omitempty" yaml:"-"`
+}
+
+// WorkspaceConfig stores the requested size and mount path for a managed workspace.
+type WorkspaceConfig struct {
+	// Size requested workspace size using Kubernetes quantity format (for example 1Gi).
+	Size string `json:"size"`
+	// MountPath absolute path inside the service container where the workspace is mounted.
+	MountPath string `json:"mount_path"`
+	// ReuseFromService references another OSCAR service name whose workspace PVC should be mounted.
+	ReuseFromService string `json:"reuse_from_service,omitempty"`
+}
+
+// WorkspaceStatus contains a minimal workspace availability status for API consumers.
+type WorkspaceStatus struct {
+	Enabled bool   `json:"enabled"`
+	Error   string `json:"error,omitempty"`
 }
 
 type Expose struct {
@@ -295,6 +325,7 @@ type Expose struct {
 	DefaultCommand bool   `json:"default_command" `
 	SetAuth        bool   `json:"set_auth" `
 	HealthPath     string `json:"health_path" default:"/" `
+	ProbeMode      string `json:"probe_mode,omitempty" default:"legacy" `
 }
 
 // ToPodSpec returns a k8s podSpec from the Service
@@ -357,6 +388,21 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 		}
 		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, volumeMount)
 		podSpec.Volumes = append(podSpec.Volumes, volume)
+	}
+
+	if service.Workspace != nil {
+		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
+			Name:      WorkspaceVolumeName,
+			MountPath: service.Workspace.MountPath,
+		})
+		podSpec.Volumes = append(podSpec.Volumes, v1.Volume{
+			Name: WorkspaceVolumeName,
+			VolumeSource: v1.VolumeSource{
+				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+					ClaimName: service.GetWorkspacePVCName(),
+				},
+			},
+		})
 	}
 
 	// Add the required environment variables for the watchdog
@@ -519,4 +565,12 @@ func (service *Service) GetSupervisorPath() string {
 // HasReplicas checks if the service has replicas defined
 func (service *Service) HasReplicas() bool {
 	return len(service.Replicas) > 0
+}
+
+// GetWorkspacePVCName returns the per-service workspace PVC name.
+func (service *Service) GetWorkspacePVCName() string {
+	if service.Workspace != nil && service.Workspace.ReuseFromService != "" {
+		return fmt.Sprintf("%s%s", service.Workspace.ReuseFromService, WorkspacePVCNameSuffix)
+	}
+	return fmt.Sprintf("%s%s", service.Name, WorkspacePVCNameSuffix)
 }

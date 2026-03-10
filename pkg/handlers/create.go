@@ -22,6 +22,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"reflect"
 	"strings"
 
@@ -32,6 +33,8 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 const (
@@ -84,6 +87,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Check service values and set defaults
 		checkValues(&service, cfg)
+		if err := validateWorkspaceConfig(service.Name, service.Workspace); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+			return
+		}
 		// Check if users in allowed_users have a MinIO associated user
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
@@ -698,4 +705,52 @@ func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider,
 	}
 
 	return minIOAdminClient.RestartServer()
+}
+
+func validateWorkspaceConfig(serviceName string, workspace *types.WorkspaceConfig) error {
+	if workspace == nil {
+		return nil
+	}
+	if strings.TrimSpace(workspace.MountPath) == "" {
+		return fmt.Errorf("workspace.mount_path is required")
+	}
+	reuseFrom := strings.TrimSpace(workspace.ReuseFromService)
+	size := strings.TrimSpace(workspace.Size)
+	if reuseFrom == "" && size == "" {
+		return fmt.Errorf("workspace.size is required when workspace.reuse_from_service is not set")
+	}
+	if reuseFrom != "" && size != "" {
+		return fmt.Errorf("workspace.size and workspace.reuse_from_service are mutually exclusive")
+	}
+	if reuseFrom != "" {
+		if errs := validation.IsDNS1123Label(reuseFrom); len(errs) > 0 {
+			return fmt.Errorf("workspace.reuse_from_service must be a valid Kubernetes service name")
+		}
+		if serviceName != "" && reuseFrom == serviceName {
+			return fmt.Errorf("workspace.reuse_from_service cannot reference the same service")
+		}
+	} else {
+		qty, err := resource.ParseQuantity(workspace.Size)
+		if err != nil || qty.Sign() <= 0 {
+			return fmt.Errorf("workspace.size must be a valid positive quantity")
+		}
+	}
+	if !path.IsAbs(workspace.MountPath) {
+		return fmt.Errorf("workspace.mount_path must be an absolute path")
+	}
+	if workspace.MountPath == types.ConfigPath || workspace.MountPath == types.VolumePath ||
+		strings.HasPrefix(workspace.MountPath, types.ConfigPath+"/") || strings.HasPrefix(workspace.MountPath, types.VolumePath+"/") {
+		return fmt.Errorf("workspace.mount_path cannot overlap OSCAR reserved paths")
+	}
+	return nil
+}
+
+func sameWorkspaceConfig(a, b *types.WorkspaceConfig) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Size == b.Size && a.MountPath == b.MountPath && a.ReuseFromService == b.ReuseFromService
 }

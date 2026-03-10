@@ -114,6 +114,13 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		return err
 	}
 
+	if err := resources.EnsureWorkspacePVC(context.TODO(), kn.kubeClientset, service, namespace); err != nil {
+		if delErr := deleteServiceConfigMap(service.Name, namespace, kn.kubeClientset); delErr != nil {
+			log.Println(delErr.Error())
+		}
+		return err
+	}
+
 	// For exposed services, skip Knative Service creation and deploy only exposed resources.
 	if service.Expose.APIPort != 0 {
 		err = resources.CreateExpose(service, namespace, kn.kubeClientset, kn.config)
@@ -128,6 +135,9 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 			if delErr := deleteServiceConfigMap(service.Name, namespace, kn.kubeClientset); delErr != nil {
 				log.Println(delErr.Error())
 			}
+			if delErr := resources.DeleteWorkspacePVC(context.TODO(), kn.kubeClientset, service, namespace); delErr != nil {
+				log.Println(delErr.Error())
+			}
 			return err
 		}
 
@@ -136,6 +146,9 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		if err != nil {
 			// Delete the previously created configMap
 			if delErr := deleteServiceConfigMap(service.Name, namespace, kn.kubeClientset); delErr != nil {
+				log.Println(delErr.Error())
+			}
+			if delErr := resources.DeleteWorkspacePVC(context.TODO(), kn.kubeClientset, service, namespace); delErr != nil {
 				log.Println(delErr.Error())
 			}
 			return err
@@ -276,6 +289,10 @@ func (kn *KnativeBackend) DeleteService(service types.Service) error {
 	// Delete all the service's jobs
 	if err := deleteServiceJobs(name, namespace, kn.kubeClientset); err != nil {
 		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
+	}
+
+	if err := resources.DeleteWorkspacePVC(context.TODO(), kn.kubeClientset, service, namespace); err != nil {
+		log.Printf("Error deleting workspace pvc for service \"%s\": %v\n", name, err)
 	}
 
 	if utils.SecretExists(name, namespace, kn.kubeClientset) {

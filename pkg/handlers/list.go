@@ -59,6 +59,7 @@ func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 
 			allowedServicesForUser := []*types.Service{}
 			for _, service := range services {
+				setWorkspaceStatus(service)
 				switch service.Visibility {
 				case utils.PUBLIC:
 					allowedServicesForUser = append(allowedServicesForUser, service)
@@ -77,6 +78,9 @@ func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 
 			c.JSON(http.StatusOK, allowedServicesForUser)
 		} else {
+			for _, service := range services {
+				setWorkspaceStatus(service)
+			}
 			c.JSON(http.StatusOK, services)
 		}
 

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -125,5 +126,35 @@ func TestMakeReadHandlerNotFound(t *testing.T) {
 
 	if resp.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 for missing service, got %d", resp.Code)
+	}
+}
+
+func TestMakeReadHandlerWorkspaceStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name: "svc",
+		Workspace: &types.WorkspaceConfig{
+			Size:      "1Gi",
+			MountPath: "/data",
+		},
+	}
+
+	r := gin.New()
+	r.GET("/system/services/:serviceName", MakeReadHandler(back))
+
+	req := httptest.NewRequest(http.MethodGet, "/system/services/svc", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	var got types.Service
+	if err := json.Unmarshal(resp.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+	if !got.WorkspaceStatus.Enabled {
+		t.Fatalf("expected workspace status to be enabled")
 	}
 }

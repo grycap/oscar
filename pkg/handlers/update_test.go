@@ -173,3 +173,38 @@ func TestMakeUpdateHandlerForbiddenOwner(t *testing.T) {
 		t.Fatalf("expected error status for different owner, got %d", resp.Code)
 	}
 }
+
+func TestMakeUpdateHandlerRejectsWorkspaceMutation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name:  "svc",
+		Owner: "owner",
+		Workspace: &types.WorkspaceConfig{
+			Size:      "1Gi",
+			MountPath: "/data",
+		},
+	}
+	cfg := &types.Config{
+		MinIOProvider: &types.MinIOProvider{},
+	}
+	isAdminUser = false
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "owner")
+		c.Next()
+	})
+	r.PUT("/system/services", MakeUpdateHandler(cfg, back))
+
+	body := `{"name":"svc","image":"img","script":"echo","workspace":{"size":"2Gi","mount_path":"/data"}}`
+	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for workspace mutation, got %d", resp.Code)
+	}
+}

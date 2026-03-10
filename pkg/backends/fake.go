@@ -31,8 +31,9 @@ var errFake = errors.New("fake error")
 
 // FakeBackend fake struct to mock the beahaviour of the ServerlessBackend interface
 type FakeBackend struct {
-	errors  map[string][]error
-	Service *types.Service // service to be returned by the ReadService function
+	errors   map[string][]error
+	Service  *types.Service // service to be returned by the ReadService function
+	Services []*types.Service
 	// UpdatedService stores the last service received through UpdateService.
 	UpdatedService *types.Service
 	kubeClientset  kubernetes.Interface
@@ -76,6 +77,9 @@ func (f *FakeBackend) GetInfo() *types.ServerlessBackendInfo {
 
 // ListServices returns a slice with all services registered in the provided namespace (fake)
 func (f *FakeBackend) ListServices(namespaces ...string) ([]*types.Service, error) {
+	if f.Services != nil {
+		return f.Services, f.returnError(getCurrentFuncName())
+	}
 	return []*types.Service{}, f.returnError(getCurrentFuncName())
 }
 

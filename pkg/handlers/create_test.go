@@ -450,3 +450,35 @@ func buildRSAJWK(pub *rsa.PublicKey) string {
 	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(pub.E)).Bytes())
 	return `{"keys":[{"kty":"RSA","alg":"RS256","use":"sig","kid":"test","n":"` + n + `","e":"` + e + `"}]}`
 }
+
+func TestValidateWorkspaceConfig(t *testing.T) {
+	tests := []struct {
+		name      string
+		svcName   string
+		workspace *types.WorkspaceConfig
+		wantErr   bool
+	}{
+		{name: "nil workspace", svcName: "svc", workspace: nil, wantErr: false},
+		{name: "valid workspace", svcName: "svc", workspace: &types.WorkspaceConfig{Size: "1Gi", MountPath: "/data"}, wantErr: false},
+		{name: "valid reused workspace", svcName: "svc", workspace: &types.WorkspaceConfig{MountPath: "/data", ReuseFromService: "openclaw-workspace"}, wantErr: false},
+		{name: "missing size and reuse", svcName: "svc", workspace: &types.WorkspaceConfig{MountPath: "/data"}, wantErr: true},
+		{name: "size and reuse both set", svcName: "svc", workspace: &types.WorkspaceConfig{Size: "1Gi", MountPath: "/data", ReuseFromService: "openclaw-workspace"}, wantErr: true},
+		{name: "invalid reuse name", svcName: "svc", workspace: &types.WorkspaceConfig{MountPath: "/data", ReuseFromService: "Invalid_Name"}, wantErr: true},
+		{name: "reuse same service", svcName: "svc", workspace: &types.WorkspaceConfig{MountPath: "/data", ReuseFromService: "svc"}, wantErr: true},
+		{name: "invalid size", workspace: &types.WorkspaceConfig{Size: "abc", MountPath: "/data"}, wantErr: true},
+		{name: "relative mount path", workspace: &types.WorkspaceConfig{Size: "1Gi", MountPath: "data"}, wantErr: true},
+		{name: "reserved mount path", workspace: &types.WorkspaceConfig{Size: "1Gi", MountPath: types.ConfigPath}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateWorkspaceConfig(tt.svcName, tt.workspace)
+			if tt.wantErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}

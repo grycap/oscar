@@ -130,6 +130,7 @@ storage_providers:
 | `isolation_level` </br> *string*                              |  Select the isolation level of the MinIO buckets: `SERVICE` or `USER` (`SERVICE` by default) Optional 
 | `visibility` </br> *string*                              |  Select the visibility level of service: `private`, `restricted` or `public` (`private` by default) Optional 
 | `mount` </br> *[MountSettings](#mountsettings)*                   | Configuration to mount a storage provider path inside the service container. Optional. 
+| `workspace` </br> *[WorkspaceSettings](#workspacesettings)*       | Configuration for an OSCAR-managed persistent workspace volume attached to the service. Optional. 
 
 ## SynchronousSettings
 
@@ -151,12 +152,20 @@ storage_providers:
 | `rewrite_target` </br> *bool* | Target the URI where the traffic is redirected. (default: false). Optional.  |
 | `default_command` </br> *bool* | Select between executing the container's default command and executing the script inside the container. (default: false). Optional.  |
 | `health_path` </br> *string* | Change the service readiness and liveness check path/endpoint. (default: "/"). Optional.  |
+| `probe_mode` </br> *string* | Probe path mode for exposed-service pod health checks. `legacy` (default) keeps current behavior; `direct` probes only `health_path` on the container without the OSCAR ingress prefix. Optional. |
 
 ## MountSettings
 | Field                        | Description                                 |
 |------------------------------| --------------------------------------------|
 | `storage_provider` </br> *string*  | Identifier of the storage provider. Optional.          |
 | `path` </br> *string*  | Path to the folder that will be mounted. Optional.          |
+
+## WorkspaceSettings
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
+| `size` </br> *string*        | Requested workspace size using Kubernetes quantity format (for example `1Gi`). Required when `reuse_from_service` is not set. |
+| `reuse_from_service` </br> *string* | Reuse the workspace PVC from another service in the same namespace (for example `openclaw-workspace`). Mutually exclusive with `size`. |
+| `mount_path` </br> *string*  | Absolute path inside the service container where the workspace is mounted. Required when workspace is set. |
 
 ## Replica
 
