@@ -1,0 +1,22 @@
+apiVersion: "serving.kserve.io/v1beta1"
+kind: "InferenceService"
+metadata:
+  name: "yolo-onnx"
+  namespace: oscar-svc
+spec:
+  predictor:
+    serviceAccountName: minio-sa
+    model:
+      protocolVersion: v2
+      modelFormat:
+        name: onnx
+        version: "1"
+      runtime: kserve-tritonserver
+      storageUri: "s3://kserve-models/onnx"
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi

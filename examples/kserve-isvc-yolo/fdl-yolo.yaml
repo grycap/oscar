@@ -1,0 +1,15 @@
+functions:
+  oscar:
+  - oscar:
+      name: fdl-isvc-yolo-request
+      cpu: '1.0'
+      memory: 1Gi
+      image: ghcr.io/esparig/oscar-yolo-fdl:latest
+      script: script.sh
+      log_level: DEBUG
+      input:
+      - storage_provider: minio
+        path: isvc-yolo-request/input
+      output:
+      - storage_provider: minio
+        path: isvc-yolo-request/output
