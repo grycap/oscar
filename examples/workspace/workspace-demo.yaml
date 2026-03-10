@@ -1,0 +1,12 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: workspace-demo
+      memory: 256Mi
+      cpu: '1.0'
+      image: ubuntu
+      script: script.sh
+      log_level: CRITICAL
+      workspace:
+        size: 1Gi
+        mount_path: /data
