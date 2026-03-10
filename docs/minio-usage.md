@@ -22,7 +22,7 @@ Finally, the following image provides an overview of the MinIO login panel and t
 
 ![oscar-info](images/usage/minio/minio-ui.png)
 
-Further information about the MinIO Console avaliable on [MinIO Console documentation](https://min.io/docs/minio/linux/administration/minio-console.html).
+Further information about the MinIO Console is available in the [MinIO Console documentation](https://min.io/docs/minio/linux/administration/minio-console.html).
 
 ## Using command-line interfaces
 

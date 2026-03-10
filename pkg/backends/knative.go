@@ -395,7 +395,9 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service, name
 	if service.Labels["vo"] != "" {
 		knSvc.Spec.ConfigurationSpec.Template.ObjectMeta.Labels["vo"] = service.Labels["vo"]
 	}
-
+	if service.Labels["kueue.x-k8s.io/queue-name"] != "" {
+		knSvc.Spec.ConfigurationSpec.Template.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = service.Labels["kueue.x-k8s.io/queue-name"]
+	}
 	if service.EnableSGX {
 		knSvc.Spec.ConfigurationSpec.Template.ObjectMeta.Annotations["kubernetes.podspec-securitycontext"] = "enabled"
 		knSvc.Spec.ConfigurationSpec.Template.ObjectMeta.Annotations["kubernetes.containerspec-addcapabilities"] = "enabled"

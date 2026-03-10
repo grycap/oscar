@@ -132,6 +132,11 @@ func main() {
 	// Status path for cluster status (Memory and CPU) checks
 	system.GET("/status", handlers.MakeStatusHandler(cfg, kubeClientset, metricsClientset))
 
+	// Quotas
+	system.GET("/quotas/user", handlers.MakeGetOwnQuotaHandler(cfg, kubeConfig))
+	system.GET("/quotas/user/:userId", handlers.MakeGetUserQuotaHandler(cfg, kubeConfig))
+	system.PUT("/quotas/user/:userId", handlers.MakeUpdateUserQuotaHandler(cfg, kubeConfig))
+
 	// Job path for async invocations
 	r.POST("/job/:serviceName", auth.GetLoggerMiddleware(), handlers.MakeJobHandler(cfg, kubeClientset, back, resMan))
 

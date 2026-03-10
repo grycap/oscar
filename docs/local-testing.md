@@ -30,7 +30,7 @@ access them.
 
 ## Automated local deployment
 
-To set up the enviroment for the platform testing you can run the following
+To set up the environment for platform testing you can run the following
 command. This script automatically executes all the necessary steps to deploy
 the local cluster and the OSCAR platform along with all the required tools. 
 
@@ -44,20 +44,26 @@ You can deploy the "devel" version of OSCAR to access the latest development ver
 
 ```sh
 git clone https://github.com/grycap/oscar
-sh oscar/deploy/kind-deploy.sh
+bash oscar/deploy/kind-deploy.sh
 ```
 The wizard will instruct you to choose the "devel" version.
 
 To skip the wizard prompts and automatically install from the `devel` branch, run:
 
 ```sh
-sh oscar/deploy/kind-deploy.sh --devel
+bash oscar/deploy/kind-deploy.sh --devel
 ```
 This flag auto-enables Knative Serving and the local Docker registry so you can test the full development stack without manual input.
 
+To enable OIDC authentication support in the deployed OSCAR (disabled by default), add:
+
+```sh
+bash oscar/deploy/kind-deploy.sh --oidc
+```
+
 ## Steps for manual local deployment
 
-If you want to do it manualy you can follow the listed steps.
+If you want to do it manually you can follow the listed steps.
 
 ### Create the cluster
 
@@ -65,7 +71,7 @@ To create a single node cluster with MinIO and Ingress controller ports
 locally accessible, run:
 
 ```sh
-cat <<EOF | kind create cluster --config=-
+cat <<EOF | kind create cluster --image kindest/node:v1.33.1 --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
@@ -158,67 +164,11 @@ kubectl -n kube-system patch deployment metrics-server --type='json' -p='[{"op":
 
 > Note that the local testing environment uses Kind, therefore the metrics will not work as expected.
 
-## Configure RBAC permissions
-
-Once we have deployed Metrics server we must configure RBAC permissions for OSCAR in order to allow it to interact with Metrics server.
-
-> Note that without the permissions the `/status` will show us an error.
-
-```sh
-cat <<EOF | kubectl apply -f -
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: oscar-cluster-role
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - nodes
-  - pods
-  - deployments
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metrics.k8s.io
-  resources:
-  - nodes
-  verbs:
-  - get
-  - list
-  - watch
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: oscar-cluster-role-binding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: oscar-cluster-role
-subjects:
-- kind: ServiceAccount
-  name: oscar-sa
-  namespace: oscar
-EOF
-```
-
 ### Deploy Knative Serving as Serverless Backend (OPTIONAL)
 
 OSCAR supports [Knative Serving](https://knative.dev/docs/serving/) as
 Serverless Backend to process
-[synchronous invocations](invoking.md#synchronous-invocations). If you want
+[synchronous invocations](invoking-sync.md). If you want
 to deploy it in the kind cluster, first you must deploy the
 [Knative Operator](https://knative.dev/docs/install/operator/knative-with-operators/)
 
@@ -271,7 +221,7 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 Then, add the [grycap helm repo](https://github.com/grycap/helm-charts) and
 deploy by running the following commands replacing `<OSCAR_PASSWORD>` with a
 password of your choice and `<MINIO_PASSWORD>` with the MinIO rootPassword,
-and remember to add the flag `--set serverlessBackend=knative` if you deployed
+and **remember** to add the flag `--set serverlessBackend=knative` if you deployed
 it in the previous step:
 
 ```sh
@@ -281,7 +231,8 @@ helm install --namespace=oscar oscar grycap/oscar \
  --set authPass=<OSCAR_PASSWORD> --set service.type=ClusterIP \
  --set ingress.create=true --set volume.storageClassName=nfs \
  --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false \
- --set minIO.accessKey=minio --set minIO.secretKey=<MINIO_PASSWORD>
+ --set minIO.accessKey=minio --set minIO.secretKey=<MINIO_PASSWORD> \
+ --set resourceManager.enable=true
 ```
 
 Now you can access to the OSCAR web interface through `https://localhost` with

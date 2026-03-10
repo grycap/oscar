@@ -38,7 +38,9 @@ const (
 	// EGIGroupsURNPrefix prefix to identify EGI group URI
 	EGIGroupsURNPrefix = "urn:mace:egi.eu:group"
 	EGIIssuer          = "/realms/egi"
-	SecretKeyLength    = 10
+	AI4EOSCIssuer      = "/realms/ai4eosc"
+
+	SecretKeyLength = 10
 )
 
 var oidcLogger = log.New(os.Stdout, "[OIDC-AUTH] ", log.Flags())
@@ -66,6 +68,24 @@ type KeycloakClaims struct {
 
 type EGIClaims struct {
 	Entitlements []string `json:"entitlements"`
+}
+
+type GroupAI4EOSC struct {
+	Sub            string `json:"sub"`
+	ResourceAccess struct {
+		Account struct {
+			Roles []string `json:"roles"`
+		} `json:"account"`
+	} `json:"resource_access"`
+	EmailVerified bool `json:"email_verified"`
+	RealmAccess   struct {
+		Roles []string `json:"roles"`
+	} `json:"realm_access"`
+	Name              string `json:"name"`
+	PreferredUsername string `json:"preferred_username"`
+	GivenName         string `json:"given_name"`
+	FamilyName        string `json:"family_name"`
+	Email             string `json:"email"`
 }
 
 // newOIDCManager returns a new oidcManager or error if the oidc.Provider can't be created
@@ -193,6 +213,10 @@ func (om *oidcManager) GetUserInfo(rawToken string) (*userInfo, error) {
 		var claims EGIClaims
 		cerr = ui.Claims(&claims)
 		groups = getGroupsEGI(claims.Entitlements)
+	} else if strings.Contains(providerAuth, AI4EOSCIssuer) {
+		var claims KeycloakClaims
+		cerr = ui.Claims(&claims)
+		groups = getGroupsKeycloak(ui)
 	} else {
 		var claims KeycloakClaims
 		cerr = ui.Claims(&claims)
@@ -235,6 +259,17 @@ func getGroupsEGI(urns []string) []string {
 		}
 	}
 	return groups
+}
+
+func getGroupsKeycloak(ui *oidc.UserInfo) []string {
+	var claims GroupAI4EOSC
+	cerr := ui.Claims(&claims)
+	if cerr != nil {
+		return []string{}
+	}
+	memberships := claims.RealmAccess.Roles
+	return memberships
+
 }
 
 func GetIssuerFromToken(rawToken string) (string, error) {

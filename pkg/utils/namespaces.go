@@ -108,7 +108,8 @@ func EnsureUserNamespace(ctx context.Context, kubeClientset kubernetes.Interface
 
 	nsName := BuildUserNamespace(cfg, owner)
 	if nsName == "" {
-		return "", fmt.Errorf("unable to resolve namespace for owner %q", owner)
+		// If namespace cannot be resolved (e.g., nil config), return empty with no error
+		return "", nil
 	}
 
 	nsClient := kubeClientset.CoreV1().Namespaces()
@@ -388,7 +389,7 @@ func buildSharedPVSpec(base corev1.PersistentVolumeSpec) corev1.PersistentVolume
 	spec := corev1.PersistentVolumeSpec{
 		Capacity:                      capacity,
 		AccessModes:                   append([]corev1.PersistentVolumeAccessMode{}, base.AccessModes...),
-		PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimRetain,
+		PersistentVolumeReclaimPolicy: base.PersistentVolumeReclaimPolicy,
 		PersistentVolumeSource:        base.PersistentVolumeSource,
 		MountOptions:                  mountOptions,
 		StorageClassName:              "",

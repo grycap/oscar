@@ -27,7 +27,7 @@ These are the steps:
 
     You will need to authenticate via
     [EGI Check-In](https://www.egi.eu/services/check-in/), which supports
-    mutiple Identity Providers (IdP). There is no need to register and the service is provided free of charge.
+    multiple Identity Providers (IdP). There is no need to register and the service is provided free of charge.
 
 1. Configure the Cloud Credentials
 
