@@ -55,3 +55,10 @@ For docs-only changes, tests may be skipped but must be stated explicitly.
 - The change requires new dependencies, CI/CD edits, or license changes.
 - The change affects external interfaces or deployment behavior.
 - Tests cannot be run or consistently fail.
+
+## Active Technologies
+- Go 1.25.0 + Gin HTTP server, Kubernetes client-go/api/apimachinery, existing OSCAR backend/resource packages (001-persistent-volumes)
+- Kubernetes PersistentVolumeClaim-backed workspace per service (001-persistent-volumes)
+
+## Recent Changes
+- 001-persistent-volumes: Added Go 1.25.0 + Gin HTTP server, Kubernetes client-go/api/apimachinery, existing OSCAR backend/resource packages
