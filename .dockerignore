@@ -1,0 +1,13 @@
+.git/
+.gitignore
+.dockerignore
+node_modules/
+ui/node_modules/
+ui/dist/
+*.log
+*.log*
+.env
+.env*
+coverage/
+site/
+pkg/apidocs/
