@@ -11,8 +11,8 @@ metadata:
     serving.kserve.io/s3-signature-version: "s3v4"
 type: Opaque
 stringData:
-  AWS_ACCESS_KEY_ID: minio
-  AWS_SECRET_ACCESS_KEY: Y2M1NWM1
+  AWS_ACCESS_KEY_ID: <user>
+  AWS_SECRET_ACCESS_KEY: <password>
 
 ---
 
