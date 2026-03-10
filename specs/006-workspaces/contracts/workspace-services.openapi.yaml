@@ -1,0 +1,153 @@
+openapi: 3.0.3
+info:
+  title: OSCAR Service Workspace Contract (Planning Draft)
+  version: 0.1.0
+  description: |
+    Contract draft for adding optional managed workspaces to OSCAR service definitions.
+    This extends existing /system/services operations.
+servers:
+  - url: /
+paths:
+  /system/services:
+    post:
+      summary: Create service (workspace-enabled or legacy)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Service'
+      responses:
+        '201':
+          description: Service created
+        '400':
+          description: Invalid service or workspace definition
+    put:
+      summary: Update service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Service'
+      responses:
+        '204':
+          description: Service updated
+        '400':
+          description: Invalid request (including immutable workspace mutation)
+        '404':
+          description: Service not found
+    get:
+      summary: List services
+      responses:
+        '200':
+          description: Service list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Service'
+  /system/services/{serviceName}:
+    get:
+      summary: Read service
+      parameters:
+        - in: path
+          name: serviceName
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Service detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '404':
+          description: Service not found
+    delete:
+      summary: Delete service
+      parameters:
+        - in: path
+          name: serviceName
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Service and default-lifecycle workspace removed
+        '404':
+          description: Service not found
+components:
+  schemas:
+    Service:
+      type: object
+      required:
+        - name
+        - image
+        - script
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 39
+        image:
+          type: string
+        script:
+          type: string
+        workspace:
+          $ref: '#/components/schemas/WorkspaceConfig'
+        workspace_status:
+          $ref: '#/components/schemas/WorkspaceStatus'
+        input:
+          type: array
+          items:
+            $ref: '#/components/schemas/StorageIOConfig'
+        output:
+          type: array
+          items:
+            $ref: '#/components/schemas/StorageIOConfig'
+        mount:
+          $ref: '#/components/schemas/StorageIOConfig'
+      additionalProperties: true
+
+    WorkspaceConfig:
+      type: object
+      required:
+        - size
+        - mount_path
+      properties:
+        size:
+          type: string
+          description: Requested persistent capacity (e.g., 10Gi)
+        mount_path:
+          type: string
+          description: Absolute mount path inside the service container
+      additionalProperties: false
+
+    WorkspaceStatus:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        error:
+          type: string
+      additionalProperties: false
+
+    StorageIOConfig:
+      type: object
+      properties:
+        storage_provider:
+          type: string
+        path:
+          type: string
+        suffix:
+          type: array
+          items:
+            type: string
+        prefix:
+          type: array
+          items:
+            type: string
+      additionalProperties: true
