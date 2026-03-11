@@ -17,10 +17,23 @@ const (
 	OSCAR_KSERVE_SERVICE_SCRIPT = ""
 )
 
+func ValidateKserveService(service *types.Service) error {
+	if !IsKserveService(service) {
+		return fmt.Errorf("service does not have KServe configuration")
+	}
+	if !validModelFormat(service.Kserve.ModelFormat) {
+		return fmt.Errorf("invalid ModelFormat: %s", service.Kserve.ModelFormat)
+	}
+	if service.Kserve.APIVersion != "" && service.Kserve.APIVersion != string(protocolVersion(service)) {
+		return fmt.Errorf("invalid APIVersion: %s for ModelFormat: %s", service.Kserve.APIVersion, service.Kserve.ModelFormat)
+	}
+	return nil
+}
+
 func NewKserveInferenceServiceDefinition(service *types.Service, knSvc *knv1.Service) (*servingv1beta1.InferenceService, error) {
 
-	if !IsKserveService(service) {
-		return nil, fmt.Errorf("service does not have KServe configuration")
+	if err := ValidateKserveService(service); err != nil {
+		return nil, err
 	}
 
 	resources, err := types.CreateResources(service)
@@ -75,8 +88,8 @@ func NewKserveInferenceServiceDefinition(service *types.Service, knSvc *knv1.Ser
 
 func UpdateKserveInferenceServiceDefinition(service *types.Service, updatedKnSvc *knv1.Service, oldIsvc *servingv1beta1.InferenceService) (*servingv1beta1.InferenceService, error) {
 
-	if !IsKserveService(service) {
-		return nil, fmt.Errorf("service does not have KServe configuration")
+	if err := ValidateKserveService(service); err != nil {
+		return nil, err
 	}
 
 	resources, err := types.CreateResources(service)
@@ -156,6 +169,9 @@ func buildKserveName(serviceName string) string {
 }
 
 func KservePredictor(serviceName string) string {
+	if serviceName == "" {
+		return ""
+	}
 	return serviceName + "-predictor"
 }
 
