@@ -19,6 +19,7 @@ package types
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/goccy/go-yaml"
 	v1 "k8s.io/api/core/v1"
@@ -65,11 +66,23 @@ const (
 	// ServiceLabel label for deploying services in all backs
 	ServiceLabel = "oscar_service"
 
-	// WorkspacePVCNameSuffix suffix used to build per-service workspace PVC names.
-	WorkspacePVCNameSuffix = "-workspace-pvc"
+	// ManagedVolumeLabel marks PVCs created and managed as OSCAR volumes.
+	ManagedVolumeLabel = "oscar.grycap/managed-volume"
 
-	// WorkspaceVolumeName name for the workspace volume in pod specs.
-	WorkspaceVolumeName = "workspace-volume"
+	// ManagedVolumeNameLabel stores the logical OSCAR volume name on the backing PVC.
+	ManagedVolumeNameLabel = "oscar.grycap/volume-name"
+
+	// ManagedVolumeCreationModeLabel stores whether the volume was created from a service or the API.
+	ManagedVolumeCreationModeLabel = "oscar.grycap/volume-creation-mode"
+
+	// ManagedVolumeCreatedByServiceLabel stores the creator service for service-created volumes.
+	ManagedVolumeCreatedByServiceLabel = "oscar.grycap/volume-created-by-service"
+
+	// ManagedVolumeLifecyclePolicyLabel stores the lifecycle policy for service-created volumes.
+	ManagedVolumeLifecyclePolicyLabel = "oscar.grycap/volume-lifecycle-policy"
+
+	// ServiceVolumeName name for the managed volume mount in pod specs.
+	ServiceVolumeName = "service-volume"
 
 	// EventVariable name used by the environment variable where events are stored
 	EventVariable = "EVENT"
@@ -290,28 +303,39 @@ type Service struct {
 	// Optional
 	Mount StorageIOConfig `json:"mount"`
 
-	// Workspace configuration to create a managed persistent workspace volume.
+	// Volume configuration to create or attach a managed persistent volume.
 	// Optional
-	Workspace *WorkspaceConfig `json:"workspace,omitempty"`
+	Volume *ServiceVolumeConfig `json:"volume,omitempty"`
 
-	// WorkspaceStatus exposes basic workspace state information in API responses.
+	// VolumeStatus exposes basic volume state information in API responses.
 	// Internal/API use only, not part of FDL.
-	WorkspaceStatus WorkspaceStatus `json:"workspace_status,omitempty" yaml:"-"`
+	VolumeStatus ServiceVolumeStatus `json:"volume_status,omitempty" yaml:"-"`
 }
 
-// WorkspaceConfig stores the requested size and mount path for a managed workspace.
-type WorkspaceConfig struct {
-	// Size requested workspace size using Kubernetes quantity format (for example 1Gi).
+// ServiceVolumeConfig stores the requested size and mount path for a managed volume.
+type ServiceVolumeConfig struct {
+	// Name is the logical volume name. It is optional for service-created volumes.
+	Name string `json:"name,omitempty"`
+	// Size requested volume size using Kubernetes quantity format (for example 1Gi).
 	Size string `json:"size"`
-	// MountPath absolute path inside the service container where the workspace is mounted.
+	// MountPath absolute path inside the service container where the volume is mounted.
 	MountPath string `json:"mount_path"`
-	// ReuseFromService references another OSCAR service name whose workspace PVC should be mounted.
-	ReuseFromService string `json:"reuse_from_service,omitempty"`
+	// LifecyclePolicy controls whether a service-created volume is deleted with the creator service.
+	LifecyclePolicy string `json:"lifecycle_policy,omitempty"`
 }
 
-// WorkspaceStatus contains a minimal workspace availability status for API consumers.
-type WorkspaceStatus struct {
+// VolumeStatus contains minimal managed-volume status information.
+type VolumeStatus struct {
+	Phase           string `json:"phase,omitempty"`
+	Message         string `json:"message,omitempty"`
+	AttachmentCount int    `json:"attachment_count,omitempty"`
+}
+
+// ServiceVolumeStatus contains a minimal service-side view of an attached volume.
+type ServiceVolumeStatus struct {
 	Enabled bool   `json:"enabled"`
+	Name    string `json:"name,omitempty"`
+	Phase   string `json:"phase,omitempty"`
 	Error   string `json:"error,omitempty"`
 }
 
@@ -390,16 +414,16 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 		podSpec.Volumes = append(podSpec.Volumes, volume)
 	}
 
-	if service.Workspace != nil {
+	if service.Volume != nil {
 		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
-			Name:      WorkspaceVolumeName,
-			MountPath: service.Workspace.MountPath,
+			Name:      ServiceVolumeName,
+			MountPath: service.Volume.MountPath,
 		})
 		podSpec.Volumes = append(podSpec.Volumes, v1.Volume{
-			Name: WorkspaceVolumeName,
+			Name: ServiceVolumeName,
 			VolumeSource: v1.VolumeSource{
 				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-					ClaimName: service.GetWorkspacePVCName(),
+					ClaimName: service.GetVolumePVCName(),
 				},
 			},
 		})
@@ -567,10 +591,31 @@ func (service *Service) HasReplicas() bool {
 	return len(service.Replicas) > 0
 }
 
-// GetWorkspacePVCName returns the per-service workspace PVC name.
-func (service *Service) GetWorkspacePVCName() string {
-	if service.Workspace != nil && service.Workspace.ReuseFromService != "" {
-		return fmt.Sprintf("%s%s", service.Workspace.ReuseFromService, WorkspacePVCNameSuffix)
+// GetVolumeName returns the logical managed volume name used by the service.
+func (service *Service) GetVolumeName() string {
+	if service == nil {
+		return ""
 	}
-	return fmt.Sprintf("%s%s", service.Name, WorkspacePVCNameSuffix)
+	if service.Volume == nil {
+		return service.Name
+	}
+	if strings.TrimSpace(service.Volume.Name) != "" {
+		return strings.TrimSpace(service.Volume.Name)
+	}
+	return service.Name
+}
+
+// GetVolumePVCName returns the backing PVC name for the managed volume.
+func (service *Service) GetVolumePVCName() string {
+	return service.GetVolumeName()
+}
+
+// CreatesManagedVolume reports whether the service requests creation of a new managed volume.
+func (service *Service) CreatesManagedVolume() bool {
+	return service != nil && service.Volume != nil && strings.TrimSpace(service.Volume.Size) != ""
+}
+
+// UsesManagedVolume reports whether the service attaches a managed volume.
+func (service *Service) UsesManagedVolume() bool {
+	return service != nil && service.Volume != nil
 }

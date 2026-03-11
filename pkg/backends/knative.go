@@ -114,7 +114,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		return err
 	}
 
-	if err := resources.EnsureWorkspacePVC(context.TODO(), kn.kubeClientset, service, namespace); err != nil {
+	if err := resources.EnsureServiceVolume(context.TODO(), kn.kubeClientset, service, namespace); err != nil {
 		if delErr := deleteServiceConfigMap(service.Name, namespace, kn.kubeClientset); delErr != nil {
 			log.Println(delErr.Error())
 		}
@@ -135,7 +135,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 			if delErr := deleteServiceConfigMap(service.Name, namespace, kn.kubeClientset); delErr != nil {
 				log.Println(delErr.Error())
 			}
-			if delErr := resources.DeleteWorkspacePVC(context.TODO(), kn.kubeClientset, service, namespace); delErr != nil {
+			if delErr := resources.DeleteServiceVolume(context.TODO(), kn.kubeClientset, service, namespace); delErr != nil {
 				log.Println(delErr.Error())
 			}
 			return err
@@ -148,7 +148,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 			if delErr := deleteServiceConfigMap(service.Name, namespace, kn.kubeClientset); delErr != nil {
 				log.Println(delErr.Error())
 			}
-			if delErr := resources.DeleteWorkspacePVC(context.TODO(), kn.kubeClientset, service, namespace); delErr != nil {
+			if delErr := resources.DeleteServiceVolume(context.TODO(), kn.kubeClientset, service, namespace); delErr != nil {
 				log.Println(delErr.Error())
 			}
 			return err
@@ -291,8 +291,8 @@ func (kn *KnativeBackend) DeleteService(service types.Service) error {
 		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
 	}
 
-	if err := resources.DeleteWorkspacePVC(context.TODO(), kn.kubeClientset, service, namespace); err != nil {
-		log.Printf("Error deleting workspace pvc for service \"%s\": %v\n", name, err)
+	if err := resources.DeleteServiceVolume(context.TODO(), kn.kubeClientset, service, namespace); err != nil {
+		log.Printf("Error deleting managed volume for service \"%s\": %v\n", name, err)
 	}
 
 	if utils.SecretExists(name, namespace, kn.kubeClientset) {

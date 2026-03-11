@@ -298,6 +298,86 @@ func TestKubeCreateService(t *testing.T) {
 	})
 }
 
+func TestKubeCreateServiceWithVolume(t *testing.T) {
+	clientset := fake.NewSimpleClientset()
+	back := MakeKubeBackend(clientset, testConfig)
+	service := types.Service{
+		Name:  "with-volume",
+		Owner: "owner",
+		Volume: &types.ServiceVolumeConfig{
+			Size:      "1Gi",
+			MountPath: "/data",
+		},
+	}
+
+	if err := back.CreateService(service); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := clientset.CoreV1().PersistentVolumeClaims(testConfig.ServicesNamespace).Get(t.Context(), "with-volume", metav1.GetOptions{}); err != nil {
+		t.Fatalf("expected created pvc, got error: %v", err)
+	}
+}
+
+func TestKubeDeleteServiceRespectsVolumeLifecycle(t *testing.T) {
+	t.Run("retain keeps pvc", func(t *testing.T) {
+		clientset := fake.NewSimpleClientset()
+		back := MakeKubeBackend(clientset, testConfig)
+		service := types.Service{
+			Name:      "retain-volume",
+			Namespace: testConfig.ServicesNamespace,
+			Owner:     "owner",
+			Volume: &types.ServiceVolumeConfig{
+				Name:            "retain-volume",
+				Size:            "1Gi",
+				MountPath:       "/data",
+				LifecyclePolicy: types.VolumeLifecycleRetain,
+			},
+		}
+		_, _ = clientset.CoreV1().PodTemplates(testConfig.ServicesNamespace).Create(t.Context(), &v1.PodTemplate{
+			ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: testConfig.ServicesNamespace},
+		}, metav1.CreateOptions{})
+		_, _ = clientset.CoreV1().PersistentVolumeClaims(testConfig.ServicesNamespace).Create(t.Context(), &v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: service.GetVolumePVCName(), Namespace: testConfig.ServicesNamespace},
+		}, metav1.CreateOptions{})
+
+		if err := back.DeleteService(service); err != nil {
+			t.Fatalf("unexpected delete error: %v", err)
+		}
+		if _, err := clientset.CoreV1().PersistentVolumeClaims(testConfig.ServicesNamespace).Get(t.Context(), service.GetVolumePVCName(), metav1.GetOptions{}); err != nil {
+			t.Fatalf("expected pvc to remain for retain policy, got error: %v", err)
+		}
+	})
+
+	t.Run("delete removes pvc", func(t *testing.T) {
+		clientset := fake.NewSimpleClientset()
+		back := MakeKubeBackend(clientset, testConfig)
+		service := types.Service{
+			Name:      "delete-volume",
+			Namespace: testConfig.ServicesNamespace,
+			Owner:     "owner",
+			Volume: &types.ServiceVolumeConfig{
+				Name:            "delete-volume",
+				Size:            "1Gi",
+				MountPath:       "/data",
+				LifecyclePolicy: types.VolumeLifecycleDelete,
+			},
+		}
+		_, _ = clientset.CoreV1().PodTemplates(testConfig.ServicesNamespace).Create(t.Context(), &v1.PodTemplate{
+			ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: testConfig.ServicesNamespace},
+		}, metav1.CreateOptions{})
+		_, _ = clientset.CoreV1().PersistentVolumeClaims(testConfig.ServicesNamespace).Create(t.Context(), &v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: service.GetVolumePVCName(), Namespace: testConfig.ServicesNamespace},
+		}, metav1.CreateOptions{})
+
+		if err := back.DeleteService(service); err != nil {
+			t.Fatalf("unexpected delete error: %v", err)
+		}
+		if _, err := clientset.CoreV1().PersistentVolumeClaims(testConfig.ServicesNamespace).Get(t.Context(), service.GetVolumePVCName(), metav1.GetOptions{}); err == nil {
+			t.Fatalf("expected pvc to be deleted for delete policy")
+		}
+	})
+}
+
 func TestKubeReadService(t *testing.T) {
 	validPodTemplateReactor := func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 		podTemplate := &v1.PodTemplate{

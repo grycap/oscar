@@ -96,7 +96,7 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 		return err
 	}
 
-	if err := resources.EnsureWorkspacePVC(context.TODO(), k.kubeClientset, service, namespace); err != nil {
+	if err := resources.EnsureServiceVolume(context.TODO(), k.kubeClientset, service, namespace); err != nil {
 		if delErr := deleteServiceConfigMap(service.Name, namespace, k.kubeClientset); delErr != nil {
 			log.Println(delErr.Error())
 		}
@@ -110,7 +110,7 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 		if delErr := deleteServiceConfigMap(service.Name, namespace, k.kubeClientset); delErr != nil {
 			log.Println(delErr.Error())
 		}
-		if delErr := resources.DeleteWorkspacePVC(context.TODO(), k.kubeClientset, service, namespace); delErr != nil {
+		if delErr := resources.DeleteServiceVolume(context.TODO(), k.kubeClientset, service, namespace); delErr != nil {
 			log.Println(delErr.Error())
 		}
 		return err
@@ -134,7 +134,7 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 		if delErr := deleteServiceConfigMap(service.Name, namespace, k.kubeClientset); delErr != nil {
 			log.Println(delErr.Error())
 		}
-		if delErr := resources.DeleteWorkspacePVC(context.TODO(), k.kubeClientset, service, namespace); delErr != nil {
+		if delErr := resources.DeleteServiceVolume(context.TODO(), k.kubeClientset, service, namespace); delErr != nil {
 			log.Println(delErr.Error())
 		}
 		return err
@@ -288,8 +288,8 @@ func (k *KubeBackend) DeleteService(service types.Service) error {
 		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
 	}
 
-	if err := resources.DeleteWorkspacePVC(context.TODO(), k.kubeClientset, service, namespace); err != nil {
-		log.Printf("Error deleting workspace pvc for service \"%s\": %v\n", name, err)
+	if err := resources.DeleteServiceVolume(context.TODO(), k.kubeClientset, service, namespace); err != nil {
+		log.Printf("Error deleting managed volume for service \"%s\": %v\n", name, err)
 	}
 
 	if utils.SecretExists(name, namespace, k.kubeClientset) {

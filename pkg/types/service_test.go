@@ -402,30 +402,30 @@ func TestHasReplicas(t *testing.T) {
 	}
 }
 
-func TestGetWorkspacePVCName(t *testing.T) {
+func TestGetVolumePVCName(t *testing.T) {
 	svc := Service{Name: "demo"}
-	expected := "demo" + WorkspacePVCNameSuffix
-	if got := svc.GetWorkspacePVCName(); got != expected {
-		t.Fatalf("expected workspace pvc name %s, got %s", expected, got)
+	expected := "demo"
+	if got := svc.GetVolumePVCName(); got != expected {
+		t.Fatalf("expected volume pvc name %s, got %s", expected, got)
 	}
 
-	svc.Workspace = &WorkspaceConfig{
-		MountPath:        "/data",
-		ReuseFromService: "openclaw-workspace",
+	svc.Volume = &ServiceVolumeConfig{
+		Name:      "openclaw-data",
+		MountPath: "/data",
 	}
-	expected = "openclaw-workspace" + WorkspacePVCNameSuffix
-	if got := svc.GetWorkspacePVCName(); got != expected {
-		t.Fatalf("expected reused workspace pvc name %s, got %s", expected, got)
+	expected = "openclaw-data"
+	if got := svc.GetVolumePVCName(); got != expected {
+		t.Fatalf("expected volume pvc name %s, got %s", expected, got)
 	}
 }
 
-func TestToPodSpecWithWorkspace(t *testing.T) {
+func TestToPodSpecWithVolume(t *testing.T) {
 	copy, err := deepcopy.Anything(testService)
 	if err != nil {
 		t.Fatalf("unable to deep copy test service: %v", err)
 	}
 	svc := copy.(Service)
-	svc.Workspace = &WorkspaceConfig{
+	svc.Volume = &ServiceVolumeConfig{
 		Size:      "1Gi",
 		MountPath: "/data",
 	}
@@ -437,16 +437,16 @@ func TestToPodSpecWithWorkspace(t *testing.T) {
 
 	var foundVolume, foundMount bool
 	for _, v := range podSpec.Volumes {
-		if v.Name == WorkspaceVolumeName && v.PersistentVolumeClaim != nil && v.PersistentVolumeClaim.ClaimName == svc.GetWorkspacePVCName() {
+		if v.Name == ServiceVolumeName && v.PersistentVolumeClaim != nil && v.PersistentVolumeClaim.ClaimName == svc.GetVolumePVCName() {
 			foundVolume = true
 		}
 	}
 	for _, vm := range podSpec.Containers[0].VolumeMounts {
-		if vm.Name == WorkspaceVolumeName && vm.MountPath == "/data" {
+		if vm.Name == ServiceVolumeName && vm.MountPath == "/data" {
 			foundMount = true
 		}
 	}
 	if !foundVolume || !foundMount {
-		t.Fatalf("expected workspace volume and mount to be present")
+		t.Fatalf("expected volume and mount to be present")
 	}
 }

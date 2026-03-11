@@ -34,6 +34,8 @@ type FakeBackend struct {
 	errors   map[string][]error
 	Service  *types.Service // service to be returned by the ReadService function
 	Services []*types.Service
+	// CreatedService stores the last service received through CreateService.
+	CreatedService *types.Service
 	// UpdatedService stores the last service received through UpdateService.
 	UpdatedService *types.Service
 	kubeClientset  kubernetes.Interface
@@ -85,6 +87,8 @@ func (f *FakeBackend) ListServices(namespaces ...string) ([]*types.Service, erro
 
 // CreateService creates a new service as a k8s podTemplate (fake)
 func (f *FakeBackend) CreateService(service types.Service) error {
+	svcCopy := service
+	f.CreatedService = &svcCopy
 	return f.returnError(getCurrentFuncName())
 }
 

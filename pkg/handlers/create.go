@@ -87,7 +87,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Check service values and set defaults
 		checkValues(&service, cfg)
-		if err := validateWorkspaceConfig(service.Name, service.Workspace); err != nil {
+		if err := validateVolumeConfig(service.Name, service.Volume); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
@@ -243,7 +243,13 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
 			if k8sErrors.IsAlreadyExists(err) {
-				c.String(http.StatusConflict, "A service with the provided name already exists")
+				if service.CreatesManagedVolume() {
+					c.String(http.StatusConflict, "A managed volume with the provided name already exists")
+				} else {
+					c.String(http.StatusConflict, "A service with the provided name already exists")
+				}
+			} else if k8sErrors.IsNotFound(err) && service.Volume != nil && !service.CreatesManagedVolume() {
+				c.String(http.StatusBadRequest, "Referenced volume does not exist in the caller namespace")
 			} else {
 				errDelete := back.DeleteService(service)
 				if errDelete != nil {
@@ -707,50 +713,64 @@ func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider,
 	return minIOAdminClient.RestartServer()
 }
 
-func validateWorkspaceConfig(serviceName string, workspace *types.WorkspaceConfig) error {
-	if workspace == nil {
+func validateVolumeConfig(serviceName string, volume *types.ServiceVolumeConfig) error {
+	if volume == nil {
 		return nil
 	}
-	if strings.TrimSpace(workspace.MountPath) == "" {
-		return fmt.Errorf("workspace.mount_path is required")
+	volume.Name = strings.TrimSpace(volume.Name)
+	volume.Size = strings.TrimSpace(volume.Size)
+	volume.MountPath = strings.TrimSpace(volume.MountPath)
+	volume.LifecyclePolicy = strings.TrimSpace(volume.LifecyclePolicy)
+
+	if volume.MountPath == "" {
+		return fmt.Errorf("volume.mount_path is required")
 	}
-	reuseFrom := strings.TrimSpace(workspace.ReuseFromService)
-	size := strings.TrimSpace(workspace.Size)
-	if reuseFrom == "" && size == "" {
-		return fmt.Errorf("workspace.size is required when workspace.reuse_from_service is not set")
+
+	if volume.Size == "" && volume.Name == "" {
+		return fmt.Errorf("volume.name is required when volume.size is not set")
 	}
-	if reuseFrom != "" && size != "" {
-		return fmt.Errorf("workspace.size and workspace.reuse_from_service are mutually exclusive")
-	}
-	if reuseFrom != "" {
-		if errs := validation.IsDNS1123Label(reuseFrom); len(errs) > 0 {
-			return fmt.Errorf("workspace.reuse_from_service must be a valid Kubernetes service name")
+
+	if volume.Name != "" {
+		if errs := validation.IsDNS1123Label(volume.Name); len(errs) > 0 {
+			return fmt.Errorf("volume.name must satisfy Kubernetes DNS-1123 naming rules")
 		}
-		if serviceName != "" && reuseFrom == serviceName {
-			return fmt.Errorf("workspace.reuse_from_service cannot reference the same service")
-		}
-	} else {
-		qty, err := resource.ParseQuantity(workspace.Size)
+	}
+
+	if volume.Size != "" {
+		qty, err := resource.ParseQuantity(volume.Size)
 		if err != nil || qty.Sign() <= 0 {
-			return fmt.Errorf("workspace.size must be a valid positive quantity")
+			return fmt.Errorf("volume.size must be a valid positive quantity")
 		}
+		if volume.Name == "" {
+			volume.Name = serviceName
+		}
+		switch volume.LifecyclePolicy {
+		case "":
+			volume.LifecyclePolicy = types.VolumeLifecycleDelete
+		case types.VolumeLifecycleDelete, types.VolumeLifecycleRetain:
+		default:
+			return fmt.Errorf("volume.lifecycle_policy must be either %q or %q", types.VolumeLifecycleDelete, types.VolumeLifecycleRetain)
+		}
+	} else if volume.LifecyclePolicy != "" {
+		return fmt.Errorf("volume.lifecycle_policy is only valid when volume.size is set")
 	}
-	if !path.IsAbs(workspace.MountPath) {
-		return fmt.Errorf("workspace.mount_path must be an absolute path")
+
+	if !path.IsAbs(volume.MountPath) {
+		return fmt.Errorf("volume.mount_path must be an absolute path")
 	}
-	if workspace.MountPath == types.ConfigPath || workspace.MountPath == types.VolumePath ||
-		strings.HasPrefix(workspace.MountPath, types.ConfigPath+"/") || strings.HasPrefix(workspace.MountPath, types.VolumePath+"/") {
-		return fmt.Errorf("workspace.mount_path cannot overlap OSCAR reserved paths")
+	if volume.MountPath == types.ConfigPath || volume.MountPath == types.VolumePath ||
+		strings.HasPrefix(volume.MountPath, types.ConfigPath+"/") || strings.HasPrefix(volume.MountPath, types.VolumePath+"/") {
+		return fmt.Errorf("volume.mount_path cannot overlap OSCAR reserved paths")
 	}
 	return nil
 }
 
-func sameWorkspaceConfig(a, b *types.WorkspaceConfig) bool {
+func sameVolumeConfig(a, b *types.ServiceVolumeConfig) bool {
 	if a == nil && b == nil {
 		return true
 	}
 	if a == nil || b == nil {
 		return false
 	}
-	return a.Size == b.Size && a.MountPath == b.MountPath && a.ReuseFromService == b.ReuseFromService
+	return a.Name == b.Name && a.Size == b.Size && a.MountPath == b.MountPath && a.LifecyclePolicy == b.LifecyclePolicy
 }

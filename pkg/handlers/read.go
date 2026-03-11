@@ -17,12 +17,14 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"slices"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/v3/pkg/backends/resources"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
@@ -61,7 +63,7 @@ func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
-			setWorkspaceStatus(service)
+			setVolumeStatus(back, service)
 
 			switch service.Visibility {
 			case utils.PUBLIC:
@@ -82,19 +84,33 @@ func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 				return
 			}
 		} else {
-			setWorkspaceStatus(service)
+			setVolumeStatus(back, service)
 			c.JSON(http.StatusOK, service)
 		}
 	}
 }
 
-func setWorkspaceStatus(service *types.Service) {
+func setVolumeStatus(back types.ServerlessBackend, service *types.Service) {
 	if service == nil {
 		return
 	}
-	if service.Workspace == nil {
-		service.WorkspaceStatus = types.WorkspaceStatus{Enabled: false}
+	if service.Volume == nil {
+		service.VolumeStatus = types.ServiceVolumeStatus{Enabled: false}
 		return
 	}
-	service.WorkspaceStatus = types.WorkspaceStatus{Enabled: true}
+	service.VolumeStatus = types.ServiceVolumeStatus{
+		Enabled: true,
+		Name:    service.GetVolumeName(),
+		Phase:   types.VolumePhasePending,
+	}
+	if service.Namespace == "" {
+		return
+	}
+	volume, err := resources.GetManagedVolume(context.TODO(), back.GetKubeClientset(), service.Namespace, service.GetVolumeName())
+	if err != nil {
+		service.VolumeStatus.Phase = types.VolumePhaseError
+		service.VolumeStatus.Error = err.Error()
+		return
+	}
+	service.VolumeStatus.Phase = volume.Status.Phase
 }

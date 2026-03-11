@@ -174,13 +174,13 @@ func TestMakeUpdateHandlerForbiddenOwner(t *testing.T) {
 	}
 }
 
-func TestMakeUpdateHandlerRejectsWorkspaceMutation(t *testing.T) {
+func TestMakeUpdateHandlerRejectsVolumeMutation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	back := backends.MakeFakeBackend()
 	back.Service = &types.Service{
 		Name:  "svc",
 		Owner: "owner",
-		Workspace: &types.WorkspaceConfig{
+		Volume: &types.ServiceVolumeConfig{
 			Size:      "1Gi",
 			MountPath: "/data",
 		},
@@ -197,7 +197,7 @@ func TestMakeUpdateHandlerRejectsWorkspaceMutation(t *testing.T) {
 	})
 	r.PUT("/system/services", MakeUpdateHandler(cfg, back))
 
-	body := `{"name":"svc","image":"img","script":"echo","workspace":{"size":"2Gi","mount_path":"/data"}}`
+	body := `{"name":"svc","image":"img","script":"echo","volume":{"size":"2Gi","mount_path":"/data"}}`
 	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer token")
@@ -205,6 +205,6 @@ func TestMakeUpdateHandlerRejectsWorkspaceMutation(t *testing.T) {
 	r.ServeHTTP(resp, req)
 
 	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for workspace mutation, got %d", resp.Code)
+		t.Fatalf("expected 400 for volume mutation, got %d", resp.Code)
 	}
 }

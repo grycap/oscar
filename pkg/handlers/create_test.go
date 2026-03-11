@@ -294,6 +294,148 @@ func TestMakeCreateHandlerWebhookError(t *testing.T) {
 	}
 }
 
+func TestMakeCreateHandlerVolumeFlows(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		if hreq.URL.Path == "/minio/admin/v3/info" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			return
+		}
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"status":"success"}`))
+	}))
+	defer server.Close()
+
+	cfg := &types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "ak",
+			SecretKey: "sk",
+			Verify:    false,
+		},
+		ServicesNamespace: "oscar-svc",
+	}
+
+	makeRouter := func(back *backends.FakeBackend, kubeClientset *testclient.Clientset) *gin.Engine {
+		r := gin.New()
+		r.Use(func(c *gin.Context) {
+			c.Set("uidOrigin", "owner@example.com")
+			c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "owner@example.com"))
+			c.Next()
+		})
+		r.POST("/system/services", MakeCreateHandler(cfg, back))
+		return r
+	}
+
+	t.Run("create new volume defaults name and lifecycle", func(t *testing.T) {
+		baseNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "oscar-svc"}}
+		basePV := &corev1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{Name: "oscar-runtime-pv"},
+			Spec: corev1.PersistentVolumeSpec{
+				PersistentVolumeSource: corev1.PersistentVolumeSource{
+					NFS: &corev1.NFSVolumeSource{Server: "nfs.example.com", Path: "/exports/oscar"},
+				},
+			},
+		}
+		basePVC := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: types.PVCName, Namespace: "oscar-svc"},
+			Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: basePV.Name},
+			Status:     corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound},
+		}
+		baseSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: auth.FormatUID("owner@example.com"), Namespace: "oscar-svc"},
+			Data: map[string][]byte{
+				"oidc_uid":  []byte("owner@example.com"),
+				"accessKey": []byte("owner@example.com"),
+				"secretKey": []byte("secret"),
+			},
+		}
+		kubeClientset := testclient.NewSimpleClientset(baseNamespace, basePV, basePVC, baseSecret)
+		back := backends.MakeFakeBackend()
+		back.SetKubeClientset(kubeClientset)
+
+		req := httptest.NewRequest(http.MethodPost, "/system/services", strings.NewReader(`{"name":"svc","image":"img","script":"echo","volume":{"size":"1Gi","mount_path":"/data"},"visibility":"public"}`))
+		req.Header.Set("Authorization", "Bearer token")
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		makeRouter(back, kubeClientset).ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
+		}
+		if back.CreatedService == nil || back.CreatedService.Volume == nil {
+			t.Fatalf("expected created service with volume")
+		}
+		if back.CreatedService.Volume.Name != "svc" {
+			t.Fatalf("expected derived volume name svc, got %q", back.CreatedService.Volume.Name)
+		}
+		if back.CreatedService.Volume.LifecyclePolicy != types.VolumeLifecycleDelete {
+			t.Fatalf("expected default lifecycle delete, got %q", back.CreatedService.Volume.LifecyclePolicy)
+		}
+	})
+
+	t.Run("mount existing volume by name", func(t *testing.T) {
+		baseNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "oscar-svc"}}
+		basePV := &corev1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{Name: "oscar-runtime-pv"},
+			Spec: corev1.PersistentVolumeSpec{
+				PersistentVolumeSource: corev1.PersistentVolumeSource{
+					NFS: &corev1.NFSVolumeSource{Server: "nfs.example.com", Path: "/exports/oscar"},
+				},
+			},
+		}
+		basePVC := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: types.PVCName, Namespace: "oscar-svc"},
+			Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: basePV.Name},
+			Status:     corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound},
+		}
+		baseSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: auth.FormatUID("owner@example.com"), Namespace: "oscar-svc"},
+			Data: map[string][]byte{
+				"oidc_uid":  []byte("owner@example.com"),
+				"accessKey": []byte("owner@example.com"),
+				"secretKey": []byte("secret"),
+			},
+		}
+		kubeClientset := testclient.NewSimpleClientset(baseNamespace, basePV, basePVC, baseSecret)
+		back := backends.MakeFakeBackend()
+		back.SetKubeClientset(kubeClientset)
+		namespace, err := utils.EnsureUserNamespace(t.Context(), kubeClientset, cfg, "owner@example.com")
+		if err != nil {
+			t.Fatalf("unexpected namespace error: %v", err)
+		}
+		_, _ = kubeClientset.CoreV1().PersistentVolumeClaims(namespace).Create(t.Context(), &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "shared-data",
+				Namespace: namespace,
+				Labels: map[string]string{
+					types.ManagedVolumeLabel:     "true",
+					types.ManagedVolumeNameLabel: "shared-data",
+				},
+			},
+		}, metav1.CreateOptions{})
+
+		req := httptest.NewRequest(http.MethodPost, "/system/services", strings.NewReader(`{"name":"svc","image":"img","script":"echo","volume":{"name":"shared-data","mount_path":"/data"},"visibility":"public"}`))
+		req.Header.Set("Authorization", "Bearer token")
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		makeRouter(back, kubeClientset).ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
+		}
+		if back.CreatedService == nil || back.CreatedService.Volume == nil {
+			t.Fatalf("expected created service with volume")
+		}
+		if back.CreatedService.Volume.Name != "shared-data" || back.CreatedService.Volume.Size != "" {
+			t.Fatalf("expected mount-existing volume, got %+v", *back.CreatedService.Volume)
+		}
+	})
+}
+
 func TestCheckValuesDefaults(t *testing.T) {
 	cfg := types.Config{
 		MinIOProvider: &types.MinIOProvider{
@@ -451,28 +593,27 @@ func buildRSAJWK(pub *rsa.PublicKey) string {
 	return `{"keys":[{"kty":"RSA","alg":"RS256","use":"sig","kid":"test","n":"` + n + `","e":"` + e + `"}]}`
 }
 
-func TestValidateWorkspaceConfig(t *testing.T) {
+func TestValidateVolumeConfig(t *testing.T) {
 	tests := []struct {
-		name      string
-		svcName   string
-		workspace *types.WorkspaceConfig
-		wantErr   bool
+		name    string
+		svcName string
+		volume  *types.ServiceVolumeConfig
+		wantErr bool
 	}{
-		{name: "nil workspace", svcName: "svc", workspace: nil, wantErr: false},
-		{name: "valid workspace", svcName: "svc", workspace: &types.WorkspaceConfig{Size: "1Gi", MountPath: "/data"}, wantErr: false},
-		{name: "valid reused workspace", svcName: "svc", workspace: &types.WorkspaceConfig{MountPath: "/data", ReuseFromService: "openclaw-workspace"}, wantErr: false},
-		{name: "missing size and reuse", svcName: "svc", workspace: &types.WorkspaceConfig{MountPath: "/data"}, wantErr: true},
-		{name: "size and reuse both set", svcName: "svc", workspace: &types.WorkspaceConfig{Size: "1Gi", MountPath: "/data", ReuseFromService: "openclaw-workspace"}, wantErr: true},
-		{name: "invalid reuse name", svcName: "svc", workspace: &types.WorkspaceConfig{MountPath: "/data", ReuseFromService: "Invalid_Name"}, wantErr: true},
-		{name: "reuse same service", svcName: "svc", workspace: &types.WorkspaceConfig{MountPath: "/data", ReuseFromService: "svc"}, wantErr: true},
-		{name: "invalid size", workspace: &types.WorkspaceConfig{Size: "abc", MountPath: "/data"}, wantErr: true},
-		{name: "relative mount path", workspace: &types.WorkspaceConfig{Size: "1Gi", MountPath: "data"}, wantErr: true},
-		{name: "reserved mount path", workspace: &types.WorkspaceConfig{Size: "1Gi", MountPath: types.ConfigPath}, wantErr: true},
+		{name: "nil volume", svcName: "svc", volume: nil, wantErr: false},
+		{name: "valid create volume", svcName: "svc", volume: &types.ServiceVolumeConfig{Size: "1Gi", MountPath: "/data"}, wantErr: false},
+		{name: "valid mount existing volume", svcName: "svc", volume: &types.ServiceVolumeConfig{Name: "openclaw-data", MountPath: "/data"}, wantErr: false},
+		{name: "missing size and name", svcName: "svc", volume: &types.ServiceVolumeConfig{MountPath: "/data"}, wantErr: true},
+		{name: "invalid name", svcName: "svc", volume: &types.ServiceVolumeConfig{Name: "Invalid_Name", MountPath: "/data"}, wantErr: true},
+		{name: "invalid size", volume: &types.ServiceVolumeConfig{Size: "abc", MountPath: "/data"}, wantErr: true},
+		{name: "relative mount path", volume: &types.ServiceVolumeConfig{Size: "1Gi", MountPath: "data"}, wantErr: true},
+		{name: "reserved mount path", volume: &types.ServiceVolumeConfig{Size: "1Gi", MountPath: types.ConfigPath}, wantErr: true},
+		{name: "invalid lifecycle for mount", volume: &types.ServiceVolumeConfig{Name: "shared-data", MountPath: "/data", LifecyclePolicy: types.VolumeLifecycleRetain}, wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateWorkspaceConfig(tt.svcName, tt.workspace)
+			err := validateVolumeConfig(tt.svcName, tt.volume)
 			if tt.wantErr && err == nil {
 				t.Fatalf("expected error, got nil")
 			}
