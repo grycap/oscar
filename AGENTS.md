@@ -59,6 +59,8 @@ For docs-only changes, tests may be skipped but must be stated explicitly.
 ## Active Technologies
 - Go 1.25.0 + Gin HTTP server, Kubernetes client-go/api/apimachinery, existing OSCAR backend/resource packages (001-persistent-volumes)
 - Kubernetes PersistentVolumeClaim-backed workspace per service (001-persistent-volumes)
+- Go 1.25.0 + Gin HTTP server, Kubernetes client-go/api/apimachinery, existing OSCAR auth/utils/backends/resources packages (006-volumes)
+- Kubernetes PersistentVolumeClaims in per-user namespaces, backed by the current NFS RWX storage-class approach used for managed service storage (006-volumes)
 
 ## Recent Changes
 - 001-persistent-volumes: Added Go 1.25.0 + Gin HTTP server, Kubernetes client-go/api/apimachinery, existing OSCAR backend/resource packages
