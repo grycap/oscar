@@ -298,9 +298,40 @@ func TestMakeCreateHandlerVolumeFlows(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		if hreq.URL.Path != "/test" && hreq.URL.Path != "/" && hreq.URL.Path != "/test/" && hreq.URL.Path != "/test/input/" && hreq.URL.Path != "/test/output/" && hreq.URL.Path != "/test/mount/" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
+			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
+		}
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
 			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			return
+		}
+		if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/info-canned-policy") {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{
+				"Version": "2012-10-17",
+				"Statement": [
+					{
+						"Effect": "Allow",
+						"Action": [
+							"s3:*"
+						],
+						"Resource": [
+							"arn:aws:s3:::test/*"
+						]
+					}
+				]
+			}`))
+			return
+		}
+		if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/set-user-or-group-policy") {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"status":"success","binding":"done"}`))
+			return
+		}
+		if hreq.Method == http.MethodGet && strings.HasPrefix(hreq.URL.Path, "/test") && hreq.URL.RawQuery == "location=" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>`))
 			return
 		}
 		rw.WriteHeader(http.StatusOK)
@@ -434,6 +465,49 @@ func TestMakeCreateHandlerVolumeFlows(t *testing.T) {
 			t.Fatalf("expected mount-existing volume, got %+v", *back.CreatedService.Volume)
 		}
 	})
+}
+
+func TestCheckValuesLegacyStorageFlowsPreserveNilVolume(t *testing.T) {
+	cfg := &types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  "http://minio:9000",
+			Region:    "us-east-1",
+			AccessKey: "ak",
+			SecretKey: "sk",
+			Verify:    false,
+		},
+	}
+
+	service := types.Service{
+		Name:   "legacy-svc",
+		Image:  "img",
+		Script: "echo",
+		Mount: types.StorageIOConfig{
+			Provider: "minio.default",
+			Path:     "test/mount",
+		},
+		Input: []types.StorageIOConfig{
+			{Provider: "minio.default", Path: "test/input"},
+		},
+		Output: []types.StorageIOConfig{
+			{Provider: "minio.default", Path: "test/output"},
+		},
+	}
+
+	checkValues(&service, cfg)
+
+	if service.Volume != nil {
+		t.Fatalf("expected legacy storage flow to keep volume nil, got %+v", service.Volume)
+	}
+	if service.Mount.Path != "test/mount" || service.Mount.Provider != "minio.default" {
+		t.Fatalf("expected mount configuration to be preserved, got %+v", service.Mount)
+	}
+	if len(service.Input) != 1 || service.Input[0].Path != "test/input" {
+		t.Fatalf("expected input configuration to be preserved, got %+v", service.Input)
+	}
+	if len(service.Output) != 1 || service.Output[0].Path != "test/output" {
+		t.Fatalf("expected output configuration to be preserved, got %+v", service.Output)
+	}
 }
 
 func TestCheckValuesDefaults(t *testing.T) {

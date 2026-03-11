@@ -38,6 +38,8 @@ type FakeBackend struct {
 	CreatedService *types.Service
 	// UpdatedService stores the last service received through UpdateService.
 	UpdatedService *types.Service
+	// DeletedService stores the last service received through DeleteService.
+	DeletedService *types.Service
 	kubeClientset  kubernetes.Interface
 }
 
@@ -111,6 +113,8 @@ func (f *FakeBackend) UpdateService(service types.Service) error {
 
 // DeleteService deletes a service (fake)
 func (f *FakeBackend) DeleteService(service types.Service) error {
+	svcCopy := service
+	f.DeletedService = &svcCopy
 	return f.returnError(getCurrentFuncName())
 }
 

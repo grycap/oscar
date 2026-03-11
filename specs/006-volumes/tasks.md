@@ -87,7 +87,7 @@
 
 ### Tests for User Story 3
 
-- [ ] T023 [P] [US3] Add lifecycle-policy service deletion tests in pkg/handlers/delete_test.go and pkg/backends/k8s_test.go
+- [X] T023 [P] [US3] Add lifecycle-policy service deletion tests in pkg/handlers/delete_test.go and pkg/backends/k8s_test.go
 - [X] T024 [P] [US3] Add volume-delete guard tests for attached volumes in pkg/handlers/volumes_test.go and pkg/backends/resources/volume_test.go
 
 ### Implementation for User Story 3
@@ -108,8 +108,8 @@
 
 ### Tests for User Story 4
 
-- [ ] T028 [P] [US4] Add regression tests for legacy services without `volume` in pkg/handlers/update_test.go and pkg/backends/knative_test.go
-- [ ] T029 [P] [US4] Add regression tests for existing `mount`, `input`, and `output` flows in pkg/handlers/create_test.go and pkg/backends/k8s_test.go
+- [X] T028 [P] [US4] Add regression tests for legacy services without `volume` in pkg/handlers/update_test.go and pkg/backends/knative_test.go
+- [X] T029 [P] [US4] Add regression tests for existing `mount`, `input`, and `output` flows in pkg/handlers/create_test.go and pkg/backends/k8s_test.go
 
 ### Implementation for User Story 4
 

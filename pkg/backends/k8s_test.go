@@ -318,6 +318,34 @@ func TestKubeCreateServiceWithVolume(t *testing.T) {
 	}
 }
 
+func TestKubeCreateServiceLegacyStorageDoesNotCreateManagedVolume(t *testing.T) {
+	clientset := fake.NewSimpleClientset()
+	back := MakeKubeBackend(clientset, testConfig)
+	service := types.Service{
+		Name:   "legacy-storage",
+		Owner:  "owner",
+		Image:  "img",
+		Script: "echo",
+		Mount: types.StorageIOConfig{
+			Provider: "minio",
+			Path:     "legacy/mount",
+		},
+		Input: []types.StorageIOConfig{
+			{Provider: "minio." + types.DefaultProvider, Path: "/input"},
+		},
+		Output: []types.StorageIOConfig{
+			{Provider: "minio." + types.DefaultProvider, Path: "/output"},
+		},
+	}
+
+	if err := back.CreateService(service); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := clientset.CoreV1().PersistentVolumeClaims(testConfig.ServicesNamespace).Get(t.Context(), service.Name, metav1.GetOptions{}); err == nil {
+		t.Fatalf("did not expect managed volume pvc for legacy storage flow")
+	}
+}
+
 func TestKubeDeleteServiceRespectsVolumeLifecycle(t *testing.T) {
 	t.Run("retain keeps pvc", func(t *testing.T) {
 		clientset := fake.NewSimpleClientset()
