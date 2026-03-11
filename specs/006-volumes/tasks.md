@@ -11,9 +11,9 @@
 
 **Purpose**: Prepare the codebase entry points and shared files for the managed-volumes feature.
 
-- [ ] T001 Add `/system/volumes` route wiring in main.go
-- [ ] T002 [P] Create volume handler scaffolding in pkg/handlers/volumes.go
-- [ ] T003 [P] Create managed-volume resource helper scaffolding in pkg/backends/resources/volume.go
+- [X] T001 Add `/system/volumes` route wiring in main.go
+- [X] T002 [P] Create volume handler scaffolding in pkg/handlers/volumes.go
+- [X] T003 [P] Create managed-volume resource helper scaffolding in pkg/backends/resources/volume.go
 
 ---
 
@@ -23,14 +23,14 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T004 Replace the legacy service storage schema with `volume` config and status types in pkg/types/service.go
-- [ ] T005 [P] Update service serialization, naming, and pod-mount tests for `volume` in pkg/types/service_test.go
-- [ ] T006 Implement shared volume validation and defaulting helpers in pkg/handlers/create.go
-- [ ] T007 [P] Enforce immutable service volume updates in pkg/handlers/update.go
-- [ ] T008 [P] Implement shared PVC naming, metadata, and namespace resolution helpers in pkg/backends/resources/volume.go
-- [ ] T009 [P] Add foundational resource-helper tests in pkg/backends/resources/volume_test.go
-- [ ] T010 [P] Implement shared volume status resolution helpers in pkg/handlers/read.go and pkg/handlers/list.go
-- [ ] T011 [P] Add foundational handler validation and status tests in pkg/handlers/create_test.go, pkg/handlers/update_test.go, pkg/handlers/read_test.go, and pkg/handlers/list_test.go
+- [X] T004 Replace the legacy service storage schema with `volume` config and status types in pkg/types/service.go
+- [X] T005 [P] Update service serialization, naming, and pod-mount tests for `volume` in pkg/types/service_test.go
+- [X] T006 Implement shared volume validation and defaulting helpers in pkg/handlers/create.go
+- [X] T007 [P] Enforce immutable service volume updates in pkg/handlers/update.go
+- [X] T008 [P] Implement shared PVC naming, metadata, and namespace resolution helpers in pkg/backends/resources/volume.go
+- [X] T009 [P] Add foundational resource-helper tests in pkg/backends/resources/volume_test.go
+- [X] T010 [P] Implement shared volume status resolution helpers in pkg/handlers/read.go and pkg/handlers/list.go
+- [X] T011 [P] Add foundational handler validation and status tests in pkg/handlers/create_test.go, pkg/handlers/update_test.go, pkg/handlers/read_test.go, and pkg/handlers/list_test.go
 
 **Checkpoint**: Foundation ready; service and volume workflows can now be implemented.
 
@@ -44,15 +44,15 @@
 
 ### Tests for User Story 1
 
-- [ ] T012 [P] [US1] Add service-create tests for new-volume and mount-existing flows in pkg/handlers/create_test.go
-- [ ] T013 [P] [US1] Add backend tests for service volume provisioning and mount wiring in pkg/backends/k8s_test.go and pkg/backends/knative_test.go
+- [X] T012 [P] [US1] Add service-create tests for new-volume and mount-existing flows in pkg/handlers/create_test.go
+- [X] T013 [P] [US1] Add backend tests for service volume provisioning and mount wiring in pkg/backends/k8s_test.go and pkg/backends/knative_test.go
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] Implement service create-path volume creation and attachment logic in pkg/handlers/create.go
-- [ ] T015 [P] [US1] Implement service pod-spec volume mount wiring in pkg/types/service.go
-- [ ] T016 [US1] Implement backend create/update/delete handling for service-attached volumes in pkg/backends/k8s.go and pkg/backends/knative.go
-- [ ] T017 [US1] Implement service-facing volume lookup and owner metadata handling in pkg/backends/resources/volume.go
+- [X] T014 [US1] Implement service create-path volume creation and attachment logic in pkg/handlers/create.go
+- [X] T015 [P] [US1] Implement service pod-spec volume mount wiring in pkg/types/service.go
+- [X] T016 [US1] Implement backend create/update/delete handling for service-attached volumes in pkg/backends/k8s.go and pkg/backends/knative.go
+- [X] T017 [US1] Implement service-facing volume lookup and owner metadata handling in pkg/backends/resources/volume.go
 
 **Checkpoint**: User Story 1 should be independently deployable and preserve data across restart/redeploy.
 
@@ -66,14 +66,14 @@
 
 ### Tests for User Story 2
 
-- [ ] T018 [P] [US2] Add handler tests for `/system/volumes` CRUD and namespace isolation in pkg/handlers/volumes_test.go
-- [ ] T019 [P] [US2] Add resource-layer tests for volume read/list metadata and attachment enumeration in pkg/backends/resources/volume_test.go
+- [X] T018 [P] [US2] Add handler tests for `/system/volumes` CRUD and namespace isolation in pkg/handlers/volumes_test.go
+- [X] T019 [P] [US2] Add resource-layer tests for volume read/list metadata and attachment enumeration in pkg/backends/resources/volume_test.go
 
 ### Implementation for User Story 2
 
-- [ ] T020 [US2] Implement `/system/volumes` create, list, read, and delete handlers in pkg/handlers/volumes.go
-- [ ] T021 [P] [US2] Implement managed-volume CRUD and attachment-discovery helpers in pkg/backends/resources/volume.go
-- [ ] T022 [US2] Register Swagger annotations for `/system/volumes` in pkg/handlers/volumes.go and main.go
+- [X] T020 [US2] Implement `/system/volumes` create, list, read, and delete handlers in pkg/handlers/volumes.go
+- [X] T021 [P] [US2] Implement managed-volume CRUD and attachment-discovery helpers in pkg/backends/resources/volume.go
+- [X] T022 [US2] Register Swagger annotations for `/system/volumes` in pkg/handlers/volumes.go and main.go
 
 **Checkpoint**: User Story 2 should expose namespace-scoped volume management without requiring service deployment.
 
@@ -88,13 +88,13 @@
 ### Tests for User Story 3
 
 - [ ] T023 [P] [US3] Add lifecycle-policy service deletion tests in pkg/handlers/delete_test.go and pkg/backends/k8s_test.go
-- [ ] T024 [P] [US3] Add volume-delete guard tests for attached volumes in pkg/handlers/volumes_test.go and pkg/backends/resources/volume_test.go
+- [X] T024 [P] [US3] Add volume-delete guard tests for attached volumes in pkg/handlers/volumes_test.go and pkg/backends/resources/volume_test.go
 
 ### Implementation for User Story 3
 
-- [ ] T025 [US3] Implement `retain` and `delete` lifecycle-policy validation and defaults in pkg/handlers/create.go and pkg/types/service.go
-- [ ] T026 [US3] Implement retain/delete cleanup behavior for service-created volumes in pkg/backends/k8s.go and pkg/backends/knative.go
-- [ ] T027 [US3] Implement explicit delete blocking for attached volumes in pkg/handlers/volumes.go and pkg/backends/resources/volume.go
+- [X] T025 [US3] Implement `retain` and `delete` lifecycle-policy validation and defaults in pkg/handlers/create.go and pkg/types/service.go
+- [X] T026 [US3] Implement retain/delete cleanup behavior for service-created volumes in pkg/backends/k8s.go and pkg/backends/knative.go
+- [X] T027 [US3] Implement explicit delete blocking for attached volumes in pkg/handlers/volumes.go and pkg/backends/resources/volume.go
 
 **Checkpoint**: User Story 3 should preserve retained volumes and clean up delete-policy volumes correctly.
 
@@ -113,8 +113,8 @@
 
 ### Implementation for User Story 4
 
-- [ ] T030 [US4] Preserve legacy no-volume service defaults in pkg/handlers/create.go, pkg/handlers/update.go, and pkg/types/service.go
-- [ ] T031 [US4] Keep read/list responses stable for services without volumes in pkg/handlers/read.go and pkg/handlers/list.go
+- [X] T030 [US4] Preserve legacy no-volume service defaults in pkg/handlers/create.go, pkg/handlers/update.go, and pkg/types/service.go
+- [X] T031 [US4] Keep read/list responses stable for services without volumes in pkg/handlers/read.go and pkg/handlers/list.go
 
 **Checkpoint**: Legacy service definitions should remain independently deployable with no behavior regression.
 
@@ -124,10 +124,10 @@
 
 **Purpose**: Finalize docs, generated API artifacts, and validation across all stories.
 
-- [ ] T032 [P] Update managed-volume documentation in docs/fdl.md, docs/api.md, and docs/additional-config.md
-- [ ] T033 [P] Regenerate Swagger artifacts for the volume API in pkg/apidocs/docs.go, pkg/apidocs/swagger.json, and pkg/apidocs/swagger.yaml
-- [ ] T034 Run `go test ./pkg/types ./pkg/handlers ./pkg/backends/...` and record outcomes in specs/006-volumes/quickstart.md
-- [ ] T035 Run `go generate ./...` and record API-doc regeneration outcomes in specs/006-volumes/quickstart.md
+- [X] T032 [P] Update managed-volume documentation in docs/fdl.md, docs/api.md, and docs/additional-config.md
+- [X] T033 [P] Regenerate Swagger artifacts for the volume API in pkg/apidocs/docs.go, pkg/apidocs/swagger.json, and pkg/apidocs/swagger.yaml
+- [X] T034 Run `go test ./pkg/types ./pkg/handlers ./pkg/backends/...` and record outcomes in specs/006-volumes/quickstart.md
+- [X] T035 Run `go generate ./...` and record API-doc regeneration outcomes in specs/006-volumes/quickstart.md
 
 ---
 
