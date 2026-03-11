@@ -115,6 +115,9 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 	var isKserve bool = (kn.kserveClientset != nil && utils.IsKserveService(&service))
 
 	if isKserve {
+		if err := utils.ValidateKserveService(&service); err != nil {
+			return err
+		}
 		if service.Environment.Vars == nil {
 			service.Environment.Vars = make(map[string]string)
 		}
