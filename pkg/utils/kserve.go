@@ -50,7 +50,7 @@ func NewKserveInferenceServiceDefinition(service *types.Service, knSvc *knv1.Ser
 	return &servingv1beta1.InferenceService{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      buildKserveName(service.Name),
-			Namespace: service.Namespace,
+			Namespace: knSvc.Namespace,
 
 			OwnerReferences: []metav1.OwnerReference{
 				metav1.OwnerReference{
