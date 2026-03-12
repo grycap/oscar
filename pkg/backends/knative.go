@@ -121,7 +121,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		if service.Environment.Vars == nil {
 			service.Environment.Vars = make(map[string]string)
 		}
-		// TODO: Replace value inyection method
+		// TODO: Replace value injection method
 		service.Environment.Vars["KSERVE_MODEL_NAME"] = service.Name
 		service.Environment.Vars["KSERVE_HOST"] = fmt.Sprintf("%s.%s.svc.cluster.local", utils.KservePredictor(service.Name), namespace)
 	}
