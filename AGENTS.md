@@ -1,7 +1,8 @@
 # Repository Guidelines
 
 ## Purpose of This File
-- This file defines mandatory rules for AI agents and humans using AI while working in this repository.
+- This file defines mandatory rules for AI agents and humans using AI while
+  working in this repository.
 - Follow these rules unless a repository maintainer explicitly overrides them.
 
 ## Agent Operating Principles
@@ -13,8 +14,10 @@
 ## Allowed and Forbidden Actions
 - You MAY add or edit files needed to complete the requested task.
 - You MAY run tests and formatting tools relevant to the changed code.
-- You MUST NOT delete files, change licenses, or modify CI/CD workflows without explicit approval.
-- You MUST NOT modify `dashboard/dist` unless the UI source has been updated and rebuilt.
+- You MUST NOT delete files, change licenses, or modify CI/CD workflows without
+  explicit approval.
+- You MUST NOT modify `dashboard/dist` unless the UI source has been updated and
+  rebuilt.
 - You MUST NOT introduce new dependencies without explicit approval.
 
 ## Code Quality Standards
@@ -25,11 +28,15 @@
 
 ## Change Scope & Discipline
 - Stay within the scope of the request; avoid opportunistic cleanup.
-- If a refactor is needed, ask before doing it unless the change is trivial and isolated.
-- Do not alter public APIs or configuration formats unless explicitly requested. See `docs/api.md`, `docs/api.yaml`, and `docs/additional-config.md` for references.
+- If a refactor is needed, ask before doing it unless the change is trivial and
+  isolated.
+- Do not alter public APIs or configuration formats unless explicitly requested.
+  See `docs/api.md`, `docs/api.yaml`, and `docs/additional-config.md` for
+  references.
 
 ## Testing & Validation
-- You MUST run tests for touched Go packages when feasible (e.g., `go test ./...`).
+- You MUST run tests for touched Go packages when feasible (e.g., `go test
+  ./...`).
 - If tests are not run, you MUST state why and what was skipped.
 - If tests fail, you MUST report failures and avoid masking them.
 For docs-only changes, tests may be skipped but must be stated explicitly.
@@ -38,7 +45,8 @@ For docs-only changes, tests may be skipped but must be stated explicitly.
 - You MUST NOT add secrets, credentials, tokens, or private URLs to the repo.
 - Configuration examples MUST use placeholders (e.g., `YOUR_TOKEN`).
 - You MUST NOT weaken authentication, authorization, or TLS defaults.
-- Dependency updates MUST be approved by a maintainer. If required, justify risk.
+- Dependency updates MUST be approved by a maintainer. If required, justify
+  risk.
 
 ## Documentation Responsibilities
 - Update `README.md` and/or `docs/` when interfaces, flags, or behavior change.
@@ -46,9 +54,11 @@ For docs-only changes, tests may be skipped but must be stated explicitly.
 - Keep documentation concise and aligned with actual behavior.
 
 ## Commit & PR Expectations (if applicable)
-- Follow short, imperative commit messages; use `fix:`/`docs:` prefixes when appropriate.
+- Follow short, imperative commit messages; use `fix:`/`docs:` prefixes when
+  appropriate.
 - PRs MUST include a clear description and any relevant links to issues.
-- Follow `CONTRIBUTING.md` requirements for version bumps and reviewer approvals.
+- Follow `CONTRIBUTING.md` requirements for version bumps and reviewer
+  approvals.
 
 ## When to Ask for Clarification
 - Requirements conflict with this file or are ambiguous.
@@ -57,10 +67,16 @@ For docs-only changes, tests may be skipped but must be stated explicitly.
 - Tests cannot be run or consistently fail.
 
 ## Active Technologies
-- Go 1.25.0 + Gin HTTP server, Kubernetes client-go/api/apimachinery, existing OSCAR backend/resource packages (001-persistent-volumes)
-- Kubernetes PersistentVolumeClaim-backed workspace per service (001-persistent-volumes)
-- Go 1.25.0 + Gin HTTP server, Kubernetes client-go/api/apimachinery, existing OSCAR auth/utils/backends/resources packages (006-volumes)
-- Kubernetes PersistentVolumeClaims in per-user namespaces, backed by the current NFS RWX storage-class approach used for managed service storage (006-volumes)
+- Go 1.25.0 + Gin HTTP server, Kubernetes client-go/api/apimachinery, existing
+  OSCAR backend/resource packages (001-persistent-volumes)
+- Kubernetes PersistentVolumeClaim-backed workspace per service
+  (001-persistent-volumes)
+- Go 1.25.0 + Gin HTTP server, Kubernetes client-go/api/apimachinery, existing
+  OSCAR auth/utils/backends/resources packages (006-volumes)
+- Kubernetes PersistentVolumeClaims in per-user namespaces, backed by the
+  current NFS RWX storage-class approach used for managed service storage
+  (006-volumes)
 
 ## Recent Changes
-- 001-persistent-volumes: Added Go 1.25.0 + Gin HTTP server, Kubernetes client-go/api/apimachinery, existing OSCAR backend/resource packages
+- 001-persistent-volumes: Added Go 1.25.0 + Gin HTTP server, Kubernetes
+  client-go/api/apimachinery, existing OSCAR backend/resource packages

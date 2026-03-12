@@ -1,6 +1,7 @@
 # Specification Quality Checklist: Persistent Workspaces for OSCAR Services
 
-**Purpose**: Validate specification completeness and quality before proceeding to planning  
+**Purpose**: Validate specification completeness and quality before proceeding
+             to planning
 **Created**: 2026-03-09  
 **Feature**: [spec.md](../spec.md)
 
@@ -32,6 +33,9 @@
 ## Notes
 
 - Validation iteration 1 (initial draft): passed.
-- Validation iteration 2 (refined from `/Users/gmolto/Downloads/Looppersistent.pdf`): passed.
-- Validation iteration 3 (removed dashboard User Story 3; scoped dashboard work to `oscar-dashboard`): passed.
-- No unresolved issues detected; specification is ready for `/speckit.clarify` or `/speckit.plan`.
+- Validation iteration 2 (refined from
+  `/Users/gmolto/Downloads/Looppersistent.pdf`): passed.
+- Validation iteration 3 (removed dashboard User Story 3; scoped dashboard work
+  to `oscar-dashboard`): passed.
+- No unresolved issues detected; specification is ready for `/speckit.clarify`
+  or `/speckit.plan`.

@@ -23,7 +23,8 @@ curl -X POST "$OSCAR_URL/system/volumes" \
 Expected result:
 - HTTP `201`.
 - The returned volume belongs to the caller namespace.
-- `GET /system/volumes` includes `shared-data` only for that same caller namespace.
+- `GET /system/volumes` includes `shared-data` only for that same caller
+  namespace.
 
 ## 2. Deploy a service that creates its own volume with an auto-generated name
 
@@ -45,9 +46,10 @@ Representative request body:
 Expected result:
 - HTTP `201`.
 - The service starts with a managed volume mounted at `/data`.
-- The resolved volume name is derived from `trainer` and exposed in service read output.
+- The resolved volume name is derived from `trainer` and exposed in service read
+  output.
 
-## 3. Deploy a service that creates its own volume with an explicit name override
+## 3. Deploy a service that creates its own named volume
 
 Representative request body:
 
@@ -153,7 +155,8 @@ Create or update a service without the `volume` field.
 
 Expected result:
 - Behavior matches current legacy service deployments.
-- Existing `mount`, `input`, `output`, and exposed-service flows remain unchanged.
+- Existing `mount`, `input`, `output`, and exposed-service flows remain
+  unchanged.
 
 ## 10. Test commands for implementation phase
 
@@ -177,5 +180,8 @@ mkdocs serve
 
 ## 11. Implementation validation results
 
-- `go test ./pkg/types ./pkg/handlers ./pkg/backends/...` completed successfully on 2026-03-11.
-- `go generate ./...` completed successfully on 2026-03-11 and regenerated `pkg/apidocs/docs.go`, `pkg/apidocs/swagger.json`, and `pkg/apidocs/swagger.yaml`.
+- `go test ./pkg/types ./pkg/handlers ./pkg/backends/...` completed successfully
+  on 2026-03-11.
+- `go generate ./...` completed successfully on 2026-03-11 and regenerated
+  `pkg/apidocs/docs.go`, `pkg/apidocs/swagger.json`, and
+  `pkg/apidocs/swagger.yaml`.
