@@ -31,7 +31,7 @@ func kserveService() *oscarType.Service {
 		Namespace: "oscar-svc",
 		CPU:       "500m",
 		Memory:    "1Gi",
-		Kserve: oscarType.Kserve{
+		Kserve: &oscarType.Kserve{
 			ModelFormat: "sklearn",
 			StorageUri:  "s3://my-bucket/model",
 			MinScale:    minScale,

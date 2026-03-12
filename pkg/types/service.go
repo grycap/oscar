@@ -285,7 +285,7 @@ type Service struct {
 	Mount StorageIOConfig `json:"mount"`
 
 	// Kserve configuration to deploy the service using KServe InferenceService CRD
-	Kserve Kserve `json:"kserve,omitempty"`
+	Kserve *Kserve `json:"kserve,omitempty"`
 }
 
 type Kserve struct {

@@ -157,7 +157,7 @@ func DeleteKserveInferenceService(kserveclient *kserveclient.Clientset, serviceN
 
 func IsKserveService(service *types.Service) bool {
 	// If the service has KServe configuration
-	if service.Kserve.ModelFormat == "" || service.Kserve.StorageUri == "" {
+	if service.Kserve == nil || (service.Kserve.ModelFormat == "" || service.Kserve.StorageUri == "") {
 		return false
 	}
 	return true
