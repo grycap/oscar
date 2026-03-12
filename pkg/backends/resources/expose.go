@@ -190,10 +190,17 @@ func getRouteKind(cfg *types.Config) string {
 
 func createRoute(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
 	if getRouteKind(cfg) == routeKindHTTPRoute {
-		return createHTTPRoute(service, namespace, kubeClientset, cfg)
+		if err := createHTTPRoute(service, namespace, kubeClientset, cfg); err != nil {
+			return fmt.Errorf("failed to create HTTPRoute for service %q: %w", service.Name, err)
+		}
+		return nil
 	}
 
-	return createIngress(service, namespace, kubeClientset, cfg)
+	if err := createIngress(service, namespace, kubeClientset, cfg); err != nil {
+		return fmt.Errorf("failed to create Ingress for service %q: %w", service.Name, err)
+	}
+
+	return nil
 }
 
 func upsertRoute(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
@@ -203,74 +210,87 @@ func upsertRoute(service types.Service, namespace string, kubeClientset kubernet
 	if getRouteKind(cfg) == routeKindHTTPRoute {
 		if ingressExists {
 			if err := deleteIngress(getIngressName(service.Name), namespace, kubeClientset, cfg); err != nil {
-				return err
+				return fmt.Errorf("failed deleting old Ingress for service %q: %w", service.Name, err)
 			}
 		}
 		if existsSecret(service.Name, namespace, kubeClientset, cfg) {
 			if err := deleteSecret(service.Name, namespace, kubeClientset, cfg); err != nil {
-				return err
+				return fmt.Errorf("failed deleting old auth secret for service %q: %w", service.Name, err)
 			}
 		}
 
 		if httpRouteExists {
-			return updateHTTPRoute(service, namespace, kubeClientset, cfg)
+			if err := updateHTTPRoute(service, namespace, kubeClientset, cfg); err != nil {
+				return fmt.Errorf("failed updating HTTPRoute for service %q: %w", service.Name, err)
+			}
+			return nil
 		}
-		return createHTTPRoute(service, namespace, kubeClientset, cfg)
+		if err := createHTTPRoute(service, namespace, kubeClientset, cfg); err != nil {
+			return fmt.Errorf("failed creating HTTPRoute for service %q: %w", service.Name, err)
+		}
+		return nil
 	}
 
 	if httpRouteExists {
 		if err := deleteHTTPRoute(getHTTPRouteName(service.Name), namespace); err != nil {
-			return err
+			return fmt.Errorf("failed deleting old HTTPRoute for service %q: %w", service.Name, err)
 		}
 	}
 
 	if existsTraefikCORSMiddleware(service.Name, namespace) {
 		if err := deleteTraefikCORSMiddleware(getTraefikCORSMiddlewareName(service.Name), namespace); err != nil {
-			return err
+			return fmt.Errorf("failed deleting old Traefik CORS middleware for service %q: %w", service.Name, err)
 		}
 	}
 
 	if ingressExists {
-		return updateIngress(service, namespace, kubeClientset, cfg)
+		if err := updateIngress(service, namespace, kubeClientset, cfg); err != nil {
+			return fmt.Errorf("failed updating Ingress for service %q: %w", service.Name, err)
+		}
+		return nil
 	}
 
-	return createIngress(service, namespace, kubeClientset, cfg)
+	if err := createIngress(service, namespace, kubeClientset, cfg); err != nil {
+		return fmt.Errorf("failed creating Ingress for service %q: %w", service.Name, err)
+	}
+
+	return nil
 }
 
 func deleteRouteResources(serviceName string, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
 	if existsIngress(serviceName, namespace, kubeClientset) {
 		if err := deleteIngress(getIngressName(serviceName), namespace, kubeClientset, cfg); err != nil {
-			return err
+			return fmt.Errorf("failed deleting Ingress resource for service %q: %w", serviceName, err)
 		}
 	}
 
 	if existsHTTPRoute(serviceName, namespace) {
 		if err := deleteHTTPRoute(getHTTPRouteName(serviceName), namespace); err != nil {
-			return err
+			return fmt.Errorf("failed deleting HTTPRoute resource for service %q: %w", serviceName, err)
 		}
 	}
 
 	if existsTraefikCORSMiddleware(serviceName, namespace) {
 		if err := deleteTraefikCORSMiddleware(getTraefikCORSMiddlewareName(serviceName), namespace); err != nil {
-			return err
+			return fmt.Errorf("failed deleting Traefik CORS middleware for service %q: %w", serviceName, err)
 		}
 	}
 
 	if existsTraefikAuthMiddleware(serviceName, namespace) {
 		if err := deleteTraefikAuthMiddleware(getTraefikAuthMiddlewareName(serviceName), namespace); err != nil {
-			return err
+			return fmt.Errorf("failed deleting Traefik auth middleware for service %q: %w", serviceName, err)
 		}
 	}
 
 	if existsTraefikAuthSecret(serviceName, namespace, kubeClientset) {
 		if err := deleteTraefikAuthSecret(getTraefikAuthSecretName(serviceName), namespace, kubeClientset); err != nil {
-			return err
+			return fmt.Errorf("failed deleting Traefik auth secret for service %q: %w", serviceName, err)
 		}
 	}
 
 	if existsSecret(serviceName, namespace, kubeClientset, cfg) {
 		if err := deleteSecret(serviceName, namespace, kubeClientset, cfg); err != nil {
-			return err
+			return fmt.Errorf("failed deleting Ingress auth secret for service %q: %w", serviceName, err)
 		}
 	}
 
@@ -705,26 +725,30 @@ func createHTTPRoute(service types.Service, namespace string, kubeClientset kube
 	}
 
 	if err := createTraefikCORSMiddleware(service, namespace, cfg); err != nil {
-		return err
+		return fmt.Errorf("failed creating Traefik CORS middleware: %w", err)
 	}
 
 	if service.Expose.SetAuth {
 		if err := createTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
-			return err
+			return fmt.Errorf("failed creating Traefik auth secret: %w", err)
 		}
 		if err := createTraefikAuthMiddleware(service, namespace); err != nil {
-			return err
+			return fmt.Errorf("failed creating Traefik auth middleware: %w", err)
 		}
 	}
 
 	gatewayClientset, err := getGatewayClientset()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed creating Gateway API client: %w", err)
 	}
 
 	httpRoute := getHTTPRouteSpec(service, namespace, cfg)
 	_, err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Create(context.TODO(), httpRoute, metav1.CreateOptions{})
-	return err
+	if err != nil {
+		return fmt.Errorf("failed creating HTTPRoute %q in namespace %q: %w", getHTTPRouteName(service.Name), namespace, err)
+	}
+
+	return nil
 }
 
 func updateHTTPRoute(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
@@ -733,37 +757,41 @@ func updateHTTPRoute(service types.Service, namespace string, kubeClientset kube
 	}
 
 	if err := upsertTraefikCORSMiddleware(service, namespace, cfg); err != nil {
-		return err
+		return fmt.Errorf("failed upserting Traefik CORS middleware: %w", err)
 	}
 
 	if service.Expose.SetAuth {
 		if err := upsertTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
-			return err
+			return fmt.Errorf("failed upserting Traefik auth secret: %w", err)
 		}
 		if err := upsertTraefikAuthMiddleware(service, namespace); err != nil {
-			return err
+			return fmt.Errorf("failed upserting Traefik auth middleware: %w", err)
 		}
 	} else {
 		if existsTraefikAuthMiddleware(service.Name, namespace) {
 			if err := deleteTraefikAuthMiddleware(getTraefikAuthMiddlewareName(service.Name), namespace); err != nil {
-				return err
+				return fmt.Errorf("failed deleting Traefik auth middleware: %w", err)
 			}
 		}
 		if existsTraefikAuthSecret(service.Name, namespace, kubeClientset) {
 			if err := deleteTraefikAuthSecret(getTraefikAuthSecretName(service.Name), namespace, kubeClientset); err != nil {
-				return err
+				return fmt.Errorf("failed deleting Traefik auth secret: %w", err)
 			}
 		}
 	}
 
 	gatewayClientset, err := getGatewayClientset()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed creating Gateway API client: %w", err)
 	}
 
 	httpRoute := getHTTPRouteSpec(service, namespace, cfg)
 	_, err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Update(context.TODO(), httpRoute, metav1.UpdateOptions{})
-	return err
+	if err != nil {
+		return fmt.Errorf("failed updating HTTPRoute %q in namespace %q: %w", getHTTPRouteName(service.Name), namespace, err)
+	}
+
+	return nil
 }
 
 func getHTTPRouteSpec(service types.Service, namespace string, cfg *types.Config) *unstructured.Unstructured {
@@ -980,23 +1008,31 @@ func deleteHTTPRoute(name string, namespace string) error {
 func createTraefikCORSMiddleware(service types.Service, namespace string, cfg *types.Config) error {
 	gatewayClientset, err := getGatewayClientset()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed creating Gateway API client: %w", err)
 	}
 
 	middleware := getTraefikCORSMiddlewareSpec(service, namespace, cfg)
 	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Create(context.TODO(), middleware, metav1.CreateOptions{})
-	return err
+	if err != nil {
+		return fmt.Errorf("failed creating Traefik CORS middleware %q in namespace %q: %w", getTraefikCORSMiddlewareName(service.Name), namespace, err)
+	}
+
+	return nil
 }
 
 func updateTraefikCORSMiddleware(service types.Service, namespace string, cfg *types.Config) error {
 	gatewayClientset, err := getGatewayClientset()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed creating Gateway API client: %w", err)
 	}
 
 	middleware := getTraefikCORSMiddlewareSpec(service, namespace, cfg)
 	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Update(context.TODO(), middleware, metav1.UpdateOptions{})
-	return err
+	if err != nil {
+		return fmt.Errorf("failed updating Traefik CORS middleware %q in namespace %q: %w", getTraefikCORSMiddlewareName(service.Name), namespace, err)
+	}
+
+	return nil
 }
 
 func upsertTraefikCORSMiddleware(service types.Service, namespace string, cfg *types.Config) error {
@@ -1010,23 +1046,31 @@ func upsertTraefikCORSMiddleware(service types.Service, namespace string, cfg *t
 func createTraefikAuthMiddleware(service types.Service, namespace string) error {
 	gatewayClientset, err := getGatewayClientset()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed creating Gateway API client: %w", err)
 	}
 
 	middleware := getTraefikAuthMiddlewareSpec(service, namespace)
 	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Create(context.TODO(), middleware, metav1.CreateOptions{})
-	return err
+	if err != nil {
+		return fmt.Errorf("failed creating Traefik auth middleware %q in namespace %q: %w", getTraefikAuthMiddlewareName(service.Name), namespace, err)
+	}
+
+	return nil
 }
 
 func updateTraefikAuthMiddleware(service types.Service, namespace string) error {
 	gatewayClientset, err := getGatewayClientset()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed creating Gateway API client: %w", err)
 	}
 
 	middleware := getTraefikAuthMiddlewareSpec(service, namespace)
 	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Update(context.TODO(), middleware, metav1.UpdateOptions{})
-	return err
+	if err != nil {
+		return fmt.Errorf("failed updating Traefik auth middleware %q in namespace %q: %w", getTraefikAuthMiddlewareName(service.Name), namespace, err)
+	}
+
+	return nil
 }
 
 func upsertTraefikAuthMiddleware(service types.Service, namespace string) error {
@@ -1079,10 +1123,15 @@ func getTraefikAuthMiddlewareSpec(service types.Service, namespace string) *unst
 func deleteTraefikCORSMiddleware(name string, namespace string) error {
 	gatewayClientset, err := getGatewayClientset()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed creating Gateway API client: %w", err)
 	}
 
-	return gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("failed deleting Traefik CORS middleware %q in namespace %q: %w", name, namespace, err)
+	}
+
+	return nil
 }
 
 func existsTraefikCORSMiddleware(serviceName string, namespace string) bool {
@@ -1098,10 +1147,15 @@ func existsTraefikCORSMiddleware(serviceName string, namespace string) bool {
 func deleteTraefikAuthMiddleware(name string, namespace string) error {
 	gatewayClientset, err := getGatewayClientset()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed creating Gateway API client: %w", err)
 	}
 
-	return gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("failed deleting Traefik auth middleware %q in namespace %q: %w", name, namespace, err)
+	}
+
+	return nil
 }
 
 func existsTraefikAuthMiddleware(serviceName string, namespace string) bool {
@@ -1138,13 +1192,21 @@ func splitCSVAny(value string) []any {
 func createTraefikAuthSecret(service types.Service, namespace string, kubeClientset kubernetes.Interface) error {
 	secret := getTraefikAuthSecretSpec(service, namespace)
 	_, err := kubeClientset.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
-	return err
+	if err != nil {
+		return fmt.Errorf("failed creating Traefik auth secret %q in namespace %q: %w", getTraefikAuthSecretName(service.Name), namespace, err)
+	}
+
+	return nil
 }
 
 func updateTraefikAuthSecret(service types.Service, namespace string, kubeClientset kubernetes.Interface) error {
 	secret := getTraefikAuthSecretSpec(service, namespace)
 	_, err := kubeClientset.CoreV1().Secrets(namespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
-	return err
+	if err != nil {
+		return fmt.Errorf("failed updating Traefik auth secret %q in namespace %q: %w", getTraefikAuthSecretName(service.Name), namespace, err)
+	}
+
+	return nil
 }
 
 func upsertTraefikAuthSecret(service types.Service, namespace string, kubeClientset kubernetes.Interface) error {
@@ -1156,7 +1218,12 @@ func upsertTraefikAuthSecret(service types.Service, namespace string, kubeClient
 }
 
 func deleteTraefikAuthSecret(name string, namespace string, kubeClientset kubernetes.Interface) error {
-	return kubeClientset.CoreV1().Secrets(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	err := kubeClientset.CoreV1().Secrets(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("failed deleting Traefik auth secret %q in namespace %q: %w", name, namespace, err)
+	}
+
+	return nil
 }
 
 func existsTraefikAuthSecret(serviceName string, namespace string, kubeClientset kubernetes.Interface) bool {

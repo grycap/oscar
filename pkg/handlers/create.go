@@ -231,13 +231,14 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Create service
 		if err := back.CreateService(service); err != nil {
+			createLogger.Printf("error creating service %q in namespace %q (route kind=%q): %v", service.Name, service.Namespace, cfg.ExposedServicesRouteKind, err)
 			// Check if error is caused because the service name provided already exists
 			if k8sErrors.IsAlreadyExists(err) {
 				c.String(http.StatusConflict, "A service with the provided name already exists")
 			} else {
 				errDelete := back.DeleteService(service)
 				if errDelete != nil {
-					log.Printf("Error deleting service: %v\n", errDelete)
+					createLogger.Printf("error rolling back service %q after create failure: %v", service.Name, errDelete)
 				}
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 			}
