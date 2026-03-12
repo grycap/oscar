@@ -44,6 +44,8 @@ spec:
           value: minio123
         - name: MINIO_TLS_VERIFY
           value: "false"
+        - name: EXPOSED_SERVICES_ROUTE_KIND
+          value: ingress
         ports:
         - name: http
           containerPort: 8080

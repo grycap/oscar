@@ -45,6 +45,7 @@ const (
 	secondsType           = "seconds"
 	urlType               = "url"
 	serverlessBackendType = "serverlessBackend"
+	routeKindType         = "routeKind"
 )
 
 type configVar struct {
@@ -206,6 +207,15 @@ type Config struct {
 	//
 	IngressHost string `json:"-"`
 
+	// ExposedServicesRouteKind determines which Kubernetes resource is used to expose services (ingress|httproute)
+	ExposedServicesRouteKind string `json:"-"`
+
+	// HTTPRouteGatewayName Gateway name used as parentRef for generated HTTPRoutes
+	HTTPRouteGatewayName string `json:"-"`
+
+	// HTTPRouteGatewayNamespace optional Gateway namespace used as parentRef for generated HTTPRoutes
+	HTTPRouteGatewayNamespace string `json:"-"`
+
 	// Github path of FaaS Supervisor (needed for Interlink config)
 	SupervisorKitImage string `json:"-"`
 
@@ -277,6 +287,9 @@ var configVars = []configVar{
 	{"OIDCGroups", "OIDC_GROUPS", false, stringSliceType, ""},
 	{"UsersAdmin", "USERS_ADMIN", false, stringSliceType, ""},
 	{"IngressHost", "INGRESS_HOST", false, stringType, ""},
+	{"ExposedServicesRouteKind", "EXPOSED_SERVICES_ROUTE_KIND", false, routeKindType, "ingress"},
+	{"HTTPRouteGatewayName", "HTTPROUTE_GATEWAY_NAME", false, stringType, "traefik-gateway"},
+	{"HTTPRouteGatewayNamespace", "HTTPROUTE_GATEWAY_NAMESPACE", false, stringType, "traefik"},
 	{"SupervisorKitImage", "SUPERVISOR_KIT_IMAGE", false, stringType, ""},
 	{"IngressServicesCORSAllowedOrigins", "INGRESS_SERVICES_CORS_ALLOWED_ORIGINS", false, stringType, "https://dashboard.oscar.grycap.net,https://dashboard-devel.oscar.grycap.net,https://dashboard-demo.oscar.grycap.net,http://oscar.oscar.svc.cluster.local,http://host.docker.internal,http://localhost,http://localhost:5173"},
 	{"IngressServicesCORSAllowedMethods", "INGRESS_SERVICES_CORS_ALLOWED_METHODS", false, stringType, "GET, PUT, POST, DELETE, PATCH, HEAD"},
@@ -376,6 +389,19 @@ func parseServerlessBackend(s string) (string, error) {
 	return s, nil
 }
 
+func parseRouteKind(s string) (string, error) {
+	if len(s) == 0 {
+		return "ingress", nil
+	}
+
+	str := strings.ToLower(strings.TrimSpace(s))
+	if str != "ingress" && str != "httproute" {
+		return "", fmt.Errorf("must be \"ingress\" or \"httproute\"")
+	}
+
+	return str, nil
+}
+
 // ReadConfig reads environment variables to create the OSCAR server configuration
 func ReadConfig() (*Config, error) {
 	config := &Config{}
@@ -403,6 +429,8 @@ func ReadConfig() (*Config, error) {
 			value, parseErr = parseSeconds(strValue)
 		case serverlessBackendType:
 			value, parseErr = parseServerlessBackend(strValue)
+		case routeKindType:
+			value, parseErr = parseRouteKind(strValue)
 		case urlType:
 			// Only check if can be parsed
 			_, parseErr = url.Parse(strValue)
