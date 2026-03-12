@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"runtime/debug"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -63,6 +64,13 @@ var isAdminUser = false
 // @Router /system/services [post]
 func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				createLogger.Printf("panic while creating service: %v\n%s", rec, string(debug.Stack()))
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: unexpected panic: %v", rec))
+			}
+		}()
+
 		var service types.Service
 		isAdminUser = false
 		authHeader := c.GetHeader("Authorization")
@@ -210,10 +218,12 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		if len(service.Environment.Secrets) > 0 {
 			if utils.SecretExists(service.Name, service.Namespace, back.GetKubeClientset()) {
 				c.String(http.StatusConflict, "A secret with the given name already exists")
+				return
 			}
 			secretsErr := utils.CreateSecret(service.Name, service.Namespace, service.Environment.Secrets, back.GetKubeClientset())
 			if secretsErr != nil {
 				c.String(http.StatusConflict, "Error creating secrets for service: %v", secretsErr)
+				return
 			}
 
 			// Empty the secrets content from the Configmap
@@ -247,9 +257,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Register minio webhook and restart the server
 		if err := registerMinIOWebhook(service.Name, service.Token, service.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
+			createLogger.Printf("error registering MinIO webhook for service %q: %v", service.Name, err)
 			derr := back.DeleteService(service)
 			if derr != nil {
-				log.Printf("Error deleting service: %v\n", derr)
+				createLogger.Printf("error rolling back service %q after webhook registration failure: %v", service.Name, derr)
 			}
 			c.String(http.StatusInternalServerError, err.Error())
 			return
@@ -257,6 +268,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		var buckets []utils.MinIOBucket
 		if buckets, err = createBuckets(&service, cfg, minIOAdminClient, false); err != nil {
+			createLogger.Printf("error creating buckets for service %q: %v", service.Name, err)
 			if err == errInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {
@@ -264,7 +276,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			derr := back.DeleteService(service)
 			if derr != nil {
-				log.Printf("Error deleting service: %v\n", derr)
+				createLogger.Printf("error rolling back service %q after bucket creation failure: %v", service.Name, derr)
 			}
 
 			if !strings.Contains(err.Error(), " already exists") {
@@ -284,7 +296,9 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				if service.Owner != types.DefaultOwner {
 					err := minIOAdminClient.SetPolicies(b)
 					if err != nil {
+						createLogger.Printf("error setting policies for bucket %q (service %q): %v", b.BucketName, service.Name, err)
 						c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+						return
 					}
 				}
 
@@ -300,7 +314,9 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					"owner_name":   ownerName,
 				}
 				if err := minIOAdminClient.SetTags(b.BucketName, tags); err != nil {
+					createLogger.Printf("error tagging bucket %q for service %q: %v", b.BucketName, service.Name, err)
 					c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
+					return
 				}
 			}
 		}
