@@ -269,13 +269,13 @@ func TestUpdateIngressSecretTransitions(t *testing.T) {
 func TestRouteKindSelection(t *testing.T) {
 	cfgIngress := newTestConfig()
 	cfgIngress.ExposedServicesRouteKind = "ingress"
-	if shouldUseHTTPRoute(cfgIngress) {
+	if getRouteKind(cfgIngress) == routeKindHTTPRoute {
 		t.Fatalf("expected ingress route kind")
 	}
 
 	cfgHTTPRoute := newTestConfig()
 	cfgHTTPRoute.ExposedServicesRouteKind = "httproute"
-	if !shouldUseHTTPRoute(cfgHTTPRoute) {
+	if getRouteKind(cfgHTTPRoute) != routeKindHTTPRoute {
 		t.Fatalf("expected httproute route kind")
 	}
 }
