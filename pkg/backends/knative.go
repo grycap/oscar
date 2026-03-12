@@ -122,7 +122,6 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 			service.Environment.Vars = make(map[string]string)
 		}
 		// TODO: Replace value injection method
-		service.Environment.Vars["KSERVE_MODEL_NAME"] = service.Name
 		service.Environment.Vars["KSERVE_HOST"] = fmt.Sprintf("%s.%s.svc.cluster.local", utils.KservePredictor(service.Name), namespace)
 	}
 
@@ -237,6 +236,12 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	}
 	var isKserve bool = (kn.kserveClientset != nil && utils.IsKserveService(&service))
 
+	if isKserve {
+		if err := utils.ValidateKserveService(&service); err != nil {
+			return err
+		}
+	}
+
 	// Check if there is some user defined settings for OSCAR
 	if err := checkAdditionalConfig(ConfigMapNameOSCAR, kn.config.ServicesNamespace, service, kn.config, kn.kubeClientset); err != nil {
 		return err
@@ -247,6 +252,8 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	if err != nil {
 		return err
 	}
+	// Preserve the original Knative Service state so it can be restored on KServe errors
+	originalKnSvc := oldSvc.DeepCopy()
 	// Get the old service's configMap
 	oldCm, err := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
@@ -294,9 +301,12 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		oldIsvc, getErr := utils.GetKserveInferenceService(kn.kserveClientset, &service, namespace)
 		if getErr != nil {
 			log.Printf("Error getting asociated KServe InferenceService for update: %v", getErr)
+			// Restore the old Knative Service
+			if _, resErr := kn.knClientset.ServingV1().Services(namespace).Update(context.TODO(), originalKnSvc, metav1.UpdateOptions{}); resErr != nil {
+				log.Println(resErr.Error())
+			}
 			// Restore the old configMap
-			_, resErr := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
-			if resErr != nil {
+			if _, resErr := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{}); resErr != nil {
 				log.Println(resErr.Error())
 			}
 			return getErr
@@ -305,9 +315,12 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		_, updateErr := utils.UpdateKserveInferenceService(kn.kserveClientset, &service, updatedKnSvc, oldIsvc)
 		if updateErr != nil {
 			log.Printf("Error updating asociated KServe InferenceService: %v", updateErr)
+			// Restore the old Knative Service
+			if _, resErr := kn.knClientset.ServingV1().Services(namespace).Update(context.TODO(), originalKnSvc, metav1.UpdateOptions{}); resErr != nil {
+				log.Println(resErr.Error())
+			}
 			// Restore the old configMap
-			_, resErr := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
-			if resErr != nil {
+			if _, resErr := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{}); resErr != nil {
 				log.Println(resErr.Error())
 			}
 			return updateErr
