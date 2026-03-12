@@ -1,10 +1,10 @@
 functions:
   oscar:
   - oscar-cluster:
-      name: openclaw-workspace
+      name: openclaw-volume
       memory: 2Gi
-      cpu: "1.0"
-      image: ghcr.io/openclaw/openclaw:2026.2.9
+      cpu: "2.0"
+      image: ghcr.io/openclaw/openclaw:2026.3.8
       script: openclawscript.sh
       environment:
         Variables:
