@@ -46,19 +46,19 @@ output: []
 script: testscript
 environment:
   Variables:
-	TEST_VAR: testvalue
+    TEST_VAR: testvalue
 annotations:
   testannotation: testannotationvalue
 labels:
   testlabel: testlabelvalue
 storage_providers:
   minio:
-	default:
-	  endpoint: http://test.minio.endpoint
-	  verify: true
-	  access_key: testaccesskey
-	  secret_key: testsecretkey
-	  region: testregion
+    default:
+      endpoint: http://test.minio.endpoint
+      verify: true
+      access_key: testaccesskey
+      secret_key: testsecretkey
+      region: testregion
 `
 
 	errorReaction = func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
