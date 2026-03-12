@@ -16,7 +16,7 @@ func knativeServiceWithUID(uid types.UID) *knv1.Service {
 	return &knv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-kn-svc",
-			Namespace: "default",
+			Namespace: "oscar-svc",
 			UID:       uid,
 		},
 	}
