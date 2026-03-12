@@ -151,7 +151,7 @@ func GetKserveInferenceService(kserveclient *kserveclient.Clientset, service *ty
 
 func DeleteKserveInferenceService(kserveclient *kserveclient.Clientset, serviceName, namespace string) error {
 	name := buildKserveName(serviceName)
-	// Create InferenceService
+	// Delete InferenceService
 	return kserveclient.ServingV1beta1().InferenceServices(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
 }
 
