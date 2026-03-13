@@ -276,13 +276,18 @@ func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset kubernetes.I
 			LabelSelector: fmt.Sprintf("%s=%s,job-name=%s", types.ServiceLabel, serviceName, jobName),
 		}
 		pods, err := kubeClientset.CoreV1().Pods(serviceNamespace).List(context.TODO(), listOpts)
-		if err != nil || len(pods.Items) < 1 {
+		if err != nil {
 			// Check if error is caused because the service is not found
-			if !errors.IsNotFound(err) && !errors.IsGone(err) {
-				c.String(http.StatusInternalServerError, err.Error())
-			} else {
+			if errors.IsNotFound(err) || errors.IsGone(err) {
 				c.Status(http.StatusNotFound)
+			} else {
+				c.String(http.StatusInternalServerError, err.Error())
 			}
+			return
+		}
+
+		if len(pods.Items) < 1 {
+			c.Status(http.StatusNotFound)
 			return
 		}
 
