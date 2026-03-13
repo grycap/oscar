@@ -152,26 +152,37 @@ Double-click on the *cowsay.pipeline* file to open it. You'll then have the orch
 
 Let's configure the nodes to work properly with our COWSAY service we have created previously. For that, right-click and select *Open Properties* on the nodes to view the properties of each node. 
 
-The `Get EGI Token` node (*setup_client.py*) contains the elements of the OSCAR cluster where the COWSAY service is created. This node is needed to interact with any OSCAR service because it stores all the credentials for accessing the cluster. You just need to change the environment variable values to properly configure it.
+The `Get EGI Token` node (*setup_client.py*) contains the elements of the OSCAR cluster where the COWSAY service is created. This node is required to interact with any OSCAR service because it stores all the credentials needed to access the cluster. You just need to change the environment variable values to properly configure it.
 
 ![juno-elyra-node1.png](images/integrations/juno-elyra-config1.png)
 
-Now configure properly the environment variables:
+Now configure the environment variables properly:
 
 - **OSCAR_ENDPOINT**: OSCAR cluster URL ( *https://default-endpoint.com* ). You can get it from the [`OSCAR dashboard`](https://dashboard.oscar.grycap.net/).
-- **YOUR_TOKEN**: User token (can be obtained from the `Info`panel in the OSCAR Dashboard.
+- **YOUR_TOKEN**: User token (can be obtained from the `Info`panel in the OSCAR Dashboard).
 
 The `OSCAR Cowsay` node (*invoke_service_cowsay.ipynb*) contains the following environment variables.
 
-![juno-elyra-node2.png](images/integrations/juno-elyra-config2.png)
-    
+![juno-elyra-config2.png](images/integrations/juno-elyra-config2.png)
     
 So let's configure them properly for our tutorial: 
 
 - **SERVICE_NAME**: Name of the Cowsay service in OSCAR cluster ( in our tutorial, *cowsay-sync-test* )
-- **TEXT_INPUT**: Input text that the service will process ( for example, *Hello world 123!* )
+- **TEXT_INPUT**: Input text that the service will process ( for example, *Hello world!* )
 
-Once all the nodes are configured, you can run the workflow. Keep in mind that all the files different from the *.pipeline* file should be closed. In Elyra, the results of the pipeline are shown in the notebook. So you will see the output when opening the code of `OSCAR Cowsay` node (double-click on the node to open it).
+Once all the nodes are configured, you can run the workflow. Keep in mind that all the files different from the *.pipeline* file should be closed. Click on the play button on the top-left corner of the screen to start running the pipeline:
+
+![juno-elyra-run.png](images/integrations/juno-elyra-run.png)
+
+You will be asked about the runtime platform to run the pipeline. Select *"Run in-place locally"*:
+
+![juno-elyra-run2.png](images/integrations/juno-elyra-run2.png)
+
+The pipeline will take some seconds to run. Wait till the next message is shown in the screen:
+
+![juno-elyra-result2.png](images/integrations/juno-elyra-result2.png)
+
+In Elyra, the pipeline results are shown in the notebook. So you will see the output when opening the code of `OSCAR Cowsay` node (double-click on the node to open it).
 
 ![juno-elyra-result.png](images/integrations/juno-elyra-result.png)
 
