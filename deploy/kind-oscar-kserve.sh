@@ -434,6 +434,22 @@ deployKServe(){
         exit 1
     fi
 
+    # Workaround: ensure llmisvc controller RBAC includes CRD permissions
+    if ! kubectl get clusterrole kserve-llmisvc-manager-role -o yaml 2>/dev/null | grep -q "customresourcedefinitions"; then
+        echo -e "[*] Applying llmisvc RBAC fix (missing CRD permissions) ..."
+        if [ -f "${kserve_root}/config/rbac/llmisvc/role.yaml" ]; then
+            kubectl apply -f "${kserve_root}/config/rbac/llmisvc/role.yaml"
+            if kubectl -n kserve get deployment llmisvc-controller-manager >/dev/null 2>&1; then
+                echo -e "[*] Restarting llmisvc-controller-manager after RBAC fix ..."
+                kubectl -n kserve rollout restart deployment/llmisvc-controller-manager
+                kubectl -n kserve rollout status deployment/llmisvc-controller-manager --timeout=300s
+            fi
+        else
+            echo -e "$RED[!]$END_COLOR Missing KServe RBAC file: ${kserve_root}/config/rbac/llmisvc/role.yaml"
+            exit 1
+        fi
+    fi
+
     echo -e "\n[*] Verifying installed KServe runtimes ..."
     kubectl get clusterservingruntime
     runtime_count=$(kubectl get clusterservingruntime --no-headers 2>/dev/null | wc -l | tr -d ' ')
@@ -895,7 +911,8 @@ echo "  - MinIO console NodePort/host port: $HOST_MINIO_CONSOLE_PORT ($minio_con
 echo "  - OSCAR image branch: $OSCAR_IMAGE_BRANCH"
 echo "  - OSCAR credentials: username='oscar', password='$OSCAR_PASSWORD'"
 echo "  - MinIO credentials: username='minio', password='$MINIO_PASSWORD'"
-echo "  - Serverless backend: Knative (KServe deployed in Standard mode)"
+echo "  - OSCAR Serverless backend: Knative"
+echo "  - KServe deployed in Standard mode"
 if [ `echo $local_reg | tr '[:upper:]' '[:lower:]'` == "y" ]; then
     echo "  - Local registry: ${reg_name} (port ${reg_port}, ${registry_status})"
 else
