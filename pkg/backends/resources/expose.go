@@ -65,6 +65,8 @@ var traefikMiddlewareGVR = schema.GroupVersionResource{
 	Resource: "middlewares",
 }
 
+var gatewayClientsetProvider = getGatewayClientset
+
 // Custom logger
 var ExposeLogger = log.New(os.Stdout, "[EXPOSED-SERVICE] ", log.Flags())
 
@@ -726,7 +728,7 @@ func createHTTPRoute(service types.Service, namespace string, kubeClientset kube
 		}
 	}
 
-	gatewayClientset, err := getGatewayClientset()
+	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return err
 	}
@@ -765,7 +767,7 @@ func updateHTTPRoute(service types.Service, namespace string, kubeClientset kube
 		}
 	}
 
-	gatewayClientset, err := getGatewayClientset()
+	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return err
 	}
@@ -978,7 +980,7 @@ func deleteIngress(name string, namespace string, kubeClientset kubernetes.Inter
 }
 
 func deleteHTTPRoute(name string, namespace string) error {
-	gatewayClientset, err := getGatewayClientset()
+	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return err
 	}
@@ -987,7 +989,7 @@ func deleteHTTPRoute(name string, namespace string) error {
 }
 
 func createTraefikCORSMiddleware(service types.Service, namespace string, cfg *types.Config) error {
-	gatewayClientset, err := getGatewayClientset()
+	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return err
 	}
@@ -998,7 +1000,7 @@ func createTraefikCORSMiddleware(service types.Service, namespace string, cfg *t
 }
 
 func updateTraefikCORSMiddleware(service types.Service, namespace string, cfg *types.Config) error {
-	gatewayClientset, err := getGatewayClientset()
+	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return err
 	}
@@ -1017,7 +1019,7 @@ func upsertTraefikCORSMiddleware(service types.Service, namespace string, cfg *t
 }
 
 func createTraefikAuthMiddleware(service types.Service, namespace string) error {
-	gatewayClientset, err := getGatewayClientset()
+	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return err
 	}
@@ -1028,7 +1030,7 @@ func createTraefikAuthMiddleware(service types.Service, namespace string) error 
 }
 
 func updateTraefikAuthMiddleware(service types.Service, namespace string) error {
-	gatewayClientset, err := getGatewayClientset()
+	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return err
 	}
@@ -1086,7 +1088,7 @@ func getTraefikAuthMiddlewareSpec(service types.Service, namespace string) *unst
 }
 
 func deleteTraefikCORSMiddleware(name string, namespace string) error {
-	gatewayClientset, err := getGatewayClientset()
+	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return err
 	}
@@ -1095,7 +1097,7 @@ func deleteTraefikCORSMiddleware(name string, namespace string) error {
 }
 
 func existsTraefikCORSMiddleware(serviceName string, namespace string) bool {
-	gatewayClientset, err := getGatewayClientset()
+	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return false
 	}
@@ -1105,7 +1107,7 @@ func existsTraefikCORSMiddleware(serviceName string, namespace string) bool {
 }
 
 func deleteTraefikAuthMiddleware(name string, namespace string) error {
-	gatewayClientset, err := getGatewayClientset()
+	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return err
 	}
@@ -1114,7 +1116,7 @@ func deleteTraefikAuthMiddleware(name string, namespace string) error {
 }
 
 func existsTraefikAuthMiddleware(serviceName string, namespace string) bool {
-	gatewayClientset, err := getGatewayClientset()
+	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return false
 	}
@@ -1271,7 +1273,7 @@ func existsIngress(serviceName string, namespace string, kubeClientset kubernete
 }
 
 func existsHTTPRoute(serviceName string, namespace string) bool {
-	gatewayClientset, err := getGatewayClientset()
+	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return false
 	}
