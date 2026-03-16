@@ -150,6 +150,11 @@ func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *types.StatusI
 	if err != nil {
 		return nil, err
 	}
+	// Retrieve all pods to calculate requests per node
+	pods, err := kubeClientset.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
 
 	nodeInfoMap := make(map[string]*NodeInfoWithAllocatable)
 	var totalGPUs int64 = 0
@@ -170,6 +175,18 @@ func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *types.StatusI
 			gpuVal, _ := gpuQty.AsInt64()
 			gpu_alloc = gpuVal
 			totalGPUs += gpuVal
+		}
+
+		// Calculate CPU and Memory Requests by summing the pods of the node
+		var cpu_request int64 = 0
+		var mem_request int64 = 0
+		for _, pod := range pods.Items {
+			if pod.Spec.NodeName == nodeName && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
+				for _, container := range pod.Spec.Containers {
+					cpu_request += container.Resources.Requests.Cpu().MilliValue()
+					mem_request += container.Resources.Requests.Memory().Value()
+				}
+			}
 		}
 
 		// 2. Status
@@ -200,12 +217,14 @@ func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *types.StatusI
 			NodeDetail: types.NodeDetail{
 				Name: nodeName,
 				CPU: types.NodeResource{
-					CapacityCores: cpu_alloc, // Use CapacityCores
-					UsageCores:    0,         // Will be updated in getMetricsInfo
+					CapacityCores: cpu_alloc,   // Use CapacityCores
+					UsageCores:    0,           // Will be updated in getMetricsInfo
+					RequestCores:  cpu_request, // Request CapacityCores
 				},
 				Memory: types.NodeResource{
 					CapacityBytes: memory_alloc, // Use CapacityBytes
 					UsageBytes:    0,            // Will be updated in getMetricsInfo
+					RequestBytes:  mem_request,  // Request CapacityBytes
 				},
 				GPU:         gpu_alloc,
 				IsInterlink: checkIfInterLinkNode(node),
@@ -237,6 +256,12 @@ func getMetricsInfo(kubeClientset kubernetes.Interface, metricsClientset version
 	var cpu_max_free int64 = 0
 	var memory_free_total int64 = 0
 	var memory_max_free int64 = 0
+
+	var cpu_schedulable_total int64 = 0
+	var cpu_max_schedulable int64 = 0
+	var memory_schedulable_total int64 = 0
+	var memory_max_schedulable int64 = 0
+
 	var number_nodes int64 = 0
 
 	var nodeDetailList []types.NodeDetail
@@ -260,6 +285,13 @@ func getMetricsInfo(kubeClientset kubernetes.Interface, metricsClientset version
 			cpu_node_free := cpu_alloc - cpu_usage_milli
 			memory_node_free := memory_alloc - memory_usage_bytes
 
+			// Request capacity
+			cpu_req := nodeInfo.NodeDetail.CPU.RequestCores
+			mem_req := nodeInfo.NodeDetail.Memory.RequestBytes
+
+			cpu_node_sched := cpu_alloc - cpu_req
+			memory_node_sched := memory_alloc - mem_req
+
 			// Update NodeDetail with usage metrics (Use UsageCores and UsageBytes)
 			nodeInfo.NodeDetail.CPU.UsageCores = cpu_usage_milli
 			nodeInfo.NodeDetail.Memory.UsageBytes = memory_usage_bytes
@@ -275,6 +307,15 @@ func getMetricsInfo(kubeClientset kubernetes.Interface, metricsClientset version
 				memory_max_free = memory_node_free
 			}
 
+			cpu_schedulable_total += cpu_node_sched
+			if cpu_max_schedulable < cpu_node_sched {
+				cpu_max_schedulable = cpu_node_sched
+			}
+			memory_schedulable_total += memory_node_sched
+			if memory_max_schedulable < memory_node_sched {
+				memory_max_schedulable = memory_node_sched
+			}
+
 			// Add to the final list
 			nodeDetailList = append(nodeDetailList, nodeInfo.NodeDetail)
 		}
@@ -286,8 +327,13 @@ func getMetricsInfo(kubeClientset kubernetes.Interface, metricsClientset version
 
 	clusterInfo.Cluster.Metrics.CPU.TotalFreeCores = cpu_free_total
 	clusterInfo.Cluster.Metrics.CPU.MaxFreeOnNodeCores = cpu_max_free
+	clusterInfo.Cluster.Metrics.CPU.TotalSchedulableCores = cpu_schedulable_total
+	clusterInfo.Cluster.Metrics.CPU.MaxSchedulableOnNodeCores = cpu_max_schedulable
+
 	clusterInfo.Cluster.Metrics.Memory.TotalFreeBytes = memory_free_total
 	clusterInfo.Cluster.Metrics.Memory.MaxFreeOnNodeBytes = memory_max_free
+	clusterInfo.Cluster.Metrics.Memory.TotalSchedulableBytes = memory_schedulable_total
+	clusterInfo.Cluster.Metrics.Memory.MaxSchedulableOnNodeBytes = memory_max_schedulable
 
 	return nil
 }
