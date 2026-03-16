@@ -9,6 +9,9 @@ import (
 	"github.com/grycap/oscar/v3/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -61,6 +64,20 @@ func newExposeService(name string, nodePort int32, setAuth bool) types.Service {
 	svc.Environment.Vars = map[string]string{}
 	svc.Environment.Secrets = map[string]string{}
 	return svc
+}
+
+func useFakeGatewayClient(t *testing.T) {
+	t.Helper()
+
+	client := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+
+	gatewayClientsetProvider = func() (dynamic.Interface, error) {
+		return client, nil
+	}
+
+	t.Cleanup(func() {
+		gatewayClientsetProvider = getGatewayClientset
+	})
 }
 
 func TestCreateExposeWithIngressAndAuth(t *testing.T) {
@@ -127,6 +144,80 @@ func TestCreateExposeNodePort(t *testing.T) {
 
 	if existsIngress(svc.Name, svc.Namespace, client) {
 		t.Fatalf("expected no ingress to be created for NodePort expose")
+	}
+}
+
+func TestCreateExposeHTTPRouteWithAuth(t *testing.T) {
+	useFakeGatewayClient(t)
+
+	cfg := newTestConfig()
+	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.HTTPRouteGatewayName = "public-gateway"
+	cfg.HTTPRouteGatewayNamespace = "gateway-system"
+	cfg.IngressHost = "example.org"
+
+	svc := newExposeService("httproute-service", 0, true)
+	svc.Namespace = cfg.ServicesNamespace
+	client := fake.NewSimpleClientset()
+
+	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
+		t.Fatalf("CreateExpose returned error: %v", err)
+	}
+
+	if !existsHTTPRoute(svc.Name, svc.Namespace) {
+		t.Fatalf("expected httproute to exist")
+	}
+
+	if existsIngress(svc.Name, svc.Namespace, client) {
+		t.Fatalf("expected no ingress to be created when route kind is httproute")
+	}
+
+	if !existsTraefikCORSMiddleware(svc.Name, svc.Namespace) {
+		t.Fatalf("expected traefik CORS middleware to exist")
+	}
+
+	if !existsTraefikAuthMiddleware(svc.Name, svc.Namespace) {
+		t.Fatalf("expected traefik auth middleware to exist")
+	}
+
+	if !existsTraefikAuthSecret(svc.Name, svc.Namespace, client) {
+		t.Fatalf("expected traefik auth secret to exist")
+	}
+
+	if existsSecret(svc.Name, svc.Namespace, client, cfg) {
+		t.Fatalf("expected ingress auth secret to not exist for httproute mode")
+	}
+}
+
+func TestCreateExposeHTTPRouteWithoutAuth(t *testing.T) {
+	useFakeGatewayClient(t)
+
+	cfg := newTestConfig()
+	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.HTTPRouteGatewayName = "public-gateway"
+
+	svc := newExposeService("httproute-no-auth", 0, false)
+	svc.Namespace = cfg.ServicesNamespace
+	client := fake.NewSimpleClientset()
+
+	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
+		t.Fatalf("CreateExpose returned error: %v", err)
+	}
+
+	if !existsHTTPRoute(svc.Name, svc.Namespace) {
+		t.Fatalf("expected httproute to exist")
+	}
+
+	if !existsTraefikCORSMiddleware(svc.Name, svc.Namespace) {
+		t.Fatalf("expected traefik CORS middleware to exist")
+	}
+
+	if existsTraefikAuthMiddleware(svc.Name, svc.Namespace) {
+		t.Fatalf("expected no traefik auth middleware when auth is disabled")
+	}
+
+	if existsTraefikAuthSecret(svc.Name, svc.Namespace, client) {
+		t.Fatalf("expected no traefik auth secret when auth is disabled")
 	}
 }
 
