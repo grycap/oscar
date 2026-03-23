@@ -1,0 +1,44 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: populate-volume-job
+  namespace: oscar-svc
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    batch.kubernetes.io/job-tracking: ""
+    meta.helm.sh/release-name: oscar
+    meta.helm.sh/release-namespace: oscar
+spec:
+  backoffLimit: 6
+  completionMode: NonIndexed
+  completions: 1
+  parallelism: 1
+  suspend: false
+  template:
+    spec:
+      containers:
+      - name: bin-downloader
+        image: ghcr.io/grycap/oscar-bin-downloader:3.7.1
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: FAAS_SUPERVISOR_VERSION
+          value: "1.6.2"
+        - name: WATCHDOG_VERSION
+          value: "0.2.1"
+        volumeMounts:
+        - name: oscar-vol
+          mountPath: /data
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      restartPolicy: Never
+      dnsPolicy: ClusterFirst
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: oscar-vol
+        persistentVolumeClaim:
+          claimName: pvc-hostpath
+  ttlSecondsAfterFinished: 120
