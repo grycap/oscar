@@ -164,6 +164,71 @@ kubectl -n kube-system patch deployment metrics-server --type='json' -p='[{"op":
 
 > Note that the local testing environment uses Kind, therefore the metrics will not work as expected.
 
+<<<<<<< HEAD
+### Monitoring stack (Prometheus + Loki + Alloy)
+
+Monitoring deployment and verification steps were moved to
+`specs/001-metrics-collection/monitoring-docs.md`.
+
+## Configure RBAC permissions
+
+Once we have deployed Metrics server we must configure RBAC permissions for OSCAR in order to allow it to interact with Metrics server.
+
+> Note that without the permissions the `/status` will show us an error.
+
+```sh
+cat <<EOF | kubectl apply -f -
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: oscar-cluster-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  - pods
+  - pods/log
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: oscar-cluster-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: oscar-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: oscar-sa
+  namespace: oscar
+EOF
+```
+
+=======
+>>>>>>> 478f4b4a11475418256e28140153fd408ff4afcd
 ### Deploy Knative Serving as Serverless Backend (OPTIONAL)
 
 OSCAR supports [Knative Serving](https://knative.dev/docs/serving/) as

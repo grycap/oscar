@@ -226,6 +226,30 @@ type Config struct {
 
 	//Job listing limit
 	JobListingLimit int `json:"-"`
+
+	// PrometheusBaseURL base URL for Prometheus HTTP API
+	PrometheusBaseURL string `json:"-"`
+
+	// PrometheusCPUQuery query template for CPU hours (use {{service}}, {{range}}, and {{services_namespace}})
+	PrometheusCPUQuery string `json:"-"`
+
+	// PrometheusGPUQuery query template for GPU hours (use {{service}}, {{range}}, and {{services_namespace}})
+	PrometheusGPUQuery string `json:"-"`
+
+	// LokiBaseURL base URL for Loki HTTP API
+	LokiBaseURL string `json:"-"`
+
+	// LokiQuery query template for request logs (use {{namespace}}, {{app}})
+	LokiQuery string `json:"-"`
+
+	// LokiExposedQuery query template for exposed-service request logs (use {{namespace}}, {{app}})
+	LokiExposedQuery string `json:"-"`
+
+	// LokiExposedNamespace namespace label for exposed-service logs
+	LokiExposedNamespace string `json:"-"`
+
+	// LokiExposedAppLabel app label for exposed-service logs
+	LokiExposedAppLabel string `json:"-"`
 }
 
 var configVars = []configVar{
@@ -284,6 +308,14 @@ var configVars = []configVar{
 	{"AdditionalConfigPath", "ADDITIONAL_CONFIG_PATH", false, stringType, "config.yaml"},
 	{"TTLJob", "TTL_JOB", false, intType, "2592000"},
 	{"JobListingLimit", "JOB_LISTING_LIMIT", false, intType, "70"},
+	{"PrometheusBaseURL", "PROMETHEUS_URL", false, urlType, ""},
+	{"PrometheusCPUQuery", "PROMETHEUS_CPU_QUERY", false, stringType, "sum(increase(container_cpu_usage_seconds_total{namespace=~\"{{services_namespace}}.*\",service=~\"{{service}}\"}[{{range}}])) / 3600"},
+	{"PrometheusGPUQuery", "PROMETHEUS_GPU_QUERY", false, stringType, "sum(increase(container_gpu_usage_seconds_total{namespace=~\"{{services_namespace}}.*\",service=~\"{{service}}\"}[{{range}}])) / 3600"},
+	{"LokiBaseURL", "LOKI_URL", false, urlType, ""},
+	{"LokiQuery", "LOKI_QUERY", false, stringType, "{namespace=\"{{namespace}}\", app=\"{{app}}\"} |~ \"/(job|run)/\""},
+	{"LokiExposedQuery", "LOKI_EXPOSED_QUERY", false, stringType, "{namespace=\"{{namespace}}\", app=\"{{app}}\"} |~ \"/system/services/.+/exposed\""},
+	{"LokiExposedNamespace", "LOKI_EXPOSED_NAMESPACE", false, stringType, "ingress-nginx"},
+	{"LokiExposedAppLabel", "LOKI_EXPOSED_APP", false, stringType, "ingress-nginx"},
 }
 
 func readConfigVar(cfgVar configVar) (string, error) {

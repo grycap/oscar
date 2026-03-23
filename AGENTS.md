@@ -3,6 +3,7 @@
 ## Purpose of This File
 - This file defines mandatory rules for AI agents and humans using AI while working in this repository.
 - Follow these rules unless a repository maintainer explicitly overrides them.
+- The OpenSpec block above applies only when OpenSpec triggers are met; otherwise follow the repository rules below.
 
 ## Agent Operating Principles
 - You MUST preserve existing behavior unless a change is explicitly requested.
@@ -22,11 +23,12 @@
 - Keep packages short and lowercase (e.g., `pkg/utils`, `pkg/handlers`).
 - Prefer clear function names and avoid overly clever abstractions.
 - Update comments only when behavior changes or when clarity improves.
+- Metrics naming MUST use plural prefixes and consistent suffixes: summary totals as `services_count_*`, `requests_count_*`, `users_count`, and per-service metrics as `requests-*-per-service`.
 
 ## Change Scope & Discipline
 - Stay within the scope of the request; avoid opportunistic cleanup.
 - If a refactor is needed, ask before doing it unless the change is trivial and isolated.
-- Do not alter public APIs or configuration formats unless explicitly requested. See `docs/api.md`, `docs/api.yaml`, and `docs/additional-config.md` for references.
+- Do not alter public APIs or configuration formats unless explicitly requested. See `docs/api.md` and `docs/additional-config.md` for references.
 
 ## Testing & Validation
 - You MUST run tests for touched Go packages when feasible (e.g., `go test ./...`).
@@ -45,6 +47,12 @@ For docs-only changes, tests may be skipped but must be stated explicitly.
 - For documentation changes, validate with `mkdocs serve` when feasible.
 - Keep documentation concise and aligned with actual behavior.
 
+## Local Testing (kind)
+- If you need to manually update the deployment image, run: `kubectl set image deployment/oscar -n oscar oscar=localhost:5001/oscar:devel`.
+- To rebuild and redeploy the OSCAR manager image for local testing, run `make deploy`.
+- This builds and pushes `localhost:5001/oscar:devel` and restarts the `oscar` deployment.
+- Ensure your kind cluster is running and the local registry is reachable.
+
 ## Commit & PR Expectations (if applicable)
 - Follow short, imperative commit messages; use `fix:`/`docs:` prefixes when appropriate.
 - PRs MUST include a clear description and any relevant links to issues.
@@ -55,3 +63,11 @@ For docs-only changes, tests may be skipped but must be stated explicitly.
 - The change requires new dependencies, CI/CD edits, or license changes.
 - The change affects external interfaces or deployment behavior.
 - Tests cannot be run or consistently fail.
+If AGENTS.md and OpenSpec instructions conflict, follow AGENTS.md unless a maintainer says otherwise.
+
+## Active Technologies
+- Go 1.25 + gin-gonic, client-go, metrics.k8s.io clien (001-metrics-collection)
+- N/A (aggregation from existing data sources) (001-metrics-collection)
+
+## Recent Changes
+- 001-metrics-collection: Added Go 1.25 + gin-gonic, client-go, metrics.k8s.io clien

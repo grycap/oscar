@@ -7,6 +7,7 @@ END_COLOR="\033[0m"
 
 CONFIG_FILEPATH=$(mktemp -t oscar-kind-config.XXXXXX)
 KNATIVE_FILEPATH=$(mktemp -t oscar-knative-config.XXXXXX)
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 MINIO_HELM_NAME="minio"
 NFS_HELM_NAME="nfs-server-provisioner"
 OSCAR_HELM_NAME="oscar"
@@ -38,6 +39,8 @@ OSCAR_HELM_IMAGE_OVERRIDES=""
 OSCAR_POST_DEPLOYMENT_IMAGE=""
 OSCAR_TARGET_REPLICAS=1
 SKIP_PROMPTS="false"
+USE_METRICS="n"
+ENABLE_METRICS="false"
 ENABLE_OIDC="false"
 ENABLE_KUEUE="false"
 OIDC_ISSUERS_DEFAULT="https://keycloak.grycap.net/realms/grycap"
@@ -49,6 +52,7 @@ Usage: $(basename "$0") [options]
 
 Options:
   --devel        Deploy using the OSCAR devel branch without interactive prompts.
+  --metrics      Deploy metrics stack (Prometheus + Loki + Alloy) for reporting.
   --oidc         Enable OIDC support for OSCAR (default: disabled).
   --kueue        Enable Kueue support for OSCAR (default: disabled).
   -h, --help     Show this help message and exit.
@@ -401,6 +405,123 @@ EOF
     kubectl apply -f $KNATIVE_FILEPATH
 }
 
+deployMetrics(){
+    echo -e "\n[*] Deploying metrics stack (Prometheus + Loki + Alloy) ..."
+    kubectl create namespace monitoring >/dev/null 2>&1 || true
+
+    echo -e "\n[*] Deploying Prometheus ..."
+    helm repo add --force-update prometheus-community https://prometheus-community.github.io/helm-charts
+    helm repo update
+    helm upgrade --install prometheus prometheus-community/prometheus \
+        --namespace monitoring \
+        --set server.service.type=ClusterIP \
+        --set server.persistentVolume.storageClass=nfs \
+        --set alertmanager.enabled=false \
+        --set pushgateway.enabled=false \
+        --set kubeStateMetrics.enabled=true \
+        --set nodeExporter.enabled=true
+
+    echo -e "\n[*] Deploying Loki ..."
+    helm repo add --force-update grafana https://grafana.github.io/helm-charts
+    helm repo update
+    if [ -f "$SCRIPT_DIR/../deploy/metrics/loki-values.kind.yaml" ]; then
+        cp "$SCRIPT_DIR/../deploy/metrics/loki-values.kind.yaml" /tmp/loki-values.yaml
+    else
+        cat <<'EOF' > /tmp/loki-values.yaml
+deploymentMode: SingleBinary
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+    bucketNames:
+      chunks: chunks
+      ruler: ruler
+      admin: admin
+  schemaConfig:
+    configs:
+      - from: 2020-10-24
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+  limits_config:
+    max_query_length: 0h
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    whenScaled: Retain
+    whenDeleted: Retain
+    enableStatefulSetAutoDeletePVC: true
+    storageClass: nfs
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+EOF
+    fi
+    helm upgrade --install loki grafana/loki --namespace monitoring --values /tmp/loki-values.yaml
+
+    echo -e "\n[*] Deploying Grafana Alloy ..."
+    if [ -f "$SCRIPT_DIR/../deploy/metrics/alloy-values.kind.yaml" ]; then
+        cp "$SCRIPT_DIR/../deploy/metrics/alloy-values.kind.yaml" /tmp/alloy-values.yaml
+    else
+        cat <<'EOF' > /tmp/alloy-values.yaml
+alloy:
+  configMap:
+    content: |
+      logging {
+        level = "info"
+      }
+
+      discovery.kubernetes "pods" {
+        role = "pod"
+      }
+
+      discovery.relabel "pod_logs" {
+        targets = discovery.kubernetes.pods.targets
+
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app"]
+          target_label  = "app"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+      }
+
+      loki.source.kubernetes "pods" {
+        targets    = discovery.relabel.pod_logs.output
+        forward_to = [loki.write.default.receiver]
+      }
+
+      loki.write "default" {
+        endpoint {
+          url = "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push"
+        }
+      }
+EOF
+    fi
+    helm upgrade --install alloy grafana/alloy --namespace monitoring --values /tmp/alloy-values.yaml
+}
+
 createKindCluster(){
     echo -e "\n[*] Creating kind cluster"
     kind create cluster --image kindest/node:v1.33.1 --config=$CONFIG_FILEPATH --name="$CLUSTER_NAME"
@@ -420,6 +541,10 @@ while [ "$#" -gt 0 ]; do
         --devel)
             SKIP_PROMPTS="true"
             OSCAR_IMAGE_BRANCH="devel"
+            shift
+            ;;
+        --metrics)
+            USE_METRICS="y"
             shift
             ;;
         --oidc)
@@ -453,6 +578,7 @@ checkKind
 echo -e "\n"
 use_knative="y"
 local_reg="y"
+use_metrics="$USE_METRICS"
 use_devel_branch="n"
 use_oidc="n"
 if [ "$SKIP_PROMPTS" == "true" ]; then
@@ -461,6 +587,7 @@ else
     read -p "Do you want to use Knative Serving as Serverless Backend? [y/n] " use_knative </dev/tty
     read -p "Do you want suport for local docker images? [y/n] " local_reg </dev/tty
     read -p "Do you want to install OSCAR from the devel branch? [y/n] (default uses master) " use_devel_branch </dev/tty
+    read -p "Do you want to deploy the metrics stack (Prometheus + Loki + Alloy)? [y/n] " use_metrics </dev/tty
     if [ "$ENABLE_OIDC" != "true" ]; then
         echo -e "\n[*] OIDC defaults to be applied if enabled:"
         echo -e "  - OIDC_ENABLE=true"
@@ -473,6 +600,8 @@ fi
 if [ `echo $use_devel_branch | tr '[:upper:]' '[:lower:]'` == "y" ]; then
     OSCAR_IMAGE_BRANCH="devel"
 fi
+if [ `echo $use_metrics | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+    ENABLE_METRICS="true"
 
 if [ `echo $use_oidc | tr '[:upper:]' '[:lower:]'` == "y" ]; then
     ENABLE_OIDC="true"
@@ -663,6 +792,11 @@ echo -e "\n[*] Deploying metrics-server ..."
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml && \
 kubectl -n kube-system patch deployment metrics-server --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
 
+#Deploy metrics stack (optional)
+if [ "$ENABLE_METRICS" == "true" ]; then
+    deployMetrics
+fi
+
 #Deploy Knative Serving
 if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
     deployKnative
@@ -676,9 +810,9 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 echo -e "\n[*] Deploying OSCAR ..."
 helm repo add --force-update grycap https://grycap.github.io/helm-charts/
 if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative --set resourceManager.enable=true --set kueue.enable=$ENABLE_KUEUE $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=standard --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative $OSCAR_HELM_IMAGE_OVERRIDES
 else
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set resourceManager.enable=true --set kueue.enable=$ENABLE_KUEUE $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=standard --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD $OSCAR_HELM_IMAGE_OVERRIDES
 fi
 
 if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
@@ -691,6 +825,15 @@ if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
     if ! kubectl -n oscar scale deployment/oscar --replicas="$OSCAR_TARGET_REPLICAS"; then
         echo -e "$RED[!]$END_COLOR Failed to scale OSCAR deployment"
         exit 1
+    fi
+fi
+
+if [ "$ENABLE_METRICS" == "true" ]; then
+    echo -e "\n[*] Configuring OSCAR to use Prometheus and Loki ..."
+    if ! kubectl -n oscar set env deployment/oscar \
+        PROMETHEUS_URL="http://prometheus-server.monitoring.svc.cluster.local" \
+        LOKI_URL="http://loki-gateway.monitoring.svc.cluster.local"; then
+        echo -e "$RED[!]$END_COLOR Failed to configure OSCAR metrics endpoints"
     fi
 fi
 

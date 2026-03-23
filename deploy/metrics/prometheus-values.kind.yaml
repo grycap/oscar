@@ -1,0 +1,85 @@
+alertmanager:
+  enabled: false
+kubeStateMetrics:
+  enabled: false
+nodeExporter:
+  enabled: false
+pushgateway:
+  enabled: false
+
+server:
+  global:
+    scrape_interval: 2m
+    scrape_timeout: 5s
+    evaluation_interval: 1m
+  persistentVolume:
+    storageClass: standard
+
+scrapeConfigs:
+  prometheus:
+    enabled: false
+  kubernetes-api-servers:
+    enabled: false
+  kubernetes-nodes:
+    enabled: true
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: kubelet_volume_stats_used_bytes|kubelet_volume_stats_capacity_bytes
+        action: keep
+      - source_labels: [namespace]
+        regex: monitoring
+        action: keep
+      - source_labels: [persistentvolumeclaim]
+        regex: prometheus-server|storage-loki-0
+        action: keep
+      - action: labeldrop
+        regex: (instance|node|job)
+  kubernetes-nodes-cadvisor:
+    enabled: true
+    job_name: ""
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: container_cpu_usage_seconds_total|container_gpu_usage_seconds_total
+        action: keep
+      - source_labels: [namespace]
+        regex: oscar-svc.*
+        action: keep
+      - source_labels: [pod]
+        regex: ^(.+)-dlp-[a-z0-9]{9,}-[a-z0-9]{5}$
+        target_label: service
+        replacement: $1
+        action: replace
+      - source_labels: [pod]
+        regex: ^(.+?)(?:-[0-9]{5}-deployment)?-[a-z0-9]{9,}-[a-z0-9]{5}$
+        target_label: service
+        replacement: $1
+        action: replace
+      - action: labeldrop
+        regex: (image|id|name|instance|node|pod)
+  kubernetes-service-endpoints:
+    enabled: false
+  kubernetes-service-endpoints-slow:
+    enabled: false
+  prometheus-pushgateway:
+    enabled: false
+  kubernetes-services:
+    enabled: false
+  kubernetes-pods:
+    enabled: false
+  kubernetes-pods-slow:
+    enabled: false
