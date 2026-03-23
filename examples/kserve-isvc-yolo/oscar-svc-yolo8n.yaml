@@ -1,0 +1,20 @@
+functions:
+  oscar:
+  - oscar-kserve-y2m:
+      name: kserve-isvc-yolo8n-onnx
+      cpu: '1.0'
+      memory: 1Gi
+      image: ghcr.io/grycap/kserve-yolo8n-onnx-script
+      script: script.sh
+      kserve:
+        model_format: onnx
+        storage_uri: "oci://ghcr.io/grycap/kserve-yolo8n-onnx"
+        min_scale: 1
+        api_version: "v2"
+      log_level: CRITICAL
+      input:
+      - storage_provider: minio
+        path: kserve-isvc-yolo8n-onnx/input
+      output:
+      - storage_provider: minio
+        path: kserve-isvc-yolo8n-onnx/output
