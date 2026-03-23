@@ -152,7 +152,7 @@ Double-click on the *cowsay.pipeline* file to open it. You'll then have the orch
 
 Let's configure the nodes to work properly with our COWSAY service we have created previously. For that, right-click and select *Open Properties* on the nodes to view the properties of each node. 
 
-The `Get EGI Token` node (*setup_client.py*) contains the elements of the OSCAR cluster where the COWSAY service is created. This node is required to interact with any OSCAR service because it stores all the credentials needed to access the cluster. You just need to change the environment variable values to properly configure it.
+The `Get OIDC Token` node (*setup_client.py*) contains the elements of the OSCAR cluster where the COWSAY service is created. This node is required to interact with any OSCAR service because it stores all the credentials needed to access the cluster. You just need to change the environment variable values to properly configure it.
 
 ![juno-elyra-node1.png](images/integrations/juno-elyra-config1.png)
 
