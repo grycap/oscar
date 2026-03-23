@@ -178,6 +178,12 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO user for uid %s: %v", uid, err))
 			}
 		}
+
+		// Create Kueue ClusterQueue and LocalQueue for the user if they don't exist
+		if err := utils.CreateKueueUserQueuesIfDontExist(cfg, uid); err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating Kueue ClusterQueue for user %s: %v", uid, err))
+		}
+
 		c.Set("uidOrigin", uid)
 		c.Set("userName", ui.Name)
 		c.Set("multitenancyConfig", mc)

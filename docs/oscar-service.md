@@ -58,18 +58,18 @@ you to start with the
 
 ### External Storage Providers
 
-[FaaS Supervisor](https://github.com/grycap/faas-supervisor) downloads the input file and uploads the output file. Each [storage provider](fdl.md/#storageproviders) has specific parameters, authentication, and capabilities. The current implementation supports:
+[FaaS Supervisor](https://github.com/grycap/faas-supervisor) downloads the input file and uploads the output file. Each [storage provider](fdl.md#storageproviders) has specific parameters, authentication, and capabilities. The current implementation supports:
 
 - **Input**: `minio` (default), `webdav`/dCache, `rucio`.
 - **Output**: `minio`, `s3`, `onedata`.
 
 #### MinIO
 
-OSCAR installs a MinIO inside the cluster. This default MinIO can be referenced as `minio` or `minio.default` in the input and output parameters of the [OSCAR service](fdl.md/#service). You can also define external MinIO endpoints in the [storage provider](fdl.md/#minioprovider) section. MinIO works as input or output without additional software. MinIO can perform [bucket replication](minio-bucket-replication.md) between two buckets.
+OSCAR installs a MinIO inside the cluster. This default MinIO can be referenced as `minio` or `minio.default` in the input and output parameters of the [OSCAR service](fdl.md#service). You can also define external MinIO endpoints in the [storage provider](fdl.md#minioprovider) section. MinIO works as input or output without additional software. MinIO can perform [bucket replication](minio-bucket-replication.md) between two buckets.
 
 #### dCache (WebDAV)
 
-[dCache](https://dcache.org/) uses the [WebDAV protocol](fdl.md/#webdavprovider) and is supported as an input provider through WebDAV. Configure it in the storage providers map and reference it in the service `input`. Note that [DCNiOS](https://intertwin-eu.github.io/dcnios/) is necessary to use dCache as input storage.
+[dCache](https://dcache.org/) uses the [WebDAV protocol](fdl.md#webdavprovider) and is supported as an input provider through WebDAV. Configure it in the storage providers map and reference it in the service `input`. Note that [DCNiOS](https://intertwin-eu.github.io/dcnios/) is necessary to use dCache as input storage.
 
 #### Rucio
 
@@ -77,11 +77,11 @@ OSCAR installs a MinIO inside the cluster. This default MinIO can be referenced 
 
 #### S3
 
-Provide AWS credentials via environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`) or via t he FDL `s3` provider configuration. S3 is supported as an output storage system. Note that [DCNiOS](https://intertwin-eu.github.io/dcnios/) is necessary to use S3 as input storage.
+Provide AWS credentials via environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`) or via the FDL `s3` provider configuration. S3 is supported as an output storage system. Note that [DCNiOS](https://intertwin-eu.github.io/dcnios/) is necessary to use S3 as input storage.
 
 #### Onedata
 
 [Onedata](https://onedata.org) is supported as an output storage provider.
-Check the [Onedata storage provider](fdl.md/#onedataprovider) for more information.
+Check the [Onedata storage provider](fdl.md#onedataprovider) for more information.
 
 ![Storage](images/storage.png)

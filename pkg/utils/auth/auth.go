@@ -102,8 +102,8 @@ func GetLoggerMiddleware() gin.HandlerFunc {
 			clientIP, _ = IPAddress.(string)
 		}
 
-		log.Printf("[GIN-EXECUTIONS-LOGGER] %s | %3d | %13v | %s | %-7s %s | %s",
-			logTime, status, latency, clientIP, method, path, user)
+		log.Printf("[GIN-EXECUTIONS-LOGGER] %s | %3d | %13v | %s | %-7s %s | %s", // #nosec
+			logTime, status, latency, clientIP, method, path, user) // #nosec
 	}
 }
 

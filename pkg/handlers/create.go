@@ -66,14 +66,18 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		var service types.Service
 		isAdminUser = false
 		authHeader := c.GetHeader("Authorization")
+		//Error creating the service: Service.serving.knative.dev "cowsay-s" is invalid: metadata.labels:
+		//  Invalid value: "platform-access:vo.ai4eosc.eu": a valid label must be an empty string or
+		// consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character
+		// (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')
+		if err := c.ShouldBindJSON(&service); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+			return
+		}
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
 			service.Owner = types.DefaultOwner
 			createLogger.Printf("Creating service '%s' for user '%s'", service.Name, service.Owner)
-		}
-		if err := c.ShouldBindJSON(&service); err != nil {
-			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
-			return
 		}
 		service.AllowedUsers = sanitizeUsers(service.AllowedUsers)
 		service.Script = utils.NormalizeLineEndings(service.Script)
@@ -221,12 +225,23 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 
+		if !isAdminUser && cfg.KueueEnable {
+			if err := utils.EnsureKueueUserQueues(c.Request.Context(), cfg, service.Namespace, service.Owner, service.Name); err != nil {
+				createLogger.Printf("error ensuring Kueue queues for service %s: %v\n", service.Name, err)
+			}
+			service.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
+		}
+
 		// Create service
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
 			if k8sErrors.IsAlreadyExists(err) {
 				c.String(http.StatusConflict, "A service with the provided name already exists")
 			} else {
+				errDelete := back.DeleteService(service)
+				if errDelete != nil {
+					log.Printf("Error deleting service: %v\n", errDelete)
+				}
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 			}
 			return
@@ -666,6 +681,7 @@ func checkIdentity(service *types.Service, authHeader string) error {
 	voFirstReplace := strings.Replace(service.VO, "/", "", 1)
 	voParse := strings.ReplaceAll(voFirstReplace, "/", "--")
 	voParse = strings.ReplaceAll(voParse, " ", "__")
+	voParse = strings.ReplaceAll(voParse, ":", "___")
 	service.Labels["vo"] = voParse
 
 	return nil

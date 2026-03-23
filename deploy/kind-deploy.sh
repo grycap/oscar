@@ -41,6 +41,10 @@ OSCAR_TARGET_REPLICAS=1
 SKIP_PROMPTS="false"
 USE_METRICS="n"
 ENABLE_METRICS="false"
+ENABLE_OIDC="false"
+ENABLE_KUEUE="false"
+OIDC_ISSUERS_DEFAULT="https://keycloak.grycap.net/realms/grycap"
+OIDC_GROUPS_DEFAULT="/oscar-staff, /oscar-test"
 
 usage(){
     cat <<EOF
@@ -49,6 +53,8 @@ Usage: $(basename "$0") [options]
 Options:
   --devel        Deploy using the OSCAR devel branch without interactive prompts.
   --metrics      Deploy metrics stack (Prometheus + Loki + Alloy) for reporting.
+  --oidc         Enable OIDC support for OSCAR (default: disabled).
+  --kueue        Enable Kueue support for OSCAR (default: disabled).
   -h, --help     Show this help message and exit.
 EOF
 }
@@ -365,15 +371,6 @@ checkOSCARDeploy(){
     else
         oscar_url="https://localhost:$HOST_HTTPS_PORT"
     fi
-    echo -e "\n > You can now acces to the OSCAR web interface through $oscar_url with the following credentials: "
-    echo "  - username: oscar"
-    echo "  - password: $OSCAR_PASSWORD"
-    minio_api_url="http://localhost:$HOST_MINIO_API_PORT"
-    minio_console_url="http://localhost:$HOST_MINIO_CONSOLE_PORT"
-    echo -e "\n > You can now access MinIO object storage through $minio_api_url and the console through $minio_console_url with the following credentials: "
-    echo "  - username: minio"
-    echo "  - password: $MINIO_PASSWORD"
-    echo -e "\n[*] Note: To delete the cluster type 'kind delete cluster --name=$CLUSTER_NAME'\n"
 }
 
 deployKnative(){
@@ -527,7 +524,7 @@ EOF
 
 createKindCluster(){
     echo -e "\n[*] Creating kind cluster"
-    kind create cluster  --image kindest/node:v1.33.1 --config=$CONFIG_FILEPATH --name="$CLUSTER_NAME" --retain
+    kind create cluster --image kindest/node:v1.33.1 --config=$CONFIG_FILEPATH --name="$CLUSTER_NAME"
 
     if ! kubectl cluster-info --context "$KIND_CONTEXT" &> /dev/null; then
         echo -e "$RED[*]$END_COLOR Kind cluster not found."
@@ -548,6 +545,14 @@ while [ "$#" -gt 0 ]; do
             ;;
         --metrics)
             USE_METRICS="y"
+            shift
+            ;;
+        --oidc)
+            ENABLE_OIDC="true"
+            shift
+            ;;
+        --kueue)
+            ENABLE_KUEUE="true"
             shift
             ;;
         -h|--help)
@@ -573,8 +578,9 @@ checkKind
 echo -e "\n"
 use_knative="y"
 local_reg="y"
-use_devel_branch="y"
 use_metrics="$USE_METRICS"
+use_devel_branch="n"
+use_oidc="n"
 if [ "$SKIP_PROMPTS" == "true" ]; then
     echo "[*] Running in non-interactive mode: Knative, local registry, and OSCAR devel branch enabled."
 else
@@ -582,6 +588,13 @@ else
     read -p "Do you want suport for local docker images? [y/n] " local_reg </dev/tty
     read -p "Do you want to install OSCAR from the devel branch? [y/n] (default uses master) " use_devel_branch </dev/tty
     read -p "Do you want to deploy the metrics stack (Prometheus + Loki + Alloy)? [y/n] " use_metrics </dev/tty
+    if [ "$ENABLE_OIDC" != "true" ]; then
+        echo -e "\n[*] OIDC defaults to be applied if enabled:"
+        echo -e "  - OIDC_ENABLE=true"
+        echo -e "  - OIDC_ISSUERS=$OIDC_ISSUERS_DEFAULT"
+        echo -e "  - OIDC_GROUPS=$OIDC_GROUPS_DEFAULT"
+        read -p "Do you want to enable OIDC authentication support with these defaults? [y/n] " use_oidc </dev/tty
+    fi
 fi
 
 if [ `echo $use_devel_branch | tr '[:upper:]' '[:lower:]'` == "y" ]; then
@@ -589,6 +602,9 @@ if [ `echo $use_devel_branch | tr '[:upper:]' '[:lower:]'` == "y" ]; then
 fi
 if [ `echo $use_metrics | tr '[:upper:]' '[:lower:]'` == "y" ]; then
     ENABLE_METRICS="true"
+
+if [ `echo $use_oidc | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+    ENABLE_OIDC="true"
 fi
 if [ "$OSCAR_IMAGE_BRANCH" == "devel" ]; then
     OSCAR_HELM_IMAGE_OVERRIDES="--set replicas=0"
@@ -761,6 +777,7 @@ echo -e "\n[*] Deploying MinIO storage provider ..."
 helm repo add --force-update minio https://charts.min.io
 helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT --create-namespace --version 4.0.7
 
+
 #Deploy NFS server provisioner
 echo -e "\n[*] Deploying NFS server provider ..."
 helm repo add --force-update nfs-ganesha-server-and-external-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
@@ -817,252 +834,28 @@ if [ "$ENABLE_METRICS" == "true" ]; then
         PROMETHEUS_URL="http://prometheus-server.monitoring.svc.cluster.local" \
         LOKI_URL="http://loki-gateway.monitoring.svc.cluster.local"; then
         echo -e "$RED[!]$END_COLOR Failed to configure OSCAR metrics endpoints"
+    fi
+fi
+
+if [ "$ENABLE_OIDC" == "true" ]; then
+    echo -e "\n[*] Enabling OIDC support in OSCAR deployment ..."
+    if ! kubectl -n oscar set env deployment/oscar \
+        OIDC_ENABLE="true" \
+        OIDC_ISSUERS="$OIDC_ISSUERS_DEFAULT" \
+        OIDC_GROUPS="$OIDC_GROUPS_DEFAULT"; then
+        echo -e "$RED[!]$END_COLOR Failed to set OIDC environment variables in OSCAR deployment"
         exit 1
     fi
 fi
 
 #Wait for OSCAR deployment
 checkOSCARDeploy
- 
-echo -e "[*] Configuring RBAC permissions ..."
-cat <<'EOF' | kubectl apply -f -
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: oscar-sa
-  namespace: oscar
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: oscar-controller
-  namespace: oscar-svc
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  - pods/log
-  - podtemplates
-  - configmaps
-  - secrets
-  - services
-  - persistentvolumeclaims
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
-- apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  - deployments
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update 
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - deletecollection
-  - update
-- apiGroups:
-  - autoscaling
-  resources:
-  - horizontalpodautoscalers
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
-- apiGroups:
-  - networking.k8s.io
-  resources:
-  - ingresses
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
-- apiGroups:
-  - serving.knative.dev
-  resources:
-  - services
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: oscar-controller-binding
-  namespace: oscar-svc
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: oscar-controller
-subjects:
-- kind: ServiceAccount
-  name: oscar-sa
-  namespace: oscar
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: oscar-controller-global
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  - pods
-  - pods/log
-  - podtemplates
-  - persistentvolumeclaims
-  - secrets
-  - services
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - namespaces
-  verbs:
-  - get
-  - list
-  - create
-  - update
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - roles
-  - rolebindings
-  verbs:
-  - get
-  - list
-  - create
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - nodes
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumes
-  verbs:
-  - get
-  - list
-  - create
-- apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  - deployments
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update 
-- apiGroups:
-  - autoscaling
-  resources:
-  - horizontalpodautoscalers
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update 
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update 
-  - deletecollection
-- apiGroups:
-  - networking.k8s.io
-  resources:
-  - ingresses
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
-- apiGroups:
-  - serving.knative.dev
-  resources:
-  - services
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update 
-- apiGroups:
-  - metrics.k8s.io
-  resources:
-  - nodes
-  verbs:
-  - list
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: oscar-controller-global-binding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: oscar-controller-global
-subjects:
-- kind: ServiceAccount
-  name: oscar-sa
-  namespace: oscar
-EOF
 
+if [ `echo $ENABLE_KUEUE | tr '[:upper:]' '[:lower:]'` == "true" ]; then
+    echo -e "\n[*] Deploying Kueue (workload admission) ..."
+    kubectl apply --server-side -k "github.com/kubernetes-sigs/kueue/config/default?ref=v0.15.0"
+fi
+ 
 echo -e "\n[*] Deployment details:"
 echo "  - Kind cluster name: $CLUSTER_NAME"
 echo "  - Kind context: $KIND_CONTEXT"

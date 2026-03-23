@@ -44,16 +44,22 @@ You can deploy the "devel" version of OSCAR to access the latest development ver
 
 ```sh
 git clone https://github.com/grycap/oscar
-sh oscar/deploy/kind-deploy.sh
+bash oscar/deploy/kind-deploy.sh
 ```
 The wizard will instruct you to choose the "devel" version.
 
 To skip the wizard prompts and automatically install from the `devel` branch, run:
 
 ```sh
-sh oscar/deploy/kind-deploy.sh --devel
+bash oscar/deploy/kind-deploy.sh --devel
 ```
 This flag auto-enables Knative Serving and the local Docker registry so you can test the full development stack without manual input.
+
+To enable OIDC authentication support in the deployed OSCAR (disabled by default), add:
+
+```sh
+bash oscar/deploy/kind-deploy.sh --oidc
+```
 
 ## Steps for manual local deployment
 
@@ -65,7 +71,7 @@ To create a single node cluster with MinIO and Ingress controller ports
 locally accessible, run:
 
 ```sh
-cat <<EOF | kind create cluster --config=-
+cat <<EOF | kind create cluster --image kindest/node:v1.33.1 --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
@@ -105,7 +111,7 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/mast
 
 OSCAR depends on [MinIO](https://min.io/) as a storage provider and function
 trigger. The easy way to run MinIO in a Kubernetes cluster is by installing
-its [helm chart](https://github.com/minio/helm). To  install the helm MinIO
+its [helm chart](https://github.com/minio/helm). To install the helm MinIO
 repo and install the chart, run the following commands replacing
 `<MINIO_PASSWORD>` with a password. It must have at least 8 characters:
 
@@ -145,7 +151,7 @@ helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/
 [problems](https://github.com/kubernetes-sigs/kind/issues/1487#issuecomment-694920754)
 using the [NFS server provisioner](https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner)
 with kind due to its default configuration of kernel-limit file descriptors.
-To workaround it, please run `sudo sysctl -w fs.nr_open=1048576`.*
+As a workaround, please run `sudo sysctl -w fs.nr_open=1048576`.*
 
 ### Deploy Metrics server
 
@@ -158,6 +164,7 @@ kubectl -n kube-system patch deployment metrics-server --type='json' -p='[{"op":
 
 > Note that the local testing environment uses Kind, therefore the metrics will not work as expected.
 
+<<<<<<< HEAD
 ### Monitoring stack (Prometheus + Loki + Alloy)
 
 Monitoring deployment and verification steps were moved to
@@ -220,6 +227,8 @@ subjects:
 EOF
 ```
 
+=======
+>>>>>>> 478f4b4a11475418256e28140153fd408ff4afcd
 ### Deploy Knative Serving as Serverless Backend (OPTIONAL)
 
 OSCAR supports [Knative Serving](https://knative.dev/docs/serving/) as
@@ -277,7 +286,7 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 Then, add the [grycap helm repo](https://github.com/grycap/helm-charts) and
 deploy by running the following commands replacing `<OSCAR_PASSWORD>` with a
 password of your choice and `<MINIO_PASSWORD>` with the MinIO rootPassword,
-and remember to add the flag `--set serverlessBackend=knative` if you deployed
+and **remember** to add the flag `--set serverlessBackend=knative` if you deployed
 it in the previous step:
 
 ```sh
@@ -287,7 +296,8 @@ helm install --namespace=oscar oscar grycap/oscar \
  --set authPass=<OSCAR_PASSWORD> --set service.type=ClusterIP \
  --set ingress.create=true --set volume.storageClassName=nfs \
  --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false \
- --set minIO.accessKey=minio --set minIO.secretKey=<MINIO_PASSWORD>
+ --set minIO.accessKey=minio --set minIO.secretKey=<MINIO_PASSWORD> \
+ --set resourceManager.enable=true
 ```
 
 Now you can access to the OSCAR web interface through `https://localhost` with

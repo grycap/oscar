@@ -6,6 +6,9 @@ functions:
      cpu: '1.0'
      image: nginx
      script: nginxscript.sh
+     environment:
+       variables:
+         MESSAGE: "Hello World"
      expose:
       min_scale: 1
       max_scale: 10 

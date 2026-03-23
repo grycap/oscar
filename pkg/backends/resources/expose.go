@@ -25,10 +25,12 @@ import (
 	htpasswd "github.com/foomo/htpasswd"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	apps "k8s.io/api/apps/v1"
 	autos "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
@@ -85,11 +87,11 @@ func DeleteExpose(name string, namespace string, kubeClientset kubernetes.Interf
 	}
 
 	err := deleteDeployment(name, targetNamespace, kubeClientset, cfg)
-	if err != nil {
+	if err = ignoreNotFound(err); err != nil {
 		return fmt.Errorf("error deleting deployment for exposed service '%s': %v", name, err)
 	}
 	err = deleteService(name, targetNamespace, kubeClientset, cfg)
-	if err != nil {
+	if err = ignoreNotFound(err); err != nil {
 		return fmt.Errorf("error deleting service for exposed service '%s': %v", name, err)
 	}
 
@@ -98,19 +100,19 @@ func DeleteExpose(name string, namespace string, kubeClientset kubernetes.Interf
 		err = deleteIngress(getIngressName(name), targetNamespace, kubeClientset, cfg)
 		if existsSecret(name, targetNamespace, kubeClientset, cfg) {
 			err = deleteSecret(name, targetNamespace, kubeClientset, cfg)
-			if err != nil {
+			if err = ignoreNotFound(err); err != nil {
 				return err
 			}
 		}
-		if err != nil {
+		if err = ignoreNotFound(err); err != nil {
 			return fmt.Errorf("error deleting ingress for exposed service '%s': %v", name, err)
 		}
 	}
 	termination := int64(0)
-	back := metav1.DeletePropagationBackground
+	foreground := metav1.DeletePropagationForeground
 	delete := metav1.DeleteOptions{
 		GracePeriodSeconds: &termination,
-		PropagationPolicy:  &back,
+		PropagationPolicy:  &foreground,
 	}
 	listOpts := metav1.ListOptions{
 		LabelSelector: "app=oscar-svc-exp-" + name,
@@ -119,7 +121,16 @@ func DeleteExpose(name string, namespace string, kubeClientset kubernetes.Interf
 	if err != nil {
 		return fmt.Errorf("error deleting pods of exposed service '%s': %v", name, err)
 	}
+	utils.DeleteWorkload(name, targetNamespace, cfg)
+
 	return nil
+}
+
+func ignoreNotFound(err error) error {
+	if err == nil || apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 // UpdateExpose updates all the components of the exposed service on the cluster
@@ -175,13 +186,20 @@ func UpdateExpose(service types.Service, namespace string, kubeClientset kuberne
 		}
 	}
 
+	utils.UpdateWorkload(service, targetNamespace, cfg, getPodTemplateSpec)
+	if cfg.KueueEnable {
+		err = utils.CheckWorkloadAdmited(service, namespace, cfg, kubeClientset, getDeploymentSpec)
+		if err != nil {
+			return fmt.Errorf("Invalid workload after update: Error checking workload admission: change the cpu/memory requests")
+		}
+	}
 	return nil
 }
 
 // TODO check and refactor
 // Main function that list all the kubernetes components
 // This function is not used, in the future could be useful
-func ListExpose(kubeClientset kubernetes.Interface, cfg *types.Config) error {
+/*func ListExpose(kubeClientset kubernetes.Interface, cfg *types.Config) error {
 	targetNamespace := cfg.ServicesNamespace
 	deploy, hpa, err := listDeployments(targetNamespace, kubeClientset, cfg)
 
@@ -202,13 +220,14 @@ func ListExpose(kubeClientset kubernetes.Interface, cfg *types.Config) error {
 	fmt.Println(deploy, hpa, services, ingress)
 	return nil
 
-}
+}*/
 
 //////////// Deployment
 
 /// Create deployment and horizontal autoscale
 
 func createDeployment(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	utils.CreateWorkload(service, namespace, cfg, getPodTemplateSpec)
 	deployment := getDeploymentSpec(service, namespace, cfg)
 	if utils.SecretExists(service.Name, namespace, kubeClientset) {
 		deployment.Spec.Template.Spec.Containers[0].EnvFrom = []v1.EnvFromSource{
@@ -231,19 +250,41 @@ func createDeployment(service types.Service, namespace string, kubeClientset kub
 	if err != nil {
 		return err
 	}
+	if cfg.KueueEnable {
+		err = utils.CheckWorkloadAdmited(service, namespace, cfg, kubeClientset, getDeploymentSpec)
+		if err != nil {
+			if err := utils.DeleteKueueLocalQueue(context.TODO(), cfg, service.Namespace, service.Name); err != nil {
+				ExposeLogger.Printf("Error deleting Kueue local queue: %v", err)
+			}
+			ExposeLogger.Printf("Error checking workload admission: change the cpu/memory requests\n")
+			return err
+		}
+	}
+
 	return nil
 }
 
 // Return the component deployment, ready to create or update
 func getDeploymentSpec(service types.Service, namespace string, cfg *types.Config) *apps.Deployment {
 	deployName := getDeploymentName(service.Name)
+	minScale := int32(0)
+	if service.Owner == types.DefaultOwner || !cfg.KueueEnable {
+		minScale = int32(service.Expose.MinScale)
+	}
+	uid := auth.FormatUID(service.Owner)
+	if len(uid) > 62 {
+		uid = uid[:62]
+	}
 	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deployName,
 			Namespace: namespace,
+			Labels: map[string]string{
+				types.KueueOwnerLabel: uid,
+			},
 		},
 		Spec: apps.DeploymentSpec{
-			Replicas: &service.Expose.MinScale,
+			Replicas: &minScale,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					keyLabelApp: prefixLabelApp + service.Name,
@@ -252,6 +293,17 @@ func getDeploymentSpec(service types.Service, namespace string, cfg *types.Confi
 			Template: getPodTemplateSpec(service, namespace, cfg),
 		},
 		Status: apps.DeploymentStatus{},
+	}
+	if service.Owner != types.DefaultOwner && cfg.KueueEnable {
+		deployment.Spec.Template.ObjectMeta.Labels[types.KueueOwnerLabel] = uid
+		deployment.Spec.Template.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
+		deployment.Spec.Template.ObjectMeta.Annotations = map[string]string{
+			"kueue.x-k8s.io/queue-name": utils.BuildLocalQueueName(service.Name),
+		}
+		deployment.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
+		deployment.ObjectMeta.Annotations = map[string]string{
+			"kueue.x-k8s.io/queue-name": utils.BuildLocalQueueName(service.Name),
+		}
 	}
 
 	return deployment
@@ -363,12 +415,12 @@ func listDeployments(namespace string, kubeClientset kubernetes.Interface, cfg *
 func deleteDeployment(name string, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
 	name_hpa := getHPAName(name)
 	err := kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(namespace).Delete(context.TODO(), name_hpa, metav1.DeleteOptions{})
-	if err != nil {
+	if err = ignoreNotFound(err); err != nil {
 		return err
 	}
 	deployment := getDeploymentName(name)
 	err = kubeClientset.AppsV1().Deployments(namespace).Delete(context.TODO(), deployment, metav1.DeleteOptions{})
-	if err != nil {
+	if err = ignoreNotFound(err); err != nil {
 		return err
 	}
 	return nil

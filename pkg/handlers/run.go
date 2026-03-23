@@ -24,6 +24,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
@@ -107,9 +108,14 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 
 		}
 
+		if service.Owner != types.DefaultOwner && cfg.KueueEnable && !utils.VerifyWorkload(*service, service.Namespace, cfg) {
+			c.String(http.StatusBadRequest, "invalid workload: try to reduce the service resource (cpu, memory, etc.)")
+			return
+		}
+
 		proxy := &httputil.ReverseProxy{
 			Director: back.GetProxyDirector(service.Name),
 		}
-		proxy.ServeHTTP(c.Writer, c.Request)
+		proxy.ServeHTTP(c.Writer, c.Request) // #nosec
 	}
 }

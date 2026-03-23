@@ -285,7 +285,7 @@ func (k *KubeBackend) DeleteService(service types.Service) error {
 	// If service is exposed delete the exposed k8s components
 	if service.Expose.APIPort != 0 {
 		if err := resources.DeleteExpose(name, namespace, k.kubeClientset, k.config); err != nil {
-			log.Printf("Error deleting all associated kubernetes component of the expose config \"%s\": %v\n", name, err)
+			return fmt.Errorf("error deleting all associated kubernetes components of exposed service \"%s\": %v", name, err)
 		}
 	}
 

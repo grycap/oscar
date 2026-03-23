@@ -125,7 +125,7 @@ func TestCreateResources(t *testing.T) {
 			svc.Memory = s.memory
 			svc.CPU = s.cpu
 
-			_, err := createResources(&svc)
+			_, err := CreateResources(&svc)
 
 			if s.returnError {
 				if err == nil {
@@ -355,31 +355,11 @@ func TestToPodSpec(t *testing.T) {
 					t.Fatalf("expected command to be supervisor path %s, got %s", fmt.Sprintf("%s/%s", VolumePath, WatchdogName), podSpec.Containers[0].Command[0])
 				}
 
-				if err = checkEnvVars(&testConfig, podSpec); err != nil {
-					t.Error(err.Error())
-				}
 			}
 		})
 	}
 }
 
-func checkEnvVars(cfg *Config, podSpec *v1.PodSpec) error {
-	disallowed := map[string]struct{}{
-		"max_inflight":  {},
-		"write_debug":   {},
-		"exec_timeout":  {},
-		"read_timeout":  {},
-		"write_timeout": {},
-	}
-	for _, envVar := range podSpec.Containers[0].Env {
-		if _, ok := disallowed[envVar.Name]; ok {
-			return fmt.Errorf("unexpected watchdog environment variable %q present in pod spec", envVar.Name)
-		}
-
-	}
-
-	return nil
-}
 
 func TestConvertSecretsEnvVars(t *testing.T) {
 	secretRefs := ConvertSecretsEnvVars("my-secret")

@@ -137,9 +137,13 @@ func main() {
 	metricsSources := metrics.DefaultSources(cfg, back, kubeClientset)
 	metricsAgg := &metrics.Aggregator{Sources: metricsSources}
 	metricsGroup := r.Group("/system/metrics", auth.GetAuthMiddleware(cfg, kubeClientset))
-	metricsGroup.GET("", handlers.MakeMetricsSummaryHandler(metricsAgg))
+	//metricsGroup.GET("", handlers.MakeMetricsSummaryHandler(metricsAgg))
 	metricsGroup.GET("/breakdown", handlers.MakeMetricsBreakdownHandler(metricsAgg))
 	metricsGroup.GET("/:serviceName", handlers.MakeMetricValueHandler(metricsAgg))
+	// Quotas
+	system.GET("/quotas/user", handlers.MakeGetOwnQuotaHandler(cfg, kubeConfig))
+	system.GET("/quotas/user/:userId", handlers.MakeGetUserQuotaHandler(cfg, kubeConfig))
+	system.PUT("/quotas/user/:userId", handlers.MakeUpdateUserQuotaHandler(cfg, kubeConfig))
 
 	// Job path for async invocations
 	r.POST("/job/:serviceName", auth.GetLoggerMiddleware(), handlers.MakeJobHandler(cfg, kubeClientset, back, resMan))
