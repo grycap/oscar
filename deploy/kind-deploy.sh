@@ -527,7 +527,7 @@ EOF
 
 createKindCluster(){
     echo -e "\n[*] Creating kind cluster"
-    kind create cluster --config=$CONFIG_FILEPATH --name="$CLUSTER_NAME" --retain
+    kind create cluster  --image kindest/node:v1.33.1 --config=$CONFIG_FILEPATH --name="$CLUSTER_NAME" --retain
 
     if ! kubectl cluster-info --context "$KIND_CONTEXT" &> /dev/null; then
         echo -e "$RED[*]$END_COLOR Kind cluster not found."
