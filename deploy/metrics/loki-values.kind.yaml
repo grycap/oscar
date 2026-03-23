@@ -27,7 +27,7 @@ singleBinary:
     whenScaled: Retain
     whenDeleted: Retain
     enableStatefulSetAutoDeletePVC: true
-    storageClass: nfs
+    storageClass: standard
 read:
   replicas: 0
 write:

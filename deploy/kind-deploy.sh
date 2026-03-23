@@ -427,8 +427,8 @@ deployMetrics(){
     echo -e "\n[*] Deploying Loki ..."
     helm repo add --force-update grafana https://grafana.github.io/helm-charts
     helm repo update
-    if [ -f "$SCRIPT_DIR/../docs/snippets/loki-values.kind.yaml" ]; then
-        cp "$SCRIPT_DIR/../docs/snippets/loki-values.kind.yaml" /tmp/loki-values.yaml
+    if [ -f "$SCRIPT_DIR/../deploy/metrics/loki-values.kind.yaml" ]; then
+        cp "$SCRIPT_DIR/../deploy/metrics/loki-values.kind.yaml" /tmp/loki-values.yaml
     else
         cat <<'EOF' > /tmp/loki-values.yaml
 deploymentMode: SingleBinary
@@ -476,8 +476,8 @@ EOF
     helm upgrade --install loki grafana/loki --namespace monitoring --values /tmp/loki-values.yaml
 
     echo -e "\n[*] Deploying Grafana Alloy ..."
-    if [ -f "$SCRIPT_DIR/../docs/snippets/alloy-values.kind.yaml" ]; then
-        cp "$SCRIPT_DIR/../docs/snippets/alloy-values.kind.yaml" /tmp/alloy-values.yaml
+    if [ -f "$SCRIPT_DIR/../deploy/metrics/alloy-values.kind.yaml" ]; then
+        cp "$SCRIPT_DIR/../deploy/metrics/alloy-values.kind.yaml" /tmp/alloy-values.yaml
     else
         cat <<'EOF' > /tmp/alloy-values.yaml
 alloy:
@@ -527,7 +527,7 @@ EOF
 
 createKindCluster(){
     echo -e "\n[*] Creating kind cluster"
-    kind create cluster --config=$CONFIG_FILEPATH --name="$CLUSTER_NAME"
+    kind create cluster --config=$CONFIG_FILEPATH --name="$CLUSTER_NAME" --retain
 
     if ! kubectl cluster-info --context "$KIND_CONTEXT" &> /dev/null; then
         echo -e "$RED[*]$END_COLOR Kind cluster not found."
@@ -793,9 +793,9 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 echo -e "\n[*] Deploying OSCAR ..."
 helm repo add --force-update grycap https://grycap.github.io/helm-charts/
 if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=standard --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative $OSCAR_HELM_IMAGE_OVERRIDES
 else
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=standard --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD $OSCAR_HELM_IMAGE_OVERRIDES
 fi
 
 if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
