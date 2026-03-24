@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../images/logo.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -1857,21 +1857,27 @@ You can follow this example step by step in the oscar-tutorial folder in your Ju
 <p><img alt="juno-elyra-cowsay.png" src="../images/integrations/juno-elyra-cowsay.png" /></p>
 <p>ℹ️ If you double-click on each of the nodes, you will be able to see the source code that will be executed.</p>
 <p>Let's configure the nodes to work properly with our COWSAY service we have created previously. For that, right-click and select <em>Open Properties</em> on the nodes to view the properties of each node. </p>
-<p>The <code>Get EGI Token</code> node (<em>setup_client.py</em>) contains the elements of the OSCAR cluster where the COWSAY service is created. This node is needed to interact with any OSCAR service because it stores all the credentials for accessing the cluster. You just need to change the environment variable values to properly configure it.</p>
+<p>The <code>Get OIDC Token</code> node (<em>setup_client.py</em>) contains the elements of the OSCAR cluster where the COWSAY service is created. This node is required to interact with any OSCAR service because it stores all the credentials needed to access the cluster. You just need to change the environment variable values to properly configure it.</p>
 <p><img alt="juno-elyra-node1.png" src="../images/integrations/juno-elyra-config1.png" /></p>
-<p>Now configure properly the environment variables:</p>
+<p>Now configure the environment variables properly:</p>
 <ul>
 <li><strong>OSCAR_ENDPOINT</strong>: OSCAR cluster URL ( <em>https://default-endpoint.com</em> ). You can get it from the <a href="https://dashboard.oscar.grycap.net/"><code>OSCAR dashboard</code></a>.</li>
-<li><strong>YOUR_TOKEN</strong>: User token (can be obtained from the <code>Info</code>panel in the OSCAR Dashboard.</li>
+<li><strong>YOUR_TOKEN</strong>: User token (can be obtained from the <code>Info</code>panel in the OSCAR Dashboard).</li>
 </ul>
 <p>The <code>OSCAR Cowsay</code> node (<em>invoke_service_cowsay.ipynb</em>) contains the following environment variables.</p>
-<p><img alt="juno-elyra-node2.png" src="../images/integrations/juno-elyra-config2.png" /></p>
+<p><img alt="juno-elyra-config2.png" src="../images/integrations/juno-elyra-config2.png" /></p>
 <p>So let's configure them properly for our tutorial: </p>
 <ul>
 <li><strong>SERVICE_NAME</strong>: Name of the Cowsay service in OSCAR cluster ( in our tutorial, <em>cowsay-sync-test</em> )</li>
-<li><strong>TEXT_INPUT</strong>: Input text that the service will process ( for example, <em>Hello world 123!</em> )</li>
+<li><strong>TEXT_INPUT</strong>: Input text that the service will process ( for example, <em>Hello world!</em> )</li>
 </ul>
-<p>Once all the nodes are configured, you can run the workflow. Keep in mind that all the files different from the <em>.pipeline</em> file should be closed. In Elyra, the results of the pipeline are shown in the notebook. So you will see the output when opening the code of <code>OSCAR Cowsay</code> node (double-click on the node to open it).</p>
+<p>Once all the nodes are configured, you can run the workflow. Keep in mind that all the files different from the <em>.pipeline</em> file should be closed. Click on the play button on the top-left corner of the screen to start running the pipeline:</p>
+<p><img alt="juno-elyra-run.png" src="../images/integrations/juno-elyra-run.png" /></p>
+<p>You will be asked about the runtime platform to run the pipeline. Select <em>"Run in-place locally"</em>:</p>
+<p><img alt="juno-elyra-run2.png" src="../images/integrations/juno-elyra-run2.png" /></p>
+<p>The pipeline will take some seconds to run. Wait till the next message is shown in the screen:</p>
+<p><img alt="juno-elyra-result2.png" src="../images/integrations/juno-elyra-result2.png" /></p>
+<p>In Elyra, the pipeline results are shown in the notebook. So you will see the output when opening the code of <code>OSCAR Cowsay</code> node (double-click on the node to open it).</p>
 <p><img alt="juno-elyra-result.png" src="../images/integrations/juno-elyra-result.png" /></p>
 <p><strong>Further details with Elyra</strong></p>
 <p>In general, to work with Elyra, you have to create a new Elyra project. For that, click on the <em>Generic Pipeline Editor</em> Elyra icon in the "Launcher" page of Jupyter.</p>
