@@ -421,6 +421,26 @@ deployMetrics(){
         --set kubeStateMetrics.enabled=true \
         --set nodeExporter.enabled=true
 
+    echo -e "\n[*] Deploying Geo Ip ..."
+    if [ -f "$SCRIPT_DIR/../deploy/metrics/geoip-pvc.yaml" ]; then
+        cp "$SCRIPT_DIR/../deploy/metrics/geoip-pvc.yaml" /tmp/geoip-pvc.yaml
+    else
+        cat <<'EOF' > /tmp/geoip-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: geoip-db
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: nfs
+EOF
+    fi
+
     echo -e "\n[*] Deploying Loki ..."
     helm repo add --force-update grafana https://grafana.github.io/helm-charts
     helm repo update
