@@ -4,7 +4,7 @@ functions:
       name: kserve-isvc-sklearn
       cpu: '1.0'
       memory: 1Gi
-      image: docker.io/curlimages/curl:latest
+      image: docker.io/curlimages/curl:8.18.0
       script: script.sh
       alpine: true
       kserve:
