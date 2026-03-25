@@ -440,6 +440,7 @@ spec:
   storageClassName: nfs
 EOF
     fi
+    kubectl apply -f /tmp/geoip-pvc.yaml
 
     echo -e "\n[*] Deploying Loki ..."
     helm repo add --force-update grafana https://grafana.github.io/helm-charts
