@@ -9,10 +9,17 @@
   --oscar-muted-light: #4F5B6B;
   --oscar-border-dark: #2A3039;
   --oscar-border-light: #D7E0EA;
+  --oscar-site-max-width: 92rem;
 }
 
 html {
   font-size: 19px;
+}
+
+@media screen and (min-width: 76.25em) {
+  .md-grid {
+    max-width: var(--oscar-site-max-width);
+  }
 }
 
 .md-typeset,
@@ -293,4 +300,95 @@ html {
 .md-typeset .oscar-pill:hover,
 .md-typeset .oscar-pill:focus {
   filter: brightness(1.06);
+}
+
+.md-typeset .oscar-media-hero {
+  margin-bottom: 1.8rem;
+}
+
+.md-typeset .oscar-media-grid {
+  display: grid;
+  gap: 1.4rem;
+  margin: 1.4rem 0 1.8rem;
+}
+
+.md-typeset .oscar-media-card {
+  padding: clamp(16px, 2.2vw, 24px);
+  border-radius: 18px;
+  border: 1px solid transparent;
+}
+
+[data-md-color-scheme="slate"] .md-typeset .oscar-media-card {
+  background:
+    linear-gradient(180deg, rgba(123, 196, 127, 0.08), rgba(123, 196, 127, 0.03)),
+    linear-gradient(160deg, rgba(16, 22, 31, 0.98), rgba(11, 16, 22, 0.98));
+  border-color: rgba(123, 196, 127, 0.22);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.24);
+}
+
+[data-md-color-scheme="default"] .md-typeset .oscar-media-card {
+  background:
+    linear-gradient(180deg, rgba(123, 196, 127, 0.08), rgba(123, 196, 127, 0.02)),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.99), rgba(241, 245, 249, 0.97));
+  border-color: rgba(123, 196, 127, 0.22);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+}
+
+.md-typeset .oscar-media-card__header > h2 {
+  margin-top: 0.15rem;
+  margin-bottom: 0.55rem;
+}
+
+.md-typeset .oscar-media-card__eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+[data-md-color-scheme="slate"] .md-typeset .oscar-media-card__eyebrow {
+  color: #B5E6B7;
+}
+
+[data-md-color-scheme="default"] .md-typeset .oscar-media-card__eyebrow {
+  color: #2F7244;
+}
+
+.md-typeset .oscar-media-card__description {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  max-width: 70ch;
+}
+
+.md-typeset .oscar-media-card__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-bottom: 1rem;
+}
+
+.md-typeset .oscar-media-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  aspect-ratio: 16 / 9;
+}
+
+[data-md-color-scheme="slate"] .md-typeset .oscar-media-frame {
+  background: rgba(3, 6, 10, 0.8);
+  border: 1px solid rgba(123, 196, 127, 0.18);
+}
+
+[data-md-color-scheme="default"] .md-typeset .oscar-media-frame {
+  background: rgba(226, 232, 240, 0.65);
+  border: 1px solid rgba(123, 196, 127, 0.2);
+}
+
+.md-typeset .oscar-media-frame iframe,
+.md-typeset .oscar-media-frame video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
 }

@@ -38,8 +38,9 @@ nav:
   - integration-node-red.md
   - integration-jupyter.md
 
-- Tutorials: 
-  - training.md
+- Training:
+  - Tutorials: tutorials.md
+  - Webinars: training.md
   - faq.md
 
 - Advanced Features:   
