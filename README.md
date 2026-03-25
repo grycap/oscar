@@ -18,9 +18,9 @@ deployed on multi-Clouds, and even on low-powered devices, to create highly-para
 data-processing serverless applications along the computing continuum. These applications execute on customized runtime
 environments provided by Docker containers that run on elastic Kubernetes clusters.
 
-Information on how to deploy an OSCAR cluster using the Infrastructure Manager can be found at: https://grycap.github.io/oscar/deploy-im-dashboard/
+Information on how to deploy an OSCAR cluster using the Infrastructure Manager can be found at: https://docs.oscar.grycap.net/latest/deploy-im-dashboard/
 
-For more documentation visit https://docs.oscar.grycap.net
+For more documentation visit https://docs.oscar.grycap.net/latest/
 
 > **_NOTE:_** If you detect inaccurate or unclear information on the documentation please report back to us either opening an issue or contacting us at products@grycap.upv.es
 
