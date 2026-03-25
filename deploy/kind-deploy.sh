@@ -421,6 +421,54 @@ deployMetrics(){
         --set kubeStateMetrics.enabled=true \
         --set nodeExporter.enabled=true
 
+    echo -e "\n[*] Deploying Geo Ip ..."
+    if [ -f "$SCRIPT_DIR/../deploy/metrics/geoip-pvc.yaml" ]; then
+        cp "$SCRIPT_DIR/../deploy/metrics/geoip-pvc.yaml" /tmp/geoip-pvc.yaml
+    else
+        cat <<'EOF' > /tmp/geoip-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: geoip-db
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: nfs
+EOF
+    fi
+
+    if [ -f "$SCRIPT_DIR/../deploy/metrics/geoip-loader.yaml" ]; then
+        cp "$SCRIPT_DIR/../deploy/metrics/geoip-loader.yaml" /tmp/geoip-loader.yaml
+    else
+        cat <<'EOF' > /tmp/geoip-loader.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: geoip-loader
+  namespace: monitoring
+spec:
+  restartPolicy: Never
+  containers:
+    - name: loader
+      image: curlimages/curl
+      command: ["sh", "-c", "curl -L https://git.io/GeoLite2-Country.mmdb -o /var/lib/geoip/GeoLite2-Country.mmdb"]
+      volumeMounts:
+        - name: geoip-db
+          mountPath: /var/lib/geoip
+  volumes:
+    - name: geoip-db
+      persistentVolumeClaim:
+        claimName: geoip-db
+
+EOF
+    fi
+    kubectl apply -f /tmp/geoip-pvc.yaml
+    kubectl apply -f /tmp/geoip-loader.yaml
+    
     echo -e "\n[*] Deploying Loki ..."
     helm repo add --force-update grafana https://grafana.github.io/helm-charts
     helm repo update
@@ -602,7 +650,7 @@ if [ `echo $use_devel_branch | tr '[:upper:]' '[:lower:]'` == "y" ]; then
 fi
 if [ `echo $use_metrics | tr '[:upper:]' '[:lower:]'` == "y" ]; then
     ENABLE_METRICS="true"
-
+fi
 if [ `echo $use_oidc | tr '[:upper:]' '[:lower:]'` == "y" ]; then
     ENABLE_OIDC="true"
 fi
@@ -810,9 +858,9 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 echo -e "\n[*] Deploying OSCAR ..."
 helm repo add --force-update grycap https://grycap.github.io/helm-charts/
 if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=standard --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative $OSCAR_HELM_IMAGE_OVERRIDES
 else
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=standard --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD $OSCAR_HELM_IMAGE_OVERRIDES
 fi
 
 if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
