@@ -68,11 +68,13 @@ You can also browse results through the Dashboard.
 
 ## Building the Images
 
-**Model image** (contains the ONNX file, served at startup by the init container):
+**Model image** (contains the ONNX file, served at startup):
 
 ```bash
 docker build -t ghcr.io/grycap/kserve-yolo8n-onnx -f Dockerfile .
 ```
+
+> Note: the image must be built and pushed to a registry before deploying the service
 
 **Script runner image** (Python environment for `script.sh`):
 
