@@ -440,8 +440,35 @@ spec:
   storageClassName: nfs
 EOF
     fi
-    kubectl apply -f /tmp/geoip-pvc.yaml
 
+    if [ -f "$SCRIPT_DIR/../deploy/metrics/geoip-loader.yaml" ]; then
+        cp "$SCRIPT_DIR/../deploy/metrics/geoip-loader.yaml" /tmp/geoip-loader.yaml
+    else
+        cat <<'EOF' > /tmp/geoip-loader.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: geoip-loader
+  namespace: monitoring
+spec:
+  restartPolicy: Never
+  containers:
+    - name: loader
+      image: curlimages/curl
+      command: ["sh", "-c", "curl -L https://git.io/GeoLite2-Country.mmdb -o /var/lib/geoip/GeoLite2-Country.mmdb"]
+      volumeMounts:
+        - name: geoip-db
+          mountPath: /var/lib/geoip
+  volumes:
+    - name: geoip-db
+      persistentVolumeClaim:
+        claimName: geoip-db
+
+EOF
+    fi
+    kubectl apply -f /tmp/geoip-pvc.yaml
+    kubectl apply -f /tmp/geoip-loader.yaml
+    
     echo -e "\n[*] Deploying Loki ..."
     helm repo add --force-update grafana https://grafana.github.io/helm-charts
     helm repo update
