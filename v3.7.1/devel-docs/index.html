@@ -8,7 +8,7 @@
       
       
       
-        <link rel="canonical" href="https://docs.oscar.grycap.net/v3.7.1/devel-docs/">
+        <link rel="canonical" href="https://docs.oscar.grycap.net/latest/v3.7.1/devel-docs/">
       
       
         <link rel="prev" href="../additional-config/">
@@ -1278,7 +1278,7 @@
   <span class="md-ellipsis">
     
   
-    Tutorials
+    Training
   
 
     
@@ -1294,11 +1294,39 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Tutorials
+    Training
   
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -1314,7 +1342,7 @@
   <span class="md-ellipsis">
     
   
-    Presentations and Webinars
+    Webinars
   
 
     
@@ -1719,6 +1747,7 @@
 
 <h1 id="documentation-development">Documentation development</h1>
 <p>OSCAR uses <a href="https://www.mkdocs.org">MKDocs</a> for the documentation. In particular, <a href="https://squidfunk.github.io/mkdocs-material/">Material for MKDocs</a>.</p>
+<p>When linking from one page under <code>docs/</code> to another OSCAR documentation page, prefer relative links such as <code>fdl.md</code> or <code>api.md</code>. This keeps links inside the currently selected version when the site is published with <code>mike</code>.</p>
 <p>Install the following dependencies:</p>
 <pre><code class="language-sh">pip install mkdocs mkdocs-material mkdocs-render-swagger-plugin mike
 </code></pre>

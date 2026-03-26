@@ -8,7 +8,7 @@
       
       
       
-        <link rel="canonical" href="https://docs.oscar.grycap.net/v3.7.1/integration-interlink/">
+        <link rel="canonical" href="https://docs.oscar.grycap.net/latest/v3.7.1/integration-interlink/">
       
       
         <link rel="prev" href="../integration-scone/">
@@ -1349,7 +1349,7 @@
   <span class="md-ellipsis">
     
   
-    Tutorials
+    Training
   
 
     
@@ -1365,11 +1365,39 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Tutorials
+    Training
   
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -1385,7 +1413,7 @@
   <span class="md-ellipsis">
     
   
-    Presentations and Webinars
+    Webinars
   
 
     
@@ -1734,12 +1762,12 @@
 <p><img alt="Diagram" src="../images/interlink.png" /></p>
 <h2 id="installation-and-use-of-interlink-node-in-oscar-cluster">Installation and use of interLink Node in OSCAR cluster</h2>
 <p>The cluster Kubernetes must have at least one virtual kubelet node. Those nodes will have tagged as <code>type=virtual-kubelet</code>. Follow the documentation in the <a href="https://intertwin-eu.github.io/interLink/">interLink homepage</a> to deploy an interLink virtual node to the Kubernetes cluster. OSCAR detects these nodes automatically.</p>
-<p>Once the Virtual node and OSCAR are installed correctly, you can use this node to offload your job to the configured remote host. To offload the jobs created by a service to an interLink node the name of the virtual node has to be set in the <code>interlink_node_name</code> variable of the <a href="https://docs.oscar.grycap.net/fdl/#service">service FDL</a>.</p>
+<p>Once the Virtual node and OSCAR are installed correctly, you can use this node to offload your job to the configured remote host. To offload the jobs created by a service to an interLink node the name of the virtual node has to be set in the <code>interlink_node_name</code> variable of the <a href="../fdl/#service">service FDL</a>.</p>
 <p>Otherwise, if the variable is not set, i.e., <code>""</code>, the job will be executed in a normal Kubernetes node.</p>
 <h2 id="annotations-restrictions-and-other-things-to-keep-in-mind">Annotations, restrictions, and other things to keep in mind</h2>
 <ul>
 <li>
-<p>The <a href="https://docs.oscar.grycap.net/fdl/#service">OSCAR services annotations</a> would be applied to every job for that service. The annotations are used to apply some configuration to the remote host.</p>
+<p>The <a href="../fdl/#service">OSCAR services annotations</a> would be applied to every job for that service. The annotations are used to apply some configuration to the remote host.</p>
 </li>
 <li>
 <p>The memory and CPU defined in the OSCAR services are not applied to the jobs that are offloaded via interLink. Those parameters are set employing the annotations, as specified by the provider.</p>

@@ -8,7 +8,7 @@
       
       
       
-        <link rel="canonical" href="https://docs.oscar.grycap.net/v3.7.1/exposed-services/">
+        <link rel="canonical" href="https://docs.oscar.grycap.net/latest/v3.7.1/exposed-services/">
       
       
         <link rel="prev" href="../invoking-async/">
@@ -1349,7 +1349,7 @@
   <span class="md-ellipsis">
     
   
-    Tutorials
+    Training
   
 
     
@@ -1365,11 +1365,39 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Tutorials
+    Training
   
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -1385,7 +1413,7 @@
   <span class="md-ellipsis">
     
   
-    Presentations and Webinars
+    Webinars
   
 
     
@@ -1812,7 +1840,7 @@ By exposing an OSCAR service, the AI model weights could be loaded just once, an
 <p>and will end up looking like this:</p>
 <pre><code class="language-bash">curl {-k} -X POST https://{oscar_endpoint}/system/services/body-pose-detection-async/exposed/{path resource} -H  &quot;accept: */*&quot; -H  &quot;Content-Type: multipart/form-data&quot; -F &quot;data=@{input image};type=image/png&quot; --output {output file}
 </code></pre>
-<p>Finally, the complete command that works in <a href="https://docs.oscar.grycap.net/local-testing/">Local Testing</a> with an image called <code>people.jpeg</code> as input and <code>output_posenet.zip</code> as output.</p>
+<p>Finally, the complete command that works in <a href="../local-testing/">Local Testing</a> with an image called <code>people.jpeg</code> as input and <code>output_posenet.zip</code> as output.</p>
 <pre><code class="language-bash">curl -X POST https://localhost/system/services/body-pose-detection-async/exposed/v3/models/posenetclas/predict/ -H  &quot;accept: */*&quot; -H  &quot;Content-Type: multipart/form-data&quot; -F &quot;data=@people.jpeg;type=image/png&quot; --output output_posenet.zip
 </code></pre>
 <p>Another FDL example shows how to expose a simple NGINX server as an OSCAR service:</p>
@@ -1830,7 +1858,7 @@ By exposing an OSCAR service, the AI model weights could be loaded just once, an
       api_port: 80  
       cpu_threshold: 50 
 </code></pre>
-<p>In case you use the NGINX example above in your <a href="https://docs.oscar.grycap.net/local-testing/">local OSCAR cluster</a>, you will see the nginx welcome page in: <code>http://localhost/system/services/nginx/exposed/</code>.
+<p>In case you use the NGINX example above in your <a href="../local-testing/">local OSCAR cluster</a>, you will see the nginx welcome page in: <code>http://localhost/system/services/nginx/exposed/</code>.
 Two active pods of the deployment will be shown with the command <code>kubectl get pods -n oscar-svc</code></p>
 <pre><code class="language-text">oscar-svc            nginx-dlp-6b9ddddbd7-cm6c9                         1/1     Running     0             2m1s
 oscar-svc            nginx-dlp-6b9ddddbd7-f4ml6                         1/1     Running     0             2m1s
