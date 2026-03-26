@@ -329,6 +329,50 @@ func TestKnativeCreateService(t *testing.T) {
 	})
 }
 
+func TestKnativeCreateServiceWithVolume(t *testing.T) {
+	fakeClientset := fake.NewSimpleClientset()
+	back := MakeKnativeBackend(fakeClientset, fakeConfig, testConfig)
+	back.knClientset = knFake.NewSimpleClientset()
+	service := types.Service{
+		Name:        "with-volume",
+		Owner:       "owner",
+		Labels:      map[string]string{},
+		Annotations: map[string]string{},
+		Volume: &types.ServiceVolumeConfig{
+			Size:      "1Gi",
+			MountPath: "/data",
+		},
+	}
+
+	if err := back.CreateService(service); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := fakeClientset.CoreV1().PersistentVolumeClaims(testConfig.ServicesNamespace).Get(t.Context(), "with-volume", metav1.GetOptions{}); err != nil {
+		t.Fatalf("expected created pvc, got error: %v", err)
+	}
+}
+
+func TestKnativeCreateServiceWithoutVolumeDoesNotCreateManagedPVC(t *testing.T) {
+	fakeClientset := fake.NewSimpleClientset()
+	back := MakeKnativeBackend(fakeClientset, fakeConfig, testConfig)
+	back.knClientset = knFake.NewSimpleClientset()
+	service := types.Service{
+		Name:        "legacy-service",
+		Owner:       "owner",
+		Image:       "img",
+		Script:      "echo",
+		Labels:      map[string]string{},
+		Annotations: map[string]string{},
+	}
+
+	if err := back.CreateService(service); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := fakeClientset.CoreV1().PersistentVolumeClaims(testConfig.ServicesNamespace).Get(t.Context(), service.Name, metav1.GetOptions{}); err == nil {
+		t.Fatalf("did not expect pvc for service without volume")
+	}
+}
+
 func TestKnativeReadService(t *testing.T) {
 	scenarios := []knativeBackendTestScenario{
 		{

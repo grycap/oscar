@@ -96,11 +96,21 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 		return err
 	}
 
+	if err := resources.EnsureServiceVolume(context.TODO(), k.config, k.kubeClientset, service, namespace); err != nil {
+		if delErr := deleteServiceConfigMap(service.Name, namespace, k.kubeClientset); delErr != nil {
+			log.Println(delErr.Error())
+		}
+		return err
+	}
+
 	// Create podSpec from the service
 	podSpec, err := service.ToPodSpec(k.config)
 	if err != nil {
 		// Delete the previously created configMap
 		if delErr := deleteServiceConfigMap(service.Name, namespace, k.kubeClientset); delErr != nil {
+			log.Println(delErr.Error())
+		}
+		if delErr := resources.DeleteServiceVolume(context.TODO(), k.kubeClientset, service, namespace); delErr != nil {
 			log.Println(delErr.Error())
 		}
 		return err
@@ -122,6 +132,9 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 	if err != nil {
 		// Delete the previously created configMap
 		if delErr := deleteServiceConfigMap(service.Name, namespace, k.kubeClientset); delErr != nil {
+			log.Println(delErr.Error())
+		}
+		if delErr := resources.DeleteServiceVolume(context.TODO(), k.kubeClientset, service, namespace); delErr != nil {
 			log.Println(delErr.Error())
 		}
 		return err
@@ -273,6 +286,10 @@ func (k *KubeBackend) DeleteService(service types.Service) error {
 	// Delete all the service's jobs
 	if err := deleteServiceJobs(name, namespace, k.kubeClientset); err != nil {
 		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
+	}
+
+	if err := resources.DeleteServiceVolume(context.TODO(), k.kubeClientset, service, namespace); err != nil {
+		log.Printf("Error deleting managed volume for service \"%s\": %v\n", name, err)
 	}
 
 	if utils.SecretExists(name, namespace, k.kubeClientset) {

@@ -18,3 +18,5 @@ data:
 Additionally, this property can be added when creating an OSCAR cluster through the IM, which will automatically create the ConfigMap.
 
 ![allowed-prefixes](images/im-dashboard/im-additional-config.png)
+
+Managed volumes do not require extra entries in this additional configuration file. Volume provisioning uses the cluster storage integration already configured for OSCAR.

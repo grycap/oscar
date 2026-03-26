@@ -56,6 +56,7 @@ require (
 )
 
 require (
+	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/common v0.66.1
 )
@@ -63,6 +64,7 @@ require (
 require (
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
+	github.com/go-openapi/spec v0.20.4 // indirect
 	github.com/go-openapi/swag/cmdutils v0.25.4 // indirect
 	github.com/go-openapi/swag/conv v0.25.4 // indirect
 	github.com/go-openapi/swag/fileutils v0.25.4 // indirect
@@ -74,10 +76,13 @@ require (
 	github.com/go-openapi/swag/stringutils v0.25.4 // indirect
 	github.com/go-openapi/swag/typeutils v0.25.4 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
+	github.com/swaggo/swag v1.16.6 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/mod v0.29.0 // indirect
+	golang.org/x/tools v0.38.0 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	sigs.k8s.io/controller-runtime v0.22.4 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect

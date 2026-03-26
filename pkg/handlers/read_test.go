@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -10,7 +11,9 @@ import (
 	"github.com/grycap/oscar/v3/pkg/backends"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
+	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -125,5 +128,46 @@ func TestMakeReadHandlerNotFound(t *testing.T) {
 
 	if resp.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 for missing service, got %d", resp.Code)
+	}
+}
+
+func TestMakeReadHandlerVolumeStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name:      "svc",
+		Namespace: "default",
+		Volume: &types.ServiceVolumeConfig{
+			Size:      "1Gi",
+			MountPath: "/data",
+		},
+	}
+	_, _ = back.GetKubeClientset().CoreV1().PersistentVolumeClaims("default").Create(t.Context(), &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "svc",
+			Namespace: "default",
+			Labels: map[string]string{
+				types.ManagedVolumeLabel:     "true",
+				types.ManagedVolumeNameLabel: "svc",
+			},
+		},
+	}, metav1.CreateOptions{})
+
+	r := gin.New()
+	r.GET("/system/services/:serviceName", MakeReadHandler(back))
+
+	req := httptest.NewRequest(http.MethodGet, "/system/services/svc", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	var got types.Service
+	if err := json.Unmarshal(resp.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+	if !got.VolumeStatus.Enabled || got.VolumeStatus.Name != "svc" {
+		t.Fatalf("expected volume status to be enabled with resolved name")
 	}
 }

@@ -468,9 +468,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 		}
 
 		probePath := service.Expose.HealthPath
-		if service.Expose.RewriteTarget {
-			probePath = getAPIPath(service.Name) + service.Expose.HealthPath
-		}
+		probePath = getProbePath(service)
 
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
@@ -1310,6 +1308,33 @@ func getTraefikAuthSecretName(name_container string) string {
 
 func getAPIPath(name_container string) string {
 	return "/system/services/" + name_container + "/exposed"
+}
+
+func normalizeHealthPath(path string) string {
+	if path == "" {
+		return "/"
+	}
+	if strings.HasPrefix(path, "/") {
+		return path
+	}
+	return "/" + path
+}
+
+func isDirectProbeMode(service types.Service) bool {
+	return strings.EqualFold(strings.TrimSpace(service.Expose.ProbeMode), "direct")
+}
+
+func getProbePath(service types.Service) string {
+	healthPath := normalizeHealthPath(service.Expose.HealthPath)
+	if isDirectProbeMode(service) {
+		return healthPath
+	}
+	// Legacy default behavior: when rewrite_target is enabled, probe through
+	// the ingress-prefixed path used by OSCAR exposed services.
+	if service.Expose.RewriteTarget {
+		return getAPIPath(service.Name) + healthPath
+	}
+	return healthPath
 }
 
 func getDeploymentName(name_container string) string {

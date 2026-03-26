@@ -130,6 +130,7 @@ storage_providers:
 | `isolation_level` </br> *string*                              |  Select the isolation level of the MinIO buckets: `SERVICE` or `USER` (`SERVICE` by default) Optional 
 | `visibility` </br> *string*                              |  Select the visibility level of service: `private`, `restricted` or `public` (`private` by default) Optional 
 | `mount` </br> *[MountSettings](#mountsettings)*                   | Configuration to mount a storage provider path inside the service container. Optional. 
+| `volume` </br> *[VolumeSettings](#volumesettings)*       | Configuration for an OSCAR-managed persistent volume attached to the service. Optional. 
 
 ## SynchronousSettings
 
@@ -151,12 +152,21 @@ storage_providers:
 | `rewrite_target` </br> *bool* | Target the URI where the traffic is redirected. (default: false). Optional.  |
 | `default_command` </br> *bool* | Select between executing the container's default command and executing the script inside the container. (default: false). Optional.  |
 | `health_path` </br> *string* | Change the service readiness and liveness check path/endpoint. (default: "/"). Optional.  |
+| `probe_mode` </br> *string* | Probe path mode for exposed-service pod health checks. `legacy` (default) keeps current behavior; `direct` probes only `health_path` on the container without the OSCAR ingress prefix. Optional. |
 
 ## MountSettings
 | Field                        | Description                                 |
 |------------------------------| --------------------------------------------|
 | `storage_provider` </br> *string*  | Identifier of the storage provider. Optional.          |
 | `path` </br> *string*  | Path to the folder that will be mounted. Optional.          |
+
+## VolumeSettings
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
+| `name` </br> *string*        | Logical volume name. Optional when creating a new volume from the service definition; required when mounting an existing managed volume. Names must follow Kubernetes DNS-1123 rules. |
+| `size` </br> *string*        | Requested volume size using Kubernetes quantity format (for example `1Gi`). Required when the service creates a new volume. |
+| `mount_path` </br> *string*  | Absolute path inside the service container where the volume is mounted. Required when volume is set. |
+| `lifecycle_policy` </br> *string*  | Lifecycle behavior for service-created volumes. Allowed values are `delete` (default) and `retain`. Ignored when mounting an existing volume. |
 
 ## Replica
 

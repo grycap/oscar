@@ -115,6 +115,12 @@ func main() {
 	system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
 	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
 
+	// CRUD Volumes
+	system.GET("/volumes", handlers.MakeListVolumesHandler(cfg, back))
+	system.POST("/volumes", handlers.MakeCreateVolumeHandler(cfg, back))
+	system.GET("/volumes/:volumeName", handlers.MakeReadVolumeHandler(cfg, back))
+	system.DELETE("/volumes/:volumeName", handlers.MakeDeleteVolumeHandler(cfg, back))
+
 	// CRUD Buckets
 	system.POST("/buckets", buckets.MakeCreateHandler(cfg))
 	system.GET("/buckets", buckets.MakeListHandler(cfg))

@@ -84,6 +84,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Check service values and set defaults
 		checkValues(&service, cfg)
+		if err := utils.ValidateVolumeConfig(service.Name, service.Volume); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+			return
+		}
 		// Check if users in allowed_users have a MinIO associated user
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
@@ -236,7 +240,13 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
 			if k8sErrors.IsAlreadyExists(err) {
-				c.String(http.StatusConflict, "A service with the provided name already exists")
+				if service.CreatesManagedVolume() {
+					c.String(http.StatusConflict, "A managed volume with the provided name already exists")
+				} else {
+					c.String(http.StatusConflict, "A service with the provided name already exists")
+				}
+			} else if k8sErrors.IsNotFound(err) && service.Volume != nil && !service.CreatesManagedVolume() {
+				c.String(http.StatusBadRequest, "Referenced volume does not exist in the caller namespace")
 			} else {
 				errDelete := back.DeleteService(service)
 				if errDelete != nil {
