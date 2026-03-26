@@ -231,6 +231,16 @@ func ensureControllerRole(ctx context.Context, kubeClientset kubernetes.Interfac
 				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
 			},
 			{
+				APIGroups: []string{"gateway.networking.k8s.io"},
+				Resources: []string{"httproutes"},
+				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
+			},
+			{
+				APIGroups: []string{"traefik.io"},
+				Resources: []string{"middlewares"},
+				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
+			},
+			{
 				APIGroups: []string{"serving.knative.dev"},
 				Resources: []string{"services"},
 				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},

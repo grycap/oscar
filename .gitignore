@@ -44,3 +44,9 @@ ui/yarn-error.log*
 
 # Generated Swagger docs
 pkg/apidocs/
+
+# Common editor/temp artifacts
+.idea/
+Thumbs.db
+*.tmp
+*.swp

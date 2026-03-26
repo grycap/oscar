@@ -32,7 +32,7 @@ require (
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/klauspost/compress v1.15.11 // indirect
+	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/minio/sha256-simd v1.0.0 // indirect
 	github.com/rs/xid v1.4.0 // indirect
@@ -57,6 +57,11 @@ require (
 
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
+	github.com/prometheus/client_golang v1.23.2
+	github.com/prometheus/common v0.66.1
+)
+
+require (
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/go-openapi/spec v0.20.4 // indirect
@@ -72,6 +77,7 @@ require (
 	github.com/go-openapi/swag/typeutils v0.25.4 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
 	github.com/swaggo/swag v1.16.6 // indirect
+	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect

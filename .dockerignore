@@ -1,13 +1,22 @@
 .git/
 .gitignore
 .dockerignore
-node_modules/
-ui/node_modules/
-ui/dist/
-*.log
-*.log*
-.env
-.env*
+Dockerfile*
+
+# Common build/test outputs
+**/node_modules/
+**/dist/
+!dashboard/dist/
+!dashboard/dist/**
+**/build/
 coverage/
-site/
-pkg/apidocs/
+*.log*
+
+# Environment files
+.env*
+
+# Editor/OS artifacts
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
