@@ -29,8 +29,6 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 // MakeListVolumesHandler godoc
@@ -83,7 +81,7 @@ func MakeCreateVolumeHandler(cfg *types.Config, back types.ServerlessBackend) gi
 			c.String(http.StatusBadRequest, fmt.Sprintf("The volume specification is not valid: %v", err))
 			return
 		}
-		if err := validateManagedVolumeCreateRequest(&req); err != nil {
+		if err := utils.ValidateManagedVolumeCreateRequest(&req); err != nil {
 			c.String(http.StatusBadRequest, err.Error())
 			return
 		}
@@ -96,6 +94,7 @@ func MakeCreateVolumeHandler(cfg *types.Config, back types.ServerlessBackend) gi
 
 		err = resources.CreateManagedVolume(
 			c.Request.Context(),
+			cfg,
 			back.GetKubeClientset(),
 			namespace,
 			owner,
@@ -210,18 +209,4 @@ func resolveVolumeCaller(c *gin.Context, cfg *types.Config, back types.Serverles
 		return "", "", err
 	}
 	return namespace, uid, nil
-}
-
-func validateManagedVolumeCreateRequest(req *types.ManagedVolumeCreateRequest) error {
-	req.Name = strings.TrimSpace(req.Name)
-	req.Size = strings.TrimSpace(req.Size)
-
-	if errs := validation.IsDNS1123Label(req.Name); len(errs) > 0 {
-		return fmt.Errorf("volume.name must satisfy Kubernetes DNS-1123 naming rules")
-	}
-	qty, err := resource.ParseQuantity(req.Size)
-	if err != nil || qty.Sign() <= 0 {
-		return fmt.Errorf("volume.size must be a valid positive quantity")
-	}
-	return nil
 }

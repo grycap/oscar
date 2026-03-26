@@ -15,11 +15,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-const volumeStorageClassName = "nfs"
-
 var ErrManagedVolumeAttached = errors.New("managed volume is still attached to one or more services")
 
-func EnsureServiceVolume(ctx context.Context, kubeClientset kubernetes.Interface, service types.Service, namespace string) error {
+func EnsureServiceVolume(ctx context.Context, cfg *types.Config, kubeClientset kubernetes.Interface, service types.Service, namespace string) error {
 	if service.Volume == nil {
 		return nil
 	}
@@ -27,6 +25,7 @@ func EnsureServiceVolume(ctx context.Context, kubeClientset kubernetes.Interface
 	if service.CreatesManagedVolume() {
 		return CreateManagedVolume(
 			ctx,
+			cfg,
 			kubeClientset,
 			namespace,
 			service.Owner,
@@ -52,11 +51,10 @@ func DeleteServiceVolume(ctx context.Context, kubeClientset kubernetes.Interface
 	return DeleteManagedVolume(ctx, kubeClientset, namespace, service.GetVolumeName(), true)
 }
 
-func CreateManagedVolume(ctx context.Context, kubeClientset kubernetes.Interface, namespace, owner, name, size, creationMode, createdByService, lifecyclePolicy string) error {
+func CreateManagedVolume(ctx context.Context, cfg *types.Config, kubeClientset kubernetes.Interface, namespace, owner, name, size, creationMode, createdByService, lifecyclePolicy string) error {
 	requests := v1.ResourceList{
 		v1.ResourceStorage: resource.MustParse(size),
 	}
-	storageClass := volumeStorageClassName
 
 	pvc := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -75,7 +73,7 @@ func CreateManagedVolume(ctx context.Context, kubeClientset kubernetes.Interface
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
-			StorageClassName: &storageClass,
+			StorageClassName: &cfg.StorageClassName,
 			Resources: v1.VolumeResourceRequirements{
 				Requests: requests,
 			},

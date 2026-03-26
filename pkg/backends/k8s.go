@@ -96,7 +96,7 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 		return err
 	}
 
-	if err := resources.EnsureServiceVolume(context.TODO(), k.kubeClientset, service, namespace); err != nil {
+	if err := resources.EnsureServiceVolume(context.TODO(), k.config, k.kubeClientset, service, namespace); err != nil {
 		if delErr := deleteServiceConfigMap(service.Name, namespace, k.kubeClientset); delErr != nil {
 			log.Println(delErr.Error())
 		}

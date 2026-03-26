@@ -22,7 +22,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path"
 	"reflect"
 	"strings"
 
@@ -33,8 +32,6 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 const (
@@ -87,7 +84,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Check service values and set defaults
 		checkValues(&service, cfg)
-		if err := validateVolumeConfig(service.Name, service.Volume); err != nil {
+		if err := utils.ValidateVolumeConfig(service.Name, service.Volume); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
@@ -711,66 +708,4 @@ func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider,
 	}
 
 	return minIOAdminClient.RestartServer()
-}
-
-func validateVolumeConfig(serviceName string, volume *types.ServiceVolumeConfig) error {
-	if volume == nil {
-		return nil
-	}
-	volume.Name = strings.TrimSpace(volume.Name)
-	volume.Size = strings.TrimSpace(volume.Size)
-	volume.MountPath = strings.TrimSpace(volume.MountPath)
-	volume.LifecyclePolicy = strings.TrimSpace(volume.LifecyclePolicy)
-
-	if volume.MountPath == "" {
-		return fmt.Errorf("volume.mount_path is required")
-	}
-
-	if volume.Size == "" && volume.Name == "" {
-		return fmt.Errorf("volume.name is required when volume.size is not set")
-	}
-
-	if volume.Name != "" {
-		if errs := validation.IsDNS1123Label(volume.Name); len(errs) > 0 {
-			return fmt.Errorf("volume.name must satisfy Kubernetes DNS-1123 naming rules")
-		}
-	}
-
-	if volume.Size != "" {
-		qty, err := resource.ParseQuantity(volume.Size)
-		if err != nil || qty.Sign() <= 0 {
-			return fmt.Errorf("volume.size must be a valid positive quantity")
-		}
-		if volume.Name == "" {
-			volume.Name = serviceName
-		}
-		switch volume.LifecyclePolicy {
-		case "":
-			volume.LifecyclePolicy = types.VolumeLifecycleDelete
-		case types.VolumeLifecycleDelete, types.VolumeLifecycleRetain:
-		default:
-			return fmt.Errorf("volume.lifecycle_policy must be either %q or %q", types.VolumeLifecycleDelete, types.VolumeLifecycleRetain)
-		}
-	} else if volume.LifecyclePolicy != "" {
-		return fmt.Errorf("volume.lifecycle_policy is only valid when volume.size is set")
-	}
-
-	if !path.IsAbs(volume.MountPath) {
-		return fmt.Errorf("volume.mount_path must be an absolute path")
-	}
-	if volume.MountPath == types.ConfigPath || volume.MountPath == types.VolumePath ||
-		strings.HasPrefix(volume.MountPath, types.ConfigPath+"/") || strings.HasPrefix(volume.MountPath, types.VolumePath+"/") {
-		return fmt.Errorf("volume.mount_path cannot overlap OSCAR reserved paths")
-	}
-	return nil
-}
-
-func sameVolumeConfig(a, b *types.ServiceVolumeConfig) bool {
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-	return a.Name == b.Name && a.Size == b.Size && a.MountPath == b.MountPath && a.LifecyclePolicy == b.LifecyclePolicy
 }

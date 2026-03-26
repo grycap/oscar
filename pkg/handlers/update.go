@@ -65,7 +65,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Check service values and set defaults
 		checkValues(&newService, cfg)
-		if err := validateVolumeConfig(newService.Name, newService.Volume); err != nil {
+		if err := utils.ValidateVolumeConfig(newService.Name, newService.Volume); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
@@ -87,7 +87,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
-		if !sameVolumeConfig(oldService.Volume, newService.Volume) {
+		if !utils.SameVolumeConfig(oldService.Volume, newService.Volume) {
 			c.String(http.StatusBadRequest, "volume updates are not supported after service creation")
 			return
 		}

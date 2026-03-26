@@ -170,6 +170,8 @@ type Config struct {
 	// when there are no available resources in the cluster (if the service has replicas)
 	ResourceManagerEnable bool `json:"-"`
 
+	StorageClassName string `json:"-"`
+
 	// // ResourceManager parameter to set the ResourceManager to use ("kubernetes" or "yunikorn")
 	// // TODO: decide if this parameter is necessary or use kubernetes by default and yunikorn always if it's enabled
 	// ResourceManager string `json:"-"`
@@ -265,6 +267,7 @@ var configVars = []configVar{
 	{"KueueDefaultCPU", "KUEUE_DEFAULT_CPU", false, stringType, "2"},
 	{"KueueDefaultMemory", "KUEUE_DEFAULT_MEMORY", false, stringType, "2Gi"},
 	{"KueueDefaultFlavor", "KUEUE_DEFAULT_FLAVOR", false, stringType, "oscar-default-flavor"},
+	{"StorageClassName", "STORAGE_CLASS_NAME", false, stringType, "nfs"},
 	{"ResourceManagerEnable", "RESOURCE_MANAGER_ENABLE", false, boolType, "false"},
 	//{"ResourceManager", "RESOURCE_MANAGER", false, resourceManagerType, "kubernetes"},
 	{"ResourceManagerInterval", "RESOURCE_MANAGER_INTERVAL", false, intType, "15"},

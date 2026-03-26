@@ -324,13 +324,6 @@ type ServiceVolumeConfig struct {
 	LifecyclePolicy string `json:"lifecycle_policy,omitempty"`
 }
 
-// VolumeStatus contains minimal managed-volume status information.
-type VolumeStatus struct {
-	Phase           string `json:"phase,omitempty"`
-	Message         string `json:"message,omitempty"`
-	AttachmentCount int    `json:"attachment_count,omitempty"`
-}
-
 // ServiceVolumeStatus contains a minimal service-side view of an attached volume.
 type ServiceVolumeStatus struct {
 	Enabled bool   `json:"enabled"`

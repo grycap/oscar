@@ -687,7 +687,7 @@ func TestValidateVolumeConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateVolumeConfig(tt.svcName, tt.volume)
+			err := utils.ValidateVolumeConfig(tt.svcName, tt.volume)
 			if tt.wantErr && err == nil {
 				t.Fatalf("expected error, got nil")
 			}

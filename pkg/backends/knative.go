@@ -114,7 +114,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		return err
 	}
 
-	if err := resources.EnsureServiceVolume(context.TODO(), kn.kubeClientset, service, namespace); err != nil {
+	if err := resources.EnsureServiceVolume(context.TODO(), kn.config, kn.kubeClientset, service, namespace); err != nil {
 		if delErr := deleteServiceConfigMap(service.Name, namespace, kn.kubeClientset); delErr != nil {
 			log.Println(delErr.Error())
 		}

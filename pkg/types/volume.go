@@ -49,3 +49,10 @@ type ManagedVolumeCreateRequest struct {
 	Name string `json:"name" binding:"required"`
 	Size string `json:"size" binding:"required"`
 }
+
+// VolumeStatus contains minimal managed-volume status information.
+type VolumeStatus struct {
+	Phase           string `json:"phase,omitempty"`
+	Message         string `json:"message,omitempty"`
+	AttachmentCount int    `json:"attachment_count,omitempty"`
+}
