@@ -1,16 +1,20 @@
 functions:
   oscar:
   - oscar-kserve-y2m:
-      name: isvc-sklearn-request
+      name: kserve-isvc-sklearn
       cpu: '1.0'
       memory: 1Gi
       image: docker.io/curlimages/curl:8.18.0
       script: script.sh
       alpine: true
-      log_level: DEBUG
+      kserve:
+        model_format: sklearn
+        storage_uri: "gs://kfserving-examples/models/sklearn/1.0/model"
+        min_scale: 1
+      log_level: CRITICAL
       input:
       - storage_provider: minio
-        path: isvc-sklearn-request/input
+        path: kserve-isvc-sklearn/input
       output:
       - storage_provider: minio
-        path: isvc-sklearn-request/output
+        path: kserve-isvc-sklearn/output
