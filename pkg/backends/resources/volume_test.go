@@ -12,6 +12,7 @@ import (
 
 func TestEnsureServiceVolumeCreate(t *testing.T) {
 	client := fake.NewSimpleClientset()
+	cfg := &types.Config{StorageClassName: "nfs"}
 	svc := types.Service{
 		Name:  "svc",
 		Owner: "owner",
@@ -20,7 +21,7 @@ func TestEnsureServiceVolumeCreate(t *testing.T) {
 			MountPath: "/data",
 		},
 	}
-	if err := EnsureServiceVolume(context.Background(), client, svc, "default"); err != nil {
+	if err := EnsureServiceVolume(context.Background(), cfg, client, svc, "default"); err != nil {
 		t.Fatalf("unexpected error creating volume pvc: %v", err)
 	}
 	if _, err := client.CoreV1().PersistentVolumeClaims("default").Get(context.Background(), svc.GetVolumePVCName(), metav1.GetOptions{}); err != nil {
@@ -30,8 +31,8 @@ func TestEnsureServiceVolumeCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("volume pvc not found: %v", err)
 	}
-	if pvc.Spec.StorageClassName == nil || *pvc.Spec.StorageClassName != volumeStorageClassName {
-		t.Fatalf("expected volume pvc storage class %q, got %v", volumeStorageClassName, pvc.Spec.StorageClassName)
+	if pvc.Spec.StorageClassName == nil || *pvc.Spec.StorageClassName != cfg.StorageClassName {
+		t.Fatalf("expected volume pvc storage class %q, got %v", cfg.StorageClassName, pvc.Spec.StorageClassName)
 	}
 	if len(pvc.Spec.AccessModes) != 1 || pvc.Spec.AccessModes[0] != v1.ReadWriteMany {
 		t.Fatalf("expected volume pvc access mode ReadWriteMany, got %v", pvc.Spec.AccessModes)
@@ -40,6 +41,7 @@ func TestEnsureServiceVolumeCreate(t *testing.T) {
 
 func TestDeleteServiceVolume(t *testing.T) {
 	client := fake.NewSimpleClientset()
+	cfg := &types.Config{StorageClassName: "nfs"}
 	svc := types.Service{
 		Name:  "svc",
 		Owner: "owner",
@@ -48,7 +50,7 @@ func TestDeleteServiceVolume(t *testing.T) {
 			MountPath: "/data",
 		},
 	}
-	if err := EnsureServiceVolume(context.Background(), client, svc, "default"); err != nil {
+	if err := EnsureServiceVolume(context.Background(), cfg, client, svc, "default"); err != nil {
 		t.Fatalf("unexpected error creating volume pvc: %v", err)
 	}
 	if err := DeleteServiceVolume(context.Background(), client, svc, "default"); err != nil {
@@ -58,6 +60,7 @@ func TestDeleteServiceVolume(t *testing.T) {
 
 func TestEnsureServiceVolumeMountExisting(t *testing.T) {
 	client := fake.NewSimpleClientset()
+	cfg := &types.Config{StorageClassName: "nfs"}
 	target := types.Service{
 		Name: "consumer",
 		Volume: &types.ServiceVolumeConfig{
@@ -76,7 +79,7 @@ func TestEnsureServiceVolumeMountExisting(t *testing.T) {
 		},
 	}, metav1.CreateOptions{})
 
-	if err := EnsureServiceVolume(context.Background(), client, target, "default"); err != nil {
+	if err := EnsureServiceVolume(context.Background(), cfg, client, target, "default"); err != nil {
 		t.Fatalf("unexpected error mounting existing volume: %v", err)
 	}
 	if _, err := client.CoreV1().PersistentVolumeClaims("default").Get(context.Background(), target.GetVolumePVCName(), metav1.GetOptions{}); err != nil {
@@ -86,6 +89,7 @@ func TestEnsureServiceVolumeMountExisting(t *testing.T) {
 
 func TestEnsureServiceVolumeMissingMountedPVC(t *testing.T) {
 	client := fake.NewSimpleClientset()
+	cfg := &types.Config{StorageClassName: "nfs"}
 	target := types.Service{
 		Name: "consumer",
 		Volume: &types.ServiceVolumeConfig{
@@ -94,7 +98,7 @@ func TestEnsureServiceVolumeMissingMountedPVC(t *testing.T) {
 		},
 	}
 
-	if err := EnsureServiceVolume(context.Background(), client, target, "default"); err == nil {
+	if err := EnsureServiceVolume(context.Background(), cfg, client, target, "default"); err == nil {
 		t.Fatalf("expected error when mounting a volume pvc that does not exist")
 	}
 }

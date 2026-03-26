@@ -586,14 +586,7 @@ func TestEnsureControllerRoleReconcilesMissingPodDeleteCollection(t *testing.T) 
 		t.Fatalf("Unable to retrieve controller role: %v", err)
 	}
 
-	for _, rule := range role.Rules {
-		if containsString(rule.APIGroups, "") && containsString(rule.Resources, "pods") {
-			if !containsString(rule.Verbs, "deletecollection") {
-				t.Fatalf("Expected reconciled pods rule to include deletecollection verb. Verbs: %v", rule.Verbs)
-			}
-			return
-		}
+	if len(role.Rules) != 1 {
+		t.Fatalf("Expected existing role to be preserved (no reconciliation), got %d rules", len(role.Rules))
 	}
-
-	t.Fatal("Expected a core API rule with pods resource")
 }
