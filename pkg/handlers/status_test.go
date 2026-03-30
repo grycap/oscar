@@ -94,6 +94,13 @@ var (
 				},
 			},
 		},
+		&v1.NamespaceList{
+			Items: []v1.Namespace{
+				{ObjectMeta: metav1.ObjectMeta{Name: "oscar"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "oscar-svc"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "oscar-svc-other"}},
+			},
+		},
 		&apps.DeploymentList{
 			Items: []apps.Deployment{
 				{
@@ -607,6 +614,17 @@ func makeFakeClients() (*fake.Clientset, *metricsfake.Clientset) {
 	_, _ = fakeClient.CoreV1().Nodes().Create(context.TODO(), &workerNode, metav1.CreateOptions{})
 	_, _ = fakeClient.CoreV1().Nodes().Create(context.TODO(), &interlinkNode, metav1.CreateOptions{})
 	_, _ = fakeClient.CoreV1().Nodes().Create(context.TODO(), &controlPlaneNode, metav1.CreateOptions{})
+
+	namesoacesList := &v1.NamespaceList{
+		Items: []v1.Namespace{
+			{ObjectMeta: metav1.ObjectMeta{Name: "oscar"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "oscar-svc"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "oscar-svc-other"}},
+		},
+	}
+	_, _ = fakeClient.CoreV1().Namespaces().Create(context.TODO(), &namesoacesList.Items[0], metav1.CreateOptions{})
+	_, _ = fakeClient.CoreV1().Namespaces().Create(context.TODO(), &namesoacesList.Items[1], metav1.CreateOptions{})
+	_, _ = fakeClient.CoreV1().Namespaces().Create(context.TODO(), &namesoacesList.Items[2], metav1.CreateOptions{})
 
 	deploy := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{

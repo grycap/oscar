@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	batchV1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -366,24 +367,39 @@ func getMinioInfo(cfg *types.Config, clusterInfo *types.StatusInfo) (err error) 
 	return nil
 }
 
-// getJobsInfo
-
+// getJobsInfo retrieves the total count of jobs and the count of pods by state for namespaces related to OSCAR services,
+// and updates the ClusterInfo structure accordingly. It filters namespaces by the prefix "oscar-svc" to focus on relevant namespaces.
 func getJobsInfo(cfg *types.Config, kubeClientset kubernetes.Interface, clusterInfo *types.StatusInfo) (err error) {
-	jobs, err := kubeClientset.BatchV1().Jobs(cfg.ServicesNamespace).List(context.Background(), metav1.ListOptions{})
+	namespaces, err := kubeClientset.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return err
+	}
+
+	var jobsItems []batchV1.Job
+	var podsItems []v1.Pod
+	// Filter by prefix "oscar-svc" to get only namespaces related to OSCAR services
+	for _, ns := range namespaces.Items {
+		if strings.HasPrefix(ns.Name, "oscar-svc") {
+			// Jobs info
+			jobs, err := kubeClientset.BatchV1().Jobs(ns.Name).List(context.Background(), metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+			jobsItems = append(jobsItems, jobs.Items...)
+
+			// Pods info (we keep the count by state)
+			pods, err := kubeClientset.CoreV1().Pods(ns.Name).List(context.Background(), metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+			podsItems = append(podsItems, pods.Items...)
+		}
 	}
 
 	// Sum all job statuses to get a simple total
 	totalJobs := 0
-	for _, job := range jobs.Items {
+	for _, job := range jobsItems {
 		totalJobs += int(job.Status.Active) + int(job.Status.Succeeded) + int(job.Status.Failed)
-	}
-
-	// Pods info (we keep the count by state)
-	pods, err := kubeClientset.CoreV1().Pods(cfg.ServicesNamespace).List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		return err
 	}
 
 	//podStates := map[string]int{}
@@ -394,13 +410,14 @@ func getJobsInfo(cfg *types.Config, kubeClientset kubernetes.Interface, clusterI
 		"Failed":    0,
 		"Unknown":   0,
 	}
-	for _, pod := range pods.Items {
+	// Count pods by their status phase
+	for _, pod := range podsItems {
 		state := string(pod.Status.Phase)
 		podStates[state]++
 	}
 
 	podInfo := types.PodStates{
-		Total:  len(pods.Items),
+		Total:  len(podsItems),
 		States: podStates,
 	}
 
