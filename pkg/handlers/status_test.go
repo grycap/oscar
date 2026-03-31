@@ -108,7 +108,10 @@ var (
 						Name:              "oscar",
 						Namespace:         "oscar",
 						CreationTimestamp: metav1.Now(),
-						Labels:            map[string]string{"app": "oscar"},
+						Labels: map[string]string{
+							"app":                       "oscar",
+							types.OscarUserServiceLabel: "true",
+						},
 					},
 					Status: apps.DeploymentStatus{
 						Replicas:          1,
@@ -134,11 +137,38 @@ var (
 						Name:              "oscar-job-1",
 						Namespace:         "oscar-svc",
 						CreationTimestamp: metav1.Now(),
+						Labels: map[string]string{
+							types.OscarUserServiceLabel: "true",
+						},
 					},
 					Status: batch.JobStatus{
 						Succeeded: 1, // 1 successful job
-						Active:    1, // 1 active job
-						Failed:    1, // 1 failed job
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "oscar-job-2",
+						Namespace:         "oscar-svc",
+						CreationTimestamp: metav1.Now(),
+						Labels: map[string]string{
+							types.OscarUserServiceLabel: "true",
+						},
+					},
+					Status: batch.JobStatus{
+						Active: 1, // 1 active job
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "oscar-job-3",
+						Namespace:         "oscar-svc",
+						CreationTimestamp: metav1.Now(),
+						Labels: map[string]string{
+							types.OscarUserServiceLabel: "true",
+						},
+					},
+					Status: batch.JobStatus{
+						Failed: 1, // 1 failed job
 					},
 				},
 			},
@@ -150,6 +180,9 @@ var (
 						Name:              "oscar-pod-1",
 						Namespace:         "oscar-svc",
 						CreationTimestamp: metav1.Now(),
+						Labels: map[string]string{
+							types.OscarUserServiceLabel: "true",
+						},
 					},
 					Status: v1.PodStatus{
 						Phase: v1.PodSucceeded, // 1 successful pod
@@ -160,6 +193,9 @@ var (
 						Name:              "oscar-pod-2",
 						Namespace:         "oscar-svc",
 						CreationTimestamp: metav1.Now(),
+						Labels: map[string]string{
+							types.OscarUserServiceLabel: "true",
+						},
 					},
 					Status: v1.PodStatus{
 						Phase: v1.PodRunning, // 1 running pod
@@ -630,7 +666,10 @@ func makeFakeClients() (*fake.Clientset, *metricsfake.Clientset) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "oscar",
 			Namespace: "oscar",
-			Labels:    map[string]string{"app": "oscar"},
+			Labels: map[string]string{
+				"app":                       "oscar",
+				types.OscarUserServiceLabel: "true",
+			},
 		},
 		Spec: apps.DeploymentSpec{
 			Replicas: int32Ptr(2),
@@ -647,6 +686,9 @@ func makeFakeClients() (*fake.Clientset, *metricsfake.Clientset) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "job-success",
 			Namespace: "oscar-svc",
+			Labels: map[string]string{
+				types.OscarUserServiceLabel: "true",
+			},
 		},
 		Status: batch.JobStatus{Succeeded: 1},
 	}
@@ -654,6 +696,9 @@ func makeFakeClients() (*fake.Clientset, *metricsfake.Clientset) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "job-failed",
 			Namespace: "oscar-svc",
+			Labels: map[string]string{
+				types.OscarUserServiceLabel: "true",
+			},
 		},
 		Status: batch.JobStatus{Failed: 1},
 	}
@@ -661,12 +706,26 @@ func makeFakeClients() (*fake.Clientset, *metricsfake.Clientset) {
 	_, _ = fakeClient.BatchV1().Jobs("oscar-svc").Create(context.TODO(), failedJob, metav1.CreateOptions{})
 
 	podSuccess := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod-success", Namespace: "oscar-svc", Labels: map[string]string{"job-name": "job-success"}},
-		Status:     v1.PodStatus{Phase: v1.PodSucceeded},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-success",
+			Namespace: "oscar-svc",
+			Labels: map[string]string{
+				"job-name":                  "job-success",
+				types.OscarUserServiceLabel: "true",
+			},
+		},
+		Status: v1.PodStatus{Phase: v1.PodSucceeded},
 	}
 	podRunning := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod-running", Namespace: "oscar-svc", Labels: map[string]string{"job-name": "job-failed"}},
-		Status:     v1.PodStatus{Phase: v1.PodRunning},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-running",
+			Namespace: "oscar-svc",
+			Labels: map[string]string{
+				"job-name":                  "job-failed",
+				types.OscarUserServiceLabel: "true",
+			},
+		},
+		Status: v1.PodStatus{Phase: v1.PodRunning},
 	}
 	_, _ = fakeClient.CoreV1().Pods("oscar-svc").Create(context.TODO(), podSuccess, metav1.CreateOptions{})
 	_, _ = fakeClient.CoreV1().Pods("oscar-svc").Create(context.TODO(), podRunning, metav1.CreateOptions{})

@@ -27,7 +27,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	batchV1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -367,39 +366,19 @@ func getMinioInfo(cfg *types.Config, clusterInfo *types.StatusInfo) (err error) 
 	return nil
 }
 
-// getJobsInfo retrieves the total count of jobs and the count of pods by state for namespaces related to OSCAR services,
-// and updates the ClusterInfo structure accordingly. It filters namespaces by the prefix "oscar-svc" to focus on relevant namespaces.
+// getJobsInfo retrieves the total count of jobs and the count of pods by state for related to OSCAR services
 func getJobsInfo(cfg *types.Config, kubeClientset kubernetes.Interface, clusterInfo *types.StatusInfo) (err error) {
-	namespaces, err := kubeClientset.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
+
+	// List all pods in the cluster that belong to OSCAR users
+	pods, err := kubeClientset.CoreV1().Pods(v1.NamespaceAll).List(context.Background(), metav1.ListOptions{LabelSelector: types.OscarUserServiceLabel})
 	if err != nil {
 		return err
 	}
 
-	var jobsItems []batchV1.Job
-	var podsItems []v1.Pod
-	// Filter by prefix "oscar-svc" to get only namespaces related to OSCAR services
-	for _, ns := range namespaces.Items {
-		if strings.HasPrefix(ns.Name, "oscar-svc") {
-			// Jobs info
-			jobs, err := kubeClientset.BatchV1().Jobs(ns.Name).List(context.Background(), metav1.ListOptions{})
-			if err != nil {
-				return err
-			}
-			jobsItems = append(jobsItems, jobs.Items...)
-
-			// Pods info (we keep the count by state)
-			pods, err := kubeClientset.CoreV1().Pods(ns.Name).List(context.Background(), metav1.ListOptions{})
-			if err != nil {
-				return err
-			}
-			podsItems = append(podsItems, pods.Items...)
-		}
-	}
-
-	// Sum all job statuses to get a simple total
-	totalJobs := 0
-	for _, job := range jobsItems {
-		totalJobs += int(job.Status.Active) + int(job.Status.Succeeded) + int(job.Status.Failed)
+	// List all jobs in the cluster that belong to OSCAR users
+	jobs, err := kubeClientset.BatchV1().Jobs(v1.NamespaceAll).List(context.Background(), metav1.ListOptions{LabelSelector: types.OscarUserServiceLabel})
+	if err != nil {
+		return err
 	}
 
 	//podStates := map[string]int{}
@@ -411,17 +390,17 @@ func getJobsInfo(cfg *types.Config, kubeClientset kubernetes.Interface, clusterI
 		"Unknown":   0,
 	}
 	// Count pods by their status phase
-	for _, pod := range podsItems {
+	for _, pod := range pods.Items {
 		state := string(pod.Status.Phase)
 		podStates[state]++
 	}
 
 	podInfo := types.PodStates{
-		Total:  len(podsItems),
+		Total:  len(pods.Items),
 		States: podStates,
 	}
 
-	clusterInfo.Oscar.JobsCount = totalJobs
+	clusterInfo.Oscar.JobsCount = len(jobs.Items)
 	clusterInfo.Oscar.Pods = podInfo
 	return nil
 }
