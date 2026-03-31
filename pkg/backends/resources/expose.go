@@ -500,7 +500,8 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 			Name:      service.Name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				keyLabelApp: prefixLabelApp + service.Name,
+				keyLabelApp:                 prefixLabelApp + service.Name,
+				types.OscarUserServiceLabel: "true",
 			},
 		},
 		Spec: *podSpec,

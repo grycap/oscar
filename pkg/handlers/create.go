@@ -355,6 +355,7 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	if service.Labels == nil {
 		service.Labels = make(map[string]string)
 	}
+	service.Labels[types.OscarUserServiceLabel] = "true"
 	service.Labels[types.ServiceLabel] = service.Name
 	service.Labels[types.YunikornApplicationIDLabel] = service.Name
 	service.Labels[types.YunikornQueueLabel] = fmt.Sprintf("%s.%s.%s", types.YunikornRootQueue, types.YunikornOscarQueue, service.Name)

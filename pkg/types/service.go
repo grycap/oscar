@@ -66,6 +66,10 @@ const (
 	// ServiceLabel label for deploying services in all backs
 	ServiceLabel = "oscar_service"
 
+	// OscarUserServiceLabel marker label applied to all pods and jobs deployed
+	// in user namespaces, used to distinguish them from cluster-level resources.
+	OscarUserServiceLabel = "oscar.grycap/user-service"
+
 	// ManagedVolumeLabel marks PVCs created and managed as OSCAR volumes.
 	ManagedVolumeLabel = "oscar.grycap/managed-volume"
 
