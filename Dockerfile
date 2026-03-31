@@ -24,9 +24,8 @@ WORKDIR /dashboard
 
 COPY dashboard /dashboard
 
-RUN sed -i -e "s|"deploy_container" : "false",|"deploy_container" : "true",|g" /dashboard/src/env.ts
 
-RUN npm install && npm run build
+RUN npm install && npm run deploy_container
 
 
 FROM alpine:3.14
