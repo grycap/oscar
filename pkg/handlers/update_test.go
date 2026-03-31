@@ -109,6 +109,9 @@ func TestMakeUpdateHandler(t *testing.T) {
 	if back.UpdatedService == nil {
 		t.Fatal("expected backend to receive updated service, got nil")
 	}
+	if back.UpdatedService.Token != svc.Token {
+		t.Fatalf("expected service token to be preserved on update, got %q", back.UpdatedService.Token)
+	}
 	if strings.Contains(back.UpdatedService.Script, "\r") {
 		t.Fatalf("expected script without CR characters, got %q", back.UpdatedService.Script)
 	}
