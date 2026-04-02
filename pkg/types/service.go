@@ -351,8 +351,10 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 	if err != nil {
 		return nil, err
 	}
+	disableServiceAccountTokenAutomount := false
 
 	podSpec := &v1.PodSpec{
+		AutomountServiceAccountToken: &disableServiceAccountTokenAutomount,
 		ImagePullSecrets: SetImagePullSecrets(service.ImagePullSecrets),
 		Containers: []v1.Container{
 			{
