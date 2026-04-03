@@ -40,6 +40,8 @@ Once the service is deployed, you can check if it was created correctly by makin
 https://{oscar_endpoint}/system/services/{service_name}/exposed/{path_resource} 
 ```
 
+For exposed services, OSCAR sets `OSCAR_SERVICE_BASE_PATH` in the container environment with the base path `/system/services/{service_name}/exposed`. The full list of OSCAR-managed environment variables is documented in [FDL](fdl.md#envvarsmap).
+
 Notice that if you get a `502 Bad Gateway` error, it is most likely because the specified port on the service does not match the API port.
 
 Additional options can be defined in the "expose" section of the FDL (some previously mentioned), such as:
