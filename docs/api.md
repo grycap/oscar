@@ -8,7 +8,30 @@ through an Ingress Controller or a Gateway API HTTPRoute. This API has been desc
 >
 > The bearer token used to run a service can be either the OSCAR [service access token](invoking-sync.md#service-access-tokens) or the [user's Access Token](integration-egi.md#obtaining-an-access-token) if the OSCAR cluster is integrated with EGI Check-in.
 
-The generated OpenAPI document includes the managed-volume endpoints under `/system/volumes` and the updated service schema with the optional `volume` block.
+!!swagger swagger.yaml!!
+
+## Deployment visibility
+
+Deployment visibility endpoints expose the current deployment summary and recent
+deployment logs for a specific service:
+
+- `/system/services/{serviceName}/deployment`
+- `/system/services/{serviceName}/deployment/logs`
+
+The service list endpoint can also include a per-service deployment summary by
+requesting:
+
+- `/system/services?include=deployment`
+
+The service detail endpoint can embed the same deployment summary in the
+service response by requesting:
+
+- `/system/services/{serviceName}?include=deployment`
+
+These endpoints are additive and service-scoped. They reuse the existing
+service-access rules, return `unavailable` when OSCAR cannot inspect a current
+runtime representation, and keep deployment evidence separate from job
+execution logs under `/system/logs/...`.
 
 ## Metrics reporting
 
@@ -42,5 +65,3 @@ to Kubernetes pod logs.
 - `LOKI_EXPOSED_QUERY` (LogQL query for exposed-service requests; default filters `/system/services/.+/exposed`)
 - `LOKI_EXPOSED_NAMESPACE` (default `ingress-nginx`)
 - `LOKI_EXPOSED_APP` (default `ingress-nginx`)
-
-!!swagger swagger.yaml!!

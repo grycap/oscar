@@ -29,6 +29,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/kubernetes"
 )
 
 // MakeReadHandler godoc
@@ -37,6 +38,7 @@ import (
 // @Tags services
 // @Produce json
 // @Param serviceName path string true "Service name"
+// @Param include query string false "Optional expansions (for example: deployment)"
 // @Success 200 {object} types.Service
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 404 {string} string "Not Found"
@@ -44,10 +46,16 @@ import (
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/services/{serviceName} [get]
-func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
+func MakeReadHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		service, err := back.ReadService("", c.Param("serviceName"))
+		serviceName, ok := validateServiceName(c, c.Param("serviceName"))
+		if !ok {
+			return
+		}
+
+		service, err := back.ReadService("", serviceName)
 		authHeader := c.GetHeader("Authorization")
+		includeDeployment := includeQueryContains(c.Query("include"), "deployment")
 
 		if err != nil {
 			// Check if error is caused because the service is not found
@@ -64,6 +72,12 @@ func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
 			setVolumeStatus(back, service)
+			if includeDeployment {
+				if err := setDeploymentSummary(back, kubeClientset, cfg, service); err != nil {
+					c.String(http.StatusInternalServerError, err.Error())
+					return
+				}
+			}
 
 			switch service.Visibility {
 			case utils.PUBLIC:
@@ -85,6 +99,12 @@ func MakeReadHandler(back types.ServerlessBackend) gin.HandlerFunc {
 			}
 		} else {
 			setVolumeStatus(back, service)
+			if includeDeployment {
+				if err := setDeploymentSummary(back, kubeClientset, cfg, service); err != nil {
+					c.String(http.StatusInternalServerError, err.Error())
+					return
+				}
+			}
 			c.JSON(http.StatusOK, service)
 		}
 	}
