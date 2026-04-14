@@ -164,8 +164,10 @@ func MakeUpdateVolumeHandler(cfg *types.Config, back types.ServerlessBackend) gi
 			return
 		}
 
-		utils.UpdateVolumeLimits(vl, auth.FormatUID(user), utils.BuildUserNamespace(cfg, user), back.GetKubeClientset(), cfg)
-
+		err := utils.UpdateVolumeLimits(vl, auth.FormatUID(user), utils.BuildUserNamespace(cfg, user), back.GetKubeClientset(), cfg)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error at updating volume: %v", err))
+		}
 		c.Status(http.StatusNoContent)
 	}
 }

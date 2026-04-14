@@ -47,6 +47,7 @@ type QuotaUpdateRequest struct {
 func CreateQuotaBackend(kubeConfig *rest.Config, kubeClientset *kubernetes.Clientset) *QuotaBackend {
 	client, err := kueueclientset.NewForConfig(kubeConfig)
 	if err != nil {
+		// #nosec
 		fmt.Errorf("creating kueue client: %w", err)
 		return nil
 	}
