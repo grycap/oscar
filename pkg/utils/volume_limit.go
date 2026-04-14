@@ -43,7 +43,7 @@ func EnsureVolumeLimits(name string, namespace string, kubeClientset kubernetes.
 	_, errQuotas := getResouceQuotas(name, namespace, kubeClientset)
 	quota := fromConftoVolumeLimits(cfg)
 
-	if errQuotas == nil {
+	if errQuotas != nil {
 		QuotasLogger.Printf("Creating ResourceQuota %s", name)
 		// #nosec
 		createResources(name, namespace, kubeClientset, &quota)
@@ -52,7 +52,7 @@ func EnsureVolumeLimits(name string, namespace string, kubeClientset kubernetes.
 	}
 
 	_, errLimits := getLimits(name, namespace, kubeClientset)
-	if errLimits == nil {
+	if errLimits != nil {
 		LimitsLogger.Printf("Creating Limit %s", name)
 		// #nosec
 		createLimits(name, namespace, kubeClientset, &quota)
