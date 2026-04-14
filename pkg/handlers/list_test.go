@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -24,6 +25,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/backends"
+	"github.com/grycap/oscar/v3/pkg/types"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestMakeListHandler(t *testing.T) {
@@ -62,5 +66,47 @@ func TestMakeListHandler(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMakeListHandlerVolumeStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	back.Services = []*types.Service{
+		{
+			Name:      "svc",
+			Namespace: "default",
+			Volume: &types.ServiceVolumeConfig{
+				Size:      "1Gi",
+				MountPath: "/data",
+			},
+		},
+	}
+	_, _ = back.GetKubeClientset().CoreV1().PersistentVolumeClaims("default").Create(t.Context(), &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "svc",
+			Namespace: "default",
+			Labels: map[string]string{
+				types.ManagedVolumeLabel:     "true",
+				types.ManagedVolumeNameLabel: "svc",
+			},
+		},
+	}, metav1.CreateOptions{})
+
+	r := gin.New()
+	r.GET("/system/services", MakeListHandler(back))
+
+	req := httptest.NewRequest(http.MethodGet, "/system/services", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var got []types.Service
+	if err := json.Unmarshal(resp.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+	if len(got) != 1 || !got[0].VolumeStatus.Enabled || got[0].VolumeStatus.Name != "svc" {
+		t.Fatalf("expected volume status enabled in list response")
 	}
 }

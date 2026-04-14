@@ -360,7 +360,6 @@ func TestToPodSpec(t *testing.T) {
 	}
 }
 
-
 func TestConvertSecretsEnvVars(t *testing.T) {
 	secretRefs := ConvertSecretsEnvVars("my-secret")
 	if len(secretRefs) != 1 {
@@ -400,5 +399,54 @@ func TestHasReplicas(t *testing.T) {
 	svc.Replicas = []Replica{{Type: "oscar", ClusterID: "a", ServiceName: "svc"}}
 	if !svc.HasReplicas() {
 		t.Fatalf("expected HasReplicas to be true when replicas are defined")
+	}
+}
+
+func TestGetVolumePVCName(t *testing.T) {
+	svc := Service{Name: "demo"}
+	expected := "demo"
+	if got := svc.GetVolumePVCName(); got != expected {
+		t.Fatalf("expected volume pvc name %s, got %s", expected, got)
+	}
+
+	svc.Volume = &ServiceVolumeConfig{
+		Name:      "openclaw-data",
+		MountPath: "/data",
+	}
+	expected = "openclaw-data"
+	if got := svc.GetVolumePVCName(); got != expected {
+		t.Fatalf("expected volume pvc name %s, got %s", expected, got)
+	}
+}
+
+func TestToPodSpecWithVolume(t *testing.T) {
+	copy, err := deepcopy.Anything(testService)
+	if err != nil {
+		t.Fatalf("unable to deep copy test service: %v", err)
+	}
+	svc := copy.(Service)
+	svc.Volume = &ServiceVolumeConfig{
+		Size:      "1Gi",
+		MountPath: "/data",
+	}
+
+	podSpec, err := svc.ToPodSpec(&testConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var foundVolume, foundMount bool
+	for _, v := range podSpec.Volumes {
+		if v.Name == ServiceVolumeName && v.PersistentVolumeClaim != nil && v.PersistentVolumeClaim.ClaimName == svc.GetVolumePVCName() {
+			foundVolume = true
+		}
+	}
+	for _, vm := range podSpec.Containers[0].VolumeMounts {
+		if vm.Name == ServiceVolumeName && vm.MountPath == "/data" {
+			foundMount = true
+		}
+	}
+	if !foundVolume || !foundMount {
+		t.Fatalf("expected volume and mount to be present")
 	}
 }

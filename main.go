@@ -40,6 +40,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/backends"
 	"github.com/grycap/oscar/v3/pkg/handlers"
 	"github.com/grycap/oscar/v3/pkg/handlers/buckets"
+	"github.com/grycap/oscar/v3/pkg/metrics"
 	"github.com/grycap/oscar/v3/pkg/resourcemanager"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
@@ -95,6 +96,12 @@ func main() {
 		go resourcemanager.StartReScheduler(cfg, back, kubeClientset)
 	}
 
+	//Create quotaBackend
+	var qb *types.QuotaBackend
+	if cfg.KueueEnable {
+		qb = types.CreateQuotaBackend(kubeConfig, kubeClientset)
+	}
+
 	// Create the router
 	r := gin.Default()
 
@@ -114,6 +121,14 @@ func main() {
 	system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
 	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
 
+	// CRUD Volumes
+	if cfg.VolumeEnable {
+		system.GET("/volumes", handlers.MakeListVolumesHandler(cfg, back))
+		system.POST("/volumes", handlers.MakeCreateVolumeHandler(cfg, back))
+		system.PUT("/volumes/:userId", handlers.MakeUpdateVolumeHandler(cfg, back))
+		system.GET("/volumes/:volumeName", handlers.MakeReadVolumeHandler(cfg, back))
+		system.DELETE("/volumes/:volumeName", handlers.MakeDeleteVolumeHandler(cfg, back))
+	}
 	// CRUD Buckets
 	system.POST("/buckets", buckets.MakeCreateHandler(cfg))
 	system.GET("/buckets", buckets.MakeListHandler(cfg))
@@ -132,11 +147,19 @@ func main() {
 	// Status path for cluster status (Memory and CPU) checks
 	system.GET("/status", handlers.MakeStatusHandler(cfg, kubeClientset, metricsClientset))
 
+	// Metrics reporting endpoints
+	metricsSources := metrics.DefaultSources(cfg, back, kubeClientset)
+	metricsAgg := &metrics.Aggregator{Sources: metricsSources}
+	metricsGroup := r.Group("/system/metrics", auth.GetAuthMiddleware(cfg, kubeClientset))
+	metricsGroup.GET("", handlers.MakeMetricsSummaryHandler(metricsAgg))
+	metricsGroup.GET("/breakdown", handlers.MakeMetricsBreakdownHandler(metricsAgg))
+	metricsGroup.GET("/:serviceName", handlers.MakeMetricValueHandler(metricsAgg))
 	// Quotas
-	system.GET("/quotas/user", handlers.MakeGetOwnQuotaHandler(cfg, kubeConfig))
-	system.GET("/quotas/user/:userId", handlers.MakeGetUserQuotaHandler(cfg, kubeConfig))
-	system.PUT("/quotas/user/:userId", handlers.MakeUpdateUserQuotaHandler(cfg, kubeConfig))
-
+	if cfg.KueueEnable {
+		system.GET("/quotas/user", handlers.MakeGetOwnQuotaHandler(*qb, cfg))
+		system.GET("/quotas/user/:userId", handlers.MakeGetUserQuotaHandler(*qb, cfg))
+		system.PUT("/quotas/user/:userId", handlers.MakeUpdateUserQuotaHandler(*qb, cfg))
+	}
 	// Job path for async invocations
 	r.POST("/job/:serviceName", auth.GetLoggerMiddleware(), handlers.MakeJobHandler(cfg, kubeClientset, back, resMan))
 

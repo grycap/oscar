@@ -41,19 +41,9 @@ rclone mount s3:/$S3_BUCKET $MNT_POINT/$S3_BUCKET `
 	webdavCommand = `mkdir -p $MNT_POINT/$WEBDAV_FOLDER
 rclone config create dcache webdav url=$WEBDAV_HOSTNAME vendor=other user=$WEBDAV_LOGIN pass=$WEBDAV_PASSWORD
 rclone mount dcache:$WEBDAV_FOLDER $MNT_POINT/$WEBDAV_FOLDER --vfs-cache-mode full `
-	communCommand = `--dir-cache-time 10s --allow-other --allow-non-empty --umask 0007 --uid 1000 --gid 100 --allow-other  --no-checksum &
-pid=$!
-while true; do
-	if [ -f /tmpfolder/finish-file ]; then
-		kill $pid
-		exit 0
-	fi
-	sleep 5
-done`
-	rcloneFolderMount    = "/mnt"
-	rcloneVolumeName     = "shared-data"
-	ephemeralVolumeName  = "ephemeral-data"
-	ephemeralVolumeMount = "/tmpfolder"
+	communCommand     = `--dir-cache-time 10s --allow-other --allow-non-empty --umask 0007 --uid 1000 --gid 100 --allow-other  --no-checksum`
+	rcloneFolderMount = "/mnt"
+	rcloneVolumeName  = "shared-data"
 )
 
 // SetMount Creates the sidecar container that mounts the source volume onto the pod volume
@@ -76,21 +66,8 @@ func addVolume(podSpec *v1.PodSpec) {
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		},
 	}
-	ephemeralvolumeMountShare := v1.VolumeMount{
-		Name:             ephemeralVolumeName,
-		MountPath:        ephemeralVolumeMount,
-		MountPropagation: &hostToContainer,
-	}
-	ephemeralvolumeshare := v1.Volume{
-		Name: ephemeralVolumeName,
-		VolumeSource: v1.VolumeSource{
-			EmptyDir: &v1.EmptyDirVolumeSource{},
-		},
-	}
 	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, volumeMountShare)
-	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, ephemeralvolumeMountShare)
 	podSpec.Volumes = append(podSpec.Volumes, volumeshare)
-	podSpec.Volumes = append(podSpec.Volumes, ephemeralvolumeshare)
 }
 
 func sidecarPodSpec(service types.Service, cfg *types.Config) v1.Container {
@@ -120,11 +97,6 @@ func sidecarPodSpec(service types.Service, cfg *types.Config) v1.Container {
 			{
 				Name:             rcloneVolumeName,
 				MountPath:        rcloneFolderMount,
-				MountPropagation: &bidirectional,
-			},
-			{
-				Name:             ephemeralVolumeName,
-				MountPath:        ephemeralVolumeMount,
 				MountPropagation: &bidirectional,
 			},
 		},

@@ -1,14 +1,14 @@
 # MinIO bucket replication
 
-In scenarios where you have two linked OSCAR clusters as part of the same workflow defined in [FDL](https://docs.oscar.grycap.net/fdl/), temporary network disconnections cause that data generated on the first cluster during the disconnection time is lost as well. 
+In scenarios where you have two linked OSCAR clusters as part of the same workflow defined in [FDL](https://docs.oscar.grycap.net/fdl/), temporary network disconnections can cause data generated on the first cluster during the disconnection period to be lost.
 
-To resolve this scenario we propose the use of replicated buckets on MinIO. With this approach, you can have two buckets synchronized on different OSCAR clusters so that, if the connection is lost, they will be re-synchronized when the connection is restored.
+To address this scenario, we propose using replicated buckets in MinIO. With this approach, you can have two buckets synchronized across different OSCAR clusters so that, if the connection is lost, they are re-synchronized when the connection is restored.
 
 An example of this scenario is shown on the following diagram, where there are two MinIO instances (each one on a different OSCAR cluster), and the output of the execution of *service_x* on the source serves as input for the *service_y* on the remote cluster.
 
 ![minio-replication-diagram](images/minio-bucket-replication/minio-replication-diagram.png)
 
-Here is in more detail the data flow between the buckets:
+Here is the data flow between the buckets in more detail:
 
 **MinIO instance source**
 
@@ -22,9 +22,9 @@ Here is in more detail the data flow between the buckets:
 
 ### Considerations
 
-When you create the service on the remote OSCAR cluster, the `intermediate` bucket which is both the replica and input of the OSCAR service will have the webhook event for PUT actions enabled so it can trigger the OSCAR service.
+When you create the service on the remote OSCAR cluster, the `intermediate` bucket, which is both the replica and input of the OSCAR service, will have the webhook event for PUT actions enabled so it can trigger the OSCAR service.
 
-Because, as explained below on [Event handling on replication events](#event-handling-on-replication-events), there are some specific events for replicated buckets, it is important to delete this event webhook to avoid getting both events every time.
+As explained in [Event handling on replication events](#event-handling-on-replication-events), there are specific events for replicated buckets, so it is important to delete this event webhook to avoid receiving both events each time.
 
 ```
 mc event remove originminio/intermediate arn:aws:sqs::intermediate:webhook --event put
@@ -32,7 +32,7 @@ mc event remove originminio/intermediate arn:aws:sqs::intermediate:webhook --eve
 
 ## Helm installation
 
-To be able to use replication each MinIO instance deployed with Helm has to be configured in distributed mode. This is done by adding the parameters `mode=distributed,replicas=NUM_REPLICAS`.
+To use replication, each MinIO instance deployed with Helm has to be configured in distributed mode. This is done by adding the parameters `mode=distributed,replicas=NUM_REPLICAS`.
 
 Here is an example of a local MinIO replicated deployment with Helm:
 
@@ -44,7 +44,7 @@ helm install minio minio/minio --namespace minio --set rootUser=minio,rootPasswo
 
 To use the replication service it is necessary to set up manually both the requirements and the replication, either by command line or via the MinIO console. We created a test environment with replication via the command line as follows.
 
-First, we define our minIO instances (`originminio` and `remoteminio`) on the minio client.
+First, we define our MinIO instances (`originminio` and `remoteminio`) on the MinIO client.
 
 ```
 mc alias set originminio https://localminio minioadminuser minioadminpassword
@@ -52,7 +52,7 @@ mc alias set originminio https://localminio minioadminuser minioadminpassword
 mc alias set remoteminio https://remoteminio minioadminuser minioadminpassword
 ```
 
-A requisite for replication is to enable the versioning on the buckets that will serve as origin and replica. When we create a service through OSCAR and the minIO buckets are created, versioning is not enabled by default, so we have to do it manually.
+A requirement for replication is to enable versioning on the buckets that will serve as origin and replica. When we create a service through OSCAR and the MinIO buckets are created, versioning is not enabled by default, so we have to do it manually.
 
 ```
 mc version enable originminio/intermediate
