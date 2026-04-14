@@ -316,8 +316,8 @@ var configVars = []configVar{
 
 	{"VolumeEnable", "VOLUME_ENABLE", false, boolType, "true"},
 	{"StorageClassName", "STORAGE_CLASS_NAME", false, stringType, "nfs"},
-	{"VolumeAvailable", "VOLUME_AVAILABLE", false, stringType, "5"},
-	{"VolumeMax", "VOLUME_MAX", false, stringType, "7Gi"},
+	{"VolumeAvailable", "VOLUME_AVAILABLE", false, stringType, "7Gi"},
+	{"VolumeMax", "VOLUME_MAX", false, stringType, "5"},
 	{"VolumeMaxDisk", "VOLUME_MAX_DISK", false, stringType, "5Gi"},
 	{"VolumeMinDisk", "VOLUME_MIN_DISK", false, stringType, "200Mi"},
 
