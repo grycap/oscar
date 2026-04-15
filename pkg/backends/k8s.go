@@ -348,12 +348,12 @@ func getServiceFromConfigMap(cm *v1.ConfigMap) (*types.Service, error) {
 }
 
 func GetExposedServiceDeployment(kubeClientset kubernetes.Interface, namespace, serviceName string) (*appsv1.Deployment, error) {
-	return kubeClientset.AppsV1().Deployments(namespace).Get(context.TODO(), serviceName+"-dlp", metav1.GetOptions{})
+	return kubeClientset.AppsV1().Deployments(namespace).Get(context.TODO(), resources.GetDeploymentName(serviceName), metav1.GetOptions{})
 }
 
 func ListExposedServicePods(kubeClientset kubernetes.Interface, namespace, serviceName string) (*v1.PodList, error) {
 	return kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("app=%s%s", exposedServiceAppLabelPrefix, serviceName),
+		LabelSelector: string(resources.KeyLabelApp) + "=" + resources.GetKeyLabelApp(serviceName),
 	})
 }
 

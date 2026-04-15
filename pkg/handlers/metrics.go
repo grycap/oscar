@@ -163,7 +163,6 @@ func MakeMetricsSummaryHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 // @Summary Get metrics breakdown
 // @Tags metrics
 // @Produce json
-// @Produce plain
 // @Param start query string false "RFC3339 start timestamp (defaults to end-24h)"
 // @Param end query string false "RFC3339 end timestamp (defaults to now)"
 // @Param group_by query string true "Breakdown dimension" Enums(service,user,country)

@@ -50,6 +50,7 @@ func MakeReadHandler(back types.ServerlessBackend, kubeClientset kubernetes.Inte
 	return func(c *gin.Context) {
 		serviceName, ok := validateServiceName(c, c.Param("serviceName"))
 		if !ok {
+			c.String(http.StatusBadRequest, serviceName)
 			return
 		}
 
@@ -66,18 +67,25 @@ func MakeReadHandler(back types.ServerlessBackend, kubeClientset kubernetes.Inte
 			}
 			return
 		}
+		setVolumeStatus(back, service)
+		if includeDeployment {
+			if err := setDeploymentSummary(back, kubeClientset, cfg, service); err != nil {
+				c.String(http.StatusInternalServerError, err.Error())
+				return
+			}
+		}
 		if len(strings.Split(authHeader, "Bearer")) > 1 {
 			uid, err := auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			}
-			setVolumeStatus(back, service)
+			/*setVolumeStatus(back, service)
 			if includeDeployment {
 				if err := setDeploymentSummary(back, kubeClientset, cfg, service); err != nil {
 					c.String(http.StatusInternalServerError, err.Error())
 					return
 				}
-			}
+			}*/
 
 			switch service.Visibility {
 			case utils.PUBLIC:
@@ -97,14 +105,16 @@ func MakeReadHandler(back types.ServerlessBackend, kubeClientset kubernetes.Inte
 				c.String(http.StatusForbidden, "User %s doesn't have permision to get this service", uid)
 				return
 			}
+			c.String(http.StatusForbidden, "User %s doesn't have permision to get this service", uid)
+			return
 		} else {
-			setVolumeStatus(back, service)
+			/*setVolumeStatus(back, service)
 			if includeDeployment {
 				if err := setDeploymentSummary(back, kubeClientset, cfg, service); err != nil {
 					c.String(http.StatusInternalServerError, err.Error())
 					return
 				}
-			}
+			}*/
 			c.JSON(http.StatusOK, service)
 		}
 	}

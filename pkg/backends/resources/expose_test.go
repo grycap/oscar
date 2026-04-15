@@ -93,7 +93,7 @@ func TestCreateExposeWithIngressAndAuth(t *testing.T) {
 		t.Fatalf("CreateExpose returned error: %v", err)
 	}
 
-	if _, err := client.AppsV1().Deployments(svc.Namespace).Get(context.TODO(), getDeploymentName(svc.Name), metav1.GetOptions{}); err != nil {
+	if _, err := client.AppsV1().Deployments(svc.Namespace).Get(context.TODO(), GetDeploymentName(svc.Name), metav1.GetOptions{}); err != nil {
 		t.Fatalf("expected deployment to exist: %v", err)
 	}
 
@@ -284,7 +284,7 @@ func TestDeleteExposeRemovesResources(t *testing.T) {
 		t.Fatalf("DeleteExpose returned error: %v", err)
 	}
 
-	if _, err := client.AppsV1().Deployments(svc.Namespace).Get(context.TODO(), getDeploymentName(svc.Name), metav1.GetOptions{}); err == nil {
+	if _, err := client.AppsV1().Deployments(svc.Namespace).Get(context.TODO(), GetDeploymentName(svc.Name), metav1.GetOptions{}); err == nil {
 		t.Fatalf("expected deployment to be removed")
 	}
 

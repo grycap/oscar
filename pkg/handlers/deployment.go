@@ -73,10 +73,12 @@ func MakeGetDeploymentStatusHandler(back types.ServerlessBackend, kubeClientset 
 	return func(c *gin.Context) {
 		serviceName, ok := validateServiceName(c, c.Param("serviceName"))
 		if !ok {
+			c.String(http.StatusBadRequest, serviceName)
 			return
 		}
 		service, ok := getAuthorizedService(c, back, serviceName)
 		if !ok {
+			c.String(http.StatusForbidden, "You do not have permission to access this service")
 			return
 		}
 
@@ -110,10 +112,12 @@ func MakeGetDeploymentLogsHandler(back types.ServerlessBackend, kubeClientset ku
 	return func(c *gin.Context) {
 		serviceName, ok := validateServiceName(c, c.Param("serviceName"))
 		if !ok {
+			c.String(http.StatusBadRequest, serviceName)
 			return
 		}
 		service, ok := getAuthorizedService(c, back, serviceName)
 		if !ok {
+			c.String(http.StatusForbidden, "You do not have permission to access this service")
 			return
 		}
 
@@ -640,12 +644,10 @@ func parseDeploymentLogLine(line string) logEntryWithTime {
 func validateServiceName(c *gin.Context, serviceName string) (string, bool) {
 	serviceName = strings.TrimSpace(serviceName)
 	if serviceName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "serviceName is required"})
-		return "", false
+		return "serviceName is required", false
 	}
 	if errs := validation.IsValidLabelValue(serviceName); len(errs) > 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid serviceName"})
-		return "", false
+		return "invalid serviceName", false
 	}
 	return serviceName, true
 }
