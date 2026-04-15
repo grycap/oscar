@@ -27,13 +27,17 @@ import (
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	serving "knative.dev/serving/pkg/apis/serving"
 )
 
 const ConfigMapNameOSCAR = "additional-oscar-config"
+
+const exposedServiceAppLabelPrefix = "oscar-svc-exp-"
 
 // KubeBackend struct to represent a Kubernetes client to store services as podTemplates
 type KubeBackend struct {
@@ -96,11 +100,21 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 		return err
 	}
 
+	if err := resources.EnsureServiceVolume(context.TODO(), k.config, k.kubeClientset, service, namespace); err != nil {
+		if delErr := deleteServiceConfigMap(service.Name, namespace, k.kubeClientset); delErr != nil {
+			log.Println(delErr.Error())
+		}
+		return err
+	}
+
 	// Create podSpec from the service
 	podSpec, err := service.ToPodSpec(k.config)
 	if err != nil {
 		// Delete the previously created configMap
 		if delErr := deleteServiceConfigMap(service.Name, namespace, k.kubeClientset); delErr != nil {
+			log.Println(delErr.Error())
+		}
+		if delErr := resources.DeleteServiceVolume(context.TODO(), k.kubeClientset, service, namespace); delErr != nil {
 			log.Println(delErr.Error())
 		}
 		return err
@@ -122,6 +136,9 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 	if err != nil {
 		// Delete the previously created configMap
 		if delErr := deleteServiceConfigMap(service.Name, namespace, k.kubeClientset); delErr != nil {
+			log.Println(delErr.Error())
+		}
+		if delErr := resources.DeleteServiceVolume(context.TODO(), k.kubeClientset, service, namespace); delErr != nil {
 			log.Println(delErr.Error())
 		}
 		return err
@@ -275,6 +292,10 @@ func (k *KubeBackend) DeleteService(service types.Service) error {
 		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
 	}
 
+	if err := resources.DeleteServiceVolume(context.TODO(), k.kubeClientset, service, namespace); err != nil {
+		log.Printf("Error deleting managed volume for service \"%s\": %v\n", name, err)
+	}
+
 	if utils.SecretExists(name, namespace, k.kubeClientset) {
 		secretsErr := utils.DeleteSecret(name, namespace, k.kubeClientset)
 		if secretsErr != nil {
@@ -285,7 +306,7 @@ func (k *KubeBackend) DeleteService(service types.Service) error {
 	// If service is exposed delete the exposed k8s components
 	if service.Expose.APIPort != 0 {
 		if err := resources.DeleteExpose(name, namespace, k.kubeClientset, k.config); err != nil {
-			log.Printf("Error deleting all associated kubernetes component of the expose config \"%s\": %v\n", name, err)
+			return fmt.Errorf("error deleting all associated kubernetes components of exposed service \"%s\": %v", name, err)
 		}
 	}
 
@@ -324,6 +345,28 @@ func getServiceFromConfigMap(cm *v1.ConfigMap) (*types.Service, error) {
 	service.Script = cm.Data[types.ScriptFileName]
 
 	return service, nil
+}
+
+func GetExposedServiceDeployment(kubeClientset kubernetes.Interface, namespace, serviceName string) (*appsv1.Deployment, error) {
+	return kubeClientset.AppsV1().Deployments(namespace).Get(context.TODO(), resources.GetDeploymentName(serviceName), metav1.GetOptions{})
+}
+
+func ListExposedServicePods(kubeClientset kubernetes.Interface, namespace, serviceName string) (*v1.PodList, error) {
+	return kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: string(resources.KeyLabelApp) + "=" + resources.GetKeyLabelApp(serviceName),
+	})
+}
+
+func ListServicePods(kubeClientset kubernetes.Interface, namespace, serviceName string) (*v1.PodList, error) {
+	return kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", types.ServiceLabel, serviceName),
+	})
+}
+
+func ListKnativeServicePods(kubeClientset kubernetes.Interface, namespace, serviceName string) (*v1.PodList, error) {
+	return kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", serving.ServiceLabelKey, serviceName),
+	})
 }
 
 func checkAdditionalConfig(configName string, configNamespace string, service types.Service, cfg *types.Config, kubeClientset kubernetes.Interface) error {

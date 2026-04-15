@@ -127,3 +127,79 @@ func TestMakeDeleteHandler(t *testing.T) {
 	// Close the fake MinIO server
 	defer server.Close()
 }
+
+func TestMakeDeleteHandlerPassesVolumeLifecycleService(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		if !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
+			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
+		}
+		if hreq.URL.Path == "/minio/admin/v3/info" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			return
+		}
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"status": "success"}`))
+	}))
+	defer server.Close()
+
+	cfg := &types.Config{
+		ServicesNamespace: "oscar-svc",
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "ak",
+			SecretKey: "sk",
+			Verify:    false,
+		},
+	}
+
+	tests := []struct {
+		name      string
+		lifecycle string
+	}{
+		{name: "retain", lifecycle: types.VolumeLifecycleRetain},
+		{name: "delete", lifecycle: types.VolumeLifecycleDelete},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			back := backends.MakeFakeBackend()
+			back.Service = &types.Service{
+				Name:      "svc",
+				Namespace: cfg.ServicesNamespace,
+				Owner:     "owner@example.com",
+				Volume: &types.ServiceVolumeConfig{
+					Name:            "svc",
+					Size:            "1Gi",
+					MountPath:       "/data",
+					LifecyclePolicy: tt.lifecycle,
+				},
+			}
+
+			r := gin.New()
+			r.Use(func(c *gin.Context) {
+				c.Set("uidOrigin", "owner@example.com")
+				c.Next()
+			})
+			r.DELETE("/system/services/:serviceName", MakeDeleteHandler(cfg, back))
+
+			req := httptest.NewRequest(http.MethodDelete, "/system/services/svc", nil)
+			req.Header.Set("Authorization", "Bearer token")
+			resp := httptest.NewRecorder()
+			r.ServeHTTP(resp, req)
+
+			if resp.Code != http.StatusNoContent {
+				t.Fatalf("expected 204, got %d: %s", resp.Code, resp.Body.String())
+			}
+			if back.DeletedService == nil || back.DeletedService.Volume == nil {
+				t.Fatalf("expected delete handler to pass service volume to backend")
+			}
+			if back.DeletedService.Volume.LifecyclePolicy != tt.lifecycle {
+				t.Fatalf("expected lifecycle %q, got %q", tt.lifecycle, back.DeletedService.Volume.LifecyclePolicy)
+			}
+		})
+	}
+}

@@ -1,0 +1,350 @@
+openapi: 3.0.3
+info:
+  title: OSCAR Managed Volumes Contract (Planning Draft)
+  version: 0.2.0
+  description: |
+    Planning contract for namespace-scoped managed volumes and service-side volume
+    attachment in OSCAR.
+servers:
+  - url: /
+paths:
+  /system/volumes:
+    get:
+      summary: List volumes in the caller namespace
+      tags:
+        - volumes
+      responses:
+        '200':
+          description: Volume list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ManagedVolume'
+        '401':
+          description: Unauthorized
+    post:
+      summary: Create a managed volume in the caller namespace
+      tags:
+        - volumes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManagedVolumeCreateRequest'
+      responses:
+        '201':
+          description: Volume created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedVolume'
+        '400':
+          description: Invalid volume definition
+        '401':
+          description: Unauthorized
+        '409':
+          description: Volume name already exists in the caller namespace
+  /system/volumes/{volumeName}:
+    get:
+      summary: Read a managed volume in the caller namespace
+      tags:
+        - volumes
+      parameters:
+        - in: path
+          name: volumeName
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Volume detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedVolume'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Volume not found in caller namespace
+    delete:
+      summary: Delete a detached managed volume in the caller namespace
+      tags:
+        - volumes
+      parameters:
+        - in: path
+          name: volumeName
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Volume deleted
+        '400':
+          description: Volume is still attached or cannot be deleted
+        '401':
+          description: Unauthorized
+        '404':
+          description: Volume not found in caller namespace
+  /system/services:
+    post:
+      summary: Create service (volume-enabled or legacy)
+      tags:
+        - services
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Service'
+      responses:
+        '201':
+          description: Service created
+        '400':
+          description: Invalid service or volume definition
+    put:
+      summary: Update service
+      tags:
+        - services
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Service'
+      responses:
+        '204':
+          description: Service updated
+        '400':
+          description: Invalid request, including immutable volume attachment mutation
+        '404':
+          description: Service not found
+    get:
+      summary: List services
+      tags:
+        - services
+      responses:
+        '200':
+          description: Service list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Service'
+  /system/services/{serviceName}:
+    get:
+      summary: Read service
+      tags:
+        - services
+      parameters:
+        - in: path
+          name: serviceName
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Service detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '404':
+          description: Service not found
+    delete:
+      summary: Delete service
+      tags:
+        - services
+      parameters:
+        - in: path
+          name: serviceName
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Service deleted; service-created volumes are retained or deleted according to lifecycle policy
+        '404':
+          description: Service not found
+components:
+  schemas:
+    Service:
+      type: object
+      required:
+        - name
+        - image
+        - script
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 39
+        image:
+          type: string
+        script:
+          type: string
+        volume:
+          $ref: '#/components/schemas/ServiceVolumeConfig'
+        volume_status:
+          $ref: '#/components/schemas/ServiceVolumeStatus'
+        input:
+          type: array
+          items:
+            $ref: '#/components/schemas/StorageIOConfig'
+        output:
+          type: array
+          items:
+            $ref: '#/components/schemas/StorageIOConfig'
+        mount:
+          $ref: '#/components/schemas/StorageIOConfig'
+      additionalProperties: true
+
+    ServiceVolumeConfig:
+      type: object
+      required:
+        - mount_path
+      properties:
+        name:
+          type: string
+          description: Existing logical volume name to mount, or override name for a newly created volume.
+        size:
+          type: string
+          description: Requested persistent capacity when creating a new volume (e.g. 10Gi).
+        mount_path:
+          type: string
+          description: Absolute path inside the service container.
+        lifecycle_policy:
+          type: string
+          enum:
+            - retain
+            - delete
+          description: Applies only to service-created volumes.
+      additionalProperties: false
+
+    ServiceVolumeStatus:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        name:
+          type: string
+        phase:
+          type: string
+          enum:
+            - pending
+            - ready
+            - in_use
+            - error
+            - deleting
+            - deleted
+        error:
+          type: string
+      additionalProperties: false
+
+    ManagedVolumeCreateRequest:
+      type: object
+      required:
+        - name
+        - size
+      properties:
+        name:
+          type: string
+        size:
+          type: string
+      additionalProperties: false
+
+    ManagedVolume:
+      type: object
+      required:
+        - name
+        - namespace
+        - pvc_name
+        - size
+        - status
+      properties:
+        name:
+          type: string
+        namespace:
+          type: string
+        pvc_name:
+          type: string
+        size:
+          type: string
+        owner_user:
+          type: string
+        created_by_service:
+          type: string
+        creation_mode:
+          type: string
+          enum:
+            - service
+            - api
+        lifecycle_policy:
+          type: string
+          enum:
+            - retain
+            - delete
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/VolumeAttachmentReference'
+        status:
+          $ref: '#/components/schemas/VolumeStatus'
+      additionalProperties: false
+
+    VolumeAttachmentReference:
+      type: object
+      required:
+        - service_name
+        - mount_path
+      properties:
+        service_name:
+          type: string
+        mount_path:
+          type: string
+      additionalProperties: false
+
+    VolumeStatus:
+      type: object
+      required:
+        - phase
+        - attachment_count
+      properties:
+        phase:
+          type: string
+          enum:
+            - pending
+            - ready
+            - in_use
+            - error
+            - deleting
+            - deleted
+        message:
+          type: string
+        attachment_count:
+          type: integer
+          minimum: 0
+        last_transition_time:
+          type: string
+          format: date-time
+      additionalProperties: false
+
+    StorageIOConfig:
+      type: object
+      properties:
+        storage_provider:
+          type: string
+        path:
+          type: string
+        suffix:
+          type: array
+          items:
+            type: string
+        prefix:
+          type: array
+          items:
+            type: string
+      additionalProperties: true

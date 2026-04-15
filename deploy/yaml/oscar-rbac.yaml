@@ -27,6 +27,7 @@ rules:
   - watch
   - create
   - delete
+  - deletecollection
   - update
 - apiGroups:
   - apps
@@ -67,6 +68,28 @@ rules:
   - networking.k8s.io
   resources:
   - ingresses
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - httproutes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+- apiGroups:
+  - traefik.io
+  resources:
+  - middlewares
   verbs:
   - get
   - list
@@ -121,6 +144,7 @@ rules:
   - watch
   - create
   - delete
+  - deletecollection
   - update
 - apiGroups:
   - ""
@@ -196,6 +220,28 @@ rules:
   - networking.k8s.io
   resources:
   - ingresses
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - httproutes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+- apiGroups:
+  - traefik.io
+  resources:
+  - middlewares
   verbs:
   - get
   - list

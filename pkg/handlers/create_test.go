@@ -294,6 +294,222 @@ func TestMakeCreateHandlerWebhookError(t *testing.T) {
 	}
 }
 
+func TestMakeCreateHandlerVolumeFlows(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		if hreq.URL.Path != "/test" && hreq.URL.Path != "/" && hreq.URL.Path != "/test/" && hreq.URL.Path != "/test/input/" && hreq.URL.Path != "/test/output/" && hreq.URL.Path != "/test/mount/" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
+			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
+		}
+		if hreq.URL.Path == "/minio/admin/v3/info" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			return
+		}
+		if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/info-canned-policy") {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{
+				"Version": "2012-10-17",
+				"Statement": [
+					{
+						"Effect": "Allow",
+						"Action": [
+							"s3:*"
+						],
+						"Resource": [
+							"arn:aws:s3:::test/*"
+						]
+					}
+				]
+			}`))
+			return
+		}
+		if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/set-user-or-group-policy") {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"status":"success","binding":"done"}`))
+			return
+		}
+		if hreq.Method == http.MethodGet && strings.HasPrefix(hreq.URL.Path, "/test") && hreq.URL.RawQuery == "location=" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>`))
+			return
+		}
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"status":"success"}`))
+	}))
+	defer server.Close()
+
+	cfg := &types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "ak",
+			SecretKey: "sk",
+			Verify:    false,
+		},
+		ServicesNamespace: "oscar-svc",
+	}
+
+	makeRouter := func(back *backends.FakeBackend, kubeClientset *testclient.Clientset) *gin.Engine {
+		r := gin.New()
+		r.Use(func(c *gin.Context) {
+			c.Set("uidOrigin", "owner@example.com")
+			c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "owner@example.com"))
+			c.Next()
+		})
+		r.POST("/system/services", MakeCreateHandler(cfg, back))
+		return r
+	}
+
+	t.Run("create new volume defaults name and lifecycle", func(t *testing.T) {
+		baseNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "oscar-svc"}}
+		basePV := &corev1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{Name: "oscar-runtime-pv"},
+			Spec: corev1.PersistentVolumeSpec{
+				PersistentVolumeSource: corev1.PersistentVolumeSource{
+					NFS: &corev1.NFSVolumeSource{Server: "nfs.example.com", Path: "/exports/oscar"},
+				},
+			},
+		}
+		basePVC := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: types.PVCName, Namespace: "oscar-svc"},
+			Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: basePV.Name},
+			Status:     corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound},
+		}
+		baseSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: auth.FormatUID("owner@example.com"), Namespace: "oscar-svc"},
+			Data: map[string][]byte{
+				"oidc_uid":  []byte("owner@example.com"),
+				"accessKey": []byte("owner@example.com"),
+				"secretKey": []byte("secret"),
+			},
+		}
+		kubeClientset := testclient.NewSimpleClientset(baseNamespace, basePV, basePVC, baseSecret)
+		back := backends.MakeFakeBackend()
+		back.SetKubeClientset(kubeClientset)
+
+		req := httptest.NewRequest(http.MethodPost, "/system/services", strings.NewReader(`{"name":"svc","image":"img","script":"echo","volume":{"size":"1Gi","mount_path":"/data"},"visibility":"public"}`))
+		req.Header.Set("Authorization", "Bearer token")
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		makeRouter(back, kubeClientset).ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
+		}
+		if back.CreatedService == nil || back.CreatedService.Volume == nil {
+			t.Fatalf("expected created service with volume")
+		}
+		if back.CreatedService.Volume.Name != "svc" {
+			t.Fatalf("expected derived volume name svc, got %q", back.CreatedService.Volume.Name)
+		}
+		if back.CreatedService.Volume.LifecyclePolicy != types.VolumeLifecycleDelete {
+			t.Fatalf("expected default lifecycle delete, got %q", back.CreatedService.Volume.LifecyclePolicy)
+		}
+	})
+
+	t.Run("mount existing volume by name", func(t *testing.T) {
+		baseNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "oscar-svc"}}
+		basePV := &corev1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{Name: "oscar-runtime-pv"},
+			Spec: corev1.PersistentVolumeSpec{
+				PersistentVolumeSource: corev1.PersistentVolumeSource{
+					NFS: &corev1.NFSVolumeSource{Server: "nfs.example.com", Path: "/exports/oscar"},
+				},
+			},
+		}
+		basePVC := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: types.PVCName, Namespace: "oscar-svc"},
+			Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: basePV.Name},
+			Status:     corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound},
+		}
+		baseSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: auth.FormatUID("owner@example.com"), Namespace: "oscar-svc"},
+			Data: map[string][]byte{
+				"oidc_uid":  []byte("owner@example.com"),
+				"accessKey": []byte("owner@example.com"),
+				"secretKey": []byte("secret"),
+			},
+		}
+		kubeClientset := testclient.NewSimpleClientset(baseNamespace, basePV, basePVC, baseSecret)
+		back := backends.MakeFakeBackend()
+		back.SetKubeClientset(kubeClientset)
+		namespace, err := utils.EnsureUserNamespace(t.Context(), kubeClientset, cfg, "owner@example.com")
+		if err != nil {
+			t.Fatalf("unexpected namespace error: %v", err)
+		}
+		_, _ = kubeClientset.CoreV1().PersistentVolumeClaims(namespace).Create(t.Context(), &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "shared-data",
+				Namespace: namespace,
+				Labels: map[string]string{
+					types.ManagedVolumeLabel:     "true",
+					types.ManagedVolumeNameLabel: "shared-data",
+				},
+			},
+		}, metav1.CreateOptions{})
+
+		req := httptest.NewRequest(http.MethodPost, "/system/services", strings.NewReader(`{"name":"svc","image":"img","script":"echo","volume":{"name":"shared-data","mount_path":"/data"},"visibility":"public"}`))
+		req.Header.Set("Authorization", "Bearer token")
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		makeRouter(back, kubeClientset).ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
+		}
+		if back.CreatedService == nil || back.CreatedService.Volume == nil {
+			t.Fatalf("expected created service with volume")
+		}
+		if back.CreatedService.Volume.Name != "shared-data" || back.CreatedService.Volume.Size != "" {
+			t.Fatalf("expected mount-existing volume, got %+v", *back.CreatedService.Volume)
+		}
+	})
+}
+
+func TestCheckValuesLegacyStorageFlowsPreserveNilVolume(t *testing.T) {
+	cfg := &types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  "http://minio:9000",
+			Region:    "us-east-1",
+			AccessKey: "ak",
+			SecretKey: "sk",
+			Verify:    false,
+		},
+	}
+
+	service := types.Service{
+		Name:   "legacy-svc",
+		Image:  "img",
+		Script: "echo",
+		Mount: types.StorageIOConfig{
+			Provider: "minio.default",
+			Path:     "test/mount",
+		},
+		Input: []types.StorageIOConfig{
+			{Provider: "minio.default", Path: "test/input"},
+		},
+		Output: []types.StorageIOConfig{
+			{Provider: "minio.default", Path: "test/output"},
+		},
+	}
+
+	checkValues(&service, cfg)
+
+	if service.Volume != nil {
+		t.Fatalf("expected legacy storage flow to keep volume nil, got %+v", service.Volume)
+	}
+	if service.Mount.Path != "test/mount" || service.Mount.Provider != "minio.default" {
+		t.Fatalf("expected mount configuration to be preserved, got %+v", service.Mount)
+	}
+	if len(service.Input) != 1 || service.Input[0].Path != "test/input" {
+		t.Fatalf("expected input configuration to be preserved, got %+v", service.Input)
+	}
+	if len(service.Output) != 1 || service.Output[0].Path != "test/output" {
+		t.Fatalf("expected output configuration to be preserved, got %+v", service.Output)
+	}
+}
+
 func TestCheckValuesDefaults(t *testing.T) {
 	cfg := types.Config{
 		MinIOProvider: &types.MinIOProvider{
@@ -449,4 +665,35 @@ func buildRSAJWK(pub *rsa.PublicKey) string {
 	n := base64.RawURLEncoding.EncodeToString(pub.N.Bytes())
 	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(pub.E)).Bytes())
 	return `{"keys":[{"kty":"RSA","alg":"RS256","use":"sig","kid":"test","n":"` + n + `","e":"` + e + `"}]}`
+}
+
+func TestValidateVolumeConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		svcName string
+		volume  *types.ServiceVolumeConfig
+		wantErr bool
+	}{
+		{name: "nil volume", svcName: "svc", volume: nil, wantErr: false},
+		{name: "valid create volume", svcName: "svc", volume: &types.ServiceVolumeConfig{Size: "1Gi", MountPath: "/data"}, wantErr: false},
+		{name: "valid mount existing volume", svcName: "svc", volume: &types.ServiceVolumeConfig{Name: "openclaw-data", MountPath: "/data"}, wantErr: false},
+		{name: "missing size and name", svcName: "svc", volume: &types.ServiceVolumeConfig{MountPath: "/data"}, wantErr: true},
+		{name: "invalid name", svcName: "svc", volume: &types.ServiceVolumeConfig{Name: "Invalid_Name", MountPath: "/data"}, wantErr: true},
+		{name: "invalid size", volume: &types.ServiceVolumeConfig{Size: "abc", MountPath: "/data"}, wantErr: true},
+		{name: "relative mount path", volume: &types.ServiceVolumeConfig{Size: "1Gi", MountPath: "data"}, wantErr: true},
+		{name: "reserved mount path", volume: &types.ServiceVolumeConfig{Size: "1Gi", MountPath: types.ConfigPath}, wantErr: true},
+		{name: "invalid lifecycle for mount", volume: &types.ServiceVolumeConfig{Name: "shared-data", MountPath: "/data", LifecyclePolicy: types.VolumeLifecycleRetain}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := utils.ValidateVolumeConfig(tt.svcName, tt.volume)
+			if tt.wantErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
 }

@@ -113,10 +113,10 @@ storage_providers:
 | `enable_gpu` </br> *bool*                                         | Enable the use of GPU. Requires a device plugin deployed on the cluster (More info: [Kubernetes device plugins](https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/#using-device-plugins)). Optional (default: false) |
 | `enable_sgx` </br> *bool*                                         | Enable the use of SGX plugin on the cluster containers. (More info: [SGX plugin documentation](https://sconedocs.github.io/helm_sgxdevplugin/)). Optional (default: false) |
 | `image_prefetch` </br> *bool*                                         | Enable the use of image prefetching (retrieve the container image in the nodes when creating the service). Optional (default: false) |
-| `total_memory` </br> *string*                                     | Limit for the memory used by all the service's jobs running simultaneously. [Apache YuniKorn](https://yunikorn.apache.org)'s' scheduler is required to work. Same format as Memory, but internally translated to MB (integer). Optional (default: "")                                          |
-| `total_cpu` </br> *string*                                        | Limit for the virtual CPUs used by all the service's jobs running simultaneously. [Apache YuniKorn](https://yunikorn.apache.org)'s' scheduler is required to work. Same format as CPU, but internally translated to millicores (integer). Optional (default: "")                               |
+| `total_memory` </br> *string*                                     | Limit for the memory used by all the service's jobs running simultaneously. [Apache YuniKorn](https://yunikorn.apache.org)'s scheduler is required to work. Same format as Memory, but internally translated to MB (integer). Optional (default: "")                                          |
+| `total_cpu` </br> *string*                                        | Limit for the virtual CPUs used by all the service's jobs running simultaneously. [Apache YuniKorn](https://yunikorn.apache.org)'s scheduler is required to work. Same format as CPU, but internally translated to millicores (integer). Optional (default: "")                               |
 | `delegation` </br> *string*                                       | Mode of job delegation for replicas. Optional. Values: `static` (default), `random`, `load-based`, `topsis`.                                                                                                                    |
-| `synchronous` </br> *[SynchronousSettings](#synchronoussettings)* | Struct to configure specific sync parameters. This settings are only applied on Knative ServerlessBackend. Optional.                                                                                                                                         |
+| `synchronous` </br> *[SynchronousSettings](#synchronoussettings)* | Struct to configure specific sync parameters. These settings are only applied on Knative ServerlessBackend. Optional.                                                                                                                                         |
 | `expose` </br> *[ExposeSettings](#exposesettings)* | Allows to expose the API or UI of the application run in the OSCAR service outside of the Kubernetes cluster. Optional.                                                                                                                                         |
 | `replicas` </br> *[Replica](#replica) array*                      | List of replicas to delegate jobs. Optional.                                                                                                                                                                                                                 |
 | `rescheduler_threshold` </br> *integer*                            | Time (in seconds) that a job (with replicas) can be queued before delegating it. Optional.                                                                                                                                                                   |
@@ -130,6 +130,7 @@ storage_providers:
 | `isolation_level` </br> *string*                              |  Select the isolation level of the MinIO buckets: `SERVICE` or `USER` (`SERVICE` by default) Optional 
 | `visibility` </br> *string*                              |  Select the visibility level of service: `private`, `restricted` or `public` (`private` by default) Optional 
 | `mount` </br> *[MountSettings](#mountsettings)*                   | Configuration to mount a storage provider path inside the service container. Optional. 
+| `volume` </br> *[VolumeSettings](#volumesettings)*       | Configuration for an OSCAR-managed persistent volume attached to the service. Optional. 
 
 ## SynchronousSettings
 
@@ -151,12 +152,21 @@ storage_providers:
 | `rewrite_target` </br> *bool* | Target the URI where the traffic is redirected. (default: false). Optional.  |
 | `default_command` </br> *bool* | Select between executing the container's default command and executing the script inside the container. (default: false). Optional.  |
 | `health_path` </br> *string* | Change the service readiness and liveness check path/endpoint. (default: "/"). Optional.  |
+| `probe_mode` </br> *string* | Probe path mode for exposed-service pod health checks. `legacy` (default) keeps current behavior; `direct` probes only `health_path` on the container without the OSCAR ingress prefix. Optional. |
 
 ## MountSettings
 | Field                        | Description                                 |
 |------------------------------| --------------------------------------------|
 | `storage_provider` </br> *string*  | Identifier of the storage provider. Optional.          |
 | `path` </br> *string*  | Path to the folder that will be mounted. Optional.          |
+
+## VolumeSettings
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
+| `name` </br> *string*        | Logical volume name. Optional when creating a new volume from the service definition; required when mounting an existing managed volume. Names must follow Kubernetes DNS-1123 rules. |
+| `size` </br> *string*        | Requested volume size using Kubernetes quantity format (for example `1Gi`). Required when the service creates a new volume. |
+| `mount_path` </br> *string*  | Absolute path inside the service container where the volume is mounted. Required when volume is set. |
+| `lifecycle_policy` </br> *string*  | Lifecycle behavior for service-created volumes. Allowed values are `delete` (default) and `retain`. Ignored when mounting an existing volume. |
 
 ## Replica
 

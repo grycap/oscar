@@ -114,30 +114,43 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		return err
 	}
 
-	// Create the Knative service definition
-	knSvc, err := kn.createKNServiceDefinition(&service, namespace)
-	if err != nil {
-		// Delete the previously created configMap
+	if err := resources.EnsureServiceVolume(context.TODO(), kn.config, kn.kubeClientset, service, namespace); err != nil {
 		if delErr := deleteServiceConfigMap(service.Name, namespace, kn.kubeClientset); delErr != nil {
 			log.Println(delErr.Error())
 		}
 		return err
 	}
 
-	// Create the Knative service
-	_, err = kn.knClientset.ServingV1().Services(namespace).Create(context.TODO(), knSvc, metav1.CreateOptions{})
-	if err != nil {
-		// Delete the previously created configMap
-		if delErr := deleteServiceConfigMap(service.Name, namespace, kn.kubeClientset); delErr != nil {
-			log.Println(delErr.Error())
-		}
-		return err
-	}
-
-	//Create an expose service
+	// For exposed services, skip Knative Service creation and deploy only exposed resources.
 	if service.Expose.APIPort != 0 {
 		err = resources.CreateExpose(service, namespace, kn.kubeClientset, kn.config)
 		if err != nil {
+			return err
+		}
+	} else {
+		// Create the Knative service definition
+		knSvc, err := kn.createKNServiceDefinition(&service, namespace)
+		if err != nil {
+			// Delete the previously created configMap
+			if delErr := deleteServiceConfigMap(service.Name, namespace, kn.kubeClientset); delErr != nil {
+				log.Println(delErr.Error())
+			}
+			if delErr := resources.DeleteServiceVolume(context.TODO(), kn.kubeClientset, service, namespace); delErr != nil {
+				log.Println(delErr.Error())
+			}
+			return err
+		}
+
+		// Create the Knative service
+		_, err = kn.knClientset.ServingV1().Services(namespace).Create(context.TODO(), knSvc, metav1.CreateOptions{})
+		if err != nil {
+			// Delete the previously created configMap
+			if delErr := deleteServiceConfigMap(service.Name, namespace, kn.kubeClientset); delErr != nil {
+				log.Println(delErr.Error())
+			}
+			if delErr := resources.DeleteServiceVolume(context.TODO(), kn.kubeClientset, service, namespace); delErr != nil {
+				log.Println(delErr.Error())
+			}
 			return err
 		}
 	}
@@ -161,11 +174,6 @@ func (kn *KnativeBackend) ReadService(namespace, name string) (*types.Service, e
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	// Check if service exists
-	if _, err := kn.knClientset.ServingV1().Services(serviceNamespace).Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
-		return nil, err
 	}
 
 	// Get the configMap of the Service
@@ -269,7 +277,7 @@ func (kn *KnativeBackend) DeleteService(service types.Service) error {
 	if namespace == "" {
 		namespace = kn.config.ServicesNamespace
 	}
-	if err := kn.knClientset.ServingV1().Services(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
+	if err := kn.knClientset.ServingV1().Services(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
@@ -283,6 +291,10 @@ func (kn *KnativeBackend) DeleteService(service types.Service) error {
 		log.Printf("Error deleting associated jobs for service \"%s\": %v\n", name, err)
 	}
 
+	if err := resources.DeleteServiceVolume(context.TODO(), kn.kubeClientset, service, namespace); err != nil {
+		log.Printf("Error deleting managed volume for service \"%s\": %v\n", name, err)
+	}
+
 	if utils.SecretExists(name, namespace, kn.kubeClientset) {
 		secretsErr := utils.DeleteSecret(name, namespace, kn.kubeClientset)
 		if secretsErr != nil {
@@ -293,7 +305,7 @@ func (kn *KnativeBackend) DeleteService(service types.Service) error {
 	// If service is exposed delete the exposed k8s components
 	if service.Expose.APIPort != 0 {
 		if err := resources.DeleteExpose(name, namespace, kn.kubeClientset, kn.config); err != nil {
-			log.Printf("Error deleting all associated kubernetes component of an exposed service \"%s\": %v\n", name, err)
+			return fmt.Errorf("error deleting all associated kubernetes components of exposed service \"%s\": %v", name, err)
 		}
 	}
 
@@ -317,6 +329,10 @@ func (kn *KnativeBackend) GetProxyDirector(serviceName string) func(req *http.Re
 		req.URL.Host = host
 		req.URL.Path = ""
 	}
+}
+
+func (kn *KnativeBackend) GetRuntimeService(namespace, name string) (*knv1.Service, error) {
+	return kn.knClientset.ServingV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (kn *KnativeBackend) resolveServiceNamespace(name string) (string, error) {

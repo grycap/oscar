@@ -208,7 +208,7 @@ func ensureControllerRole(ctx context.Context, kubeClientset kubernetes.Interfac
 			{
 				APIGroups: []string{""},
 				Resources: []string{"pods", "pods/log", "podtemplates", "configmaps", "secrets", "services", "persistentvolumeclaims"},
-				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
+				Verbs:     []string{"get", "list", "watch", "create", "delete", "deletecollection", "update"},
 			},
 			{
 				APIGroups: []string{"apps"},
@@ -228,6 +228,16 @@ func ensureControllerRole(ctx context.Context, kubeClientset kubernetes.Interfac
 			{
 				APIGroups: []string{"networking.k8s.io"},
 				Resources: []string{"ingresses"},
+				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
+			},
+			{
+				APIGroups: []string{"gateway.networking.k8s.io"},
+				Resources: []string{"httproutes"},
+				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
+			},
+			{
+				APIGroups: []string{"traefik.io"},
+				Resources: []string{"middlewares"},
 				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
 			},
 			{
