@@ -109,7 +109,7 @@ and will end up looking like this:
 curl {-k} -X POST https://{oscar_endpoint}/system/services/body-pose-detection-async/exposed/{path resource} -H  "accept: */*" -H  "Content-Type: multipart/form-data" -F "data=@{input image};type=image/png" --output {output file}
 ```
 
-Finally, the complete command that works in [Local Testing](https://docs.oscar.grycap.net/local-testing/) with an image called `people.jpeg` as input and `output_posenet.zip` as output.
+Finally, the complete command that works in [Local Testing](local-testing.md) with an image called `people.jpeg` as input and `output_posenet.zip` as output.
 
 ``` bash
 curl -X POST https://localhost/system/services/body-pose-detection-async/exposed/v3/models/posenetclas/predict/ -H  "accept: */*" -H  "Content-Type: multipart/form-data" -F "data=@people.jpeg;type=image/png" --output output_posenet.zip
@@ -133,7 +133,7 @@ functions:
       cpu_threshold: 50 
 ```
 
-In case you use the NGINX example above in your [local OSCAR cluster](https://docs.oscar.grycap.net/local-testing/), you will see the nginx welcome page in: `http://localhost/system/services/nginx/exposed/`.
+In case you use the NGINX example above in your [local OSCAR cluster](local-testing.md), you will see the nginx welcome page in: `http://localhost/system/services/nginx/exposed/`.
 Two active pods of the deployment will be shown with the command `kubectl get pods -n oscar-svc`
 
 ``` text

@@ -66,7 +66,7 @@ to support the OSCAR platform:
 - [Knative](https://knative.dev), a serverless framework to serve
     container-based applications for synchronous invocations (default
     Serverless Backend).
-- [OSCAR Manager](https://docs.oscar.grycap.net/api/), the main API, responsible for the management of the services and the integration of the different components. 
+- [OSCAR Manager](api.md), the main API, responsible for the management of the services and the integration of the different components. 
 - [OSCAR Dashboard](https://github.com/grycap/oscar-dashboard), an easy-to-use web-based graphical user interface aimed at end users.
 
 As external storage providers, the following services can be used:
@@ -94,6 +94,6 @@ A summary of the components used:
 ![OSCAR components](images/oscar-components.png)
 
 An OSCAR cluster can be accessed via its
-[REST API](https://grycap.github.io/oscar/api/), the web-based 
+[REST API](api.md), the web-based 
 [OSCAR Dashboard](https://github.com/grycap/oscar-dashboard) and the command-line interface provided by
 [OSCAR CLI](https://github.com/grycap/oscar-cli).

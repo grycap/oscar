@@ -2,6 +2,8 @@
 
 OSCAR uses [MKDocs](https://www.mkdocs.org) for the documentation. In particular, [Material for MKDocs](https://squidfunk.github.io/mkdocs-material/).
 
+When linking from one page under `docs/` to another OSCAR documentation page, prefer relative links such as `fdl.md` or `api.md`. This keeps links inside the currently selected version when the site is published with `mike`.
+
 Install the following dependencies:
 
 ```sh

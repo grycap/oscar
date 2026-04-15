@@ -1,6 +1,6 @@
 # MinIO bucket replication
 
-In scenarios where you have two linked OSCAR clusters as part of the same workflow defined in [FDL](https://docs.oscar.grycap.net/fdl/), temporary network disconnections can cause data generated on the first cluster during the disconnection period to be lost.
+In scenarios where you have two linked OSCAR clusters as part of the same workflow defined in [FDL](fdl.md), temporary network disconnections cause that data generated on the first cluster during the disconnection time is lost as well. 
 
 To address this scenario, we propose using replicated buckets in MinIO. With this approach, you can have two buckets synchronized across different OSCAR clusters so that, if the connection is lost, they are re-synchronized when the connection is restored.
 
