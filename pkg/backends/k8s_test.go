@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/grycap/oscar/v3/pkg/types"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -840,5 +841,78 @@ func TestKubeGetKubeClientset(t *testing.T) {
 
 	if clientset != back.GetKubeClientset() {
 		t.Error("the clientset obtained is not the same")
+	}
+}
+
+func TestGetExposedServiceDeployment(t *testing.T) {
+	client := fake.NewSimpleClientset(&appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "svc-dlp",
+			Namespace: "ns",
+		},
+	})
+
+	deployment, err := GetExposedServiceDeployment(client, "ns", "svc")
+	if err != nil {
+		t.Fatalf("get exposed deployment: %v", err)
+	}
+	if deployment.Name != "svc-dlp" {
+		t.Fatalf("expected deployment name svc-dlp, got %s", deployment.Name)
+	}
+}
+
+func TestListServicePodsHelpers(t *testing.T) {
+	client := fake.NewSimpleClientset(
+		&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "service-pod",
+				Namespace: "ns",
+				Labels: map[string]string{
+					types.ServiceLabel: "svc",
+				},
+			},
+		},
+		&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "exposed-pod",
+				Namespace: "ns",
+				Labels: map[string]string{
+					"app": "oscar-svc-exp-svc",
+				},
+			},
+		},
+		&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "knative-pod",
+				Namespace: "ns",
+				Labels: map[string]string{
+					"serving.knative.dev/service": "svc",
+				},
+			},
+		},
+	)
+
+	servicePods, err := ListServicePods(client, "ns", "svc")
+	if err != nil {
+		t.Fatalf("list service pods: %v", err)
+	}
+	if len(servicePods.Items) != 1 || servicePods.Items[0].Name != "service-pod" {
+		t.Fatalf("unexpected service pods: %#v", servicePods.Items)
+	}
+
+	exposedPods, err := ListExposedServicePods(client, "ns", "svc")
+	if err != nil {
+		t.Fatalf("list exposed pods: %v", err)
+	}
+	if len(exposedPods.Items) != 1 || exposedPods.Items[0].Name != "exposed-pod" {
+		t.Fatalf("unexpected exposed pods: %#v", exposedPods.Items)
+	}
+
+	knativePods, err := ListKnativeServicePods(client, "ns", "svc")
+	if err != nil {
+		t.Fatalf("list knative service pods: %v", err)
+	}
+	if len(knativePods.Items) != 1 || knativePods.Items[0].Name != "knative-pod" {
+		t.Fatalf("unexpected knative service pods: %#v", knativePods.Items)
 	}
 }

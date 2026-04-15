@@ -26,6 +26,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	"k8s.io/client-go/kubernetes"
 )
 
 // MakeListHandler godoc
@@ -33,16 +34,17 @@ import (
 // @Description List all created services.
 // @Tags services
 // @Produce json
+// @Param include query string false "Optional expansions (for example: deployment)"
 // @Success 200 {array} types.Service
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/services [get]
-func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
+func MakeListHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
 		authHeader := c.GetHeader("Authorization")
+		includeDeployment := includeQueryContains(c.Query("include"), "deployment")
 
 		services, err := back.ListServices()
 		if err != nil {
@@ -60,6 +62,12 @@ func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 			allowedServicesForUser := []*types.Service{}
 			for _, service := range services {
 				setVolumeStatus(back, service)
+				if includeDeployment {
+					if err := setDeploymentSummary(back, kubeClientset, cfg, service); err != nil {
+						c.String(http.StatusInternalServerError, err.Error())
+						return
+					}
+				}
 				switch service.Visibility {
 				case utils.PUBLIC:
 					allowedServicesForUser = append(allowedServicesForUser, service)
@@ -80,9 +88,33 @@ func MakeListHandler(back types.ServerlessBackend) gin.HandlerFunc {
 		} else {
 			for _, service := range services {
 				setVolumeStatus(back, service)
+				if includeDeployment {
+					if err := setDeploymentSummary(back, kubeClientset, cfg, service); err != nil {
+						c.String(http.StatusInternalServerError, err.Error())
+						return
+					}
+				}
 			}
 			c.JSON(http.StatusOK, services)
 		}
 
 	}
+}
+
+func includeQueryContains(raw string, target string) bool {
+	for _, value := range strings.Split(raw, ",") {
+		if strings.EqualFold(strings.TrimSpace(value), target) {
+			return true
+		}
+	}
+	return false
+}
+
+func setDeploymentSummary(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config, service *types.Service) error {
+	runtimeCtx, err := inspectDeploymentRuntime(back, kubeClientset, service, cfg)
+	if err != nil {
+		return err
+	}
+	service.Deployment = deploymentSummaryFromStatus(runtimeCtx.status)
+	return nil
 }
