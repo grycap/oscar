@@ -94,6 +94,6 @@ A summary of the components used:
 ![OSCAR components](images/oscar-components.png)
 
 An OSCAR cluster can be accessed via its
-[REST API](https://grycap.github.io/oscar/api/), the web-based 
+[REST API](api.md), the web-based 
 [OSCAR Dashboard](https://github.com/grycap/oscar-dashboard) and the command-line interface provided by
 [OSCAR CLI](https://github.com/grycap/oscar-cli).
