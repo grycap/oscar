@@ -28,8 +28,7 @@ This deploys `openclaw-volume` with:
 The startup script now assumes:
 
 - persistence is handled by the managed volume mounted at `/data`
-- FDL environment variables are propagated correctly
-- only the OSCAR service token may need to be read from `/oscar/config/function_config.yaml`
+- OSCAR injects service metadata through environment variables such as `OSCAR_SERVICE_TOKEN`
 
 ## Access exposed UI
 
