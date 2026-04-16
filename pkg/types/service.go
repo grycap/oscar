@@ -369,8 +369,10 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 		return nil, err
 	}
 
+	enableServiceLinks := false
 	podSpec := &v1.PodSpec{
-		ImagePullSecrets: SetImagePullSecrets(service.ImagePullSecrets),
+		ImagePullSecrets:   SetImagePullSecrets(service.ImagePullSecrets),
+		EnableServiceLinks: &enableServiceLinks,
 		Containers: []v1.Container{
 			{
 				Name:            ContainerName,

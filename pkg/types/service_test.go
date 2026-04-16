@@ -357,6 +357,13 @@ func TestToPodSpec(t *testing.T) {
 					t.Errorf("unexpected error: %v", err)
 				}
 
+				if podSpec.EnableServiceLinks == nil {
+					t.Fatal("expected EnableServiceLinks to be set")
+				}
+				if *podSpec.EnableServiceLinks {
+					t.Fatal("expected EnableServiceLinks to be false")
+				}
+
 				if len(podSpec.Containers[0].Command) != 1 {
 					t.Fatalf("expected a single command entry, got %d", len(podSpec.Containers[0].Command))
 				}
