@@ -370,6 +370,12 @@ func TestToPodSpec(t *testing.T) {
 				if podSpec.Containers[0].Command[0] != fmt.Sprintf("%s/%s", VolumePath, WatchdogName) {
 					t.Fatalf("expected command to be supervisor path %s, got %s", fmt.Sprintf("%s/%s", VolumePath, WatchdogName), podSpec.Containers[0].Command[0])
 				}
+				if podSpec.AutomountServiceAccountToken == nil {
+					t.Fatalf("expected automountServiceAccountToken to be set")
+				}
+				if *podSpec.AutomountServiceAccountToken {
+					t.Fatalf("expected automountServiceAccountToken to be false")
+				}
 				envVars := envVarsToMap(podSpec.Containers[0].Env)
 				if envVars[OscarServiceNameEnvVar] != svc.Name {
 					t.Fatalf("expected %s to be %q, got %q", OscarServiceNameEnvVar, svc.Name, envVars[OscarServiceNameEnvVar])
