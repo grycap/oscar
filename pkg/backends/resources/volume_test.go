@@ -142,6 +142,15 @@ func TestListManagedVolumesAndAttachments(t *testing.T) {
 	if volumes[0].Name != "shared-data" || volumes[0].Status.AttachmentCount != 1 || volumes[0].Status.Phase != types.VolumePhaseInUse {
 		t.Fatalf("unexpected managed volume payload: %+v", volumes[0])
 	}
+	if len(volumes[0].Attachments) != 1 {
+		t.Fatalf("expected one attachment in payload, got %+v", volumes[0])
+	}
+	if volumes[0].Attachments[0].ServiceName != "consumer" {
+		t.Fatalf("unexpected attachment service: %+v", volumes[0].Attachments)
+	}
+	if volumes[0].Attachments[0].MountPath != "/data" {
+		t.Fatalf("unexpected attachment mount path: %+v", volumes[0].Attachments)
+	}
 
 	attachments, err := CountVolumeAttachments(context.Background(), client, "default", "shared-data")
 	if err != nil {
@@ -149,5 +158,16 @@ func TestListManagedVolumesAndAttachments(t *testing.T) {
 	}
 	if attachments != 1 {
 		t.Fatalf("expected one attachment, got %d", attachments)
+	}
+
+	references, err := ListVolumeAttachments(context.Background(), client, "default", "shared-data")
+	if err != nil {
+		t.Fatalf("unexpected attachment listing error: %v", err)
+	}
+	if len(references) != 1 {
+		t.Fatalf("expected one attachment reference, got %+v", references)
+	}
+	if references[0].ServiceName != "consumer" || references[0].MountPath != "/data" {
+		t.Fatalf("unexpected attachment reference: %+v", references[0])
 	}
 }
