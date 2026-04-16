@@ -236,6 +236,13 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			service.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 		}
 
+		ownerName := "oscar"
+		if !isAdminUser {
+			ownerName = auth.GetUserNameFromContext(c)
+			ownerName = utils.RemoveAccents(ownerName)
+		}
+		service.Labels["owner_name"] = strings.ReplaceAll(ownerName, " ", "_")
+
 		// Create service
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
@@ -300,11 +307,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					}
 				}
 
-				ownerName := "oscar"
-				if !isAdminUser {
-					ownerName = auth.GetUserNameFromContext(c)
-					ownerName = utils.RemoveAccents(ownerName)
-				}
 				// Bucket metadata for filtering
 				tags := map[string]string{
 					"owner":        uid,
