@@ -366,22 +366,17 @@ func getMinioInfo(cfg *types.Config, clusterInfo *types.StatusInfo) (err error) 
 	return nil
 }
 
-// getJobsInfo
-
+// getJobsInfo retrieves the total count of jobs and the count of pods by state for related to OSCAR services
 func getJobsInfo(cfg *types.Config, kubeClientset kubernetes.Interface, clusterInfo *types.StatusInfo) (err error) {
-	jobs, err := kubeClientset.BatchV1().Jobs(cfg.ServicesNamespace).List(context.Background(), metav1.ListOptions{})
+
+	// List all pods in the cluster that belong to OSCAR users
+	pods, err := kubeClientset.CoreV1().Pods(v1.NamespaceAll).List(context.Background(), metav1.ListOptions{LabelSelector: types.OscarUserServiceLabel})
 	if err != nil {
 		return err
 	}
 
-	// Sum all job statuses to get a simple total
-	totalJobs := 0
-	for _, job := range jobs.Items {
-		totalJobs += int(job.Status.Active) + int(job.Status.Succeeded) + int(job.Status.Failed)
-	}
-
-	// Pods info (we keep the count by state)
-	pods, err := kubeClientset.CoreV1().Pods(cfg.ServicesNamespace).List(context.Background(), metav1.ListOptions{})
+	// List all jobs in the cluster that belong to OSCAR users
+	jobs, err := kubeClientset.BatchV1().Jobs(v1.NamespaceAll).List(context.Background(), metav1.ListOptions{LabelSelector: types.OscarUserServiceLabel})
 	if err != nil {
 		return err
 	}
@@ -394,6 +389,7 @@ func getJobsInfo(cfg *types.Config, kubeClientset kubernetes.Interface, clusterI
 		"Failed":    0,
 		"Unknown":   0,
 	}
+	// Count pods by their status phase
 	for _, pod := range pods.Items {
 		state := string(pod.Status.Phase)
 		podStates[state]++
@@ -404,7 +400,7 @@ func getJobsInfo(cfg *types.Config, kubeClientset kubernetes.Interface, clusterI
 		States: podStates,
 	}
 
-	clusterInfo.Oscar.JobsCount = totalJobs
+	clusterInfo.Oscar.JobsCount = len(jobs.Items)
 	clusterInfo.Oscar.Pods = podInfo
 	return nil
 }
