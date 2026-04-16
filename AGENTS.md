@@ -89,7 +89,13 @@ For docs-only changes, tests may be skipped but must be stated explicitly.
 - Kubernetes PersistentVolumeClaims in per-user namespaces, backed by the
   current NFS RWX storage-class approach used for managed service storage
   (006-volumes)
+- Go 1.25.0 + gin-gonic/gin, k8s.io/client-go, k8s.io/api/apimachinery, existing OSCAR backends/resources/types/auth packages (002-deployment-status-logs)
+- N/A (read-only access to existing Kubernetes service, deployment, pod, and pod-log state) (002-deployment-status-logs)
+- N/A (read-only inspection of existing Kubernetes resources and log streams) (002-deployment-status-logs)
+- Go 1.25.0 + gin-gonic/gin, k8s.io/client-go, k8s.io/api, k8s.io/apimachinery, existing OSCAR handlers/backends/resources/types/auth packages (002-deployment-status-logs)
 
 ## Recent Changes
 - 001-persistent-volumes: Added Go 1.25.0 + Gin HTTP server, Kubernetes
   client-go/api/apimachinery, existing OSCAR backend/resource packages
+- 002-deployment-status-logs: Planned API-only deployment visibility with
+  service-scoped deployment summaries and service-level deployment log access

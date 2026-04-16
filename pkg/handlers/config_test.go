@@ -44,6 +44,7 @@ func createExpectedBody(access_key string, secret_key string, cfg *types.Config)
 			"interLink_available":        false,
 			"yunikorn_enable":            false,
 			"kueue_enable":               false,
+			"volume_enable":              false,
 			"oidc_groups":                nil,
 		},
 		"minio_provider": map[string]interface{}{

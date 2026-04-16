@@ -196,6 +196,16 @@ storage_providers:
 |`variables` </br> *map[string]string* | Map to define the environment variables that will be available in the service container |
 |`secrets` </br> *map[string]string* | Map to define the secret environment variables that will be available in the service container |
 
+OSCAR also injects a small set of reserved environment variables in every service container:
+
+| Variable | Description |
+|----------|-------------|
+| `OSCAR_SERVICE_NAME` | Service name. |
+| `OSCAR_SERVICE_TOKEN` | Generated OSCAR service token. |
+| `OSCAR_SERVICE_BASE_PATH` | Base exposed path, for example `/system/services/{service_name}/exposed`. It is an empty string for non-exposed services. |
+
+These variables are managed by OSCAR and are available in addition to the user-defined entries declared in `environment.variables`.
+
 ## StorageProviders
 
 | Field                                                            | Description                                                                                                                                    |

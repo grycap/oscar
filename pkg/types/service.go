@@ -66,6 +66,10 @@ const (
 	// ServiceLabel label for deploying services in all backs
 	ServiceLabel = "oscar_service"
 
+	// OscarUserServiceLabel marker label applied to all pods and jobs deployed
+	// in user namespaces, used to distinguish them from cluster-level resources.
+	OscarUserServiceLabel = "oscar.grycap/user-service"
+
 	// ManagedVolumeLabel marks PVCs created and managed as OSCAR volumes.
 	ManagedVolumeLabel = "oscar.grycap/managed-volume"
 
@@ -89,6 +93,15 @@ const (
 
 	// JobUUIDVariable name used by the environment variable of the job UUID
 	JobUUIDVariable = "JOB_UUID"
+
+	// OscarServiceNameEnvVar exposes the OSCAR service name inside the container.
+	OscarServiceNameEnvVar = "OSCAR_SERVICE_NAME"
+
+	// OscarServiceTokenEnvVar exposes the OSCAR service token inside the container.
+	OscarServiceTokenEnvVar = "OSCAR_SERVICE_TOKEN"
+
+	// OscarServiceBasePathEnvVar exposes the OSCAR service base path inside the container.
+	OscarServiceBasePathEnvVar = "OSCAR_SERVICE_BASE_PATH"
 
 	// OpenfaasZeroScalingLabel label to enable zero scaling in OpenFaaS functions
 	//OpenfaasZeroScalingLabel = "com.openfaas.scale.zero"
@@ -310,6 +323,10 @@ type Service struct {
 	// VolumeStatus exposes basic volume state information in API responses.
 	// Internal/API use only, not part of FDL.
 	VolumeStatus ServiceVolumeStatus `json:"volume_status,omitempty" yaml:"-"`
+
+	// Deployment exposes an optional deployment summary in list/read API responses.
+	// Internal/API use only, not part of FDL.
+	Deployment *ServiceDeploymentSummary `json:"deployment,omitempty" yaml:"-"`
 }
 
 // ServiceVolumeConfig stores the requested size and mount path for a managed volume.
@@ -353,9 +370,11 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 	}
 	disableServiceAccountTokenAutomount := false
 
+	enableServiceLinks := false
 	podSpec := &v1.PodSpec{
 		AutomountServiceAccountToken: &disableServiceAccountTokenAutomount,
-		ImagePullSecrets: SetImagePullSecrets(service.ImagePullSecrets),
+		ImagePullSecrets:             SetImagePullSecrets(service.ImagePullSecrets),
+		EnableServiceLinks:           &enableServiceLinks,
 		Containers: []v1.Container{
 			{
 				Name:            ContainerName,
@@ -423,6 +442,9 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 			},
 		})
 	}
+
+	// Add OSCAR-managed environment variables
+	addServiceMetadataEnvVars(podSpec, service)
 
 	// Add the required environment variables for the watchdog
 	addWatchdogEnvVars(podSpec, cfg, service)
@@ -573,12 +595,43 @@ func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) {
 	}
 }
 
+func addServiceMetadataEnvVars(p *v1.PodSpec, service *Service) {
+	requiredEnvVars := []v1.EnvVar{
+		{
+			Name:  OscarServiceNameEnvVar,
+			Value: service.Name,
+		},
+		{
+			Name:  OscarServiceTokenEnvVar,
+			Value: service.Token,
+		},
+		{
+			Name:  OscarServiceBasePathEnvVar,
+			Value: service.GetExposedBasePath(),
+		},
+	}
+
+	for i, cont := range p.Containers {
+		if cont.Name == ContainerName {
+			p.Containers[i].Env = append(p.Containers[i].Env, requiredEnvVars...)
+		}
+	}
+}
+
 // GetSupervisorPath returns the appropriate supervisor path
 func (service *Service) GetSupervisorPath() string {
 	if service.Alpine {
 		return fmt.Sprintf("%s/%s/%s", VolumePath, AlpineDirectory, SupervisorName)
 	}
 	return fmt.Sprintf("%s/%s", VolumePath, SupervisorName)
+}
+
+// GetExposedBasePath returns the OSCAR exposed-service base path or an empty string.
+func (service *Service) GetExposedBasePath() string {
+	if service == nil || service.Expose.APIPort == 0 {
+		return ""
+	}
+	return fmt.Sprintf("/system/services/%s/exposed", service.Name)
 }
 
 // HasReplicas checks if the service has replicas defined

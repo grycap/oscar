@@ -35,7 +35,8 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 				Name:      "job",
 				Namespace: "namespace",
 				Labels: map[string]string{
-					types.ServiceLabel: "test",
+					types.ServiceLabel:       "test",
+					"oscar.grycap/job-owner": "user",
 				},
 			},
 		},
@@ -60,8 +61,9 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 						Name:      "pod",
 						Namespace: "namespace",
 						Labels: map[string]string{
-							"oscar_service": "test",
-							"job-name":      "job"},
+							"oscar_service":          "test",
+							"oscar.grycap/job-owner": "user",
+							"job-name":               "job"},
 					},
 				},
 			},
@@ -70,6 +72,10 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
 
 	r := gin.Default()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "user@example.org")
+		c.Next()
+	})
 	r.GET("/system/logs/:serviceName", MakeJobsInfoHandler(back, kubeClientset, &cfg))
 
 	w := httptest.NewRecorder()
@@ -96,7 +102,8 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 			},
 		},
 	}
-
+	fmt.Println(response)
+	fmt.Println(expected)
 	if !reflect.DeepEqual(response, expected) {
 		t.Errorf("expecting %v, got %v", expected, response)
 	}
@@ -196,6 +203,7 @@ func TestMakeGetLogsHandler(t *testing.T) {
 }
 func TestMakeDeleteJobHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{Owner: "user@example.org"}
 	cfg := types.Config{
 		JobListingLimit:   70,
 		ServicesNamespace: "namespace",
@@ -206,7 +214,8 @@ func TestMakeDeleteJobHandler(t *testing.T) {
 				Name:      "job",
 				Namespace: "namespace",
 				Labels: map[string]string{
-					types.ServiceLabel: "test",
+					types.ServiceLabel:       "test",
+					"oscar.grycap/job-owner": "user",
 				},
 			},
 		},
@@ -215,7 +224,7 @@ func TestMakeDeleteJobHandler(t *testing.T) {
 
 	r := gin.Default()
 	r.Use(func(c *gin.Context) {
-		c.Set("uidOrigin", "some-uid-value")
+		c.Set("uidOrigin", "user@example.org")
 		c.Next()
 	})
 	r.DELETE("/system/logs/:serviceName/:jobName", MakeDeleteJobHandler(back, kubeClientset, &cfg))

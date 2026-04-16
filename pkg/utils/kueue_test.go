@@ -395,6 +395,56 @@ func TestVerifyWorkload(t *testing.T) {
 	// so we don't test the external modification, just the return value
 }
 
+func TestWorkloadIsAdmitted(t *testing.T) {
+	tests := []struct {
+		name string
+		wl   *kueuev1.Workload
+		want bool
+	}{
+		{
+			name: "admitted",
+			wl: &kueuev1.Workload{
+				Status: kueuev1.WorkloadStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(kueuev1.WorkloadAdmitted),
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "not admitted",
+			wl: &kueuev1.Workload{
+				Status: kueuev1.WorkloadStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(kueuev1.WorkloadAdmitted),
+							Status: metav1.ConditionFalse,
+						},
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "no conditions",
+			wl:   &kueuev1.Workload{},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := workloadIsAdmitted(tt.wl); got != tt.want {
+				t.Fatalf("workloadIsAdmitted() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCheckWorkloadAdmited(t *testing.T) {
 	// This test verifies the function doesn't panic when not in-cluster
 	cfg := newTestConfig()

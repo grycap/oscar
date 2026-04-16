@@ -331,6 +331,10 @@ func (kn *KnativeBackend) GetProxyDirector(serviceName string) func(req *http.Re
 	}
 }
 
+func (kn *KnativeBackend) GetRuntimeService(namespace, name string) (*knv1.Service, error) {
+	return kn.knClientset.ServingV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+}
+
 func (kn *KnativeBackend) resolveServiceNamespace(name string) (string, error) {
 	listOpts := metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", types.ServiceLabel, name),

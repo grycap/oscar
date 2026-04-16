@@ -1,5 +1,17 @@
 # Introduction
 
+<section class="oscar-hero">
+  <h1 class="oscar-hero__title">Open Source Serverless Computing for Data-Processing Applications</h1>
+  <p class="oscar-hero__body">
+    OSCAR helps you deploy scalable data-processing services on Kubernetes and multi-cloud environments with a clean serverless model.
+  </p>
+  <div class="oscar-hero__actions">
+    <a class="oscar-pill" href="deploy-im-dashboard/">Deploy OSCAR</a>
+    <a class="oscar-pill" href="fdl/">Define your first service</a>
+    <a class="oscar-pill" href="oscar-cli/">Use OSCAR CLI</a>
+  </div>
+</section>
+
 ![OSCAR logo](images/oscar3.png)
 
 OSCAR is an open-source platform to support the event-driven serverless computing model for data-processing applications. It can be automatically deployed on multi-Clouds, and even on low-powered devices, to create highly-parallel event-driven data-processing serverless applications along the computing continuum. These applications execute on customized runtime environments provided by Docker containers that run on elastic Kubernetes clusters. It is also integrated with the 
@@ -54,7 +66,7 @@ to support the OSCAR platform:
 - [Knative](https://knative.dev), a serverless framework to serve
     container-based applications for synchronous invocations (default
     Serverless Backend).
-- [OSCAR Manager](https://docs.oscar.grycap.net/api/), the main API, responsible for the management of the services and the integration of the different components. 
+- [OSCAR Manager](api.md), the main API, responsible for the management of the services and the integration of the different components. 
 - [OSCAR Dashboard](https://github.com/grycap/oscar-dashboard), an easy-to-use web-based graphical user interface aimed at end users.
 
 As external storage providers, the following services can be used:
@@ -82,6 +94,6 @@ A summary of the components used:
 ![OSCAR components](images/oscar-components.png)
 
 An OSCAR cluster can be accessed via its
-[REST API](https://grycap.github.io/oscar/api/), the web-based 
+[REST API](api.md), the web-based 
 [OSCAR Dashboard](https://github.com/grycap/oscar-dashboard) and the command-line interface provided by
 [OSCAR CLI](https://github.com/grycap/oscar-cli).

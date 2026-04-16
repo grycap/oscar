@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -134,20 +135,20 @@ func DeleteManagedVolume(ctx context.Context, kubeClientset kubernetes.Interface
 }
 
 func CountVolumeAttachments(ctx context.Context, kubeClientset kubernetes.Interface, namespace, volumeName string) (int, error) {
-	services, err := ListServicesUsingVolume(ctx, kubeClientset, namespace, volumeName)
+	attachments, err := ListVolumeAttachments(ctx, kubeClientset, namespace, volumeName)
 	if err != nil {
 		return 0, err
 	}
-	return len(services), nil
+	return len(attachments), nil
 }
 
-func ListServicesUsingVolume(ctx context.Context, kubeClientset kubernetes.Interface, namespace, volumeName string) ([]string, error) {
+func ListVolumeAttachments(ctx context.Context, kubeClientset kubernetes.Interface, namespace, volumeName string) ([]types.VolumeAttachmentReference, error) {
 	configMaps, err := kubeClientset.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	services := []string{}
+	attachments := []types.VolumeAttachmentReference{}
 	for _, cm := range configMaps.Items {
 		rawFDL, ok := cm.Data[types.FDLFileName]
 		if !ok || rawFDL == "" {
@@ -159,11 +160,18 @@ func ListServicesUsingVolume(ctx context.Context, kubeClientset kubernetes.Inter
 			continue
 		}
 		if service.Volume != nil && service.GetVolumeName() == volumeName {
-			services = append(services, service.Name)
+			attachments = append(attachments, types.VolumeAttachmentReference{
+				ServiceName: service.Name,
+				MountPath:   service.Volume.MountPath,
+			})
 		}
 	}
 
-	return services, nil
+	sort.Slice(attachments, func(i, j int) bool {
+		return attachments[i].ServiceName < attachments[j].ServiceName
+	})
+
+	return attachments, nil
 }
 
 func managedVolumeFromPVC(ctx context.Context, kubeClientset kubernetes.Interface, pvc *v1.PersistentVolumeClaim) (*types.ManagedVolume, error) {
@@ -175,10 +183,16 @@ func managedVolumeFromPVC(ctx context.Context, kubeClientset kubernetes.Interfac
 	if name == "" {
 		name = pvc.Name
 	}
-	attachmentCount, err := CountVolumeAttachments(ctx, kubeClientset, pvc.Namespace, name)
+	attachments, err := ListVolumeAttachments(
+		ctx,
+		kubeClientset,
+		pvc.Namespace,
+		name,
+	)
 	if err != nil {
 		return nil, err
 	}
+	attachmentCount := len(attachments)
 
 	phase := types.VolumePhaseReady
 	if pvc.DeletionTimestamp != nil {
@@ -203,6 +217,7 @@ func managedVolumeFromPVC(ctx context.Context, kubeClientset kubernetes.Interfac
 		CreatedByService: pvc.Labels[types.ManagedVolumeCreatedByServiceLabel],
 		CreationMode:     pvc.Labels[types.ManagedVolumeCreationModeLabel],
 		LifecyclePolicy:  pvc.Labels[types.ManagedVolumeLifecyclePolicyLabel],
+		Attachments:      attachments,
 		Status: types.VolumeStatus{
 			Phase:           phase,
 			AttachmentCount: attachmentCount,

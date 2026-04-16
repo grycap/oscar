@@ -32,16 +32,9 @@ func ValidateManagedVolumeCreateRequest(req *types.ManagedVolumeCreateRequest) e
 	if errs := validationName(req.Name); errs != nil {
 		return errs
 	}
-	/*if errs := validation.IsDNS1123Label(req.Name); len(errs) > 0 {
-		return fmt.Errorf("volume.name must satisfy Kubernetes DNS-1123 naming rules")
-	}*/
 	if errs := validateSize(req.Size); errs != nil {
 		return errs
 	}
-	/*qty, err := resource.ParseQuantity(req.Size)
-	if err != nil || qty.Sign() <= 0 {
-		return fmt.Errorf("volume.size must be a valid positive quantity")
-	}*/
 	return nil
 }
 

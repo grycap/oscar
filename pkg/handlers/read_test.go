@@ -11,6 +11,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/backends"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,7 +22,7 @@ func TestMakeReadHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
 
 	r := gin.Default()
-	r.GET("/system/services/:serviceName", MakeReadHandler(back))
+	r.GET("/system/services/:serviceName", MakeReadHandler(back, back.GetKubeClientset(), &types.Config{}))
 
 	scenarios := []struct {
 		name        string
@@ -101,7 +102,7 @@ func TestMakeReadHandlerVisibility(t *testing.T) {
 				}
 				c.Next()
 			})
-			r.GET("/system/services/:serviceName", MakeReadHandler(svc))
+			r.GET("/system/services/:serviceName", MakeReadHandler(svc, svc.GetKubeClientset(), &types.Config{}))
 
 			req := httptest.NewRequest(http.MethodGet, "/system/services/svc", nil)
 			resp := httptest.NewRecorder()
@@ -120,7 +121,7 @@ func TestMakeReadHandlerNotFound(t *testing.T) {
 	back.AddError("ReadService", k8serr.NewNotFound(schema.GroupResource{Group: "test", Resource: "services"}, "missing"))
 
 	r := gin.New()
-	r.GET("/system/services/:serviceName", MakeReadHandler(back))
+	r.GET("/system/services/:serviceName", MakeReadHandler(back, back.GetKubeClientset(), &types.Config{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/system/services/missing", nil)
 	resp := httptest.NewRecorder()
@@ -154,7 +155,7 @@ func TestMakeReadHandlerVolumeStatus(t *testing.T) {
 	}, metav1.CreateOptions{})
 
 	r := gin.New()
-	r.GET("/system/services/:serviceName", MakeReadHandler(back))
+	r.GET("/system/services/:serviceName", MakeReadHandler(back, back.GetKubeClientset(), &types.Config{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/system/services/svc", nil)
 	resp := httptest.NewRecorder()
@@ -169,5 +170,69 @@ func TestMakeReadHandlerVolumeStatus(t *testing.T) {
 	}
 	if !got.VolumeStatus.Enabled || got.VolumeStatus.Name != "svc" {
 		t.Fatalf("expected volume status to be enabled with resolved name")
+	}
+}
+
+func TestMakeReadHandlerIncludeDeploymentSummary(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name:      "svc",
+		Namespace: "default",
+		Expose: types.Expose{
+			APIPort: 8080,
+		},
+	}
+
+	replicas := int32(2)
+	_, _ = back.GetKubeClientset().AppsV1().Deployments("default").Create(t.Context(), &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "svc-dlp",
+			Namespace: "default",
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+		},
+		Status: appsv1.DeploymentStatus{
+			Replicas:          2,
+			AvailableReplicas: 1,
+		},
+	}, metav1.CreateOptions{})
+
+	r := gin.New()
+	r.GET("/system/services/:serviceName", MakeReadHandler(back, back.GetKubeClientset(), &types.Config{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/system/services/svc?include=deployment", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	var got types.Service
+	if err := json.Unmarshal(resp.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+	if got.Deployment == nil {
+		t.Fatalf("expected deployment summary to be included")
+	}
+	if got.Deployment.State != types.DeploymentStateDegraded {
+		t.Fatalf("expected degraded deployment state, got %s", got.Deployment.State)
+	}
+}
+
+func TestMakeReadHandlerInvalidServiceName(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+
+	r := gin.New()
+	r.GET("/system/services/:serviceName", MakeReadHandler(back, back.GetKubeClientset(), &types.Config{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/system/services/svc}", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid service name, got %d", resp.Code)
 	}
 }
