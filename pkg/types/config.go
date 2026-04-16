@@ -171,7 +171,18 @@ type Config struct {
 	// when there are no available resources in the cluster (if the service has replicas)
 	ResourceManagerEnable bool `json:"-"`
 
+	//Enable volumes in OSCAR
+	VolumeEnable bool `json:"volume_enable"`
+	// Default storageclass of volume
 	StorageClassName string `json:"-"`
+	//Number of volume available per user
+	VolumeAvailable string `json:"-"`
+	//Max disk that a user can get
+	VolumeMax string `json:"-"`
+	//Max disk that a user can get pero volume
+	VolumeMaxDisk string `json:"-"`
+	//Min disk that a user can get pero volume
+	VolumeMinDisk string `json:"-"`
 
 	// // ResourceManager parameter to set the ResourceManager to use ("kubernetes" or "yunikorn")
 	// // TODO: decide if this parameter is necessary or use kubernetes by default and yunikorn always if it's enabled
@@ -297,11 +308,19 @@ var configVars = []configVar{
 	{"YunikornNamespace", "YUNIKORN_NAMESPACE", false, stringType, "yunikorn"},
 	{"YunikornConfigMap", "YUNIKORN_CONFIGMAP", false, stringType, "yunikorn-configs"},
 	{"YunikornConfigFileName", "YUNIKORN_CONFIG_FILENAME", false, stringType, "queues.yaml"},
+
 	{"KueueEnable", "KUEUE_ENABLE", false, boolType, "true"},
 	{"KueueDefaultCPU", "KUEUE_DEFAULT_CPU", false, stringType, "2"},
 	{"KueueDefaultMemory", "KUEUE_DEFAULT_MEMORY", false, stringType, "2Gi"},
 	{"KueueDefaultFlavor", "KUEUE_DEFAULT_FLAVOR", false, stringType, "oscar-default-flavor"},
+
+	{"VolumeEnable", "VOLUME_ENABLE", false, boolType, "true"},
 	{"StorageClassName", "STORAGE_CLASS_NAME", false, stringType, "nfs"},
+	{"VolumeAvailable", "VOLUME_AVAILABLE", false, stringType, "7Gi"},
+	{"VolumeMax", "VOLUME_MAX", false, stringType, "5"},
+	{"VolumeMaxDisk", "VOLUME_MAX_DISK", false, stringType, "5Gi"},
+	{"VolumeMinDisk", "VOLUME_MIN_DISK", false, stringType, "200Mi"},
+
 	{"ResourceManagerEnable", "RESOURCE_MANAGER_ENABLE", false, boolType, "false"},
 	//{"ResourceManager", "RESOURCE_MANAGER", false, resourceManagerType, "kubernetes"},
 	{"ResourceManagerInterval", "RESOURCE_MANAGER_INTERVAL", false, intType, "15"},

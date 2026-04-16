@@ -25,6 +25,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+func envVarsToMap(envVars []v1.EnvVar) map[string]string {
+	values := make(map[string]string, len(envVars))
+	for _, envVar := range envVars {
+		values[envVar.Name] = envVar.Value
+	}
+	return values
+}
+
 var (
 	testService Service = Service{
 		Name:      "testname",
@@ -335,6 +343,7 @@ func TestToPodSpec(t *testing.T) {
 			// Assign resources from scenario
 			svc.Memory = s.memory
 			svc.CPU = s.cpu
+			svc.Token = "test-token"
 			//svc.ImagePullSecrets = []string{"testcred"}
 
 			podSpec, err := svc.ToPodSpec(&testConfig)
@@ -353,6 +362,16 @@ func TestToPodSpec(t *testing.T) {
 				}
 				if podSpec.Containers[0].Command[0] != fmt.Sprintf("%s/%s", VolumePath, WatchdogName) {
 					t.Fatalf("expected command to be supervisor path %s, got %s", fmt.Sprintf("%s/%s", VolumePath, WatchdogName), podSpec.Containers[0].Command[0])
+				}
+				envVars := envVarsToMap(podSpec.Containers[0].Env)
+				if envVars[OscarServiceNameEnvVar] != svc.Name {
+					t.Fatalf("expected %s to be %q, got %q", OscarServiceNameEnvVar, svc.Name, envVars[OscarServiceNameEnvVar])
+				}
+				if envVars[OscarServiceTokenEnvVar] != svc.Token {
+					t.Fatalf("expected %s to be %q, got %q", OscarServiceTokenEnvVar, svc.Token, envVars[OscarServiceTokenEnvVar])
+				}
+				if envVars[OscarServiceBasePathEnvVar] != "" {
+					t.Fatalf("expected %s to be empty for non-exposed service, got %q", OscarServiceBasePathEnvVar, envVars[OscarServiceBasePathEnvVar])
 				}
 
 			}
@@ -402,6 +421,43 @@ func TestHasReplicas(t *testing.T) {
 	}
 }
 
+func TestGetExposedBasePath(t *testing.T) {
+	tests := []struct {
+		name    string
+		service *Service
+		want    string
+	}{
+		{
+			name:    "nil service",
+			service: nil,
+			want:    "",
+		},
+		{
+			name:    "non exposed service",
+			service: &Service{Name: "demo"},
+			want:    "",
+		},
+		{
+			name: "exposed service",
+			service: &Service{
+				Name: "demo",
+				Expose: Expose{
+					APIPort: 8080,
+				},
+			},
+			want: "/system/services/demo/exposed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.service.GetExposedBasePath(); got != tt.want {
+				t.Fatalf("expected exposed base path %q, got %q", tt.want, got)
+			}
+		})
+	}
+}
+
 func TestGetVolumePVCName(t *testing.T) {
 	svc := Service{Name: "demo"}
 	expected := "demo"
@@ -429,6 +485,7 @@ func TestToPodSpecWithVolume(t *testing.T) {
 		Size:      "1Gi",
 		MountPath: "/data",
 	}
+	svc.Token = "test-token"
 
 	podSpec, err := svc.ToPodSpec(&testConfig)
 	if err != nil {
@@ -448,5 +505,31 @@ func TestToPodSpecWithVolume(t *testing.T) {
 	}
 	if !foundVolume || !foundMount {
 		t.Fatalf("expected volume and mount to be present")
+	}
+}
+
+func TestToPodSpecWithExposeMetadataEnvVars(t *testing.T) {
+	copy, err := deepcopy.Anything(testService)
+	if err != nil {
+		t.Fatalf("unable to deep copy test service: %v", err)
+	}
+	svc := copy.(Service)
+	svc.Token = "test-token"
+	svc.Expose.APIPort = 8080
+
+	podSpec, err := svc.ToPodSpec(&testConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	envVars := envVarsToMap(podSpec.Containers[0].Env)
+	if envVars[OscarServiceNameEnvVar] != svc.Name {
+		t.Fatalf("expected %s to be %q, got %q", OscarServiceNameEnvVar, svc.Name, envVars[OscarServiceNameEnvVar])
+	}
+	if envVars[OscarServiceTokenEnvVar] != svc.Token {
+		t.Fatalf("expected %s to be %q, got %q", OscarServiceTokenEnvVar, svc.Token, envVars[OscarServiceTokenEnvVar])
+	}
+	if envVars[OscarServiceBasePathEnvVar] != "/system/services/testname/exposed" {
+		t.Fatalf("expected %s to be %q, got %q", OscarServiceBasePathEnvVar, "/system/services/testname/exposed", envVars[OscarServiceBasePathEnvVar])
 	}
 }

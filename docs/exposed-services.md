@@ -40,6 +40,8 @@ Once the service is deployed, you can check if it was created correctly by makin
 https://{oscar_endpoint}/system/services/{service_name}/exposed/{path_resource} 
 ```
 
+For exposed services, OSCAR sets `OSCAR_SERVICE_BASE_PATH` in the container environment with the base path `/system/services/{service_name}/exposed`. The full list of OSCAR-managed environment variables is documented in [FDL](fdl.md#envvarsmap).
+
 Notice that if you get a `502 Bad Gateway` error, it is most likely because the specified port on the service does not match the API port.
 
 Additional options can be defined in the "expose" section of the FDL (some previously mentioned), such as:
@@ -109,7 +111,7 @@ and will end up looking like this:
 curl {-k} -X POST https://{oscar_endpoint}/system/services/body-pose-detection-async/exposed/{path resource} -H  "accept: */*" -H  "Content-Type: multipart/form-data" -F "data=@{input image};type=image/png" --output {output file}
 ```
 
-Finally, the complete command that works in [Local Testing](https://docs.oscar.grycap.net/local-testing/) with an image called `people.jpeg` as input and `output_posenet.zip` as output.
+Finally, the complete command that works in [Local Testing](local-testing.md) with an image called `people.jpeg` as input and `output_posenet.zip` as output.
 
 ``` bash
 curl -X POST https://localhost/system/services/body-pose-detection-async/exposed/v3/models/posenetclas/predict/ -H  "accept: */*" -H  "Content-Type: multipart/form-data" -F "data=@people.jpeg;type=image/png" --output output_posenet.zip
@@ -133,7 +135,7 @@ functions:
       cpu_threshold: 50 
 ```
 
-In case you use the NGINX example above in your [local OSCAR cluster](https://docs.oscar.grycap.net/local-testing/), you will see the nginx welcome page in: `http://localhost/system/services/nginx/exposed/`.
+In case you use the NGINX example above in your [local OSCAR cluster](local-testing.md), you will see the nginx welcome page in: `http://localhost/system/services/nginx/exposed/`.
 Two active pods of the deployment will be shown with the command `kubectl get pods -n oscar-svc`
 
 ``` text

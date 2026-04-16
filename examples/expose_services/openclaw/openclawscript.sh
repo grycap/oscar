@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 
-if [ -z "${OPENCLAW_GATEWAY_TOKEN:-}" ] && [ -f "/oscar/config/function_config.yaml" ]; then
-  OPENCLAW_GATEWAY_TOKEN="$(awk -F': ' '/^token:/ {print $2; exit}' /oscar/config/function_config.yaml | tr -d '"' || true)"
+if [ -z "${OPENCLAW_GATEWAY_TOKEN:-}" ] && [ -n "${OSCAR_SERVICE_TOKEN:-}" ]; then
+  OPENCLAW_GATEWAY_TOKEN="${OSCAR_SERVICE_TOKEN}"
   export OPENCLAW_GATEWAY_TOKEN
 fi
 
