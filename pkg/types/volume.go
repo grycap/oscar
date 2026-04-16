@@ -31,6 +31,18 @@ const (
 	VolumePhaseDeleted  = "deleted"
 )
 
+type VolumeInfo struct {
+	VolumeLimits  VolumeLimits    `json:"volume_limits"`
+	ManagedVolume []ManagedVolume `json:"managed_volume"`
+}
+
+type VolumeLimits struct {
+	DiskAvailable    string `json:"disk_available"`
+	MaxVolumes       string `json:"max_volumes"`
+	MaxDiskperVolume string `json:"max_disk_per_volume"`
+	MinDiskperVolume string `json:"min_disk_per_volume"`
+}
+
 // ManagedVolume represents the API response for a managed OSCAR volume.
 type ManagedVolume struct {
 	Name             string                      `json:"name"`

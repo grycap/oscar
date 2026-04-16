@@ -516,6 +516,7 @@ func MakeDeleteJobHandler(back types.ServerlessBackend, kubeClientset kubernetes
 		serviceName := c.Param("serviceName")
 		service, ok := getAuthorizedService(c, back, serviceName)
 		if !ok {
+			c.String(http.StatusForbidden, "You do not have permission to access this service")
 			return
 		}
 		serviceNamespace := resolveServiceNamespace(service, cfg)
@@ -584,26 +585,31 @@ func authorizeRequest(c *gin.Context, service *types.Service) bool {
 	if len(strings.Split(authHeader, "Bearer")) > 1 {
 		uid, err := auth.GetUIDFromContext(c)
 		if err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+			//c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			return false
 		}
-		if service.Visibility == "public" {
+		fmt.Println(service.Owner)
+		fmt.Println(uid)
+		if service.Visibility == utils.PUBLIC {
 			return true
 		}
-		isAllowed := len(service.AllowedUsers) == 0 || uid == service.Owner
-		if !isAllowed {
+
+		if uid == service.Owner {
+			return true
+		}
+
+		if service.Visibility == utils.RESTRICTED && len(service.AllowedUsers) > 0 {
 			for _, id := range service.AllowedUsers {
 				if uid == id {
-					isAllowed = true
-					break
+					return true
 				}
 			}
 		}
-
-		if !isAllowed {
+		return false
+		/*if !isAllowed {
 			c.String(http.StatusForbidden, "User %s doesn't have permision to get this service", uid)
 			return false
-		}
+		}*/
 	}
 	return true
 }

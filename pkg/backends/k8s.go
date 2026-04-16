@@ -27,13 +27,17 @@ import (
 	"github.com/grycap/oscar/v3/pkg/imagepuller"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	serving "knative.dev/serving/pkg/apis/serving"
 )
 
 const ConfigMapNameOSCAR = "additional-oscar-config"
+
+const exposedServiceAppLabelPrefix = "oscar-svc-exp-"
 
 // KubeBackend struct to represent a Kubernetes client to store services as podTemplates
 type KubeBackend struct {
@@ -341,6 +345,28 @@ func getServiceFromConfigMap(cm *v1.ConfigMap) (*types.Service, error) {
 	service.Script = cm.Data[types.ScriptFileName]
 
 	return service, nil
+}
+
+func GetExposedServiceDeployment(kubeClientset kubernetes.Interface, namespace, serviceName string) (*appsv1.Deployment, error) {
+	return kubeClientset.AppsV1().Deployments(namespace).Get(context.TODO(), resources.GetDeploymentName(serviceName), metav1.GetOptions{})
+}
+
+func ListExposedServicePods(kubeClientset kubernetes.Interface, namespace, serviceName string) (*v1.PodList, error) {
+	return kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: string(resources.KeyLabelApp) + "=" + resources.GetKeyLabelApp(serviceName),
+	})
+}
+
+func ListServicePods(kubeClientset kubernetes.Interface, namespace, serviceName string) (*v1.PodList, error) {
+	return kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", types.ServiceLabel, serviceName),
+	})
+}
+
+func ListKnativeServicePods(kubeClientset kubernetes.Interface, namespace, serviceName string) (*v1.PodList, error) {
+	return kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", serving.ServiceLabelKey, serviceName),
+	})
 }
 
 func checkAdditionalConfig(configName string, configNamespace string, service types.Service, cfg *types.Config, kubeClientset kubernetes.Interface) error {
