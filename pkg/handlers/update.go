@@ -92,6 +92,10 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
+		if oldService.Token != "" {
+			newService.Token = oldService.Token
+		}
+
 		serviceNamespace := oldService.Namespace
 		if serviceNamespace == "" {
 			serviceNamespace = cfg.ServicesNamespace
