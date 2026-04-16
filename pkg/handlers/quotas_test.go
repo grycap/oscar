@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -176,6 +177,58 @@ func TestQuotaResponseStructures(t *testing.T) {
 
 func TestFetchQuotaSkipped(t *testing.T) {
 	t.Skip("fetchQuota requires a valid Kueue client to be initialized")
+}
+
+func TestEnsureKueueQuotasEnabled(t *testing.T) {
+	t.Run("disabled", func(t *testing.T) {
+		err := ensureKueueQuotasEnabled(&types.Config{KueueEnable: false})
+		if !errors.Is(err, errKueueDisabled) {
+			t.Fatalf("expected errKueueDisabled, got %v", err)
+		}
+	})
+
+	t.Run("enabled", func(t *testing.T) {
+		if err := ensureKueueQuotasEnabled(&types.Config{KueueEnable: true}); err != nil {
+			t.Fatalf("expected nil error, got %v", err)
+		}
+	})
+}
+
+func TestIsMissingKueueAPI(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "server cannot find resource",
+			err:  errors.New("the server could not find the requested resource (get clusterqueues.kueue.x-k8s.io test)"),
+			want: true,
+		},
+		{
+			name: "no kind match",
+			err:  errors.New("no matches for kind \"ClusterQueue\" in version \"kueue.x-k8s.io/v1beta2\""),
+			want: true,
+		},
+		{
+			name: "ordinary error",
+			err:  errors.New("clusterqueues.kueue.x-k8s.io \"missing\" not found"),
+			want: false,
+		},
+		{
+			name: "nil",
+			err:  nil,
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isMissingKueueAPI(tt.err); got != tt.want {
+				t.Fatalf("isMissingKueueAPI() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
 
 func TestUpdateQuotaSkipped(t *testing.T) {

@@ -17,8 +17,10 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -29,13 +31,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var (
+	errKueueDisabled    = errors.New("kueue is not enabled")
+	errKueueUnavailable = errors.New("kueue API is not available")
+)
+
 // MakeGetOwnQuotaHandler handles GET /system/quotas/user for the bearer user.
 // @Summary Get own quotas
 // @Description Return CPU and memory quotas and current usage for the authenticated user. CPU values are in millicores, memory values in bytes.
 // @Tags quotas
 // @Produce json
-// @Success 200 {object} quotaResponse
+// @Success 200 {object} types.QuotaResponse
 // @Failure 401 {string} string "Unauthorized"
+// @Failure 503 {string} string "Service Unavailable"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BearerAuth
 // @Router /system/quotas/user [get]
@@ -46,9 +54,13 @@ func MakeGetOwnQuotaHandler(qb types.QuotaBackend, cfg *types.Config) gin.Handle
 			c.String(http.StatusUnauthorized, fmt.Sprintf("missing user identificator: %v", err))
 			return
 		}
+		if err := ensureKueueQuotasEnabled(cfg); err != nil {
+			writeQuotaError(c, err)
+			return
+		}
 		resp, err := fetchQuota(c.Request.Context(), cfg, qb, uid)
 		if err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
+			writeQuotaError(c, err)
 			return
 		}
 		c.JSON(http.StatusOK, resp)
@@ -64,6 +76,7 @@ func MakeGetOwnQuotaHandler(qb types.QuotaBackend, cfg *types.Config) gin.Handle
 // @Success 200 {object} quotaResponse
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 403 {string} string "Forbidden"
+// @Failure 503 {string} string "Service Unavailable"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
 // @Router /system/quotas/user/{userId} [get]
@@ -75,10 +88,14 @@ func MakeGetUserQuotaHandler(qb types.QuotaBackend, cfg *types.Config) gin.Handl
 			c.String(http.StatusForbidden, "forbidden")
 			return
 		}
+		if err := ensureKueueQuotasEnabled(cfg); err != nil {
+			writeQuotaError(c, err)
+			return
+		}
 
 		resp, err := fetchQuota(c.Request.Context(), cfg, qb, user)
 		if err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
+			writeQuotaError(c, err)
 			return
 		}
 		c.JSON(http.StatusOK, resp)
@@ -97,6 +114,7 @@ func MakeGetUserQuotaHandler(qb types.QuotaBackend, cfg *types.Config) gin.Handl
 // @Failure 400 {string} string "Bad Request"
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 403 {string} string "Forbidden"
+// @Failure 503 {string} string "Service Unavailable"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
 // @Router /system/quotas/user/{userId} [put]
@@ -118,17 +136,36 @@ func MakeUpdateUserQuotaHandler(qb types.QuotaBackend, cfg *types.Config) gin.Ha
 			c.String(http.StatusBadRequest, "cpu or memory must be provided")
 			return
 		}
+		if err := ensureKueueQuotasEnabled(cfg); err != nil {
+			writeQuotaError(c, err)
+			return
+		}
 		if err := updateQuota(c.Request.Context(), cfg, qb, user, req); err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
+			writeQuotaError(c, err)
 			return
 		}
 		resp, err := fetchQuota(c.Request.Context(), cfg, qb, user)
 		if err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
+			writeQuotaError(c, err)
 			return
 		}
 		c.JSON(http.StatusOK, resp)
 	}
+}
+
+func ensureKueueQuotasEnabled(cfg *types.Config) error {
+	if cfg == nil || !cfg.KueueEnable {
+		return fmt.Errorf("%w: /system/quotas requires KUEUE_ENABLE=true", errKueueDisabled)
+	}
+	return nil
+}
+
+func writeQuotaError(c *gin.Context, err error) {
+	if errors.Is(err, errKueueDisabled) || errors.Is(err, errKueueUnavailable) {
+		c.String(http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	c.String(http.StatusInternalServerError, err.Error())
 }
 
 func fetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, user string) (*types.QuotaResponse, error) {
@@ -136,6 +173,9 @@ func fetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, u
 	cqName := utils.BuildClusterQueueName(user)
 	cq, err := qb.Kueueclient.KueueV1beta2().ClusterQueues().Get(ctx, cqName, metav1.GetOptions{})
 	if err != nil {
+		if isMissingKueueAPI(err) {
+			return nil, fmt.Errorf("%w: install Kueue CRDs before using /system/quotas: %v", errKueueUnavailable, err)
+		}
 		return nil, fmt.Errorf("getting ClusterQueue %s: %w", cqName, err)
 	}
 
@@ -181,6 +221,9 @@ func updateQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, 
 	cqName := utils.BuildClusterQueueName(user)
 	cq, err := qb.Kueueclient.KueueV1beta2().ClusterQueues().Get(ctx, cqName, metav1.GetOptions{})
 	if err != nil {
+		if isMissingKueueAPI(err) {
+			return fmt.Errorf("%w: install Kueue CRDs before using /system/quotas: %v", errKueueUnavailable, err)
+		}
 		return fmt.Errorf("getting ClusterQueue %s: %w", cqName, err)
 	}
 
@@ -212,5 +255,17 @@ func updateQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, 
 	}
 
 	_, err = qb.Kueueclient.KueueV1beta2().ClusterQueues().Update(ctx, cq, metav1.UpdateOptions{})
+	if isMissingKueueAPI(err) {
+		return fmt.Errorf("%w: install Kueue CRDs before using /system/quotas: %v", errKueueUnavailable, err)
+	}
 	return err
+}
+
+func isMissingKueueAPI(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "the server could not find the requested resource") ||
+		strings.Contains(msg, "no matches for kind")
 }

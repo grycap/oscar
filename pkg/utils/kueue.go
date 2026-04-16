@@ -7,6 +7,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/grycap/oscar/v3/pkg/types"
 	apps "k8s.io/api/apps/v1"
@@ -26,6 +27,7 @@ import (
 const (
 	defaultKueueQueuePrefix      = "oscar-cq"
 	defaultKueueLocalQueuePrefix = "oscar-lq"
+	defaultKueueAdmissionTimeout = 30 * time.Second
 )
 
 var KueueLogger = log.New(os.Stdout, "[KUEUE-SERVICE] ", log.Flags())
@@ -470,11 +472,12 @@ func VerifyWorkload(service types.Service, namespace string, cfg *types.Config) 
 	if service.Expose.MinScale == 0 {
 		service.Expose.MinScale = 1
 	}
-	creation := CreateWorkload(service, namespace, cfg, getPodTemplateSpec)
-	check := onlyCheckWorkloadAdmited(service.Name)
+	if !CreateWorkload(service, namespace, cfg, getPodTemplateSpec) {
+		return false
+	}
+	check := onlyCheckWorkloadAdmited(service.Name, defaultKueueAdmissionTimeout)
 	delete := DeleteWorkload(service.Name, namespace, cfg)
-	//return (creation && check)
-	return (creation && check && delete)
+	return check && delete
 }
 
 func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Config) v1.PodTemplateSpec {
@@ -500,7 +503,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 	}
 }
 
-func onlyCheckWorkloadAdmited(serviceName string) bool {
+func onlyCheckWorkloadAdmited(serviceName string, timeout time.Duration) bool {
 	restCfg, err := rest.InClusterConfig()
 	if err != nil {
 		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
@@ -509,10 +512,11 @@ func onlyCheckWorkloadAdmited(serviceName string) bool {
 	kueueClient, err := kueueclientset.NewForConfig(restCfg)
 	if err != nil {
 		KueueLogger.Printf("error building kueue clientset: %v", err)
+		return false
 	}
 	factory := kueueinformers.NewSharedInformerFactory(kueueClient, 0)
 	workloadsInformer := factory.Kueue().V1beta2().Workloads().Informer()
-	admissionChan := make(chan bool)
+	admissionChan := make(chan bool, 1)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
@@ -522,12 +526,13 @@ func onlyCheckWorkloadAdmited(serviceName string) bool {
 			if newWL.Name != serviceName {
 				return
 			}
-			for _, cond := range newWL.Status.Conditions {
-				if cond.Type == "Admitted" && cond.Status == "True" {
-					KueueLogger.Printf("¡Workload %s admitted!", serviceName)
-					admissionChan <- true
-					return
+			if workloadIsAdmitted(newWL) {
+				KueueLogger.Printf("Workload %s admitted", serviceName)
+				select {
+				case admissionChan <- true:
+				default:
 				}
+				return
 			}
 		},
 	})
@@ -536,10 +541,34 @@ func onlyCheckWorkloadAdmited(serviceName string) bool {
 	}
 
 	factory.Start(stopCh)
-	factory.WaitForCacheSync(stopCh)
+	if !cache.WaitForCacheSync(stopCh, workloadsInformer.HasSynced) {
+		KueueLogger.Printf("timed out syncing workload informer for service '%s'", serviceName)
+		return false
+	}
 
+	for _, obj := range workloadsInformer.GetStore().List() {
+		if wl, ok := obj.(*kueuev1.Workload); ok && wl.Name == serviceName && workloadIsAdmitted(wl) {
+			KueueLogger.Printf("Workload %s admitted", serviceName)
+			return true
+		}
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 	select {
 	case admitted := <-admissionChan:
 		return admitted
+	case <-timer.C:
+		KueueLogger.Printf("timed out waiting for Kueue admission for service '%s'", serviceName)
+		return false
 	}
+}
+
+func workloadIsAdmitted(wl *kueuev1.Workload) bool {
+	for _, cond := range wl.Status.Conditions {
+		if cond.Type == kueuev1.WorkloadAdmitted && cond.Status == metav1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
