@@ -24,7 +24,8 @@ WORKDIR /dashboard
 
 COPY dashboard /dashboard
 
-RUN npm install && npm run build
+
+RUN npm install && npm run deploy_container
 
 
 FROM alpine:3.14

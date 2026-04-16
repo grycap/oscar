@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -44,6 +46,7 @@ func TestVolumeHandlersCRUD(t *testing.T) {
 	listResp := httptest.NewRecorder()
 	r.ServeHTTP(listResp, listReq)
 	if listResp.Code != http.StatusOK {
+		fmt.Println(listResp.Body)
 		t.Fatalf("expected list volume status 200, got %d", listResp.Code)
 	}
 	if !strings.Contains(listResp.Body.String(), "shared-data") {
@@ -129,6 +132,37 @@ func createBaseRuntimePVC(t *testing.T, back *backends.FakeBackend, cfg *types.C
 		},
 		Status: v1.PersistentVolumeClaimStatus{
 			Phase: v1.ClaimBound,
+		},
+	}, metav1.CreateOptions{})
+	_, _ = back.GetKubeClientset().CoreV1().ResourceQuotas("oscar-svc-user-example-org-547e41ffe2031bcdc35ffc6687f10d498c46").Create(t.Context(), &v1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "user",
+			Namespace: "oscar-svc-user-example-org-547e41ffe2031bcdc35ffc6687f10d498c46",
+		},
+		Spec: v1.ResourceQuotaSpec{
+			Hard: v1.ResourceList{
+				v1.ResourceRequestsStorage:        resource.MustParse("1Gi"),
+				v1.ResourcePersistentVolumeClaims: resource.MustParse("2"),
+			},
+		},
+	}, metav1.CreateOptions{})
+	_, _ = back.GetKubeClientset().CoreV1().LimitRanges("oscar-svc-user-example-org-547e41ffe2031bcdc35ffc6687f10d498c46").Create(t.Context(), &v1.LimitRange{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "user",
+			Namespace: "oscar-svc-user-example-org-547e41ffe2031bcdc35ffc6687f10d498c46",
+		},
+		Spec: v1.LimitRangeSpec{
+			Limits: []v1.LimitRangeItem{
+				{
+					Type: "PersistentVolumeClaim",
+					Max: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					Min: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("200Mi"),
+					},
+				},
+			},
 		},
 	}, metav1.CreateOptions{})
 }

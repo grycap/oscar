@@ -26,6 +26,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/backends"
 	"github.com/grycap/oscar/v3/pkg/types"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -34,7 +35,7 @@ func TestMakeListHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
 
 	r := gin.Default()
-	r.GET("/system/services", MakeListHandler(back))
+	r.GET("/system/services", MakeListHandler(back, back.GetKubeClientset(), &types.Config{}))
 
 	scenarios := []struct {
 		name        string
@@ -94,7 +95,7 @@ func TestMakeListHandlerVolumeStatus(t *testing.T) {
 	}, metav1.CreateOptions{})
 
 	r := gin.New()
-	r.GET("/system/services", MakeListHandler(back))
+	r.GET("/system/services", MakeListHandler(back, back.GetKubeClientset(), &types.Config{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/system/services", nil)
 	resp := httptest.NewRecorder()
@@ -108,5 +109,90 @@ func TestMakeListHandlerVolumeStatus(t *testing.T) {
 	}
 	if len(got) != 1 || !got[0].VolumeStatus.Enabled || got[0].VolumeStatus.Name != "svc" {
 		t.Fatalf("expected volume status enabled in list response")
+	}
+}
+
+func TestMakeListHandlerIncludeDeploymentSummary(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	back.Services = []*types.Service{
+		{
+			Name:      "svc",
+			Namespace: "default",
+			Expose: types.Expose{
+				APIPort: 8080,
+			},
+		},
+	}
+
+	replicas := int32(2)
+	_, _ = back.GetKubeClientset().AppsV1().Deployments("default").Create(t.Context(), &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "svc-dlp",
+			Namespace: "default",
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+		},
+		Status: appsv1.DeploymentStatus{
+			Replicas:          2,
+			AvailableReplicas: 1,
+		},
+	}, metav1.CreateOptions{})
+
+	r := gin.New()
+	r.GET("/system/services", MakeListHandler(back, back.GetKubeClientset(), &types.Config{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/system/services?include=deployment", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	var got []types.Service
+	if err := json.Unmarshal(resp.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected one service, got %d", len(got))
+	}
+	if got[0].Deployment == nil {
+		t.Fatalf("expected deployment summary to be included")
+	}
+	if got[0].Deployment.State != types.DeploymentStateDegraded {
+		t.Fatalf("expected degraded deployment state, got %s", got[0].Deployment.State)
+	}
+	if got[0].Deployment.ActiveInstances != 2 || got[0].Deployment.AffectedInstances != 1 {
+		t.Fatalf("unexpected deployment counters: active=%d affected=%d", got[0].Deployment.ActiveInstances, got[0].Deployment.AffectedInstances)
+	}
+}
+
+func TestMakeListHandlerDefaultResponseOmitsDeploymentSummary(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	back.Services = []*types.Service{
+		{Name: "svc", Namespace: "default"},
+	}
+
+	r := gin.New()
+	r.GET("/system/services", MakeListHandler(back, back.GetKubeClientset(), &types.Config{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/system/services", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	var got []map[string]any
+	if err := json.Unmarshal(resp.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected one service, got %d", len(got))
+	}
+	if _, exists := got[0]["deployment"]; exists {
+		t.Fatalf("expected default list response not to include deployment summary")
 	}
 }

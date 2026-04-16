@@ -184,6 +184,8 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating Kueue ClusterQueue for user %s: %v", uid, err))
 		}
 
+		utils.EnsureVolumeLimits(FormatUID(uid), utils.BuildUserNamespace(cfg, uid), kubeClientset, cfg)
+
 		c.Set("uidOrigin", uid)
 		c.Set("userName", ui.Name)
 		c.Set("multitenancyConfig", mc)

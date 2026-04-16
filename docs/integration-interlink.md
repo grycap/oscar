@@ -11,14 +11,14 @@ OSCAR uses the Kubernetes Virtual Node to translate a job request from the Kuber
 
 The Kubernetes cluster must have at least one virtual kubelet node. Those nodes are tagged as `type=virtual-kubelet`. Follow the documentation in the [interLink homepage](https://intertwin-eu.github.io/interLink/) to deploy an interLink virtual node to the Kubernetes cluster. OSCAR detects these nodes automatically.
 
-Once the Virtual node and OSCAR are installed correctly, you can use this node to offload your job to the configured remote host. To offload the jobs created by a service to an interLink node the name of the virtual node has to be set in the `interlink_node_name` variable of the [service FDL](https://docs.oscar.grycap.net/fdl/#service).
+Once the Virtual node and OSCAR are installed correctly, you can use this node to offload your job to the configured remote host. To offload the jobs created by a service to an interLink node the name of the virtual node has to be set in the `interlink_node_name` variable of the [service FDL](fdl.md#service).
 
 Otherwise, if the variable is not set, i.e., `""`, the job will be executed in a normal Kubernetes node.
 
 
 ## Annotations, restrictions, and other things to keep in mind
 
-- The [OSCAR services annotations](https://docs.oscar.grycap.net/fdl/#service) would be applied to every job for that service. The annotations are used to apply some configuration to the remote host.
+- The [OSCAR services annotations](fdl.md#service) would be applied to every job for that service. The annotations are used to apply some configuration to the remote host.
 
 - The memory and CPU defined in the OSCAR services are not applied to the jobs that are offloaded via interLink. Those parameters are set employing the annotations, as specified by the provider.
 

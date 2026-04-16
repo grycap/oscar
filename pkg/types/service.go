@@ -314,6 +314,10 @@ type Service struct {
 	// VolumeStatus exposes basic volume state information in API responses.
 	// Internal/API use only, not part of FDL.
 	VolumeStatus ServiceVolumeStatus `json:"volume_status,omitempty" yaml:"-"`
+
+	// Deployment exposes an optional deployment summary in list/read API responses.
+	// Internal/API use only, not part of FDL.
+	Deployment *ServiceDeploymentSummary `json:"deployment,omitempty" yaml:"-"`
 }
 
 // ServiceVolumeConfig stores the requested size and mount path for a managed volume.

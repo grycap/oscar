@@ -1,5 +1,5 @@
 site_name: OSCAR Documentation
-site_url: https://docs.oscar.grycap.net/
+site_url: https://docs.oscar.grycap.net/latest/
 repo_url: https://github.com/grycap/oscar
 nav:
 - Introduction: 
@@ -24,6 +24,12 @@ nav:
   - api.md
   - MinIO: minio-usage.md
 
+- Service Deployment:
+  - deployment-api.md
+  - deployment-oscar-cli.md
+  - deployment-oscar-dashboard.md
+  - deployment-python.md
+
 - Service Execution: 
   - invoking.md
   - invoking-sync.md
@@ -38,14 +44,17 @@ nav:
   - integration-node-red.md
   - integration-jupyter.md
 
-- Tutorials: 
-  - training.md
+- Training:
+  - Tutorials: tutorials.md
+  - Webinars: training.md
   - faq.md
 
 - Advanced Features:   
   - MinIO bucket replication: minio-bucket-replication.md
   - Mount external volumes: mount.md
   - Additional configuration: additional-config.md
+  - Metrics: metrics.md
+  - Deployment visibility: deployment-visibility.md
 
 - Development:
   - Documentation: devel-docs.md
@@ -56,13 +65,32 @@ theme:
   favicon: images/logo.png
   logo: images/logo.png
   name: material
+  font:
+    text: Lato
+    code: Roboto Mono
   palette:
-    primary: teal
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
   features:
     - instant
     - versioning
     - toc.integrate
     - content.code.copy
+
+extra_css:
+  - stylesheets/oscar-theme.css
 
 plugins:
 - search

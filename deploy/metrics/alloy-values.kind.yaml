@@ -91,7 +91,7 @@ alloy:
         forward_to = [loki.write.default.receiver]
 
         stage.match {
-          selector = "{namespace!=\"\"} |~ \"/system/services/.+/exposed/\""
+          selector = "{namespace!=\"\"} |~ \"/system/services/[^/[:space:]]+/exposed($|[/?[:space:]])\""
           action   = "keep"
 
           stage.label_drop {
@@ -100,7 +100,7 @@ alloy:
         }
 
         stage.match {
-          selector = "{namespace!=\"\"} !~ \"/system/services/.+/exposed/\""
+          selector = "{namespace!=\"\"} !~ \"/system/services/[^/[:space:]]+/exposed($|[/?[:space:]])\""
           action   = "drop"
         }
       }
