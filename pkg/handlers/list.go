@@ -117,10 +117,10 @@ func includeQueryContains(raw string, target string) bool {
 }
 
 func setDeploymentSummary(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config, service *types.Service) error {
-	runtimeCtx, err := inspectDeploymentRuntime(back, kubeClientset, service, cfg)
+	runtimeStatus, err := inspectDeploymentRuntimeStatusOnly(back, kubeClientset, service, cfg)
 	if err != nil {
 		return err
 	}
-	service.Deployment = deploymentSummaryFromStatus(runtimeCtx.status)
+	service.Deployment = deploymentSummaryFromStatus(runtimeStatus)
 	return nil
 }
