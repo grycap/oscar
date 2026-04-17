@@ -651,3 +651,59 @@ func validateServiceName(c *gin.Context, serviceName string) (string, bool) {
 	}
 	return serviceName, true
 }
+
+func inspectDeploymentRuntimeStatusOnly(back types.ServerlessBackend, kubeClientset kubernetes.Interface, service *types.Service, cfg *types.Config) (types.ServiceDeploymentStatus, error) {
+	namespace := resolveServiceNamespace(service, cfg)
+	service.Namespace = namespace
+
+	if service.Expose.APIPort != 0 {
+		return inspectExposedDeploymentRuntimeStatusOnly(kubeClientset, service)
+	}
+
+	if getter, ok := back.(deploymentRuntimeServiceGetter); ok {
+		knService, err := getter.GetRuntimeService(namespace, service.Name)
+		if err == nil {
+			return inspectKnativeDeploymentRuntimeStatusOnly(kubeClientset, service, knService)
+		}
+		if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+			return types.ServiceDeploymentStatus{}, err
+		}
+	}
+
+	return inspectPodBackedDeploymentRuntimeStatusOnly(kubeClientset, service)
+}
+
+func inspectPodBackedDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interface, service *types.Service) (types.ServiceDeploymentStatus, error) {
+	_, err := backends.ListServicePods(kubeClientset, service.Namespace, service.Name)
+	if err != nil {
+		if apierrors.IsNotFound(err) || apierrors.IsGone(err) {
+			return unavailableDeploymentStatus(service, "Current runtime resources are unavailable."), nil
+		}
+		return types.ServiceDeploymentStatus{}, err
+	}
+
+	return unavailableDeploymentStatus(service, "Current deployment visibility is unavailable for this service runtime."), nil
+}
+
+func inspectKnativeDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interface, service *types.Service, knService *knv1.Service) (types.ServiceDeploymentStatus, error) {
+	pods, err := backends.ListKnativeServicePods(kubeClientset, service.Namespace, service.Name)
+	if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+		return types.ServiceDeploymentStatus{}, err
+	}
+	items := podItems(pods)
+	current := filterCurrentRuntimePods(items)
+
+	return deploymentStatusFromKnativeService(service, knService, current), nil
+}
+
+func inspectExposedDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interface, service *types.Service) (types.ServiceDeploymentStatus, error) {
+	deployment, err := backends.GetExposedServiceDeployment(kubeClientset, service.Namespace, service.Name)
+	if err != nil {
+		if apierrors.IsNotFound(err) || apierrors.IsGone(err) {
+			return unavailableDeploymentStatus(service, "Current deployment resources are unavailable."), nil
+		}
+		return types.ServiceDeploymentStatus{}, err
+	}
+
+	return deploymentStatusFromDeployment(service, deployment), nil
+}
