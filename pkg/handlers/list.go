@@ -59,28 +59,34 @@ func MakeListHandler(back types.ServerlessBackend, kubeClientset kubernetes.Inte
 				return
 			}
 
+			isAllowedServiceForUser := false
 			allowedServicesForUser := []*types.Service{}
 			for _, service := range services {
-				setVolumeStatus(back, service)
-				if includeDeployment {
-					if err := setDeploymentSummary(back, kubeClientset, cfg, service); err != nil {
-						c.String(http.StatusInternalServerError, err.Error())
-						return
-					}
-				}
 				switch service.Visibility {
 				case utils.PUBLIC:
-					allowedServicesForUser = append(allowedServicesForUser, service)
-
+					isAllowedServiceForUser = true
 				case utils.PRIVATE:
 					if service.Owner == uid {
-						allowedServicesForUser = append(allowedServicesForUser, service)
-
+						isAllowedServiceForUser = true
 					}
 				case utils.RESTRICTED:
 					if service.Owner == uid || slices.Contains(service.AllowedUsers, uid) {
-						allowedServicesForUser = append(allowedServicesForUser, service)
+						isAllowedServiceForUser = true
 					}
+				}
+				// If the service is allowed for the user,
+				// set the volume status and deployment summary (if requested),
+				// and add it to the list of allowed services for the user.
+				if isAllowedServiceForUser {
+					isAllowedServiceForUser = false
+					setVolumeStatus(back, service)
+					if includeDeployment {
+						if err := setDeploymentSummary(back, kubeClientset, cfg, service); err != nil {
+							c.String(http.StatusInternalServerError, err.Error())
+							return
+						}
+					}
+					allowedServicesForUser = append(allowedServicesForUser, service)
 				}
 			}
 
