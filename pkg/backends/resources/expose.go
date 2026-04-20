@@ -31,6 +31,7 @@ import (
 	autos "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -134,6 +135,13 @@ func DeleteExpose(name string, namespace string, kubeClientset kubernetes.Interf
 	utils.DeleteWorkload(name, targetNamespace, cfg)
 
 	return nil
+}
+
+func ignoreNotFound(err error) error {
+	if err == nil || apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 // UpdateExpose updates all the components of the exposed service on the cluster
