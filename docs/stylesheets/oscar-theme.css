@@ -392,3 +392,41 @@ html {
   height: 100%;
   border: 0;
 }
+
+.md-typeset .oscar-media-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-top: 0.65rem;
+}
+
+.md-typeset .oscar-slide-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 1.9rem;
+  padding: 0.28rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 0.78rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+[data-md-color-scheme="slate"] .md-typeset .oscar-slide-button {
+  color: #DDF3DF;
+  background: rgba(123, 196, 127, 0.12);
+  border-color: rgba(123, 196, 127, 0.32);
+}
+
+[data-md-color-scheme="default"] .md-typeset .oscar-slide-button {
+  color: #2F7244;
+  background: rgba(123, 196, 127, 0.12);
+  border-color: rgba(90, 174, 96, 0.36);
+}
+
+.md-typeset .oscar-slide-button:hover,
+.md-typeset .oscar-slide-button:focus {
+  filter: brightness(1.08);
+}
