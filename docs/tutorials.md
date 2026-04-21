@@ -6,6 +6,7 @@
     Short guided videos for quick onboarding and focused learning. Consider the following alternative learning resources:
   </p>
   <div class="oscar-hero__actions">
+    <a class="oscar-pill" href="../hands-on/">Hands-on Labs</a>
     <a class="oscar-pill" href="../training/">Webinars</a>
     <a class="oscar-pill" href="../deploy-im-dashboard/">Deploy OSCAR</a>
     <a class="oscar-pill" href="../fdl/">Define a Service</a>

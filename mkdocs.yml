@@ -39,6 +39,9 @@ nav:
   - integration-jupyter.md
 
 - Training:
+  - Hands-on Labs:
+    - hands-on.md
+    - Lab 01 - ImageMagick: hands-on-imagemagick.md
   - Tutorials: tutorials.md
   - Webinars: training.md
   - faq.md
