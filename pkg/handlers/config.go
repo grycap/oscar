@@ -17,24 +17,25 @@ limitations under the License.
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/v3/pkg/backends"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 var (
 	getUIDFromContextFn                = auth.GetUIDFromContext
 	getMultitenancyConfigFromContextFn = auth.GetMultitenancyConfigFromContext
 )
-
-type ConfigForUser struct {
-	Cfg           *types.Config        `json:"config"`
-	MinIOProvider *types.MinIOProvider `json:"minio_provider"`
-}
 
 // MakeConfigHandler godoc
 // @Summary Get configuration
@@ -47,14 +48,33 @@ type ConfigForUser struct {
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/config [get]
-func MakeConfigHandler(cfg *types.Config) gin.HandlerFunc {
+func MakeConfigHandler(cfg *types.Config, back kubernetes.Interface) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Return configForUser
-		var conf ConfigForUser
+		var conf types.ConfigForUser
 		minIOProvider := cfg.MinIOProvider
+		var air []string
+		cm, err := backends.GetOSCARCMConfiguration(back, cfg.AdditionalConfigPath, cfg.Namespace)
+		if err != nil && !apierrors.IsNotFound(err) {
+			c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+
+		}
+		if apierrors.IsNotFound(err) {
+			air = []string{}
+		} else {
+			err := json.Unmarshal([]byte(cm.Data[types.AIR]), &air)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+
+			}
+		}
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
-			conf = ConfigForUser{cfg, minIOProvider}
+			conf = types.ConfigForUser{
+				Cfg:                      cfg,
+				MinIOProvider:            minIOProvider,
+				AllowedImageRepositories: air,
+			}
 		} else {
 
 			// Get MinIO credentials from k8s secret for user
@@ -82,9 +102,93 @@ func MakeConfigHandler(cfg *types.Config) gin.HandlerFunc {
 				Region:    minIOProvider.Region,
 			}
 
-			conf = ConfigForUser{cfg, userMinIOProvider}
+			conf = types.ConfigForUser{
+				Cfg:                      cfg,
+				MinIOProvider:            userMinIOProvider,
+				AllowedImageRepositories: air,
+			}
 		}
 
 		c.JSON(http.StatusOK, conf)
+	}
+}
+
+// MakeConfigHandler godoc
+// @Summary Put configuration
+// @Description Change the cluster configuration
+// @Tags config
+// @Produce json
+// @Success 200 {object} handlers.ConfigForUser
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Router /system/config [put]
+func MakeConfigUpdateHandler(cfg *types.Config, back kubernetes.Interface) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if len(strings.Split(authHeader, "Bearer")) > 1 {
+			c.JSON(http.StatusUnauthorized, "")
+
+		}
+		configInput := types.ConfigForUser{}
+		if err := c.ShouldBindJSON(&configInput); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The configuration specification is not valid: %v", err))
+			return
+		}
+		_, err := backends.GetOSCARCMConfiguration(back, cfg.AdditionalConfigPath, cfg.Namespace)
+
+		if err != nil && !apierrors.IsNotFound(err) {
+			c.JSON(http.StatusInternalServerError, err)
+			return
+
+		}
+		if apierrors.IsNotFound(err) {
+			if configInput.AllowedImageRepositories == nil || len(configInput.AllowedImageRepositories) == 0 {
+				cm := getOSCARCMConfigurationDefaultDefinition(cfg.AdditionalConfigPath)
+				backends.CreateOSCARCMConfiguration(back, cm, cfg.Namespace)
+				c.JSON(http.StatusOK, configInput.AllowedImageRepositories)
+				return
+
+			} else {
+				cm := getOSCARCMConfigurationCustomDefinition(cfg.AdditionalConfigPath, configInput.AllowedImageRepositories)
+				err := backends.CreateOSCARCMConfiguration(back, cm, cfg.Namespace)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, err)
+					return
+
+				}
+				c.JSON(http.StatusOK, configInput.AllowedImageRepositories)
+				return
+			}
+		}
+		newConfigMap := getOSCARCMConfigurationCustomDefinition(cfg.AdditionalConfigPath, configInput.AllowedImageRepositories)
+		backends.UpdateOSCARCMConfiguration(back, newConfigMap, cfg.Namespace)
+		c.JSON(http.StatusOK, configInput.AllowedImageRepositories)
+		return
+
+	}
+}
+
+func getOSCARCMConfigurationDefaultDefinition(name string) *v1.ConfigMap {
+	return &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Data: map[string]string{
+			types.AIR: "[]",
+		},
+	}
+}
+
+func getOSCARCMConfigurationCustomDefinition(name string, air []string) *v1.ConfigMap {
+	data, _ := json.Marshal(air)
+	dataString := string(data)
+	return &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Data: map[string]string{
+			types.AIR: dataString,
+		},
 	}
 }

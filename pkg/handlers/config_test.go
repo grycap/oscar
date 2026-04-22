@@ -54,6 +54,7 @@ func createExpectedBody(access_key string, secret_key string, cfg *types.Config)
 			"secret_key": secret_key,
 			"region":     cfg.MinIOProvider.Region,
 		},
+		"allowed_image_repositories": []interface{}{},
 	}
 }
 
@@ -71,9 +72,10 @@ func TestMakeConfigHandler(t *testing.T) {
 		},
 	}
 
+	kubeClientset := testclient.NewSimpleClientset()
 	t.Run("Without Authorization Header", func(t *testing.T) {
 		router := gin.New()
-		router.GET("/config", MakeConfigHandler(cfg))
+		router.GET("/config", MakeConfigHandler(cfg, kubeClientset))
 
 		req, _ := http.NewRequest("GET", "/config", nil)
 		w := httptest.NewRecorder()
@@ -101,10 +103,10 @@ func TestMakeConfigHandler(t *testing.T) {
 		},
 	}
 
-	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
+	kubeClientset = testclient.NewSimpleClientset(K8sObjects...)
 	t.Run("With Bearer Authorization Header", func(t *testing.T) {
 		router := gin.New()
-		router.GET("/config", MakeConfigHandler(cfg))
+		router.GET("/config", MakeConfigHandler(cfg, kubeClientset))
 
 		req, _ := http.NewRequest("GET", "/config", nil)
 		req.Header.Set("Authorization", "Bearer some-token")
@@ -145,7 +147,7 @@ func TestMakeConfigHandler(t *testing.T) {
 
 	t.Run("With Token Authorization Header", func(t *testing.T) {
 		router := gin.New()
-		router.GET("/config", MakeConfigHandler(cfg))
+		router.GET("/config", MakeConfigHandler(cfg, kubeClientset))
 
 		req, _ := http.NewRequest("GET", "/config", nil)
 		req.Header.Set("Authorization", "SomeToken")
