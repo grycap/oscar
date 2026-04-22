@@ -1,8 +1,6 @@
-# Lab 01: Image Processing Service in OSCAR
-
 <section class="oscar-hero oscar-lab-hero">
   <p class="oscar-lab-kicker">Hands-on lab</p>
-  <h1 class="oscar-hero__title">Deploy an ImageMagick service in OSCAR</h1>
+  <h1 class="oscar-hero__title">Lab 01. Deployment and Execution in OSCAR</h1>
   <p class="oscar-hero__body">
     This lab uses the ImageMagick example from OSCAR Hub to show a complete onboarding workflow: deploy the service,
     confirm that the generated resources are ready, execute a quick synchronous test, and then validate the asynchronous
@@ -22,30 +20,13 @@
   </div>
 </section>
 
-<section class="oscar-media-card oscar-lab-feature">
-  <div class="oscar-media-card__header">
-    <p class="oscar-media-card__eyebrow">Overview</p>
-    <h2>What this lab covers</h2>
-    <p class="oscar-media-card__description">
-      This lab demonstrates a complete first workflow for external users, from deployment in OSCAR Hub to validation
-      through both synchronous and asynchronous execution modes.
-    </p>
-  </div>
-  <div class="oscar-lab-tag-row">
-    <span class="oscar-lab-tag">OSCAR Hub deployment</span>
-    <span class="oscar-lab-tag">Service verification</span>
-    <span class="oscar-lab-tag">Synchronous execution</span>
-    <span class="oscar-lab-tag">Asynchronous execution</span>
-  </div>
-</section>
-
 <div class="oscar-lab-intro-grid">
   <section class="oscar-lab-panel">
     <p class="oscar-media-card__eyebrow">Before you start</p>
     <h2>Prerequisites</h2>
     <ul>
       <li>A running OSCAR deployment with access to the Dashboard.</li>
-      <li>Credentials to log in and permission to deploy services.</li>
+      <li>Credentials to log in and enough quota to deploy services.</li>
       <li>One sample image for the synchronous test and optionally a few more images for the asynchronous test.</li>
       <li>Recommended references: <a href="../deploy-im-dashboard/">Deploy OSCAR</a>, <a href="../usage-dashboard/">OSCAR Dashboard</a>, and <a href="../oscar-cli/">OSCAR CLI</a>.</li>
     </ul>
@@ -165,7 +146,7 @@ Finally, open the output bucket and verify that the processed files were convert
 
 ## 10. Delete the service
 
-When you finish the lab, delete the service to clean up the deployed serviceif it is no longer needed.
+When you finish the lab, if you do not plan to proceed with additional hands-on labs, delete the service to clean up the deployed service if it is no longer needed.
 The associated bucket will be automatically deleted.
 
 ![Delete the service](images/hands-on/lab-01/13-oscar-dashboard-service-delete.png)
@@ -190,3 +171,19 @@ The associated bucket will be automatically deleted.
     <li>You can explain the practical difference between sync and async execution in OSCAR.</li>
   </ul>
 </section>
+
+<!--
+<section class="oscar-media-card oscar-lab-feature">
+  <div class="oscar-media-card__header">
+    <p class="oscar-media-card__eyebrow">Next lab</p>
+    <h2>Continue with Lab 02: Interactive Analysis</h2>
+    <p class="oscar-media-card__description">
+      The next lab skeleton is ready so you can add the interactive analysis workflow on top of the same training
+      structure used here.
+    </p>
+  </div>
+  <div class="oscar-media-card__actions">
+    <a class="oscar-slide-button" href="../hands-on-interactive-analysis/">Open Lab 02</a>
+  </div>
+</section>
+-->

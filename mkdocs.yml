@@ -41,7 +41,7 @@ nav:
 - Training:
   - Hands-on Labs:
     - hands-on.md
-    - Lab 01 - ImageMagick: hands-on-imagemagick.md
+    - Lab 01 - Deploy & Execute: hands-on-deploy-execute.md    
   - Tutorials: tutorials.md
   - Webinars: training.md
   - faq.md

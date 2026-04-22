@@ -52,7 +52,22 @@
       </p>
     </div>    
     <div class="oscar-media-card__actions">
-      <a class="oscar-slide-button" href="../hands-on-imagemagick/">Open lab</a>
+      <a class="oscar-slide-button" href="../hands-on-deploy-execute/">Open lab</a>
     </div>
   </section>
+  <!--
+  <section class="oscar-media-card oscar-lab-feature">
+    <div class="oscar-media-card__header">
+      <p class="oscar-media-card__eyebrow">Lab 02</p>
+      <h2>Interactive Analysis</h2>
+      <p class="oscar-media-card__description">
+        Skeleton page for the next hands-on lab. Fill this lab with the interactive analysis workflow, screenshots,
+        validation steps, and cleanup instructions.
+      </p>
+    </div>
+    <div class="oscar-media-card__actions">
+      <a class="oscar-slide-button" href="../hands-on-interactive-analysis/">Open lab</a>
+    </div>
+  </section>
+  -->
 </div>
