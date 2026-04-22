@@ -6,6 +6,7 @@
     Long-form OSCAR presentations and webinars delivered in collaboration with research projects and community initiatives.
   </p>
   <div class="oscar-hero__actions">
+    <a class="oscar-pill" href="../hands-on/">Hands-on Labs</a>
     <a class="oscar-pill" href="../tutorials/">Tutorials</a>
     <a class="oscar-pill" href="../faq/">FAQ</a>
   </div>
