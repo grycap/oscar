@@ -61,15 +61,6 @@ in order to test the OSCAR framework for specific applications. We recommend
 you to start with the
 [plant classification example](https://github.com/grycap/oscar/tree/master/examples/plant-classification-sync).
 
-#### Restrict Container images
-
-An admin user can allow a trusted image repository and discard images from other repositories. Use the PUT /system/config API call. The next example only allows images from the `ghcr.io/grycap` repository/owner.
-
-```
-curl -vX PUT  -H "Authorization: Basic <echo 'user:password' -n | base64>"  https://<oscar_endpoint>/system/config -d '{"allowed_image_repositories":["ghcr.io/grycap"]}'
-```
-
-
 ### External Storage Providers
 
 [FaaS Supervisor](https://github.com/grycap/faas-supervisor) downloads the input file and uploads the output file. Each [storage provider](fdl.md#storageproviders) has specific parameters, authentication, and capabilities. The current implementation supports:
