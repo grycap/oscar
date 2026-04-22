@@ -202,7 +202,7 @@ func getOSCARCMConfigurationDefaultDefinition(name string) *v1.ConfigMap {
 func getOSCARCMConfigurationCustomDefinition(name string, air []string) (*v1.ConfigMap, error) {
 	data, err := json.Marshal(air)
 	if err != nil {
-		return _, err
+		return nil, err
 	}
 	dataString := string(data)
 	return &v1.ConfigMap{
