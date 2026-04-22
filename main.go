@@ -112,7 +112,8 @@ func main() {
 	system := r.Group("/system", auth.GetAuthMiddleware(cfg, kubeClientset))
 
 	// Config path
-	system.GET("/config", handlers.MakeConfigHandler(cfg))
+	system.GET("/config", handlers.MakeConfigHandler(cfg, kubeClientset))
+	system.PUT("/config", handlers.MakeConfigUpdateHandler(cfg, kubeClientset))
 
 	// CRUD Services
 	system.POST("/services", handlers.MakeCreateHandler(cfg, back))

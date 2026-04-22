@@ -46,6 +46,7 @@ const (
 	urlType               = "url"
 	serverlessBackendType = "serverlessBackend"
 	routeKindType         = "routeKind"
+	AIR                   = "allowed_image_repositories"
 )
 
 type configVar struct {
@@ -273,6 +274,12 @@ type Config struct {
 
 	// LokiExposedAppLabel app label for exposed-service logs
 	LokiExposedAppLabel string `json:"-"`
+}
+
+type ConfigForUser struct {
+	Cfg                      *Config        `json:"config"`
+	MinIOProvider            *MinIOProvider `json:"minio_provider"`
+	AllowedImageRepositories []string       `json:"allowed_image_repositories"`
 }
 
 var configVars = []configVar{

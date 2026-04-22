@@ -18,6 +18,7 @@ package backends
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -371,19 +372,20 @@ func ListKnativeServicePods(kubeClientset kubernetes.Interface, namespace, servi
 
 func checkAdditionalConfig(configName string, configNamespace string, service types.Service, cfg *types.Config, kubeClientset kubernetes.Interface) error {
 	// Get the configMapwith the service additional settings
-	cm, err := kubeClientset.CoreV1().ConfigMaps(configNamespace).Get(context.TODO(), configName, metav1.GetOptions{})
+	cm, err := GetOSCARCMConfiguration(kubeClientset, cfg.AdditionalConfigPath, cfg.Namespace)
 	if err != nil {
 		return nil
 	}
 
-	additionalConfig := &types.AdditionalConfig{}
+	var air []string
 	// Unmarshal the FDL stored in the configMap
-	if err = yaml.Unmarshal([]byte(cm.Data[cfg.AdditionalConfigPath]), additionalConfig); err != nil {
+	err = json.Unmarshal([]byte(cm.Data[types.AIR]), &air)
+	if err != nil {
 		return nil
 	}
 
-	if len(additionalConfig.Images.AllowedPrefixes) > 0 {
-		for _, prefix := range additionalConfig.Images.AllowedPrefixes {
+	if len(air) > 0 {
+		for _, prefix := range air {
 			if strings.Contains(service.Image, prefix) {
 				return nil
 			}
