@@ -145,13 +145,22 @@ func MakeConfigUpdateHandler(cfg *types.Config, back kubernetes.Interface) gin.H
 		if apierrors.IsNotFound(err) {
 			if configInput.AllowedImageRepositories == nil || len(configInput.AllowedImageRepositories) == 0 {
 				cm := getOSCARCMConfigurationDefaultDefinition(cfg.AdditionalConfigPath)
-				backends.CreateOSCARCMConfiguration(back, cm, cfg.Namespace)
+				err = backends.CreateOSCARCMConfiguration(back, cm, cfg.Namespace)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, err)
+					return
+
+				}
 				c.JSON(http.StatusOK, configInput.AllowedImageRepositories)
 				return
 
 			} else {
-				cm := getOSCARCMConfigurationCustomDefinition(cfg.AdditionalConfigPath, configInput.AllowedImageRepositories)
-				err := backends.CreateOSCARCMConfiguration(back, cm, cfg.Namespace)
+				cm, err := getOSCARCMConfigurationCustomDefinition(cfg.AdditionalConfigPath, configInput.AllowedImageRepositories)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, err)
+					return
+				}
+				err = backends.CreateOSCARCMConfiguration(back, cm, cfg.Namespace)
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, err)
 					return
@@ -161,8 +170,18 @@ func MakeConfigUpdateHandler(cfg *types.Config, back kubernetes.Interface) gin.H
 				return
 			}
 		}
-		newConfigMap := getOSCARCMConfigurationCustomDefinition(cfg.AdditionalConfigPath, configInput.AllowedImageRepositories)
-		backends.UpdateOSCARCMConfiguration(back, newConfigMap, cfg.Namespace)
+		newConfigMap, err := getOSCARCMConfigurationCustomDefinition(cfg.AdditionalConfigPath, configInput.AllowedImageRepositories)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, err)
+			return
+
+		}
+		err = backends.UpdateOSCARCMConfiguration(back, newConfigMap, cfg.Namespace)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, err)
+			return
+
+		}
 		c.JSON(http.StatusOK, configInput.AllowedImageRepositories)
 		return
 
@@ -180,8 +199,11 @@ func getOSCARCMConfigurationDefaultDefinition(name string) *v1.ConfigMap {
 	}
 }
 
-func getOSCARCMConfigurationCustomDefinition(name string, air []string) *v1.ConfigMap {
-	data, _ := json.Marshal(air)
+func getOSCARCMConfigurationCustomDefinition(name string, air []string) (*v1.ConfigMap, error) {
+	data, err := json.Marshal(air)
+	if err != nil {
+		return _, err
+	}
 	dataString := string(data)
 	return &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -190,5 +212,5 @@ func getOSCARCMConfigurationCustomDefinition(name string, air []string) *v1.Conf
 		Data: map[string]string{
 			types.AIR: dataString,
 		},
-	}
+	}, nil
 }
