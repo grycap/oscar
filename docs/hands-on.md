@@ -45,7 +45,7 @@
   <section class="oscar-media-card oscar-lab-feature">
     <div class="oscar-media-card__header">
       <p class="oscar-media-card__eyebrow">Lab 01</p>
-      <h2>ImageMagick from OSCAR Hub</h2>
+      <h2>Deployment and Execution in OSCAR</h2>
       <p class="oscar-media-card__description">
         Deploy the ImageMagick example from OSCAR Hub, run a synchronous smoke test, and then validate the asynchronous
         file-processing workflow by uploading images to the generated input bucket.
@@ -55,19 +55,17 @@
       <a class="oscar-slide-button" href="../hands-on-deploy-execute/">Open lab</a>
     </div>
   </section>
-  <!--
   <section class="oscar-media-card oscar-lab-feature">
     <div class="oscar-media-card__header">
       <p class="oscar-media-card__eyebrow">Lab 02</p>
       <h2>Interactive Analysis</h2>
       <p class="oscar-media-card__description">
-        Skeleton page for the next hands-on lab. Fill this lab with the interactive analysis workflow, screenshots,
-        validation steps, and cleanup instructions.
+        Reuse the ImageMagick service outputs inside a mounted Jupyter environment, then explore the generated images
+        and metrics through an interactive notebook-based analysis workflow.
       </p>
     </div>
     <div class="oscar-media-card__actions">
       <a class="oscar-slide-button" href="../hands-on-interactive-analysis/">Open lab</a>
     </div>
   </section>
-  -->
 </div>
