@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://docs.oscar.grycap.net/latest/v3.7.1/mount/">
+        <link rel="canonical" href="https://docs.oscar.grycap.net/latest/v3.7.1/hands-on-deploy-execute/">
       
       
-        <link rel="prev" href="../minio-bucket-replication/">
+        <link rel="prev" href="../hands-on/">
       
       
-        <link rel="next" href="../additional-config/">
+        <link rel="next" href="../tutorials/">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Mount external volumes - OSCAR Documentation</title>
+        <title>Lab 01 - Deploy & Execute - OSCAR Documentation</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#mounting-external-storage-on-service-volumes" class="md-skip">
+        <a href="#0-login-to-the-oscar-cluster" class="md-skip">
           Skip to content
         </a>
       
@@ -117,7 +117,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Mount external volumes
+              Lab 01 - Deploy & Execute
             
           </span>
         </div>
@@ -1257,18 +1257,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
         
           
           <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
@@ -1289,7 +1291,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1304,18 +1306,20 @@
                 
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_1" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_1" checked>
         
           
           <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
@@ -1336,7 +1340,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_7_1">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1379,10 +1383,35 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../hands-on-deploy-execute/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lab 01 - Deploy & Execute
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1398,6 +1427,145 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#0-login-to-the-oscar-cluster" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0. Login to the OSCAR cluster
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-find-the-imagemagick-service-in-oscar-hub" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Find the ImageMagick service in OSCAR Hub
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-review-the-service-details-and-deployment-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Review the service details and deployment options
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-verify-that-the-service-is-ready" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Verify that the service is ready
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-see-the-oscar-service-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. See the OSCAR service details
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-run-a-synchronous-invocation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Run a synchronous invocation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-open-the-service-bucket" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Open the service bucket
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-run-an-asynchronous-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Run an asynchronous execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-check-the-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Check the job(s)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-list-and-verify-the-outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. List and verify the output(s)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-delete-the-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Delete the service
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1506,20 +1674,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
         
           
           <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
@@ -1540,7 +1706,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1583,19 +1749,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../mount/" class="md-nav__link">
         
   
   
@@ -1611,7 +1768,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -1808,44 +1964,149 @@
   
 
 
-<h1 id="mounting-external-storage-on-service-volumes">Mounting external storage on service volumes</h1>
-<p>This feature enables the mounting of a folder from a storage provider, such as MinIO or dCache, into the service container. As illustrated in the following diagram, the folder is placed inside the /mnt directory on the container volume, thereby making it accessible to the service.</p>
-<p><img alt="mount-diagram" src="../images/mount.png" /></p>
-<p>This functionality can be useful with exposed services, such as those using a Jupyter Notebook, to make the content of the storage bucket accessible directly within the Notebook. For instance, if you have a MinIO bucket called <code>notebook</code> you want to access, you would need to add the following parameters to the service definition:</p>
-<pre><code class="language-yaml">mount:
-  storage_provider: minio.default
-  path: /notebook
-</code></pre>
-<p>The complete definition of this use case that integrates the expose of a Jupyter Notebook with the access to a mounted bucket would look like the following:</p>
-<pre><code class="language-yaml">functions:
-  oscar:
-  - oscar-cluster:
-     name: jupyter
-     memory: 2Gi
-     cpu: '1.0'
-     image: jupyter/base-notebook
-     script: jupyterscript2.sh
-     environment:
-       Variables:
-         JUPYTER_TOKEN: &quot;root&quot;
-         JHUB_BASE_URL: &quot;/system/services/jupyter/exposed&quot;
-         JUPYTER_DIRECTORY: &quot;/mnt&quot;
-     mount:
-       storage_provider: minio.default
-       path: /notebook
-     expose:
-      min_scale: 1
-      max_scale: 1
-      api_port: 8888
-      cpu_threshold: 90
-      rewrite_target: true
-</code></pre>
-<p><strong>Note</strong>: You can find the files of this example on <a href="https://github.com/grycap/oscar/tree/master/examples/expose_services/jupyter">OSCAR's repository examples</a></p>
-<p>As OSCAR has the credentials of the default MinIO instance internally, if you want to use a different one or a different storage provider, you need to set these credentials on the service <a href="../fdl/">FDL</a>. Currently, the storage providers supported on this functionality are:</p>
+<section class="oscar-hero oscar-lab-hero">
+  <p class="oscar-lab-kicker">Hands-on lab</p>
+  <h1 class="oscar-hero__title">Lab 01. Deployment and Execution in OSCAR</h1>
+  <p class="oscar-hero__body">
+    This lab uses the ImageMagick example from OSCAR Hub to show a complete onboarding workflow: deploy the service,
+    confirm that the generated resources are ready, execute a quick synchronous test, and then validate the asynchronous
+    event-driven path by uploading files to the input bucket.
+  </p>
+  <div class="oscar-hero__actions">
+    <a class="oscar-pill" href="../usage-dashboard/">Dashboard guide</a>
+    <a class="oscar-pill" href="../invoking-sync/">Sync invocations</a>
+    <a class="oscar-pill" href="../invoking-async/">Async invocations</a>
+    <a class="oscar-pill" href="https://hub.oscar.grycap.net">OSCAR Hub</a>
+  </div>
+  <div class="oscar-back-nav">
+    <a class="oscar-back-link" href="../hands-on/">
+      <span class="oscar-back-link__icon" aria-hidden="true">&#8592;</span>
+      <span>Back to all labs</span>
+    </a>
+  </div>
+</section>
+
+<div class="oscar-lab-intro-grid">
+  <section class="oscar-lab-panel">
+    <p class="oscar-media-card__eyebrow">Before you start</p>
+    <h2>Prerequisites</h2>
+    <ul>
+      <li>A running OSCAR deployment with access to the Dashboard.</li>
+      <li>Credentials to log in and enough quota to deploy services.</li>
+      <li>One sample image for the synchronous test and optionally a few more images for the asynchronous test.</li>
+      <li>Recommended references: <a href="../deploy-im-dashboard/">Deploy OSCAR</a>, <a href="../usage-dashboard/">OSCAR Dashboard</a>, and <a href="../oscar-cli/">OSCAR CLI</a>.</li>
+    </ul>
+  </section>
+  <section class="oscar-lab-panel">
+    <p class="oscar-media-card__eyebrow">Expected outcome</p>
+    <h2>What you should get</h2>
+    <ul>
+      <li>The ImageMagick service is deployed from OSCAR Hub.</li>
+      <li>A synchronous request returns a valid grayscale image.</li>
+      <li>An asynchronous upload creates jobs and stores grayscale outputs in the output bucket.</li>
+      <li>You finish the lab understanding when to prefer sync or async execution.</li>
+    </ul>
+  </section>
+</div>
+
+<h2 id="0-login-to-the-oscar-cluster">0. Login to the OSCAR cluster</h2>
+<p>Open the Dashboard login page and sign in with an account that has permission to deploy services.</p>
+<p><img alt="OSCAR Dashboard login" src="../images/hands-on/lab-01/00-oscar-dashboard-login.png" /></p>
+<h2 id="1-find-the-imagemagick-service-in-oscar-hub">1. Find the ImageMagick service in OSCAR Hub</h2>
+<p>Log in to the Dashboard, open the OSCAR Hub catalog, and locate the ImageMagick service.</p>
+<p><img alt="OSCAR Hub catalog in the Dashboard" src="../images/hands-on/lab-01/01-oscar-dashboard-hub.png" /></p>
+<p><em>Browse the OSCAR Hub catalog and locate the ImageMagick service.</em></p>
+<h2 id="2-review-the-service-details-and-deployment-options">2. Review the service details and deployment options</h2>
+<p>Open the service card to inspect its description and confirm that it is the image-processing example you want to use for the lab.</p>
+<p><img alt="ImageMagick service details in OSCAR Hub" src="../images/hands-on/lab-01/02-oscar-dashboard-hub-details.png" /></p>
+<p><em>Check the service description before deploying it.</em></p>
+<p>Review the deployment options and choose a service name that is easy to identify, together with a bucket name.
+Using the same name for both the service and the bucket can simplify the lab, but it is optional.
+Keep the default resource configuration for a first run unless you already know that you need different sizing.</p>
+<p><img alt="ImageMagick deployment configuration in OSCAR Hub" src="../images/hands-on/lab-01/03-oscar-dashboard-hub-deploy.png" /></p>
+<p><em>Use the resource configuration for the first hands-on execution.</em></p>
+<h2 id="3-verify-that-the-service-is-ready">3. Verify that the service is ready</h2>
+<p>Deploy the service and wait until it appears in the main services view of the Dashboard.</p>
 <ul>
-<li><a href="../fdl/#minioprovider">MinIO provider</a></li>
-<li><a href="../fdl/#webdavprovider">WebDav provider</a></li>
+<li>Confirm that the deployment completed successfully.</li>
+<li>Check that the service token, logs action, and storage-related information are available.</li>
+<li>Verify that the required input and output locations have been created.</li>
 </ul>
+<p><img alt="Service view in the OSCAR Dashboard" src="../images/hands-on/lab-01/04-oscar-dashboard-service-list.png" /></p>
+<p><em>Wait until the deployed service is visible in the main Dashboard view.</em></p>
+<h2 id="4-see-the-oscar-service-details">4. See the OSCAR service details</h2>
+<p>Open the deployed service and review its token, storage configuration, and available actions before invoking it.</p>
+<p><img alt="Service details in the OSCAR Dashboard" src="../images/hands-on/lab-01/05-oscar-dashboard-service-info.png" /></p>
+<h2 id="5-run-a-synchronous-invocation">5. Run a synchronous invocation</h2>
+<p>Open the service invocation view from the Dashboard and upload <a href="https://raw.githubusercontent.com/grycap/oscar-hub/main/crates/imagemagick/input.png">a sample image</a>.</p>
+<ul>
+<li>Use this step as a quick validation that the service image and runtime are working correctly.</li>
+<li>Inspect the response and confirm that the output corresponds to the grayscale version of the original file.</li>
+</ul>
+<p><img alt="Synchronous invocation view in the OSCAR Dashboard" src="../images/hands-on/lab-01/06-oscar-dashboard-service-invoke-sync.png" /></p>
+<p><em>Upload the input payload from the Dashboard invocation view.</em></p>
+<p><img alt="Synchronous invocation result in the OSCAR Dashboard" src="../images/hands-on/lab-01/07-oscar-dashboard-service-invoke-result.png" /></p>
+<p><em>Inspect the response returned by the synchronous invocation.</em></p>
+<h2 id="6-open-the-service-bucket">6. Open the service bucket</h2>
+<p>Find the service bucket in the Dashboard:</p>
+<p><img alt="Service bucket in the OSCAR Dashboard" src="../images/hands-on/lab-01/08-oscar-dashboard-buckets-view.png" /></p>
+<h2 id="7-run-an-asynchronous-execution">7. Run an asynchronous execution</h2>
+<p>Upload one or several images into the bucket.</p>
+<ul>
+<li>Each upload should trigger the service automatically.</li>
+<li>Use multiple files if you want to observe the event-driven behaviour more clearly.</li>
+</ul>
+<p><img alt="Uploading files to the input bucket" src="../images/hands-on/lab-01/09-oscar-dashboard-buckets-upload.png" /></p>
+<p><em>Upload one or more images to trigger asynchronous execution.</em></p>
+<h2 id="8-check-the-jobs">8. Check the job(s)</h2>
+<p>Follow the jobs from the logs panel and wait until they reach the <code>Succeeded</code> state.</p>
+<p><img alt="Logs view for asynchronous jobs" src="../images/hands-on/lab-01/10-oscar-dashboard-jobs.png" /></p>
+<p><em>Inspect the lifecycle and status of the asynchronous jobs.</em></p>
+<h2 id="9-list-and-verify-the-outputs">9. List and verify the output(s)</h2>
+<p>Finally, open the output bucket and verify that the processed files were converted to grayscale.</p>
+<p><img alt="List of the generated output files" src="../images/hands-on/lab-01/11-oscar-dashboard-bucket-output.png" /></p>
+<p><em>Validate the resulting files in the output bucket.</em></p>
+<p><img alt="Preview of the generated output files" src="../images/hands-on/lab-01/12-oscar-dashboard-bucket-output-view.png" /></p>
+<h2 id="10-delete-the-service">10. Delete the service</h2>
+<p>When you finish the lab, if you do not plan to proceed with additional hands-on labs, delete the service to clean up the deployed service if it is no longer needed.
+The associated bucket will be automatically deleted.</p>
+<p><img alt="Delete the service" src="../images/hands-on/lab-01/13-oscar-dashboard-service-delete.png" /></p>
+<section class="oscar-lab-panel oscar-lab-outcome">
+  <p class="oscar-media-card__eyebrow">Summary</p>
+  <h2>Key takeaways</h2>
+  <ul>
+    <li>Synchronous execution gives immediate feedback and is useful as a smoke test.</li>
+    <li>Asynchronous execution is better aligned with OSCAR's event-driven model for file-processing workloads.</li>
+    <li>Both execution modes use the same service but differ in how the request is triggered and how the result is inspected.</li>
+  </ul>
+</section>
+
+<section class="oscar-lab-panel oscar-lab-outcome">
+  <p class="oscar-media-card__eyebrow">Final checklist</p>
+  <h2>What you should verify before finishing</h2>
+  <ul>
+    <li>The ImageMagick service was deployed successfully from OSCAR Hub.</li>
+    <li>The synchronous invocation returned a valid result.</li>
+    <li>The asynchronous upload triggered jobs and produced output files.</li>
+    <li>You can explain the practical difference between sync and async execution in OSCAR.</li>
+  </ul>
+</section>
+
+<!--
+<section class="oscar-media-card oscar-lab-feature">
+  <div class="oscar-media-card__header">
+    <p class="oscar-media-card__eyebrow">Next lab</p>
+    <h2>Continue with Lab 02: Interactive Analysis</h2>
+    <p class="oscar-media-card__description">
+      The next lab skeleton is ready so you can add the interactive analysis workflow on top of the same training
+      structure used here.
+    </p>
+  </div>
+  <div class="oscar-media-card__actions">
+    <a class="oscar-slide-button" href="../hands-on-interactive-analysis/">Open Lab 02</a>
+  </div>
+</section>
+-->
 
 
 
