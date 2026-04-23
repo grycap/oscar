@@ -61,7 +61,6 @@ in order to test the OSCAR framework for specific applications. We recommend
 you to start with the
 [plant classification example](https://github.com/grycap/oscar/tree/master/examples/plant-classification-sync).
 
-
 ### External Storage Providers
 
 [FaaS Supervisor](https://github.com/grycap/faas-supervisor) downloads the input file and uploads the output file. Each [storage provider](fdl.md#storageproviders) has specific parameters, authentication, and capabilities. The current implementation supports:
