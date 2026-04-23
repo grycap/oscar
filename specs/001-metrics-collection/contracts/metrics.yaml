@@ -1,11 +1,12 @@
 openapi: 3.0.3
 info:
   title: OSCAR Metrics Reporting
-  version: 1.2.0
+  version: 1.2.1
 paths:
   /system/metrics/{serviceName}:
     get:
       summary: Get a single metric value for a service and time range
+      description: For OIDC Bearer requests, access is limited to services visible to the authenticated user. Basic Auth as the OSCAR admin user remains cluster-wide.
       parameters:
         - name: serviceName
           in: path
@@ -43,11 +44,14 @@ paths:
                   - $ref: "#/components/schemas/ServiceMetrics"
         "400":
           description: Invalid parameters
+        "403":
+          description: The authenticated OIDC user cannot access the requested service
         "500":
           description: Metrics computation failed
   /system/metrics:
     get:
       summary: Get metrics summary for a time range
+      description: For OIDC Bearer requests, totals are scoped to services visible to the authenticated user. Basic Auth as the OSCAR admin user returns cluster-wide totals.
       parameters:
         - name: start
           in: query
@@ -77,6 +81,7 @@ paths:
   /system/metrics/breakdown:
     get:
       summary: Get metrics breakdown by dimension
+      description: For OIDC Bearer requests, breakdown items are scoped to services visible to the authenticated user. Basic Auth as the OSCAR admin user remains cluster-wide.
       parameters:
         - name: start
           in: query

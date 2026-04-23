@@ -10,6 +10,12 @@ the list of users per service, set `include_users=true` (JSON only).
 The `start`/`end` query parameters are optional. If omitted, the API defaults to
 the last 24 hours (end = now, start = end - 24h).
 
+When using OIDC Bearer tokens, metrics are limited to the services visible to
+the authenticated user under the usual service visibility rules (`public`,
+owned services, and `restricted` services where the user is listed in
+`allowed_users`). When using Basic Auth as the OSCAR admin user, metrics remain
+cluster-wide and include all services.
+
 ### Prometheus usage metrics
 
 CPU/GPU hours are fetched from Prometheus. If `PROMETHEUS_URL` is not set, the
