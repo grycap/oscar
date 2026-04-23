@@ -185,7 +185,6 @@ func ensureClusterQueue(ctx context.Context, kueueClient *kueueclientset.Clients
 		len(current.Spec.ResourceGroups) == 0 ||
 		len(current.Spec.ResourceGroups[0].Flavors) == 0 ||
 		len(current.Spec.ResourceGroups[0].Flavors[0].Resources) == 0 ||
-		!reflect.DeepEqual(current.Spec.ResourceGroups, cq.Spec.ResourceGroups) ||
 		!reflect.DeepEqual(current.Spec.NamespaceSelector, cq.Spec.NamespaceSelector) {
 		current.Spec.ResourceGroups = cq.Spec.ResourceGroups
 		current.Spec.NamespaceSelector = cq.Spec.NamespaceSelector
