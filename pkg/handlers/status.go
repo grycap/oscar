@@ -163,12 +163,67 @@ func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *types.StatusI
 		// Calculate CPU and Memory Requests by summing the pods of the node
 		var cpu_request int64 = 0
 		var mem_request int64 = 0
+
 		for _, pod := range pods.Items {
+			// Filter by node and phase (avoid succeeded pods)
 			if pod.Spec.NodeName == nodeName && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-				for _, container := range pod.Spec.Containers {
-					cpu_request += container.Resources.Requests.Cpu().MilliValue()
-					mem_request += container.Resources.Requests.Memory().Value()
+
+				var podAppCPU int64 = 0
+				var podAppMem int64 = 0
+				var sidecarCPU int64 = 0
+				var sidecarMem int64 = 0
+				var maxRegularInitCPU int64 = 0
+				var maxRegularInitMem int64 = 0
+
+				// 1. Add App Containers (Standard Containers)
+				for _, c := range pod.Spec.Containers {
+					if cpu := c.Resources.Requests.Cpu(); cpu != nil {
+						podAppCPU += cpu.MilliValue()
+					}
+					if mem := c.Resources.Requests.Memory(); mem != nil {
+						podAppMem += mem.Value()
+					}
+
 				}
+
+				// 2. Process InitContainers (Differentiating Sidecars from K8s 1.29+)
+				for _, ic := range pod.Spec.InitContainers {
+					icCPU := ic.Resources.Requests.Cpu().MilliValue()
+					icMem := ic.Resources.Requests.Memory().Value()
+
+					// If it is a Sidecar (RestartPolicy: Always)
+					if ic.RestartPolicy != nil && *ic.RestartPolicy == v1.ContainerRestartPolicyAlways {
+						sidecarCPU += icCPU
+						sidecarMem += icMem
+					} else {
+						// If it's a classic Init (it looks for the individual maximum)
+						if icCPU > maxRegularInitCPU {
+							maxRegularInitCPU = icCPU
+						}
+						if icMem > maxRegularInitMem {
+							maxRegularInitMem = icMem
+						}
+					}
+				}
+
+				// 3. Final Pod Calculation according to the Scheduler:
+
+				// The Pod needs: Sum of Sidecars + the larger of (Apps or the heaviest Init)
+
+				// We calculate the main block (Apps vs. Classic Init)
+				var mainBlockCPU int64 = podAppCPU
+				if maxRegularInitCPU > mainBlockCPU {
+					mainBlockCPU = maxRegularInitCPU
+				}
+
+				var mainBlockMem int64 = podAppMem
+				if maxRegularInitMem > mainBlockMem {
+					mainBlockMem = maxRegularInitMem
+				}
+
+				// 4. Add to the total of the NODE (CPU_REQUEST and MEM_REQUEST)
+				cpu_request += (mainBlockCPU + sidecarCPU)
+				mem_request += (mainBlockMem + sidecarMem)
 			}
 		}
 
