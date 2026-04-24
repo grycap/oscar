@@ -79,7 +79,7 @@ func GetLoggerMiddleware() gin.HandlerFunc {
 		endTime := time.Now()
 
 		// Log custom information after the request is processed
-		logTime := endTime.Format("2006/01/02 - 15:04:05")
+		logTime := endTime.UTC().Format(time.RFC3339Nano)
 		latency := time.Since(startTime)
 		status := c.Writer.Status()
 		clientIP := c.ClientIP()
