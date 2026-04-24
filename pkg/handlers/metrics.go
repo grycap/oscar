@@ -62,11 +62,14 @@ type serviceBreakdownResponse struct {
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/metrics/{serviceName} [get]
-func MakeMetricValueHandler(agg *metrics.Aggregator) gin.HandlerFunc {
+func MakeMetricValueHandler(back types.ServerlessBackend, agg *metrics.Aggregator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		serviceName := strings.TrimSpace(c.Param("serviceName"))
 		if serviceName == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "serviceName is required"})
+			return
+		}
+		if _, ok := getAuthorizedServiceForMetrics(c, back, serviceName); !ok {
 			return
 		}
 
@@ -75,9 +78,14 @@ func MakeMetricValueHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 			return
 		}
 
+		scopedAgg, ok := scopedMetricsAggregator(c, back, agg)
+		if !ok {
+			return
+		}
+
 		metricRaw := strings.TrimSpace(c.Query("metric"))
 		if metricRaw == "" {
-			metricsList, err := loadAllServiceMetrics(c, agg, tr, serviceName)
+			metricsList, err := loadAllServiceMetrics(c, scopedAgg, tr, serviceName)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
@@ -97,7 +105,7 @@ func MakeMetricValueHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 			return
 		}
 
-		resp, err := agg.MetricValue(c.Request.Context(), tr, serviceName, metricKey)
+		resp, err := scopedAgg.MetricValue(c.Request.Context(), tr, serviceName, metricKey)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -143,14 +151,19 @@ func loadAllServiceMetrics(c *gin.Context, agg *metrics.Aggregator, tr metrics.T
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/metrics [get]
-func MakeMetricsSummaryHandler(agg *metrics.Aggregator) gin.HandlerFunc {
+func MakeMetricsSummaryHandler(back types.ServerlessBackend, agg *metrics.Aggregator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tr, ok := parseTimeRange(c)
 		if !ok {
 			return
 		}
 
-		resp, err := agg.Summary(c.Request.Context(), tr)
+		scopedAgg, ok := scopedMetricsAggregator(c, back, agg)
+		if !ok {
+			return
+		}
+
+		resp, err := scopedAgg.Summary(c.Request.Context(), tr)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -175,7 +188,7 @@ func MakeMetricsSummaryHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/metrics/breakdown [get]
-func MakeMetricsBreakdownHandler(agg *metrics.Aggregator) gin.HandlerFunc {
+func MakeMetricsBreakdownHandler(back types.ServerlessBackend, agg *metrics.Aggregator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tr, ok := parseTimeRange(c)
 		if !ok {
@@ -195,7 +208,12 @@ func MakeMetricsBreakdownHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 		}
 
 		includeUsers := strings.ToLower(strings.TrimSpace(c.DefaultQuery("include_users", "false"))) == "true"
-		resp, err := agg.Breakdown(c.Request.Context(), tr, groupBy, includeUsers)
+		scopedAgg, ok := scopedMetricsAggregator(c, back, agg)
+		if !ok {
+			return
+		}
+
+		resp, err := scopedAgg.Breakdown(c.Request.Context(), tr, groupBy, includeUsers)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -259,6 +277,39 @@ func MakeMetricsBreakdownHandler(agg *metrics.Aggregator) gin.HandlerFunc {
 
 		c.JSON(http.StatusOK, resp)
 	}
+}
+
+func scopedMetricsAggregator(c *gin.Context, back types.ServerlessBackend, agg *metrics.Aggregator) (*metrics.Aggregator, bool) {
+	allowedServices, scoped, ok := allowedMetricsServiceIDs(c, back)
+	if !ok {
+		return nil, false
+	}
+	if !scoped {
+		return agg, true
+	}
+	return &metrics.Aggregator{
+		Sources: metrics.ScopeSources(agg.Sources, allowedServices),
+	}, true
+}
+
+func allowedMetricsServiceIDs(c *gin.Context, back types.ServerlessBackend) (map[string]struct{}, bool, bool) {
+	if !isBearerRequest(c) {
+		return nil, false, true
+	}
+
+	services, ok := listAuthorizedServicesForMetrics(c, back)
+	if !ok {
+		return nil, false, false
+	}
+
+	allowed := make(map[string]struct{}, len(services))
+	for _, service := range services {
+		if service == nil {
+			continue
+		}
+		allowed[service.Name] = struct{}{}
+	}
+	return allowed, true, true
 }
 
 func parseTimeRange(c *gin.Context) (metrics.TimeRange, bool) {
