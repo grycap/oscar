@@ -462,8 +462,8 @@ func parseExecutionLogs(raw string) []executionLogEntry {
 		}
 
 		rawTimestamp := strings.TrimSpace(parts[0])
-		if parsedTime, err := time.ParseInLocation("2006/01/02 - 15:04:05", rawTimestamp, time.Local); err == nil {
-			entry.Timestamp = parsedTime.UTC().Format(time.RFC3339)
+		if parsedTime, err := time.Parse(time.RFC3339Nano, rawTimestamp); err == nil {
+			entry.Timestamp = parsedTime.UTC().Format(time.RFC3339Nano)
 		} else {
 			entry.Timestamp = rawTimestamp
 		}

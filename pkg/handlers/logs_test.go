@@ -357,9 +357,9 @@ func TestMakeGetSystemLogsHandlerRejectsOIDC(t *testing.T) {
 
 func TestParseExecutionLogs(t *testing.T) {
 	raw := `
-[GIN-EXECUTIONS-LOGGER] 2025/10/28 - 16:53:34 | 200 |  347.805334ms | 172.25.0.1 | POST    /run/simple-test | oscar
-[GIN-EXECUTIONS-LOGGER] 2025/10/28 - 16:55:12 | 201 |   14.219292ms | 127.0.0.1 | POST    /job/simple-test | minio
-[GIN-EXECUTIONS-LOGGER] 2025/10/28 - 16:55:20 | 200 |   10.000000ms | 127.0.0.1 | GET     /health | oscar
+[GIN-EXECUTIONS-LOGGER] 2025-10-28T16:53:34Z | 200 |  347.805334ms | 172.25.0.1 | POST    /run/simple-test | oscar
+[GIN-EXECUTIONS-LOGGER] 2025-10-28T16:55:12Z | 201 |   14.219292ms | 127.0.0.1 | POST    /job/simple-test | minio
+[GIN-EXECUTIONS-LOGGER] 2025-10-28T16:55:20Z | 200 |   10.000000ms | 127.0.0.1 | GET     /health | oscar
 `
 
 	entries := parseExecutionLogs(raw)
@@ -367,24 +367,23 @@ func TestParseExecutionLogs(t *testing.T) {
 		t.Fatalf("expected 2 entries, got %d", len(entries))
 	}
 
-	layout := "2006/01/02 - 15:04:05"
 	first := entries[0]
-	firstExpected, err := time.ParseInLocation(layout, "2025/10/28 - 16:53:34", time.Local)
+	firstExpected, err := time.Parse(time.RFC3339Nano, "2025-10-28T16:53:34Z")
 	if err != nil {
 		t.Fatalf("unable to parse expected timestamp: %v", err)
 	}
-	if first.Timestamp != firstExpected.UTC().Format(time.RFC3339) {
+	if first.Timestamp != firstExpected.UTC().Format(time.RFC3339Nano) {
 		t.Fatalf("unexpected first timestamp: %s", first.Timestamp)
 	}
 	if first.Method != "POST" || first.Path != "/run/simple-test" || first.User != "oscar" {
 		t.Fatalf("unexpected first entry: %+v", first)
 	}
 	second := entries[1]
-	secondExpected, err := time.ParseInLocation(layout, "2025/10/28 - 16:55:12", time.Local)
+	secondExpected, err := time.Parse(time.RFC3339Nano, "2025-10-28T16:55:12Z")
 	if err != nil {
 		t.Fatalf("unable to parse expected timestamp: %v", err)
 	}
-	if second.Timestamp != secondExpected.UTC().Format(time.RFC3339) {
+	if second.Timestamp != secondExpected.UTC().Format(time.RFC3339Nano) {
 		t.Fatalf("unexpected second timestamp: %s", second.Timestamp)
 	}
 	if second.Path != "/job/simple-test" || second.Status != 201 {

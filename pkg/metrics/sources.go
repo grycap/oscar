@@ -632,7 +632,7 @@ func parseGinExecutionLog(line string) (RequestRecord, bool) {
 	}
 
 	timestampRaw := strings.TrimSpace(parts[0])
-	timestamp, err := time.ParseInLocation("2006/01/02 - 15:04:05", timestampRaw, time.UTC)
+	timestamp, err := time.Parse(time.RFC3339Nano, timestampRaw)
 	if err != nil {
 		return RequestRecord{}, false
 	}
@@ -657,7 +657,7 @@ func parseGinExecutionLog(line string) (RequestRecord, bool) {
 		Country:    "",
 		AuthMethod: "",
 		Type:       reqType,
-		Timestamp:  timestamp,
+		Timestamp:  timestamp.UTC(),
 	}, ip != ""
 }
 

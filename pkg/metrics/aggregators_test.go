@@ -286,7 +286,7 @@ func TestBuildLokiQuery(t *testing.T) {
 }
 
 func TestParseGinExecutionLogFromGinPrefix(t *testing.T) {
-	line := "[GIN] 2026/01/20 - 10:00:00 | 200 |  12.345ms | 10.0.0.1 | POST    /job/test-service | user@example.com"
+	line := "[GIN] 2026-01-20T10:00:00Z | 200 |  12.345ms | 10.0.0.1 | POST    /job/test-service | user@example.com"
 	record, ok := parseGinExecutionLog(line)
 	if !ok {
 		t.Fatal("expected log line to parse")
@@ -299,6 +299,10 @@ func TestParseGinExecutionLogFromGinPrefix(t *testing.T) {
 	}
 	if record.UserID != "user@example.com" {
 		t.Fatalf("expected user@example.com, got %s", record.UserID)
+	}
+	expectedTime := time.Date(2026, time.January, 20, 10, 0, 0, 0, time.UTC)
+	if !record.Timestamp.Equal(expectedTime) {
+		t.Fatalf("expected timestamp %s, got %s", expectedTime.Format(time.RFC3339Nano), record.Timestamp.Format(time.RFC3339Nano))
 	}
 }
 
