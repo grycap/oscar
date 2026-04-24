@@ -37,7 +37,7 @@ func extractRefreshTokenSecret(service *types.Service) string {
 		return ""
 	}
 
-	delete(service.Environment.Secrets, types.RefreshTokenSecretKey)
+	//delete(service.Environment.Secrets, types.RefreshTokenSecretKey)
 	return strings.TrimSpace(refreshToken)
 }
 

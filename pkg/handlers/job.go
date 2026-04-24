@@ -70,6 +70,8 @@ const (
 	InterLinkRestartPolicy      = "OnFailure"
 	InterLinkTolerationKey      = "virtual-node.interlink/no-schedule"
 	InterLinkTolerationOperator = "Exists"
+
+	DelegationHeader = "X-Delegated-Job-ID"
 )
 
 // MakeJobHandler godoc
@@ -283,15 +285,30 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			}
 		}
 
-		// Make JOB_UUID envVar
-		serviceNameLenght := len(service.Name)
-		serviceName := service.Name
-		jobUUID := uuid.New().String()
+		//extract delegation header
+		delegateUID := c.GetHeader(DelegationHeader)
+		var jobUUID string
 
-		if serviceNameLenght >= 25 {
-			serviceName = serviceName[:16]
+		if delegateUID != "" {
+			jobUUID = delegateUID
+			delegateFrom := c.GetHeader("X-Delegated-From")
+			jobLogger.Printf("Creating job \"%s\" delegated from cluster \"%s\" ", jobUUID, delegateFrom)
+
+		} else {
+
+			serviceNameLenght := len(service.Name)
+			serviceName := service.Name
+			jobUUID = uuid.New().String()
+
+			if serviceNameLenght >= 25 {
+				serviceName = serviceName[:16]
+			}
+			jobUUID = serviceName + "-" + jobUUID
+			jobLogger.Printf("Creating job \"%s\". ", jobUUID)
+
 		}
-		jobUUID = serviceName + "-" + jobUUID
+
+		// Make JOB_UUID envVar
 		jobUUIDVar := v1.EnvVar{
 			Name:  types.JobUUIDVariable,
 			Value: jobUUID,
@@ -323,7 +340,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		if rm != nil && service.HasFederationMembers() {
 			if !rm.IsSchedulable(podSpec.Containers[0].Resources) {
 				authHeader := c.GetHeader("Authorization")
-				err := resourcemanager.DelegateJob(service, event.Value, authHeader, resourcemanager.ResourceManagerLogger, cfg, back.GetKubeClientset())
+				err := resourcemanager.DelegateJob(service, event.Value, jobUUID, authHeader, resourcemanager.ResourceManagerLogger, cfg, back.GetKubeClientset())
 				if err == nil {
 					// TODO: check if another status code suits better
 					c.Status(http.StatusCreated)

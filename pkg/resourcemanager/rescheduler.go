@@ -61,7 +61,8 @@ func StartReScheduler(cfg *types.Config, back types.ServerlessBackend, kubeClien
 				reSchedulerLogger.Printf("skip reschedule for job %q: service not found", rsi.jobName)
 				continue
 			}
-			err := delegateJobFunc(rsi.service, rsi.event, "", reSchedulerLogger, cfg, kubeClientset)
+
+			err := delegateJobFunc(rsi.service, rsi.event, rsi.jobName, "", reSchedulerLogger, cfg, kubeClientset)
 			if err != nil {
 				reSchedulerLogger.Println(err.Error())
 			} else {

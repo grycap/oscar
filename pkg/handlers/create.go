@@ -214,6 +214,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		refreshToken := extractRefreshTokenSecret(&service)
+		//log.Printf("extractRefreshTokenSecret: %s", refreshToken)
 		if service.HasFederationMembers() && refreshToken == "" {
 			c.String(http.StatusBadRequest, "refresh_token secret is required for federated services")
 			return
@@ -225,12 +226,14 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				return
 			}
 		}
-		if refreshToken != "" {
+		/*if refreshToken != "" {
 			if err := upsertRefreshTokenSecret(&service, service.Namespace, refreshToken, back.GetKubeClientset()); err != nil {
 				c.String(http.StatusInternalServerError, "Error creating refresh-token secret: %v", err)
 				return
 			}
-		}
+		}*/
+
+		utils.ApplyFederation(&service)
 
 		if len(service.Environment.Secrets) > 0 {
 			if utils.SecretExists(service.Name, service.Namespace, back.GetKubeClientset()) {
@@ -246,8 +249,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				service.Environment.Secrets[secretKey] = ""
 			}
 		}
-
-		utils.ApplyFederation(&service)
 
 		// Create service
 		if err := back.CreateService(service); err != nil {
@@ -458,7 +459,11 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	}
 
 	// Generate a new access token
-	service.Token = utils.GenerateToken()
+	if val, exist := service.Annotations[types.FederationWorkerAnnotation]; exist && val == "true" {
+		//fmt.Println(service.Token)
+	} else {
+		service.Token = utils.GenerateToken()
+	}
 }
 
 func normalizeStoragePaths(service *types.Service) error {
