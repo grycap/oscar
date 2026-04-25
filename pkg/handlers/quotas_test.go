@@ -23,7 +23,11 @@ import (
 
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
+	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func newTestConfig() *types.Config {
@@ -150,6 +154,13 @@ func TestQuotaResponseStructures(t *testing.T) {
 				},
 				isValid: false,
 			},
+			{
+				name: "only volumes",
+				req: types.QuotaUpdateRequest{
+					Volumes: &types.VolumeQuotaUpdate{MaxDiskperVolume: "5Gi"},
+				},
+				isValid: true,
+			},
 		}
 
 		for _, tt := range tests {
@@ -165,8 +176,8 @@ func TestQuotaResponseStructures(t *testing.T) {
 					t.Fatalf("Failed to unmarshal types.QuotaUpdateRequest: %v", err)
 				}
 
-				// Test validation logic (CPU or memory must be provided)
-				hasValidField := unmarshaled.CPU != "" || unmarshaled.Memory != ""
+				// Test validation logic (CPU, memory or volume quotas must be provided)
+				hasValidField := unmarshaled.CPU != "" || unmarshaled.Memory != "" || hasVolumeQuotaUpdate(unmarshaled.Volumes)
 				if hasValidField != tt.isValid {
 					t.Errorf("Expected valid=%t, got valid=%t", tt.isValid, hasValidField)
 				}
@@ -177,6 +188,242 @@ func TestQuotaResponseStructures(t *testing.T) {
 
 func TestFetchQuotaSkipped(t *testing.T) {
 	t.Skip("fetchQuota requires a valid Kueue client to be initialized")
+}
+
+func TestFetchQuotaIncludesVolumeQuotas(t *testing.T) {
+	user := "user@example.org"
+	cfg := &types.Config{
+		ServicesNamespace: "oscar-svc",
+		VolumeEnable:      true,
+		VolumeAvailable:   "7Gi",
+		VolumeMax:         "5",
+		VolumeMaxDisk:     "5Gi",
+		VolumeMinDisk:     "200Mi",
+	}
+	namespace := utils.BuildUserNamespace(cfg, user)
+	quotaName := auth.FormatUID(user)
+	client := fake.NewSimpleClientset(
+		&corev1.ResourceQuota{
+			ObjectMeta: metav1.ObjectMeta{Name: quotaName, Namespace: namespace},
+			Spec: corev1.ResourceQuotaSpec{
+				Hard: corev1.ResourceList{
+					corev1.ResourceRequestsStorage:        resource.MustParse("7Gi"),
+					corev1.ResourcePersistentVolumeClaims: resource.MustParse("5"),
+				},
+			},
+			Status: corev1.ResourceQuotaStatus{
+				Used: corev1.ResourceList{
+					corev1.ResourceRequestsStorage:        resource.MustParse("2Gi"),
+					corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				},
+			},
+		},
+		&corev1.LimitRange{
+			ObjectMeta: metav1.ObjectMeta{Name: quotaName, Namespace: namespace},
+			Spec: corev1.LimitRangeSpec{
+				Limits: []corev1.LimitRangeItem{
+					{
+						Type: corev1.LimitTypePersistentVolumeClaim,
+						Max:  corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("5Gi")},
+						Min:  corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("200Mi")},
+					},
+				},
+			},
+		},
+		&corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "oscar-pvc",
+				Namespace: namespace,
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("2Gi")},
+				},
+			},
+		},
+		&corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "legacy-workspace",
+				Namespace: namespace,
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
+				},
+			},
+		},
+		&corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "managed-volume",
+				Namespace: namespace,
+				Labels: map[string]string{
+					types.ManagedVolumeLabel: "true",
+				},
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
+				},
+			},
+		},
+	)
+
+	resp, err := fetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
+	if err != nil {
+		t.Fatalf("unexpected fetchQuota error: %v", err)
+	}
+	if resp.Volumes == nil {
+		t.Fatalf("expected volume quotas in response")
+	}
+	if resp.Volumes.Disk.Max != "4Gi" || resp.Volumes.Disk.Used != "1Gi" {
+		t.Fatalf("unexpected disk quota values: %+v", resp.Volumes.Disk)
+	}
+	if resp.Volumes.Volumes.Max != "3" || resp.Volumes.Volumes.Used != "1" {
+		t.Fatalf("unexpected pvc quota values: %+v", resp.Volumes.Volumes)
+	}
+	if resp.Volumes.MaxDiskperVolume != "5Gi" || resp.Volumes.MinDiskperVolume != "200Mi" {
+		t.Fatalf("unexpected per-volume quota values: %+v", resp.Volumes)
+	}
+}
+
+func TestUpdateVolumeQuotaMergesPartialUpdate(t *testing.T) {
+	user := "user@example.org"
+	cfg := &types.Config{
+		ServicesNamespace: "oscar-svc",
+		VolumeEnable:      true,
+		VolumeAvailable:   "7Gi",
+		VolumeMax:         "5",
+		VolumeMaxDisk:     "5Gi",
+		VolumeMinDisk:     "200Mi",
+	}
+	namespace := utils.BuildUserNamespace(cfg, user)
+	quotaName := auth.FormatUID(user)
+	client := fake.NewSimpleClientset(
+		&corev1.ResourceQuota{
+			ObjectMeta: metav1.ObjectMeta{Name: quotaName, Namespace: namespace},
+			Spec: corev1.ResourceQuotaSpec{
+				Hard: corev1.ResourceList{
+					corev1.ResourceRequestsStorage:        resource.MustParse("7Gi"),
+					corev1.ResourcePersistentVolumeClaims: resource.MustParse("5"),
+				},
+			},
+		},
+		&corev1.LimitRange{
+			ObjectMeta: metav1.ObjectMeta{Name: quotaName, Namespace: namespace},
+			Spec: corev1.LimitRangeSpec{
+				Limits: []corev1.LimitRangeItem{
+					{
+						Type: corev1.LimitTypePersistentVolumeClaim,
+						Max:  corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("5Gi")},
+						Min:  corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("200Mi")},
+					},
+				},
+			},
+		},
+	)
+
+	err := updateVolumeQuota(user, &types.VolumeQuotaUpdate{MaxDiskperVolume: "10Gi"}, cfg, types.QuotaBackend{KubeClientset: client})
+	if err != nil {
+		t.Fatalf("unexpected updateVolumeQuota error: %v", err)
+	}
+
+	quota, err := client.CoreV1().ResourceQuotas(namespace).Get(t.Context(), quotaName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected resource quota get error: %v", err)
+	}
+	totalStorage := quota.Spec.Hard[corev1.ResourceRequestsStorage]
+	if totalStorage != resource.MustParse("7Gi") {
+		t.Fatalf("expected total storage quota to be preserved, got %s", totalStorage.String())
+	}
+	limit, err := client.CoreV1().LimitRanges(namespace).Get(t.Context(), quotaName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected limit range get error: %v", err)
+	}
+	maxStorage := limit.Spec.Limits[0].Max[corev1.ResourceStorage]
+	if maxStorage != resource.MustParse("10Gi") {
+		t.Fatalf("expected per-volume max to be updated, got %s", maxStorage.String())
+	}
+	minStorage := limit.Spec.Limits[0].Min[corev1.ResourceStorage]
+	if minStorage != resource.MustParse("200Mi") {
+		t.Fatalf("expected per-volume min to be preserved, got %s", minStorage.String())
+	}
+}
+
+func TestUpdateVolumeQuotaStoresUserVisibleDiskQuota(t *testing.T) {
+	user := "user@example.org"
+	cfg := &types.Config{
+		ServicesNamespace: "oscar-svc",
+		VolumeEnable:      true,
+		VolumeAvailable:   "7Gi",
+		VolumeMax:         "5",
+		VolumeMaxDisk:     "5Gi",
+		VolumeMinDisk:     "200Mi",
+	}
+	namespace := utils.BuildUserNamespace(cfg, user)
+	quotaName := auth.FormatUID(user)
+	client := fake.NewSimpleClientset(
+		&corev1.ResourceQuota{
+			ObjectMeta: metav1.ObjectMeta{Name: quotaName, Namespace: namespace},
+			Spec: corev1.ResourceQuotaSpec{
+				Hard: corev1.ResourceList{
+					corev1.ResourceRequestsStorage:        resource.MustParse("7Gi"),
+					corev1.ResourcePersistentVolumeClaims: resource.MustParse("5"),
+				},
+			},
+		},
+		&corev1.LimitRange{
+			ObjectMeta: metav1.ObjectMeta{Name: quotaName, Namespace: namespace},
+			Spec: corev1.LimitRangeSpec{
+				Limits: []corev1.LimitRangeItem{
+					{
+						Type: corev1.LimitTypePersistentVolumeClaim,
+						Max:  corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("5Gi")},
+						Min:  corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("200Mi")},
+					},
+				},
+			},
+		},
+		&corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "oscar-pvc",
+				Namespace: namespace,
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("2Gi")},
+				},
+			},
+		},
+	)
+
+	err := updateVolumeQuota(user, &types.VolumeQuotaUpdate{Disk: "10Gi", Volumes: "3"}, cfg, types.QuotaBackend{KubeClientset: client})
+	if err != nil {
+		t.Fatalf("unexpected updateVolumeQuota error: %v", err)
+	}
+
+	quota, err := client.CoreV1().ResourceQuotas(namespace).Get(t.Context(), quotaName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected resource quota get error: %v", err)
+	}
+	rawStorage := quota.Spec.Hard[corev1.ResourceRequestsStorage]
+	if rawStorage != resource.MustParse("12Gi") {
+		t.Fatalf("expected raw storage quota to include non-managed PVC usage, got %s", rawStorage.String())
+	}
+	rawVolumes := quota.Spec.Hard[corev1.ResourcePersistentVolumeClaims]
+	if rawVolumes.Value() != 4 {
+		t.Fatalf("expected raw volume quota to include non-managed PVC count, got %s", rawVolumes.String())
+	}
+
+	resp, err := fetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
+	if err != nil {
+		t.Fatalf("unexpected fetchQuota error: %v", err)
+	}
+	if resp.Volumes.Disk.Max != "10Gi" {
+		t.Fatalf("expected visible disk quota 10Gi, got %s", resp.Volumes.Disk.Max)
+	}
+	if resp.Volumes.Volumes.Max != "3" {
+		t.Fatalf("expected visible volume quota 3, got %s", resp.Volumes.Volumes.Max)
+	}
 }
 
 func TestEnsureKueueQuotasEnabled(t *testing.T) {
@@ -320,6 +567,12 @@ func TestQuotaJSONTags(t *testing.T) {
 		req := types.QuotaUpdateRequest{
 			CPU:    "1000m",
 			Memory: "2Gi",
+			Volumes: &types.VolumeQuotaUpdate{
+				Disk:             "7Gi",
+				Volumes:          "5",
+				MaxDiskperVolume: "5Gi",
+				MinDiskperVolume: "200Mi",
+			},
 		}
 
 		data, err := json.Marshal(req)
@@ -340,6 +593,15 @@ func TestQuotaJSONTags(t *testing.T) {
 
 		if _, exists := raw["memory"]; !exists {
 			t.Error("Expected 'memory' field in JSON")
+		}
+		volumes, ok := raw["volumes"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected 'volumes' field in JSON")
+		}
+		for _, field := range []string{"disk", "volumes", "max_disk_per_volume", "min_disk_per_volume"} {
+			if _, exists := volumes[field]; !exists {
+				t.Errorf("Expected volumes.%s field in JSON", field)
+			}
 		}
 	})
 }

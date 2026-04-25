@@ -70,6 +70,32 @@ func TestVolumeHandlersCRUD(t *testing.T) {
 	}
 }
 
+func TestCreateVolumeHandlerRejectsQuotaExceeded(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	cfg := &types.Config{ServicesNamespace: "oscar-svc"}
+	createBaseRuntimePVC(t, back, cfg)
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "user@example.org")
+		c.Next()
+	})
+	r.POST("/system/volumes", MakeCreateVolumeHandler(cfg, back))
+
+	req := httptest.NewRequest(http.MethodPost, "/system/volumes", strings.NewReader(`{"name":"too-large","size":"2Gi"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected create volume status 400, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if !strings.Contains(resp.Body.String(), "not enough volume disk quota") {
+		t.Fatalf("expected volume quota error, got %s", resp.Body.String())
+	}
+}
+
 func TestDeleteVolumeHandlerRejectsAttachedVolume(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	back := backends.MakeFakeBackend()

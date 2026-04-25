@@ -207,7 +207,7 @@ func ensureControllerRole(ctx context.Context, kubeClientset kubernetes.Interfac
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{""},
-				Resources: []string{"pods", "pods/log", "podtemplates", "configmaps", "secrets", "services", "persistentvolumeclaims"},
+				Resources: []string{"pods", "pods/log", "podtemplates", "configmaps", "secrets", "services", "persistentvolumeclaims", "resourcequotas", "limitranges"},
 				Verbs:     []string{"get", "list", "watch", "create", "delete", "deletecollection", "update"},
 			},
 			{

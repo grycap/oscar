@@ -522,7 +522,7 @@ func TestNamespaceConstants(t *testing.T) {
 	}
 }
 
-func TestEnsureControllerRoleIncludesPodDeleteCollectionOnCreate(t *testing.T) {
+func TestEnsureControllerRoleIncludesVolumeQuotaPermissionsOnCreate(t *testing.T) {
 	ctx := context.Background()
 	namespace := "test-ns"
 
@@ -539,18 +539,38 @@ func TestEnsureControllerRoleIncludesPodDeleteCollectionOnCreate(t *testing.T) {
 		t.Fatalf("Unable to retrieve controller role: %v", err)
 	}
 
-	found := false
+	foundPodsRule := false
+	foundResourceQuotas := false
+	foundLimitRanges := false
 	for _, rule := range role.Rules {
 		if containsString(rule.APIGroups, "") && containsString(rule.Resources, "pods") {
-			found = true
+			foundPodsRule = true
 			if !containsString(rule.Verbs, "deletecollection") {
 				t.Fatalf("Expected pods rule to include deletecollection verb. Verbs: %v", rule.Verbs)
 			}
 		}
+		if containsString(rule.APIGroups, "") && containsString(rule.Resources, "resourcequotas") {
+			foundResourceQuotas = true
+			if !containsString(rule.Verbs, "get") || !containsString(rule.Verbs, "create") || !containsString(rule.Verbs, "update") {
+				t.Fatalf("Expected resourcequotas rule to include get/create/update verbs. Verbs: %v", rule.Verbs)
+			}
+		}
+		if containsString(rule.APIGroups, "") && containsString(rule.Resources, "limitranges") {
+			foundLimitRanges = true
+			if !containsString(rule.Verbs, "get") || !containsString(rule.Verbs, "create") || !containsString(rule.Verbs, "update") {
+				t.Fatalf("Expected limitranges rule to include get/create/update verbs. Verbs: %v", rule.Verbs)
+			}
+		}
 	}
 
-	if !found {
+	if !foundPodsRule {
 		t.Fatal("Expected a core API rule with pods resource")
+	}
+	if !foundResourceQuotas {
+		t.Fatal("Expected a core API rule with resourcequotas resource")
+	}
+	if !foundLimitRanges {
+		t.Fatal("Expected a core API rule with limitranges resource")
 	}
 }
 
