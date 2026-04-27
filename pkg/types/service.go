@@ -289,8 +289,11 @@ type Service struct {
 }
 
 type Kserve struct {
+	// ModelFormat the model format to use for KServe InferenceService
+	// ("onnx", "sklearn", "xgboost", "pytorch", "tensorflow", "triton", "huggingface").
 	ModelFormat string `json:"model_format"`
-	StorageUri  string `json:"storage_uri"`
+	// StorageUri the URI of the model storage for KServe
+	StorageUri string `json:"storage_uri"`
 	// Can be used to specify the protocol version for KServe (e.g., "v1", "v2").
 	// Optional. (default: "v1")
 	APIVersion string `json:"api_version,omitempty" default:"v1"`
@@ -300,6 +303,23 @@ type Kserve struct {
 	// MaxScale maximum number of active replicas (pods) for the service
 	// Optional. (default: 0 [Unlimited])
 	MaxScale int32 `json:"max_scale,omitempty" default:"0"`
+	// CPU cpu limit for the service following the kubernetes format
+	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
+	// Optional. (default: 0.2)
+	CPU string `json:"cpu,omitempty" default:"0.2"`
+	// Memory memory limit for the service following the kubernetes format
+	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
+	// Optional. (default: 256Mi)
+	Memory string `json:"memory,omitempty" default:"256Mi"`
+	// Args command-line arguments to be passed to the container
+	// Optional
+	Args []string `json:"args,omitempty"`
+	// Environment variables to be passed to the container
+	// Optional
+	Env map[string]string `json:"env,omitempty"`
+	// EnableGPU parameter to request gpu usage in KServe InferenceService
+	// Optional. (default: false)
+	EnableGPU bool `json:"enable_gpu,omitempty" default:"false"`
 }
 
 type Expose struct {
