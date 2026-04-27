@@ -320,6 +320,9 @@ type Kserve struct {
 	// EnableGPU parameter to request gpu usage in KServe InferenceService
 	// Optional. (default: false)
 	EnableGPU bool `json:"enable_gpu,omitempty" default:"false"`
+	// SetAuth parameter to set the authentication for the KServe InferenceService
+	// Optional. (default: false)
+	SetAuth bool `json:"set_auth,omitempty" default:"false"`
 }
 
 type Expose struct {
