@@ -27,6 +27,7 @@ rules:
   - watch
   - create
   - delete
+  - deletecollection
   - update
 - apiGroups:
   - apps
@@ -143,6 +144,7 @@ rules:
   - watch
   - create
   - delete
+  - deletecollection
   - update
 - apiGroups:
   - ""
@@ -270,6 +272,7 @@ rules:
   - resourceflavors
   - clusterqueues
   - localqueues
+  - workloads
   verbs:
   - get
   - list

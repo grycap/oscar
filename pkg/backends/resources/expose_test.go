@@ -93,8 +93,18 @@ func TestCreateExposeWithIngressAndAuth(t *testing.T) {
 		t.Fatalf("CreateExpose returned error: %v", err)
 	}
 
-	if _, err := client.AppsV1().Deployments(svc.Namespace).Get(context.TODO(), getDeploymentName(svc.Name), metav1.GetOptions{}); err != nil {
+	if _, err := client.AppsV1().Deployments(svc.Namespace).Get(context.TODO(), GetDeploymentName(svc.Name), metav1.GetOptions{}); err != nil {
 		t.Fatalf("expected deployment to exist: %v", err)
+	}
+	deployment, err := client.AppsV1().Deployments(svc.Namespace).Get(context.TODO(), GetDeploymentName(svc.Name), metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("expected deployment to exist: %v", err)
+	}
+	if deployment.Spec.Template.Spec.EnableServiceLinks == nil {
+		t.Fatal("expected deployment pod spec to set EnableServiceLinks")
+	}
+	if *deployment.Spec.Template.Spec.EnableServiceLinks {
+		t.Fatal("expected deployment pod spec to disable service links")
 	}
 
 	if _, err := client.AutoscalingV1().HorizontalPodAutoscalers(svc.Namespace).Get(context.TODO(), getHPAName(svc.Name), metav1.GetOptions{}); err != nil {
@@ -284,7 +294,7 @@ func TestDeleteExposeRemovesResources(t *testing.T) {
 		t.Fatalf("DeleteExpose returned error: %v", err)
 	}
 
-	if _, err := client.AppsV1().Deployments(svc.Namespace).Get(context.TODO(), getDeploymentName(svc.Name), metav1.GetOptions{}); err == nil {
+	if _, err := client.AppsV1().Deployments(svc.Namespace).Get(context.TODO(), GetDeploymentName(svc.Name), metav1.GetOptions{}); err == nil {
 		t.Fatalf("expected deployment to be removed")
 	}
 
@@ -302,6 +312,25 @@ func TestDeleteExposeRemovesResources(t *testing.T) {
 
 	if existsSecret(svc.Name, svc.Namespace, client, cfg) {
 		t.Fatalf("expected secret to be removed")
+	}
+}
+
+func TestDeleteExposeIsIdempotent(t *testing.T) {
+	cfg := newTestConfig()
+	client := fake.NewSimpleClientset()
+
+	svc := newExposeService("cleanup-idempotent", 0, true)
+	svc.Namespace = cfg.ServicesNamespace
+	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
+		t.Fatalf("failed to create expose: %v", err)
+	}
+
+	if err := DeleteExpose(svc.Name, svc.Namespace, client, cfg); err != nil {
+		t.Fatalf("first DeleteExpose returned error: %v", err)
+	}
+
+	if err := DeleteExpose(svc.Name, svc.Namespace, client, cfg); err != nil {
+		t.Fatalf("second DeleteExpose should be idempotent, got error: %v", err)
 	}
 }
 
@@ -354,6 +383,81 @@ func TestUpdateIngressSecretTransitions(t *testing.T) {
 	}
 	if !existsSecret(svc.Name, cfg.ServicesNamespace, client, cfg) {
 		t.Fatalf("expected secret to exist after re-enabling auth")
+	}
+}
+
+func TestGetProbePath(t *testing.T) {
+	tests := []struct {
+		name    string
+		service types.Service
+		want    string
+	}{
+		{
+			name: "legacy default with rewrite target true",
+			service: types.Service{
+				Name: "svc",
+				Expose: types.Expose{
+					RewriteTarget: true,
+					HealthPath:    "/",
+				},
+			},
+			want: "/system/services/svc/exposed/",
+		},
+		{
+			name: "legacy explicit with rewrite target true and custom health path",
+			service: types.Service{
+				Name: "svc",
+				Expose: types.Expose{
+					RewriteTarget: true,
+					HealthPath:    "/healthz",
+					ProbeMode:     "legacy",
+				},
+			},
+			want: "/system/services/svc/exposed/healthz",
+		},
+		{
+			name: "direct mode with rewrite target true and custom health path",
+			service: types.Service{
+				Name: "svc",
+				Expose: types.Expose{
+					RewriteTarget: true,
+					HealthPath:    "/healthz",
+					ProbeMode:     "direct",
+				},
+			},
+			want: "/healthz",
+		},
+		{
+			name: "direct mode normalizes missing leading slash",
+			service: types.Service{
+				Name: "svc",
+				Expose: types.Expose{
+					HealthPath: "healthz",
+					ProbeMode:  "direct",
+				},
+			},
+			want: "/healthz",
+		},
+		{
+			name: "legacy behavior when rewrite target false",
+			service: types.Service{
+				Name: "svc",
+				Expose: types.Expose{
+					RewriteTarget: false,
+					HealthPath:    "/ready",
+				},
+			},
+			want: "/ready",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getProbePath(tt.service)
+			if got != tt.want {
+				t.Fatalf("expected probe path %q, got %q", tt.want, got)
+			}
+		})
 	}
 }
 

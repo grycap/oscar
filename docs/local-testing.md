@@ -111,7 +111,7 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/mast
 
 OSCAR depends on [MinIO](https://min.io/) as a storage provider and function
 trigger. The easy way to run MinIO in a Kubernetes cluster is by installing
-its [helm chart](https://github.com/minio/helm). To  install the helm MinIO
+its [helm chart](https://github.com/minio/helm). To install the helm MinIO
 repo and install the chart, run the following commands replacing
 `<MINIO_PASSWORD>` with a password. It must have at least 8 characters:
 
@@ -151,7 +151,7 @@ helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/
 [problems](https://github.com/kubernetes-sigs/kind/issues/1487#issuecomment-694920754)
 using the [NFS server provisioner](https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner)
 with kind due to its default configuration of kernel-limit file descriptors.
-To workaround it, please run `sudo sysctl -w fs.nr_open=1048576`.*
+As a workaround, please run `sudo sysctl -w fs.nr_open=1048576`.*
 
 ### Deploy Metrics server
 
@@ -164,6 +164,71 @@ kubectl -n kube-system patch deployment metrics-server --type='json' -p='[{"op":
 
 > Note that the local testing environment uses Kind, therefore the metrics will not work as expected.
 
+<<<<<<< HEAD
+### Monitoring stack (Prometheus + Loki + Alloy)
+
+Monitoring deployment and verification steps were moved to
+`specs/001-metrics-collection/monitoring-docs.md`.
+
+## Configure RBAC permissions
+
+Once we have deployed Metrics server we must configure RBAC permissions for OSCAR in order to allow it to interact with Metrics server.
+
+> Note that without the permissions the `/status` will show us an error.
+
+```sh
+cat <<EOF | kubectl apply -f -
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: oscar-cluster-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  - pods
+  - pods/log
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: oscar-cluster-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: oscar-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: oscar-sa
+  namespace: oscar
+EOF
+```
+
+=======
+>>>>>>> 478f4b4a11475418256e28140153fd408ff4afcd
 ### Deploy Knative Serving as Serverless Backend (OPTIONAL)
 
 OSCAR supports [Knative Serving](https://knative.dev/docs/serving/) as

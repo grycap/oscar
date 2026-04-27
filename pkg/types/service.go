@@ -19,6 +19,7 @@ package types
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/goccy/go-yaml"
 	v1 "k8s.io/api/core/v1"
@@ -65,11 +66,42 @@ const (
 	// ServiceLabel label for deploying services in all backs
 	ServiceLabel = "oscar_service"
 
+	// OscarUserServiceLabel marker label applied to all pods and jobs deployed
+	// in user namespaces, used to distinguish them from cluster-level resources.
+	OscarUserServiceLabel = "oscar.grycap/user-service"
+
+	// ManagedVolumeLabel marks PVCs created and managed as OSCAR volumes.
+	ManagedVolumeLabel = "oscar.grycap/managed-volume"
+
+	// ManagedVolumeNameLabel stores the logical OSCAR volume name on the backing PVC.
+	ManagedVolumeNameLabel = "oscar.grycap/volume-name"
+
+	// ManagedVolumeCreationModeLabel stores whether the volume was created from a service or the API.
+	ManagedVolumeCreationModeLabel = "oscar.grycap/volume-creation-mode"
+
+	// ManagedVolumeCreatedByServiceLabel stores the creator service for service-created volumes.
+	ManagedVolumeCreatedByServiceLabel = "oscar.grycap/volume-created-by-service"
+
+	// ManagedVolumeLifecyclePolicyLabel stores the lifecycle policy for service-created volumes.
+	ManagedVolumeLifecyclePolicyLabel = "oscar.grycap/volume-lifecycle-policy"
+
+	// ServiceVolumeName name for the managed volume mount in pod specs.
+	ServiceVolumeName = "service-volume"
+
 	// EventVariable name used by the environment variable where events are stored
 	EventVariable = "EVENT"
 
 	// JobUUIDVariable name used by the environment variable of the job UUID
 	JobUUIDVariable = "JOB_UUID"
+
+	// OscarServiceNameEnvVar exposes the OSCAR service name inside the container.
+	OscarServiceNameEnvVar = "OSCAR_SERVICE_NAME"
+
+	// OscarServiceTokenEnvVar exposes the OSCAR service token inside the container.
+	OscarServiceTokenEnvVar = "OSCAR_SERVICE_TOKEN"
+
+	// OscarServiceBasePathEnvVar exposes the OSCAR service base path inside the container.
+	OscarServiceBasePathEnvVar = "OSCAR_SERVICE_BASE_PATH"
 
 	// OpenfaasZeroScalingLabel label to enable zero scaling in OpenFaaS functions
 	//OpenfaasZeroScalingLabel = "com.openfaas.scale.zero"
@@ -284,6 +316,18 @@ type Service struct {
 	// Optional
 	Mount StorageIOConfig `json:"mount"`
 
+	// Volume configuration to create or attach a managed persistent volume.
+	// Optional
+	Volume *ServiceVolumeConfig `json:"volume,omitempty"`
+
+	// VolumeStatus exposes basic volume state information in API responses.
+	// Internal/API use only, not part of FDL.
+	VolumeStatus ServiceVolumeStatus `json:"volume_status,omitempty" yaml:"-"`
+
+	// Deployment exposes an optional deployment summary in list/read API responses.
+	// Internal/API use only, not part of FDL.
+	Deployment *ServiceDeploymentSummary `json:"deployment,omitempty" yaml:"-"`
+
 	// Kserve configuration to deploy the service using KServe InferenceService CRD
 	Kserve *Kserve `json:"kserve,omitempty"`
 }
@@ -325,6 +369,26 @@ type Kserve struct {
 	SetAuth bool `json:"set_auth,omitempty" default:"false"`
 }
 
+// ServiceVolumeConfig stores the requested size and mount path for a managed volume.
+type ServiceVolumeConfig struct {
+	// Name is the logical volume name. It is optional for service-created volumes.
+	Name string `json:"name,omitempty"`
+	// Size requested volume size using Kubernetes quantity format (for example 1Gi).
+	Size string `json:"size"`
+	// MountPath absolute path inside the service container where the volume is mounted.
+	MountPath string `json:"mount_path"`
+	// LifecyclePolicy controls whether a service-created volume is deleted with the creator service.
+	LifecyclePolicy string `json:"lifecycle_policy,omitempty"`
+}
+
+// ServiceVolumeStatus contains a minimal service-side view of an attached volume.
+type ServiceVolumeStatus struct {
+	Enabled bool   `json:"enabled"`
+	Name    string `json:"name,omitempty"`
+	Phase   string `json:"phase,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
 type Expose struct {
 	MinScale       int32  `json:"min_scale" default:"1"`
 	MaxScale       int32  `json:"max_scale" default:"10"`
@@ -335,6 +399,7 @@ type Expose struct {
 	DefaultCommand bool   `json:"default_command" `
 	SetAuth        bool   `json:"set_auth" `
 	HealthPath     string `json:"health_path" default:"/" `
+	ProbeMode      string `json:"probe_mode,omitempty" default:"legacy" `
 }
 
 // ToPodSpec returns a k8s podSpec from the Service
@@ -343,9 +408,13 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 	if err != nil {
 		return nil, err
 	}
+	disableServiceAccountTokenAutomount := false
 
+	enableServiceLinks := false
 	podSpec := &v1.PodSpec{
-		ImagePullSecrets: SetImagePullSecrets(service.ImagePullSecrets),
+		AutomountServiceAccountToken: &disableServiceAccountTokenAutomount,
+		ImagePullSecrets:             SetImagePullSecrets(service.ImagePullSecrets),
+		EnableServiceLinks:           &enableServiceLinks,
 		Containers: []v1.Container{
 			{
 				Name:            ContainerName,
@@ -398,6 +467,24 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, volumeMount)
 		podSpec.Volumes = append(podSpec.Volumes, volume)
 	}
+
+	if service.Volume != nil {
+		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
+			Name:      ServiceVolumeName,
+			MountPath: service.Volume.MountPath,
+		})
+		podSpec.Volumes = append(podSpec.Volumes, v1.Volume{
+			Name: ServiceVolumeName,
+			VolumeSource: v1.VolumeSource{
+				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+					ClaimName: service.GetVolumePVCName(),
+				},
+			},
+		})
+	}
+
+	// Add OSCAR-managed environment variables
+	addServiceMetadataEnvVars(podSpec, service)
 
 	// Add the required environment variables for the watchdog
 	addWatchdogEnvVars(podSpec, cfg, service)
@@ -548,6 +635,29 @@ func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) {
 	}
 }
 
+func addServiceMetadataEnvVars(p *v1.PodSpec, service *Service) {
+	requiredEnvVars := []v1.EnvVar{
+		{
+			Name:  OscarServiceNameEnvVar,
+			Value: service.Name,
+		},
+		{
+			Name:  OscarServiceTokenEnvVar,
+			Value: service.Token,
+		},
+		{
+			Name:  OscarServiceBasePathEnvVar,
+			Value: service.GetExposedBasePath(),
+		},
+	}
+
+	for i, cont := range p.Containers {
+		if cont.Name == ContainerName {
+			p.Containers[i].Env = append(p.Containers[i].Env, requiredEnvVars...)
+		}
+	}
+}
+
 // GetSupervisorPath returns the appropriate supervisor path
 func (service *Service) GetSupervisorPath() string {
 	if service.Alpine {
@@ -556,7 +666,44 @@ func (service *Service) GetSupervisorPath() string {
 	return fmt.Sprintf("%s/%s", VolumePath, SupervisorName)
 }
 
+// GetExposedBasePath returns the OSCAR exposed-service base path or an empty string.
+func (service *Service) GetExposedBasePath() string {
+	if service == nil || service.Expose.APIPort == 0 {
+		return ""
+	}
+	return fmt.Sprintf("/system/services/%s/exposed", service.Name)
+}
+
 // HasReplicas checks if the service has replicas defined
 func (service *Service) HasReplicas() bool {
 	return len(service.Replicas) > 0
+}
+
+// GetVolumeName returns the logical managed volume name used by the service.
+func (service *Service) GetVolumeName() string {
+	if service == nil {
+		return ""
+	}
+	if service.Volume == nil {
+		return service.Name
+	}
+	if strings.TrimSpace(service.Volume.Name) != "" {
+		return strings.TrimSpace(service.Volume.Name)
+	}
+	return service.Name
+}
+
+// GetVolumePVCName returns the backing PVC name for the managed volume.
+func (service *Service) GetVolumePVCName() string {
+	return service.GetVolumeName()
+}
+
+// CreatesManagedVolume reports whether the service requests creation of a new managed volume.
+func (service *Service) CreatesManagedVolume() bool {
+	return service != nil && service.Volume != nil && strings.TrimSpace(service.Volume.Size) != ""
+}
+
+// UsesManagedVolume reports whether the service attaches a managed volume.
+func (service *Service) UsesManagedVolume() bool {
+	return service != nil && service.Volume != nil
 }

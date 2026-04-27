@@ -79,7 +79,7 @@ func GetLoggerMiddleware() gin.HandlerFunc {
 		endTime := time.Now()
 
 		// Log custom information after the request is processed
-		logTime := endTime.Format("2006/01/02 - 15:04:05")
+		logTime := endTime.UTC().Format(time.RFC3339Nano)
 		latency := time.Since(startTime)
 		status := c.Writer.Status()
 		clientIP := c.ClientIP()
@@ -102,8 +102,8 @@ func GetLoggerMiddleware() gin.HandlerFunc {
 			clientIP, _ = IPAddress.(string)
 		}
 
-		log.Printf("[GIN-EXECUTIONS-LOGGER] %s | %3d | %13v | %s | %-7s %s | %s",
-			logTime, status, latency, clientIP, method, path, user)
+		log.Printf("[GIN-EXECUTIONS-LOGGER] %s | %3d | %13v | %s | %-7s %s | %s", // #nosec
+			logTime, status, latency, clientIP, method, path, user) // #nosec
 	}
 }
 

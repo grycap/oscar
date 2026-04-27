@@ -211,6 +211,16 @@ func TestEnsureLocalQueue(t *testing.T) {
 	t.Skip("Skipping ensureLocalQueue test - requires kubernetes client setup")
 }
 
+func TestCreateKueueUserQueuesIfDontExistDisabled(t *testing.T) {
+	cfg := newTestConfig()
+	cfg.KueueEnable = false
+
+	err := CreateKueueUserQueuesIfDontExist(cfg, "user1")
+	if err != nil {
+		t.Errorf("CreateKueueUserQueuesIfDontExist() with disabled kueue returned error: %v", err)
+	}
+}
+
 func TestDeleteKueueLocalQueueDisabled(t *testing.T) {
 	cfg := newTestConfig()
 	cfg.KueueEnable = false
@@ -385,6 +395,56 @@ func TestVerifyWorkload(t *testing.T) {
 	// so we don't test the external modification, just the return value
 }
 
+func TestWorkloadIsAdmitted(t *testing.T) {
+	tests := []struct {
+		name string
+		wl   *kueuev1.Workload
+		want bool
+	}{
+		{
+			name: "admitted",
+			wl: &kueuev1.Workload{
+				Status: kueuev1.WorkloadStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(kueuev1.WorkloadAdmitted),
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "not admitted",
+			wl: &kueuev1.Workload{
+				Status: kueuev1.WorkloadStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(kueuev1.WorkloadAdmitted),
+							Status: metav1.ConditionFalse,
+						},
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "no conditions",
+			wl:   &kueuev1.Workload{},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := workloadIsAdmitted(tt.wl); got != tt.want {
+				t.Fatalf("workloadIsAdmitted() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCheckWorkloadAdmited(t *testing.T) {
 	// This test verifies the function doesn't panic when not in-cluster
 	cfg := newTestConfig()
@@ -418,5 +478,21 @@ func TestEnsureKueueUserQueuesIntegration(t *testing.T) {
 	err := EnsureKueueUserQueues(context.Background(), cfg, "test-ns", "testuser", "test-service")
 	if err != nil {
 		t.Errorf("EnsureKueueUserQueues() failed with disabled kueue: %v", err)
+	}
+}
+
+func TestCreateKueueUserQueuesIfDontExistIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// This test would require actual in-cluster config to work fully
+	// For now, we test the disabled case
+	cfg := newTestConfig()
+	cfg.KueueEnable = false
+
+	err := CreateKueueUserQueuesIfDontExist(cfg, "testuser")
+	if err != nil {
+		t.Errorf("CreateKueueUserQueuesIfDontExist() failed with disabled kueue: %v", err)
 	}
 }

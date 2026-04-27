@@ -66,7 +66,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		var service types.Service
 		isAdminUser = false
 		authHeader := c.GetHeader("Authorization")
-
+		//Error creating the service: Service.serving.knative.dev "cowsay-s" is invalid: metadata.labels:
+		//  Invalid value: "platform-access:vo.ai4eosc.eu": a valid label must be an empty string or
+		// consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character
+		// (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')
 		if err := c.ShouldBindJSON(&service); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
@@ -81,6 +84,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Check service values and set defaults
 		checkValues(&service, cfg)
+		if err := utils.ValidateVolumeConfig(service.Name, service.Volume); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+			return
+		}
 		// Check if users in allowed_users have a MinIO associated user
 		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
 
@@ -229,11 +236,24 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			service.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 		}
 
+		ownerName := "oscar"
+		if !isAdminUser {
+			ownerName = auth.GetUserNameFromContext(c)
+			ownerName = utils.RemoveAccents(ownerName)
+		}
+		service.Labels["owner_name"] = strings.ReplaceAll(ownerName, " ", "_")
+
 		// Create service
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
 			if k8sErrors.IsAlreadyExists(err) {
-				c.String(http.StatusConflict, "A service with the provided name already exists")
+				if service.CreatesManagedVolume() {
+					c.String(http.StatusConflict, "A managed volume with the provided name already exists")
+				} else {
+					c.String(http.StatusConflict, "A service with the provided name already exists")
+				}
+			} else if k8sErrors.IsNotFound(err) && service.Volume != nil && !service.CreatesManagedVolume() {
+				c.String(http.StatusBadRequest, "Referenced volume does not exist in the caller namespace")
 			} else {
 				errDelete := back.DeleteService(service)
 				if errDelete != nil {
@@ -287,11 +307,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					}
 				}
 
-				ownerName := "oscar"
-				if !isAdminUser {
-					ownerName = auth.GetUserNameFromContext(c)
-					ownerName = utils.RemoveAccents(ownerName)
-				}
 				// Bucket metadata for filtering
 				tags := map[string]string{
 					"owner":        uid,
@@ -342,6 +357,7 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	if service.Labels == nil {
 		service.Labels = make(map[string]string)
 	}
+	service.Labels[types.OscarUserServiceLabel] = "true"
 	service.Labels[types.ServiceLabel] = service.Name
 	service.Labels[types.YunikornApplicationIDLabel] = service.Name
 	service.Labels[types.YunikornQueueLabel] = fmt.Sprintf("%s.%s.%s", types.YunikornRootQueue, types.YunikornOscarQueue, service.Name)
@@ -591,6 +607,20 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 					Owner:      service.Owner,
 				}
 				visibility := minIOAdminClient.GetCurrentResourceVisibility(minio)
+
+				// Add admin exception for mount buckets
+				// Only allowed private buckets
+				// Admin buckets have no MinIO policy so visibility returns "".
+				// Guard against mounting another user's bucket by verifying the owner tag is empty or matches the admin user
+				// (oscar in our case, as admin users don't have a UID and are identified by the "owner" tag in MinIO buckets).
+				// (user buckets always carry their UID in the "owner" tag).
+				if isAdminUser && visibility == "" {
+					bucketTags, _ := minIOAdminClient.GetTaggedMetadata(splitPath[0])
+					if bucketTags["owner"] == "oscar" || bucketTags["owner"] == "" {
+						visibility = utils.PRIVATE
+					}
+				}
+
 				if visibility != utils.PRIVATE {
 					return nil, fmt.Errorf("the bucket \"%s\" must be private to be used as mount", minio.BucketName)
 				} else {
@@ -678,6 +708,7 @@ func checkIdentity(service *types.Service, authHeader string) error {
 	voFirstReplace := strings.Replace(service.VO, "/", "", 1)
 	voParse := strings.ReplaceAll(voFirstReplace, "/", "--")
 	voParse = strings.ReplaceAll(voParse, " ", "__")
+	voParse = strings.ReplaceAll(voParse, ":", "___")
 	service.Labels["vo"] = voParse
 
 	return nil
