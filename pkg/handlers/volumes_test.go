@@ -117,6 +117,10 @@ func TestDeleteVolumeHandlerRejectsAttachedVolume(t *testing.T) {
 
 func createBaseRuntimePVC(t *testing.T, back *backends.FakeBackend, cfg *types.Config) {
 	t.Helper()
+	namespace := utils.BuildUserNamespace(cfg, "user@example.org")
+	_, _ = back.GetKubeClientset().CoreV1().Namespaces().Create(t.Context(), &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: namespace},
+	}, metav1.CreateOptions{})
 	_, _ = back.GetKubeClientset().CoreV1().PersistentVolumes().Create(t.Context(), &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "base-oscar-pv",
@@ -134,10 +138,11 @@ func createBaseRuntimePVC(t *testing.T, back *backends.FakeBackend, cfg *types.C
 			Phase: v1.ClaimBound,
 		},
 	}, metav1.CreateOptions{})
-	_, _ = back.GetKubeClientset().CoreV1().ResourceQuotas("oscar-svc-user-example-org-547e41ffe2031bcdc35ffc6687f10d498c46").Create(t.Context(), &v1.ResourceQuota{
+	userNS := utils.BuildUserNamespace(cfg, "user@example.org")
+	_, _ = back.GetKubeClientset().CoreV1().ResourceQuotas(userNS).Create(t.Context(), &v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "user",
-			Namespace: "oscar-svc-user-example-org-547e41ffe2031bcdc35ffc6687f10d498c46",
+			Namespace: userNS,
 		},
 		Spec: v1.ResourceQuotaSpec{
 			Hard: v1.ResourceList{
@@ -146,10 +151,10 @@ func createBaseRuntimePVC(t *testing.T, back *backends.FakeBackend, cfg *types.C
 			},
 		},
 	}, metav1.CreateOptions{})
-	_, _ = back.GetKubeClientset().CoreV1().LimitRanges("oscar-svc-user-example-org-547e41ffe2031bcdc35ffc6687f10d498c46").Create(t.Context(), &v1.LimitRange{
+	_, _ = back.GetKubeClientset().CoreV1().LimitRanges(userNS).Create(t.Context(), &v1.LimitRange{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "user",
-			Namespace: "oscar-svc-user-example-org-547e41ffe2031bcdc35ffc6687f10d498c46",
+			Namespace: userNS,
 		},
 		Spec: v1.LimitRangeSpec{
 			Limits: []v1.LimitRangeItem{
