@@ -1340,7 +1340,7 @@ func getProbePath(service types.Service) string {
 }
 
 func GetDeploymentName(nameContainer string) string {
-	return nameContainer + "-dlp"
+	return nameContainer + "-dpl"
 }
 
 func getHPAName(nameContainer string) string {

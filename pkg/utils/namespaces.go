@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	maxNamespaceLength          = 63
+	maxNamespaceLength          = 18
 	controllerRoleName          = "oscar-controller"
 	controllerRoleBindingName   = "oscar-controller-binding"
 	namespaceManagedByLabel     = "app.kubernetes.io/managed-by"

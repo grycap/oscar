@@ -53,13 +53,13 @@ func TestBuildUserNamespace(t *testing.T) {
 			name:     "custom owner with default prefix",
 			cfg:      &types.Config{ServicesNamespace: "oscar-svc"},
 			owner:    "testuser",
-			expected: "oscar-svc-testuser-45c571a156ddcef41351a713bcddee5ba7e95460",
+			expected: "oscar-svc-testuser",
 		},
 		{
 			name:     "custom owner with custom prefix",
 			cfg:      &types.Config{ServicesNamespace: "custom-svc"},
 			owner:    "testuser",
-			expected: "custom-svc-testuser-45c571a156ddcef41351a713bcddee5ba7e95460",
+			expected: "custom-svc-testuse",
 		},
 		{
 			name:     "nil config",
@@ -71,7 +71,7 @@ func TestBuildUserNamespace(t *testing.T) {
 			name:     "empty services namespace",
 			cfg:      &types.Config{ServicesNamespace: ""},
 			owner:    "testuser",
-			expected: "oscar-svc-testuser-45c571a156ddcef41351a713bcddee5ba7e95460",
+			expected: "oscar-svc-testuser",
 		},
 	}
 
@@ -463,8 +463,8 @@ func TestEnsureUserNamespaceBasic(t *testing.T) {
 		// Just test namespace generation, don't try to create resources
 		expected := BuildUserNamespace(cfg, "testuser")
 
-		if expected != "oscar-svc-testuser-45c571a156ddcef41351a713bcddee5ba7e95460" {
-			t.Errorf("Expected namespace %s, got %s", "oscar-svc-testuser-45c571a156ddcef41351a713bcddee5ba7e95460", expected)
+		if expected != "oscar-svc-testuser" {
+			t.Errorf("Expected namespace %s, got %s", "oscar-svc-testuser", expected)
 		}
 	})
 
@@ -485,8 +485,8 @@ func TestEnsureUserNamespaceBasic(t *testing.T) {
 
 func TestNamespaceConstants(t *testing.T) {
 	// Test that constants have expected values
-	if maxNamespaceLength != 63 {
-		t.Errorf("Expected maxNamespaceLength 63, got %d", maxNamespaceLength)
+	if maxNamespaceLength != 18 {
+		t.Errorf("Expected maxNamespaceLength 18, got %d", maxNamespaceLength)
 	}
 
 	if controllerRoleName != "oscar-controller" {

@@ -46,7 +46,7 @@ func TestMakeGetDeploymentStatusHandlerReadyExposed(t *testing.T) {
 	now := metav1.NewTime(time.Now().UTC())
 	kubeClientset := testclient.NewSimpleClientset(&appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "svc-dlp",
+			Name:      "svc-dpl",
 			Namespace: "ns",
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -195,7 +195,7 @@ func TestMakeGetDeploymentStatusHandlerDegraded(t *testing.T) {
 	now := metav1.NewTime(time.Now().UTC())
 	kubeClientset := testclient.NewSimpleClientset(&appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "svc-dlp",
+			Name:      "svc-dpl",
 			Namespace: "ns",
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -251,7 +251,7 @@ func TestMakeGetDeploymentStatusHandlerPending(t *testing.T) {
 	now := metav1.NewTime(time.Now().UTC())
 	kubeClientset := testclient.NewSimpleClientset(&appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "svc-dlp",
+			Name:      "svc-dpl",
 			Namespace: "ns",
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -304,7 +304,7 @@ func TestMakeGetDeploymentStatusHandlerFailed(t *testing.T) {
 	now := metav1.NewTime(time.Now().UTC())
 	kubeClientset := testclient.NewSimpleClientset(&appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "svc-dlp",
+			Name:      "svc-dpl",
 			Namespace: "ns",
 		},
 		Spec: appsv1.DeploymentSpec{

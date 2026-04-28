@@ -187,7 +187,7 @@ func TestMakeReadHandlerIncludeDeploymentSummary(t *testing.T) {
 	replicas := int32(2)
 	_, _ = back.GetKubeClientset().AppsV1().Deployments("default").Create(t.Context(), &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "svc-dlp",
+			Name:      "svc-dpl",
 			Namespace: "default",
 		},
 		Spec: appsv1.DeploymentSpec{
