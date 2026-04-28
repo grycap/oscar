@@ -35,7 +35,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 )
 
@@ -132,7 +131,8 @@ func checkIfInterLinkNode(node v1.Node) bool {
 }
 
 func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *types.StatusInfo) (map[string]*NodeInfoWithAllocatable, error) {
-	nodes, err := kubeClientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+	nodes, err := kubeClientset.CoreV1().Nodes().List(context.Background(),
+		metav1.ListOptions{LabelSelector: "!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master"})
 	if err != nil {
 		return nil, err
 	}
@@ -144,9 +144,8 @@ func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *types.StatusI
 
 	nodeInfoMap := make(map[string]*NodeInfoWithAllocatable)
 	var totalGPUs int64 = 0
-	eligibleNodes := utils.SelectEligibleNodes(nodes.Items)
 
-	for _, node := range eligibleNodes {
+	for _, node := range nodes.Items {
 		nodeName := node.Name
 
 		// Allocatable Resources
