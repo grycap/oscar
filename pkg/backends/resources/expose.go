@@ -51,6 +51,17 @@ const (
 	servicePortNumber  = 80
 	routeKindIngress   = "ingress"
 	routeKindHTTPRoute = "httproute"
+
+	livenessInitialDelaySeconds  = 60
+	livenessFailureThreshold     = 12
+	livenessPeriodSeconds        = 10
+	livenessTimeoutSeconds       = 10
+	readinessInitialDelaySeconds = 10
+	readinessPeriodSeconds       = 5
+	readinessTimeoutSeconds      = 10
+	startupFailureThreshold      = 18
+	startupPeriodSeconds         = 10
+	startupTimeoutSeconds        = 10
 )
 
 var httpRouteGVR = schema.GroupVersionResource{
@@ -478,16 +489,23 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 		}
 
 		podSpec.Containers[i].LivenessProbe = &v1.Probe{
-			InitialDelaySeconds: 30,
-			PeriodSeconds:       10,
+			FailureThreshold:    livenessFailureThreshold,
+			InitialDelaySeconds: livenessInitialDelaySeconds,
+			PeriodSeconds:       livenessPeriodSeconds,
 			ProbeHandler:        probeHandler,
-			TimeoutSeconds:      2,
+			TimeoutSeconds:      livenessTimeoutSeconds,
 		}
 		podSpec.Containers[i].ReadinessProbe = &v1.Probe{
-			InitialDelaySeconds: 10,
-			PeriodSeconds:       5,
+			InitialDelaySeconds: readinessInitialDelaySeconds,
+			PeriodSeconds:       readinessPeriodSeconds,
 			ProbeHandler:        probeHandler,
-			TimeoutSeconds:      2,
+			TimeoutSeconds:      readinessTimeoutSeconds,
+		}
+		podSpec.Containers[i].StartupProbe = &v1.Probe{
+			FailureThreshold: startupFailureThreshold,
+			PeriodSeconds:    startupPeriodSeconds,
+			ProbeHandler:     probeHandler,
+			TimeoutSeconds:   startupTimeoutSeconds,
 		}
 	}
 	var num int32 = 0777

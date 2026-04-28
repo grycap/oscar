@@ -42,7 +42,7 @@ var (
 // @Description Retrieve cluster configuration and MinIO credentials for the authenticated user.
 // @Tags config
 // @Produce json
-// @Success 200 {object} handlers.ConfigForUser
+// @Success 200 {object} types.ConfigForUser
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
@@ -118,7 +118,7 @@ func MakeConfigHandler(cfg *types.Config, back kubernetes.Interface) gin.Handler
 // @Description Change the cluster configuration
 // @Tags config
 // @Produce json
-// @Success 200 {object} handlers.ConfigForUser
+// @Success 200 {object} types.ConfigForUser
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
