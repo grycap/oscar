@@ -121,7 +121,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		if service.Environment.Vars == nil {
 			service.Environment.Vars = make(map[string]string)
 		}
-		service.Environment.Vars["KSERVE_HOST"] = fmt.Sprintf("%s.%s.svc.cluster.local", utils.KservePredictor(service.Name), namespace)
+		service.Environment.Vars["KSERVE_HOST"] = fmt.Sprintf("%s.%s.svc.cluster.local", utils.GetKserveSvcName(service.Name, service.Kserve.ModelFormat), namespace)
 	}
 
 	// Check if there is some user defined settings for OSCAR
@@ -164,7 +164,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		}
 
 		// Create the Knative service
-		createdKnSvc, err = kn.knClientset.ServingV1().Services(namespace).Create(context.TODO(), knSvc, metav1.CreateOptions{})
+		createdKnSvc, err := kn.knClientset.ServingV1().Services(namespace).Create(context.TODO(), knSvc, metav1.CreateOptions{})
 		if err != nil {
 			// Delete the previously created configMap
 			if delErr := deleteServiceConfigMap(service.Name, namespace, kn.kubeClientset); delErr != nil {

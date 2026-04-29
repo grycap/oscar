@@ -37,6 +37,8 @@ func kserveService() *oscarType.Service {
 			MinScale:    minScale,
 			MaxScale:    maxScale,
 			APIVersion:  "v1",
+			CPU:         "1.0",
+			Memory:      "2Gi",
 		},
 	}
 }
@@ -70,28 +72,6 @@ func TestIsKserveService_BothMissing(t *testing.T) {
 	svc := &oscarType.Service{}
 	if IsKserveService(svc) {
 		t.Error("expected IsKserveService to return false when both ModelFormat and StorageUri are empty")
-	}
-}
-
-// ─── KservePredictor ─────────────────────────────────────────────────────────
-
-func TestKservePredictor(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{"simple name", "my-service", "my-service-predictor"},
-		{"empty name", "", ""},
-		{"name with numbers", "svc123", "svc123-predictor"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := KservePredictor(tt.input)
-			if got != tt.expected {
-				t.Errorf("KservePredictor(%q) = %q, want %q", tt.input, got, tt.expected)
-			}
-		})
 	}
 }
 
@@ -201,7 +181,7 @@ func TestNewKserveInferenceServiceDefinition_NoKserveConfig(t *testing.T) {
 
 func TestNewKserveInferenceServiceDefinition_InvalidCPU(t *testing.T) {
 	svc := kserveService()
-	svc.CPU = "not-valid-cpu"
+	svc.Kserve.CPU = "not-valid-cpu"
 	knSvc := knativeServiceWithUID("uid")
 
 	_, err := NewKserveInferenceServiceDefinition(svc, knSvc)
@@ -212,7 +192,7 @@ func TestNewKserveInferenceServiceDefinition_InvalidCPU(t *testing.T) {
 
 func TestNewKserveInferenceServiceDefinition_InvalidMemory(t *testing.T) {
 	svc := kserveService()
-	svc.Memory = "bad-mem"
+	svc.Kserve.Memory = "bad-mem"
 	knSvc := knativeServiceWithUID("uid")
 
 	_, err := NewKserveInferenceServiceDefinition(svc, knSvc)
@@ -348,25 +328,25 @@ func TestOnlyProtocolV2_OtherFormats(t *testing.T) {
 
 func TestValidModelFormat(t *testing.T) {
 	tests := []struct {
-		format string
-		valid  bool
+		service *oscarType.Service
+		valid   bool
 	}{
-		{"onnx", true},
-		{"sklearn", true},
-		{"xgboost", true},
-		{"pytorch", true},
-		{"tensorflow", true},
-		{"triton", true},
-		{"", false},
-		{"unknown", false},
-		{"SKLEARN", false},
-		{"torch", false},
+		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "onnx"}}, true},
+		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "sklearn"}}, true},
+		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "xgboost"}}, true},
+		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "pytorch"}}, true},
+		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "tensorflow"}}, true},
+		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "triton"}}, true},
+		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: ""}}, false},
+		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "unknown"}}, false},
+		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "SKLEARN"}}, false},
+		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "torch"}}, false},
 	}
 	for _, tt := range tests {
-		t.Run(tt.format, func(t *testing.T) {
-			got := validModelFormat(tt.format)
+		t.Run(tt.service.Kserve.ModelFormat, func(t *testing.T) {
+			got := validModelFormat(tt.service)
 			if got != tt.valid {
-				t.Errorf("validModelFormat(%q) = %v, want %v", tt.format, got, tt.valid)
+				t.Errorf("validModelFormat(%q) = %v, want %v", tt.service.Kserve.ModelFormat, got, tt.valid)
 			}
 		})
 	}

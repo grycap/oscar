@@ -367,6 +367,15 @@ type Kserve struct {
 	// SetAuth parameter to set the authentication for the KServe InferenceService
 	// Optional. (default: false)
 	SetAuth bool `json:"set_auth,omitempty" default:"false"`
+	// LLM configuration for LLM-specific KServe deployments
+	// Only if ModelFormat is "llm"
+	// Optional
+	LLM *LLMConfig `json:"llm,omitempty"`
+}
+
+type LLMConfig struct {
+	ModelName    string `json:"model_name,omitempty"`
+	RuntimeImage string `json:"runtime_image,omitempty"`
 }
 
 // ServiceVolumeConfig stores the requested size and mount path for a managed volume.
