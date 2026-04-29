@@ -112,7 +112,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 	if namespace == "" {
 		namespace = kn.config.ServicesNamespace
 	}
-	var isKserve bool = (kn.kserveClientset != nil && utils.IsKserveService(&service))
+	var isKserve bool = isKserveServiceAndSupported(&service, kn)
 
 	if isKserve {
 		if err := utils.ValidateKserveService(&service); err != nil {
@@ -241,7 +241,7 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	if namespace == "" {
 		namespace = kn.config.ServicesNamespace
 	}
-	var isKserve bool = (kn.kserveClientset != nil && utils.IsKserveService(&service))
+	var isKserve bool = isKserveServiceAndSupported(&service, kn)
 
 	if isKserve {
 		if err := utils.ValidateKserveService(&service); err != nil {
@@ -509,4 +509,11 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service, name
 // GetKubeClientset returns the Kubernetes Clientset
 func (kn *KnativeBackend) GetKubeClientset() kubernetes.Interface {
 	return kn.kubeClientset
+}
+
+func isKserveServiceAndSupported(service *types.Service, kn *KnativeBackend) bool {
+	return (kn.config.KserveEnable &&
+		kn.kserveClientset != nil &&
+		utils.IsKserveService(service) &&
+		kn.config.ExposedServicesRouteKind == "httproute")
 }
