@@ -21,12 +21,15 @@ rules:
   - secrets
   - services
   - persistentvolumeclaims
+  - resourcequotas
+  - limitranges
   verbs:
   - get
   - list
   - watch
   - create
   - delete
+  - deletecollection
   - update
 - apiGroups:
   - apps
@@ -75,6 +78,28 @@ rules:
   - delete
   - update
 - apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - httproutes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+- apiGroups:
+  - traefik.io
+  resources:
+  - middlewares
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+- apiGroups:
   - serving.knative.dev
   resources:
   - services
@@ -113,6 +138,8 @@ rules:
   - pods/log
   - podtemplates
   - persistentvolumeclaims
+  - resourcequotas
+  - limitranges
   - secrets
   - services
   verbs:
@@ -121,6 +148,7 @@ rules:
   - watch
   - create
   - delete
+  - deletecollection
   - update
 - apiGroups:
   - ""
@@ -204,6 +232,28 @@ rules:
   - delete
   - update
 - apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - httproutes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+- apiGroups:
+  - traefik.io
+  resources:
+  - middlewares
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+- apiGroups:
   - serving.knative.dev
   resources:
   - services
@@ -226,6 +276,7 @@ rules:
   - resourceflavors
   - clusterqueues
   - localqueues
+  - workloads
   verbs:
   - get
   - list

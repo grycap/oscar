@@ -1,21 +1,42 @@
+# syntax=docker/dockerfile:1.7
+
 FROM golang:1.25 AS build
 
 ARG VERSION
 ARG GIT_COMMIT
 ARG GOOS=linux
 
-RUN mkdir /oscar
 WORKDIR /oscar
 
-COPY go.mod .
-COPY go.sum .
-COPY main.go .
-COPY pkg pkg
+COPY go.mod go.sum ./
 
-RUN GOOS=${GOOS} CGO_ENABLED=0 go build --ldflags "-s -w \
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+COPY main.go ./
+COPY pkg ./pkg
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    GOOS=${GOOS} CGO_ENABLED=0 go build --ldflags "-s -w \
 -X \"github.com/grycap/oscar/v3/pkg/version.Version=${VERSION}\" \
 -X \"github.com/grycap/oscar/v3/pkg/version.GitCommit=${GIT_COMMIT}\"" \
--a -installsuffix cgo -o oscar .
+    -o oscar .
+
+
+FROM node:20-alpine AS ui-build
+
+WORKDIR /dashboard
+
+COPY dashboard/package.json ./
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm install
+
+COPY dashboard /dashboard
+
+RUN --mount=type=cache,target=/root/.npm \
+    node scripts/deploy_container.cjs && npm run build
 
 
 FROM alpine:3.14
@@ -36,9 +57,7 @@ WORKDIR /home/app
 EXPOSE 8080
 
 COPY --from=build /oscar/oscar .
-
-# Remember to build the ui first (npm install && npm run build)
-COPY /dashboard/dist assets
+COPY --from=ui-build /dashboard/dist assets
 
 RUN chown -R app:app ./
 

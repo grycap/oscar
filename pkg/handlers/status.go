@@ -35,6 +35,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 )
 
@@ -130,35 +131,22 @@ func checkIfInterLinkNode(node v1.Node) bool {
 	return false
 }
 
-// Helper function to check if a node is a control plane node
-func isControlPlaneNode(node v1.Node) bool {
-	// Check for control-plane role label (Kubernetes 1.20+)
-	if _, exists := node.Labels["node-role.kubernetes.io/control-plane"]; exists {
-		return true
-	}
-
-	// Check for master role label (older Kubernetes versions)
-	if _, exists := node.Labels["node-role.kubernetes.io/master"]; exists {
-		return true
-	}
-
-	return false
-}
-
 func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *types.StatusInfo) (map[string]*NodeInfoWithAllocatable, error) {
 	nodes, err := kubeClientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	// Retrieve all pods to calculate requests per node
+	pods, err := kubeClientset.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	nodeInfoMap := make(map[string]*NodeInfoWithAllocatable)
 	var totalGPUs int64 = 0
+	eligibleNodes := utils.SelectEligibleNodes(nodes.Items)
 
-	for _, node := range nodes.Items {
-		if isControlPlaneNode(node) {
-			continue
-		}
-
+	for _, node := range eligibleNodes {
 		nodeName := node.Name
 
 		// Allocatable Resources
@@ -170,6 +158,73 @@ func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *types.StatusI
 			gpuVal, _ := gpuQty.AsInt64()
 			gpu_alloc = gpuVal
 			totalGPUs += gpuVal
+		}
+
+		// Calculate CPU and Memory Requests by summing the pods of the node
+		var cpu_request int64 = 0
+		var mem_request int64 = 0
+
+		for _, pod := range pods.Items {
+			// Filter by node and phase (avoid succeeded pods)
+			if pod.Spec.NodeName == nodeName && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
+
+				var podAppCPU int64 = 0
+				var podAppMem int64 = 0
+				var sidecarCPU int64 = 0
+				var sidecarMem int64 = 0
+				var maxRegularInitCPU int64 = 0
+				var maxRegularInitMem int64 = 0
+
+				// 1. Add App Containers (Standard Containers)
+				for _, c := range pod.Spec.Containers {
+					if cpu := c.Resources.Requests.Cpu(); cpu != nil {
+						podAppCPU += cpu.MilliValue()
+					}
+					if mem := c.Resources.Requests.Memory(); mem != nil {
+						podAppMem += mem.Value()
+					}
+
+				}
+
+				// 2. Process InitContainers (Differentiating Sidecars from K8s 1.29+)
+				for _, ic := range pod.Spec.InitContainers {
+					icCPU := ic.Resources.Requests.Cpu().MilliValue()
+					icMem := ic.Resources.Requests.Memory().Value()
+
+					// If it is a Sidecar (RestartPolicy: Always)
+					if ic.RestartPolicy != nil && *ic.RestartPolicy == v1.ContainerRestartPolicyAlways {
+						sidecarCPU += icCPU
+						sidecarMem += icMem
+					} else {
+						// If it's a classic Init (it looks for the individual maximum)
+						if icCPU > maxRegularInitCPU {
+							maxRegularInitCPU = icCPU
+						}
+						if icMem > maxRegularInitMem {
+							maxRegularInitMem = icMem
+						}
+					}
+				}
+
+				// 3. Final Pod Calculation according to the Scheduler:
+
+				// The Pod needs: Sum of Sidecars + the larger of (Apps or the heaviest Init)
+
+				// We calculate the main block (Apps vs. Classic Init)
+				var mainBlockCPU int64 = podAppCPU
+				if maxRegularInitCPU > mainBlockCPU {
+					mainBlockCPU = maxRegularInitCPU
+				}
+
+				var mainBlockMem int64 = podAppMem
+				if maxRegularInitMem > mainBlockMem {
+					mainBlockMem = maxRegularInitMem
+				}
+
+				// 4. Add to the total of the NODE (CPU_REQUEST and MEM_REQUEST)
+				cpu_request += (mainBlockCPU + sidecarCPU)
+				mem_request += (mainBlockMem + sidecarMem)
+			}
 		}
 
 		// 2. Status
@@ -200,12 +255,14 @@ func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *types.StatusI
 			NodeDetail: types.NodeDetail{
 				Name: nodeName,
 				CPU: types.NodeResource{
-					CapacityCores: cpu_alloc, // Use CapacityCores
-					UsageCores:    0,         // Will be updated in getMetricsInfo
+					CapacityCores: cpu_alloc,   // Use CapacityCores
+					UsageCores:    0,           // Will be updated in getMetricsInfo
+					RequestCores:  cpu_request, // Request CapacityCores
 				},
 				Memory: types.NodeResource{
 					CapacityBytes: memory_alloc, // Use CapacityBytes
 					UsageBytes:    0,            // Will be updated in getMetricsInfo
+					RequestBytes:  mem_request,  // Request CapacityBytes
 				},
 				GPU:         gpu_alloc,
 				IsInterlink: checkIfInterLinkNode(node),
@@ -237,6 +294,12 @@ func getMetricsInfo(kubeClientset kubernetes.Interface, metricsClientset version
 	var cpu_max_free int64 = 0
 	var memory_free_total int64 = 0
 	var memory_max_free int64 = 0
+
+	var cpu_schedulable_total int64 = 0
+	var cpu_max_schedulable int64 = 0
+	var memory_schedulable_total int64 = 0
+	var memory_max_schedulable int64 = 0
+
 	var number_nodes int64 = 0
 
 	var nodeDetailList []types.NodeDetail
@@ -260,6 +323,13 @@ func getMetricsInfo(kubeClientset kubernetes.Interface, metricsClientset version
 			cpu_node_free := cpu_alloc - cpu_usage_milli
 			memory_node_free := memory_alloc - memory_usage_bytes
 
+			// Request capacity
+			cpu_req := nodeInfo.NodeDetail.CPU.RequestCores
+			mem_req := nodeInfo.NodeDetail.Memory.RequestBytes
+
+			cpu_node_sched := cpu_alloc - cpu_req
+			memory_node_sched := memory_alloc - mem_req
+
 			// Update NodeDetail with usage metrics (Use UsageCores and UsageBytes)
 			nodeInfo.NodeDetail.CPU.UsageCores = cpu_usage_milli
 			nodeInfo.NodeDetail.Memory.UsageBytes = memory_usage_bytes
@@ -275,6 +345,15 @@ func getMetricsInfo(kubeClientset kubernetes.Interface, metricsClientset version
 				memory_max_free = memory_node_free
 			}
 
+			cpu_schedulable_total += cpu_node_sched
+			if cpu_max_schedulable < cpu_node_sched {
+				cpu_max_schedulable = cpu_node_sched
+			}
+			memory_schedulable_total += memory_node_sched
+			if memory_max_schedulable < memory_node_sched {
+				memory_max_schedulable = memory_node_sched
+			}
+
 			// Add to the final list
 			nodeDetailList = append(nodeDetailList, nodeInfo.NodeDetail)
 		}
@@ -286,8 +365,13 @@ func getMetricsInfo(kubeClientset kubernetes.Interface, metricsClientset version
 
 	clusterInfo.Cluster.Metrics.CPU.TotalFreeCores = cpu_free_total
 	clusterInfo.Cluster.Metrics.CPU.MaxFreeOnNodeCores = cpu_max_free
+	clusterInfo.Cluster.Metrics.CPU.TotalSchedulableCores = cpu_schedulable_total
+	clusterInfo.Cluster.Metrics.CPU.MaxSchedulableOnNodeCores = cpu_max_schedulable
+
 	clusterInfo.Cluster.Metrics.Memory.TotalFreeBytes = memory_free_total
 	clusterInfo.Cluster.Metrics.Memory.MaxFreeOnNodeBytes = memory_max_free
+	clusterInfo.Cluster.Metrics.Memory.TotalSchedulableBytes = memory_schedulable_total
+	clusterInfo.Cluster.Metrics.Memory.MaxSchedulableOnNodeBytes = memory_max_schedulable
 
 	return nil
 }

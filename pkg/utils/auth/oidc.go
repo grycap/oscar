@@ -178,6 +178,14 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO user for uid %s: %v", uid, err))
 			}
 		}
+
+		// Create Kueue ClusterQueue and LocalQueue for the user if they don't exist
+		if err := utils.CreateKueueUserQueuesIfDontExist(cfg, uid); err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating Kueue ClusterQueue for user %s: %v", uid, err))
+		}
+
+		utils.EnsureVolumeLimits(FormatUID(uid), utils.BuildUserNamespace(cfg, uid), kubeClientset, cfg)
+
 		c.Set("uidOrigin", uid)
 		c.Set("userName", ui.Name)
 		c.Set("multitenancyConfig", mc)
@@ -332,5 +340,14 @@ func (om *oidcManager) IsAuthorised(rawToken string) bool {
 		}
 	}
 
+	return false
+}
+
+func (om *oidcManager) UserInOneGroup(ui *userInfo, cfg *types.Config) bool {
+	for _, vo := range cfg.OIDCGroups {
+		if om.UserHasVO(ui, vo) {
+			return true
+		}
+	}
 	return false
 }

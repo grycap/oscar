@@ -24,7 +24,9 @@ import (
 
 	"github.com/grycap/oscar/v3/pkg/types"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -51,13 +53,13 @@ func TestBuildUserNamespace(t *testing.T) {
 			name:     "custom owner with default prefix",
 			cfg:      &types.Config{ServicesNamespace: "oscar-svc"},
 			owner:    "testuser",
-			expected: "oscar-svc-testuser-45c571a156ddcef41351a713bcddee5ba7e95460",
+			expected: "oscar-svc-testuser",
 		},
 		{
 			name:     "custom owner with custom prefix",
 			cfg:      &types.Config{ServicesNamespace: "custom-svc"},
 			owner:    "testuser",
-			expected: "custom-svc-testuser-45c571a156ddcef41351a713bcddee5ba7e95460",
+			expected: "custom-svc-testuse",
 		},
 		{
 			name:     "nil config",
@@ -69,7 +71,7 @@ func TestBuildUserNamespace(t *testing.T) {
 			name:     "empty services namespace",
 			cfg:      &types.Config{ServicesNamespace: ""},
 			owner:    "testuser",
-			expected: "oscar-svc-testuser-45c571a156ddcef41351a713bcddee5ba7e95460",
+			expected: "oscar-svc-testuser",
 		},
 	}
 
@@ -461,8 +463,8 @@ func TestEnsureUserNamespaceBasic(t *testing.T) {
 		// Just test namespace generation, don't try to create resources
 		expected := BuildUserNamespace(cfg, "testuser")
 
-		if expected != "oscar-svc-testuser-45c571a156ddcef41351a713bcddee5ba7e95460" {
-			t.Errorf("Expected namespace %s, got %s", "oscar-svc-testuser-45c571a156ddcef41351a713bcddee5ba7e95460", expected)
+		if expected != "oscar-svc-testuser" {
+			t.Errorf("Expected namespace %s, got %s", "oscar-svc-testuser", expected)
 		}
 	})
 
@@ -483,8 +485,8 @@ func TestEnsureUserNamespaceBasic(t *testing.T) {
 
 func TestNamespaceConstants(t *testing.T) {
 	// Test that constants have expected values
-	if maxNamespaceLength != 63 {
-		t.Errorf("Expected maxNamespaceLength 63, got %d", maxNamespaceLength)
+	if maxNamespaceLength != 18 {
+		t.Errorf("Expected maxNamespaceLength 18, got %d", maxNamespaceLength)
 	}
 
 	if controllerRoleName != "oscar-controller" {
@@ -517,5 +519,94 @@ func TestNamespaceConstants(t *testing.T) {
 
 	if namespaceHashPaddingDivider != "-" {
 		t.Errorf("Expected namespaceHashPaddingDivider '-', got '%s'", namespaceHashPaddingDivider)
+	}
+}
+
+func TestEnsureControllerRoleIncludesVolumeQuotaPermissionsOnCreate(t *testing.T) {
+	ctx := context.Background()
+	namespace := "test-ns"
+
+	clientset := fake.NewSimpleClientset(&corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: namespace},
+	})
+
+	if err := ensureControllerRole(ctx, clientset, namespace); err != nil {
+		t.Fatalf("Unexpected error creating controller role: %v", err)
+	}
+
+	role, err := clientset.RbacV1().Roles(namespace).Get(ctx, controllerRoleName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Unable to retrieve controller role: %v", err)
+	}
+
+	foundPodsRule := false
+	foundResourceQuotas := false
+	foundLimitRanges := false
+	for _, rule := range role.Rules {
+		if containsString(rule.APIGroups, "") && containsString(rule.Resources, "pods") {
+			foundPodsRule = true
+			if !containsString(rule.Verbs, "deletecollection") {
+				t.Fatalf("Expected pods rule to include deletecollection verb. Verbs: %v", rule.Verbs)
+			}
+		}
+		if containsString(rule.APIGroups, "") && containsString(rule.Resources, "resourcequotas") {
+			foundResourceQuotas = true
+			if !containsString(rule.Verbs, "get") || !containsString(rule.Verbs, "create") || !containsString(rule.Verbs, "update") {
+				t.Fatalf("Expected resourcequotas rule to include get/create/update verbs. Verbs: %v", rule.Verbs)
+			}
+		}
+		if containsString(rule.APIGroups, "") && containsString(rule.Resources, "limitranges") {
+			foundLimitRanges = true
+			if !containsString(rule.Verbs, "get") || !containsString(rule.Verbs, "create") || !containsString(rule.Verbs, "update") {
+				t.Fatalf("Expected limitranges rule to include get/create/update verbs. Verbs: %v", rule.Verbs)
+			}
+		}
+	}
+
+	if !foundPodsRule {
+		t.Fatal("Expected a core API rule with pods resource")
+	}
+	if !foundResourceQuotas {
+		t.Fatal("Expected a core API rule with resourcequotas resource")
+	}
+	if !foundLimitRanges {
+		t.Fatal("Expected a core API rule with limitranges resource")
+	}
+}
+
+func TestEnsureControllerRoleReconcilesMissingPodDeleteCollection(t *testing.T) {
+	ctx := context.Background()
+	namespace := "test-ns"
+
+	existingRole := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      controllerRoleName,
+			Namespace: namespace,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"pods", "services"},
+				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
+			},
+		},
+	}
+
+	clientset := fake.NewSimpleClientset(
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}},
+		existingRole,
+	)
+
+	if err := ensureControllerRole(ctx, clientset, namespace); err != nil {
+		t.Fatalf("Unexpected error reconciling controller role: %v", err)
+	}
+
+	role, err := clientset.RbacV1().Roles(namespace).Get(ctx, controllerRoleName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Unable to retrieve controller role: %v", err)
+	}
+
+	if len(role.Rules) != 1 {
+		t.Fatalf("Expected existing role to be preserved (no reconciliation), got %d rules", len(role.Rules))
 	}
 }

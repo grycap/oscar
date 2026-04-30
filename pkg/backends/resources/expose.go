@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	htpasswd "github.com/foomo/htpasswd"
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -30,20 +31,52 @@ import (
 	autos "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	net "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 const (
-	typeNodePort      = "NodePort"
-	typeClusterIP     = "ClusterIP"
-	prefixLabelApp    = "oscar-svc-exp-"
-	keyLabelApp       = "app"
-	podPortName       = "podport"
-	servicePortName   = "serviceport"
-	servicePortNumber = 80
+	typeNodePort       = "NodePort"
+	typeClusterIP      = "ClusterIP"
+	prefixLabelApp     = "oscar-svc-exp-"
+	KeyLabelApp        = "app"
+	podPortName        = "podport"
+	servicePortName    = "serviceport"
+	servicePortNumber  = 80
+	routeKindIngress   = "ingress"
+	routeKindHTTPRoute = "httproute"
+
+	livenessInitialDelaySeconds  = 60
+	livenessFailureThreshold     = 12
+	livenessPeriodSeconds        = 10
+	livenessTimeoutSeconds       = 10
+	readinessInitialDelaySeconds = 10
+	readinessPeriodSeconds       = 5
+	readinessTimeoutSeconds      = 10
+	startupFailureThreshold      = 18
+	startupPeriodSeconds         = 10
+	startupTimeoutSeconds        = 10
 )
+
+var httpRouteGVR = schema.GroupVersionResource{
+	Group:    "gateway.networking.k8s.io",
+	Version:  "v1",
+	Resource: "httproutes",
+}
+
+var traefikMiddlewareGVR = schema.GroupVersionResource{
+	Group:    "traefik.io",
+	Version:  "v1alpha1",
+	Resource: "middlewares",
+}
+
+var gatewayClientsetProvider = getGatewayClientset
 
 // Custom logger
 var ExposeLogger = log.New(os.Stdout, "[EXPOSED-SERVICE] ", log.Flags())
@@ -70,9 +103,9 @@ func CreateExpose(service types.Service, namespace string, kubeClientset kuberne
 		return fmt.Errorf("error creating svc for exposed service '%s': %v", service.Name, err)
 	}
 	if service.Expose.NodePort == 0 {
-		err = createIngress(service, targetNamespace, kubeClientset, cfg)
+		err = createRoute(service, targetNamespace, kubeClientset, cfg)
 		if err != nil {
-			return fmt.Errorf("error creating ingress for exposed service '%s': %v", service.Name, err)
+			return fmt.Errorf("error creating route for exposed service '%s': %v", service.Name, err)
 		}
 	}
 	return nil
@@ -86,35 +119,25 @@ func DeleteExpose(name string, namespace string, kubeClientset kubernetes.Interf
 	}
 
 	err := deleteDeployment(name, targetNamespace, kubeClientset, cfg)
-	if err != nil {
+	if err = ignoreNotFound(err); err != nil {
 		return fmt.Errorf("error deleting deployment for exposed service '%s': %v", name, err)
 	}
 	err = deleteService(name, targetNamespace, kubeClientset, cfg)
-	if err != nil {
+	if err = ignoreNotFound(err); err != nil {
 		return fmt.Errorf("error deleting service for exposed service '%s': %v", name, err)
 	}
 
-	ingressType := existsIngress(name, targetNamespace, kubeClientset)
-	if ingressType {
-		err = deleteIngress(getIngressName(name), targetNamespace, kubeClientset, cfg)
-		if existsSecret(name, targetNamespace, kubeClientset, cfg) {
-			err = deleteSecret(name, targetNamespace, kubeClientset, cfg)
-			if err != nil {
-				return err
-			}
-		}
-		if err != nil {
-			return fmt.Errorf("error deleting ingress for exposed service '%s': %v", name, err)
-		}
+	if err := deleteRouteResources(name, targetNamespace, kubeClientset, cfg); err != nil {
+		return fmt.Errorf("error deleting route for exposed service '%s': %v", name, err)
 	}
 	termination := int64(0)
-	back := metav1.DeletePropagationBackground
+	foreground := metav1.DeletePropagationForeground
 	delete := metav1.DeleteOptions{
 		GracePeriodSeconds: &termination,
-		PropagationPolicy:  &back,
+		PropagationPolicy:  &foreground,
 	}
 	listOpts := metav1.ListOptions{
-		LabelSelector: "app=oscar-svc-exp-" + name,
+		LabelSelector: KeyLabelApp + "=" + GetKeyLabelApp(name),
 	}
 	err = kubeClientset.CoreV1().Pods(targetNamespace).DeleteCollection(context.TODO(), delete, listOpts)
 	if err != nil {
@@ -123,6 +146,13 @@ func DeleteExpose(name string, namespace string, kubeClientset kubernetes.Interf
 	utils.DeleteWorkload(name, targetNamespace, cfg)
 
 	return nil
+}
+
+func ignoreNotFound(err error) error {
+	if err == nil || apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 // UpdateExpose updates all the components of the exposed service on the cluster
@@ -144,37 +174,15 @@ func UpdateExpose(service types.Service, namespace string, kubeClientset kuberne
 		return err
 	}
 
-	ingressType := existsIngress(service.Name, targetNamespace, kubeClientset)
-	// Old service config was Ingress type
-	if ingressType {
-		// New service config if NodePort
-		if service.Expose.NodePort != 0 {
-			err = deleteIngress(getIngressName(service.Name), targetNamespace, kubeClientset, cfg)
-			if existsSecret(service.Name, targetNamespace, kubeClientset, cfg) {
-				err := deleteSecret(service.Name, targetNamespace, kubeClientset, cfg)
-				if err != nil {
-					return err
-				}
-			}
-			if err != nil {
-				log.Printf("error deleting ingress service: %v\n", err)
-				return err
-			}
-		} else {
-			err = updateIngress(service, targetNamespace, kubeClientset, cfg)
-			if err != nil {
-				log.Printf("error updating ingress service: %v\n", err)
-				return err
-			}
+	if service.Expose.NodePort != 0 {
+		if err = deleteRouteResources(service.Name, targetNamespace, kubeClientset, cfg); err != nil {
+			log.Printf("error deleting route service: %v\n", err)
+			return err
 		}
 	} else {
-		// Old service config is NodeType and the new one is Ingress type
-		if service.Expose.NodePort == 0 {
-			err = createIngress(service, targetNamespace, kubeClientset, cfg)
-			if err != nil {
-				log.Printf("error creating ingress service: %v\n", err)
-				return err
-			}
+		if err = upsertRoute(service, targetNamespace, kubeClientset, cfg); err != nil {
+			log.Printf("error updating route service: %v\n", err)
+			return err
 		}
 	}
 
@@ -185,6 +193,130 @@ func UpdateExpose(service types.Service, namespace string, kubeClientset kuberne
 			return fmt.Errorf("Invalid workload after update: Error checking workload admission: change the cpu/memory requests")
 		}
 	}
+	return nil
+}
+
+func getRouteKind(cfg *types.Config) string {
+	if cfg == nil {
+		return routeKindIngress
+	}
+
+	routeKind := strings.ToLower(strings.TrimSpace(cfg.ExposedServicesRouteKind))
+	if routeKind == routeKindHTTPRoute {
+		return routeKindHTTPRoute
+	}
+
+	return routeKindIngress
+}
+
+func createRoute(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	if getRouteKind(cfg) == routeKindHTTPRoute {
+		return createHTTPRoute(service, namespace, kubeClientset, cfg)
+	}
+
+	return createIngress(service, namespace, kubeClientset, cfg)
+}
+
+func upsertRoute(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	ingressExists := existsIngress(service.Name, namespace, kubeClientset)
+	httpRouteExists := existsHTTPRoute(service.Name, namespace)
+
+	if getRouteKind(cfg) == routeKindHTTPRoute {
+		if ingressExists {
+			if err := deleteIngress(getIngressName(service.Name), namespace, kubeClientset, cfg); err != nil {
+				return err
+			}
+		}
+		if existsSecret(service.Name, namespace, kubeClientset, cfg) {
+			if err := deleteSecret(service.Name, namespace, kubeClientset, cfg); err != nil {
+				return err
+			}
+		}
+
+		if httpRouteExists {
+			return updateHTTPRoute(service, namespace, kubeClientset, cfg)
+		}
+		return createHTTPRoute(service, namespace, kubeClientset, cfg)
+	}
+
+	if httpRouteExists {
+		if err := deleteHTTPRoute(getHTTPRouteName(service.Name), namespace); err != nil {
+			return err
+		}
+	}
+
+	if existsTraefikCORSMiddleware(service.Name, namespace) {
+		if err := deleteTraefikCORSMiddleware(getTraefikCORSMiddlewareName(service.Name), namespace); err != nil {
+			return err
+		}
+	}
+
+	if ingressExists {
+		return updateIngress(service, namespace, kubeClientset, cfg)
+	}
+
+	return createIngress(service, namespace, kubeClientset, cfg)
+}
+
+func deleteRouteResources(serviceName string, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	if existsIngress(serviceName, namespace, kubeClientset) {
+		if err := deleteIngress(getIngressName(serviceName), namespace, kubeClientset, cfg); err != nil {
+			return err
+		}
+	}
+
+	if existsHTTPRoute(serviceName, namespace) {
+		if err := deleteHTTPRoute(getHTTPRouteName(serviceName), namespace); err != nil {
+			return err
+		}
+	}
+
+	if existsTraefikCORSMiddleware(serviceName, namespace) {
+		if err := deleteTraefikCORSMiddleware(getTraefikCORSMiddlewareName(serviceName), namespace); err != nil {
+			return err
+		}
+	}
+
+	if existsTraefikAuthMiddleware(serviceName, namespace) {
+		if err := deleteTraefikAuthMiddleware(getTraefikAuthMiddlewareName(serviceName), namespace); err != nil {
+			return err
+		}
+	}
+
+	if existsTraefikAuthSecret(serviceName, namespace, kubeClientset) {
+		if err := deleteTraefikAuthSecret(getTraefikAuthSecretName(serviceName), namespace, kubeClientset); err != nil {
+			return err
+		}
+	}
+
+	if existsSecret(serviceName, namespace, kubeClientset, cfg) {
+		err := deleteSecret(serviceName, namespace, kubeClientset, cfg)
+		if err = ignoreNotFound(err); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func getGatewayClientset() (dynamic.Interface, error) {
+	restCfg, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	return dynamic.NewForConfig(restCfg)
+}
+
+func validateHTTPRouteConfig(service types.Service, cfg *types.Config) error {
+	if cfg == nil {
+		return fmt.Errorf("config cannot be nil")
+	}
+
+	if strings.TrimSpace(cfg.HTTPRouteGatewayName) == "" {
+		return fmt.Errorf("HTTPROUTE_GATEWAY_NAME must be defined when EXPOSED_SERVICES_ROUTE_KIND=httproute")
+	}
+
 	return nil
 }
 
@@ -258,7 +390,7 @@ func createDeployment(service types.Service, namespace string, kubeClientset kub
 
 // Return the component deployment, ready to create or update
 func getDeploymentSpec(service types.Service, namespace string, cfg *types.Config) *apps.Deployment {
-	deployName := getDeploymentName(service.Name)
+	deployName := GetDeploymentName(service.Name)
 	minScale := int32(0)
 	if service.Owner == types.DefaultOwner || !cfg.KueueEnable {
 		minScale = int32(service.Expose.MinScale)
@@ -279,7 +411,7 @@ func getDeploymentSpec(service types.Service, namespace string, cfg *types.Confi
 			Replicas: &minScale,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					keyLabelApp: prefixLabelApp + service.Name,
+					KeyLabelApp: GetKeyLabelApp(service.Name),
 				},
 			},
 			Template: getPodTemplateSpec(service, namespace, cfg),
@@ -304,7 +436,7 @@ func getDeploymentSpec(service types.Service, namespace string, cfg *types.Confi
 // Return the component HorizontalAutoScale, ready to create or update
 func getHortizontalAutoScaleSpec(service types.Service, namespace string, cfg *types.Config) *autos.HorizontalPodAutoscaler {
 	hpaName := getHPAName(service.Name)
-	deployName := getDeploymentName(service.Name)
+	deployName := GetDeploymentName(service.Name)
 	hpa := &autos.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      hpaName,
@@ -347,9 +479,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 		}
 
 		probePath := service.Expose.HealthPath
-		if service.Expose.RewriteTarget {
-			probePath = getAPIPath(service.Name) + service.Expose.HealthPath
-		}
+		probePath = getProbePath(service)
 
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
@@ -359,16 +489,23 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 		}
 
 		podSpec.Containers[i].LivenessProbe = &v1.Probe{
-			InitialDelaySeconds: 30,
-			PeriodSeconds:       10,
+			FailureThreshold:    livenessFailureThreshold,
+			InitialDelaySeconds: livenessInitialDelaySeconds,
+			PeriodSeconds:       livenessPeriodSeconds,
 			ProbeHandler:        probeHandler,
-			TimeoutSeconds:      2,
+			TimeoutSeconds:      livenessTimeoutSeconds,
 		}
 		podSpec.Containers[i].ReadinessProbe = &v1.Probe{
-			InitialDelaySeconds: 10,
-			PeriodSeconds:       5,
+			InitialDelaySeconds: readinessInitialDelaySeconds,
+			PeriodSeconds:       readinessPeriodSeconds,
 			ProbeHandler:        probeHandler,
-			TimeoutSeconds:      2,
+			TimeoutSeconds:      readinessTimeoutSeconds,
+		}
+		podSpec.Containers[i].StartupProbe = &v1.Probe{
+			FailureThreshold: startupFailureThreshold,
+			PeriodSeconds:    startupPeriodSeconds,
+			ProbeHandler:     probeHandler,
+			TimeoutSeconds:   startupTimeoutSeconds,
 		}
 	}
 	var num int32 = 0777
@@ -381,7 +518,8 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 			Name:      service.Name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				keyLabelApp: prefixLabelApp + service.Name,
+				types.OscarUserServiceLabel: "true",
+				KeyLabelApp:                 GetKeyLabelApp(service.Name),
 			},
 		},
 		Spec: *podSpec,
@@ -407,12 +545,12 @@ func listDeployments(namespace string, kubeClientset kubernetes.Interface, cfg *
 func deleteDeployment(name string, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
 	name_hpa := getHPAName(name)
 	err := kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(namespace).Delete(context.TODO(), name_hpa, metav1.DeleteOptions{})
-	if err != nil {
+	if err = ignoreNotFound(err); err != nil {
 		return err
 	}
-	deployment := getDeploymentName(name)
+	deployment := GetDeploymentName(name)
 	err = kubeClientset.AppsV1().Deployments(namespace).Delete(context.TODO(), deployment, metav1.DeleteOptions{})
-	if err != nil {
+	if err = ignoreNotFound(err); err != nil {
 		return err
 	}
 	return nil
@@ -421,7 +559,7 @@ func deleteDeployment(name string, namespace string, kubeClientset kubernetes.In
 ///Update Deployment and HPA
 
 func updateDeployment(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
-	_, err := kubeClientset.AppsV1().Deployments(namespace).Get(context.TODO(), getDeploymentName(service.Name), metav1.GetOptions{})
+	_, err := kubeClientset.AppsV1().Deployments(namespace).Get(context.TODO(), GetDeploymentName(service.Name), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -492,7 +630,7 @@ func getServiceSpec(service types.Service, namespace string, cfg *types.Config) 
 			Ports: []v1.ServicePort{port},
 			Type:  service_type,
 			Selector: map[string]string{
-				keyLabelApp: prefixLabelApp + service.Name,
+				KeyLabelApp: GetKeyLabelApp(service.Name),
 			},
 		},
 		Status: v1.ServiceStatus{},
@@ -589,6 +727,173 @@ func updateIngress(service types.Service, namespace string, kubeClientset kubern
 	return nil
 }
 
+func createHTTPRoute(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	if err := validateHTTPRouteConfig(service, cfg); err != nil {
+		return err
+	}
+
+	if err := createTraefikCORSMiddleware(service, namespace, cfg); err != nil {
+		return err
+	}
+
+	if service.Expose.SetAuth {
+		if err := createTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
+			return err
+		}
+		if err := createTraefikAuthMiddleware(service, namespace); err != nil {
+			return err
+		}
+	}
+
+	gatewayClientset, err := gatewayClientsetProvider()
+	if err != nil {
+		return err
+	}
+
+	httpRoute := getHTTPRouteSpec(service, namespace, cfg)
+	_, err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Create(context.TODO(), httpRoute, metav1.CreateOptions{})
+	return err
+}
+
+func updateHTTPRoute(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	if err := validateHTTPRouteConfig(service, cfg); err != nil {
+		return err
+	}
+
+	if err := upsertTraefikCORSMiddleware(service, namespace, cfg); err != nil {
+		return err
+	}
+
+	if service.Expose.SetAuth {
+		if err := upsertTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
+			return err
+		}
+		if err := upsertTraefikAuthMiddleware(service, namespace); err != nil {
+			return err
+		}
+	} else {
+		if existsTraefikAuthMiddleware(service.Name, namespace) {
+			if err := deleteTraefikAuthMiddleware(getTraefikAuthMiddlewareName(service.Name), namespace); err != nil {
+				return err
+			}
+		}
+		if existsTraefikAuthSecret(service.Name, namespace, kubeClientset) {
+			if err := deleteTraefikAuthSecret(getTraefikAuthSecretName(service.Name), namespace, kubeClientset); err != nil {
+				return err
+			}
+		}
+	}
+
+	gatewayClientset, err := gatewayClientsetProvider()
+	if err != nil {
+		return err
+	}
+
+	httpRoute := getHTTPRouteSpec(service, namespace, cfg)
+	_, err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Update(context.TODO(), httpRoute, metav1.UpdateOptions{})
+	return err
+}
+
+func getHTTPRouteSpec(service types.Service, namespace string, cfg *types.Config) *unstructured.Unstructured {
+	nameHTTPRoute := getHTTPRouteName(service.Name)
+	nameService := getServiceName(service.Name)
+	pathAPI := getAPIPath(service.Name)
+
+	rule := map[string]any{
+		"matches": []any{
+			map[string]any{
+				"path": map[string]any{
+					"type":  "PathPrefix",
+					"value": pathAPI,
+				},
+			},
+		},
+		"backendRefs": []any{
+			map[string]any{
+				"name": nameService,
+				"port": int64(servicePortNumber),
+			},
+		},
+	}
+
+	if !service.Expose.RewriteTarget {
+		rule["filters"] = []any{
+			map[string]any{
+				"type": "URLRewrite",
+				"urlRewrite": map[string]any{
+					"path": map[string]any{
+						"type":               "ReplacePrefixMatch",
+						"replacePrefixMatch": "/",
+					},
+				},
+			},
+			map[string]any{
+				"type": "ExtensionRef",
+				"extensionRef": map[string]any{
+					"group": "traefik.io",
+					"kind":  "Middleware",
+					"name":  getTraefikCORSMiddlewareName(service.Name),
+				},
+			},
+		}
+	} else {
+		rule["filters"] = []any{
+			map[string]any{
+				"type": "ExtensionRef",
+				"extensionRef": map[string]any{
+					"group": "traefik.io",
+					"kind":  "Middleware",
+					"name":  getTraefikCORSMiddlewareName(service.Name),
+				},
+			},
+		}
+	}
+
+	if service.Expose.SetAuth {
+		filters, _ := rule["filters"].([]any)
+		filters = append(filters, map[string]any{
+			"type": "ExtensionRef",
+			"extensionRef": map[string]any{
+				"group": "traefik.io",
+				"kind":  "Middleware",
+				"name":  getTraefikAuthMiddlewareName(service.Name),
+			},
+		})
+		rule["filters"] = filters
+	}
+
+	spec := map[string]any{
+		"rules": []any{rule},
+	}
+
+	host := strings.TrimSpace(cfg.IngressHost)
+	if host != "" {
+		spec["hostnames"] = []any{host}
+	}
+
+	parentRef := map[string]any{
+		"group": "gateway.networking.k8s.io",
+		"kind":  "Gateway",
+		"name":  strings.TrimSpace(cfg.HTTPRouteGatewayName),
+	}
+
+	if gatewayNamespace := strings.TrimSpace(cfg.HTTPRouteGatewayNamespace); gatewayNamespace != "" {
+		parentRef["namespace"] = gatewayNamespace
+	}
+
+	spec["parentRefs"] = []any{parentRef}
+
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "gateway.networking.k8s.io/v1",
+		"kind":       "HTTPRoute",
+		"metadata": map[string]any{
+			"name":      nameHTTPRoute,
+			"namespace": namespace,
+		},
+		"spec": spec,
+	}}
+}
+
 // Return a kubernetes ingress component, ready to deploy or update
 func getIngressSpec(service types.Service, namespace string, cfg *types.Config) *net.Ingress {
 	name_ingress := getIngressName(service.Name)
@@ -653,6 +958,7 @@ func getIngressSpec(service types.Service, namespace string, cfg *types.Config) 
 		"nginx.ingress.kubernetes.io/cors-allow-origin":  cfg.IngressServicesCORSAllowedOrigins,
 		"nginx.ingress.kubernetes.io/cors-allow-methods": cfg.IngressServicesCORSAllowedMethods,
 		"nginx.ingress.kubernetes.io/cors-allow-headers": cfg.IngressServicesCORSAllowedHeaders,
+		"nginx.ingress.kubernetes.io/proxy-body-size":    "0",
 	}
 	if service.Expose.SetAuth {
 		annotation["nginx.ingress.kubernetes.io/auth-type"] = "basic"
@@ -689,6 +995,227 @@ func deleteIngress(name string, namespace string, kubeClientset kubernetes.Inter
 		return err
 	}
 	return nil
+}
+
+func deleteHTTPRoute(name string, namespace string) error {
+	gatewayClientset, err := gatewayClientsetProvider()
+	if err != nil {
+		return err
+	}
+
+	return gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+}
+
+func createTraefikCORSMiddleware(service types.Service, namespace string, cfg *types.Config) error {
+	gatewayClientset, err := gatewayClientsetProvider()
+	if err != nil {
+		return err
+	}
+
+	middleware := getTraefikCORSMiddlewareSpec(service, namespace, cfg)
+	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Create(context.TODO(), middleware, metav1.CreateOptions{})
+	return err
+}
+
+func updateTraefikCORSMiddleware(service types.Service, namespace string, cfg *types.Config) error {
+	gatewayClientset, err := gatewayClientsetProvider()
+	if err != nil {
+		return err
+	}
+
+	middleware := getTraefikCORSMiddlewareSpec(service, namespace, cfg)
+	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Update(context.TODO(), middleware, metav1.UpdateOptions{})
+	return err
+}
+
+func upsertTraefikCORSMiddleware(service types.Service, namespace string, cfg *types.Config) error {
+	if existsTraefikCORSMiddleware(service.Name, namespace) {
+		return updateTraefikCORSMiddleware(service, namespace, cfg)
+	}
+
+	return createTraefikCORSMiddleware(service, namespace, cfg)
+}
+
+func createTraefikAuthMiddleware(service types.Service, namespace string) error {
+	gatewayClientset, err := gatewayClientsetProvider()
+	if err != nil {
+		return err
+	}
+
+	middleware := getTraefikAuthMiddlewareSpec(service, namespace)
+	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Create(context.TODO(), middleware, metav1.CreateOptions{})
+	return err
+}
+
+func updateTraefikAuthMiddleware(service types.Service, namespace string) error {
+	gatewayClientset, err := gatewayClientsetProvider()
+	if err != nil {
+		return err
+	}
+
+	middleware := getTraefikAuthMiddlewareSpec(service, namespace)
+	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Update(context.TODO(), middleware, metav1.UpdateOptions{})
+	return err
+}
+
+func upsertTraefikAuthMiddleware(service types.Service, namespace string) error {
+	if existsTraefikAuthMiddleware(service.Name, namespace) {
+		return updateTraefikAuthMiddleware(service, namespace)
+	}
+
+	return createTraefikAuthMiddleware(service, namespace)
+}
+
+func getTraefikCORSMiddlewareSpec(service types.Service, namespace string, cfg *types.Config) *unstructured.Unstructured {
+	nameMiddleware := getTraefikCORSMiddlewareName(service.Name)
+
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "traefik.io/v1alpha1",
+		"kind":       "Middleware",
+		"metadata": map[string]any{
+			"name":      nameMiddleware,
+			"namespace": namespace,
+		},
+		"spec": map[string]any{
+			"headers": map[string]any{
+				"accessControlAllowOriginList": splitCSVAny(cfg.IngressServicesCORSAllowedOrigins),
+				"accessControlAllowMethods":    splitCSVAny(cfg.IngressServicesCORSAllowedMethods),
+				"accessControlAllowHeaders":    splitCSVAny(cfg.IngressServicesCORSAllowedHeaders),
+				"addVaryHeader":                true,
+			},
+		},
+	}}
+}
+
+func getTraefikAuthMiddlewareSpec(service types.Service, namespace string) *unstructured.Unstructured {
+	nameMiddleware := getTraefikAuthMiddlewareName(service.Name)
+
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "traefik.io/v1alpha1",
+		"kind":       "Middleware",
+		"metadata": map[string]any{
+			"name":      nameMiddleware,
+			"namespace": namespace,
+		},
+		"spec": map[string]any{
+			"basicAuth": map[string]any{
+				"secret": getTraefikAuthSecretName(service.Name),
+			},
+		},
+	}}
+}
+
+func deleteTraefikCORSMiddleware(name string, namespace string) error {
+	gatewayClientset, err := gatewayClientsetProvider()
+	if err != nil {
+		return err
+	}
+
+	return gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+}
+
+func existsTraefikCORSMiddleware(serviceName string, namespace string) bool {
+	gatewayClientset, err := gatewayClientsetProvider()
+	if err != nil {
+		return false
+	}
+
+	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Get(context.TODO(), getTraefikCORSMiddlewareName(serviceName), metav1.GetOptions{})
+	return err == nil
+}
+
+func deleteTraefikAuthMiddleware(name string, namespace string) error {
+	gatewayClientset, err := gatewayClientsetProvider()
+	if err != nil {
+		return err
+	}
+
+	return gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+}
+
+func existsTraefikAuthMiddleware(serviceName string, namespace string) bool {
+	gatewayClientset, err := gatewayClientsetProvider()
+	if err != nil {
+		return false
+	}
+
+	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Get(context.TODO(), getTraefikAuthMiddlewareName(serviceName), metav1.GetOptions{})
+	return err == nil
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
+func splitCSVAny(value string) []any {
+	parts := splitCSV(value)
+	result := make([]any, 0, len(parts))
+	for _, part := range parts {
+		result = append(result, part)
+	}
+	return result
+}
+
+func createTraefikAuthSecret(service types.Service, namespace string, kubeClientset kubernetes.Interface) error {
+	secret := getTraefikAuthSecretSpec(service, namespace)
+	_, err := kubeClientset.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	return err
+}
+
+func updateTraefikAuthSecret(service types.Service, namespace string, kubeClientset kubernetes.Interface) error {
+	secret := getTraefikAuthSecretSpec(service, namespace)
+	_, err := kubeClientset.CoreV1().Secrets(namespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
+	return err
+}
+
+func upsertTraefikAuthSecret(service types.Service, namespace string, kubeClientset kubernetes.Interface) error {
+	if existsTraefikAuthSecret(service.Name, namespace, kubeClientset) {
+		return updateTraefikAuthSecret(service, namespace, kubeClientset)
+	}
+
+	return createTraefikAuthSecret(service, namespace, kubeClientset)
+}
+
+func deleteTraefikAuthSecret(name string, namespace string, kubeClientset kubernetes.Interface) error {
+	return kubeClientset.CoreV1().Secrets(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+}
+
+func existsTraefikAuthSecret(serviceName string, namespace string, kubeClientset kubernetes.Interface) bool {
+	_, err := kubeClientset.CoreV1().Secrets(namespace).Get(context.TODO(), getTraefikAuthSecretName(serviceName), metav1.GetOptions{})
+	return err == nil
+}
+
+func getTraefikAuthSecretSpec(service types.Service, namespace string) *v1.Secret {
+	hash := make(htpasswd.HashedPasswords)
+	err := hash.SetPassword(service.Name, service.Token, htpasswd.HashAPR1)
+	if err != nil {
+		ExposeLogger.Print(err.Error())
+	}
+
+	inmutable := false
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      getTraefikAuthSecretName(service.Name),
+			Namespace: namespace,
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "v1",
+		},
+		Immutable: &inmutable,
+		StringData: map[string]string{
+			"users": service.Name + ":" + hash[service.Name],
+		},
+		Type: "Opaque",
+	}
 }
 
 // Secret
@@ -763,6 +1290,16 @@ func existsIngress(serviceName string, namespace string, kubeClientset kubernete
 	return err == nil
 }
 
+func existsHTTPRoute(serviceName string, namespace string) bool {
+	gatewayClientset, err := gatewayClientsetProvider()
+	if err != nil {
+		return false
+	}
+
+	_, err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Get(context.TODO(), getHTTPRouteName(serviceName), metav1.GetOptions{})
+	return err == nil
+}
+
 /// These are auxiliary functions
 
 func getServiceName(name_container string) string {
@@ -773,18 +1310,65 @@ func getIngressName(name_container string) string {
 	return name_container + "-ing"
 }
 
+func getHTTPRouteName(name_container string) string {
+	return name_container + "-route"
+}
+
+func getTraefikCORSMiddlewareName(name_container string) string {
+	return name_container + "-cors-mdw"
+}
+
+func getTraefikAuthMiddlewareName(name_container string) string {
+	return name_container + "-auth-mdw"
+}
+
+func getTraefikAuthSecretName(name_container string) string {
+	return name_container + "-auth-traefik"
+}
+
 func getAPIPath(name_container string) string {
 	return "/system/services/" + name_container + "/exposed"
 }
 
-func getDeploymentName(name_container string) string {
-	return name_container + "-dlp"
+func normalizeHealthPath(path string) string {
+	if path == "" {
+		return "/"
+	}
+	if strings.HasPrefix(path, "/") {
+		return path
+	}
+	return "/" + path
 }
 
-func getHPAName(name_container string) string {
-	return name_container + "-hpa"
+func isDirectProbeMode(service types.Service) bool {
+	return strings.EqualFold(strings.TrimSpace(service.Expose.ProbeMode), "direct")
 }
 
-func getSecretName(name_container string) string {
-	return name_container + "-auth-expose"
+func getProbePath(service types.Service) string {
+	healthPath := normalizeHealthPath(service.Expose.HealthPath)
+	if isDirectProbeMode(service) {
+		return healthPath
+	}
+	// Legacy default behavior: when rewrite_target is enabled, probe through
+	// the ingress-prefixed path used by OSCAR exposed services.
+	if service.Expose.RewriteTarget {
+		return getAPIPath(service.Name) + healthPath
+	}
+	return healthPath
+}
+
+func GetDeploymentName(nameContainer string) string {
+	return nameContainer + "-dpl"
+}
+
+func getHPAName(nameContainer string) string {
+	return nameContainer + "-hpa"
+}
+
+func getSecretName(nameContainer string) string {
+	return nameContainer + "-auth-expose"
+}
+
+func GetKeyLabelApp(serviceName string) string {
+	return prefixLabelApp + serviceName
 }

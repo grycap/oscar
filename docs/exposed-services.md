@@ -13,11 +13,11 @@ OSCAR supports the deployment and elasticity management of long-running stateles
 ![OSCAR Exposed Service](images/oscar-exposed-service.png)
 
 
- An auto-scaled load-balanced approach for these stateless services is supported. When the average CPU exceeds a certain user-defined threshold, additional service pods are dynamically created (and removed when no longer necessary) within the user-defined boundaries. The user can also define the minimum and maximum replicas of the service to be present on the cluster (see the parameters `min_scale` and `max_scale` in [ExposeSettings](fdl.md/#exposesettings)).
+ An auto-scaled load-balanced approach for these stateless services is supported. When the average CPU exceeds a certain user-defined threshold, additional service pods are dynamically created (and removed when no longer necessary) within the user-defined boundaries. The user can also define the minimum and maximum replicas of the service to be present on the cluster (see the parameters `min_scale` and `max_scale` in [ExposeSettings](fdl.md#exposesettings)).
 
 
 ### Prerequisites in the container image
-The container image needs to have an HTTP server that binds to a specific port (see the parameter `port` in [ExposeSettings](fdl.md/#exposesettings)). If developing a service from scratch in Python, you can use [FastAPI](https://fastapi.tiangolo.com/) or [Flask](https://flask.palletsprojects.com/en/2.3.x/) to create an API. In Go, you can use [Gin](https://gin-gonic.com/). For Ruby, you can use [Sinatra](https://sinatrarb.com/). 
+The container image needs to have an HTTP server that binds to a specific port (see the parameter `port` in [ExposeSettings](fdl.md#exposesettings)). If developing a service from scratch in Python, you can use [FastAPI](https://fastapi.tiangolo.com/) or [Flask](https://flask.palletsprojects.com/en/2.3.x/) to create an API. In Go, you can use [Gin](https://gin-gonic.com/). For Ruby, you can use [Sinatra](https://sinatrarb.com/). 
 
 
 > ⚠️
@@ -39,6 +39,8 @@ Once the service is deployed, you can check if it was created correctly by makin
 ``` bash
 https://{oscar_endpoint}/system/services/{service_name}/exposed/{path_resource} 
 ```
+
+For exposed services, OSCAR sets `OSCAR_SERVICE_BASE_PATH` in the container environment with the base path `/system/services/{service_name}/exposed`. The full list of OSCAR-managed environment variables is documented in [FDL](fdl.md#envvarsmap).
 
 Notice that if you get a `502 Bad Gateway` error, it is most likely because the specified port on the service does not match the API port.
 

@@ -18,7 +18,6 @@ Kubernetes master node IP.
 ![login](images/usage/usage-01.png)
 
 After a correct login, you should see the main view:
-<!-- TODO actualizar foto del login a la nueva interfaz -->
 ![main view](images/usage/usage-02.png)
 
 ## Deploying services

@@ -17,7 +17,7 @@ limitations under the License.
 package backends
 
 import (
-	"net/http/httptest"
+	"net/http"
 	"testing"
 
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -90,9 +90,9 @@ func TestMakeFakeSyncBackend(t *testing.T) {
 
 func TestFakeGetProxyDirector(t *testing.T) {
 	back := MakeFakeSyncBackend()
-	req := httptest.NewRequest("GET", "http://example.com/initial", nil)
+	req, _ := http.NewRequest("GET", "http://example.com/initial", nil)
 
-	director := back.GetProxyDirector("svc")
+	director := back.GetProxyDirector("svc", "default")
 	director(req)
 
 	if req.URL.Host != "httpbin.org" || req.URL.Path != "/status/200" {

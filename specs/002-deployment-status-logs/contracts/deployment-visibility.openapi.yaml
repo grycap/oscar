@@ -1,0 +1,218 @@
+openapi: 3.0.3
+info:
+  title: OSCAR Deployment Visibility API
+  version: "0.1.0"
+  description: >
+    Additive API contract for service deployment visibility. The contract covers
+    the current deployment summary plus current or recent service-level
+    deployment logs.
+servers:
+  - url: https://YOUR_OSCAR_MANAGER
+paths:
+  /system/services/{serviceName}/deployment:
+    get:
+      summary: Get service deployment summary
+      description: Retrieve the current deployment status for a service.
+      tags:
+        - deployment
+      security:
+        - BasicAuth: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ServiceName'
+      responses:
+        "200":
+          description: Deployment summary returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentStatusResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /system/services/{serviceName}/deployment/logs:
+    get:
+      summary: Get service deployment logs
+      description: Retrieve current or recent deployment logs for the service-level deployment scope.
+      tags:
+        - deployment
+      security:
+        - BasicAuth: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ServiceName'
+        - $ref: '#/components/parameters/Timestamps'
+        - $ref: '#/components/parameters/TailLines'
+      responses:
+        "200":
+          description: Deployment log stream returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentLogResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: basic
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ServiceName:
+      name: serviceName
+      in: path
+      required: true
+      schema:
+        type: string
+      description: OSCAR service name.
+    Timestamps:
+      name: timestamps
+      in: query
+      required: false
+      schema:
+        type: boolean
+        default: false
+      description: Include timestamps in returned log entries.
+    TailLines:
+      name: tailLines
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 200
+      description: Maximum number of recent log entries to return.
+
+  schemas:
+    DeploymentStatusResponse:
+      type: object
+      required:
+        - service_name
+        - state
+        - active_instances
+        - affected_instances
+        - resource_kind
+      properties:
+        service_name:
+          type: string
+        namespace:
+          type: string
+        state:
+          type: string
+          description: >
+            Top-level deployment state. For `knative_service`, this follows the
+            Knative Service readiness condition and does not switch to
+            `degraded` solely because some pods are temporarily pending or not
+            yet ready during normal autoscaling.
+          enum:
+            - pending
+            - ready
+            - degraded
+            - failed
+            - unavailable
+        reason:
+          type: string
+        last_transition_time:
+          type: string
+          format: date-time
+        active_instances:
+          type: integer
+          minimum: 0
+          description: >
+            Aggregate count of currently observed active runtime instances when
+            the selected runtime source exposes it. For `knative_service`, this
+            is diagnostic context and may change during autoscaling.
+        affected_instances:
+          type: integer
+          minimum: 0
+          description: >
+            Aggregate affected runtime instance count when the selected runtime
+            source exposes it. For `knative_service`, this becomes `0` while
+            the Knative Service remains ready during normal autoscaling.
+        resource_kind:
+          type: string
+          description: Runtime source used to derive the deployment status.
+          enum:
+            - exposed_service
+            - knative_service
+            - unavailable
+
+    DeploymentLogResponse:
+      type: object
+      required:
+        - service_name
+        - available
+        - entries
+      properties:
+        service_name:
+          type: string
+        available:
+          type: boolean
+        message:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeploymentLogEntry'
+
+    DeploymentLogEntry:
+      type: object
+      required:
+        - message
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: Authentication is required.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Caller is not allowed to view this service deployment.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Service or deployment visibility resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
