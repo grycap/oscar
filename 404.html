@@ -1,27 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Redirecting...</title>
-  <script>
-    (function () {
-      var path = window.location.pathname;
-      var latestPrefix = '/latest';
-
-      // Avoid redirect loops: if already under /latest or a versioned path, don't redirect
-      if (/^\/(latest|v\d+\.\d+\.\d+)(\/|$)/.test(path)) {
-        document.write('<h1>404 &ndash; Page not found</h1><p>The page <code>' + path + '</code> does not exist.</p>');
-        return;
-      }
-
-      var target = 'https://docs.oscar.grycap.net' + latestPrefix + path;
-      window.location.replace(target);
-    })();
-  </script>
+  <meta charset="utf-8">
+  <title>Redirecting</title>
   <noscript>
-    <meta http-equiv="refresh" content="0; url=https://docs.oscar.grycap.net/latest/">
+    <meta http-equiv="refresh" content="1; url=latest/" />
   </noscript>
+  <script>
+    window.location.replace(
+      "latest/" + window.location.search + window.location.hash
+    );
+  </script>
 </head>
 <body>
+  Redirecting to <a href="latest/">latest/</a>...
 </body>
 </html>
