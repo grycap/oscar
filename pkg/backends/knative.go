@@ -95,6 +95,30 @@ func (kn *KnativeBackend) ListServices(namespaces ...string) ([]*types.Service, 
 	return services, nil
 }
 
+// ListServicesByName returns a slice with services matching the provided name in the provided namespace(s)
+func (kn *KnativeBackend) ListServicesByName(name string, namespaces ...string) ([]*types.Service, error) {
+	// Get the list with all OSCAR services in the specified namespace(s)
+	configmaps, err := getAllServicesConfigMaps(kn.kubeClientset, namespaces...)
+	if err != nil {
+		log.Printf("WARNING: %v\n", err)
+		return nil, err
+	}
+	services := []*types.Service{}
+
+	// Filter configmaps by service name
+	for _, cm := range configmaps.Items {
+		if cm.Labels[types.ServiceLabel] == name {
+			service, err := getServiceFromConfigMap(&cm) // #nosec G601
+			if err != nil {
+				return nil, err
+			}
+			service.Namespace = cm.Namespace
+			services = append(services, service)
+		}
+	}
+	return services, nil
+}
+
 // CreateService creates a new service as a Knative service
 func (kn *KnativeBackend) CreateService(service types.Service) error {
 	namespace := service.Namespace
@@ -313,13 +337,17 @@ func (kn *KnativeBackend) DeleteService(service types.Service) error {
 }
 
 // GetProxyDirector returns a director function to use in a httputil.ReverseProxy
-func (kn *KnativeBackend) GetProxyDirector(serviceName string) func(req *http.Request) {
+func (kn *KnativeBackend) GetProxyDirector(serviceName string, serviceNamespace string) func(req *http.Request) {
 	return func(req *http.Request) {
-		namespace := kn.config.ServicesNamespace
-		if resolved, err := kn.resolveServiceNamespace(serviceName); err == nil && resolved != "" {
-			namespace = resolved
+		var namespace string
+		if serviceNamespace == "" {
+			namespace = kn.config.ServicesNamespace
+			if resolved, err := kn.resolveServiceNamespace(serviceName); err == nil && resolved != "" {
+				namespace = resolved
+			}
+		} else {
+			namespace = serviceNamespace
 		}
-
 		// Set the request Host parameter to avoid issues in the redirection
 		// related issue: https://github.com/golang/go/issues/7682
 		host := fmt.Sprintf("%s.%s", serviceName, namespace)
