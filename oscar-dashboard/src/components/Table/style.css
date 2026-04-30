@@ -1,0 +1,35 @@
+.oscar-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.oscar-table thead {
+  background-color: white;
+  height: 34px;
+  border-bottom: 1px solid #d9d9d9;
+}
+
+.oscar-table th {
+  text-align: left;
+  vertical-align: middle;
+}
+
+.oscar-table tbody tr {
+  height: 54px;
+  border-bottom: 1px solid #d9d9d9;
+}
+
+.oscar-table tbody tr td:last-child {
+  width: min-content;
+}
+
+.oscar-table thead tr th:last-child {
+  width: min-content;
+}
+
+.sticky-thead {
+  position: sticky;
+  top: 0;
+  background-color: white;
+  z-index: 1;
+}

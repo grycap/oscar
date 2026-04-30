@@ -1,0 +1,4 @@
+.text-decoration-underline-hover:hover {
+  text-decoration: underline;
+  transition: text-decoration 0.2s ease-out;
+}

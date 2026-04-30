@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<link rel="apple-touch-icon" sizes="76x76" href="img/apple-icon.png">
+	<link rel="icon" type="image/png" sizes="96x96" href="img/favicon.png">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<title>Callback Page</title>
+	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+  <!--     Fonts and icons     -->
+  <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700,200" rel="stylesheet" />
+  <link rel='stylesheet' id='eosc-google-fonts-css'
+    href='https://fonts.googleapis.com/css?family=Nunito%3A400%2C400i%2C700&#038;display=swap&#038;ver=5.5.1'
+    type='text/css' media='all' />
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.13/css/all.css"
+    integrity="sha384-DNOHZ68U8hZfKXOrtjWvjxusGo9WQnrNx2sqG0tfsghAvtVlRW3tvkXWZh58N9jp" crossorigin="anonymous">
+
+</head>
+<body>
+
+	<script src="https://code.jquery.com/jquery-3.2.1.js" integrity="sha256-DZAnKJ/6XZ9si04Hgrsxu/8s717jcIzLy3oi35EouyE=" crossorigin="anonymous"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min.js" integrity="sha512-bZS47S7sPOxkjU/4Bt0zrhEtWx0y0CRkhEp8IckzK+ltifIIE9EMIMTuT/mEzoIMewUINruDBIR/jJnbguonqQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+	<script src="https://unpkg.com/vue"></script>
+  <div id="test" class="loading-overlay is-active">
+    <div>
+      <div style="vertical-align: middle;display: flex;">
+        <span class="fas fa-spinner fa-5x fa-spin"></span>
+        <!-- <p style="padding-left: 10px;text-transform: uppercase;font-weight: 700;margin-bottom: 0px;margin-top: 15px;">
+          </p> -->
+      </div>
+      <div>
+    </div>
+  </div>
+
+  <script>
+        const baseUrl = localStorage.getItem('provider_url');
+        const client_id = localStorage.getItem('client_id');
+        const client_secret = localStorage.getItem('client_secret');
+        const groupId = '00gwb2x6jewAvwYSX0h7';
+        const redirect_uri = `${location.origin}/callback.html`;
+        const authorize_endpoint = localStorage.getItem('url_authorize');;
+        const token_endpoint = localStorage.getItem('token_endpoint');;
+        const userinfo_endpoint = localStorage.getItem('url_user_info');;
+        if(baseUrl.includes('egi.eu')){
+          scope = 'openid profile email eduperson_entitlement';
+        }else{
+          scope = 'openid profile email';
+        }
+
+        const q = new URLSearchParams(location.search);
+        var tokens;
+
+        if (q.has('error')) {
+          results.innerHTML = q.get('error') + '<br>' + q.get('error_description') + `<br><br>Fix the error and <a href="${redirect_uri}">try again</a>`;
+        } else if (q.has('code')) { // If the server returned an authorization code, exchange it for an access token.
+          if (localStorage.state == q.get('state')) {
+            getUsers();
+            // updateMe();
+            // getTokens();
+            //console.log('here')
+          } else {
+            results.innerHTML = 'Invalid state. <a href="/pkce">retry</a>';
+          }
+
+        } else {
+          startPkce();
+        }
+
+      async function getUsers() {
+        tokens = await getTokens();
+        history.replaceState({}, null, '/callback.html'); // Remove the auth code from the browser address bar.
+        const id_token = JSON.parse(atob(tokens.id_token.split('.')[1]));
+        const access_token = JSON.parse(atob(tokens.access_token.split('.')[1]));
+        const options = {
+            headers: {Authorization: `Bearer ${tokens.access_token}` }
+        };
+          const r = await fetch(`${userinfo_endpoint}`, options);
+          const users = await r.json();
+          localStorage.setItem("session", JSON.stringify({ user: { 'access_token': tokens['access_token'], info:users, authenticated: true } }));
+          axios({
+                method: 'get',
+                url: localStorage.getItem('api')+'/system/config',
+                headers: {Authorization: `Bearer ${tokens.access_token}` }
+
+              }).then(function (response) {
+                  var port=getPort(response.data.minio_provider.endpoint)
+                  var endpoint_host = getHost(response.data.minio_provider.endpoint)
+                  if(localStorage.getItem('api').includes('localhost')){
+                    localStorage.setItem("endpoint",'localhost')
+                    localStorage.setItem("useSSL",false)
+                    localStorage.setItem("port",30300)
+                  }else{
+                    localStorage.setItem("endpoint",endpoint_host)
+                    localStorage.setItem("port",port)
+                    if (response.data.minio_provider.endpoint.indexOf("http://") == 0) {
+                      localStorage.setItem("useSSL",false)
+                    } else {
+                      localStorage.setItem("useSSL",true)
+                    }
+                  }
+                  
+                  localStorage.setItem("accessKey",response.data.minio_provider?.access_key)
+                  localStorage.setItem("secretKey",response.data.minio_provider?.secret_key)
+                  localStorage.setItem("authenticated", true);
+                  localStorage.setItem("yunikorn_enable",response.data.config?.yunikorn_enable);
+                  localStorage.setItem("gpu_available",response.data.config?.gpu_available);
+                  localStorage.setItem("interLink_available",response.data.config?.interLink_available);
+                  localStorage.setItem("oidc_groups",response.data.config?.oidc_groups);
+                  const authData= JSON.stringify({
+                    "authenticated":true,
+                    "user":users?.name,
+                    "password": "tokens['access_token']",
+                    "token": tokens['access_token'],
+                    "endpoint": localStorage.getItem('api'),
+                    "egiSession": users
+                  })                  
+                  localStorage.setItem("authData",authData); 
+                  var url_redirect = window.location.origin + "/#/ui/services"
+                  window.location.href = url_redirect
+              }).catch(function (error) {
+                  console.log(error)
+                  var url_redirect = window.location.origin
+                  window.location.href = url_redirect
+              })
+
+    }
+
+    async function getGroups() {
+      const options = {
+              headers: {Authorization: `Bearer ${tokens.access_token}` },
+            method: 'post'
+      };
+            const r = await fetch(`${userinfo_endpoint}`, options);
+            if (r.ok) {
+        const info = await r.json();
+            return info.groups;
+      } else {
+        return 'error';
+      }
+    }
+
+    async function makeAdmin(userId, displayName) {
+      const options = {
+              headers: {Authorization: `Bearer ${tokens.access_token}` },
+            method: 'put'
+      };
+            const r = await fetch(`${baseUrl}/api/v1/groups/${groupId}/users/${userId}`, options);
+            results.innerHTML += '<br>' + displayName + ' is now an Admin.';
+    }
+
+    async function updateMe() {
+                tokens = await getTokens();
+              const options = {
+                headers: {
+                Authorization: `Bearer ${tokens.access_token}`,
+              'Content-Type': 'application/json'
+        },
+              method: 'post',
+              body: JSON.stringify({
+                profile: {
+                lastName: 'Sroka test'
+          }
+        })
+      };
+        const r = await fetch(`${baseUrl}/api/v1/users/me`, options);
+        console.log(await r.json());
+    }
+
+    async function getTokens() {
+      const params = {
+              grant_type: 'authorization_code',
+              code: q.get('code'),
+              client_id,
+              client_secret,
+              redirect_uri,
+              code_verifier: localStorage.code_verifier
+      };
+              const r = await fetch(token_endpoint, {
+                method: 'post',
+              body: new URLSearchParams(params)
+      });
+              const tokens = await r.json();
+              const id_token = JSON.parse(atob(tokens.id_token.split('.')[1]));
+              const access_token = JSON.parse(atob(tokens.access_token.split('.')[1]));
+              return tokens;
+    }
+
+    async function startPkce() {
+      const state = generateRandomString();
+              const code_verifier = generateRandomString();
+              localStorage.state = state;
+              localStorage.code_verifier = code_verifier;
+              const code_challenge = await pkceChallengeFromVerifier(code_verifier);
+              const params = {
+                response_type: 'code',
+              client_id,
+              state,
+              scope,
+              redirect_uri,
+              code_challenge,
+              code_challenge_method: 'S256'
+      };
+              location = authorize_endpoint + '?' + new URLSearchParams(params);
+    }
+
+      // PKCE HELPER FUNCTIONS
+
+      // Generate a secure random string using the browser crypto functions.
+      function generateRandomString() {
+      const array = new Uint32Array(28);
+              crypto.getRandomValues(array);
+      return Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('');
+    }
+
+      async function pkceChallengeFromVerifier(v) {
+      const encoder = new TextEncoder();
+              const data = encoder.encode(v);
+              const hashed = await crypto.subtle.digest('SHA-256', data);
+              return base64urlencode(hashed);
+    }
+
+    function base64urlencode(str) {
+      // Convert the ArrayBuffer to string using Uint8 array to convert to what btoa accepts.
+      // btoa accepts chars only within ascii 0-255 and base64 encodes them.
+      // Then convert the base64 encoded to base64url encoded
+      //   (replace + with -, replace / with _, trim trailing =)
+      return btoa(String.fromCharCode.apply(null, new Uint8Array(str)))
+              .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    function getHost(url) {
+       var hostname;
+        //find & remove protocol (http, ftp, etc.) and get hostname
+
+        if (url.indexOf("//") > -1) {
+            hostname = url.split('/')[2];
+        }
+        else {
+            hostname = url.split('/')[0];
+        }
+
+        //find & remove port number
+        hostname = hostname.split(':')[0];
+        //find & remove "?"
+        hostname = hostname.split('?')[0];
+
+        return hostname;
+    }
+
+    function  getPort(url) {
+        url = url.match(/^(([a-z]+:)?(\/\/)?[^\/]+).*$/)[1] || url;
+        var parts = url.split(':'),
+            port = parseInt(parts[parts.length - 1], 10);
+        return port;
+    }
+  </script>
+	<style>
+		body {
+			/* background: url(img/back-callback.png) no-repeat center center fixed; */
+			-webkit-background-size: cover;
+			-moz-background-size: cover;
+			-o-background-size: cover;
+			background-size: cover;
+		}
+    .loading-overlay {
+      display: none;
+      background: rgba(255, 255, 255, 0.7);
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      top: 0;
+      z-index: 9998;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .loading-overlay.is-active {
+      display: flex;
+    }
+	</style>
+</body>
+</html>
