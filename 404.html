@@ -2,7 +2,14 @@
 <!doctype html>
 <html lang="en" class="no-js">
   <head>
-    
+    <script>
+      (function () {
+        var path = window.location.pathname;
+        // Avoid redirect loops: already under /latest or a versioned path
+        if (/^\/(latest|v\d+\.\d+\.\d+)(\/|$)/.test(path)) { return; }
+        window.location.replace('https://docs.oscar.grycap.net/latest' + path);
+      })();
+    </script>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
