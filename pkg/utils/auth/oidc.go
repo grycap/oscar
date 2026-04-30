@@ -342,3 +342,12 @@ func (om *oidcManager) IsAuthorised(rawToken string) bool {
 
 	return false
 }
+
+func (om *oidcManager) UserInOneGroup(ui *userInfo, cfg *types.Config) bool {
+	for _, vo := range cfg.OIDCGroups {
+		if om.UserHasVO(ui, vo) {
+			return true
+		}
+	}
+	return false
+}

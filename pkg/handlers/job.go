@@ -82,7 +82,10 @@ const (
 // @Router /job/{serviceName} [post]
 func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back types.ServerlessBackend, rm resourcemanager.ResourceManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		service, err := back.ReadService("", c.Param("serviceName"))
+		var service *types.Service
+		var podSpec *v1.PodSpec
+		var serviceNamespace string
+		serviceList, err := back.ListServicesByName(c.Param("serviceName"), "")
 		if err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {
@@ -91,17 +94,6 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				c.String(http.StatusInternalServerError, err.Error())
 			}
 			return
-		}
-
-		// Get podSpec from the service
-		podSpec, err := service.ToPodSpec(cfg)
-		if err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
-			return
-		}
-		serviceNamespace := service.Namespace
-		if serviceNamespace == "" {
-			serviceNamespace = cfg.ServicesNamespace
 		}
 
 		// Check auth token
@@ -117,9 +109,19 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		var minIOSecretKey string
 		rawToken := strings.TrimSpace(splitToken[1])
 		if len(rawToken) == tokenLength {
-
-			if rawToken != service.Token {
+			for _, serviceIter := range serviceList {
+				if rawToken == serviceIter.Token {
+					service = serviceIter
+				}
+			}
+			if service == nil {
 				c.Status(http.StatusUnauthorized)
+				return
+			}
+			// Get podSpec from the service
+			podSpec, serviceNamespace, err = getPodSpecNamespace(service, cfg)
+			if err != nil {
+				c.String(http.StatusInternalServerError, err.Error())
 				return
 			}
 			// Use
@@ -143,6 +145,24 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				return
 			}
 			uid := auth.FormatUID(uidFromToken)
+			c.Set("uidOrigin", uid)
+			c.Next()
+
+			service, err = selectService(c, serviceList)
+			if err != nil {
+				if err.Error() == errServiceNotFound {
+					c.Status(http.StatusNotFound)
+				} else {
+					c.String(http.StatusBadRequest, err.Error())
+				}
+				return
+			}
+			// Get podSpec from the service
+			podSpec, serviceNamespace, err = getPodSpecNamespace(service, cfg)
+			if err != nil {
+				c.String(http.StatusInternalServerError, err.Error())
+				return
+			}
 			if len(uid) > 62 {
 				uid = uid[:62]
 			}
@@ -152,12 +172,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				return
 			}
 
-			if err != nil {
-				c.String(http.StatusInternalServerError, err.Error())
-				return
-			}
-
-			if !oidcManager.UserHasVO(ui, service.VO) {
+			if !oidcManager.UserInOneGroup(ui, cfg) {
 				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
 				return
 			}
@@ -447,4 +462,18 @@ func ensureMinIOSecret(kubeClientset kubernetes.Interface, uid, namespace string
 	}
 
 	return nil
+}
+
+func getPodSpecNamespace(service *types.Service, cfg *types.Config) (*v1.PodSpec, string, error) {
+
+	// Get podSpec from the service
+	podSpec, err := service.ToPodSpec(cfg)
+	if err != nil {
+		return nil, "", err
+	}
+	serviceNamespace := service.Namespace
+	if serviceNamespace == "" {
+		serviceNamespace = cfg.ServicesNamespace
+	}
+	return podSpec, serviceNamespace, nil
 }

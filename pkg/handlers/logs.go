@@ -588,8 +588,6 @@ func authorizeRequest(c *gin.Context, service *types.Service) bool {
 			//c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			return false
 		}
-		fmt.Println(service.Owner)
-		fmt.Println(uid)
 		if service.Visibility == utils.PUBLIC {
 			return true
 		}
