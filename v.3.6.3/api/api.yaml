@@ -1,0 +1,770 @@
+openapi: 3.0.3
+info:
+  title: OSCAR API
+  version: v2.0.0
+  license:
+    name: Apache 2.0
+    url: 'https://www.apache.org/licenses/LICENSE-2.0'
+  description: OSCAR API documentation
+  contact:
+    name: GRyCAP
+    email: products@grycap.upv.es
+externalDocs:
+  description: More documentation available on GitHub
+  url: 'https://github.com/grycap/oscar'
+paths:
+  /system/services:
+    get:
+      summary: List services
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Service'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+      operationId: ListServices
+      description: List all created services
+      security:
+        - basicAuth: []
+        - token: []
+      tags:
+        - services
+    post:
+      summary: Create service
+      operationId: CreateService
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+      description: Create a service
+      security:
+        - basicAuth: []
+        - token: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Service'
+      tags:
+        - services
+    put:
+      summary: Update service
+      operationId: UpdateService
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      description: Update a service
+      security:
+        - basicAuth: []
+        - token: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Service'
+      tags:
+        - services
+  '/system/services/{serviceName}':
+    parameters:
+      - schema:
+          type: string
+        name: serviceName
+        in: path
+        required: true
+    get:
+      summary: Read service
+      tags:
+        - services
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      operationId: ReadService
+      security:
+        - basicAuth: []
+        - token: []
+      description: Read a service
+    delete:
+      summary: Delete service
+      operationId: DeleteService
+      responses:
+        '204':
+          description: No Content
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      description: Delete a service
+      security:
+        - basicAuth: []
+        - token: []
+      tags:
+        - services
+  '/system/logs/{serviceName}':
+    parameters:
+      - schema:
+          type: string
+        name: serviceName
+        in: path
+        required: true
+    get:
+      summary: List jobs
+      tags:
+        - logs
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobName:
+                    allOf:
+                      - $ref: '#/components/schemas/JobInfo'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      operationId: ListJobs
+      security:
+        - basicAuth: []
+        - token: []
+      description: List all jobs with their status
+    delete:
+      summary: Delete jobs
+      operationId: DeleteJobs
+      responses:
+        '204':
+          description: No Content
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      description: Delete all jobs from a service.
+      security:
+        - basicAuth: []
+        - token: []
+      parameters:
+        - schema:
+            type: boolean
+          in: query
+          name: all
+          description: 'If "all" is true delete pending, running and failed jobs, else delete only completed jobs (default: false)'
+      tags:
+        - logs
+  '/system/logs/{serviceName}/{jobName}':
+    parameters:
+      - schema:
+          type: string
+        name: serviceName
+        in: path
+        required: true
+      - schema:
+          type: string
+        name: jobName
+        in: path
+        required: true
+    get:
+      summary: Get logs
+      tags:
+        - logs
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      operationId: GetJobLogs
+      description: Get the logs from a job
+      security:
+        - basicAuth: []
+        - token: []
+      parameters:
+        - schema:
+            type: boolean
+          in: query
+          name: timestamps
+    delete:
+      summary: Delete job
+      operationId: DeleteJob
+      responses:
+        '204':
+          description: No Content
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      description: Delete a job
+      security:
+        - basicAuth: []
+        - token: []
+      tags:
+        - logs
+  /system/info:
+    get:
+      summary: Get info
+      tags:
+        - info
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Info'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+      operationId: GetInfo
+      description: Get system info
+      security:
+        - basicAuth: []
+        - token: []
+  /health:
+    get:
+      summary: Health
+      tags:
+        - health
+      responses:
+        '200':
+          description: OK
+      operationId: HealthCheck
+      description: Health check
+  '/job/{serviceName}':
+    parameters:
+      - schema:
+          type: string
+        name: serviceName
+        in: path
+        required: true
+    post:
+      summary: Invoke service (async)
+      operationId: InvokeAsync
+      responses:
+        '201':
+          description: Created
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      tags:
+        - async
+      security:
+        - token: []
+      description: Invoke a service asynchronously (create kubernetes job)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+              format: binary
+            examples: {}
+        description: Event
+  /system/config:
+    get:
+      summary: Your GET endpoint
+      tags:
+        - config
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Config'
+        '401':
+          description: ''
+        '500':
+          description: Internal Server Error
+      operationId: GetConfig
+      description: Get system configuration
+      security:
+        - basicAuth: []
+        - token: []
+  '/run/{serviceName}':
+    parameters:
+      - schema:
+          type: string
+        name: serviceName
+        in: path
+        required: true
+    post:
+      summary: Invoke service (sync)
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      operationId: InvokeSync
+      tags:
+        - sync
+      security:
+        - token: []
+      description: Invoke a service synchronously (a Serverless backend is required)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+              format: binary
+        description: Event
+  /system/buckets:
+    get:
+      summary: List buckets
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Buckets'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+      operationId: ListBuckets
+      description: List all buckets visible for the user
+      security:
+        - basicAuth: []
+        - token: []
+      tags:
+        - buckets
+    post:
+      summary: Create bucket
+      operationId: CreateBucket
+      responses:
+        '201':
+          description: Bucket created
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+      description: Create a independent bucket
+      security:
+        - basicAuth: []
+        - token: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Buckets'
+      tags:
+        - buckets        
+    put:
+      summary: Update bucket
+      operationId: UpdateBucket
+      responses:
+        '204':
+          description: Bucket updated
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      description: Update a specific bucket
+      security:
+        - basicAuth: []
+        - token: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Buckets'
+      tags:
+        - buckets
+  '/system/buckets/{bucket}':
+    parameters:
+      - schema:
+          type: string
+        name: bucket
+        in: path
+        required: true
+    delete:
+      summary: Delete bucket
+      operationId: DeleteBucket
+      responses:
+        '204':
+          description: Bucket deleted
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not Found
+        '500':
+          description: Internal Server Error
+      description: Delete a scpecific bucket
+      security:
+        - basicAuth: []
+        - token: []
+      tags:
+        - buckets
+  /status:
+    get:
+      summary: Your GET endpoint
+      tags:
+        - status
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+      operationId: Status
+      description: Get cluster status
+      security:
+        - basicAuth: []
+        - token: []
+components:
+  schemas:
+    Service:
+      title: Service
+      type: object
+      properties:
+        name:
+          type: string
+        cluster_id:
+          type: string
+        memory:
+          type: string
+        cpu:
+          type: string
+        enable_gpu:
+          type: boolean
+          default: false
+        total_memory:
+          type: string
+        total_cpu:
+          type: string
+        synchronous:
+          type: object
+          properties:
+            min_scale:
+              type: integer
+              default: 0
+            max_scale:
+              type: integer
+              default: 0
+        replicas:
+          type: array
+          items:
+            type: object
+            properties:
+              type: 
+                type: string
+              cluster_id: 
+                type: string
+              service_name: 
+                type: string
+              url: 
+                type: string
+              ssl_verify: 
+                type: boolean
+                default: true
+              priority: 
+                type: integer
+                default: 0
+              headers:
+                type: object
+                additionalProperties:
+                  type: string
+                  properties:
+                    value:
+                      type: string
+        rescheduler_threshold:
+          type: string
+        token:
+          type: string
+          readOnly: true
+        log_level:
+          type: string
+        image:
+          type: string
+        alpine:
+          type: boolean
+          default: false
+        script:
+          type: string
+        isolation_level:
+          type: string
+        mount:
+          $ref: '#/components/schemas/StorageIOConfig'
+        image_pull_secrets: 
+          type: array
+          items: 
+            type: string
+        environment:
+          type: object
+          properties:
+            Variables:
+              type: object
+              additionalProperties:
+                type: string
+            Secrets:
+              type: object
+              additionalProperties:
+                type: string
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+        input:
+          type: array
+          items:
+            $ref: '#/components/schemas/StorageIOConfig'
+        output:
+          type: array
+          items:
+            $ref: '#/components/schemas/StorageIOConfig'
+        storage_providers:
+          $ref: '#/components/schemas/StorageProviders'
+        clusters:
+          $ref: '#/components/schemas/Clusters'
+      required:
+        - name
+        - image
+        - script
+    StorageIOConfig:
+      title: StorageIOConfig
+      type: object
+      properties:
+        storage_provider:
+          type: string
+        path:
+          type: string
+        suffix:
+          type: array
+          items:
+            type: string
+        prefix:
+          type: array
+          items:
+            type: string
+    StorageProviders:
+      title: StorageProviders
+      type: object
+      properties:
+        s3:
+          type: object
+          properties:
+            id:
+              type: object
+              properties:
+                access_key:
+                  type: string
+                secret_key:
+                  type: string
+                region:
+                  type: string
+        minio:
+          type: object
+          properties:
+            id:
+              $ref: '#/components/schemas/MinIOProvider'
+        onedata:
+          type: object
+          properties:
+            id:
+              type: object
+              properties:
+                oneprovider_host:
+                  type: string
+                token:
+                  type: string
+                space:
+                  type: string
+        webdav:
+          type: object
+          properties:
+            id:
+              type: object
+              properties:
+                hostname:
+                  type: string
+                login:
+                  type: string
+                password:
+                  type: string
+    Buckets:
+      title: Buckets
+      type: object
+      properties:
+        bucket_path:
+          type: string
+        visibility:
+          type: string
+        allowed_users:
+          type: array
+          items:
+            type: string
+        owner:
+          type: string
+        metadata:
+          type: object
+          properties:
+            owner:
+              type: string
+            service:
+              type: boolean
+    Clusters:
+      title: Clusters
+      type: object
+      properties:
+        id:
+          type: object
+          properties:
+            endpoint:
+              type: string
+            auth_user:
+              type: string
+            auth_password:
+              type: string
+            ssl_verify:
+              type: boolean
+    JobInfo:
+      title: JobInfo
+      type: object
+      properties:
+        status:
+          type: string
+        creation_time:
+          type: string
+        start_time:
+          type: string
+        finish_time:
+          type: string
+    Info:
+      title: Info
+      type: object
+      properties:
+        version:
+          type: string
+        git_commit:
+          type: string
+        architecture:
+          type: string
+        kubernetes_version:
+          type: string
+        serverless_backend:
+          type: object
+          properties:
+            name:
+              type: string
+            version:
+              type: string
+    Config:
+      title: Config
+      type: object
+      properties:
+        minio_provider:
+          $ref: '#/components/schemas/MinIOProvider'
+        name:
+          type: string
+        namespace:
+          type: string
+        gpu_avaliable:
+          type: boolean
+        serverless_backend:
+          type: string
+        yunikorn_enable:
+          type: boolean
+        oidc_groups:
+          type: array
+          items: 
+            type: string
+    MinIOProvider:
+      title: MinIOProvider
+      type: object
+      properties:
+        endpoint:
+          type: string
+        region:
+          type: string
+        secret_key:
+          type: string
+        access_key:
+          type: string
+        verify:
+          type: boolean
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: ''
+    token:
+      type: http
+      scheme: bearer
+      description: ''
+tags:
+  - name: services
+  - name: logs
+  - name: sync
+  - name: async
+  - name: info
+  - name: health
+  - name: buckets
+servers:
+  - url: 'https://localhost'
+    description: 'Local testing'
+  - url: 'https://inference.cloud.ai4eosc.eu'
+    description: 'AI4EOSC OSCAR cluster'
+  - url: 'https://inference-walton.cloud.imagine-ai.eu'
+    description: 'iMagine OSCAR cluster'
