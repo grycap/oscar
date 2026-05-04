@@ -53,6 +53,25 @@ func getNestedString(t *testing.T, obj *unstructured.Unstructured, fields ...str
 	return val
 }
 
+// getRawNested walks the object map along fields and returns the raw value.
+func getRawNested(t *testing.T, obj *unstructured.Unstructured, fields ...string) any {
+	t.Helper()
+	var cur any = obj.Object
+	for _, f := range fields {
+		m, ok := cur.(map[string]any)
+		if !ok {
+			t.Errorf("field %v: unexpected type at %q", fields, f)
+			return nil
+		}
+		cur, ok = m[f]
+		if !ok {
+			t.Errorf("field %v not found at %q", fields, f)
+			return nil
+		}
+	}
+	return cur
+}
+
 func getNestedMap(t *testing.T, obj *unstructured.Unstructured, fields ...string) map[string]any {
 	t.Helper()
 	val, found, err := unstructured.NestedMap(obj.Object, fields...)
@@ -62,13 +81,20 @@ func getNestedMap(t *testing.T, obj *unstructured.Unstructured, fields ...string
 	return val
 }
 
-func getNestedInt64(t *testing.T, obj *unstructured.Unstructured, fields ...string) int64 {
+func getNestedInt32(t *testing.T, obj *unstructured.Unstructured, fields ...string) int32 {
 	t.Helper()
-	val, found, err := unstructured.NestedInt64(obj.Object, fields...)
-	if err != nil || !found {
-		t.Errorf("field %v not found or error: %v", fields, err)
+	v := getRawNested(t, obj, fields...)
+	if v == nil {
+		return 0
 	}
-	return val
+	switch n := v.(type) {
+	case int32:
+		return n
+	case int64:
+		return int32(n)
+	}
+	t.Errorf("field %v: unexpected type %T", fields, v)
+	return 0
 }
 
 // ─── IsKserveService ─────────────────────────────────────────────────────────
@@ -131,17 +157,18 @@ func TestNewKserveInferenceServiceDefinition_Success(t *testing.T) {
 		t.Errorf("metadata.namespace = %q, want %q", v, knSvc.Namespace)
 	}
 
-	// ownerReferences
-	ownerRefs, found, err := unstructured.NestedSlice(isvc.Object, "metadata", "ownerReferences")
-	if err != nil || !found || len(ownerRefs) != 1 {
-		t.Fatalf("expected 1 ownerReference, got %v (found=%v, err=%v)", len(ownerRefs), found, err)
+	// ownerReferences — stored as typed []metav1.OwnerReference (not []interface{}),
+	// so read directly from the raw map via type assertion.
+	rawMeta := isvc.Object["metadata"].(map[string]any)
+	ownerRefs := rawMeta["ownerReferences"].([]metav1.OwnerReference)
+	if len(ownerRefs) != 1 {
+		t.Fatalf("expected 1 ownerReference, got %d", len(ownerRefs))
 	}
-	ownerRef := ownerRefs[0].(map[string]any)
-	if ownerRef["uid"] != string(uid) {
-		t.Errorf("ownerReference.uid = %v, want %v", ownerRef["uid"], uid)
+	if ownerRefs[0].UID != uid {
+		t.Errorf("ownerReference.uid = %v, want %v", ownerRefs[0].UID, uid)
 	}
-	if ownerRef["kind"] != "Service" {
-		t.Errorf("ownerReference.kind = %v, want Service", ownerRef["kind"])
+	if ownerRefs[0].Kind != "Service" {
+		t.Errorf("ownerReference.kind = %v, want Service", ownerRefs[0].Kind)
 	}
 
 	// predictor model fields
@@ -156,15 +183,17 @@ func TestNewKserveInferenceServiceDefinition_Success(t *testing.T) {
 	}
 
 	// scale
-	if v := getNestedInt64(t, isvc, "spec", "predictor", "minReplicas"); int32(v) != svc.Kserve.MinScale {
+	if v := getNestedInt32(t, isvc, "spec", "predictor", "minReplicas"); v != svc.Kserve.MinScale {
 		t.Errorf("minReplicas = %d, want %d", v, svc.Kserve.MinScale)
 	}
-	if v := getNestedInt64(t, isvc, "spec", "predictor", "maxReplicas"); int32(v) != svc.Kserve.MaxScale {
+	if v := getNestedInt32(t, isvc, "spec", "predictor", "maxReplicas"); v != svc.Kserve.MaxScale {
 		t.Errorf("maxReplicas = %d, want %d", v, svc.Kserve.MaxScale)
 	}
 
 	// resources present
-	getNestedMap(t, isvc, "spec", "predictor", "model", "resources")
+	if getRawNested(t, isvc, "spec", "predictor", "model", "resources") == nil {
+		t.Error("expected resources to be set")
+	}
 }
 
 func TestNewKserveInferenceServiceDefinition_ProtocolVersion(t *testing.T) {
@@ -258,16 +287,18 @@ func TestUpdateKserveInferenceServiceDefinition_Success(t *testing.T) {
 	if v := getNestedString(t, result, "spec", "predictor", "model", "storageUri"); v != "s3://new-bucket/model" {
 		t.Errorf("storageUri = %q, want s3://new-bucket/model", v)
 	}
-	if v := getNestedInt64(t, result, "spec", "predictor", "minReplicas"); int32(v) != 2 {
+	if v := getNestedInt32(t, result, "spec", "predictor", "minReplicas"); v != 2 {
 		t.Errorf("minReplicas = %d, want 2", v)
 	}
-	if v := getNestedInt64(t, result, "spec", "predictor", "maxReplicas"); int32(v) != 5 {
+	if v := getNestedInt32(t, result, "spec", "predictor", "maxReplicas"); v != 5 {
 		t.Errorf("maxReplicas = %d, want 5", v)
 	}
 	if v := getNestedString(t, result, "spec", "predictor", "model", "protocolVersion"); v != "v2" {
 		t.Errorf("protocolVersion = %q, want %q", v, "v2")
 	}
-	getNestedMap(t, result, "spec", "predictor", "model", "resources")
+	if getRawNested(t, result, "spec", "predictor", "model", "resources") == nil {
+		t.Error("expected resources to be set")
+	}
 }
 
 func TestUpdateKserveInferenceServiceDefinition_ProtocolVersion(t *testing.T) {
