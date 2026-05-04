@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 )
 
 func TestMakeFakeBackend(t *testing.T) {

@@ -21,7 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 )
 

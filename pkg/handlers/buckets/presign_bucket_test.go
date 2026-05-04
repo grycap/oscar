@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/testsupport"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/testsupport"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
 )
 
 func TestMakePresignHandler_AdminUpload(t *testing.T) {

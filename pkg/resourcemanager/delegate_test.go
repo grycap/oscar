@@ -27,8 +27,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grycap/oscar/v3/pkg/testsupport"
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/testsupport"
+	"github.com/grycap/oscar/v4/pkg/types"
 )
 
 func TestDelegateJob(t *testing.T) {

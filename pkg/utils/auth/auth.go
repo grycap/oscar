@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
 	"k8s.io/client-go/kubernetes"
 )
 

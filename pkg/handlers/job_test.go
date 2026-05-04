@@ -11,8 +11,8 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/backends"
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/backends"
+	"github.com/grycap/oscar/v4/pkg/types"
 	batchv1 "k8s.io/api/batch/v1"
 )
 

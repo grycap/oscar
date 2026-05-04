@@ -3,7 +3,7 @@ package utils
 import (
 	"testing"
 
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 )
 
 func TestValidateManagedVolumeCreateRequest(t *testing.T) {

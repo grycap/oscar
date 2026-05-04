@@ -34,8 +34,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"slices"
 
-	"github.com/grycap/oscar/v3/pkg/testsupport"
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/testsupport"
+	"github.com/grycap/oscar/v4/pkg/types"
 	madmin "github.com/minio/madmin-go"
 	"github.com/minio/minio-go/v7"
 	miniocreds "github.com/minio/minio-go/v7/pkg/credentials"

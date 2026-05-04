@@ -1,4 +1,4 @@
-module github.com/grycap/oscar/v3
+module github.com/grycap/oscar/v4
 
 go 1.25.0
 
@@ -146,6 +146,6 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	knative.dev/networking v0.0.0-20230123233838-db2bcbea2560 // indirect
-	knative.dev/pkg v0.0.0-20230125083639-408ad0773f47 // indirect
+	knative.dev/pkg v0.0.0-20230125083639-408ad0773f47
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 )

@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 )
 
 type Aggregator struct {
