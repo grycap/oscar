@@ -7,9 +7,6 @@ import (
 	"strings"
 
 	"github.com/grycap/oscar/v3/pkg/types"
-	servingv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
-	kserveclient "github.com/kserve/kserve/pkg/client/clientset/versioned"
-	"github.com/kserve/kserve/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,6 +27,13 @@ const (
 	defaultLLMGPUimage   = "vllm/vllm-openai:latest"
 )
 
+var (
+	llmInferenceServiceGVR     = schema.GroupVersionResource{Group: "serving.kserve.io", Version: "v1alpha1", Resource: "llminferenceservices"}
+	kserveIsvcGVR              = schema.GroupVersionResource{Group: "serving.kserve.io", Version: "v1beta1", Resource: "inferenceservices"}
+	kserveHTTPRouteGVR         = schema.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "httproutes"}
+	kserveTraefikMiddlewareGVR = schema.GroupVersionResource{Group: "traefik.io", Version: "v1alpha1", Resource: "middlewares"}
+)
+
 // ValidateKserveService checks if the provided service has valid KServe configuration.
 func ValidateKserveService(service *types.Service) error {
 	if !IsKserveService(service) {
@@ -38,14 +42,16 @@ func ValidateKserveService(service *types.Service) error {
 	if !validModelFormat(service) {
 		return fmt.Errorf("invalid ModelFormat: %s", service.Kserve.ModelFormat)
 	}
-	if service.Kserve.APIVersion != "" && service.Kserve.APIVersion != string(protocolVersion(service)) {
+	if service.Kserve.APIVersion != "" && service.Kserve.APIVersion != protocolVersion(service) {
 		return fmt.Errorf("invalid APIVersion: %s for ModelFormat: %s", service.Kserve.APIVersion, service.Kserve.ModelFormat)
 	}
 	return nil
 }
 
-func NewKserveInferenceServiceDefinition(service *types.Service, knSvc *knv1.Service) (*servingv1beta1.InferenceService, error) {
-
+// NewKserveInferenceServiceDefinition builds an unstructured InferenceService
+// (serving.kserve.io/v1beta1) suitable for use with a dynamic Kubernetes client.
+// It is functionally equivalent to NewKserveInferenceServiceDefinition.
+func NewKserveInferenceServiceDefinition(service *types.Service, knSvc *knv1.Service) (*unstructured.Unstructured, error) {
 	if err := ValidateKserveService(service); err != nil {
 		return nil, err
 	}
@@ -55,149 +61,176 @@ func NewKserveInferenceServiceDefinition(service *types.Service, knSvc *knv1.Ser
 		return nil, err
 	}
 
-	// Determine protocol version based on service configuration, default to v1 if not specified or invalid
-	protocolV := protocolVersion(service)
-	controller := false
-	blockOwnerDeletion := true
+	modelSpec := map[string]any{
+		"modelFormat":     map[string]any{"name": service.Kserve.ModelFormat},
+		"storageUri":      service.Kserve.StorageUri,
+		"protocolVersion": protocolVersion(service),
+	}
+	modelSpec["resources"] = resources
+	modelSpec["args"] = service.Kserve.Args
+	modelSpec["env"] = types.ConvertEnvVars(service.Kserve.Env)
 
-	// Define InferenceService
-	return &servingv1beta1.InferenceService{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      buildKserveName(service.Name),
-			Namespace: knSvc.Namespace,
+	predictor := map[string]any{
+		"model":       modelSpec,
+		"minReplicas": service.Kserve.MinScale,
+		"maxReplicas": service.Kserve.MaxScale,
+	}
 
-			OwnerReferences: []metav1.OwnerReference{
-				metav1.OwnerReference{
-					APIVersion:         "serving.knative.dev/v1",
-					Kind:               "Service",
-					Name:               service.Name,
-					UID:                knSvc.UID,
-					Controller:         &controller,
-					BlockOwnerDeletion: &blockOwnerDeletion,
-				},
-			},
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "serving.kserve.io/v1beta1",
+		"kind":       "InferenceService",
+		"metadata": map[string]any{
+			"name":            buildKserveName(service.Name),
+			"namespace":       knSvc.Namespace,
+			"ownerReferences": getOwnerReference(knSvc),
 		},
-		Spec: servingv1beta1.InferenceServiceSpec{
-			Predictor: servingv1beta1.PredictorSpec{
-				Model: &servingv1beta1.ModelSpec{
-					ModelFormat: servingv1beta1.ModelFormat{
-						Name: service.Kserve.ModelFormat,
-					},
-					PredictorExtensionSpec: servingv1beta1.PredictorExtensionSpec{
-						StorageURI:      &service.Kserve.StorageUri,
-						ProtocolVersion: &protocolV,
-						Container: corev1.Container{
-							Args: service.Kserve.Args,
-							Env:  types.ConvertEnvVars(service.Kserve.Env),
-						},
-					},
-				},
-				ComponentExtensionSpec: servingv1beta1.ComponentExtensionSpec{
-					MinReplicas: &service.Kserve.MinScale,
-					MaxReplicas: service.Kserve.MaxScale,
-				},
-				PodSpec: servingv1beta1.PodSpec{
-					Resources: &resources,
-				},
-			},
+		"spec": map[string]any{
+			"predictor": predictor,
 		},
-	}, nil
+	}}, nil
 }
 
-func UpdateKserveInferenceServiceDefinition(service *types.Service, updatedKnSvc *knv1.Service, oldIsvc *servingv1beta1.InferenceService) (*servingv1beta1.InferenceService, error) {
-
+// UpdateKserveInferenceServiceDefinition updates the spec fields of an existing
+// unstructured InferenceService object in place, preserving metadata (including resourceVersion).
+func UpdateKserveInferenceServiceDefinition(service *types.Service, oldIsvc *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	if err := ValidateKserveService(service); err != nil {
 		return nil, err
 	}
 
-	resources, err := types.CreateResources(service)
+	resources, err := createKserveResources(service.Kserve)
 	if err != nil {
 		return nil, err
 	}
 
-	// Determine protocol version based on service configuration, default to v1 if not specified or invalid
-	protocolV := protocolVersion(service)
+	modelSpec := map[string]any{
+		"modelFormat":     map[string]any{"name": service.Kserve.ModelFormat},
+		"storageUri":      service.Kserve.StorageUri,
+		"protocolVersion": protocolVersion(service),
+	}
+	modelSpec["resources"] = resources
+	modelSpec["args"] = service.Kserve.Args
+	modelSpec["env"] = types.ConvertEnvVars(service.Kserve.Env)
 
-	// Revise InferenceService
-	oldIsvc.Spec.Predictor.Model.ModelFormat.Name = service.Kserve.ModelFormat
-	oldIsvc.Spec.Predictor.Model.StorageURI = &service.Kserve.StorageUri
-	oldIsvc.Spec.Predictor.Model.ProtocolVersion = &protocolV
-	oldIsvc.Spec.Predictor.Model.Container.Args = service.Kserve.Args
-	oldIsvc.Spec.Predictor.ComponentExtensionSpec.MinReplicas = &service.Kserve.MinScale
-	oldIsvc.Spec.Predictor.ComponentExtensionSpec.MaxReplicas = service.Kserve.MaxScale
-	oldIsvc.Spec.Predictor.PodSpec.Resources = &resources
+	predictor := map[string]any{
+		"model":       modelSpec,
+		"minReplicas": service.Kserve.MinScale,
+		"maxReplicas": service.Kserve.MaxScale,
+	}
+
+	oldIsvc.Object["spec"] = map[string]any{
+		"predictor": predictor,
+	}
 	return oldIsvc, nil
 }
 
 // CreateKserveInferenceService creates a KServe InferenceService based on the provided service and Knative service.
 // It set an OwnerReference to the Knative service, so if the Knative service is deleted the KServe InferenceService will be automatically deleted by Kubernetes garbage collection.
 // It returns the created InferenceService or an error if the creation fails.
-func CreateKserveInferenceService(kserveclient *kserveclient.Clientset, service *types.Service, knativeService *knv1.Service, cfg *types.Config) (*servingv1beta1.InferenceService, error) {
+func CreateKserveInferenceService(service *types.Service, knativeService *knv1.Service, cfg *types.Config) error {
+	if err := ValidateKserveService(service); err != nil {
+		return err
+	}
+
+	// Create dynamic client
+	restCfg, err := rest.InClusterConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get in-cluster config: %v", err)
+	}
+	dynClient, err := dynamic.NewForConfig(restCfg)
+	if err != nil {
+		return fmt.Errorf("failed to create dynamic client: %v", err)
+	}
 
 	if service.Kserve.ModelFormat == "llm" {
 		log.Println("LLM Service creation")
 		// For LLM services, we use a different InferenceService definition (LLMInferenceService)
 		llmIsvc, err := NewKserveLLMInferenceServiceDefinition(service, knativeService, cfg)
-		// Create LLMInferenceService via dynamic client
-		restCfg, _ := rest.InClusterConfig()
-		dynClient, _ := dynamic.NewForConfig(restCfg)
-		llmIsvcGVR := schema.GroupVersionResource{Group: "serving.kserve.io", Version: "v1alpha1", Resource: "llminferenceservices"}
-		_, err = dynClient.Resource(llmIsvcGVR).Namespace(knativeService.Namespace).Create(context.Background(), llmIsvc, metav1.CreateOptions{})
+		_, err = dynClient.Resource(llmInferenceServiceGVR).Namespace(knativeService.Namespace).Create(context.Background(), llmIsvc, metav1.CreateOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("failed to create InferenceService: %v", err)
+			return fmt.Errorf("failed to create InferenceService: %v", err)
 		}
-		return nil, nil
+		return nil
 	}
 
-	isvc, err := NewKserveInferenceServiceDefinition(service, knativeService)
+	rawIsvc, err := NewKserveInferenceServiceDefinition(service, knativeService)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	// Create InferenceService
-	isvc, err = kserveclient.ServingV1beta1().InferenceServices(isvc.Namespace).Create(context.Background(), isvc, metav1.CreateOptions{})
+	_, err = dynClient.Resource(kserveIsvcGVR).Namespace(knativeService.Namespace).Create(context.Background(), rawIsvc, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create InferenceService: %v", err)
+		return fmt.Errorf("failed to create InferenceService: %v", err)
 	}
 
 	err = ExposeKserveService(service, knativeService, cfg)
 	if err != nil {
 		// If exposing the service fails, delete the created InferenceService to avoid orphaned resources
-		deleteErr := DeleteKserveInferenceService(kserveclient, service.Name, service.Namespace)
+		deleteErr := DeleteKserveInferenceService(service.Name, service.Namespace)
 		if deleteErr != nil {
-			return nil, fmt.Errorf("failed to expose InferenceService: %v; additionally, failed to delete InferenceService: %v", err, deleteErr)
+			return fmt.Errorf("failed to expose InferenceService: %v; additionally, failed to delete InferenceService: %v", err, deleteErr)
 		}
-		return nil, fmt.Errorf("failed to expose InferenceService: %v", err)
+		return fmt.Errorf("failed to expose InferenceService: %v", err)
 	}
-	return isvc, nil
+	return nil
 }
 
-func UpdateKserveInferenceService(kserveclient *kserveclient.Clientset, service *types.Service, knativeService *knv1.Service, oldIsvc *servingv1beta1.InferenceService) (*servingv1beta1.InferenceService, error) {
-	revisedIsvc, err := UpdateKserveInferenceServiceDefinition(service, knativeService, oldIsvc)
-	if err != nil {
-		return nil, err
+func UpdateKserveInferenceService(service *types.Service, namespace string) error {
+	if err := ValidateKserveService(service); err != nil {
+		return err
 	}
-	// Update InferenceService
-	updatedIsvc, err := kserveclient.ServingV1beta1().InferenceServices(revisedIsvc.Namespace).Update(context.Background(), revisedIsvc, metav1.UpdateOptions{})
+
+	restCfg, err := rest.InClusterConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to update InferenceService: %v", err)
+		return fmt.Errorf("failed to get in-cluster config: %v", err)
 	}
-	return updatedIsvc, nil
+	dynClient, err := dynamic.NewForConfig(restCfg)
+	if err != nil {
+		return fmt.Errorf("failed to create dynamic client: %v", err)
+	}
+
+	// Get existing object to preserve resourceVersion
+	oldIsvc, err := dynClient.Resource(kserveIsvcGVR).Namespace(namespace).Get(context.Background(), buildKserveName(service.Name), metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get InferenceService: %v", err)
+	}
+
+	updatedIsvc, err := UpdateKserveInferenceServiceDefinition(service, oldIsvc)
+	if err != nil {
+		return err
+	}
+
+	_, err = dynClient.Resource(kserveIsvcGVR).Namespace(namespace).Update(context.Background(), updatedIsvc, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update InferenceService: %v", err)
+	}
+	return nil
 }
 
-func GetKserveInferenceService(kserveclient *kserveclient.Clientset, service *types.Service, namespace string) (*servingv1beta1.InferenceService, error) {
-	// Get InferenceService
-	isvc, err := kserveclient.ServingV1beta1().InferenceServices(namespace).Get(context.Background(), buildKserveName(service.Name), metav1.GetOptions{})
+func GetKserveInferenceService(serviceName, namespace string) (*unstructured.Unstructured, error) {
+	restCfg, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get in-cluster config: %v", err)
+	}
+	dynClient, err := dynamic.NewForConfig(restCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create dynamic client: %v", err)
+	}
+	isvc, err := dynClient.Resource(kserveIsvcGVR).Namespace(namespace).Get(context.Background(), buildKserveName(serviceName), metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get InferenceService: %v", err)
 	}
 	return isvc, nil
 }
 
-func DeleteKserveInferenceService(kserveclient *kserveclient.Clientset, serviceName, namespace string) error {
-	name := buildKserveName(serviceName)
-
-	// Delete InferenceService
-	err := kserveclient.ServingV1beta1().InferenceServices(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
+func DeleteKserveInferenceService(serviceName, namespace string) error {
+	restCfg, err := rest.InClusterConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get in-cluster config: %v", err)
+	}
+	dynClient, err := dynamic.NewForConfig(restCfg)
+	if err != nil {
+		return fmt.Errorf("failed to create dynamic client: %v", err)
+	}
+	err = dynClient.Resource(kserveIsvcGVR).Namespace(namespace).Delete(context.Background(), buildKserveName(serviceName), metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("failed to delete Kserve InferenceService: %v", err)
 	}
@@ -297,14 +330,14 @@ func GetKserveSvcName(serviceNamne, kserveModelFormat string) string {
 
 // Helper function to determine the protocol version for KServe based on service configuration
 // Defaults to "v1" if not specified or invalid
-func protocolVersion(service *types.Service) constants.InferenceServiceProtocol {
+func protocolVersion(service *types.Service) string {
 	switch {
 	case service.Kserve.APIVersion == "v1" && !onlyProtocolV2(service):
-		return constants.ProtocolV1
+		return "v1"
 	case service.Kserve.APIVersion == "v2" || onlyProtocolV2(service):
-		return constants.ProtocolV2
+		return "v2"
 	default:
-		return constants.ProtocolV1
+		return "v1"
 	}
 }
 
@@ -323,18 +356,6 @@ func validModelFormat(service *types.Service) bool {
 	default:
 		return false
 	}
-}
-
-var kserveHTTPRouteGVR = schema.GroupVersionResource{
-	Group:    "gateway.networking.k8s.io",
-	Version:  "v1",
-	Resource: "httproutes",
-}
-
-var kserveTraefikMiddlewareGVR = schema.GroupVersionResource{
-	Group:    "traefik.io",
-	Version:  "v1alpha1",
-	Resource: "middlewares",
 }
 
 func ExposeKserveService(service *types.Service, knSvc *knv1.Service, cfg *types.Config) error {

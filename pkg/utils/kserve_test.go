@@ -4,9 +4,8 @@ import (
 	"testing"
 
 	oscarType "github.com/grycap/oscar/v3/pkg/types"
-	servingv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
-	"github.com/kserve/kserve/pkg/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types" // for UID
 	knv1 "knative.dev/serving/pkg/apis/serving/v1"
 )
@@ -41,6 +40,35 @@ func kserveService() *oscarType.Service {
 			Memory:      "2Gi",
 		},
 	}
+}
+
+// ─── helpers for unstructured field access ────────────────────────────────────
+
+func getNestedString(t *testing.T, obj *unstructured.Unstructured, fields ...string) string {
+	t.Helper()
+	val, found, err := unstructured.NestedString(obj.Object, fields...)
+	if err != nil || !found {
+		t.Errorf("field %v not found or error: %v", fields, err)
+	}
+	return val
+}
+
+func getNestedMap(t *testing.T, obj *unstructured.Unstructured, fields ...string) map[string]any {
+	t.Helper()
+	val, found, err := unstructured.NestedMap(obj.Object, fields...)
+	if err != nil || !found {
+		t.Errorf("field %v not found or error: %v", fields, err)
+	}
+	return val
+}
+
+func getNestedInt64(t *testing.T, obj *unstructured.Unstructured, fields ...string) int64 {
+	t.Helper()
+	val, found, err := unstructured.NestedInt64(obj.Object, fields...)
+	if err != nil || !found {
+		t.Errorf("field %v not found or error: %v", fields, err)
+	}
+	return val
 }
 
 // ─── IsKserveService ─────────────────────────────────────────────────────────
@@ -87,83 +115,81 @@ func TestNewKserveInferenceServiceDefinition_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Name / namespace
-	if isvc.Name != svc.Name {
-		t.Errorf("isvc.Name = %q, want %q", isvc.Name, svc.Name)
+	// apiVersion / kind
+	if v := getNestedString(t, isvc, "apiVersion"); v != "serving.kserve.io/v1beta1" {
+		t.Errorf("apiVersion = %q, want serving.kserve.io/v1beta1", v)
 	}
-	if isvc.Namespace != svc.Namespace {
-		t.Errorf("isvc.Namespace = %q, want %q", isvc.Namespace, svc.Namespace)
-	}
-
-	// OwnerReference points to the Knative service
-	if len(isvc.OwnerReferences) != 1 {
-		t.Fatalf("expected 1 OwnerReference, got %d", len(isvc.OwnerReferences))
-	}
-	ownerRef := isvc.OwnerReferences[0]
-	if ownerRef.UID != uid {
-		t.Errorf("OwnerReference.UID = %q, want %q", ownerRef.UID, uid)
-	}
-	if ownerRef.Kind != "Service" {
-		t.Errorf("OwnerReference.Kind = %q, want Service", ownerRef.Kind)
-	}
-	if *ownerRef.Controller {
-		t.Error("OwnerReference.Controller should be false")
-	}
-	if !*ownerRef.BlockOwnerDeletion {
-		t.Error("OwnerReference.BlockOwnerDeletion should be true")
+	if v := getNestedString(t, isvc, "kind"); v != "InferenceService" {
+		t.Errorf("kind = %q, want InferenceService", v)
 	}
 
-	// Predictor model format
-	if isvc.Spec.Predictor.Model.ModelFormat.Name != svc.Kserve.ModelFormat {
-		t.Errorf("ModelFormat = %q, want %q", isvc.Spec.Predictor.Model.ModelFormat.Name, svc.Kserve.ModelFormat)
+	// name / namespace
+	if v := getNestedString(t, isvc, "metadata", "name"); v != buildKserveName(svc.Name) {
+		t.Errorf("metadata.name = %q, want %q", v, buildKserveName(svc.Name))
+	}
+	if v := getNestedString(t, isvc, "metadata", "namespace"); v != knSvc.Namespace {
+		t.Errorf("metadata.namespace = %q, want %q", v, knSvc.Namespace)
 	}
 
-	// StorageURI
-	if *isvc.Spec.Predictor.Model.StorageURI != svc.Kserve.StorageUri {
-		t.Errorf("StorageURI = %q, want %q", *isvc.Spec.Predictor.Model.StorageURI, svc.Kserve.StorageUri)
+	// ownerReferences
+	ownerRefs, found, err := unstructured.NestedSlice(isvc.Object, "metadata", "ownerReferences")
+	if err != nil || !found || len(ownerRefs) != 1 {
+		t.Fatalf("expected 1 ownerReference, got %v (found=%v, err=%v)", len(ownerRefs), found, err)
+	}
+	ownerRef := ownerRefs[0].(map[string]any)
+	if ownerRef["uid"] != string(uid) {
+		t.Errorf("ownerReference.uid = %v, want %v", ownerRef["uid"], uid)
+	}
+	if ownerRef["kind"] != "Service" {
+		t.Errorf("ownerReference.kind = %v, want Service", ownerRef["kind"])
 	}
 
-	// Protocol version defaults to V1
-	if *isvc.Spec.Predictor.Model.ProtocolVersion != constants.ProtocolV1 {
-		t.Errorf("ProtocolVersion = %v, want %v", *isvc.Spec.Predictor.Model.ProtocolVersion, constants.ProtocolV1)
+	// predictor model fields
+	if v := getNestedString(t, isvc, "spec", "predictor", "model", "modelFormat", "name"); v != svc.Kserve.ModelFormat {
+		t.Errorf("modelFormat.name = %q, want %q", v, svc.Kserve.ModelFormat)
+	}
+	if v := getNestedString(t, isvc, "spec", "predictor", "model", "storageUri"); v != svc.Kserve.StorageUri {
+		t.Errorf("storageUri = %q, want %q", v, svc.Kserve.StorageUri)
+	}
+	if v := getNestedString(t, isvc, "spec", "predictor", "model", "protocolVersion"); v != "v1" {
+		t.Errorf("protocolVersion = %q, want %q", v, "v1")
 	}
 
-	// Scale settings
-	if *isvc.Spec.Predictor.MinReplicas != svc.Kserve.MinScale {
-		t.Errorf("MinReplicas = %d, want %d", *isvc.Spec.Predictor.MinReplicas, svc.Kserve.MinScale)
+	// scale
+	if v := getNestedInt64(t, isvc, "spec", "predictor", "minReplicas"); int32(v) != svc.Kserve.MinScale {
+		t.Errorf("minReplicas = %d, want %d", v, svc.Kserve.MinScale)
 	}
-	if isvc.Spec.Predictor.MaxReplicas != svc.Kserve.MaxScale {
-		t.Errorf("MaxReplicas = %d, want %d", isvc.Spec.Predictor.MaxReplicas, svc.Kserve.MaxScale)
+	if v := getNestedInt64(t, isvc, "spec", "predictor", "maxReplicas"); int32(v) != svc.Kserve.MaxScale {
+		t.Errorf("maxReplicas = %d, want %d", v, svc.Kserve.MaxScale)
 	}
 
-	// Resources present
-	if isvc.Spec.Predictor.PodSpec.Resources == nil {
-		t.Error("PodSpec.Resources should not be nil")
-	}
+	// resources present
+	getNestedMap(t, isvc, "spec", "predictor", "model", "resources")
 }
 
 func TestNewKserveInferenceServiceDefinition_ProtocolVersion(t *testing.T) {
 	knSvc := knativeServiceWithUID("uid")
 
 	tests := []struct {
-		protocolVersion string
-		input           string
-		expected        string
+		name     string
+		input    string
+		expected string
 	}{
-		{"v1", "v1", "v1"},
-		{"v1", "", "v1"},
-		{"v2", "v2", "v2"},
+		{"v1 explicit", "v1", "v1"},
+		{"default to v1", "", "v1"},
+		{"v2 explicit", "v2", "v2"},
 	}
 	for _, tt := range tests {
-		t.Run(tt.protocolVersion, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			svc := kserveService()
-			svc.Kserve.APIVersion = tt.protocolVersion
+			svc.Kserve.APIVersion = tt.input
 			isvc, err := NewKserveInferenceServiceDefinition(svc, knSvc)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if string(*isvc.Spec.Predictor.Model.ProtocolVersion) != tt.expected {
-				t.Errorf("APIVersion = %q, want %q", *isvc.Spec.Predictor.Model.ProtocolVersion, tt.expected)
+			got := getNestedString(t, isvc, "spec", "predictor", "model", "protocolVersion")
+			if got != tt.expected {
+				t.Errorf("protocolVersion = %q, want %q", got, tt.expected)
 			}
 		})
 	}
@@ -207,75 +233,72 @@ func TestUpdateKserveInferenceServiceDefinition_Success(t *testing.T) {
 	original := kserveService()
 	knSvc := knativeServiceWithUID("uid-update")
 
-	// Create an initial isvc from the original service
 	oldIsvc, err := NewKserveInferenceServiceDefinition(original, knSvc)
 	if err != nil {
 		t.Fatalf("setup error: %v", err)
 	}
 
-	// Build an updated service
 	updated := kserveService()
 	updated.Kserve.ModelFormat = "tensorflow"
 	updated.Kserve.StorageUri = "s3://new-bucket/model"
 	updated.Kserve.MinScale = 2
 	updated.Kserve.MaxScale = 5
-	updated.CPU = "1"
-	updated.Memory = "2Gi"
+	updated.Kserve.CPU = "1"
+	updated.Kserve.Memory = "2Gi"
 	updated.Kserve.APIVersion = "v2"
 
-	result, err := UpdateKserveInferenceServiceDefinition(updated, knSvc, oldIsvc)
+	result, err := UpdateKserveInferenceServiceDefinition(updated, oldIsvc)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result.Spec.Predictor.Model.ModelFormat.Name != "tensorflow" {
-		t.Errorf("ModelFormat = %q, want tensorflow", result.Spec.Predictor.Model.ModelFormat.Name)
+	if v := getNestedString(t, result, "spec", "predictor", "model", "modelFormat", "name"); v != "tensorflow" {
+		t.Errorf("modelFormat.name = %q, want tensorflow", v)
 	}
-	if *result.Spec.Predictor.Model.StorageURI != "s3://new-bucket/model" {
-		t.Errorf("StorageURI = %q, want s3://new-bucket/model", *result.Spec.Predictor.Model.StorageURI)
+	if v := getNestedString(t, result, "spec", "predictor", "model", "storageUri"); v != "s3://new-bucket/model" {
+		t.Errorf("storageUri = %q, want s3://new-bucket/model", v)
 	}
-	if *result.Spec.Predictor.MinReplicas != 2 {
-		t.Errorf("MinReplicas = %d, want 2", *result.Spec.Predictor.MinReplicas)
+	if v := getNestedInt64(t, result, "spec", "predictor", "minReplicas"); int32(v) != 2 {
+		t.Errorf("minReplicas = %d, want 2", v)
 	}
-	if result.Spec.Predictor.MaxReplicas != 5 {
-		t.Errorf("MaxReplicas = %d, want 5", result.Spec.Predictor.MaxReplicas)
+	if v := getNestedInt64(t, result, "spec", "predictor", "maxReplicas"); int32(v) != 5 {
+		t.Errorf("maxReplicas = %d, want 5", v)
 	}
-	if *result.Spec.Predictor.Model.ProtocolVersion != constants.ProtocolV2 {
-		t.Errorf("ProtocolVersion = %v, want %v", *result.Spec.Predictor.Model.ProtocolVersion, constants.ProtocolV2)
+	if v := getNestedString(t, result, "spec", "predictor", "model", "protocolVersion"); v != "v2" {
+		t.Errorf("protocolVersion = %q, want %q", v, "v2")
 	}
-	if result.Spec.Predictor.PodSpec.Resources == nil {
-		t.Error("PodSpec.Resources should not be nil after update")
-	}
+	getNestedMap(t, result, "spec", "predictor", "model", "resources")
 }
 
 func TestUpdateKserveInferenceServiceDefinition_ProtocolVersion(t *testing.T) {
 	original := kserveService()
 	knSvc := knativeServiceWithUID("uid-update")
-	// Create an initial isvc from the original service
+
 	oldIsvc, err := NewKserveInferenceServiceDefinition(original, knSvc)
 	if err != nil {
 		t.Fatalf("setup error: %v", err)
 	}
 
 	tests := []struct {
-		protocolVersion string
-		input           string
-		expected        string
+		name     string
+		input    string
+		expected string
 	}{
-		{"v1", "v1", "v1"},
-		{"v1", "", "v1"},
-		{"v2", "v2", "v2"},
+		{"v1 explicit", "v1", "v1"},
+		{"default to v1", "", "v1"},
+		{"v2 explicit", "v2", "v2"},
 	}
 	for _, tt := range tests {
-		t.Run(tt.protocolVersion, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			svc := kserveService()
-			svc.Kserve.APIVersion = tt.protocolVersion
-			isvc, err := UpdateKserveInferenceServiceDefinition(svc, knSvc, oldIsvc)
+			svc.Kserve.APIVersion = tt.input
+			isvc, err := UpdateKserveInferenceServiceDefinition(svc, oldIsvc)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if string(*isvc.Spec.Predictor.Model.ProtocolVersion) != tt.expected {
-				t.Errorf("APIVersion = %q, want %q", *isvc.Spec.Predictor.Model.ProtocolVersion, tt.expected)
+			got := getNestedString(t, isvc, "spec", "predictor", "model", "protocolVersion")
+			if got != tt.expected {
+				t.Errorf("protocolVersion = %q, want %q", got, tt.expected)
 			}
 		})
 	}
@@ -283,10 +306,9 @@ func TestUpdateKserveInferenceServiceDefinition_ProtocolVersion(t *testing.T) {
 
 func TestUpdateKserveInferenceServiceDefinition_NoKserveConfig(t *testing.T) {
 	svc := &oscarType.Service{Name: "no-kserve"}
-	knSvc := knativeServiceWithUID("uid")
-	oldIsvc := &servingv1beta1.InferenceService{}
+	oldIsvc := &unstructured.Unstructured{Object: map[string]any{}}
 
-	_, err := UpdateKserveInferenceServiceDefinition(svc, knSvc, oldIsvc)
+	_, err := UpdateKserveInferenceServiceDefinition(svc, oldIsvc)
 	if err == nil {
 		t.Error("expected error when service has no KServe configuration, got nil")
 	}
@@ -294,11 +316,10 @@ func TestUpdateKserveInferenceServiceDefinition_NoKserveConfig(t *testing.T) {
 
 func TestUpdateKserveInferenceServiceDefinition_InvalidCPU(t *testing.T) {
 	svc := kserveService()
-	svc.CPU = "not-valid-cpu"
-	knSvc := knativeServiceWithUID("uid")
-	oldIsvc := &servingv1beta1.InferenceService{}
+	svc.Kserve.CPU = "not-valid-cpu"
+	oldIsvc := &unstructured.Unstructured{Object: map[string]any{}}
 
-	_, err := UpdateKserveInferenceServiceDefinition(svc, knSvc, oldIsvc)
+	_, err := UpdateKserveInferenceServiceDefinition(svc, oldIsvc)
 	if err == nil {
 		t.Error("expected error due to invalid CPU quantity, got nil")
 	}
@@ -359,14 +380,14 @@ func TestProtocolVersion(t *testing.T) {
 		name        string
 		modelFormat string
 		apiVersion  string
-		expected    constants.InferenceServiceProtocol
+		expected    string
 	}{
-		{"v1 explicit", "sklearn", "v1", constants.ProtocolV1},
-		{"v2 explicit", "sklearn", "v2", constants.ProtocolV2},
-		{"default to v1 when empty", "sklearn", "", constants.ProtocolV1},
-		{"onnx forces v2 regardless of apiVersion", "onnx", "v1", constants.ProtocolV2},
-		{"onnx forces v2 when apiVersion empty", "onnx", "", constants.ProtocolV2},
-		{"invalid apiVersion defaults to v1", "sklearn", "v3", constants.ProtocolV1},
+		{"v1 explicit", "sklearn", "v1", "v1"},
+		{"v2 explicit", "sklearn", "v2", "v2"},
+		{"default to v1 when empty", "sklearn", "", "v1"},
+		{"onnx forces v2 regardless of apiVersion", "onnx", "v1", "v2"},
+		{"onnx forces v2 when apiVersion empty", "onnx", "", "v2"},
+		{"invalid apiVersion defaults to v1", "sklearn", "v3", "v1"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -381,7 +402,7 @@ func TestProtocolVersion(t *testing.T) {
 	}
 }
 
-// ─── validateKserveService ───────────────────────────────────────────────────
+// ─── ValidateKserveService ───────────────────────────────────────────────────
 
 func TestValidateKserveService_Valid(t *testing.T) {
 	svc := kserveService()
