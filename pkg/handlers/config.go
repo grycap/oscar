@@ -128,7 +128,7 @@ func MakeConfigUpdateHandler(cfg *types.Config, back kubernetes.Interface) gin.H
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) > 1 {
 			c.JSON(http.StatusUnauthorized, "")
-
+			return
 		}
 		configInput := types.ConfigForUser{}
 		if err := c.ShouldBindJSON(&configInput); err != nil {

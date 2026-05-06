@@ -28,6 +28,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	testclient "k8s.io/client-go/kubernetes/fake"
@@ -169,4 +170,38 @@ func TestMakeConfigHandler(t *testing.T) {
 			t.Fatalf("Unexpected response body: %s", w.Body.String())
 		}
 	})
+}
+
+func TestMakeConfigUpdateHandlerRejectsBearerWithoutMutation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &types.Config{
+		Namespace:            "oscar",
+		AdditionalConfigPath: "oscar-config",
+		MinIOProvider:        &types.MinIOProvider{},
+	}
+	kubeClientset := testclient.NewSimpleClientset()
+
+	router := gin.New()
+	router.PUT("/config", MakeConfigUpdateHandler(cfg, kubeClientset))
+
+	body := `{"allowed_image_repositories":["registry.example.com/"]}`
+	req := httptest.NewRequest(http.MethodPut, "/config", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer token")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status code 401, got %d", w.Code)
+	}
+
+	_, err := kubeClientset.CoreV1().ConfigMaps(cfg.Namespace).Get(
+		req.Context(),
+		cfg.AdditionalConfigPath,
+		metav1.GetOptions{},
+	)
+	if !apierrors.IsNotFound(err) {
+		t.Fatalf("expected config map not to be created, got err=%v", err)
+	}
 }
