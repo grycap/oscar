@@ -98,7 +98,7 @@ func TestDelegateJob(t *testing.T) {
 	}
 
 	t.Run("Replica type oscar", func(t *testing.T) {
-		err := DelegateJob(service, event, "", logger, nil, nil)
+		err := DelegateJob(service, event, "", "", logger, nil, nil)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
@@ -106,7 +106,7 @@ func TestDelegateJob(t *testing.T) {
 
 	t.Run("Replica type oscar with delegation random", func(t *testing.T) {
 		service.Federation.Delegation = "random"
-		err := DelegateJob(service, event, "", logger, nil, nil)
+		err := DelegateJob(service, event, "", "", logger, nil, nil)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
@@ -114,7 +114,7 @@ func TestDelegateJob(t *testing.T) {
 
 	t.Run("Replica type oscar with delegation load-based", func(t *testing.T) {
 		service.Federation.Delegation = "load-based"
-		err := DelegateJob(service, event, "", logger, nil, nil)
+		err := DelegateJob(service, event, "", "", logger, nil, nil)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
@@ -123,7 +123,7 @@ func TestDelegateJob(t *testing.T) {
 	t.Run("Replica type endpoint", func(t *testing.T) {
 		service.Federation.Members[0].Type = "endpoint"
 		service.Federation.Members[0].URL = server.URL
-		err := DelegateJob(service, event, "", logger, nil, nil)
+		err := DelegateJob(service, event, "", "", logger, nil, nil)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}

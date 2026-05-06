@@ -191,7 +191,7 @@ func sortAlternatives(preferences []float64) []Alternative {
 	// Create a list of alternatives with their preference indices
 	for i := 0; i < len(preferences); i++ {
 		alternatives[i] = Alternative{
-			Index:      i + 1, // Alternativa 1, 2, etc.
+			Index:      i + 1, // Alternative 1, 2, etc.
 			Preference: preferences[i],
 		}
 	}
@@ -229,7 +229,6 @@ func reorganizeIfNearby(alternatives []Alternative, distances []float64, thresho
 	}
 
 	// Randomly shuffle nearby items
-	//rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(nearby), func(i, j int) {
 		nearby[i], nearby[j] = nearby[j], nearby[i]
 	})
@@ -254,12 +253,7 @@ func reorganizeIfNearby(alternatives []Alternative, distances []float64, thresho
 // DelegateJob sends the event to a service's replica
 func DelegateJob(service *types.Service, event string, jobID string, authHeader string, logger *log.Logger, cfg *types.Config, kubeClientset kubernetes.Interface) error {
 
-	//Block access before executing the function
-	//mutex.Lock()
-	//defer mutex.Unlock()
-
 	delegationToken := resolveDelegationToken(service, authHeader, logger, cfg, kubeClientset)
-	//log.Printf("delegationToken: %s", delegationToken)
 
 	replicas := federationMembers(service)
 	if len(replicas) == 0 {
@@ -270,16 +264,11 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 	//Determine priority level of each replica to delegate
 	if delegation == "topsis" {
 		results := [][]float64{}
-		//ServiceCPU, err := strconv.ParseFloat(service.CPU, 64)
-		//if err != nil {
-		//	fmt.Println("Error to converter CPU of service to int: ", err)
-		//	continue
-		//}
 		for _, cred := range replicas {
 
 			cluster, ok := service.Clusters[cred.ClusterID]
 			if !ok {
-				//logger.Printf("Error delegating service \"%s\" to ClusterID \"%s\": Cluster not defined\n", service.Name, replica.ClusterID)
+
 				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
 				continue
 			}
@@ -287,7 +276,6 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			// Parse the cluster's endpoint URL and add the service's path
 			JobURL, err := url.Parse(cluster.Endpoint)
 			if err != nil {
-				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", service.Name, replica.ClusterID, cluster.Endpoint, err)
 				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
 				continue
 			}
@@ -297,7 +285,6 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			// Make request to get service's definition (including token) from cluster
 			req2, err := http.NewRequest("GET", JobURL.String(), nil)
 			if err != nil {
-				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to make request: %v\n", service.Name, replica.ClusterID, err)
 				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
 				continue
 			}
@@ -310,7 +297,6 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			addAuthHeader(req2, authHeader, delegationToken, cluster)
 
 			// Make HTTP client
-			// #nosec
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
@@ -324,7 +310,6 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			// Send the request
 			resp2, err := client.Do(req2)
 			if err != nil {
-				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", service.Name, replica.ClusterID, err)
 				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
 				continue
 			}
@@ -343,14 +328,11 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 				continue
 			}
 
-			// Show job statuses
-
 			// Count job statuses
 			averageExecutionTime, pendingCount := countJobs(jobStatuses)
 
 			JobURL, err = url.Parse(cluster.Endpoint)
 			if err != nil {
-				//logger.Printf("Error delegating job from service \"%s\" to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", service.Name, replica.ClusterID, cluster.Endpoint, err)
 				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
 				continue
 			}
@@ -396,7 +378,6 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 				results = append(results, []float64{duration.Seconds(), 0, 0, 0, 1e6, 1e6})
 				continue
 			}
-			//results = createParameters(results, duration, clusterStatus, serviceCPU, 1e6, 1e6)
 			results = createParameters(results, duration, clusterStatus, serviceCPU, averageExecutionTime, float64(pendingCount))
 
 		}
@@ -419,45 +400,27 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 		}
 		fmt.Println("Replicas stable to topsis method: ", replicas)
 
-		//fmt.Println("Priority ", replicas[id].Priority, " with ", delegation, " delegation")
 	} else {
 		replicas = getClusterStatus(service, replicas, authHeader, delegationToken, delegation)
-		//fmt.Println("Replicas: ", replicas)
 
 		// Check if replicas are sorted by priority and sort it if needed
 		if !sort.IsSorted(replicas) {
 			sort.Stable(replicas)
-			//fmt.Println("Replicas Stable: ", replicas)
 		}
 	}
-
-	//fmt.Println("Event : ", event)
-
-	/*delegatedEvent := WrapEvent(service.ClusterID, event)
-
-	eventJSON, err := json.Marshal(delegatedEvent)
-	if err != nil {
-		return fmt.Errorf("error marshalling delegated event: %v", err)
-	}*/
 
 	storage_provider := delegationStorageProvider(service)
 	//Create event depending on delegation level
 
 	eventJSON, _ := eventBuild(event, storage_provider)
-	//fmt.Println("Storage_provider :  ", provider)
-	//fmt.Println(string(eventJSON))
-
-	//if provider != "" { //storatage _provider not empty in the delegation proccess.
 
 	for _, replica := range replicas {
 		// Manage if replica.Type is "oscar" and have the capacity to receive a service
 
 		if strings.ToLower(replica.Type) == oscarReplicaType && replica.Priority < noDelegateCode {
-			//fmt.Println("Delegation job in ClusterID: ", replica.ClusterID, "with Priority ", replica.Priority)
 			timestamp := time.Now().Format("2006/01/02 15:04:05")
 			log.Printf("[RESOURCE-DELEGATION] %s | Delegation job ( \"%s\" ) in ClusterID: %s with Priority %d", timestamp, jobID, replica.ClusterID, replica.Priority)
 			// Check ClusterID is defined in 'Clusters'
-			//fmt.Println("Delegating ...")
 			cluster, ok := service.Clusters[replica.ClusterID]
 			if !ok {
 				logger.Printf("Error delegating job ( \"%s\" ) from service \"%s\" to ClusterID \"%s\": Cluster not defined\n", jobID, service.Name, replica.ClusterID)
@@ -473,7 +436,6 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			postJobURL.Path = path.Join(postJobURL.Path, "job", replica.ServiceName)
 
 			// Make request to get service's definition (including token) from cluster
-			//fmt.Println(string(eventJSON))
 			req, err := http.NewRequest(http.MethodPost, postJobURL.String(), bytes.NewBuffer(eventJSON))
 
 			if err != nil {
@@ -495,7 +457,6 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			addAuthHeader(req, authHeader, delegationToken, cluster)
 
 			// Make HTTP client
-			// #nosec
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
@@ -516,12 +477,10 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			// Check status code
 			if res.StatusCode == http.StatusCreated {
 				logger.Printf("Job ( \"%s\" ) successfully delegated from service \"%s\" to cluster \"%s\"\n", jobID, service.Name, replica.ClusterID)
-				//fmt.Println("Job successfully delegated to cluster ", replica.ClusterID)
 				return nil
 			} else if res.StatusCode == http.StatusUnauthorized {
 				// Retry updating the token
 				token, err := updateServiceToken(replica, cluster)
-				//log.Printf("updateServiceToken : %s", token)
 				if err != nil {
 					logger.Printf("Error delegating job ( \"%s\" ) from service \"%s\" to ClusterID \"%s\": %v\n", jobID, service.Name, replica.ClusterID, err)
 					continue
@@ -543,7 +502,6 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 		// Manage if replica.Type is "endpoint"
 		if strings.ToLower(replica.Type) == endpointReplicaType {
 			// Parse the replica URL to check if it's valid
-			//fmt.Println("Delegation job in ClusterID: ", replica.ClusterID, "with Priority ", replica.Priority)
 			timestamp := time.Now().Format("2006/01/02 15:04:05")
 			log.Printf("[RESOURCE-DELEGATION] %s | Delegation job ( \"%s\" ) in ClusterID: %s with Priority %d", timestamp, jobID, replica.ClusterID, replica.Priority)
 			replicaURL, err := url.Parse(replica.URL)
@@ -565,7 +523,6 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			}
 
 			// Make HTTP client
-			// #nosec
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: !replica.SSLVerify},
@@ -591,10 +548,6 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			logger.Printf("Error delegating job ( \"%s\" ) from service \"%s\" to endpoint \"%s\": Status code %d\n", jobID, service.Name, replica.URL, res.StatusCode)
 		}
 	}
-	//} else {
-	//	fmt.Println("Error by Storage_Provider empty.")
-	//}
-
 	return fmt.Errorf("unable to delegate job ( \"%s\" ) from service \"%s\" to any replica, scheduling in the current cluster", jobID, service.Name)
 }
 
@@ -652,13 +605,11 @@ func delegationStorageProvider(service *types.Service) string {
 func resolveDelegationToken(service *types.Service, authHeader string, logger *log.Logger, cfg *types.Config, kubeClientset kubernetes.Interface) string {
 	refreshToken := getRefreshTokenForService(service, kubeClientset, logger)
 	// refresh token o ""
-	//log.Printf("getRefreshTokenForService: %s", refreshToken)
 	if refreshToken == "" {
 		return getBearerToken(authHeader)
 	}
 
 	accessToken, err := exchangeRefreshToken(cfg, refreshToken)
-	//log.Printf("exchangeRefreshToken : %s", accessToken)
 	if err != nil {
 		if logger != nil {
 			logger.Printf("error exchanging refresh token: %v", err)
@@ -677,12 +628,6 @@ func getRefreshTokenForService(service *types.Service, kubeClientset kubernetes.
 	if service.Namespace == "" {
 		return ""
 	}
-
-	/*secretName := utils.RefreshTokenSecretName(service.Name)
-	if secretName == "" {
-		return ""
-	}*/
-
 	secret, err := kubeClientset.CoreV1().Secrets(service.Namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
 		if logger != nil {
@@ -758,62 +703,6 @@ func exchangeRefreshToken(cfg *types.Config, refreshToken string) (string, error
 		return "", fmt.Errorf("error: cannot read the response json: %v", err)
 	}
 	return rrt.AccessToken, nil
-
-	/*if cfg == nil {
-		return "", fmt.Errorf("config is nil")
-	}
-	if refreshToken == "" {
-		return "", fmt.Errorf("refresh token is empty")
-	}
-	if len(cfg.OIDCValidIssuers) == 0 {
-		return "", fmt.Errorf("OIDC issuers not configured")
-	}
-	if cfg.OIDCClientID == "" {
-		return "", fmt.Errorf("OIDC client ID not configured")
-	}
-
-	issuer := cfg.OIDCValidIssuers[0]
-	provider, err := oidc.NewProvider(context.TODO(), issuer)
-	if err != nil {
-		return "", fmt.Errorf("unable to discover OIDC issuer %q: %v", issuer, err)
-	}
-
-	endpoint := provider.Endpoint()
-	form := url.Values{}
-	form.Set("grant_type", "refresh_token")
-	form.Set("refresh_token", refreshToken)
-	form.Set("client_id", cfg.OIDCClientID)
-	if cfg.OIDCClientSecret != "" {
-		form.Set("client_secret", cfg.OIDCClientSecret)
-	}
-
-	req, err := http.NewRequest(http.MethodPost, endpoint.TokenURL, strings.NewReader(form.Encode()))
-	if err != nil {
-		return "", fmt.Errorf("unable to build token exchange request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	client := &http.Client{Timeout: time.Second * 20}
-	res, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("token exchange failed: %v", err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(res.Body)
-		return "", fmt.Errorf("token exchange failed with status %d: %s", res.StatusCode, strings.TrimSpace(string(body)))
-	}
-
-	var tokenResp refreshTokenResponse
-	if err := json.NewDecoder(res.Body).Decode(&tokenResp); err != nil {
-		return "", fmt.Errorf("unable to decode token response: %v", err)
-	}
-	if tokenResp.AccessToken == "" {
-		return "", fmt.Errorf("token response missing access_token")
-	}
-
-	return tokenResp.AccessToken, nil*/
 }
 
 func getBearerToken(authHeader string) string {
@@ -826,8 +715,6 @@ func getBearerToken(authHeader string) string {
 func addAuthHeader(req *http.Request, authHeader string, token string, cluster types.Cluster) {
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
-		//fmt.Println(req.Header)
-		//fmt.Println(token)
 		return
 	}
 	if strings.HasPrefix(authHeader, "Bearer ") {
@@ -879,7 +766,7 @@ func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, e
 	req.SetBasicAuth(cluster.AuthUser, cluster.AuthPassword)
 
 	// Make HTTP client
-	// #nosec
+
 	var transport http.RoundTripper = &http.Transport{
 		// Enable/disable SSL verification
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
@@ -920,7 +807,7 @@ func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, e
 }
 
 func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHeader string, token string, delegation string) types.ReplicaList {
-	//fmt.Println("Process to getClusterStatus function.")
+
 	for id, replica := range replicas {
 		// Manage if replica.Type is "oscar"
 		if strings.ToLower(replica.Type) == oscarReplicaType {
@@ -929,7 +816,6 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 			if !ok {
 				if delegation != "static" {
 					replicas[id].Priority = noDelegateCode
-					//replica.Priority = noDelegateCode
 				}
 				fmt.Printf("Error checking to ClusterID \"%s\": Cluster not defined\n", replica.ClusterID)
 				continue
@@ -939,7 +825,6 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 			if err != nil {
 				if delegation != "static" {
 					replicas[id].Priority = noDelegateCode
-					//replica.Priority = noDelegateCode
 				}
 				fmt.Printf("Error parsing the cluster's endpoint URL to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", replica.ClusterID, cluster.Endpoint, err)
 				continue
@@ -951,7 +836,6 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 			if err != nil {
 				if delegation != "static" {
 					replicas[id].Priority = noDelegateCode
-					//replica.Priority = noDelegateCode
 				}
 				fmt.Printf("Error making request to ClusterID \"%s\": unable to make request: %v\n", replica.ClusterID, err)
 				continue
@@ -959,13 +843,10 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 			addAuthHeader(req, authHeader, token, cluster)
 
 			// Make HTTP client
-			//fmt.Println("SSLVerify :", cluster.SSLVerify)
-			// #nosec
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
 			}
-			//fmt.Println("Transport : ", transport)
 			client := &http.Client{
 				Transport: transport,
 				Timeout:   time.Second * 20,
@@ -973,11 +854,9 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 
 			// Send the request
 			res, err := client.Do(req)
-			//fmt.Println("StatusCode : ", res.StatusCode)
 			if err != nil {
 				if delegation != "static" {
 					replicas[id].Priority = noDelegateCode
-					//replica.Priority = noDelegateCode
 				}
 				fmt.Printf("Error getting cluster status to ClusterID \"%s\": unable to send request: %v\n", replica.ClusterID, err)
 				continue
@@ -985,7 +864,6 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 
 			// Check status code
 			if res.StatusCode == http.StatusOK {
-				//fmt.Printf("Successful get of cluster status to ClusterID\"%s\"\n", replica.ClusterID)
 
 				//Convert cluster status response to JSON
 				var clusterStatus types.StatusInfo
@@ -993,7 +871,6 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 				if err != nil {
 					if delegation != "static" {
 						replicas[id].Priority = noDelegateCode
-						//replica.Priority = noDelegateCode
 					}
 					fmt.Println("Error decoding the JSON of the response:", err)
 					continue
@@ -1005,7 +882,6 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 				if err != nil {
 					if delegation != "static" {
 						replicas[id].Priority = noDelegateCode
-						//replica.Priority = noDelegateCode
 					}
 					fmt.Println("Error to converter CPU of service to int: ", err)
 					continue
@@ -1015,23 +891,10 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 				if err != nil {
 					if delegation != "static" {
 						replicas[id].Priority = noDelegateCode
-						//replica.Priority = noDelegateCode
 					}
-
 					continue
-
 				}
 				serviceRAM := float64(quantityRAM.Value())
-
-				//fmt.Println("serviceCPU: ", serviceCPU)
-				//maxNodeCPU := float64(clusterStatus.Cluster.Metrics.CPU.MaxFreeOnNodeCores)
-				// Modificar para CPU Schedulable
-				//maxNodeCPU := float64(clusterStatus.Cluster.Metrics.CPU.MaxSchedulableOnNodeCores)
-
-				//fmt.Println("maxNodeCPU: ", maxNodeCPU)
-				//Calculate CPU difference to determine whether to delegate a replica to the cluster
-				//dist := maxNodeCPU - (1000 * serviceCPU)
-				//fmt.Println("CPU difference:  ", dist)
 
 				// Search for delegation condition on a cluster node:
 				canExecute := false
@@ -1045,11 +908,9 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 					dist_cpu_node := node_cpu_schedulable - (1000 * serviceCPU)
 					dist_mem_node := node_mem_schedulable - serviceRAM
 					if dist_cpu_node >= 0 && dist_mem_node >= 0 {
-						//fmt.Printf("Node Available : %s\n", node.Name)
 						canExecute = true
 						break
 					} else {
-						//fmt.Printf("Node Unavailable: %s\n", node.Name)
 						canExecute = false
 					}
 				}
@@ -1060,11 +921,8 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 					if delegation == "random" {
 						randPriority := rand.Intn(noDelegateCode)  // #nosec
 						replicas[id].Priority = uint(randPriority) // #nosec G115
-						//replica.Priority = uint(randPriority)
-						//fmt.Println("Resources available in ClusterID", replica.ClusterID, "--Priority ", replicas[id].Priority, " with ", delegation, " delegation")
 						timestamp := time.Now().Format("2006/01/02 15:04:05")
 						log.Printf("[RESOURCE-STATUS] %s | Resources available in ClusterID: %s -- Priority: %d with %s delegation", timestamp, replica.ClusterID, replicas[id].Priority, delegation)
-						//fmt.Println("Priority ", replicas[id].Priority, " with ", delegation, " delegation")
 					} else if delegation == "load-based" {
 						//Map the totalClusterCPU range to a smaller range (input range 0 to 32 cpu to output range 100 to 0 priority)
 
@@ -1091,15 +949,11 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 						healthScore := math.Round(geometricMean * 100)
 						mappedCPUPriority := 100 - int(healthScore)
 
-						//mappedCPUPriority := mapToRange(geometricMean, 0, 1, 100, 0)
-						replicas[id].Priority = uint(mappedCPUPriority) // #nosec G115
-						//replica.Priority = uint(mappedCPUPriority)
-						//fmt.Println("Resources available in ClusterID", replica.ClusterID, "--Priority ", replicas[id].Priority, " with ", delegation, " delegation")
+						replicas[id].Priority = uint(mappedCPUPriority)
 						timestamp := time.Now().Format("2006/01/02 15:04:05")
 						log.Printf("[RESOURCE-STATUS] %s | Resources available in ClusterID: %s -- Priority: %d with %s delegation", timestamp, replica.ClusterID, replicas[id].Priority, delegation) //fmt.Println("Priority ", replicas[id].Priority, " with ", delegation, " delegation")
 					} else if delegation != "static" {
 						replicas[id].Priority = noDelegateCode
-						//replica.Priority = noDelegateCode
 						fmt.Println("Error when declaring the type of delegation in ClusterID ", replica.ClusterID)
 						continue
 					}
@@ -1108,23 +962,18 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 
 					if delegation != "static" {
 						replicas[id].Priority = noDelegateCode
-						//fmt.Println("No resources to delegate job in ClusterID: ", replica.ClusterID, "--Priority ", replicas[id].Priority, " with ", delegation, " delegation")
 						timestamp := time.Now().Format("2006/01/02 15:04:05")
 						log.Printf("[RESOURCE-STATUS] %s | No resources to delegate job in ClusterID:: %s -- Priority: %d with %s delegation", timestamp, replica.ClusterID, replicas[id].Priority, delegation)
 
 					}
 					continue
 				}
-				//fmt.Println("Status Cluster ", clusterStatus)
-				//fmt.Println("Priority: ", replicas[id].Priority)
 
 			} else {
 				if delegation != "static" {
 					replicas[id].Priority = noDelegateCode
-					//fmt.Println("No resources to delegate job in ClusterID: ", replica.ClusterID, "--Priority ", replicas[id].Priority, " with ", delegation, " delegation")
 					timestamp := time.Now().Format("2006/01/02 15:04:05")
 					log.Printf("[RESOURCE-STATUS] %s | No resources to delegate job in ClusterID:: %s -- Priority: %d with %s delegation", timestamp, replica.ClusterID, replicas[id].Priority, delegation)
-					//replica.Priority = noDelegateCode
 				}
 				fmt.Printf("Error to get of cluster status to ClusterID\"%s\"\n", replica.ClusterID)
 			}
@@ -1152,22 +1001,12 @@ func topsisMethod(results [][]float64, weight []float64) []float64 {
 
 	// Step 1: Normalize the matrix
 	matrixNormalized := normalizeMatrix(results)
-	//fmt.Println("//Normalized matrix: ")
-	//for _, row := range matrizNormalizada {
-	//	fmt.Println(row)
-	//}
 
 	// Step 2: Weight the matrix
 	matrixWeighted := weightMatrix(matrixNormalized, weight)
-	//fmt.Println("\n//Weighted Matrix:")
-	//for _, row := range matrizPonderada {
-	//	fmt.Println(row)
-	//}
 
 	// Step 3: Compute the ideal and anti-ideal solution
 	ideal, antiIdeal := calculateSolutions(matrixWeighted)
-	//fmt.Println("\nIdeal Solution:", ideal)
-	//fmt.Println("Anti-Ideal Solution:", antiIdeal)
 
 	// Step 4: Compute the distances and preference index
 	preferences := calculatePreferences(matrixWeighted, ideal, antiIdeal)
@@ -1185,8 +1024,6 @@ func sortbyThreshold(preferences []float64, umbral int) []Alternative {
 	for _, alt := range alternativesSort {
 		fmt.Printf("Alternative %d: %f\n", alt.Index, alt.Preference)
 
-		//mapped := mapToRange(int64(alt*100.0), 0, 100, 100, 0)
-		//fmt.Printf("Original Preference: %.4f -> Mapped %d\n", alt, mapped)
 	}
 
 	distancesFromBetter := distancesFromBetter(alternativesSort)
@@ -1201,10 +1038,8 @@ func sortbyThreshold(preferences []float64, umbral int) []Alternative {
 
 	var priority_map int
 	for id, alt := range newAlternatives {
-		//fmt.Printf("Alternative %d: %d\n", alt.Index, int(alt.Preference*100))
 		priority_map = mapToRange(int64(alt.Preference*100.0), 0, 100, 100, 0)
 		newAlternatives[id].Preference = float64(priority_map)
-		//fmt.Printf("Alternative %d: %f\n", alt.Index, newAlternatives[id].Preference)
 	}
 
 	return newAlternatives
@@ -1243,7 +1078,7 @@ func countJobs(jobStatuses map[string]JobStatus) (float64, int) {
 
 func createParameters(results [][]float64, duration time.Duration, clusterStatus types.StatusInfo, serviceCPU float64, averageExecutionTime float64, pendingCount float64) [][]float64 {
 	maxNodeCPU := float64(clusterStatus.Cluster.Metrics.CPU.MaxFreeOnNodeCores)
-	dist := maxNodeCPU - (1000 * serviceCPU)
+	dist := maxNodeCPU - (1000 * serviceCPU) //
 
 	if dist >= 0 {
 		results = append(results, []float64{
@@ -1262,7 +1097,6 @@ func createParameters(results [][]float64, duration time.Duration, clusterStatus
 }
 
 func eventBuild(event string, storage_provider string) ([]byte, string) {
-	//fmt.Println("eventBuild Function...")
 	var eventMap map[string]interface{}
 	var cluster_storage string
 	err := json.Unmarshal([]byte(event), &eventMap)
@@ -1270,20 +1104,13 @@ func eventBuild(event string, storage_provider string) ([]byte, string) {
 		fmt.Println("Error to read the event:", err)
 		return nil, ""
 	}
-	//fmt.Println(len(eventMap))
 	var eventJSON []byte
 	if storage, exists := eventMap["storage_provider"]; exists {
-		//fmt.Println("The 'storage_provider' field exists in the event ")
 		eventValue := eventMap["event"]
-		//eventString, _ := json.Marshal(eventValue)
-
-		//delegatedEvent1 := WrapEvent(storage.(string), string(eventString))
 		delegatedEvent1 := WrapEvent(storage.(string), eventValue.(string))
-		//fmt.Println("New DelegatedEvent:", delegatedEvent1)
 
 		k, err1 := json.Marshal(delegatedEvent1)
 
-		//k, err1 := json.Marshal(event)
 		if err1 != nil {
 			fmt.Printf("error marshalling delegated event: %v ", err1)
 			return nil, ""
@@ -1293,10 +1120,8 @@ func eventBuild(event string, storage_provider string) ([]byte, string) {
 		cluster_storage = storage.(string)
 
 	} else {
-		//fmt.Println("The 'storage_provider' field does NOT exist in the event")
 
 		delegatedEvent := WrapEvent(storage_provider, event)
-		//fmt.Println("New DelegatedEvent:", delegatedEvent)
 
 		z, err2 := json.Marshal(delegatedEvent)
 		if err2 != nil {
@@ -1307,6 +1132,5 @@ func eventBuild(event string, storage_provider string) ([]byte, string) {
 		cluster_storage = storage_provider
 	}
 
-	//fmt.Println(string(eventJson))
 	return eventJSON, cluster_storage
 }

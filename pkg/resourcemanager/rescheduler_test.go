@@ -178,7 +178,7 @@ func TestStartReScheduler(t *testing.T) {
 
 	// Mock the Delegate function using test hook variable
 	origDelegate := delegateJobFunc
-	delegateJobFunc = func(*types.Service, string, string, *log.Logger, *types.Config, kubernetes.Interface) error {
+	delegateJobFunc = func(*types.Service, string, string, string, *log.Logger, *types.Config, kubernetes.Interface) error {
 		return nil
 	}
 	t.Cleanup(func() { delegateJobFunc = origDelegate })
