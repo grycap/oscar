@@ -82,6 +82,30 @@ func (k *KubeBackend) ListServices(namespaces ...string) ([]*types.Service, erro
 	return services, nil
 }
 
+// ListServicesByName returns a slice with services matching the provided name in the provided namespace(s)
+func (k *KubeBackend) ListServicesByName(name string, namespaces ...string) ([]*types.Service, error) {
+	// Get the list with all OSCAR services in the specified namespace(s)
+	configmaps, err := getAllServicesConfigMaps(k.kubeClientset, namespaces...)
+	if err != nil {
+		log.Printf("WARNING: %v\n", err)
+		return nil, err
+	}
+	services := []*types.Service{}
+
+	// Filter configmaps by service name
+	for _, cm := range configmaps.Items {
+		if cm.Labels[types.ServiceLabel] == name {
+			service, err := getServiceFromConfigMap(&cm) // #nosec G601
+			if err != nil {
+				return nil, err
+			}
+			service.Namespace = cm.Namespace
+			services = append(services, service)
+		}
+	}
+	return services, nil
+}
+
 // CreateService creates a new service as a k8s podTemplate
 func (k *KubeBackend) CreateService(service types.Service) error {
 	namespace := service.Namespace
@@ -103,6 +127,9 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 
 	if err := resources.EnsureServiceVolume(context.TODO(), k.config, k.kubeClientset, service, namespace); err != nil {
 		if delErr := deleteServiceConfigMap(service.Name, namespace, k.kubeClientset); delErr != nil {
+			log.Println(delErr.Error())
+		}
+		if delErr := resources.DeleteServiceVolume(context.TODO(), k.kubeClientset, service, namespace); delErr != nil {
 			log.Println(delErr.Error())
 		}
 		return err

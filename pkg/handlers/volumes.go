@@ -36,7 +36,7 @@ import (
 // @Description List managed volumes in the caller namespace.
 // @Tags volumes
 // @Produce json
-// @Success 200 {object} types.VolumeInfo
+// @Success 200 {array} types.ManagedVolume
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
@@ -44,7 +44,7 @@ import (
 // @Router /system/volumes [get]
 func MakeListVolumesHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		namespace, uid, err := resolveVolumeCaller(c, cfg, back)
+		namespace, _, err := resolveVolumeCaller(c, cfg, back)
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
@@ -56,18 +56,7 @@ func MakeListVolumesHandler(cfg *types.Config, back types.ServerlessBackend) gin
 			return
 		}
 
-		VolumeLimits, err := utils.GetVolumeLimitInfo(auth.FormatUID(uid), utils.BuildUserNamespace(cfg, uid), cfg, back.GetKubeClientset())
-		if err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
-			return
-		}
-
-		volumeInfo := types.VolumeInfo{
-			VolumeLimits:  *VolumeLimits,
-			ManagedVolume: volumes,
-		}
-
-		c.JSON(http.StatusOK, volumeInfo)
+		c.JSON(http.StatusOK, volumes)
 	}
 }
 
@@ -103,6 +92,12 @@ func MakeCreateVolumeHandler(cfg *types.Config, back types.ServerlessBackend) gi
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
+		if owner != types.DefaultOwner {
+			if err := utils.ValidateManagedVolumeQuota(auth.FormatUID(owner), namespace, req.Size, cfg, back.GetKubeClientset()); err != nil {
+				c.String(http.StatusBadRequest, err.Error())
+				return
+			}
+		}
 
 		err = resources.CreateManagedVolume(
 			c.Request.Context(),
@@ -132,43 +127,6 @@ func MakeCreateVolumeHandler(cfg *types.Config, back types.ServerlessBackend) gi
 			return
 		}
 		c.JSON(http.StatusCreated, volume)
-	}
-}
-
-// MakeUpdateVolumeHandler godoc
-// @Summary Update volume
-// @Description Update a managed volume in the caller namespace.
-// @Tags volumes
-// @Accept json
-// @Produce json
-// @Param volume body types.ManagedVolumeCreateRequest true "Volume definition"
-// @Success 204 {string} string "No Content"
-// @Failure 400 {string} string "Bad Request"
-// @Failure 401 {string} string "Unauthorized"
-// @Failure 409 {string} string "Conflict"
-// @Failure 500 {string} string "Internal Server Error"
-// @Security BasicAuth
-// @Router /system/volumes/{userId} [post]
-func MakeUpdateVolumeHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		user := c.Param("userId")
-		authUser := c.GetString(gin.AuthUserKey)
-		if authUser != cfg.Username {
-			c.String(http.StatusForbidden, "forbidden")
-			return
-		}
-
-		var vl types.VolumeLimits
-		if err := c.ShouldBindJSON(&vl); err != nil {
-			c.String(http.StatusBadRequest, fmt.Sprintf("The volume specification is not valid: %v", err))
-			return
-		}
-
-		err := utils.UpdateVolumeLimits(vl, auth.FormatUID(user), utils.BuildUserNamespace(cfg, user), back.GetKubeClientset(), cfg)
-		if err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error at updating volume: %v", err))
-		}
-		c.Status(http.StatusNoContent)
 	}
 }
 

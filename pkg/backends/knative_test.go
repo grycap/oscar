@@ -806,7 +806,7 @@ func TestKnativeGetProxyDirector(t *testing.T) {
 
 	back := MakeKnativeBackend(clientset, fakeConfig, testConfig)
 
-	proxyDirector := back.GetProxyDirector("testService")
+	proxyDirector := back.GetProxyDirector("testService", testConfig.ServicesNamespace)
 
 	testReq, _ := http.NewRequest(http.MethodPost, "testurl", nil)
 

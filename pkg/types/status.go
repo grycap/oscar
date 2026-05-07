@@ -39,13 +39,17 @@ type ClusterMetrics struct {
 }
 
 type CPUMetrics struct {
-	TotalFreeCores     int64 `json:"total_free_cores"`
-	MaxFreeOnNodeCores int64 `json:"max_free_on_node_cores"`
+	TotalFreeCores            int64 `json:"total_free_cores"`
+	MaxFreeOnNodeCores        int64 `json:"max_free_on_node_cores"`
+	TotalSchedulableCores     int64 `json:"total_schedulable_cores"`
+	MaxSchedulableOnNodeCores int64 `json:"total_schedulable_on_node_cores"`
 }
 
 type MemoryMetrics struct {
-	TotalFreeBytes     int64 `json:"total_free_bytes"`
-	MaxFreeOnNodeBytes int64 `json:"max_free_on_node_bytes"`
+	TotalFreeBytes            int64 `json:"total_free_bytes"`
+	MaxFreeOnNodeBytes        int64 `json:"max_free_on_node_bytes"`
+	TotalSchedulableBytes     int64 `json:"total_schedulable_bytes"`
+	MaxSchedulableOnNodeBytes int64 `json:"max_schedulable_on_node_bytes"`
 }
 
 type GPUMetrics struct {
@@ -65,8 +69,10 @@ type NodeDetail struct {
 type NodeResource struct {
 	CapacityCores int64 `json:"capacity_cores,omitempty"`
 	UsageCores    int64 `json:"usage_cores,omitempty"`
+	RequestCores  int64 `json:"request_cores,omitempty"`
 	CapacityBytes int64 `json:"capacity_bytes,omitempty"`
 	UsageBytes    int64 `json:"usage_bytes,omitempty"`
+	RequestBytes  int64 `json:"request_bytes,omitempty"`
 }
 
 type NodeConditionSimple struct {

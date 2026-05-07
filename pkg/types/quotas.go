@@ -30,8 +30,9 @@ type QuotaBackend struct {
 
 type QuotaResponse struct {
 	UserID       string                 `json:"user_id"`
-	ClusterQueue string                 `json:"cluster_queue"`
-	Resources    map[string]QuotaValues `json:"resources"`
+	ClusterQueue string                 `json:"cluster_queue,omitempty"`
+	Resources    map[string]QuotaValues `json:"resources,omitempty"`
+	Volumes      *VolumeQuotaResponse   `json:"volumes,omitempty"`
 }
 
 type QuotaValues struct {
@@ -39,9 +40,33 @@ type QuotaValues struct {
 	Used int64 `json:"used"`
 }
 
+type VolumeQuotaResponse struct {
+	// Disk contains the user-visible storage quota for OSCAR-managed volumes.
+	Disk VolumeQuotaValues `json:"disk"`
+	// Volumes contains the user-visible count quota for OSCAR-managed volumes.
+	Volumes          VolumeQuotaValues `json:"volumes"`
+	MaxDiskperVolume string            `json:"max_disk_per_volume"`
+	MinDiskperVolume string            `json:"min_disk_per_volume"`
+}
+
+type VolumeQuotaValues struct {
+	Max  string `json:"max"`
+	Used string `json:"used"`
+}
+
 type QuotaUpdateRequest struct {
-	CPU    string `json:"cpu"`
-	Memory string `json:"memory"`
+	CPU     string             `json:"cpu"`
+	Memory  string             `json:"memory"`
+	Volumes *VolumeQuotaUpdate `json:"volumes,omitempty"`
+}
+
+type VolumeQuotaUpdate struct {
+	// Disk sets the user-visible storage quota for OSCAR-managed volumes.
+	Disk string `json:"disk,omitempty"`
+	// Volumes sets the user-visible count quota for OSCAR-managed volumes.
+	Volumes          string `json:"volumes,omitempty"`
+	MaxDiskperVolume string `json:"max_disk_per_volume,omitempty"`
+	MinDiskperVolume string `json:"min_disk_per_volume,omitempty"`
 }
 
 func CreateQuotaBackend(kubeConfig *rest.Config, kubeClientset *kubernetes.Clientset) *QuotaBackend {

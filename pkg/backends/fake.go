@@ -47,11 +47,12 @@ type FakeBackend struct {
 func MakeFakeBackend() *FakeBackend {
 	return &FakeBackend{
 		errors: map[string][]error{
-			"ListServices":  {},
-			"CreateService": {},
-			"ReadService":   {},
-			"UpdateService": {},
-			"DeleteService": {},
+			"ListServices":       {},
+			"ListServicesByName": {},
+			"CreateService":      {},
+			"ReadService":        {},
+			"UpdateService":      {},
+			"DeleteService":      {},
 		},
 		kubeClientset: testclient.NewSimpleClientset(),
 	}
@@ -61,12 +62,13 @@ func MakeFakeBackend() *FakeBackend {
 func MakeFakeSyncBackend() *FakeBackend {
 	return &FakeBackend{
 		errors: map[string][]error{
-			"ListServices":     {},
-			"CreateService":    {},
-			"ReadService":      {},
-			"UpdateService":    {},
-			"DeleteService":    {},
-			"GetProxyDirector": {},
+			"ListServices":       {},
+			"ListServicesByName": {},
+			"CreateService":      {},
+			"ReadService":        {},
+			"UpdateService":      {},
+			"DeleteService":      {},
+			"GetProxyDirector":   {},
 		},
 	}
 }
@@ -83,6 +85,21 @@ func (f *FakeBackend) GetInfo() *types.ServerlessBackendInfo {
 func (f *FakeBackend) ListServices(namespaces ...string) ([]*types.Service, error) {
 	if f.Services != nil {
 		return f.Services, f.returnError(getCurrentFuncName())
+	}
+	return []*types.Service{}, f.returnError(getCurrentFuncName())
+}
+
+// ListServicesByName returns a slice with services matching the provided name in the provided namespace (fake)
+func (f *FakeBackend) ListServicesByName(name string, namespaces ...string) ([]*types.Service, error) {
+	if f.Services != nil {
+		// Filter services by name
+		filteredServices := []*types.Service{}
+		for _, svc := range f.Services {
+			if svc.Name == name {
+				filteredServices = append(filteredServices, svc)
+			}
+		}
+		return filteredServices, f.returnError(getCurrentFuncName())
 	}
 	return []*types.Service{}, f.returnError(getCurrentFuncName())
 }
@@ -133,7 +150,7 @@ func (f *FakeBackend) SetKubeClientset(client kubernetes.Interface) {
 }
 
 // GetProxyDirector returns the ProxyDirector (fake)
-func (f *FakeBackend) GetProxyDirector(serviceName string) func(req *http.Request) {
+func (f *FakeBackend) GetProxyDirector(serviceName string, serviceNamespace string) func(req *http.Request) {
 	return func(req *http.Request) {
 		host := "httpbin.org"
 		req.Host = host

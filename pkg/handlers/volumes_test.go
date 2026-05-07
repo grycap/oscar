@@ -70,6 +70,32 @@ func TestVolumeHandlersCRUD(t *testing.T) {
 	}
 }
 
+func TestCreateVolumeHandlerRejectsQuotaExceeded(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	cfg := &types.Config{ServicesNamespace: "oscar-svc"}
+	createBaseRuntimePVC(t, back, cfg)
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "user@example.org")
+		c.Next()
+	})
+	r.POST("/system/volumes", MakeCreateVolumeHandler(cfg, back))
+
+	req := httptest.NewRequest(http.MethodPost, "/system/volumes", strings.NewReader(`{"name":"too-large","size":"2Gi"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected create volume status 400, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if !strings.Contains(resp.Body.String(), "not enough volume disk quota") {
+		t.Fatalf("expected volume quota error, got %s", resp.Body.String())
+	}
+}
+
 func TestDeleteVolumeHandlerRejectsAttachedVolume(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	back := backends.MakeFakeBackend()
@@ -117,6 +143,10 @@ func TestDeleteVolumeHandlerRejectsAttachedVolume(t *testing.T) {
 
 func createBaseRuntimePVC(t *testing.T, back *backends.FakeBackend, cfg *types.Config) {
 	t.Helper()
+	namespace := utils.BuildUserNamespace(cfg, "user@example.org")
+	_, _ = back.GetKubeClientset().CoreV1().Namespaces().Create(t.Context(), &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: namespace},
+	}, metav1.CreateOptions{})
 	_, _ = back.GetKubeClientset().CoreV1().PersistentVolumes().Create(t.Context(), &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "base-oscar-pv",
@@ -134,10 +164,11 @@ func createBaseRuntimePVC(t *testing.T, back *backends.FakeBackend, cfg *types.C
 			Phase: v1.ClaimBound,
 		},
 	}, metav1.CreateOptions{})
-	_, _ = back.GetKubeClientset().CoreV1().ResourceQuotas("oscar-svc-user-example-org-547e41ffe2031bcdc35ffc6687f10d498c46").Create(t.Context(), &v1.ResourceQuota{
+	userNS := utils.BuildUserNamespace(cfg, "user@example.org")
+	_, _ = back.GetKubeClientset().CoreV1().ResourceQuotas(userNS).Create(t.Context(), &v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "user",
-			Namespace: "oscar-svc-user-example-org-547e41ffe2031bcdc35ffc6687f10d498c46",
+			Namespace: userNS,
 		},
 		Spec: v1.ResourceQuotaSpec{
 			Hard: v1.ResourceList{
@@ -146,10 +177,10 @@ func createBaseRuntimePVC(t *testing.T, back *backends.FakeBackend, cfg *types.C
 			},
 		},
 	}, metav1.CreateOptions{})
-	_, _ = back.GetKubeClientset().CoreV1().LimitRanges("oscar-svc-user-example-org-547e41ffe2031bcdc35ffc6687f10d498c46").Create(t.Context(), &v1.LimitRange{
+	_, _ = back.GetKubeClientset().CoreV1().LimitRanges(userNS).Create(t.Context(), &v1.LimitRange{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "user",
-			Namespace: "oscar-svc-user-example-org-547e41ffe2031bcdc35ffc6687f10d498c46",
+			Namespace: userNS,
 		},
 		Spec: v1.LimitRangeSpec{
 			Limits: []v1.LimitRangeItem{

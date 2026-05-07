@@ -53,13 +53,13 @@ func TestBuildUserNamespace(t *testing.T) {
 			name:     "custom owner with default prefix",
 			cfg:      &types.Config{ServicesNamespace: "oscar-svc"},
 			owner:    "testuser",
-			expected: "oscar-svc-testuser-45c571a156ddcef41351a713bcddee5ba7e95460",
+			expected: "oscar-svc-testuser",
 		},
 		{
 			name:     "custom owner with custom prefix",
 			cfg:      &types.Config{ServicesNamespace: "custom-svc"},
 			owner:    "testuser",
-			expected: "custom-svc-testuser-45c571a156ddcef41351a713bcddee5ba7e95460",
+			expected: "custom-svc-testuse",
 		},
 		{
 			name:     "nil config",
@@ -71,7 +71,7 @@ func TestBuildUserNamespace(t *testing.T) {
 			name:     "empty services namespace",
 			cfg:      &types.Config{ServicesNamespace: ""},
 			owner:    "testuser",
-			expected: "oscar-svc-testuser-45c571a156ddcef41351a713bcddee5ba7e95460",
+			expected: "oscar-svc-testuser",
 		},
 	}
 
@@ -463,8 +463,8 @@ func TestEnsureUserNamespaceBasic(t *testing.T) {
 		// Just test namespace generation, don't try to create resources
 		expected := BuildUserNamespace(cfg, "testuser")
 
-		if expected != "oscar-svc-testuser-45c571a156ddcef41351a713bcddee5ba7e95460" {
-			t.Errorf("Expected namespace %s, got %s", "oscar-svc-testuser-45c571a156ddcef41351a713bcddee5ba7e95460", expected)
+		if expected != "oscar-svc-testuser" {
+			t.Errorf("Expected namespace %s, got %s", "oscar-svc-testuser", expected)
 		}
 	})
 
@@ -485,8 +485,8 @@ func TestEnsureUserNamespaceBasic(t *testing.T) {
 
 func TestNamespaceConstants(t *testing.T) {
 	// Test that constants have expected values
-	if maxNamespaceLength != 63 {
-		t.Errorf("Expected maxNamespaceLength 63, got %d", maxNamespaceLength)
+	if maxNamespaceLength != 18 {
+		t.Errorf("Expected maxNamespaceLength 18, got %d", maxNamespaceLength)
 	}
 
 	if controllerRoleName != "oscar-controller" {
@@ -522,7 +522,7 @@ func TestNamespaceConstants(t *testing.T) {
 	}
 }
 
-func TestEnsureControllerRoleIncludesPodDeleteCollectionOnCreate(t *testing.T) {
+func TestEnsureControllerRoleIncludesVolumeQuotaPermissionsOnCreate(t *testing.T) {
 	ctx := context.Background()
 	namespace := "test-ns"
 
@@ -539,18 +539,38 @@ func TestEnsureControllerRoleIncludesPodDeleteCollectionOnCreate(t *testing.T) {
 		t.Fatalf("Unable to retrieve controller role: %v", err)
 	}
 
-	found := false
+	foundPodsRule := false
+	foundResourceQuotas := false
+	foundLimitRanges := false
 	for _, rule := range role.Rules {
 		if containsString(rule.APIGroups, "") && containsString(rule.Resources, "pods") {
-			found = true
+			foundPodsRule = true
 			if !containsString(rule.Verbs, "deletecollection") {
 				t.Fatalf("Expected pods rule to include deletecollection verb. Verbs: %v", rule.Verbs)
 			}
 		}
+		if containsString(rule.APIGroups, "") && containsString(rule.Resources, "resourcequotas") {
+			foundResourceQuotas = true
+			if !containsString(rule.Verbs, "get") || !containsString(rule.Verbs, "create") || !containsString(rule.Verbs, "update") {
+				t.Fatalf("Expected resourcequotas rule to include get/create/update verbs. Verbs: %v", rule.Verbs)
+			}
+		}
+		if containsString(rule.APIGroups, "") && containsString(rule.Resources, "limitranges") {
+			foundLimitRanges = true
+			if !containsString(rule.Verbs, "get") || !containsString(rule.Verbs, "create") || !containsString(rule.Verbs, "update") {
+				t.Fatalf("Expected limitranges rule to include get/create/update verbs. Verbs: %v", rule.Verbs)
+			}
+		}
 	}
 
-	if !found {
+	if !foundPodsRule {
 		t.Fatal("Expected a core API rule with pods resource")
+	}
+	if !foundResourceQuotas {
+		t.Fatal("Expected a core API rule with resourcequotas resource")
+	}
+	if !foundLimitRanges {
+		t.Fatal("Expected a core API rule with limitranges resource")
 	}
 }
 

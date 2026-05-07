@@ -18,6 +18,12 @@ import (
 
 func TestMakeJobHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
+	back.Services = []*types.Service{{
+		Name:  "testName",
+		Token: "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf",
+		CPU:   "100m",
+		Memory: "128Mi",
+	}}
 	cfg := types.Config{}
 	kubeClient := testclient.NewSimpleClientset()
 
@@ -27,7 +33,7 @@ func TestMakeJobHandler(t *testing.T) {
 	w := httptest.NewRecorder()
 	body := strings.NewReader(`{"Records": [{"requestParameters": {"principalId": "uid", "sourceIPAddress": "ip"}}]}`)
 	serviceName := "testName"
-	req, _ := http.NewRequest("POST", "/job/services"+serviceName, body)
+	req, _ := http.NewRequest("POST", "/job/"+serviceName, body)
 	req.Header.Set("Authorization", "Bearer 11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf")
 	r.ServeHTTP(w, req)
 

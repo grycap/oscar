@@ -31,11 +31,6 @@ const (
 	VolumePhaseDeleted  = "deleted"
 )
 
-type VolumeInfo struct {
-	VolumeLimits  VolumeLimits    `json:"volume_limits"`
-	ManagedVolume []ManagedVolume `json:"managed_volume"`
-}
-
 type VolumeLimits struct {
 	DiskAvailable    string `json:"disk_available"`
 	MaxVolumes       string `json:"max_volumes"`

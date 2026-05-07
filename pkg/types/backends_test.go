@@ -95,7 +95,7 @@ type mockSyncBackend struct {
 	*mockServerlessBackend
 }
 
-func (m *mockSyncBackend) GetProxyDirector(serviceName string) func(req *http.Request) {
+func (m *mockSyncBackend) GetProxyDirector(serviceName string, serviceNamespace string) func(req *http.Request) {
 	return m.proxyFunc
 }
 
@@ -302,7 +302,7 @@ func TestSyncBackendInterface(t *testing.T) {
 	}
 
 	backend.proxyFunc = proxyFunc
-	director := backend.GetProxyDirector("test-service")
+	director := backend.GetProxyDirector("test-service", "default")
 
 	if director == nil {
 		t.Error("Expected GetProxyDirector to return non-nil director")
@@ -333,13 +333,13 @@ func TestSyncBackendMultipleProxyDirectors(t *testing.T) {
 
 	// Test director for service1
 	backend.proxyFunc = proxyFunc1
-	director1 := backend.GetProxyDirector("service1")
+	director1 := backend.GetProxyDirector("service1", "default")
 	req1 := &http.Request{}
 	director1(req1)
 
 	// Test director for service2
 	backend.proxyFunc = proxyFunc2
-	director2 := backend.GetProxyDirector("service2")
+	director2 := backend.GetProxyDirector("service2", "default")
 	req2 := &http.Request{}
 	director2(req2)
 

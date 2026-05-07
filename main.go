@@ -100,6 +100,11 @@ func main() {
 	var qb *types.QuotaBackend
 	if cfg.KueueEnable {
 		qb = types.CreateQuotaBackend(kubeConfig, kubeClientset)
+	} else if cfg.VolumeEnable {
+		qb = &types.QuotaBackend{KubeClientset: kubeClientset}
+	}
+	if qb == nil && (cfg.KueueEnable || cfg.VolumeEnable) {
+		qb = &types.QuotaBackend{KubeClientset: kubeClientset}
 	}
 
 	// Create the router
@@ -128,7 +133,6 @@ func main() {
 	if cfg.VolumeEnable {
 		system.GET("/volumes", handlers.MakeListVolumesHandler(cfg, back))
 		system.POST("/volumes", handlers.MakeCreateVolumeHandler(cfg, back))
-		system.PUT("/volumes/:userId", handlers.MakeUpdateVolumeHandler(cfg, back))
 		system.GET("/volumes/:volumeName", handlers.MakeReadVolumeHandler(cfg, back))
 		system.DELETE("/volumes/:volumeName", handlers.MakeDeleteVolumeHandler(cfg, back))
 	}
@@ -158,7 +162,7 @@ func main() {
 	metricsGroup.GET("/breakdown", handlers.MakeMetricsBreakdownHandler(back, metricsAgg))
 	metricsGroup.GET("/:serviceName", handlers.MakeMetricValueHandler(back, metricsAgg))
 	// Quotas
-	if cfg.KueueEnable {
+	if cfg.KueueEnable || cfg.VolumeEnable {
 		system.GET("/quotas/user", handlers.MakeGetOwnQuotaHandler(*qb, cfg))
 		system.GET("/quotas/user/:userId", handlers.MakeGetUserQuotaHandler(*qb, cfg))
 		system.PUT("/quotas/user/:userId", handlers.MakeUpdateUserQuotaHandler(*qb, cfg))

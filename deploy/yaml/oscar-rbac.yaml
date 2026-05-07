@@ -21,6 +21,8 @@ rules:
   - secrets
   - services
   - persistentvolumeclaims
+  - resourcequotas
+  - limitranges
   verbs:
   - get
   - list
@@ -136,6 +138,8 @@ rules:
   - pods/log
   - podtemplates
   - persistentvolumeclaims
+  - resourcequotas
+  - limitranges
   - secrets
   - services
   verbs:

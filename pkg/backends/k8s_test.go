@@ -847,7 +847,7 @@ func TestKubeGetKubeClientset(t *testing.T) {
 func TestGetExposedServiceDeployment(t *testing.T) {
 	client := fake.NewSimpleClientset(&appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "svc-dlp",
+			Name:      "svc-dpl",
 			Namespace: "ns",
 		},
 	})
@@ -856,8 +856,8 @@ func TestGetExposedServiceDeployment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get exposed deployment: %v", err)
 	}
-	if deployment.Name != "svc-dlp" {
-		t.Fatalf("expected deployment name svc-dlp, got %s", deployment.Name)
+	if deployment.Name != "svc-dpl" {
+		t.Fatalf("expected deployment name svc-dpl, got %s", deployment.Name)
 	}
 }
 
