@@ -168,7 +168,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		// If the service is a KServe service, create the associated InferenceService
 		if isKserve {
 			// The Kserve service set an OwnerReference to the Knative service, so if the Knative service is deleted the KServe InferenceService will be automatically deleted by Kubernetes garbage collection
-			err := utils.CreateKserveInferenceService(&service, createdKnSvc, kn.config)
+			err := utils.CreateKserveService(&service, createdKnSvc, kn.config)
 			if err != nil {
 				if knSvcDelErr := kn.knClientset.ServingV1().Services(namespace).Delete(context.TODO(), knSvc.Name, metav1.DeleteOptions{}); knSvcDelErr != nil {
 					log.Println(knSvcDelErr.Error())
@@ -293,8 +293,11 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 
 	// If the service is a KServe service, update the associated InferenceService
 	if isKserve {
-		// The Kserve service set an OwnerReference to the Knative service, so if the Knative service is deleted the KServe InferenceService will be automatically deleted by Kubernetes garbage collection
-		updateErr := utils.UpdateKserveInferenceService(&service, namespace)
+		oldService, updateErr := getServiceFromConfigMap(oldCm)
+		if updateErr == nil {
+			// The Kserve service set an OwnerReference to the Knative service, so if the Knative service is deleted the KServe InferenceService will be automatically deleted by Kubernetes garbage collection
+			updateErr = utils.UpdateKserveService(&service, oldService, namespace)
+		}
 		if updateErr != nil {
 			log.Printf("Error updating asociated KServe InferenceService: %v", updateErr)
 			// Restore the old Knative Service
@@ -488,7 +491,6 @@ func (kn *KnativeBackend) GetKubeClientset() kubernetes.Interface {
 
 func isKserveServiceAndSupported(service *types.Service, kn *KnativeBackend) bool {
 	return (kn.config.KserveEnable &&
-		//	kn.kserveClientset != nil &&
 		utils.IsKserveService(service) &&
 		kn.config.ExposedServicesRouteKind == "httproute")
 }

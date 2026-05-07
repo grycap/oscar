@@ -136,7 +136,7 @@ func TestNewKserveInferenceServiceDefinition_Success(t *testing.T) {
 	uid := types.UID("test-uid-1234")
 	knSvc := knativeServiceWithUID(uid)
 
-	isvc, err := NewKserveInferenceServiceDefinition(svc, knSvc)
+	isvc, err := NewKserveInferenceServiceDefinition(svc, knSvc, &oscarType.Config{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -212,7 +212,7 @@ func TestNewKserveInferenceServiceDefinition_ProtocolVersion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := kserveService()
 			svc.Kserve.APIVersion = tt.input
-			isvc, err := NewKserveInferenceServiceDefinition(svc, knSvc)
+			isvc, err := NewKserveInferenceServiceDefinition(svc, knSvc, &oscarType.Config{})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -228,7 +228,7 @@ func TestNewKserveInferenceServiceDefinition_NoKserveConfig(t *testing.T) {
 	svc := &oscarType.Service{Name: "no-kserve"}
 	knSvc := knativeServiceWithUID("uid")
 
-	_, err := NewKserveInferenceServiceDefinition(svc, knSvc)
+	_, err := NewKserveInferenceServiceDefinition(svc, knSvc, &oscarType.Config{})
 	if err == nil {
 		t.Error("expected error when service has no KServe configuration, got nil")
 	}
@@ -239,7 +239,7 @@ func TestNewKserveInferenceServiceDefinition_InvalidCPU(t *testing.T) {
 	svc.Kserve.CPU = "not-valid-cpu"
 	knSvc := knativeServiceWithUID("uid")
 
-	_, err := NewKserveInferenceServiceDefinition(svc, knSvc)
+	_, err := NewKserveInferenceServiceDefinition(svc, knSvc, &oscarType.Config{})
 	if err == nil {
 		t.Error("expected error due to invalid CPU quantity, got nil")
 	}
@@ -250,7 +250,7 @@ func TestNewKserveInferenceServiceDefinition_InvalidMemory(t *testing.T) {
 	svc.Kserve.Memory = "bad-mem"
 	knSvc := knativeServiceWithUID("uid")
 
-	_, err := NewKserveInferenceServiceDefinition(svc, knSvc)
+	_, err := NewKserveInferenceServiceDefinition(svc, knSvc, &oscarType.Config{})
 	if err == nil {
 		t.Error("expected error due to invalid memory quantity, got nil")
 	}
@@ -262,7 +262,7 @@ func TestUpdateKserveInferenceServiceDefinition_Success(t *testing.T) {
 	original := kserveService()
 	knSvc := knativeServiceWithUID("uid-update")
 
-	oldIsvc, err := NewKserveInferenceServiceDefinition(original, knSvc)
+	oldIsvc, err := NewKserveInferenceServiceDefinition(original, knSvc, &oscarType.Config{})
 	if err != nil {
 		t.Fatalf("setup error: %v", err)
 	}
@@ -305,7 +305,7 @@ func TestUpdateKserveInferenceServiceDefinition_ProtocolVersion(t *testing.T) {
 	original := kserveService()
 	knSvc := knativeServiceWithUID("uid-update")
 
-	oldIsvc, err := NewKserveInferenceServiceDefinition(original, knSvc)
+	oldIsvc, err := NewKserveInferenceServiceDefinition(original, knSvc, &oscarType.Config{})
 	if err != nil {
 		t.Fatalf("setup error: %v", err)
 	}
@@ -389,16 +389,44 @@ func TestValidModelFormat(t *testing.T) {
 		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "pytorch"}}, true},
 		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "tensorflow"}}, true},
 		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "triton"}}, true},
-		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: ""}}, false},
+		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: ""}}, false}, // empty string should be invalid
 		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "unknown"}}, false},
-		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "SKLEARN"}}, false},
+		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "SKLEARN"}}, true}, // case-insensitive
 		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "torch"}}, false},
+		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "llm"}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.service.Kserve.ModelFormat, func(t *testing.T) {
 			got := validModelFormat(tt.service)
 			if got != tt.valid {
 				t.Errorf("validModelFormat(%q) = %v, want %v", tt.service.Kserve.ModelFormat, got, tt.valid)
+			}
+		})
+	}
+}
+
+// ─── getKserveType ────────────────────────────────────────────────────────
+
+func TestGetKserveType(t *testing.T) {
+	tests := []struct {
+		modelFormat string
+		expected    string
+	}{
+		{"onnx", "predictor"},
+		{"sklearn", "predictor"},
+		{"xgboost", "predictor"},
+		{"pytorch", "predictor"},
+		{"tensorflow", "predictor"},
+		{"triton", "predictor"},
+		{"llm", "llm"},
+		{"", ""},
+		{"unknown", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.modelFormat, func(t *testing.T) {
+			got := getKserveType(tt.modelFormat)
+			if got != tt.expected {
+				t.Errorf("getKserveType(%q) = %v, want %v", tt.modelFormat, got, tt.expected)
 			}
 		})
 	}
