@@ -627,10 +627,13 @@ func collectDeploymentLogs(kubeClientset kubernetes.Interface, namespace string,
 func getPodDeploymentLogs(kubeClientset kubernetes.Interface, pod *corev1.Pod, namespace string, tailLines int64) ([]logEntryWithTime, error) {
 	containerName := types.ContainerName
 
-	if pod.Spec.Containers[0].Name == utils.KserveISVCContainerName {
-		containerName = utils.KserveISVCContainerName
-	} else if pod.Labels[utils.KserveLLMISVCLabelKey] == utils.KserveLLMISVCLabelValue && pod.Spec.Containers[0].Name == utils.KserveLLMISVCContainerName {
-		containerName = utils.KserveLLMISVCContainerName
+	if len(pod.Spec.Containers) > 0 {
+		// TO DO: See somthing better
+		if pod.Spec.Containers[0].Name == utils.KserveISVCContainerName {
+			containerName = utils.KserveISVCContainerName
+		} else if pod.Labels[utils.KserveLLMISVCLabelKey] == utils.KserveLLMISVCLabelValue && pod.Spec.Containers[0].Name == utils.KserveLLMISVCContainerName {
+			containerName = utils.KserveLLMISVCContainerName
+		}
 	}
 
 	req := kubeClientset.CoreV1().Pods(namespace).GetLogs(pod.Name, &corev1.PodLogOptions{
