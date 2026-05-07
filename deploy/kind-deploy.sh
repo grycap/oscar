@@ -331,25 +331,24 @@ checkOSCARDeploy(){
     creation_timeout=120
     readiness_timeout=600
     start=$(date +%s)
-    echo -e "\n[*] Waiting for OSCAR pods to be scheduled ..."
+    echo -e "\n[*] Waiting for OSCAR deployment to be created ..."
     while true; do
-        pod_info=$(kubectl get pods -n oscar -l app=oscar --no-headers 2>/dev/null)
-        if [ -n "$pod_info" ]; then
-            pod_count=$(echo "$pod_info" | wc -l | tr -d ' ')
-            echo -e "\n[*] Detected $pod_count OSCAR pod(s). Waiting for them to become ready (timeout ${readiness_timeout}s) ..."
+        if kubectl get deployment -n oscar oscar >/dev/null 2>&1; then
+            echo -e "\n[*] OSCAR deployment detected. Waiting for rollout to complete (timeout ${readiness_timeout}s) ..."
             break
         fi
         actual=$(date +%s)
         if [ $((actual - start)) -gt $creation_timeout ]; then
-            echo -e "\n$RED[!]$END_COLOR Error: OSCAR pods were not created after ${creation_timeout}s."
-            kubectl get pods -n oscar
+            echo -e "\n$RED[!]$END_COLOR Error: OSCAR deployment was not created after ${creation_timeout}s."
+            kubectl get deployment -n oscar
             exit 1
         fi
         sleep 5
     done
 
-    if ! kubectl wait --namespace oscar --for=condition=Ready pod -l app=oscar --timeout="${readiness_timeout}s"; then
-        echo -e "\n$RED[!]$END_COLOR Error: OSCAR pods did not become ready after ${readiness_timeout}s."
+    if ! kubectl -n oscar rollout status deployment/oscar --timeout="${readiness_timeout}s"; then
+        echo -e "\n$RED[!]$END_COLOR Error: OSCAR deployment rollout did not complete after ${readiness_timeout}s."
+        kubectl get deployment -n oscar oscar
         kubectl get pods -n oscar
         failing_pods=$(kubectl get pods -n oscar -l app=oscar --no-headers | awk '{
             split($2, ready, "/");
