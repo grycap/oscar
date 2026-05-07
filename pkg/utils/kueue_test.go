@@ -2,6 +2,8 @@ package utils
 
 import (
 	"context"
+	"math"
+	"strconv"
 	"testing"
 
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -431,6 +433,39 @@ func TestGetResourceOnlyWorkloadSpec(t *testing.T) {
 
 	if _, ok := resources.Requests[v1.ResourceMemory]; !ok {
 		t.Fatal("expected memory request in resource-only workload")
+	}
+}
+
+func TestGetResourceOnlyWorkloadSpecUsesSynchronousMinScale(t *testing.T) {
+	service := newTestService("test-service", "testuser")
+	service.Expose.APIPort = 0
+	service.Synchronous.MinScale = 3
+	cfg := newTestConfig()
+
+	workload, err := getResourceOnlyWorkloadSpec(&service, cfg, "test-ns", "verify-test-service", "oscar-lq-test-service")
+	if err != nil {
+		t.Fatalf("getResourceOnlyWorkloadSpec() returned error: %v", err)
+	}
+
+	if workload.Spec.PodSets[0].Count != int32(service.Synchronous.MinScale) {
+		t.Fatalf("service podset replicas = %d, want %d", workload.Spec.PodSets[0].Count, service.Synchronous.MinScale)
+	}
+}
+
+func TestGetResourceOnlyWorkloadSpecSynchronousMinScaleOverflow(t *testing.T) {
+	if strconv.IntSize <= 32 {
+		t.Skip("int overflow test requires 64-bit int")
+	}
+
+	service := newTestService("test-service", "testuser")
+	service.Expose.APIPort = 0
+	overflowMinScale := int64(math.MaxInt32) + 1
+	service.Synchronous.MinScale = int(overflowMinScale)
+	cfg := newTestConfig()
+
+	workload, err := getResourceOnlyWorkloadSpec(&service, cfg, "test-ns", "verify-test-service", "oscar-lq-test-service")
+	if err == nil {
+		t.Fatalf("getResourceOnlyWorkloadSpec() expected overflow error, got workload: %#v", workload)
 	}
 }
 

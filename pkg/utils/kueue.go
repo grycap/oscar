@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"reflect"
 	"strings"
@@ -398,6 +399,9 @@ func getResourceOnlyWorkloadSpec(service *types.Service, cfg *types.Config, name
 	if service.Expose.APIPort != 0 && service.Expose.MinScale > 1 {
 		serviceReplicas = service.Expose.MinScale
 	} else if service.Synchronous.MinScale > 1 {
+		if service.Synchronous.MinScale > math.MaxInt32 {
+			return nil, fmt.Errorf("synchronous min_scale %d exceeds int32 range", service.Synchronous.MinScale)
+		}
 		serviceReplicas = int32(service.Synchronous.MinScale)
 	}
 
