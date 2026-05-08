@@ -289,6 +289,7 @@ rules:
   - serving.kserve.io
   resources:
   - inferenceservices
+  - llminferenceservices
   verbs:
   - create
   - delete
