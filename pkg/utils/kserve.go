@@ -43,14 +43,14 @@ var (
 	kserveTraefikMiddlewareGVR = schema.GroupVersionResource{Group: "traefik.io", Version: "v1alpha1", Resource: "middlewares"}
 	// Mapping of supported model formats to their corresponding KServe runtime types and frameworks
 	kserveTypeByFormat = map[string]kserveRuntime{
-		"onnx":        {kserveType: "predictor", framework: "mlserver"},
-		"sklearn":     {kserveType: "predictor", framework: "mlserver"},
-		"xgboost":     {kserveType: "predictor", framework: "mlserver"},
-		"pytorch":     {kserveType: "predictor", framework: "mlserver"},
-		"tensorflow":  {kserveType: "predictor", framework: "mlserver"},
-		"triton":      {kserveType: "predictor", framework: "triton"},
-		"huggingface": {kserveType: "predictor", framework: "vllm"},
-		"llm":         {kserveType: "llm", framework: "vllm"},
+		"onnx":        {kserveType: "predictor", framework: "triton", protocolV1: false, protocolV2: true},
+		"sklearn":     {kserveType: "predictor", framework: "mlserver", protocolV1: true, protocolV2: true},
+		"xgboost":     {kserveType: "predictor", framework: "mlserver", protocolV1: true, protocolV2: true},
+		"pytorch":     {kserveType: "predictor", framework: "mlserver", protocolV1: true, protocolV2: true},
+		"tensorflow":  {kserveType: "predictor", framework: "mlserver", protocolV1: true, protocolV2: true},
+		"triton":      {kserveType: "predictor", framework: "triton", protocolV1: true, protocolV2: true},
+		"huggingface": {kserveType: "predictor", framework: "vllm", protocolV1: true, protocolV2: true},
+		"llm":         {kserveType: "llm", framework: "vllm", protocolV1: true, protocolV2: true},
 	}
 
 	defaultKserveCpuRequest    = resource.MustParse("0.2")
@@ -60,6 +60,8 @@ var (
 type kserveRuntime struct {
 	kserveType string
 	framework  string
+	protocolV1 bool
+	protocolV2 bool
 }
 
 func IsKserveService(service *types.Service) bool {
@@ -303,29 +305,6 @@ func DeleteKserveInferenceService(serviceName, namespace string) error {
 	return nil
 }
 
-func exposeKserveInferenceService(service *types.Service, knSvc *knv1.Service, cfg *types.Config) error {
-	gatewayClientset, err := getDynamicClient()
-	if err != nil {
-		return fmt.Errorf("failed to create dynamic client: %v", err)
-	}
-
-	var authMiddlewareName string = ""
-	if service.Kserve.SetAuth {
-		authMiddlewareName = service.Name + authMiddlewareSuffix
-		// Create OIDC forwardAuth Traefik Middleware
-		if err = createOIDCMiddleware(gatewayClientset, cfg, knSvc, authMiddlewareName); err != nil {
-			return fmt.Errorf("failed to create OIDC middleware: %v", err)
-		}
-	}
-
-	// Create HTTPRoute
-	if err = createHTTPRoute(gatewayClientset, service, knSvc, cfg, authMiddlewareName); err != nil {
-		return fmt.Errorf("failed to create HTTPRoute: %v", err)
-	}
-
-	return nil
-}
-
 func NewKserveLLMInferenceServiceDefinition(service *types.Service, knSvc *knv1.Service, cfg *types.Config) (*unstructured.Unstructured, error) {
 	if err := ValidateKserveService(service); err != nil {
 		return nil, err
@@ -455,6 +434,97 @@ func GetKserveLabelSelector(serviceName string) string {
 	return fmt.Sprintf("%s=%s", kserveKeyLabelApp, prefixLabelApp+serviceName)
 }
 
+func GetKserveSvcName(serviceNamne, kserveModelFormat string) string {
+	if serviceNamne == "" {
+		return ""
+	}
+
+	switch getKserveType(kserveModelFormat) {
+	case "predictor":
+		return serviceNamne + "-predictor"
+	case "llm":
+		return serviceNamne + "-kserve-workload-svc"
+	default:
+		return ""
+	}
+}
+
+func GetKservePodAndDplName(serviceNamne, kserveModelFormat string) string {
+	if serviceNamne == "" {
+		return ""
+	}
+
+	switch getKserveType(kserveModelFormat) {
+	case "predictor":
+		return serviceNamne + "-predictor"
+	case "llm":
+		return serviceNamne + "-kserve"
+	default:
+		return ""
+	}
+}
+
+func getKserveType(kserveModelFormat string) string {
+	modelFormat := strings.ToLower(strings.TrimSpace(kserveModelFormat))
+	if modelFormat == "" {
+		return ""
+	}
+
+	if kserveType, ok := kserveTypeByFormat[modelFormat]; ok {
+		return kserveType.kserveType
+	}
+
+	return ""
+}
+
+func getKserveFramework(kserveModelFormat string) string {
+	modelFormat := strings.ToLower(strings.TrimSpace(kserveModelFormat))
+	if modelFormat == "" {
+		return ""
+	}
+
+	if kserveType, ok := kserveTypeByFormat[modelFormat]; ok {
+		return kserveType.framework
+	}
+
+	return ""
+}
+
+func validModelFormat(service *types.Service) bool {
+	KserveDef := service.Kserve
+	switch getKserveType(KserveDef.ModelFormat) {
+	case "predictor":
+		return true
+	case "llm": // TO DO: add more validation for LLM services
+		return true
+	default:
+		return false
+	}
+}
+
+func exposeKserveInferenceService(service *types.Service, knSvc *knv1.Service, cfg *types.Config) error {
+	gatewayClientset, err := getDynamicClient()
+	if err != nil {
+		return fmt.Errorf("failed to create dynamic client: %v", err)
+	}
+
+	var authMiddlewareName string = ""
+	if service.Kserve.SetAuth {
+		authMiddlewareName = service.Name + authMiddlewareSuffix
+		// Create OIDC forwardAuth Traefik Middleware
+		if err = createTraefikOIDCMiddleware(gatewayClientset, cfg, knSvc, authMiddlewareName); err != nil {
+			return fmt.Errorf("failed to create OIDC middleware: %v", err)
+		}
+	}
+
+	// Create HTTPRoute
+	if err = createHTTPRoute(gatewayClientset, service, knSvc, cfg, authMiddlewareName); err != nil {
+		return fmt.Errorf("failed to create HTTPRoute: %v", err)
+	}
+
+	return nil
+}
+
 func checkKserveUpdate(old *types.Kserve, new *types.Kserve) bool {
 	// If both old and new KServe configurations are nil,
 	// we consider it valid (no change)
@@ -503,96 +573,27 @@ func buildKserveName(serviceName string) string {
 	return serviceName
 }
 
-func getKserveType(kserveModelFormat string) string {
-	modelFormat := strings.ToLower(strings.TrimSpace(kserveModelFormat))
-	if modelFormat == "" {
-		return ""
-	}
-
-	if kserveType, ok := kserveTypeByFormat[modelFormat]; ok {
-		return kserveType.kserveType
-	}
-
-	return ""
-}
-
-func getKserveFramework(kserveModelFormat string) string {
-	modelFormat := strings.ToLower(strings.TrimSpace(kserveModelFormat))
-	if modelFormat == "" {
-		return ""
-	}
-
-	if kserveType, ok := kserveTypeByFormat[modelFormat]; ok {
-		return kserveType.framework
-	}
-
-	return ""
-}
-
-func GetKserveSvcName(serviceNamne, kserveModelFormat string) string {
-	if serviceNamne == "" {
-		return ""
-	}
-
-	switch getKserveType(kserveModelFormat) {
-	case "predictor":
-		return serviceNamne + "-predictor"
-	case "llm":
-		return serviceNamne + "-kserve-workload-svc"
-	default:
-		return ""
-	}
-}
-
-func GetKservePodAndDplName(serviceNamne, kserveModelFormat string) string {
-	if serviceNamne == "" {
-		return ""
-	}
-
-	switch getKserveType(kserveModelFormat) {
-	case "predictor":
-		return serviceNamne + "-predictor"
-	case "llm":
-		return serviceNamne + "-kserve"
-	default:
-		return ""
-	}
-}
-
 // Helper function to determine the protocol version for KServe based on service configuration
 // Defaults to "v1" if not specified or invalid
 func protocolVersion(service *types.Service) string {
+	modelFormat := strings.ToLower(strings.TrimSpace(service.Kserve.ModelFormat))
 	switch {
-	case service.Kserve.APIVersion == "v1" && !onlyProtocolV2(service):
+	case service.Kserve.APIVersion == "v1" && kserveTypeByFormat[modelFormat].protocolV1:
 		return "v1"
-	case service.Kserve.APIVersion == "v2" || onlyProtocolV2(service):
+	case service.Kserve.APIVersion == "v2" && kserveTypeByFormat[modelFormat].protocolV2:
+		return "v2"
+	// For model formats that do not support v1, default to v2
+	case (service.Kserve.APIVersion == "" || service.Kserve.APIVersion == "v1") && !kserveTypeByFormat[modelFormat].protocolV1:
 		return "v2"
 	default:
 		return "v1"
 	}
 }
 
-// onlyProtocolV2 checks if the service runtime supports only Protocol V2
-func onlyProtocolV2(service *types.Service) bool {
-	return service.Kserve.ModelFormat == "onnx"
-}
-
-func validModelFormat(service *types.Service) bool {
-	KserveDef := service.Kserve
-	switch getKserveType(KserveDef.ModelFormat) {
-	case "predictor":
-		return true
-	case "llm": // TO DO: add more validation for LLM services
-		return true
-	default:
-		return false
-	}
-}
-
-// createOIDCMiddleware creates a Traefik Middleware of type ForwardAuth for OIDC authentication,
+// createTraefikOIDCMiddleware creates a Traefik Middleware of type ForwardAuth for OIDC authentication,
 // which will be used in the HTTPRoute to protect the KServe service.
 // TO DO: change implementation when decided how to handle authentication for KServe services
-func createOIDCMiddleware(gatewayClientset *dynamic.DynamicClient, cfg *types.Config, knSvc *knv1.Service, middlewareName string) error {
+func createTraefikOIDCMiddleware(gatewayClientset *dynamic.DynamicClient, cfg *types.Config, knSvc *knv1.Service, middlewareName string) error {
 	if middlewareName == "" {
 		return fmt.Errorf("middleware name cannot be empty when creating HTTPRoute")
 	}
@@ -628,7 +629,7 @@ func createHTTPRoute(gatewayClientset *dynamic.DynamicClient, service *types.Ser
 	isvcName := service.Name
 	httpRouteName := isvcName + httpRouteSuffix
 	namespace := knSvc.Namespace
-	apiPath := getApiPath(isvcName)
+	apiPath := getAPIPath(isvcName)
 	svcName := GetKserveSvcName(isvcName, service.Kserve.ModelFormat)
 
 	filters := []any{
@@ -770,7 +771,7 @@ func buildKserveLLMServiceRouter(service *types.Service, knSvc *knv1.Service, cf
 	var authMiddlewareName string = ""
 	if service.Kserve.SetAuth {
 		authMiddlewareName = service.Name + authMiddlewareSuffix
-		err := createOIDCMiddleware(gatewayClientset, cfg, knSvc, authMiddlewareName)
+		err := createTraefikOIDCMiddleware(gatewayClientset, cfg, knSvc, authMiddlewareName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create OIDC middleware: %v", err)
 		}
@@ -824,7 +825,7 @@ func getKserveLLMServiceRouter(serviceName, namespace string, authMiddlewareName
 								map[string]any{
 									"path": map[string]any{
 										"type":  "PathPrefix",
-										"value": getApiPath(serviceName),
+										"value": getAPIPath(serviceName),
 									},
 								},
 							},
@@ -853,7 +854,7 @@ func getOwnerReference(knSvc *knv1.Service) []metav1.OwnerReference {
 	}
 }
 
-func getApiPath(serviceName string) string {
+func getAPIPath(serviceName string) string {
 	return fmt.Sprintf("/system/services/%s/exposed", serviceName)
 }
 
@@ -880,9 +881,9 @@ func injectRootPath(service *types.Service) {
 			if service.Kserve.Env == nil {
 				service.Kserve.Env = make(map[string]string)
 			}
-			service.Kserve.Env["MLSERVER_ROOT_PATH"] = getApiPath(service.Name)
+			service.Kserve.Env["MLSERVER_ROOT_PATH"] = getAPIPath(service.Name)
 		} else if kserveServiceFramework == "vllm" {
-			service.Kserve.Args = append(service.Kserve.Args, fmt.Sprintf("--root-path=%s", getApiPath(service.Name)))
+			service.Kserve.Args = append(service.Kserve.Args, fmt.Sprintf("--root-path=%s", getAPIPath(service.Name)))
 		}
 	}
 }

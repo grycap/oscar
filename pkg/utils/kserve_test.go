@@ -356,26 +356,6 @@ func TestUpdateKserveInferenceServiceDefinition_InvalidCPU(t *testing.T) {
 	}
 }
 
-// ─── onlyProtocolV2 ──────────────────────────────────────────────────────────
-
-func TestOnlyProtocolV2_Onnx(t *testing.T) {
-	svc := kserveService()
-	svc.Kserve.ModelFormat = "onnx"
-	if !onlyProtocolV2(svc) {
-		t.Error("expected onlyProtocolV2 to return true for onnx model format")
-	}
-}
-
-func TestOnlyProtocolV2_OtherFormats(t *testing.T) {
-	for _, format := range []string{"sklearn", "xgboost", "pytorch", "tensorflow", "triton"} {
-		svc := kserveService()
-		svc.Kserve.ModelFormat = format
-		if onlyProtocolV2(svc) {
-			t.Errorf("expected onlyProtocolV2 to return false for model format %q", format)
-		}
-	}
-}
-
 // ─── validModelFormat ────────────────────────────────────────────────────────
 
 func TestValidModelFormat(t *testing.T) {
