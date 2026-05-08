@@ -3,9 +3,12 @@ package utils
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
 	"regexp"
 	"strings"
 
+	"github.com/foomo/htpasswd"
 	"github.com/grycap/oscar/v3/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -29,7 +32,9 @@ const (
 const (
 	//	defaultAuthMiddlewareName = "oidc-auth"
 	httpRouteSuffix      = "-route"
-	authMiddlewareSuffix = "-mdw-auth"
+	authMiddlewareSuffix = "-auth-mdw"
+	authSecretSuffix     = "-auth-traefik"
+	corsMiddlewareSuffix = "-cors-mdw"
 	defaultLLMCPUimage   = "vllm/vllm-openai-cpu:latest"
 	defaultLLMGPUimage   = "vllm/vllm-openai:latest"
 	kserveKeyLabelApp    = "oscar-app"
@@ -41,6 +46,7 @@ var (
 	kserveIsvcGVR              = schema.GroupVersionResource{Group: "serving.kserve.io", Version: "v1beta1", Resource: "inferenceservices"}
 	kserveHTTPRouteGVR         = schema.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "httproutes"}
 	kserveTraefikMiddlewareGVR = schema.GroupVersionResource{Group: "traefik.io", Version: "v1alpha1", Resource: "middlewares"}
+	kserveSecretGVR            = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
 	// Mapping of supported model formats to their corresponding KServe runtime types and frameworks
 	kserveTypeByFormat = map[string]kserveRuntime{
 		"onnx":        {kserveType: "predictor", framework: "triton", protocolV1: false, protocolV2: true},
@@ -56,6 +62,7 @@ var (
 	defaultKserveCpuRequest    = resource.MustParse("0.2")
 	defaultKserveMemoryRequest = resource.MustParse("256Mi")
 )
+var kserveLogger = log.New(os.Stdout, "[KSERVE-SERVICE] ", log.Flags())
 
 type kserveRuntime struct {
 	kserveType string
@@ -92,15 +99,15 @@ func ValidateKserveService(service *types.Service) error {
 
 // CreateKserveService creates a KServe service based on the provided service and Knative service.
 func CreateKserveService(service *types.Service, knativeService *knv1.Service, cfg *types.Config) error {
-	dynClient, err := getDynamicClient()
-
 	if err := ValidateKserveService(service); err != nil {
 		return err
 	}
 
+	dynClient, err := getDynamicClient()
 	if err != nil {
 		return fmt.Errorf("failed to create dynamic client: %v", err)
 	}
+	//kserveLogger.Printf("Creating KServe service '%s' for user '%s' with model format %s", service.Name, service.Owner, service.Kserve.ModelFormat)
 
 	if getKserveType(service.Kserve.ModelFormat) == "llm" {
 		// For LLM services, we use a different InferenceService definition (LLMInferenceService)
@@ -137,8 +144,8 @@ func UpdateKserveService(service *types.Service, oldService *types.Service, name
 	if err := ValidateKserveService(service); err != nil {
 		return err
 	}
-	if checkKserveUpdate(service.Kserve, oldService.Kserve) {
-		return fmt.Errorf("model format changes or adding/removing KServe configuration are not supported after service creation")
+	if err := checkKserveUpdate(service, oldService); err != nil {
+		return err
 	}
 
 	dynClient, err := getDynamicClient()
@@ -508,37 +515,58 @@ func exposeKserveInferenceService(service *types.Service, knSvc *knv1.Service, c
 		return fmt.Errorf("failed to create dynamic client: %v", err)
 	}
 
-	var authMiddlewareName string = ""
 	if service.Kserve.SetAuth {
-		authMiddlewareName = service.Name + authMiddlewareSuffix
-		// Create OIDC forwardAuth Traefik Middleware
-		if err = createTraefikOIDCMiddleware(gatewayClientset, cfg, knSvc, authMiddlewareName); err != nil {
+		if err = createTraefikAuthMiddleware(gatewayClientset, service, knSvc); err != nil {
 			return fmt.Errorf("failed to create OIDC middleware: %v", err)
 		}
+		// Create OIDC forwardAuth Traefik Middleware
+		/*
+			if err = createTraefikOIDCMiddleware(gatewayClientset, service, knSvc, cfg); err != nil {
+				return fmt.Errorf("failed to create OIDC middleware: %v", err)
+			}
+		*/
 	}
 
 	// Create HTTPRoute
-	if err = createHTTPRoute(gatewayClientset, service, knSvc, cfg, authMiddlewareName); err != nil {
+	if err = createHTTPRoute(gatewayClientset, service, knSvc, cfg); err != nil {
 		return fmt.Errorf("failed to create HTTPRoute: %v", err)
 	}
 
 	return nil
 }
 
-func checkKserveUpdate(old *types.Kserve, new *types.Kserve) bool {
+func checkKserveUpdate(oldService *types.Service, newService *types.Service) error {
+	if oldService.Token != newService.Token {
+		return fmt.Errorf("unexpected error")
+	}
+	oldKserve := oldService.Kserve
+	newKserve := newService.Kserve
 	// If both old and new KServe configurations are nil,
 	// we consider it valid (no change)
-	if old == nil && new == nil {
-		return true
+	if oldKserve == nil && newKserve == nil {
+		return nil
 	}
 	// If one of them is nil and the other is not,
 	// it's a not alloved change in KServe configuration
-	if old == nil || new == nil {
-		return false
+	if oldKserve == nil || newKserve == nil {
+		return fmt.Errorf("cannot add or remove KServe configuration")
+
 	}
 	// ModelFormat is the only field we allow to be set at creation
 	// and not changed afterwards, so if it changes we return false
-	return old.ModelFormat != new.ModelFormat
+	// We also check StorageUri and SetAuth because changing them would require changes to the InferenceService spec
+	// that are not supported in an update, and we want to prevent users from making changes that would lead to an
+	// inconsistent state where the spec does not match the service configuration
+	if oldKserve.ModelFormat != newKserve.ModelFormat {
+		return fmt.Errorf("cannot update model format for KServe")
+	}
+	if oldKserve.StorageUri != newKserve.StorageUri {
+		return fmt.Errorf("cannot update model storage configuration for KServe")
+	}
+	if oldKserve.SetAuth != newKserve.SetAuth {
+		return fmt.Errorf("cannot update authentication configuration for KServe")
+	}
+	return nil
 }
 
 func getDynamicClient() (*dynamic.DynamicClient, error) {
@@ -593,19 +621,13 @@ func protocolVersion(service *types.Service) string {
 // createTraefikOIDCMiddleware creates a Traefik Middleware of type ForwardAuth for OIDC authentication,
 // which will be used in the HTTPRoute to protect the KServe service.
 // TO DO: change implementation when decided how to handle authentication for KServe services
-func createTraefikOIDCMiddleware(gatewayClientset *dynamic.DynamicClient, cfg *types.Config, knSvc *knv1.Service, middlewareName string) error {
-	if middlewareName == "" {
-		return fmt.Errorf("middleware name cannot be empty when creating HTTPRoute")
-	}
+func createTraefikOIDCMiddleware(gatewayClientset dynamic.Interface, service *types.Service, knSvc *knv1.Service, cfg *types.Config) error {
 	authEndpointAddress := fmt.Sprintf("http://%s.%s.svc.cluster.local:%d/system/config", cfg.Name, cfg.Namespace, cfg.ServicePort)
-	/*if gatewayNamespace := strings.TrimSpace(cfg.HTTPRouteGatewayNamespace); gatewayNamespace != "" {
-		parentRef["namespace"] = gatewayNamespace
-	}*/
 	middleware := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "traefik.io/v1alpha1",
 		"kind":       "Middleware",
 		"metadata": map[string]any{
-			"name":            middlewareName,
+			"name":            getTraefikCORSMiddlewareName(knSvc.Name),
 			"namespace":       knSvc.Namespace,
 			"ownerReferences": getOwnerReference(knSvc),
 		},
@@ -624,8 +646,76 @@ func createTraefikOIDCMiddleware(gatewayClientset *dynamic.DynamicClient, cfg *t
 	return nil
 }
 
+func createTraefikAuthMiddleware(gatewayClientset dynamic.Interface, service *types.Service, knSvc *knv1.Service) error {
+	err := createTraefikAuthSecret(gatewayClientset, service, knSvc)
+	if err != nil {
+		return fmt.Errorf("failed to create auth secret: %v", err)
+	}
+
+	middleware := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "traefik.io/v1alpha1",
+		"kind":       "Middleware",
+		"metadata": map[string]any{
+			"name":            getTraefikAuthMiddlewareName(service.Name),
+			"namespace":       knSvc.Namespace,
+			"ownerReferences": getOwnerReference(knSvc),
+		},
+		"spec": map[string]any{
+			"basicAuth": map[string]any{
+				"secret": getTraefikAuthSecretName(service.Name),
+			},
+		},
+	}}
+	_, err = gatewayClientset.Resource(kserveTraefikMiddlewareGVR).Namespace(knSvc.Namespace).Create(context.TODO(), middleware, metav1.CreateOptions{})
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create basic auth middleware: %v", err)
+	}
+	return nil
+}
+
+func createTraefikAuthSecret(gatewayClientset dynamic.Interface, service *types.Service, knSvc *knv1.Service) error {
+	hash := make(htpasswd.HashedPasswords)
+	err := hash.SetPassword(service.Name, service.Token, htpasswd.HashAPR1)
+	if err != nil {
+		kserveLogger.Print(err.Error())
+	}
+
+	secret := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1",
+		"kind":       "Secret",
+		"metadata": map[string]any{
+			"name":            getTraefikAuthSecretName(service.Name),
+			"namespace":       knSvc.Namespace,
+			"ownerReferences": getOwnerReference(knSvc),
+		},
+		"immutable": true,
+		"stringData": map[string]any{
+			"users": service.Name + ":" + hash[service.Name],
+		},
+		"type": "Opaque",
+	}}
+	_, err = gatewayClientset.Resource(kserveSecretGVR).Namespace(knSvc.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	return err
+}
+
+func getHTTPRouteName(serviceName string) string {
+	return serviceName + "-route"
+}
+
+func getTraefikCORSMiddlewareName(serviceName string) string {
+	return serviceName + "-cors-mdw"
+}
+
+func getTraefikAuthMiddlewareName(serviceName string) string {
+	return serviceName + "-auth-mdw"
+}
+
+func getTraefikAuthSecretName(serviceName string) string {
+	return serviceName + "-auth-traefik"
+}
+
 // createHTTPRoute creates a Gateway API HTTPRoute to expose the KServe InferenceService.
-func createHTTPRoute(gatewayClientset *dynamic.DynamicClient, service *types.Service, knSvc *knv1.Service, cfg *types.Config, authMiddlewareName string) error {
+func createHTTPRoute(gatewayClientset dynamic.Interface, service *types.Service, knSvc *knv1.Service, cfg *types.Config) error {
 	isvcName := service.Name
 	httpRouteName := isvcName + httpRouteSuffix
 	namespace := knSvc.Namespace
@@ -643,13 +733,13 @@ func createHTTPRoute(gatewayClientset *dynamic.DynamicClient, service *types.Ser
 			},
 		},
 	}
-	if service.Kserve.SetAuth && authMiddlewareName != "" {
+	if service.Kserve.SetAuth {
 		filters = append(filters, map[string]any{
 			"type": "ExtensionRef",
 			"extensionRef": map[string]any{
 				"group": "traefik.io",
 				"kind":  "Middleware",
-				"name":  authMiddlewareName,
+				"name":  getTraefikAuthMiddlewareName(service.Name),
 			},
 		})
 	}
@@ -768,38 +858,37 @@ func buildKserveLLMServiceRouter(service *types.Service, knSvc *knv1.Service, cf
 		return nil, fmt.Errorf("failed to create dynamic client: %v", err)
 	}
 
-	var authMiddlewareName string = ""
 	if service.Kserve.SetAuth {
-		authMiddlewareName = service.Name + authMiddlewareSuffix
-		err := createTraefikOIDCMiddleware(gatewayClientset, cfg, knSvc, authMiddlewareName)
+		//err := createTraefikOIDCMiddleware(gatewayClientset, service, knSvc, cfg)
+		err := createTraefikAuthMiddleware(gatewayClientset, service, knSvc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create OIDC middleware: %v", err)
 		}
 	}
-	return getKserveLLMServiceRouter(service.Name, knSvc.Namespace, authMiddlewareName), nil
+	return getKserveLLMServiceRouterSpec(service, knSvc.Namespace), nil
 }
 
-// getKserveLLMServiceRouter returns a router configuration for LLM InferenceServices
+// getKserveLLMServiceRouterSpec returns a router configuration for LLM InferenceServices
 // to route requests based on the service name (use inference Pool).
-func getKserveLLMServiceRouter(serviceName, namespace string, authMiddlewareName string) map[string]any {
+func getKserveLLMServiceRouterSpec(service *types.Service, namespace string) map[string]any {
 	filters := []any{
 		map[string]any{
 			"type": "RequestHeaderModifier",
 			"requestHeaderModifier": map[string]any{
 				"set": []any{
-					map[string]any{"name": "KServe-Isvc-Name", "value": serviceName},
+					map[string]any{"name": "KServe-Isvc-Name", "value": service.Name},
 					map[string]any{"name": "KServe-Isvc-Namespace", "value": namespace},
 				},
 			},
 		},
 	}
-	if authMiddlewareName != "" {
+	if service.Kserve.SetAuth {
 		filters = append(filters, map[string]any{
 			"type": "ExtensionRef",
 			"extensionRef": map[string]any{
 				"group": "traefik.io",
 				"kind":  "Middleware",
-				"name":  authMiddlewareName,
+				"name":  getTraefikAuthMiddlewareName(service.Name),
 			},
 		})
 	}
@@ -825,7 +914,7 @@ func getKserveLLMServiceRouter(serviceName, namespace string, authMiddlewareName
 								map[string]any{
 									"path": map[string]any{
 										"type":  "PathPrefix",
-										"value": getAPIPath(serviceName),
+										"value": getAPIPath(service.Name),
 									},
 								},
 							},
@@ -887,3 +976,13 @@ func injectRootPath(service *types.Service) {
 		}
 	}
 }
+
+/*
+if service.Expose.SetAuth {
+		if err := createTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
+			return err
+		}
+		if err := createTraefikAuthMiddleware(service, namespace); err != nil {
+			return err
+		}
+	}*/
