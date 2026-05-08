@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -350,11 +351,11 @@ type Kserve struct {
 	// CPU cpu limit for the service following the kubernetes format
 	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
 	// Optional. (default: 0.2)
-	CPU string `json:"cpu,omitempty" default:"0.2"`
+	CPU string `json:"cpu" default:"0.2"`
 	// Memory memory limit for the service following the kubernetes format
 	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
 	// Optional. (default: 256Mi)
-	Memory string `json:"memory,omitempty" default:"256Mi"`
+	Memory string `json:"memory" default:"256Mi"`
 	// Args command-line arguments to be passed to the container
 	// Optional
 	Args []string `json:"args,omitempty"`
@@ -365,12 +366,24 @@ type Kserve struct {
 	// Optional. (default: false)
 	EnableGPU bool `json:"enable_gpu,omitempty" default:"false"`
 	// SetAuth parameter to set the authentication for the KServe InferenceService
-	// Optional. (default: false)
-	SetAuth bool `json:"set_auth,omitempty" default:"false"`
+	// Optional. (default: true)
+	SetAuth bool `json:"set_auth,omitempty" default:"true"`
 	// LLM configuration for LLM-specific KServe deployments
 	// Only if ModelFormat is "llm"
 	// Optional
 	LLM *LLMConfig `json:"llm,omitempty"`
+}
+
+// UnmarshalJSON sets KServe defaults for fields that may be omitted in API requests.
+func (k *Kserve) UnmarshalJSON(data []byte) error {
+	type kserveAlias Kserve
+
+	// Keep auth enabled by default unless it is explicitly set to false.
+	k.SetAuth = true
+	k.CPU = "0.2"
+	k.Memory = "256Mi"
+
+	return json.Unmarshal(data, (*kserveAlias)(k))
 }
 
 type LLMConfig struct {
