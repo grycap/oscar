@@ -47,6 +47,10 @@ func TestMakeRunHandler(t *testing.T) {
 	}
 	for _, s := range scenarios {
 		back := backends.MakeFakeSyncBackend()
+		back.Services = []*types.Service{{
+			Name:  "testName",
+			Token: "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf",
+		}}
 		http.DefaultClient.Timeout = 400 * time.Second
 		r := gin.Default()
 		r.POST("/run/:serviceName", MakeRunHandler(&testConfigValidRun, back))
@@ -61,10 +65,10 @@ func TestMakeRunHandler(t *testing.T) {
 			if s.returnError {
 				switch s.errType {
 				case "404":
-					back.AddError("ReadService", k8serr.NewGone("Not Found"))
+					back.AddError("ListServicesByName", k8serr.NewGone("Not Found"))
 				case "500":
 					err := errors.New("Not found")
-					back.AddError("ReadService", k8serr.NewInternalError(err))
+					back.AddError("ListServicesByName", k8serr.NewInternalError(err))
 				case "splitErr":
 					req.Header.Set("Authorization", "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf")
 				case "diffErr":
@@ -130,7 +134,7 @@ func TestMakeRunHandlerOIDCPath(t *testing.T) {
 		},
 		Owner:        "somelonguid@egi.eu",
 		AllowedUsers: []string{}}
-	back.Service = svc
+	back.Services = []*types.Service{svc}
 	cfg := types.Config{
 		MinIOProvider: &types.MinIOProvider{
 			Region:    "us-east-1",
@@ -188,7 +192,7 @@ func TestMakeRunHandlerUnauthorized(t *testing.T) {
 		},
 		Owner:        "somelonguid@egi.eu",
 		AllowedUsers: []string{}}
-	back.Service = svc
+	back.Services = []*types.Service{svc}
 
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
@@ -227,6 +231,7 @@ func TestMakeRunHandlerWithServiceToken(t *testing.T) {
 		}
 	}))
 	svc := &types.Service{
+		Name:  "hello",
 		Token: "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf",
 		CPU:   "2.0",
 		StorageProviders: &types.StorageProviders{
@@ -238,7 +243,7 @@ func TestMakeRunHandlerWithServiceToken(t *testing.T) {
 		},
 		Owner:        "somelonguid@egi.eu",
 		AllowedUsers: []string{}}
-	back.Service = svc
+	back.Services = []*types.Service{svc}
 	cfg := types.Config{
 		MinIOProvider: &types.MinIOProvider{
 			Region:    "us-east-1",

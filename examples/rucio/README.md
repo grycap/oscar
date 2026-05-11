@@ -2,7 +2,7 @@ To illustrate the usage of Rucio as a data source in an OSCAR Service and Datafl
 
 The example consists of two main components:
 
-1. **Rucio Service**: This service is defined in the `rucio-service.yaml` file. It specifies the use of a Docker image that processes files fetched from Rucio. The service is configured with necessary parameters such as Rucio account, RSE, and authentication details.
+1. **Rucio Service**: This service is defined in the `rucio-service.yaml` file. It specifies the use of a Docker image that processes files fetched from Rucio. The service is configured with necessary parameters such as Rucio account, RSE (Rucio Storage Element, e.g., DESY-DCACHE), and authentication details.
 
 2. **Rucio Dataflow**: The dataflow is defined in the `rucio-dataflow.yaml` file. It sets up a connection to a Rucio messaging queue to listen for new files. When a new file is detected, it triggers the invocation of the Rucio Service to process the file.
 

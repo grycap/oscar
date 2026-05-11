@@ -5,7 +5,7 @@ Example cloned from: <https://github.com/indigo-dc/plant-classification-theano>
 To run this example you need:
 
 1. A Kubernetes cluster running the OSCAR framework, as indicated in the
-  [deployment instructions](https://o-scar.readthedocs.io/en/latest/deploy.html).
+  [deployment instructions](https://docs.oscar.grycap.net/deploy-im-dashboard/).
 
 1. The container to deploy available in Docker Hub:
 

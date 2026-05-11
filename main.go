@@ -96,6 +96,17 @@ func main() {
 		go resourcemanager.StartReScheduler(cfg, back, kubeClientset)
 	}
 
+	//Create quotaBackend
+	var qb *types.QuotaBackend
+	if cfg.KueueEnable {
+		qb = types.CreateQuotaBackend(kubeConfig, kubeClientset)
+	} else if cfg.VolumeEnable {
+		qb = &types.QuotaBackend{KubeClientset: kubeClientset}
+	}
+	if qb == nil && (cfg.KueueEnable || cfg.VolumeEnable) {
+		qb = &types.QuotaBackend{KubeClientset: kubeClientset}
+	}
+
 	// Create the router
 	r := gin.Default()
 
@@ -106,12 +117,15 @@ func main() {
 	system := r.Group("/system", auth.GetAuthMiddleware(cfg, kubeClientset))
 
 	// Config path
-	system.GET("/config", handlers.MakeConfigHandler(cfg))
+	system.GET("/config", handlers.MakeConfigHandler(cfg, kubeClientset))
+	system.PUT("/config", handlers.MakeConfigUpdateHandler(cfg, kubeClientset))
 
 	// CRUD Services
 	system.POST("/services", handlers.MakeCreateHandler(cfg, back))
-	system.GET("/services", handlers.MakeListHandler(back))
-	system.GET("/services/:serviceName", handlers.MakeReadHandler(back))
+	system.GET("/services", handlers.MakeListHandler(back, kubeClientset, cfg))
+	system.GET("/services/:serviceName", handlers.MakeReadHandler(back, kubeClientset, cfg))
+	system.GET("/services/:serviceName/deployment", handlers.MakeGetDeploymentStatusHandler(back, kubeClientset, cfg))
+	system.GET("/services/:serviceName/deployment/logs", handlers.MakeGetDeploymentLogsHandler(back, kubeClientset, cfg))
 	system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
 	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
 
@@ -121,6 +135,13 @@ func main() {
 	system.PUT("/federation/:serviceName", handlers.MakeFederationPutHandler(back))
 	system.DELETE("/federation/:serviceName", handlers.MakeFederationDeleteHandler(back))
 
+	// CRUD Volumes
+	if cfg.VolumeEnable {
+		system.GET("/volumes", handlers.MakeListVolumesHandler(cfg, back))
+		system.POST("/volumes", handlers.MakeCreateVolumeHandler(cfg, back))
+		system.GET("/volumes/:volumeName", handlers.MakeReadVolumeHandler(cfg, back))
+		system.DELETE("/volumes/:volumeName", handlers.MakeDeleteVolumeHandler(cfg, back))
+	}
 	// CRUD Buckets
 	system.POST("/buckets", buckets.MakeCreateHandler(cfg))
 	system.GET("/buckets", buckets.MakeListHandler(cfg))
@@ -143,11 +164,15 @@ func main() {
 	metricsSources := metrics.DefaultSources(cfg, back, kubeClientset)
 	metricsAgg := &metrics.Aggregator{Sources: metricsSources}
 	metricsGroup := r.Group("/system/metrics", auth.GetAuthMiddleware(cfg, kubeClientset))
-	metricsGroup.GET("", handlers.MakeMetricsSummaryHandler(metricsAgg))
-	metricsGroup.GET("/", handlers.MakeMetricsSummaryHandler(metricsAgg))
-	metricsGroup.GET("/breakdown", handlers.MakeMetricsBreakdownHandler(metricsAgg))
-	metricsGroup.GET("/:serviceName", handlers.MakeMetricValueHandler(metricsAgg))
-
+	metricsGroup.GET("", handlers.MakeMetricsSummaryHandler(back, metricsAgg))
+	metricsGroup.GET("/breakdown", handlers.MakeMetricsBreakdownHandler(back, metricsAgg))
+	metricsGroup.GET("/:serviceName", handlers.MakeMetricValueHandler(back, metricsAgg))
+	// Quotas
+	if cfg.KueueEnable || cfg.VolumeEnable {
+		system.GET("/quotas/user", handlers.MakeGetOwnQuotaHandler(*qb, cfg))
+		system.GET("/quotas/user/:userId", handlers.MakeGetUserQuotaHandler(*qb, cfg))
+		system.PUT("/quotas/user/:userId", handlers.MakeUpdateUserQuotaHandler(*qb, cfg))
+	}
 	// Job path for async invocations
 	r.POST("/job/:serviceName", auth.GetLoggerMiddleware(), handlers.MakeJobHandler(cfg, kubeClientset, back, resMan))
 

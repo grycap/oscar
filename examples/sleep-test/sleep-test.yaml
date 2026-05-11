@@ -1,0 +1,19 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: sleep-test
+      memory: 256Mi
+      cpu: '1.0'
+      image: ubuntu
+      script: script.sh
+      allowed_users: []
+      log_level: CRITICAL
+      input:
+      - storage_provider: minio.default
+        path: sleep-test/input
+      output:
+      - storage_provider: minio.default
+        path: sleep-test/output
+      environment:
+        variables:
+          SLEEP_SECONDS: "30"

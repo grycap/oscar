@@ -8,7 +8,7 @@ However, writing an entire workflow in an [FDL](fdl.md) file can be a difficult 
 
 To simplify the process you can use
 [FDL Composer](http://composer.oscar.grycap.net), a web-based application
-to facilitate the definition of [FDL](https://docs.oscar.grycap.net/fdl/) YAML
+to facilitate the definition of [FDL](fdl.md) YAML
 files for [OSCAR](https://oscar.grycap.net/) and
 [SCAR](https://scar.readthedocs.io).
 
@@ -58,7 +58,7 @@ the input files to be processed by `OSCAR services` and the output files
 generated as a result of the processing.
 
 Three types of storage providers can be used in OSCAR
-[FDLs](https://docs.oscar.grycap.net/fdl/): [MinIO](https://min.io),
+[FDLs](fdl.md): [MinIO](https://min.io),
 [Amazon S3](https://aws.amazon.com/s3), and [OneData](https://onedata.org).
 
 To configure them, drag the storage

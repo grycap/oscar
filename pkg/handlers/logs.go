@@ -24,17 +24,25 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	batch "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
+
+type PodListResult struct {
+	Pods     *types.JobInfo
+	Identity string
+}
 
 // TODO Try using cookies to avoid excesive calls to the k8s API //
 
@@ -80,47 +88,96 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.
 			Limit:         int64(cfg.JobListingLimit),
 			Continue:      page,
 		}
+		jobs := getJobs(kubeClientset, serviceNamespace, listOpts, c)
+		var wg sync.WaitGroup
+		channelPod := make(chan PodListResult)
 
-		// List jobs' pods
-		pods, err := kubeClientset.CoreV1().Pods(serviceNamespace).List(context.TODO(), listOpts)
-		if err != nil {
-			// Check if error is caused because the service is not found
-			if errors.IsNotFound(err) || errors.IsGone(err) {
-				c.Status(http.StatusNotFound)
-			} else {
-				c.String(http.StatusInternalServerError, err.Error())
-			}
-			return
+		for i := range jobs.Items {
+			wg.Add(1)
+			go func(job batchv1.Job) {
+				defer wg.Done()
+				getPod(
+					kubeClientset,
+					serviceNamespace,
+					jobs.Items[i].ObjectMeta.Name,
+					listOpts,
+					c,
+					channelPod,
+				)
+			}(jobs.Items[i])
 		}
 
-		// Populate jobsInfo with status, start and finish times (from pods)
-		for _, pod := range pods.Items {
-			if jobName, ok := pod.Labels["job-name"]; ok {
-				jobsInfo[jobName] = &types.JobInfo{
-					Status:       string(pod.Status.Phase),
-					CreationTime: pod.Status.StartTime,
-				}
-				// Loop through job.Status.ContainerStatuses to find oscar-container
-				for _, contStatus := range pod.Status.ContainerStatuses {
-					if contStatus.Name == types.ContainerName {
-						if contStatus.State.Running != nil {
-							jobsInfo[jobName].StartTime = &(contStatus.State.Running.StartedAt)
-						} else if contStatus.State.Terminated != nil {
-							jobsInfo[jobName].StartTime = &(contStatus.State.Terminated.StartedAt)
-							jobsInfo[jobName].FinishTime = &(contStatus.State.Terminated.FinishedAt)
-						}
-					}
-				}
-			}
+		go func() {
+			wg.Wait()
+			close(channelPod)
+		}()
+
+		for podListResult := range channelPod {
+			jobsInfo[podListResult.Identity] = podListResult.Pods
 		}
 		jr := types.JobsResponse{
 			Jobs:         jobsInfo,
-			NextPage:     pods.ListMeta.Continue,
-			RemainingJob: pods.ListMeta.RemainingItemCount,
+			NextPage:     jobs.ListMeta.Continue,
+			RemainingJob: jobs.ListMeta.RemainingItemCount,
 		}
 
 		c.JSON(http.StatusOK, jr)
 	}
+}
+
+func getJobs(kubeClientset kubernetes.Interface, serviceNamespace string, listOpts metav1.ListOptions, c *gin.Context) *batch.JobList {
+	jobs, err := kubeClientset.BatchV1().Jobs(serviceNamespace).List(context.TODO(), listOpts)
+	if err != nil {
+		// Check if error is caused because the service is not found
+		if errors.IsNotFound(err) || errors.IsGone(err) {
+			c.Status(http.StatusNotFound)
+		} else {
+			c.String(http.StatusInternalServerError, err.Error())
+		}
+		return nil
+	}
+	return jobs
+}
+
+func getPod(kubeClientset kubernetes.Interface, serviceNamespace string, jobName string, listOpts metav1.ListOptions, c *gin.Context, ch chan PodListResult) {
+	if listOpts.LabelSelector != "" {
+		listOpts.LabelSelector += "," // separar con coma
+	}
+	listOpts.LabelSelector += fmt.Sprintf("job-name=%s", jobName)
+	pods, err := kubeClientset.CoreV1().Pods(serviceNamespace).List(context.TODO(), listOpts)
+	if err != nil {
+		// Check if error is caused because the service is not found
+		if errors.IsNotFound(err) || errors.IsGone(err) {
+			c.Status(http.StatusNotFound)
+		} else {
+			c.String(http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+
+	if len(pods.Items) < 1 {
+		ch <- PodListResult{Pods: &types.JobInfo{
+			Status: string("Suspended"),
+		}, Identity: jobName}
+		return
+
+	}
+	podObject := pods.Items[0]
+	jobInfo := &types.JobInfo{
+		Status:       string(podObject.Status.Phase),
+		CreationTime: podObject.Status.StartTime,
+	}
+	for _, contStatus := range podObject.Status.ContainerStatuses {
+		if contStatus.Name == types.ContainerName {
+			if contStatus.State.Running != nil {
+				jobInfo.StartTime = &(contStatus.State.Running.StartedAt)
+			} else if contStatus.State.Terminated != nil {
+				jobInfo.StartTime = &(contStatus.State.Terminated.StartedAt)
+				jobInfo.FinishTime = &(contStatus.State.Terminated.FinishedAt)
+			}
+		}
+	}
+	ch <- PodListResult{Pods: jobInfo, Identity: jobName}
 }
 
 // MakeDeleteJobsHandler godoc
@@ -405,8 +462,8 @@ func parseExecutionLogs(raw string) []executionLogEntry {
 		}
 
 		rawTimestamp := strings.TrimSpace(parts[0])
-		if parsedTime, err := time.ParseInLocation("2006/01/02 - 15:04:05", rawTimestamp, time.Local); err == nil {
-			entry.Timestamp = parsedTime.UTC().Format(time.RFC3339)
+		if parsedTime, err := time.Parse(time.RFC3339Nano, rawTimestamp); err == nil {
+			entry.Timestamp = parsedTime.UTC().Format(time.RFC3339Nano)
 		} else {
 			entry.Timestamp = rawTimestamp
 		}
@@ -459,6 +516,7 @@ func MakeDeleteJobHandler(back types.ServerlessBackend, kubeClientset kubernetes
 		serviceName := c.Param("serviceName")
 		service, ok := getAuthorizedService(c, back, serviceName)
 		if !ok {
+			c.String(http.StatusForbidden, "You do not have permission to access this service")
 			return
 		}
 		serviceNamespace := resolveServiceNamespace(service, cfg)
@@ -527,26 +585,29 @@ func authorizeRequest(c *gin.Context, service *types.Service) bool {
 	if len(strings.Split(authHeader, "Bearer")) > 1 {
 		uid, err := auth.GetUIDFromContext(c)
 		if err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+			//c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			return false
 		}
-		if service.Visibility == "public" {
+		if service.Visibility == utils.PUBLIC {
 			return true
 		}
-		isAllowed := len(service.AllowedUsers) == 0 || uid == service.Owner
-		if !isAllowed {
+
+		if uid == service.Owner {
+			return true
+		}
+
+		if service.Visibility == utils.RESTRICTED && len(service.AllowedUsers) > 0 {
 			for _, id := range service.AllowedUsers {
 				if uid == id {
-					isAllowed = true
-					break
+					return true
 				}
 			}
 		}
-
-		if !isAllowed {
+		return false
+		/*if !isAllowed {
 			c.String(http.StatusForbidden, "User %s doesn't have permision to get this service", uid)
 			return false
-		}
+		}*/
 	}
 	return true
 }

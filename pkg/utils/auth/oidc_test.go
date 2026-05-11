@@ -252,6 +252,10 @@ func TestGetOIDCMiddleware(t *testing.T) {
 		OIDCSubject:      "123433g",
 		OIDCValidIssuers: []string{server.URL},
 		OIDCGroups:       []string{"/group/group1", "/group/group2"},
+		VolumeAvailable:  "5Gi",
+		VolumeMax:        "7Gi",
+		VolumeMaxDisk:    "5Gi",
+		VolumeMinDisk:    "1Gi",
 	}
 	minIOAdminClient, _ := utils.MakeMinIOAdminClient(&cfg)
 	issuer := server.URL

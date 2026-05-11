@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	maxNamespaceLength          = 63
+	maxNamespaceLength          = 18
 	controllerRoleName          = "oscar-controller"
 	controllerRoleBindingName   = "oscar-controller-binding"
 	namespaceManagedByLabel     = "app.kubernetes.io/managed-by"
@@ -108,7 +108,8 @@ func EnsureUserNamespace(ctx context.Context, kubeClientset kubernetes.Interface
 
 	nsName := BuildUserNamespace(cfg, owner)
 	if nsName == "" {
-		return "", fmt.Errorf("unable to resolve namespace for owner %q", owner)
+		// If namespace cannot be resolved (e.g., nil config), return empty with no error
+		return "", nil
 	}
 
 	nsClient := kubeClientset.CoreV1().Namespaces()
@@ -206,8 +207,8 @@ func ensureControllerRole(ctx context.Context, kubeClientset kubernetes.Interfac
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{""},
-				Resources: []string{"pods", "pods/log", "podtemplates", "configmaps", "secrets", "services", "persistentvolumeclaims"},
-				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
+				Resources: []string{"pods", "pods/log", "podtemplates", "configmaps", "secrets", "services", "persistentvolumeclaims", "resourcequotas", "limitranges"},
+				Verbs:     []string{"get", "list", "watch", "create", "delete", "deletecollection", "update"},
 			},
 			{
 				APIGroups: []string{"apps"},
@@ -227,6 +228,16 @@ func ensureControllerRole(ctx context.Context, kubeClientset kubernetes.Interfac
 			{
 				APIGroups: []string{"networking.k8s.io"},
 				Resources: []string{"ingresses"},
+				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
+			},
+			{
+				APIGroups: []string{"gateway.networking.k8s.io"},
+				Resources: []string{"httproutes"},
+				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
+			},
+			{
+				APIGroups: []string{"traefik.io"},
+				Resources: []string{"middlewares"},
 				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
 			},
 			{
@@ -388,7 +399,7 @@ func buildSharedPVSpec(base corev1.PersistentVolumeSpec) corev1.PersistentVolume
 	spec := corev1.PersistentVolumeSpec{
 		Capacity:                      capacity,
 		AccessModes:                   append([]corev1.PersistentVolumeAccessMode{}, base.AccessModes...),
-		PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimRetain,
+		PersistentVolumeReclaimPolicy: base.PersistentVolumeReclaimPolicy,
 		PersistentVolumeSource:        base.PersistentVolumeSource,
 		MountOptions:                  mountOptions,
 		StorageClassName:              "",

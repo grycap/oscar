@@ -24,12 +24,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v3/pkg/utils"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
 const (
-	tokenLength = 64
+	tokenLength            = 64
+	errServiceNotFound     = "Service Not Found"
+	errMultipleServiceAuth = "More than one service authorize, use the owner query to select the service"
 )
 
 // MakeRunHandler godoc
@@ -49,7 +52,8 @@ const (
 // @Router /run/{serviceName} [post]
 func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		service, err := back.ReadService("", c.Param("serviceName"))
+		var service *types.Service
+		serviceList, err := back.ListServicesByName(c.Param("serviceName"), "")
 		if err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {
@@ -71,8 +75,12 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 		// Check if reqToken is the service token
 		rawToken := strings.TrimSpace(splitToken[1])
 		if len(rawToken) == tokenLength {
-
-			if rawToken != service.Token {
+			for _, serviceIter := range serviceList {
+				if rawToken == serviceIter.Token {
+					service = serviceIter
+				}
+			}
+			if service == nil {
 				c.Status(http.StatusUnauthorized)
 				return
 			}
@@ -90,14 +98,7 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 			ui, err := oidcManager.GetUserInfo(rawToken)
 
 			if !oidcManager.IsAuthorised(rawToken) {
-				c.Status(http.StatusUnauthorized)
-				return
-			}
-
-			hasVO := oidcManager.UserHasVO(ui, service.VO)
-
-			if !hasVO {
-				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
+				c.Status(http.StatusNotFound)
 				return
 			}
 
@@ -105,11 +106,73 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 			c.Set("uidOrigin", uid)
 			c.Next()
 
+			service, err = selectService(c, serviceList)
+			if err != nil {
+				if err.Error() == errServiceNotFound {
+					c.Status(http.StatusNotFound)
+				} else {
+					c.String(http.StatusBadRequest, err.Error())
+				}
+				return
+			}
+
+			hasVO := oidcManager.UserInOneGroup(ui, cfg)
+
+			if !hasVO {
+				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
+				return
+			}
+
+		}
+
+		if service.Owner != types.DefaultOwner && cfg.KueueEnable && !utils.VerifyWorkload(*service, service.Namespace, cfg) {
+			c.String(http.StatusBadRequest, "invalid workload: try to reduce the service resource (cpu, memory, etc.)")
+			return
 		}
 
 		proxy := &httputil.ReverseProxy{
-			Director: back.GetProxyDirector(service.Name),
+			Director: back.GetProxyDirector(service.Name, service.Namespace),
 		}
-		proxy.ServeHTTP(c.Writer, c.Request)
+		proxy.ServeHTTP(c.Writer, c.Request) // #nosec
+	}
+}
+
+func selectService(c *gin.Context, serviceList []*types.Service) (*types.Service, error) {
+	// If no services found, return not found
+	if len(serviceList) == 0 {
+		return nil, fmt.Errorf(errServiceNotFound)
+	} else if len(serviceList) == 1 { // Found 1 service
+		if authorizeRequest(c, serviceList[0]) { // Found 1 service and is authorize
+			return serviceList[0], nil
+		} else {
+			return nil, fmt.Errorf(errServiceNotFound)
+		}
+	} else { // Found more than one service with same name
+		authTime := 0
+		var service *types.Service
+		for _, serviceIter := range serviceList {
+			if authorizeRequest(c, serviceIter) { // Get the services authorized
+				service = serviceIter
+				authTime++
+			}
+		}
+		if authTime == 1 { // More than 1 service found, but 1 service authorize
+			return service, nil
+		} else if authTime == 0 { // More than 1 service found, but no service authorize
+			return nil, fmt.Errorf(errServiceNotFound)
+		} else if authTime > 1 { // More than 1 service found, and more than one service authorize -> user query owner
+			owner := strings.TrimSpace(c.Query("owner"))
+			if owner == "" {
+				return nil, fmt.Errorf(errMultipleServiceAuth)
+			}
+			for _, serviceIter := range serviceList {
+				if authorizeRequest(c, serviceIter) && serviceIter.Owner == owner {
+					service = serviceIter
+					return service, nil
+				}
+			}
+			return nil, fmt.Errorf(errServiceNotFound)
+		}
+		return nil, fmt.Errorf(errServiceNotFound)
 	}
 }

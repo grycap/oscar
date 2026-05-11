@@ -91,6 +91,8 @@ report marks the source as missing and flags affected metrics.
   historical metric data for at least 6 months).
 - A report spans a period with partial data source coverage (surface completeness
   flags and partial counts).
+- An OIDC user requests metrics for a service that is not visible to that user
+  (deny access and do not expose service metrics).
 
 ## Requirements *(mandatory)*
 
@@ -133,6 +135,14 @@ report marks the source as missing and flags affected metrics.
 - **FR-017**: Breakdown requests with `group_by=service` MUST support an optional
   `include_users=true` flag that returns the list of users per service in JSON
   responses (CSV export excludes the user list).
+- **FR-018**: Metrics endpoints MUST apply the same service visibility rules as
+  `/system/services` for OIDC Bearer requests. OIDC users MUST only receive
+  metrics for services they can access (`public`, owned services, and
+  `restricted` services where the user appears in `allowed_users`).
+- **FR-019**: Metrics endpoints accessed with Basic Auth as the OSCAR admin user
+  MUST continue to return cluster-wide data for all services.
+- **FR-020**: Per-service metrics requests for an inaccessible service MUST be
+  rejected without returning service metrics.
 
 ### Non-Functional Requirements
 
@@ -184,6 +194,9 @@ per-service when used with `/system/metrics/{serviceName}`.
 - **Time range**: Both start and end timestamps are inclusive. If omitted,
   the system defaults to the last 24 hours (end = now, start = end - 24h).
 - **Metrics base path**: All metrics endpoints are served under `/system/metrics`.
+- **Metrics authorization scope**: OIDC Bearer requests are limited to the
+  caller's visible services; Basic Auth as the OSCAR admin user remains
+  cluster-wide.
 - **Breakdown membership**: Include membership only when `group_by=user`.
 - **Breakdown user list**: Include per-service user lists only when
   `group_by=service` and `include_users=true`.
@@ -203,6 +216,8 @@ per-service when used with `/system/metrics/{serviceName}`.
 - Existing service inventory, execution logs, resource usage metrics, and OIDC
   group membership data are available and can be queried for the requested time
   range.
+- Service visibility for metrics follows the same access model already enforced
+  by the service listing and read endpoints.
 - Metric data is retained for at least 6 months to support 3/6 month reporting
   windows.
 - Country attribution can be derived from request metadata when available.

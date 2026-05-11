@@ -28,6 +28,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils/auth"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	testclient "k8s.io/client-go/kubernetes/fake"
@@ -43,6 +44,8 @@ func createExpectedBody(access_key string, secret_key string, cfg *types.Config)
 			"gpu_available":              false,
 			"interLink_available":        false,
 			"yunikorn_enable":            false,
+			"kueue_enable":               false,
+			"volume_enable":              false,
 			"oidc_groups":                nil,
 		},
 		"minio_provider": map[string]interface{}{
@@ -52,6 +55,7 @@ func createExpectedBody(access_key string, secret_key string, cfg *types.Config)
 			"secret_key": secret_key,
 			"region":     cfg.MinIOProvider.Region,
 		},
+		"allowed_image_repositories": []interface{}{},
 	}
 }
 
@@ -69,9 +73,10 @@ func TestMakeConfigHandler(t *testing.T) {
 		},
 	}
 
+	kubeClientset := testclient.NewSimpleClientset()
 	t.Run("Without Authorization Header", func(t *testing.T) {
 		router := gin.New()
-		router.GET("/config", MakeConfigHandler(cfg))
+		router.GET("/config", MakeConfigHandler(cfg, kubeClientset))
 
 		req, _ := http.NewRequest("GET", "/config", nil)
 		w := httptest.NewRecorder()
@@ -99,10 +104,10 @@ func TestMakeConfigHandler(t *testing.T) {
 		},
 	}
 
-	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
+	kubeClientset = testclient.NewSimpleClientset(K8sObjects...)
 	t.Run("With Bearer Authorization Header", func(t *testing.T) {
 		router := gin.New()
-		router.GET("/config", MakeConfigHandler(cfg))
+		router.GET("/config", MakeConfigHandler(cfg, kubeClientset))
 
 		req, _ := http.NewRequest("GET", "/config", nil)
 		req.Header.Set("Authorization", "Bearer some-token")
@@ -143,7 +148,7 @@ func TestMakeConfigHandler(t *testing.T) {
 
 	t.Run("With Token Authorization Header", func(t *testing.T) {
 		router := gin.New()
-		router.GET("/config", MakeConfigHandler(cfg))
+		router.GET("/config", MakeConfigHandler(cfg, kubeClientset))
 
 		req, _ := http.NewRequest("GET", "/config", nil)
 		req.Header.Set("Authorization", "SomeToken")
@@ -165,4 +170,38 @@ func TestMakeConfigHandler(t *testing.T) {
 			t.Fatalf("Unexpected response body: %s", w.Body.String())
 		}
 	})
+}
+
+func TestMakeConfigUpdateHandlerRejectsBearerWithoutMutation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &types.Config{
+		Namespace:            "oscar",
+		AdditionalConfigPath: "oscar-config",
+		MinIOProvider:        &types.MinIOProvider{},
+	}
+	kubeClientset := testclient.NewSimpleClientset()
+
+	router := gin.New()
+	router.PUT("/config", MakeConfigUpdateHandler(cfg, kubeClientset))
+
+	body := `{"allowed_image_repositories":["registry.example.com/"]}`
+	req := httptest.NewRequest(http.MethodPut, "/config", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer token")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status code 401, got %d", w.Code)
+	}
+
+	_, err := kubeClientset.CoreV1().ConfigMaps(cfg.Namespace).Get(
+		req.Context(),
+		cfg.AdditionalConfigPath,
+		metav1.GetOptions{},
+	)
+	if !apierrors.IsNotFound(err) {
+		t.Fatalf("expected config map not to be created, got err=%v", err)
+	}
 }

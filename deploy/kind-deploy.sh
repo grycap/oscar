@@ -44,6 +44,7 @@ SKIP_PROMPTS="false"
 USE_METRICS="n"
 ENABLE_METRICS="false"
 KIND_NODE_IMAGE=""
+ENABLE_KUEUE="false"
 ENABLE_OIDC="false"
 OIDC_ISSUERS_DEFAULT="https://keycloak.grycap.net/realms/grycap"
 OIDC_GROUPS_DEFAULT="/oscar-staff, /oscar-test"
@@ -64,6 +65,7 @@ Options:
   --metrics      Deploy metrics stack (Prometheus + Loki + Alloy) for reporting.
   --kind-image   Kind node image to use (e.g., kindest/node:v1.34.0).
   --oidc         Enable OIDC support for OSCAR (default: disabled).
+  --kueue        Enable Kueue support for OSCAR (default: disabled).
   -h, --help     Show this help message and exit.
 EOF
 }
@@ -380,15 +382,6 @@ checkOSCARDeploy(){
     else
         oscar_url="https://localhost:$HOST_HTTPS_PORT"
     fi
-    echo -e "\n > You can now acces to the OSCAR web interface through $oscar_url with the following credentials: "
-    echo "  - username: oscar"
-    echo "  - password: $OSCAR_PASSWORD"
-    minio_api_url="http://localhost:$HOST_MINIO_API_PORT"
-    minio_console_url="http://localhost:$HOST_MINIO_CONSOLE_PORT"
-    echo -e "\n > You can now access MinIO object storage through $minio_api_url and the console through $minio_console_url with the following credentials: "
-    echo "  - username: minio"
-    echo "  - password: $MINIO_PASSWORD"
-    echo -e "\n[*] Note: To delete the cluster type 'kind delete cluster --name=$CLUSTER_NAME'\n"
 }
 
 deployKnative(){
@@ -439,11 +432,59 @@ deployMetrics(){
         --set kubeStateMetrics.enabled=true \
         --set nodeExporter.enabled=true
 
+    echo -e "\n[*] Deploying Geo Ip ..."
+    if [ -f "$SCRIPT_DIR/../deploy/metrics/geoip-pvc.yaml" ]; then
+        cp "$SCRIPT_DIR/../deploy/metrics/geoip-pvc.yaml" /tmp/geoip-pvc.yaml
+    else
+        cat <<'EOF' > /tmp/geoip-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: geoip-db
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: nfs
+EOF
+    fi
+
+    if [ -f "$SCRIPT_DIR/../deploy/metrics/geoip-loader.yaml" ]; then
+        cp "$SCRIPT_DIR/../deploy/metrics/geoip-loader.yaml" /tmp/geoip-loader.yaml
+    else
+        cat <<'EOF' > /tmp/geoip-loader.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: geoip-loader
+  namespace: monitoring
+spec:
+  restartPolicy: Never
+  containers:
+    - name: loader
+      image: curlimages/curl
+      command: ["sh", "-c", "curl -L https://git.io/GeoLite2-Country.mmdb -o /var/lib/geoip/GeoLite2-Country.mmdb"]
+      volumeMounts:
+        - name: geoip-db
+          mountPath: /var/lib/geoip
+  volumes:
+    - name: geoip-db
+      persistentVolumeClaim:
+        claimName: geoip-db
+
+EOF
+    fi
+    kubectl apply -f /tmp/geoip-pvc.yaml
+    kubectl apply -f /tmp/geoip-loader.yaml
+    
     echo -e "\n[*] Deploying Loki ..."
     helm repo add --force-update grafana https://grafana.github.io/helm-charts
     helm repo update
-    if [ -f "$SCRIPT_DIR/../docs/snippets/loki-values.kind.yaml" ]; then
-        cp "$SCRIPT_DIR/../docs/snippets/loki-values.kind.yaml" /tmp/loki-values.yaml
+    if [ -f "$SCRIPT_DIR/../deploy/metrics/loki-values.kind.yaml" ]; then
+        cp "$SCRIPT_DIR/../deploy/metrics/loki-values.kind.yaml" /tmp/loki-values.yaml
     else
         cat <<'EOF' > /tmp/loki-values.yaml
 deploymentMode: SingleBinary
@@ -491,30 +532,8 @@ EOF
     helm upgrade --install loki grafana/loki --namespace monitoring --values /tmp/loki-values.yaml
 
     echo -e "\n[*] Deploying Grafana Alloy ..."
-    if [ -f "$SCRIPT_DIR/../docs/snippets/geoip-pvc.yaml" ]; then
-        kubectl apply -f "$SCRIPT_DIR/../docs/snippets/geoip-pvc.yaml"
-    fi
-    echo -e "\n[*] Preparing GeoIP database for Alloy ..."
-    if [ ! -f "$GEOIP_DB_PATH" ]; then
-        if command -v curl &> /dev/null; then
-            curl -L --retry 3 --retry-delay 2 --max-time 30 -o "$GEOIP_DB_PATH" "$GEOIP_DB_URL"
-        elif command -v wget &> /dev/null; then
-            wget -O "$GEOIP_DB_PATH" "$GEOIP_DB_URL"
-        else
-            echo -e "$RED[!]$END_COLOR Neither curl nor wget is available to download GeoIP DB."
-            exit 1
-        fi
-    fi
-    if [ -f "$SCRIPT_DIR/../docs/snippets/geoip-loader-pod.yaml" ]; then
-        kubectl -n monitoring delete pod geoip-loader --ignore-not-found
-        kubectl apply -f "$SCRIPT_DIR/../docs/snippets/geoip-loader-pod.yaml"
-        kubectl -n monitoring wait --for=condition=Ready pod/geoip-loader --timeout=120s
-        kubectl -n monitoring cp "$GEOIP_DB_PATH" \
-            geoip-loader:/var/lib/geoip/GeoLite2-Country.mmdb
-        kubectl -n monitoring delete pod geoip-loader
-    fi
-    if [ -f "$SCRIPT_DIR/../docs/snippets/alloy-values.kind.yaml" ]; then
-        cp "$SCRIPT_DIR/../docs/snippets/alloy-values.kind.yaml" /tmp/alloy-values.yaml
+    if [ -f "$SCRIPT_DIR/../deploy/metrics/alloy-values.kind.yaml" ]; then
+        cp "$SCRIPT_DIR/../deploy/metrics/alloy-values.kind.yaml" /tmp/alloy-values.yaml
     else
         cat <<'EOF' > /tmp/alloy-values.yaml
 alloy:
@@ -597,6 +616,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --oidc)
             ENABLE_OIDC="true"
+            shift
+            ;;
+        --kueue)
+            ENABLE_KUEUE="true"
             shift
             ;;
         -h|--help)
@@ -839,6 +862,7 @@ echo -e "\n[*] Deploying MinIO storage provider ..."
 helm repo add --force-update minio https://charts.min.io
 helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT --create-namespace --version 4.0.7
 
+
 #Deploy NFS server provisioner
 echo -e "\n[*] Deploying NFS server provider ..."
 helm repo add --force-update nfs-ganesha-server-and-external-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
@@ -919,6 +943,16 @@ if [ "$ENABLE_METRICS" == "true" ]; then
         PROMETHEUS_URL="http://prometheus-server.monitoring.svc.cluster.local" \
         LOKI_URL="http://loki-gateway.monitoring.svc.cluster.local"; then
         echo -e "$RED[!]$END_COLOR Failed to configure OSCAR metrics endpoints"
+    fi
+fi
+
+if [ "$ENABLE_OIDC" == "true" ]; then
+    echo -e "\n[*] Enabling OIDC support in OSCAR deployment ..."
+    if ! kubectl -n oscar set env deployment/oscar \
+        OIDC_ENABLE="true" \
+        OIDC_ISSUERS="$OIDC_ISSUERS_DEFAULT" \
+        OIDC_GROUPS="$OIDC_GROUPS_DEFAULT"; then
+        echo -e "$RED[!]$END_COLOR Failed to set OIDC environment variables in OSCAR deployment"
         exit 1
     fi
 fi
@@ -938,6 +972,11 @@ fi
 #Wait for OSCAR deployment
 checkOSCARDeploy
 
+if [ `echo $ENABLE_KUEUE | tr '[:upper:]' '[:lower:]'` == "true" ]; then
+    echo -e "\n[*] Deploying Kueue (workload admission) ..."
+    kubectl apply --server-side -k "github.com/kubernetes-sigs/kueue/config/default?ref=v0.15.0"
+fi
+ 
 echo -e "\n[*] Deployment details:"
 echo "  - Kind cluster name: $CLUSTER_NAME"
 echo "  - Kind context: $KIND_CONTEXT"

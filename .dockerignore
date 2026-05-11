@@ -1,7 +1,12 @@
 .git/
+.git
+**/.git
 .gitignore
 .dockerignore
 Dockerfile*
+.cache/
+.codex/
+.specify/
 
 # Common build/test outputs
 **/node_modules/
@@ -20,3 +25,13 @@ coverage/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Project content not needed for the runtime image build
+deploy/
+docs/
+examples/
+log/
+site/
+specs/
+templates/
+tools/

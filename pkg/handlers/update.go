@@ -72,7 +72,12 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// Check service values and set defaults
 		checkValues(&newService, cfg)
 		utils.ApplyFederation(&newService)
+		if err := utils.ValidateVolumeConfig(newService.Name, newService.Volume); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+			return
+		}
 		authHeader := c.GetHeader("Authorization")
+		isAdminUser := false
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
 			createLogger.Printf("[*] Updating service as admin user")
@@ -88,6 +93,15 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
 			}
 			return
+		}
+
+		if !utils.SameVolumeConfig(oldService.Volume, newService.Volume) {
+			c.String(http.StatusBadRequest, "volume updates are not supported after service creation")
+			return
+		}
+
+		if oldService.Token != "" {
+			newService.Token = oldService.Token
 		}
 
 		serviceNamespace := oldService.Namespace
@@ -363,6 +377,10 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		if err := back.UpdateService(newService); err != nil {
+			uerr := back.UpdateService(*oldService)
+			if uerr != nil {
+				log.Println(uerr.Error())
+			}
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
 			return
 		}

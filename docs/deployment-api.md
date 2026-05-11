@@ -14,7 +14,7 @@ To deploy a service, you must have the [FDL](fdl.md) file that defines the servi
 
 First, you need the credentials to access the cluster. This can be via an [OIDC Token](integration-egi.md) or basic authentication.
 
-In that case, we give an example of creating the [cowsay service](https://github.com/grycap/oscar/tree/master/examples/cowsay) using a cURL request with an [OIDC Token](integration-egi.md). Basically, it involves embedding the FDL document as JSON-based document and the script inside the POST request.
+In that case, we give an example of creating the [cowsay service](https://github.com/grycap/oscar/tree/master/examples/cowsay) using a cURL request with an [OIDC Token](integration-egi.md). Basically, it involves embedding the FDL document as JSON-based document and the script inside a simple POST request.
 
 ```bash
 curl -X POST "https://oscar-cluster-remote/system/services" \

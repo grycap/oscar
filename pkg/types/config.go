@@ -45,6 +45,8 @@ const (
 	secondsType           = "seconds"
 	urlType               = "url"
 	serverlessBackendType = "serverlessBackend"
+	routeKindType         = "routeKind"
+	AIR                   = "allowed_image_repositories"
 )
 
 type configVar struct {
@@ -116,7 +118,7 @@ type Config struct {
 	OpenfaasScalerInterval string `json:"-"`
 
 	// OpenfaasScalerInactivityDuration
-	OpenfaasScalerInactivityDuration string `json:"-"`
+	OpenfaasScalerInactivityDuration string `json:"-"`*/
 
 	// WatchdogMaxInflight
 	WatchdogMaxInflight int `json:"-"`
@@ -131,7 +133,7 @@ type Config struct {
 	WatchdogReadTimeout int `json:"-"`
 
 	// WatchdogWriteTimeout
-	WatchdogWriteTimeout int `json:"-"`*/
+	WatchdogWriteTimeout int `json:"-"`
 
 	// WatchdogHealthCheckInterval
 	WatchdogHealthCheckInterval int `json:"-"`
@@ -154,9 +156,34 @@ type Config struct {
 	// YunikornConfigFileName
 	YunikornConfigFileName string `json:"-"`
 
+	// KueueEnable option to configure Kueue admission queues
+	KueueEnable bool `json:"kueue_enable"`
+
+	// KueueDefaultCPU default per-user ClusterQueue CPU quota
+	KueueDefaultCPU string `json:"-"`
+
+	// KueueDefaultMemory default per-user ClusterQueue memory quota
+	KueueDefaultMemory string `json:"-"`
+
+	// KueueDefaultFlavor default ResourceFlavor name used for ClusterQueues
+	KueueDefaultFlavor string `json:"-"`
+
 	// ResourceManagerEnable option to enable the Resource Manager to delegate jobs
 	// when there are no available resources in the cluster (if the service has replicas)
 	ResourceManagerEnable bool `json:"-"`
+
+	//Enable volumes in OSCAR
+	VolumeEnable bool `json:"volume_enable"`
+	// Default storageclass of volume
+	StorageClassName string `json:"-"`
+	//Number of volume available per user
+	VolumeAvailable string `json:"-"`
+	//Max disk that a user can get
+	VolumeMax string `json:"-"`
+	//Max disk that a user can get pero volume
+	VolumeMaxDisk string `json:"-"`
+	//Min disk that a user can get pero volume
+	VolumeMinDisk string `json:"-"`
 
 	// // ResourceManager parameter to set the ResourceManager to use ("kubernetes" or "yunikorn")
 	// // TODO: decide if this parameter is necessary or use kubernetes by default and yunikorn always if it's enabled
@@ -199,6 +226,15 @@ type Config struct {
 
 	//
 	IngressHost string `json:"-"`
+
+	// ExposedServicesRouteKind determines which Kubernetes resource is used to expose services (ingress|httproute)
+	ExposedServicesRouteKind string `json:"-"`
+
+	// HTTPRouteGatewayName Gateway name used as parentRef for generated HTTPRoutes
+	HTTPRouteGatewayName string `json:"-"`
+
+	// HTTPRouteGatewayNamespace optional Gateway namespace used as parentRef for generated HTTPRoutes
+	HTTPRouteGatewayNamespace string `json:"-"`
 
 	// Github path of FaaS Supervisor (needed for Interlink config)
 	SupervisorKitImage string `json:"-"`
@@ -246,6 +282,12 @@ type Config struct {
 	LokiExposedAppLabel string `json:"-"`
 }
 
+type ConfigForUser struct {
+	Cfg                      *Config        `json:"config"`
+	MinIOProvider            *MinIOProvider `json:"minio_provider"`
+	AllowedImageRepositories []string       `json:"allowed_image_repositories"`
+}
+
 var configVars = []configVar{
 	{"Username", "OSCAR_USERNAME", true, stringType, ""},
 	{"Password", "OSCAR_PASSWORD", true, stringType, ""},
@@ -266,11 +308,11 @@ var configVars = []configVar{
 	//{"OpenfaasScalerEnable", "OPENFAAS_SCALER_ENABLE", false, boolType, "false"},
 	//{"OpenfaasScalerInterval", "OPENFAAS_SCALER_INTERVAL", false, stringType, "2m"},
 	//{"OpenfaasScalerInactivityDuration", "OPENFAAS_SCALER_INACTIVITY_DURATION", false, stringType, "10m"},
-	//{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
-	//{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
-	//{"WatchdogExecTimeout", "WATCHDOG_EXEC_TIMEOUT", false, intType, "0"},
-	//{"WatchdogReadTimeout", "WATCHDOG_READ_TIMEOUT", false, intType, "300"},
-	//{"WatchdogWriteTimeout", "WATCHDOG_WRITE_TIMEOUT", false, intType, "300"},
+	{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
+	{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
+	{"WatchdogExecTimeout", "WATCHDOG_EXEC_TIMEOUT", false, intType, "0"},
+	{"WatchdogReadTimeout", "WATCHDOG_READ_TIMEOUT", false, intType, "300"},
+	{"WatchdogWriteTimeout", "WATCHDOG_WRITE_TIMEOUT", false, intType, "300"},
 	{"WatchdogHealthCheckInterval", "WATCHDOG_HEALTHCHECK_INTERVAL", false, intType, "5"},
 	{"ReadTimeout", "READ_TIMEOUT", false, secondsType, "300"},
 	{"WriteTimeout", "WRITE_TIMEOUT", false, secondsType, "300"},
@@ -279,6 +321,19 @@ var configVars = []configVar{
 	{"YunikornNamespace", "YUNIKORN_NAMESPACE", false, stringType, "yunikorn"},
 	{"YunikornConfigMap", "YUNIKORN_CONFIGMAP", false, stringType, "yunikorn-configs"},
 	{"YunikornConfigFileName", "YUNIKORN_CONFIG_FILENAME", false, stringType, "queues.yaml"},
+
+	{"KueueEnable", "KUEUE_ENABLE", false, boolType, "true"},
+	{"KueueDefaultCPU", "KUEUE_DEFAULT_CPU", false, stringType, "2"},
+	{"KueueDefaultMemory", "KUEUE_DEFAULT_MEMORY", false, stringType, "2Gi"},
+	{"KueueDefaultFlavor", "KUEUE_DEFAULT_FLAVOR", false, stringType, "oscar-default-flavor"},
+
+	{"VolumeEnable", "VOLUME_ENABLE", false, boolType, "true"},
+	{"StorageClassName", "STORAGE_CLASS_NAME", false, stringType, "nfs"},
+	{"VolumeAvailable", "VOLUME_AVAILABLE", false, stringType, "7Gi"},
+	{"VolumeMax", "VOLUME_MAX", false, stringType, "5"},
+	{"VolumeMaxDisk", "VOLUME_MAX_DISK", false, stringType, "5Gi"},
+	{"VolumeMinDisk", "VOLUME_MIN_DISK", false, stringType, "200Mi"},
+
 	{"ResourceManagerEnable", "RESOURCE_MANAGER_ENABLE", false, boolType, "false"},
 	//{"ResourceManager", "RESOURCE_MANAGER", false, resourceManagerType, "kubernetes"},
 	{"ResourceManagerInterval", "RESOURCE_MANAGER_INTERVAL", false, intType, "15"},
@@ -293,6 +348,9 @@ var configVars = []configVar{
 	{"OIDCClientSecret", "OIDC_CLIENT_SECRET", false, stringType, ""},
 	{"UsersAdmin", "USERS_ADMIN", false, stringSliceType, ""},
 	{"IngressHost", "INGRESS_HOST", false, stringType, ""},
+	{"ExposedServicesRouteKind", "EXPOSED_SERVICES_ROUTE_KIND", false, routeKindType, "ingress"},
+	{"HTTPRouteGatewayName", "HTTPROUTE_GATEWAY_NAME", false, stringType, "traefik-gateway"},
+	{"HTTPRouteGatewayNamespace", "HTTPROUTE_GATEWAY_NAMESPACE", false, stringType, "traefik"},
 	{"SupervisorKitImage", "SUPERVISOR_KIT_IMAGE", false, stringType, ""},
 	{"IngressServicesCORSAllowedOrigins", "INGRESS_SERVICES_CORS_ALLOWED_ORIGINS", false, stringType, "https://dashboard.oscar.grycap.net,https://dashboard-devel.oscar.grycap.net,https://dashboard-demo.oscar.grycap.net,http://oscar.oscar.svc.cluster.local,http://host.docker.internal,http://localhost,http://localhost:5173"},
 	{"IngressServicesCORSAllowedMethods", "INGRESS_SERVICES_CORS_ALLOWED_METHODS", false, stringType, "GET, PUT, POST, DELETE, PATCH, HEAD"},
@@ -400,6 +458,19 @@ func parseServerlessBackend(s string) (string, error) {
 	return s, nil
 }
 
+func parseRouteKind(s string) (string, error) {
+	if len(s) == 0 {
+		return "ingress", nil
+	}
+
+	str := strings.ToLower(strings.TrimSpace(s))
+	if str != "ingress" && str != "httproute" {
+		return "", fmt.Errorf("must be \"ingress\" or \"httproute\"")
+	}
+
+	return str, nil
+}
+
 // ReadConfig reads environment variables to create the OSCAR server configuration
 func ReadConfig() (*Config, error) {
 	config := &Config{}
@@ -427,6 +498,8 @@ func ReadConfig() (*Config, error) {
 			value, parseErr = parseSeconds(strValue)
 		case serverlessBackendType:
 			value, parseErr = parseServerlessBackend(strValue)
+		case routeKindType:
+			value, parseErr = parseRouteKind(strValue)
 		case urlType:
 			// Only check if can be parsed
 			_, parseErr = url.Parse(strValue)

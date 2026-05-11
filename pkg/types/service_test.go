@@ -25,6 +25,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+func envVarsToMap(envVars []v1.EnvVar) map[string]string {
+	values := make(map[string]string, len(envVars))
+	for _, envVar := range envVars {
+		values[envVar.Name] = envVar.Value
+	}
+	return values
+}
+
 var (
 	testService Service = Service{
 		Name:      "testname",
@@ -131,7 +139,7 @@ func TestCreateResources(t *testing.T) {
 			svc.Memory = s.memory
 			svc.CPU = s.cpu
 
-			_, err := createResources(&svc)
+			_, err := CreateResources(&svc)
 
 			if s.returnError {
 				if err == nil {
@@ -342,6 +350,7 @@ func TestToPodSpec(t *testing.T) {
 			// Assign resources from scenario
 			svc.Memory = s.memory
 			svc.CPU = s.cpu
+			svc.Token = "test-token"
 			//svc.ImagePullSecrets = []string{"testcred"}
 
 			podSpec, err := svc.ToPodSpec(&testConfig)
@@ -355,37 +364,39 @@ func TestToPodSpec(t *testing.T) {
 					t.Errorf("unexpected error: %v", err)
 				}
 
+				if podSpec.EnableServiceLinks == nil {
+					t.Fatal("expected EnableServiceLinks to be set")
+				}
+				if *podSpec.EnableServiceLinks {
+					t.Fatal("expected EnableServiceLinks to be false")
+				}
+
 				if len(podSpec.Containers[0].Command) != 1 {
 					t.Fatalf("expected a single command entry, got %d", len(podSpec.Containers[0].Command))
 				}
 				if podSpec.Containers[0].Command[0] != fmt.Sprintf("%s/%s", VolumePath, WatchdogName) {
 					t.Fatalf("expected command to be supervisor path %s, got %s", fmt.Sprintf("%s/%s", VolumePath, WatchdogName), podSpec.Containers[0].Command[0])
 				}
-
-				if err = checkEnvVars(&testConfig, podSpec); err != nil {
-					t.Error(err.Error())
+				if podSpec.AutomountServiceAccountToken == nil {
+					t.Fatalf("expected automountServiceAccountToken to be set")
 				}
+				if *podSpec.AutomountServiceAccountToken {
+					t.Fatalf("expected automountServiceAccountToken to be false")
+				}
+				envVars := envVarsToMap(podSpec.Containers[0].Env)
+				if envVars[OscarServiceNameEnvVar] != svc.Name {
+					t.Fatalf("expected %s to be %q, got %q", OscarServiceNameEnvVar, svc.Name, envVars[OscarServiceNameEnvVar])
+				}
+				if envVars[OscarServiceTokenEnvVar] != svc.Token {
+					t.Fatalf("expected %s to be %q, got %q", OscarServiceTokenEnvVar, svc.Token, envVars[OscarServiceTokenEnvVar])
+				}
+				if envVars[OscarServiceBasePathEnvVar] != "" {
+					t.Fatalf("expected %s to be empty for non-exposed service, got %q", OscarServiceBasePathEnvVar, envVars[OscarServiceBasePathEnvVar])
+				}
+
 			}
 		})
 	}
-}
-
-func checkEnvVars(cfg *Config, podSpec *v1.PodSpec) error {
-	disallowed := map[string]struct{}{
-		"max_inflight":  {},
-		"write_debug":   {},
-		"exec_timeout":  {},
-		"read_timeout":  {},
-		"write_timeout": {},
-	}
-	for _, envVar := range podSpec.Containers[0].Env {
-		if _, ok := disallowed[envVar.Name]; ok {
-			return fmt.Errorf("unexpected watchdog environment variable %q present in pod spec", envVar.Name)
-		}
-
-	}
-
-	return nil
 }
 
 func TestConvertSecretsEnvVars(t *testing.T) {
@@ -429,5 +440,118 @@ func TestHasFederationMembers(t *testing.T) {
 	}
 	if !svc.HasFederationMembers() {
 		t.Fatalf("expected HasFederationMembers to be true when members are defined")
+	}
+}
+
+func TestGetExposedBasePath(t *testing.T) {
+	tests := []struct {
+		name    string
+		service *Service
+		want    string
+	}{
+		{
+			name:    "nil service",
+			service: nil,
+			want:    "",
+		},
+		{
+			name:    "non exposed service",
+			service: &Service{Name: "demo"},
+			want:    "",
+		},
+		{
+			name: "exposed service",
+			service: &Service{
+				Name: "demo",
+				Expose: Expose{
+					APIPort: 8080,
+				},
+			},
+			want: "/system/services/demo/exposed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.service.GetExposedBasePath(); got != tt.want {
+				t.Fatalf("expected exposed base path %q, got %q", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestGetVolumePVCName(t *testing.T) {
+	svc := Service{Name: "demo"}
+	expected := "demo"
+	if got := svc.GetVolumePVCName(); got != expected {
+		t.Fatalf("expected volume pvc name %s, got %s", expected, got)
+	}
+
+	svc.Volume = &ServiceVolumeConfig{
+		Name:      "openclaw-data",
+		MountPath: "/data",
+	}
+	expected = "openclaw-data"
+	if got := svc.GetVolumePVCName(); got != expected {
+		t.Fatalf("expected volume pvc name %s, got %s", expected, got)
+	}
+}
+
+func TestToPodSpecWithVolume(t *testing.T) {
+	copy, err := deepcopy.Anything(testService)
+	if err != nil {
+		t.Fatalf("unable to deep copy test service: %v", err)
+	}
+	svc := copy.(Service)
+	svc.Volume = &ServiceVolumeConfig{
+		Size:      "1Gi",
+		MountPath: "/data",
+	}
+	svc.Token = "test-token"
+
+	podSpec, err := svc.ToPodSpec(&testConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var foundVolume, foundMount bool
+	for _, v := range podSpec.Volumes {
+		if v.Name == ServiceVolumeName && v.PersistentVolumeClaim != nil && v.PersistentVolumeClaim.ClaimName == svc.GetVolumePVCName() {
+			foundVolume = true
+		}
+	}
+	for _, vm := range podSpec.Containers[0].VolumeMounts {
+		if vm.Name == ServiceVolumeName && vm.MountPath == "/data" {
+			foundMount = true
+		}
+	}
+	if !foundVolume || !foundMount {
+		t.Fatalf("expected volume and mount to be present")
+	}
+}
+
+func TestToPodSpecWithExposeMetadataEnvVars(t *testing.T) {
+	copy, err := deepcopy.Anything(testService)
+	if err != nil {
+		t.Fatalf("unable to deep copy test service: %v", err)
+	}
+	svc := copy.(Service)
+	svc.Token = "test-token"
+	svc.Expose.APIPort = 8080
+
+	podSpec, err := svc.ToPodSpec(&testConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	envVars := envVarsToMap(podSpec.Containers[0].Env)
+	if envVars[OscarServiceNameEnvVar] != svc.Name {
+		t.Fatalf("expected %s to be %q, got %q", OscarServiceNameEnvVar, svc.Name, envVars[OscarServiceNameEnvVar])
+	}
+	if envVars[OscarServiceTokenEnvVar] != svc.Token {
+		t.Fatalf("expected %s to be %q, got %q", OscarServiceTokenEnvVar, svc.Token, envVars[OscarServiceTokenEnvVar])
+	}
+	if envVars[OscarServiceBasePathEnvVar] != "/system/services/testname/exposed" {
+		t.Fatalf("expected %s to be %q, got %q", OscarServiceBasePathEnvVar, "/system/services/testname/exposed", envVars[OscarServiceBasePathEnvVar])
 	}
 }
