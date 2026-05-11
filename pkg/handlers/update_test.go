@@ -109,6 +109,9 @@ func TestMakeUpdateHandler(t *testing.T) {
 	if back.UpdatedService == nil {
 		t.Fatal("expected backend to receive updated service, got nil")
 	}
+	if back.UpdatedService.Token != svc.Token {
+		t.Fatalf("expected service token to be preserved on update, got %q", back.UpdatedService.Token)
+	}
 	if strings.Contains(back.UpdatedService.Script, "\r") {
 		t.Fatalf("expected script without CR characters, got %q", back.UpdatedService.Script)
 	}
@@ -171,5 +174,109 @@ func TestMakeUpdateHandlerForbiddenOwner(t *testing.T) {
 
 	if resp.Code == http.StatusOK {
 		t.Fatalf("expected error status for different owner, got %d", resp.Code)
+	}
+}
+
+func TestMakeUpdateHandlerRejectsVolumeMutation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name:  "svc",
+		Owner: "owner",
+		Volume: &types.ServiceVolumeConfig{
+			Size:      "1Gi",
+			MountPath: "/data",
+		},
+	}
+	cfg := &types.Config{
+		MinIOProvider: &types.MinIOProvider{},
+	}
+	isAdminUser = false
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "owner")
+		c.Next()
+	})
+	r.PUT("/system/services", MakeUpdateHandler(cfg, back))
+
+	body := `{"name":"svc","image":"img","script":"echo","volume":{"size":"2Gi","mount_path":"/data"}}`
+	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for volume mutation, got %d", resp.Code)
+	}
+}
+
+func TestMakeUpdateHandlerLegacyServiceWithoutVolume(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	back := backends.MakeFakeBackend()
+	kubeClientset := testclient.NewSimpleClientset()
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+		if hreq.URL.Path != "/input" && hreq.URL.Path != "/output" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
+			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
+		}
+		if hreq.URL.Path == "/minio/admin/v3/info" {
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			return
+		}
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte(`{"status": "success"}`))
+	}))
+	defer server.Close()
+
+	back.Service = &types.Service{
+		Name:  "svc",
+		Token: "token",
+		CPU:   "1.0",
+		Owner: "owner@example.com",
+		StorageProviders: &types.StorageProviders{
+			MinIO: map[string]*types.MinIOProvider{types.DefaultProvider: {
+				Region:    "us-east-1",
+				Endpoint:  server.URL,
+				AccessKey: "ak",
+				SecretKey: "sk",
+			}},
+		},
+	}
+
+	cfg := &types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "ak",
+			SecretKey: "sk",
+		},
+	}
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "owner@example.com")
+		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "owner@example.com"))
+		c.Next()
+	})
+	r.PUT("/system/services", MakeUpdateHandler(cfg, back))
+
+	body := `{"name":"svc","cluster_id":"oscar","memory":"1Gi","cpu":"1.0","log_level":"CRITICAL","image":"ghcr.io/grycap/cowsay","script":"echo hi","allowed_users":[]}`
+	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 for legacy service update, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if back.UpdatedService == nil {
+		t.Fatal("expected backend to receive updated service")
+	}
+	if back.UpdatedService.Volume != nil {
+		t.Fatalf("expected legacy service update to keep volume nil, got %+v", back.UpdatedService.Volume)
 	}
 }

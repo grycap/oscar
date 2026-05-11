@@ -26,6 +26,7 @@ import (
 type ServerlessBackend interface {
 	GetInfo() *ServerlessBackendInfo
 	ListServices(namespaces ...string) ([]*Service, error)
+	ListServicesByName(name string, namespaces ...string) ([]*Service, error)
 	CreateService(service Service) error
 	ReadService(namespace, name string) (*Service, error)
 	UpdateService(service Service) error
@@ -36,5 +37,5 @@ type ServerlessBackend interface {
 // SyncBackend define an interface for serverless backends that allow sync invocations
 type SyncBackend interface {
 	ServerlessBackend
-	GetProxyDirector(serviceName string) func(req *http.Request)
+	GetProxyDirector(serviceName string, serviceNamespace string) func(req *http.Request)
 }

@@ -42,5 +42,5 @@ functions:
 
 As OSCAR has the credentials of the default MinIO instance internally, if you want to use a different one or a different storage provider, you need to set these credentials on the service [FDL](fdl.md). Currently, the storage providers supported on this functionality are:
 
- - [MinIO provider](fdl.md/#minioprovider)
- - [WebDav provider](fdl.md/#webdavprovider)
+ - [MinIO provider](fdl.md#minioprovider)
+ - [WebDav provider](fdl.md#webdavprovider)

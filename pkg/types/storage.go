@@ -74,7 +74,7 @@ type StorageProviders struct {
 
 // S3Provider stores the credentials of the AWS S3 storage provider
 type S3Provider struct {
-	AccessKey string `json:"access_key"`
+	AccessKey string `json:"access_key"` // #nosec
 	SecretKey string `json:"secret_key"`
 	Region    string `json:"region"`
 }
@@ -83,7 +83,7 @@ type S3Provider struct {
 type MinIOProvider struct {
 	Endpoint  string `json:"endpoint"`
 	Verify    bool   `json:"verify"`
-	AccessKey string `json:"access_key"`
+	AccessKey string `json:"access_key"` // #nosec
 	SecretKey string `json:"secret_key"`
 	Region    string `json:"region"`
 }
@@ -99,7 +99,7 @@ type OnedataProvider struct {
 type WebDavProvider struct {
 	Hostname string `json:"hostname"`
 	Login    string `json:"login"`
-	Password string `json:"password"`
+	Password string `json:"password"` // #nosec
 }
 
 // Rucio stores the credentials of the a storage provider that can be accessed via Rucio
@@ -107,7 +107,7 @@ type Rucio struct {
 	Host          string `json:"host"`
 	Account       string `json:"account"`
 	Rse           string `json:"rse"`
-	RefreshToken  string `json:"refresh_token"`
+	RefreshToken  string `json:"refresh_token"` // #nosec
 	AuthHost      string `json:"auth_host"`
 	OidcAudience  string `json:"oidc_audience"`
 	TokenEndpoint string `json:"token_endpoint"`

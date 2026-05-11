@@ -1,0 +1,330 @@
+adminUser: admin
+adminPassword: admin
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-server.monitoring.svc.cluster.local
+        isDefault: true
+        uid: Prometheus
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki-gateway.monitoring.svc.cluster.local
+        uid: Loki
+
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: oscar
+        orgId: 1
+        folder: OSCAR
+        type: file
+        disableDeletion: true
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/oscar
+
+
+dashboards:
+  oscar:
+    oscar-metrics:
+      json: |
+        {
+          "uid": "oscar-metrics",
+          "title": "OSCAR Metrics (Prometheus + Loki)",
+          "schemaVersion": 37,
+          "version": 2,
+          "refresh": "1m",
+          "time": {
+            "from": "now-30d",
+            "to": "now"
+          },
+          "templating": {
+            "list": [
+              {
+                "name": "service",
+                "type": "query",
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "Prometheus"
+                },
+                "refresh": 1,
+                "query": "label_values(container_cpu_usage_seconds_total{namespace=~\"oscar-svc.*\"}, service)",
+                "multi": true,
+                "includeAll": true,
+                "allValue": ".+",
+                "regex": "^(?!.*-dlp$).*$"
+              }
+            ]
+          },
+          "panels": [
+            {
+              "type": "stat",
+              "title": "CPU Hours (Total)",
+              "gridPos": {
+                "h": 5,
+                "w": 6,
+                "x": 0,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "expr": "sum(increase(container_cpu_usage_seconds_total{namespace=~\"oscar-svc.*\",service=~\"${service:regex}\"}[$__range])) / 3600",
+                  "refId": "A"
+                }
+              ],
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              }
+            },
+            {
+              "type": "stat",
+              "title": "GPU Hours (Total)",
+              "gridPos": {
+                "h": 5,
+                "w": 6,
+                "x": 6,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "expr": "sum(increase(container_gpu_usage_seconds_total{namespace=~\"oscar-svc.*\",service=~\"${service:regex}\"}[$__range])) / 3600",
+                  "refId": "A"
+                }
+              ],
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              }
+            },
+            {
+              "type": "stat",
+              "title": "Services Count (Active)",
+              "gridPos": {
+                "h": 5,
+                "w": 6,
+                "x": 12,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "expr": "count(count by (service) (container_cpu_usage_seconds_total{namespace=~\"oscar-svc.*\",service=~\"${service:regex}\"}))",
+                  "refId": "A"
+                }
+              ],
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              }
+            },
+            {
+              "type": "timeseries",
+              "title": "Requests (Sync / Async / Exposed)",
+              "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 5
+              },
+              "targets": [
+                {
+                  "expr": "sum by (service) (count_over_time({namespace=\"oscar\"} |~ \"GIN-EXECUTIONS-LOGGER\" |~ \"/run/${service:regex}[^/ ]*\" | regexp \"(/run)/(?P<service>[^/ ]+)\" [$__interval]))",
+                  "refId": "A",
+                  "legendFormat": "{{service}} sync"
+                },
+                {
+                  "expr": "sum by (service) (count_over_time({namespace=\"oscar\"} |~ \"GIN-EXECUTIONS-LOGGER\" |~ \"/job/${service:regex}[^/ ]*\" | regexp \"(/job)/(?P<service>[^/ ]+)\" [$__interval]))",
+                  "refId": "B",
+                  "legendFormat": "{{service}} async"
+                },
+                {
+                  "expr": "sum by (service) (count_over_time({namespace=\"ingress-nginx\"} |~ \"/system/services/${service:regex}[^/ ]*/exposed\" | regexp \"/system/services/(?P<service>[^/ ]+)/exposed\" [$__interval]))",
+                  "refId": "C",
+                  "legendFormat": "{{service}} exposed"
+                }
+              ],
+              "datasource": {
+                "type": "loki",
+                "uid": "Loki"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "decimals": 0,
+                  "unit": "none"
+                }
+              }
+            },
+            {
+              "type": "bargauge",
+              "title": "CPU Hours by Service",
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 13
+              },
+              "targets": [
+                {
+                  "expr": "sum by (service) (increase(container_cpu_usage_seconds_total{namespace=~\"oscar-svc.*\",service=~\"${service:regex}\"}[$__range])) / 3600",
+                  "refId": "A",
+                  "legendFormat": "{{service}}",
+                  "instant": true
+                }
+              ],
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "options": {
+                "displayMode": "gradient",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showUnfilled": true,
+                "valueMode": "color"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "decimals": 2,
+                  "min": 0
+                },
+                "overrides": []
+              }
+            },
+            {
+              "type": "bargauge",
+              "title": "GPU Hours by Service",
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 13
+              },
+              "targets": [
+                {
+                  "expr": "sum by (service) (increase(container_gpu_usage_seconds_total{namespace=~\"oscar-svc.*\",service=~\"${service:regex}\"}[$__range])) / 3600",
+                  "refId": "A",
+                  "legendFormat": "{{service}}",
+                  "instant": true
+                }
+              ],
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "options": {
+                "displayMode": "gradient",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showUnfilled": true,
+                "valueMode": "color"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "decimals": 2,
+                  "min": 0
+                },
+                "overrides": []
+              }
+            },
+            {
+              "type": "barchart",
+              "title": "Requests Sync by Service",
+              "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 0,
+                "y": 21
+              },
+              "targets": [
+                {
+                  "expr": "sum by (service) (count_over_time({namespace=\"oscar\"} |~ \"GIN-EXECUTIONS-LOGGER\" |~ \"/run/${service:regex}[^/ ]*\" | regexp \"(/run)/(?P<service>[^/ ]+)\" [$__range]))",
+                  "refId": "A",
+                  "legendFormat": "{{service}}",
+                  "instant": true
+                }
+              ],
+              "datasource": {
+                "type": "loki",
+                "uid": "Loki"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "decimals": 0
+                }
+              }
+            },
+            {
+              "type": "barchart",
+              "title": "Requests Async by Service",
+              "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 8,
+                "y": 21
+              },
+              "targets": [
+                {
+                  "expr": "sum by (service) (count_over_time({namespace=\"oscar\"} |~ \"GIN-EXECUTIONS-LOGGER\" |~ \"/job/${service:regex}[^/ ]*\" | regexp \"(/job)/(?P<service>[^/ ]+)\" [$__range]))",
+                  "refId": "A",
+                  "legendFormat": "{{service}}",
+                  "instant": true
+                }
+              ],
+              "datasource": {
+                "type": "loki",
+                "uid": "Loki"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "decimals": 0
+                }
+              }
+            },
+            {
+              "type": "barchart",
+              "title": "Requests Exposed by Service",
+              "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 16,
+                "y": 21
+              },
+              "targets": [
+                {
+                  "expr": "sum by (service) (count_over_time({namespace=\"ingress-nginx\"} |~ \"/system/services/${service:regex}[^/ ]*/exposed\" | regexp \"/system/services/(?P<service>[^/ ]+)/exposed\" [$__range]))",
+                  "refId": "A",
+                  "legendFormat": "{{service}}",
+                  "instant": true
+                }
+              ],
+              "datasource": {
+                "type": "loki",
+                "uid": "Loki"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "decimals": 0
+                }
+              }
+            }
+          ]
+        }

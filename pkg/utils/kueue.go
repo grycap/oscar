@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/grycap/oscar/v3/pkg/types"
 	apps "k8s.io/api/apps/v1"
@@ -26,6 +28,12 @@ import (
 const (
 	defaultKueueQueuePrefix      = "oscar-cq"
 	defaultKueueLocalQueuePrefix = "oscar-lq"
+	defaultKueueAdmissionTimeout = 30 * time.Second
+)
+
+var (
+	defaultCpuRequest    = resource.MustParse("0.2")
+	defaultMemoryRequest = resource.MustParse("256Mi")
 )
 
 var KueueLogger = log.New(os.Stdout, "[KUEUE-SERVICE] ", log.Flags())
@@ -61,6 +69,40 @@ func EnsureKueueUserQueues(ctx context.Context, cfg *types.Config, serviceNamesp
 		return fmt.Errorf("ensuring kueue LocalQueue: %w", err)
 	}
 
+	return nil
+}
+
+// CreateKueueUserQueuesIfDontExist creates the ClusterQueue for the user if it doesn't exist.
+// It is idempotent and will no-op if Kueue is disabled.
+func CreateKueueUserQueuesIfDontExist(cfg *types.Config, user string) error {
+	if !cfg.KueueEnable {
+		return nil
+	}
+	// Set empty Context
+	ctx := context.TODO()
+
+	restCfg, err := rest.InClusterConfig()
+	if err != nil {
+		return fmt.Errorf("unable to build in-cluster config for kueue: %v", err)
+	}
+
+	kueueClient, err := kueueclientset.NewForConfig(restCfg)
+	if err != nil {
+		return fmt.Errorf("unable to create kueue client: %v", err)
+	}
+	// Check if the ClusterQueue for the user already exists, if not create it
+	clusterQueueName := buildClusterQueueName(user)
+	_, err = kueueClient.KueueV1beta2().ClusterQueues().Get(ctx, clusterQueueName, metav1.GetOptions{})
+	if err != nil {
+		flavorName := sanitizeKueueName(cfg.KueueDefaultFlavor)
+		if err := ensureResourceFlavor(ctx, kueueClient, flavorName); err != nil {
+			return fmt.Errorf("unable to ensure kueue ResourceFlavor: %v", err)
+		}
+
+		if err := ensureClusterQueue(ctx, kueueClient, cfg, clusterQueueName, flavorName, user); err != nil {
+			return fmt.Errorf("unable to ensure kueue ClusterQueue: %v", err)
+		}
+	}
 	return nil
 }
 
@@ -149,7 +191,6 @@ func ensureClusterQueue(ctx context.Context, kueueClient *kueueclientset.Clients
 		len(current.Spec.ResourceGroups) == 0 ||
 		len(current.Spec.ResourceGroups[0].Flavors) == 0 ||
 		len(current.Spec.ResourceGroups[0].Flavors[0].Resources) == 0 ||
-		!reflect.DeepEqual(current.Spec.ResourceGroups, cq.Spec.ResourceGroups) ||
 		!reflect.DeepEqual(current.Spec.NamespaceSelector, cq.Spec.NamespaceSelector) {
 		current.Spec.ResourceGroups = cq.Spec.ResourceGroups
 		current.Spec.NamespaceSelector = cq.Spec.NamespaceSelector
@@ -349,6 +390,197 @@ func getWorkloadSpec(service types.Service, namespace string, cfg *types.Config,
 	return workload
 }
 
+func getResourceOnlyWorkloadSpec(service *types.Service, cfg *types.Config, namespace, workloadName, localQueueName string) (*kueuev1.Workload, error) {
+	serviceRequests, err := getServiceResourceRequests(service, cfg)
+	if err != nil {
+		return nil, err
+	}
+	var serviceReplicas int32 = 1
+	if service.Expose.APIPort != 0 && service.Expose.MinScale > 1 {
+		serviceReplicas = service.Expose.MinScale
+	} else if service.Synchronous.MinScale > 1 {
+		if service.Synchronous.MinScale > math.MaxInt32 {
+			return nil, fmt.Errorf("synchronous min_scale %d exceeds int32 range", service.Synchronous.MinScale)
+		}
+		serviceReplicas = int32(service.Synchronous.MinScale)
+	}
+
+	podSets := []kueuev1.PodSet{
+		buildResourceCheckPodSet("oscar-service", serviceReplicas, serviceRequests),
+	}
+
+	kserveRequests, kserveReplicas, hasKservePodSet, err := getKserveResourceRequests(service, cfg)
+	if err != nil {
+		return nil, err
+	}
+	if hasKservePodSet {
+		podSets = append(podSets, buildResourceCheckPodSet("kserve-service", kserveReplicas, kserveRequests))
+	}
+
+	boolActive := true
+	workload := &kueuev1.Workload{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      workloadName,
+			Namespace: namespace,
+		},
+		Spec: kueuev1.WorkloadSpec{
+			Active:    &boolActive,
+			QueueName: kueuev1.LocalQueueName(localQueueName),
+			PodSets:   podSets,
+		},
+	}
+
+	return workload, nil
+}
+
+func buildResourceCheckPodSet(name string, replicas int32, requests v1.ResourceList) kueuev1.PodSet {
+	return kueuev1.PodSet{
+		Name:  kueuev1.PodSetReference(name),
+		Count: replicas,
+		Template: v1.PodTemplateSpec{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{Name: "resource-check"}},
+				Resources: &v1.ResourceRequirements{
+					Requests: requests,
+				},
+			},
+		},
+	}
+}
+
+func getServiceResourceRequests(service *types.Service, cfg *types.Config) (v1.ResourceList, error) {
+	requests := v1.ResourceList{}
+	var cpuQty resource.Quantity = defaultCpuRequest
+	var memoryQty resource.Quantity = defaultMemoryRequest
+
+	if len(service.CPU) > 0 {
+		parsedCPU, err := resource.ParseQuantity(service.CPU)
+		if err != nil {
+			return nil, fmt.Errorf("invalid service CPU %q: %w", service.CPU, err)
+		}
+		cpuQty = parsedCPU
+	}
+	if len(service.Memory) > 0 {
+		parsedMemory, err := resource.ParseQuantity(service.Memory)
+		if err != nil {
+			return nil, fmt.Errorf("invalid service memory %q: %w", service.Memory, err)
+		}
+		memoryQty = parsedMemory
+	}
+
+	requests[v1.ResourceCPU] = cpuQty
+	requests[v1.ResourceMemory] = memoryQty
+
+	if service.EnableGPU {
+		gpu, err := resource.ParseQuantity("1")
+		if err != nil {
+			return nil, fmt.Errorf("invalid service GPU quantity: %w", err)
+		}
+		requests["nvidia.com/gpu"] = gpu
+	}
+
+	if service.EnableSGX {
+		sgx, err := resource.ParseQuantity("1")
+		if err != nil {
+			return nil, fmt.Errorf("invalid service SGX quantity: %w", err)
+		}
+		requests["sgx.intel.com/enclave"] = sgx
+	}
+
+	if len(requests) == 0 {
+		return nil, fmt.Errorf("service %q has no resource requests to validate", service.Name)
+	}
+
+	return requests, nil
+}
+
+func getKserveResourceRequests(service *types.Service, cfg *types.Config) (v1.ResourceList, int32, bool, error) {
+	isKserveService := IsKserveService(service) && IsKserveSupported(cfg)
+	if !isKserveService {
+		return nil, 0, false, nil
+	}
+
+	requests := v1.ResourceList{}
+	cpuQty := defaultKserveCpuRequest
+	memoryQty := defaultKserveMemoryRequest
+
+	if len(service.Kserve.CPU) > 0 {
+		parsedCPU, err := resource.ParseQuantity(service.Kserve.CPU)
+		if err != nil {
+			return nil, 0, false, fmt.Errorf("invalid KServe service CPU %q: %w", service.Kserve.CPU, err)
+		}
+		cpuQty = parsedCPU
+	}
+	if len(service.Kserve.Memory) > 0 {
+		parsedMemory, err := resource.ParseQuantity(service.Kserve.Memory)
+		if err != nil {
+			return nil, 0, false, fmt.Errorf("invalid KServe service memory %q: %w", service.Kserve.Memory, err)
+		}
+		memoryQty = parsedMemory
+	}
+
+	requests[v1.ResourceCPU] = cpuQty
+	requests[v1.ResourceMemory] = memoryQty
+
+	if service.Kserve.EnableGPU {
+		gpu, err := resource.ParseQuantity("1")
+		if err != nil {
+			return nil, 0, false, fmt.Errorf("invalid KServe service GPU quantity: %w", err)
+		}
+		requests["nvidia.com/gpu"] = gpu
+	}
+
+	var kserveMinScale int32 = 1
+	if service.Kserve.MinScale > 1 {
+		kserveMinScale = service.Kserve.MinScale
+	}
+
+	// resoures, replicas, hasKservePodSet, err
+	return requests, kserveMinScale, true, nil
+}
+
+// checkQueueReferences validates that the specified LocalQueue and ClusterQueue exist and are correctly linked.
+func checkQueueReferences(ctx context.Context, kueueClient *kueueclientset.Clientset, namespace, localQueueName, clusterQueueName string) error {
+	if strings.TrimSpace(localQueueName) == "" || strings.TrimSpace(clusterQueueName) == "" {
+		return fmt.Errorf("localQueueName and clusterQueueName are required")
+	}
+
+	lq, err := kueueClient.KueueV1beta2().LocalQueues(namespace).Get(ctx, localQueueName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("unable to get LocalQueue %q in namespace %q: %w", localQueueName, namespace, err)
+	}
+
+	if string(lq.Spec.ClusterQueue) != clusterQueueName {
+		return fmt.Errorf("LocalQueue %q points to ClusterQueue %q, expected %q", localQueueName, lq.Spec.ClusterQueue, clusterQueueName)
+	}
+
+	_, err = kueueClient.KueueV1beta2().ClusterQueues().Get(ctx, clusterQueueName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("unable to get ClusterQueue %q: %w", clusterQueueName, err)
+	}
+
+	return nil
+}
+
+func buildVerificationWorkloadName(serviceName string) string {
+	suffix := fmt.Sprintf("-%d", time.Now().UnixNano())
+	base := sanitizeKueueName(fmt.Sprintf("verify-%s", serviceName))
+
+	maxBaseLen := validation.DNS1123LabelMaxLength - len(suffix)
+	if maxBaseLen < 1 {
+		maxBaseLen = 1
+	}
+
+	if len(base) > maxBaseLen {
+		base = strings.TrimRight(base[:maxBaseLen], "-")
+	}
+	if base == "" {
+		base = "verify"
+	}
+
+	return base + suffix
+}
+
 func CheckWorkloadAdmited(service types.Service, namespace string, cfg *types.Config, kubeClientset kubernetes.Interface, templateFunction func(types.Service, string, *types.Config) *apps.Deployment) error {
 	restCfg, err := rest.InClusterConfig()
 	if err != nil {
@@ -408,6 +640,18 @@ func CheckWorkloadAdmited(service types.Service, namespace string, cfg *types.Co
 	} else {
 		KueueLogger.Printf("workload for exposed service '%s' is admitted", service.Name)
 		deployment := templateFunction(service, namespace, cfg) //getDeploymentSpec
+		if SecretExists(service.Name, namespace, kubeClientset) {
+			fmt.Println("exist")
+			deployment.Spec.Template.Spec.Containers[0].EnvFrom = []v1.EnvFromSource{
+				{
+					SecretRef: &v1.SecretEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: service.Name,
+						},
+					},
+				},
+			}
+		}
 		deployment.Spec.Replicas = &service.Expose.MinScale
 		_, err := kubeClientset.AppsV1().Deployments(namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
 		if err != nil {
@@ -418,17 +662,70 @@ func CheckWorkloadAdmited(service types.Service, namespace string, cfg *types.Co
 	return nil
 }
 
-//------------Knative--------------------------
-
+// ------------Knative--------------------------
 func VerifyWorkload(service types.Service, namespace string, cfg *types.Config) bool {
 	if service.Expose.MinScale == 0 {
 		service.Expose.MinScale = 1
 	}
-	creation := CreateWorkload(service, namespace, cfg, getPodTemplateSpec)
-	check := onlyCheckWorkloadAdmited()
+	if !CreateWorkload(service, namespace, cfg, getPodTemplateSpec) {
+		return false
+	}
+	check := onlyCheckWorkloadAdmited(service.Name, defaultKueueAdmissionTimeout)
 	delete := DeleteWorkload(service.Name, namespace, cfg)
-	//return (creation && check)
-	return (creation && check && delete)
+	return check && delete
+}
+
+// VerifyWorkloadByResources validates a temporary workload using only service resources
+// and explicit LocalQueue/ClusterQueue references.
+func VerifyWorkloadByResources(service types.Service, cfg *types.Config) bool {
+	if cfg == nil {
+		KueueLogger.Printf("invalid nil config while verifying workload for service '%s'", service.Name)
+		return false
+	}
+	if !cfg.KueueEnable {
+		return true
+	}
+	if service.Expose.MinScale == 0 {
+		service.Expose.MinScale = 1
+	}
+
+	localQueueName := BuildLocalQueueName(service.Name)
+	clusterQueueName := BuildClusterQueueName(service.Owner)
+	namespace := service.Namespace
+
+	restCfg, err := rest.InClusterConfig()
+	if err != nil {
+		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
+		return false
+	}
+
+	kueueClient, err := kueueclientset.NewForConfig(restCfg)
+	if err != nil {
+		KueueLogger.Printf("error building kueue clientset: %v", err)
+		return false
+	}
+
+	if err := checkQueueReferences(context.TODO(), kueueClient, namespace, localQueueName, clusterQueueName); err != nil {
+		KueueLogger.Printf("invalid queue references while verifying workload for service '%s': %v", service.Name, err)
+		return false
+	}
+
+	workloadName := buildVerificationWorkloadName(service.Name)
+	workloadSpec, err := getResourceOnlyWorkloadSpec(&service, cfg, namespace, workloadName, localQueueName)
+	if err != nil {
+		KueueLogger.Printf("error building resource-only workload for service '%s': %v", service.Name, err)
+		return false
+	}
+
+	_, err = kueueClient.KueueV1beta2().Workloads(namespace).Create(context.TODO(), workloadSpec, metav1.CreateOptions{})
+	if err != nil {
+		KueueLogger.Printf("error creating resource-only workload for service '%s': %v", service.Name, err)
+		return false
+	}
+
+	check := onlyCheckWorkloadAdmited(workloadName, 4*time.Second)
+	delete := DeleteWorkload(workloadName, namespace, cfg)
+	return check && delete
 }
 
 func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Config) v1.PodTemplateSpec {
@@ -454,7 +751,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 	}
 }
 
-func onlyCheckWorkloadAdmited() bool {
+func onlyCheckWorkloadAdmited(serviceName string, timeout time.Duration) bool {
 	restCfg, err := rest.InClusterConfig()
 	if err != nil {
 		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
@@ -463,18 +760,27 @@ func onlyCheckWorkloadAdmited() bool {
 	kueueClient, err := kueueclientset.NewForConfig(restCfg)
 	if err != nil {
 		KueueLogger.Printf("error building kueue clientset: %v", err)
+		return false
 	}
 	factory := kueueinformers.NewSharedInformerFactory(kueueClient, 0)
 	workloadsInformer := factory.Kueue().V1beta2().Workloads().Informer()
-	valueReturn := false
+	admissionChan := make(chan bool, 1)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
 
 	resource, err := workloadsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newWL := newObj.(*kueuev1.Workload)
-			if newWL.Status.Conditions != nil && newWL.Status.Conditions[0].Status == "True" {
-				valueReturn = true
-			} else if newWL.Status.Conditions != nil && newWL.Status.Conditions[0].Status != "True" {
-				valueReturn = false
+			if newWL.Name != serviceName {
+				return
+			}
+			if workloadIsAdmitted(newWL) {
+				KueueLogger.Printf("Workload %s admitted", serviceName)
+				select {
+				case admissionChan <- true:
+				default:
+				}
+				return
 			}
 		},
 	})
@@ -482,10 +788,35 @@ func onlyCheckWorkloadAdmited() bool {
 		KueueLogger.Printf("error adding event handler to workload informer: %v, %v", err, resource)
 	}
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
 	factory.Start(stopCh)
-	factory.WaitForCacheSync(stopCh)
-	return valueReturn
+	if !cache.WaitForCacheSync(stopCh, workloadsInformer.HasSynced) {
+		KueueLogger.Printf("timed out syncing workload informer for service '%s'", serviceName)
+		return false
+	}
+
+	for _, obj := range workloadsInformer.GetStore().List() {
+		if wl, ok := obj.(*kueuev1.Workload); ok && wl.Name == serviceName && workloadIsAdmitted(wl) {
+			KueueLogger.Printf("Workload %s admitted", serviceName)
+			return true
+		}
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case admitted := <-admissionChan:
+		return admitted
+	case <-timer.C:
+		KueueLogger.Printf("timed out waiting for Kueue admission for service '%s'", serviceName)
+		return false
+	}
+}
+
+func workloadIsAdmitted(wl *kueuev1.Workload) bool {
+	for _, cond := range wl.Status.Conditions {
+		if cond.Type == kueuev1.WorkloadAdmitted && cond.Status == metav1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }

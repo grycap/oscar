@@ -6,15 +6,22 @@ To give the administrator a more personalized cluster configuration, the OSCAR m
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: additional-oscar-config
-  namespace: oscar-svc
+  name: config.yaml
+  namespace: oscar
 data:
   config.yaml: |
     images:
-      allowed_prefixes:
-      - ghcr.io
+      allowed_image_repositories:  '["ghcr.io/grycap",...]'
+```
+
+Also, the administrator can use the PUT /system/config API call to modify the trusted image repositories. The next example only allows images from the `ghcr.io/grycap` repository/owner.
+
+```
+curl -vX PUT  -H "Authorization: Basic <echo 'user:password' -n | base64>"  https://<oscar_endpoint>/system/config -d '{"allowed_image_repositories":["ghcr.io/grycap"]}'
 ```
 
 Additionally, this property can be added when creating an OSCAR cluster through the IM, which will automatically create the ConfigMap.
 
 ![allowed-prefixes](images/im-dashboard/im-additional-config.png)
+
+Managed volumes do not require extra entries in this additional configuration file. Volume provisioning uses the cluster storage integration already configured for OSCAR.
