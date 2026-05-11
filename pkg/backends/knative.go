@@ -228,11 +228,6 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		return err
 	}
 
-	// Get the old knative service
-	oldSvc, err := kn.knClientset.ServingV1().Services(namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
 	// Get the old service's configMap
 	oldCm, err := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
@@ -244,44 +239,54 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		return err
 	}
 
-	// Create the Knative service definition
-	knSvc, err := kn.createKNServiceDefinition(&service, namespace)
-	if err != nil {
-		// Restore the old configMap
-		_, resErr := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
-		if resErr != nil {
-			log.Println(resErr.Error())
-		}
-		return err
-	}
-
-	// Set the new service's values on the old Knative service to avoid update issues
-	oldSvc.ObjectMeta.Labels = knSvc.ObjectMeta.Labels
-	oldSvc.Spec = knSvc.Spec
-	// Update the annotations
-	for k, v := range knSvc.ObjectMeta.Annotations {
-		oldSvc.ObjectMeta.Annotations[k] = v
-	}
-
-	// Update the Knative service
-	_, err = kn.knClientset.ServingV1().Services(namespace).Update(context.TODO(), oldSvc, metav1.UpdateOptions{})
-	if err != nil {
-		// Restore the old configMap
-		_, resErr := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
-		if resErr != nil {
-			log.Println(resErr.Error())
-		}
-		return err
-	}
-
 	// If the service is exposed update its configuration
 	if service.Expose.APIPort != 0 {
 		err = resources.UpdateExpose(service, namespace, kn.kubeClientset, kn.config)
 		if err != nil {
+			// Restore the old configMap
+			_, resErr := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
+			if resErr != nil {
+				log.Println(resErr.Error())
+			}
+			return err
+		}
+	} else {
+		// Get the old knative service
+		oldSvc, err := kn.knClientset.ServingV1().Services(namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		// Create the Knative service definition
+		knSvc, err := kn.createKNServiceDefinition(&service, namespace)
+		if err != nil {
+			// Restore the old configMap
+			_, resErr := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
+			if resErr != nil {
+				log.Println(resErr.Error())
+			}
+			return err
+		}
+
+		// Set the new service's values on the old Knative service to avoid update issues
+		oldSvc.ObjectMeta.Labels = knSvc.ObjectMeta.Labels
+		oldSvc.Spec = knSvc.Spec
+		// Update the annotations
+		for k, v := range knSvc.ObjectMeta.Annotations {
+			oldSvc.ObjectMeta.Annotations[k] = v
+		}
+
+		// Update the Knative service
+		_, err = kn.knClientset.ServingV1().Services(namespace).Update(context.TODO(), oldSvc, metav1.UpdateOptions{})
+		if err != nil {
+			// Restore the old configMap
+			_, resErr := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
+			if resErr != nil {
+				log.Println(resErr.Error())
+			}
 			return err
 		}
 	}
-
 	//Create deaemonset to cache the service image on all the nodes
 	if service.ImagePrefetch {
 		err = imagepuller.CreateDaemonset(kn.config, service, namespace, kn.kubeClientset)
