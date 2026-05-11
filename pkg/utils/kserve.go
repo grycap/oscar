@@ -33,7 +33,7 @@ const (
 	//	defaultAuthMiddlewareName = "oidc-auth"
 	httpRouteSuffix      = "-route"
 	authMiddlewareSuffix = "-auth-mdw"
-	authSecretSuffix     = "-auth-traefik"
+	authSecretSuffix     = "-auth-traefik" // #nosec G101
 	corsMiddlewareSuffix = "-cors-mdw"
 	defaultLLMCPUimage   = "vllm/vllm-openai-cpu:latest"
 	defaultLLMGPUimage   = "vllm/vllm-openai:latest"
