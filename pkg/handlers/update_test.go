@@ -172,8 +172,8 @@ func TestMakeUpdateHandlerForbiddenOwner(t *testing.T) {
 	resp := httptest.NewRecorder()
 	r.ServeHTTP(resp, req)
 
-	if resp.Code == http.StatusOK {
-		t.Fatalf("expected error status for different owner, got %d", resp.Code)
+	if resp.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for different owner, got %d: %s", resp.Code, resp.Body.String())
 	}
 }
 
