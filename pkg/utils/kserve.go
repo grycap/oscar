@@ -112,6 +112,10 @@ func CreateKserveService(service *types.Service, knativeService *knv1.Service, c
 	if getKserveType(service.Kserve.ModelFormat) == "llm" {
 		// For LLM services, we use a different InferenceService definition (LLMInferenceService)
 		llmIsvc, err := NewKserveLLMInferenceServiceDefinition(service, knativeService, cfg)
+		if err != nil {
+			return err
+		}
+
 		_, err = dynClient.Resource(llmInferenceServiceGVR).Namespace(knativeService.Namespace).Create(context.Background(), llmIsvc, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to create InferenceService: %v", err)
@@ -144,7 +148,7 @@ func UpdateKserveService(service *types.Service, oldService *types.Service, name
 	if err := ValidateKserveService(service); err != nil {
 		return err
 	}
-	if err := checkKserveUpdate(service, oldService); err != nil {
+	if err := checkKserveUpdate(oldService, service); err != nil {
 		return err
 	}
 
@@ -269,13 +273,17 @@ func UpdateKserveInferenceServiceDefinition(service *types.Service, oldIsvc *uns
 	modelSpec["resources"] = resources
 	modelSpec["args"] = service.Kserve.Args
 	modelSpec["env"] = types.ConvertEnvVars(service.Kserve.Env)
-	minScale, maxScale := normalizeScaleFromKserveService(service.Kserve)
 
 	predictor := map[string]any{
-		"model":       modelSpec,
-		"minReplicas": minScale,
-		"maxReplicas": maxScale,
+		"model": modelSpec,
+		"labels": map[string]any{
+			types.KueueOwnerLabel:       formatUID(service.Owner),
+			"kueue.x-k8s.io/queue-name": BuildLocalQueueName(service.Name),
+		},
 	}
+	minScale, maxScale := normalizeScaleFromKserveService(service.Kserve)
+	predictor["minReplicas"] = minScale
+	predictor["maxReplicas"] = maxScale
 
 	oldIsvc.Object["spec"] = map[string]any{
 		"predictor": predictor,
@@ -315,6 +323,9 @@ func DeleteKserveInferenceService(serviceName, namespace string) error {
 func NewKserveLLMInferenceServiceDefinition(service *types.Service, knSvc *knv1.Service, cfg *types.Config) (*unstructured.Unstructured, error) {
 	if err := ValidateKserveService(service); err != nil {
 		return nil, err
+	}
+	if service.Kserve.ModelFormat != "llm" {
+		return nil, fmt.Errorf("invalid ModelFormat for LLMInferenceService: %s", service.Kserve.ModelFormat)
 	}
 
 	runtimeImage := defaultLLMCPUimage
@@ -678,6 +689,7 @@ func createTraefikAuthSecret(gatewayClientset dynamic.Interface, service *types.
 	err := hash.SetPassword(service.Name, service.Token, htpasswd.HashAPR1)
 	if err != nil {
 		kserveLogger.Print(err.Error())
+		return fmt.Errorf("failed to hash password: %v", err)
 	}
 
 	secret := &unstructured.Unstructured{Object: map[string]any{
@@ -862,7 +874,7 @@ func buildKserveLLMServiceRouter(service *types.Service, knSvc *knv1.Service, cf
 		//err := createTraefikOIDCMiddleware(gatewayClientset, service, knSvc, cfg)
 		err := createTraefikAuthMiddleware(gatewayClientset, service, knSvc)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create OIDC middleware: %v", err)
+			return nil, fmt.Errorf("failed to create Auth middleware: %v", err)
 		}
 	}
 	return getKserveLLMServiceRouterSpec(service, knSvc.Namespace), nil
