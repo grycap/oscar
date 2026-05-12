@@ -335,7 +335,9 @@ func NewKserveLLMInferenceServiceDefinition(service *types.Service, knSvc *knv1.
 
 	modelName := service.Name
 	if service.Kserve.LLM != nil {
-		modelName = service.Kserve.LLM.ModelName
+		if service.Kserve.LLM.ModelName != "" {
+			modelName = service.Kserve.LLM.ModelName
+		}
 		if service.Kserve.LLM.RuntimeImage != "" {
 			runtimeImage = service.Kserve.LLM.RuntimeImage
 		}
@@ -411,7 +413,9 @@ func UpdateKserveLLMInferenceServiceDefinition(service *types.Service, oldLLMIsv
 
 	modelName := service.Name
 	if service.Kserve.LLM != nil {
-		modelName = service.Kserve.LLM.ModelName
+		if service.Kserve.LLM.ModelName != "" {
+			modelName = service.Kserve.LLM.ModelName
+		}
 		if service.Kserve.LLM.RuntimeImage != "" {
 			runtimeImage = service.Kserve.LLM.RuntimeImage
 		}
