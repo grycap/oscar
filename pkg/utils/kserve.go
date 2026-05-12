@@ -456,31 +456,31 @@ func GetKserveLabelSelector(serviceName string) string {
 	return fmt.Sprintf("%s=%s", kserveKeyLabelApp, prefixLabelApp+serviceName)
 }
 
-func GetKserveSvcName(serviceNamne, kserveModelFormat string) string {
-	if serviceNamne == "" {
+func GetKserveSvcName(serviceName, kserveModelFormat string) string {
+	if serviceName == "" {
 		return ""
 	}
 
 	switch getKserveType(kserveModelFormat) {
 	case "predictor":
-		return serviceNamne + "-predictor"
+		return serviceName + "-predictor"
 	case "llm":
-		return serviceNamne + "-kserve-workload-svc"
+		return serviceName + "-kserve-workload-svc"
 	default:
 		return ""
 	}
 }
 
-func GetKservePodAndDplName(serviceNamne, kserveModelFormat string) string {
-	if serviceNamne == "" {
+func GetKservePodAndDplName(serviceName, kserveModelFormat string) string {
+	if serviceName == "" {
 		return ""
 	}
 
 	switch getKserveType(kserveModelFormat) {
 	case "predictor":
-		return serviceNamne + "-predictor"
+		return serviceName + "-predictor"
 	case "llm":
-		return serviceNamne + "-kserve"
+		return serviceName + "-kserve"
 	default:
 		return ""
 	}
@@ -562,7 +562,7 @@ func checkKserveUpdate(oldService *types.Service, newService *types.Service) err
 		return nil
 	}
 	// If one of them is nil and the other is not,
-	// it's a not alloved change in KServe configuration
+	// it's a not allowed change in KServe configuration
 	if oldKserve == nil || newKserve == nil {
 		return fmt.Errorf("cannot add or remove KServe configuration")
 
