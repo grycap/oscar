@@ -54,7 +54,7 @@ Options:
   --devel        Deploy using the OSCAR devel branch without interactive prompts.
   --metrics      Deploy metrics stack (Prometheus + Loki + Alloy) for reporting.
   --oidc         Enable OIDC support for OSCAR (default: disabled).
-  --kueue        Enable Kueue support for OSCAR (default: disabled).
+  --kueue        Enable Kueue support for CPU and memory quotas (default: disabled).
   -h, --help     Show this help message and exit.
 EOF
 }
@@ -628,6 +628,7 @@ local_reg="y"
 use_metrics="$USE_METRICS"
 use_devel_branch="n"
 use_oidc="n"
+use_kueue="n"
 if [ "$SKIP_PROMPTS" == "true" ]; then
     echo "[*] Running in non-interactive mode: Knative, local registry, and OSCAR devel branch enabled."
 else
@@ -642,6 +643,9 @@ else
         echo -e "  - OIDC_GROUPS=$OIDC_GROUPS_DEFAULT"
         read -p "Do you want to enable OIDC authentication support with these defaults? [y/n] " use_oidc </dev/tty
     fi
+    if [ "$ENABLE_KUEUE" != "true" ]; then
+        read -p "Do you want to enable CPU and memory quotas with Kueue? [y/n] " use_kueue </dev/tty
+    fi
 fi
 
 if [ `echo $use_devel_branch | tr '[:upper:]' '[:lower:]'` == "y" ]; then
@@ -652,6 +656,9 @@ if [ `echo $use_metrics | tr '[:upper:]' '[:lower:]'` == "y" ]; then
 fi
 if [ `echo $use_oidc | tr '[:upper:]' '[:lower:]'` == "y" ]; then
     ENABLE_OIDC="true"
+fi
+if [ `echo $use_kueue | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+    ENABLE_KUEUE="true"
 fi
 if [ "$OSCAR_IMAGE_BRANCH" == "devel" ]; then
     OSCAR_HELM_IMAGE_OVERRIDES="--set replicas=0"
@@ -849,6 +856,12 @@ if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then
     deployKnative
 fi
 
+if [ `echo $ENABLE_KUEUE | tr '[:upper:]' '[:lower:]'` == "true" ]; then
+    echo -e "\n[*] Deploying Kueue (workload admission) ..."
+    kubectl apply --server-side -k "github.com/kubernetes-sigs/kueue/config/default?ref=v0.15.0"
+    kubectl -n kueue-system rollout status deployment/kueue-controller-manager --timeout=120s
+fi
+
 echo -e "\n[*] Creating namespaces ..."
 #Create namespaces
 kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/yaml/oscar-namespaces.yaml
@@ -898,11 +911,6 @@ fi
 #Wait for OSCAR deployment
 checkOSCARDeploy
 
-if [ `echo $ENABLE_KUEUE | tr '[:upper:]' '[:lower:]'` == "true" ]; then
-    echo -e "\n[*] Deploying Kueue (workload admission) ..."
-    kubectl apply --server-side -k "github.com/kubernetes-sigs/kueue/config/default?ref=v0.15.0"
-fi
- 
 echo -e "\n[*] Deployment details:"
 echo "  - Kind cluster name: $CLUSTER_NAME"
 echo "  - Kind context: $KIND_CONTEXT"
