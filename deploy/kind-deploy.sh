@@ -858,9 +858,9 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 echo -e "\n[*] Deploying OSCAR ..."
 helm repo add --force-update grycap https://grycap.github.io/helm-charts/
 if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative --set resourceManager.enable=true --set kueue.enable=$ENABLE_KUEUE $OSCAR_HELM_IMAGE_OVERRIDES
 else
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set resourceManager.enable=true --set kueue.enable=$ENABLE_KUEUE $OSCAR_HELM_IMAGE_OVERRIDES
 fi
 
 if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
