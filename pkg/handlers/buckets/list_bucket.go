@@ -91,7 +91,7 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 						return
 					}
 				}
-				c.String(http.StatusInternalServerError, "Error reading buckets from user: ", uid)
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error reading buckets from user: %s", uid))
 				return
 			}
 		}
