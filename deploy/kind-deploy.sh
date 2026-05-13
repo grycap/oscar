@@ -34,6 +34,7 @@ DEFAULT_HTTPS_PORT=443
 DEFAULT_MINIO_API_PORT=30300
 DEFAULT_MINIO_CONSOLE_PORT=30301
 DEFAULT_REGISTRY_PORT=5001
+DEFAULT_TRAEFIK_DASHBOARD_PORT=9080
 OSCAR_IMAGE_BRANCH="master"
 OSCAR_HELM_IMAGE_OVERRIDES=""
 OSCAR_POST_DEPLOYMENT_IMAGE=""
@@ -57,7 +58,7 @@ Options:
   --devel        Deploy using the OSCAR devel branch without interactive prompts.
   --metrics      Deploy metrics stack (Prometheus + Loki + Alloy) for reporting.
   --oidc         Enable OIDC support for OSCAR (default: disabled).
-  --kueue        Enable Kueue support for OSCAR (default: disabled).
+  --kueue        Enable Kueue support for CPU and memory quotas (default: disabled).
   --kserve       Install KServe using deploy/kind-oscar-kserve.sh (default: disabled).
   --ingress      Use NGINX Ingress as gateway controller.
   --traefik      Use Traefik as gateway controller (default).
@@ -360,25 +361,24 @@ checkOSCARDeploy(){
     creation_timeout=120
     readiness_timeout=600
     start=$(date +%s)
-    echo -e "\n[*] Waiting for OSCAR pods to be scheduled ..."
+    echo -e "\n[*] Waiting for OSCAR deployment to be created ..."
     while true; do
-        pod_info=$(kubectl get pods -n oscar -l app=oscar --no-headers 2>/dev/null)
-        if [ -n "$pod_info" ]; then
-            pod_count=$(echo "$pod_info" | wc -l | tr -d ' ')
-            echo -e "\n[*] Detected $pod_count OSCAR pod(s). Waiting for them to become ready (timeout ${readiness_timeout}s) ..."
+        if kubectl get deployment -n oscar oscar >/dev/null 2>&1; then
+            echo -e "\n[*] OSCAR deployment detected. Waiting for rollout to complete (timeout ${readiness_timeout}s) ..."
             break
         fi
         actual=$(date +%s)
         if [ $((actual - start)) -gt $creation_timeout ]; then
-            echo -e "\n$RED[!]$END_COLOR Error: OSCAR pods were not created after ${creation_timeout}s."
-            kubectl get pods -n oscar
+            echo -e "\n$RED[!]$END_COLOR Error: OSCAR deployment was not created after ${creation_timeout}s."
+            kubectl get deployment -n oscar
             exit 1
         fi
         sleep 5
     done
 
-    if ! kubectl wait --namespace oscar --for=condition=Ready pod -l app=oscar --timeout="${readiness_timeout}s"; then
-        echo -e "\n$RED[!]$END_COLOR Error: OSCAR pods did not become ready after ${readiness_timeout}s."
+    if ! kubectl -n oscar rollout status deployment/oscar --timeout="${readiness_timeout}s"; then
+        echo -e "\n$RED[!]$END_COLOR Error: OSCAR deployment rollout did not complete after ${readiness_timeout}s."
+        kubectl get deployment -n oscar oscar
         kubectl get pods -n oscar
         failing_pods=$(kubectl get pods -n oscar -l app=oscar --no-headers | awk '{
             split($2, ready, "/");
@@ -673,6 +673,7 @@ use_metrics="$USE_METRICS"
 use_devel_branch="n"
 use_oidc="n"
 use_kserve="n"
+use_kueue="n"
 if [ "$SKIP_PROMPTS" == "true" ]; then
     echo "[*] Running in non-interactive mode: Knative, local registry, and OSCAR devel branch enabled."
 else
@@ -700,6 +701,9 @@ else
     fi
     if [ "$ENABLE_KSERVE" != "true" ]; then
         read -p "Do you want to install KServe with deploy/kind-oscar-kserve.sh? [y/n] " use_kserve </dev/tty
+    fi
+    if [ "$ENABLE_KUEUE" != "true" ]; then
+        read -p "Do you want to enable CPU and memory quotas with Kueue? [y/n] " use_kueue </dev/tty
     fi
 fi
 
@@ -730,14 +734,16 @@ else
     KIND_HTTPS_CONTAINER_PORT=443
 fi
 
-HTTP_PORT_FALLBACKS=(8081 8082 8880 9080 10080)
-HTTPS_PORT_FALLBACKS=(444 8443 9443 10443)
+HTTP_PORT_FALLBACKS=(8080 8081 8082 8880 9080 10080)
+HTTPS_PORT_FALLBACKS=(444 8443 9443 10443 11443 12443)
 MINIO_API_PORT_FALLBACKS=(30302 30304 30306 31300 32000 32500)
 MINIO_CONSOLE_PORT_FALLBACKS=(30303 30305 30307 31301 32001 32501)
+TRAEFIK_DASHBOARD_PORT_FALLBACKS=(9081 9082 9090 9091 9092)
 HOST_HTTP_PORT=$(findAvailablePort "$DEFAULT_HTTP_PORT" "${HTTP_PORT_FALLBACKS[@]}")
 HOST_HTTPS_PORT=$(findAvailablePort "$DEFAULT_HTTPS_PORT" "${HTTPS_PORT_FALLBACKS[@]}")
 HOST_MINIO_API_PORT=$(findAvailablePort "$DEFAULT_MINIO_API_PORT" "${MINIO_API_PORT_FALLBACKS[@]}")
 HOST_MINIO_CONSOLE_PORT=$(findAvailablePortExclude "$DEFAULT_MINIO_CONSOLE_PORT" "$HOST_MINIO_API_PORT" "${MINIO_CONSOLE_PORT_FALLBACKS[@]}")
+HOST_TRAEFIK_DASHBOARD_PORT=$(findAvailablePort "$DEFAULT_TRAEFIK_DASHBOARD_PORT" "${TRAEFIK_DASHBOARD_PORT_FALLBACKS[@]}")
 
 if [ -z "$HOST_HTTP_PORT" ]; then
     echo -e "$RED[!]$END_COLOR Error: Unable to find a free port for HTTP ingress"
@@ -773,6 +779,10 @@ fi
 
 if [ "$HOST_MINIO_CONSOLE_PORT" != "$DEFAULT_MINIO_CONSOLE_PORT" ]; then
     echo -e "$ORANGE[*]$END_COLOR Port $DEFAULT_MINIO_CONSOLE_PORT is busy. Using $HOST_MINIO_CONSOLE_PORT for MinIO console instead."
+fi
+
+fi [ "$GATEWAY_CONTROLLER" == "traefik" ] && [ "$HOST_TRAEFIK_DASHBOARD_PORT" != "$DEFAULT_TRAEFIK_DASHBOARD_PORT" ]; then
+    echo -e "$ORANGE[*]$END_COLOR Port $DEFAULT_TRAEFIK_DASHBOARD_PORT is busy. Using $HOST_TRAEFIK_DASHBOARD_PORT for Traefik dashboard instead."
 fi
 
 #Deploy Knative Serving
@@ -825,7 +835,7 @@ nodes:
     hostPort: ${HOST_HTTPS_PORT}
     protocol: TCP
   - containerPort: 31080
-    hostPort: 8080
+    hostPort: ${HOST_TRAEFIK_DASHBOARD_PORT}
     protocol: TCP
   - containerPort: ${HOST_MINIO_API_PORT}
     hostPort: ${HOST_MINIO_API_PORT}
@@ -879,7 +889,7 @@ nodes:
     hostPort: ${HOST_HTTPS_PORT}
     protocol: TCP
   - containerPort: 31080
-    hostPort: 8080
+    hostPort: ${HOST_TRAEFIK_DASHBOARD_PORT}
     protocol: TCP
   - containerPort: ${HOST_MINIO_API_PORT}
     hostPort: ${HOST_MINIO_API_PORT}
@@ -922,6 +932,18 @@ fi
 #Deploy Knative Serving
 if [ $(echo $use_knative | tr '[:upper:]' '[:lower:]') == "y" ]; then 
     deployKnative
+fi
+
+if [ `echo $ENABLE_KUEUE | tr '[:upper:]' '[:lower:]'` == "true" ]; then
+    #echo -e "\n[*] Deploying Kueue (workload admission) ..."
+    #kubectl apply --server-side -k "github.com/kubernetes-sigs/kueue/config/default?ref=v0.15.0"
+    #kubectl -n kueue-system rollout status deployment/kueue-controller-manager --timeout=120s
+    echo -e "\n[*] Deploying Kueue (workload admission) ..."
+    helm install kueue oci://registry.k8s.io/kueue/charts/kueue \
+    --version=0.17.2 \
+    --namespace  kueue-system \
+    --create-namespace \
+    --wait --timeout 300s
 fi
 
 echo -e "\n[*] Creating namespaces ..."
@@ -970,19 +992,6 @@ if [ "$ENABLE_OIDC" == "true" ]; then
     fi
 fi
 
-#Wait for OSCAR deployment
-checkOSCARDeploy
-
-if [ $(echo $ENABLE_KUEUE | tr '[:upper:]' '[:lower:]') == "true" ]; then
-    echo -e "\n[*] Deploying Kueue (workload admission) ..."
-    helm install kueue oci://registry.k8s.io/kueue/charts/kueue \
-    --version=0.17.2 \
-    --namespace  kueue-system \
-    --create-namespace \
-    --wait --timeout 300s
-    kubectl set env deployment/oscar -n oscar KUEUE_ENABLE=true 
-fi
-
 if [ $(echo $ENABLE_KSERVE | tr '[:upper:]' '[:lower:]') == "true" ]; then
     if [ "$GATEWAY_CONTROLLER" != "traefik" ]; then
         echo -e "\n$RED[!]$END_COLOR KServe installer script currently targets Traefik gateway. Please use --traefik to enable KServe installation."
@@ -998,6 +1007,9 @@ if [ $(echo $ENABLE_KSERVE | tr '[:upper:]' '[:lower:]') == "true" ]; then
         exit 1
     fi
 fi
+
+#Wait for OSCAR deployment
+checkOSCARDeploy
  
 echo -e "\n[*] Deployment details:"
 echo "  - Kind cluster name: $CLUSTER_NAME"

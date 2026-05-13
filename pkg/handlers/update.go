@@ -70,6 +70,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 		authHeader := c.GetHeader("Authorization")
+		isAdminUser := false
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
 			createLogger.Printf("[*] Updating service as admin user")

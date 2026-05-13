@@ -276,6 +276,112 @@ func TestNewKserveInferenceServiceDefinition_InvalidMemory(t *testing.T) {
 	}
 }
 
+func TestValidateKserveService_InvalidAPIVersion(t *testing.T) {
+	svc := kserveService()
+	svc.Kserve.APIVersion = "v3"
+
+	if err := ValidateKserveService(svc); err == nil {
+		t.Fatal("expected error for invalid APIVersion, got nil")
+	}
+}
+
+func TestNewKserveLLMInferenceServiceDefinition(t *testing.T) {
+	tests := []struct {
+		name          string
+		mutateService func(svc *oscarType.Service)
+		wantImage     string
+		wantModelName string
+	}{
+		{
+			name:          "default cpu runtime",
+			mutateService: func(svc *oscarType.Service) {},
+			wantImage:     defaultLLMCPUimage,
+			wantModelName: "my-llm-service",
+		},
+		{
+			name: "gpu runtime",
+			mutateService: func(svc *oscarType.Service) {
+				svc.Kserve.EnableGPU = true
+			},
+			wantImage:     defaultLLMGPUimage,
+			wantModelName: "my-llm-service",
+		},
+		{
+			name: "custom runtime and model name",
+			mutateService: func(svc *oscarType.Service) {
+				svc.Kserve.LLM = &oscarType.LLMConfig{ModelName: "custom-model", RuntimeImage: "repo/custom:v1"}
+			},
+			wantImage:     "repo/custom:v1",
+			wantModelName: "custom-model",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := llmKserveService()
+			tt.mutateService(svc)
+			knSvc := knativeServiceWithUID("uid-llm")
+
+			isvc, err := NewKserveLLMInferenceServiceDefinition(svc, knSvc, &oscarType.Config{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if got := getNestedString(t, isvc, "apiVersion"); got != "serving.kserve.io/v1alpha1" {
+				t.Errorf("apiVersion = %q, want %q", got, "serving.kserve.io/v1alpha1")
+			}
+			if got := getNestedString(t, isvc, "kind"); got != "LLMInferenceService" {
+				t.Errorf("kind = %q, want %q", got, "LLMInferenceService")
+			}
+			if got := getNestedString(t, isvc, "metadata", "name"); got != buildKserveName(svc.Name) {
+				t.Errorf("metadata.name = %q, want %q", got, buildKserveName(svc.Name))
+			}
+			if got := getNestedString(t, isvc, "metadata", "namespace"); got != knSvc.Namespace {
+				t.Errorf("metadata.namespace = %q, want %q", got, knSvc.Namespace)
+			}
+
+			if got := getNestedString(t, isvc, "spec", "model", "uri"); got != svc.Kserve.StorageUri {
+				t.Errorf("model.uri = %q, want %q", got, svc.Kserve.StorageUri)
+			}
+			if got := getNestedString(t, isvc, "spec", "model", "name"); got != tt.wantModelName {
+				t.Errorf("model.name = %q, want %q", got, tt.wantModelName)
+			}
+			if got := getNestedInt32(t, isvc, "spec", "replicas"); got != svc.Kserve.MinScale {
+				t.Errorf("replicas = %d, want %d", got, svc.Kserve.MinScale)
+			}
+
+			containersAny := getRawNested(t, isvc, "spec", "template", "containers")
+			containers, ok := containersAny.([]any)
+			if !ok || len(containers) != 1 {
+				t.Fatalf("expected one container, got %T (%v)", containersAny, containersAny)
+			}
+			container, ok := containers[0].(map[string]any)
+			if !ok {
+				t.Fatalf("expected container map, got %T", containers[0])
+			}
+			if got, ok := container["image"].(string); !ok || got != tt.wantImage {
+				t.Errorf("container.image = %v, want %q", container["image"], tt.wantImage)
+			}
+			if got, ok := container["name"].(string); !ok || got != KserveLLMISVCContainerName {
+				t.Errorf("container.name = %v, want %q", container["name"], KserveLLMISVCContainerName)
+			}
+			if container["resources"] == nil {
+				t.Error("expected container resources to be set")
+			}
+		})
+	}
+}
+
+func TestNewKserveLLMInferenceServiceDefinition_InvalidModelFormat(t *testing.T) {
+	svc := kserveService()
+	knSvc := knativeServiceWithUID("uid-llm-invalid")
+
+	_, err := NewKserveLLMInferenceServiceDefinition(svc, knSvc, &oscarType.Config{})
+	if err == nil {
+		t.Fatal("expected error when ModelFormat is not llm, got nil")
+	}
+}
+
 // ─── UpdateKserveInferenceServiceDefinition ───────────────────────────────────
 
 func TestUpdateKserveInferenceServiceDefinition_Success(t *testing.T) {
@@ -767,7 +873,7 @@ func TestCheckKserveUpdate(t *testing.T) {
 				tt.mutate(oldSvc, newSvc)
 			}
 
-			err := checkKserveUpdate(oldSvc, newSvc)
+			err := CheckKserveUpdate(oldSvc, newSvc)
 			if tt.wantErr && err == nil {
 				t.Fatal("expected error, got nil")
 			}
