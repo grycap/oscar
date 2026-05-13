@@ -823,6 +823,9 @@ nodes:
 - role: control-plane
   kubeadmConfigPatches:
   - |
+    kind: ClusterConfiguration
+    controlPlaneEndpoint: "${CLUSTER_NAME}-control-plane:6443"
+  - |
     kind: InitConfiguration
     nodeRegistration:
       kubeletExtraArgs:
@@ -876,6 +879,9 @@ apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
 - role: control-plane
   kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    controlPlaneEndpoint: "${CLUSTER_NAME}-control-plane:6443"
   - |
     kind: InitConfiguration
     nodeRegistration:
