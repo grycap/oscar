@@ -62,6 +62,17 @@ var (
 	defaultKserveCpuRequest    = resource.MustParse("0.2")
 	defaultKserveMemoryRequest = resource.MustParse("256Mi")
 )
+
+type dynamicClientFactory func() (*dynamic.DynamicClient, error)
+
+var newDynamicClient dynamicClientFactory = func() (*dynamic.DynamicClient, error) {
+	restCfg, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+	return dynamic.NewForConfig(restCfg)
+}
+
 var kserveLogger = log.New(os.Stdout, "[KSERVE-SERVICE] ", log.Flags())
 
 type kserveRuntime struct {
@@ -148,7 +159,7 @@ func UpdateKserveService(service *types.Service, oldService *types.Service, name
 	if err := ValidateKserveService(service); err != nil {
 		return err
 	}
-	if err := checkKserveUpdate(oldService, service); err != nil {
+	if err := CheckKserveUpdate(oldService, service); err != nil {
 		return err
 	}
 
@@ -305,13 +316,9 @@ func GetKserveInferenceService(serviceName, namespace string) (*unstructured.Uns
 }
 
 func DeleteKserveInferenceService(serviceName, namespace string) error {
-	restCfg, err := rest.InClusterConfig()
+	dynClient, err := getDynamicClient()
 	if err != nil {
-		return fmt.Errorf("failed to get in-cluster config: %v", err)
-	}
-	dynClient, err := dynamic.NewForConfig(restCfg)
-	if err != nil {
-		return fmt.Errorf("failed to create dynamic client: %v", err)
+		return err
 	}
 	err = dynClient.Resource(kserveIsvcGVR).Namespace(namespace).Delete(context.Background(), buildKserveName(serviceName), metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -550,7 +557,7 @@ func exposeKserveInferenceService(service *types.Service, knSvc *knv1.Service, c
 	return nil
 }
 
-func checkKserveUpdate(oldService *types.Service, newService *types.Service) error {
+func CheckKserveUpdate(oldService *types.Service, newService *types.Service) error {
 	if oldService.Token != newService.Token {
 		return fmt.Errorf("unexpected error")
 	}
@@ -585,11 +592,7 @@ func checkKserveUpdate(oldService *types.Service, newService *types.Service) err
 }
 
 func getDynamicClient() (*dynamic.DynamicClient, error) {
-	restCfg, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get in-cluster config: %v", err)
-	}
-	dynClient, err := dynamic.NewForConfig(restCfg)
+	dynClient, err := newDynamicClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dynamic client: %v", err)
 	}
@@ -607,6 +610,9 @@ func normalizeScaleFromKserveService(service *types.Kserve) (int32, int32) {
 	}
 	if minScale > maxScale {
 		maxScale = minScale
+	}
+	if service.ModelFormat == "llm" && minScale == 0 {
+		minScale = 1
 	}
 	return minScale, maxScale
 }
@@ -869,14 +875,14 @@ func createKserveResources(service *types.Kserve) (v1.ResourceRequirements, erro
 }
 
 func buildKserveLLMServiceRouter(service *types.Service, knSvc *knv1.Service, cfg *types.Config) (map[string]any, error) {
-	gatewayClientset, err := getDynamicClient()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create dynamic client: %v", err)
-	}
-
 	if service.Kserve.SetAuth {
+		gatewayClientset, err := getDynamicClient()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create dynamic client: %v", err)
+		}
+
 		//err := createTraefikOIDCMiddleware(gatewayClientset, service, knSvc, cfg)
-		err := createTraefikAuthMiddleware(gatewayClientset, service, knSvc)
+		err = createTraefikAuthMiddleware(gatewayClientset, service, knSvc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Auth middleware: %v", err)
 		}
