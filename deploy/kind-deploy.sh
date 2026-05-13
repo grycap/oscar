@@ -34,6 +34,7 @@ DEFAULT_HTTPS_PORT=443
 DEFAULT_MINIO_API_PORT=30300
 DEFAULT_MINIO_CONSOLE_PORT=30301
 DEFAULT_REGISTRY_PORT=5001
+DEFAULT_TRAEFIK_DASHBOARD_PORT=9080
 OSCAR_IMAGE_BRANCH="master"
 OSCAR_HELM_IMAGE_OVERRIDES=""
 OSCAR_POST_DEPLOYMENT_IMAGE=""
@@ -733,14 +734,16 @@ else
     KIND_HTTPS_CONTAINER_PORT=443
 fi
 
-HTTP_PORT_FALLBACKS=(8081 8082 8880 9080 10080)
-HTTPS_PORT_FALLBACKS=(444 8443 9443 10443)
+HTTP_PORT_FALLBACKS=(8080 8081 8082 8880 9080 10080)
+HTTPS_PORT_FALLBACKS=(444 8443 9443 10443 11443 12443)
 MINIO_API_PORT_FALLBACKS=(30302 30304 30306 31300 32000 32500)
 MINIO_CONSOLE_PORT_FALLBACKS=(30303 30305 30307 31301 32001 32501)
+TRAEFIK_DASHBOARD_PORT_FALLBACKS=(9081 9082 9090 9091 9092)
 HOST_HTTP_PORT=$(findAvailablePort "$DEFAULT_HTTP_PORT" "${HTTP_PORT_FALLBACKS[@]}")
 HOST_HTTPS_PORT=$(findAvailablePort "$DEFAULT_HTTPS_PORT" "${HTTPS_PORT_FALLBACKS[@]}")
 HOST_MINIO_API_PORT=$(findAvailablePort "$DEFAULT_MINIO_API_PORT" "${MINIO_API_PORT_FALLBACKS[@]}")
 HOST_MINIO_CONSOLE_PORT=$(findAvailablePortExclude "$DEFAULT_MINIO_CONSOLE_PORT" "$HOST_MINIO_API_PORT" "${MINIO_CONSOLE_PORT_FALLBACKS[@]}")
+HOST_TRAEFIK_DASHBOARD_PORT=$(findAvailablePort "$DEFAULT_TRAEFIK_DASHBOARD_PORT" "${TRAEFIK_DASHBOARD_PORT_FALLBACKS[@]}")
 
 if [ -z "$HOST_HTTP_PORT" ]; then
     echo -e "$RED[!]$END_COLOR Error: Unable to find a free port for HTTP ingress"
@@ -776,6 +779,10 @@ fi
 
 if [ "$HOST_MINIO_CONSOLE_PORT" != "$DEFAULT_MINIO_CONSOLE_PORT" ]; then
     echo -e "$ORANGE[*]$END_COLOR Port $DEFAULT_MINIO_CONSOLE_PORT is busy. Using $HOST_MINIO_CONSOLE_PORT for MinIO console instead."
+fi
+
+fi [ "$GATEWAY_CONTROLLER" == "traefik" ] && [ "$HOST_TRAEFIK_DASHBOARD_PORT" != "$DEFAULT_TRAEFIK_DASHBOARD_PORT" ]; then
+    echo -e "$ORANGE[*]$END_COLOR Port $DEFAULT_TRAEFIK_DASHBOARD_PORT is busy. Using $HOST_TRAEFIK_DASHBOARD_PORT for Traefik dashboard instead."
 fi
 
 #Deploy Knative Serving
@@ -828,7 +835,7 @@ nodes:
     hostPort: ${HOST_HTTPS_PORT}
     protocol: TCP
   - containerPort: 31080
-    hostPort: 8080
+    hostPort: ${HOST_TRAEFIK_DASHBOARD_PORT}
     protocol: TCP
   - containerPort: ${HOST_MINIO_API_PORT}
     hostPort: ${HOST_MINIO_API_PORT}
@@ -882,7 +889,7 @@ nodes:
     hostPort: ${HOST_HTTPS_PORT}
     protocol: TCP
   - containerPort: 31080
-    hostPort: 8080
+    hostPort: ${HOST_TRAEFIK_DASHBOARD_PORT}
     protocol: TCP
   - containerPort: ${HOST_MINIO_API_PORT}
     hostPort: ${HOST_MINIO_API_PORT}
@@ -927,22 +934,6 @@ if [ $(echo $use_knative | tr '[:upper:]' '[:lower:]') == "y" ]; then
     deployKnative
 fi
 
-if [ $(echo $ENABLE_KSERVE | tr '[:upper:]' '[:lower:]') == "true" ]; then
-    if [ "$GATEWAY_CONTROLLER" != "traefik" ]; then
-        echo -e "\n$RED[!]$END_COLOR KServe installer script currently targets Traefik gateway. Please use --traefik to enable KServe installation."
-        exit 1
-    fi
-    echo -e "\n[*] Installing KServe using $SCRIPT_DIR/kind-oscar-kserve.sh ..."
-    if [ ! -f "$SCRIPT_DIR/kind-oscar-kserve.sh" ]; then
-        echo -e "$RED[!]$END_COLOR KServe script not found: $SCRIPT_DIR/kind-oscar-kserve.sh"
-        exit 1
-    fi
-    if ! bash "$SCRIPT_DIR/kind-oscar-kserve.sh"; then
-        echo -e "$RED[!]$END_COLOR KServe installation failed"
-        exit 1
-    fi
-fi
-
 if [ `echo $ENABLE_KUEUE | tr '[:upper:]' '[:lower:]'` == "true" ]; then
     #echo -e "\n[*] Deploying Kueue (workload admission) ..."
     #kubectl apply --server-side -k "github.com/kubernetes-sigs/kueue/config/default?ref=v0.15.0"
@@ -954,7 +945,6 @@ if [ `echo $ENABLE_KUEUE | tr '[:upper:]' '[:lower:]'` == "true" ]; then
     --create-namespace \
     --wait --timeout 300s
 fi
-
 
 echo -e "\n[*] Creating namespaces ..."
 #Create namespaces
@@ -998,6 +988,22 @@ if [ "$ENABLE_OIDC" == "true" ]; then
         OIDC_ISSUERS="$OIDC_ISSUERS_DEFAULT" \
         OIDC_GROUPS="$OIDC_GROUPS_DEFAULT"; then
         echo -e "$RED[!]$END_COLOR Failed to set OIDC environment variables in OSCAR deployment"
+        exit 1
+    fi
+fi
+
+if [ $(echo $ENABLE_KSERVE | tr '[:upper:]' '[:lower:]') == "true" ]; then
+    if [ "$GATEWAY_CONTROLLER" != "traefik" ]; then
+        echo -e "\n$RED[!]$END_COLOR KServe installer script currently targets Traefik gateway. Please use --traefik to enable KServe installation."
+        exit 1
+    fi
+    echo -e "\n[*] Installing KServe using $SCRIPT_DIR/kind-oscar-kserve.sh ..."
+    if [ ! -f "$SCRIPT_DIR/kind-oscar-kserve.sh" ]; then
+        echo -e "$RED[!]$END_COLOR KServe script not found: $SCRIPT_DIR/kind-oscar-kserve.sh"
+        exit 1
+    fi
+    if ! bash "$SCRIPT_DIR/kind-oscar-kserve.sh"; then
+        echo -e "$RED[!]$END_COLOR KServe installation failed"
         exit 1
     fi
 fi
