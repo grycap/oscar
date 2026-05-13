@@ -165,7 +165,7 @@ func TestMakeUpdateHandlerForbiddenOwner(t *testing.T) {
 	})
 	r.PUT("/system/services", MakeUpdateHandler(cfg, back))
 
-	body := `{"name":"svc","token":"t","visibility":"private"}`
+	body := `{"name":"svc","image":"img","script":"echo","token":"t","visibility":"private"}`
 	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer token")
@@ -174,6 +174,36 @@ func TestMakeUpdateHandlerForbiddenOwner(t *testing.T) {
 
 	if resp.Code == http.StatusOK {
 		t.Fatalf("expected error status for different owner, got %d", resp.Code)
+	}
+}
+
+func TestMakeUpdateHandlerIgnoresStaleGlobalAdminState(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{Name: "svc", Owner: "owner"}
+	cfg := &types.Config{MinIOProvider: &types.MinIOProvider{}}
+	isAdminUser = true
+	defer func() { isAdminUser = false }()
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "other")
+		c.Next()
+	})
+	r.PUT("/system/services", MakeUpdateHandler(cfg, back))
+
+	body := `{"name":"svc","image":"img","script":"echo","token":"t","visibility":"private"}`
+	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for different owner despite stale admin state, got %d", resp.Code)
+	}
+	if back.UpdatedService != nil {
+		t.Fatalf("expected backend not to update service, got %+v", back.UpdatedService)
 	}
 }
 

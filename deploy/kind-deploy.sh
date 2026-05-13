@@ -57,7 +57,7 @@ Options:
   --devel        Deploy using the OSCAR devel branch without interactive prompts.
   --metrics      Deploy metrics stack (Prometheus + Loki + Alloy) for reporting.
   --oidc         Enable OIDC support for OSCAR (default: disabled).
-  --kueue        Enable Kueue support for OSCAR (default: disabled).
+  --kueue        Enable Kueue support for CPU and memory quotas (default: disabled).
   --kserve       Install KServe using deploy/kind-oscar-kserve.sh (default: disabled).
   --ingress      Use NGINX Ingress as gateway controller.
   --traefik      Use Traefik as gateway controller (default).
@@ -360,25 +360,24 @@ checkOSCARDeploy(){
     creation_timeout=120
     readiness_timeout=600
     start=$(date +%s)
-    echo -e "\n[*] Waiting for OSCAR pods to be scheduled ..."
+    echo -e "\n[*] Waiting for OSCAR deployment to be created ..."
     while true; do
-        pod_info=$(kubectl get pods -n oscar -l app=oscar --no-headers 2>/dev/null)
-        if [ -n "$pod_info" ]; then
-            pod_count=$(echo "$pod_info" | wc -l | tr -d ' ')
-            echo -e "\n[*] Detected $pod_count OSCAR pod(s). Waiting for them to become ready (timeout ${readiness_timeout}s) ..."
+        if kubectl get deployment -n oscar oscar >/dev/null 2>&1; then
+            echo -e "\n[*] OSCAR deployment detected. Waiting for rollout to complete (timeout ${readiness_timeout}s) ..."
             break
         fi
         actual=$(date +%s)
         if [ $((actual - start)) -gt $creation_timeout ]; then
-            echo -e "\n$RED[!]$END_COLOR Error: OSCAR pods were not created after ${creation_timeout}s."
-            kubectl get pods -n oscar
+            echo -e "\n$RED[!]$END_COLOR Error: OSCAR deployment was not created after ${creation_timeout}s."
+            kubectl get deployment -n oscar
             exit 1
         fi
         sleep 5
     done
 
-    if ! kubectl wait --namespace oscar --for=condition=Ready pod -l app=oscar --timeout="${readiness_timeout}s"; then
-        echo -e "\n$RED[!]$END_COLOR Error: OSCAR pods did not become ready after ${readiness_timeout}s."
+    if ! kubectl -n oscar rollout status deployment/oscar --timeout="${readiness_timeout}s"; then
+        echo -e "\n$RED[!]$END_COLOR Error: OSCAR deployment rollout did not complete after ${readiness_timeout}s."
+        kubectl get deployment -n oscar oscar
         kubectl get pods -n oscar
         failing_pods=$(kubectl get pods -n oscar -l app=oscar --no-headers | awk '{
             split($2, ready, "/");
@@ -673,6 +672,7 @@ use_metrics="$USE_METRICS"
 use_devel_branch="n"
 use_oidc="n"
 use_kserve="n"
+use_kueue="n"
 if [ "$SKIP_PROMPTS" == "true" ]; then
     echo "[*] Running in non-interactive mode: Knative, local registry, and OSCAR devel branch enabled."
 else
@@ -700,6 +700,9 @@ else
     fi
     if [ "$ENABLE_KSERVE" != "true" ]; then
         read -p "Do you want to install KServe with deploy/kind-oscar-kserve.sh? [y/n] " use_kserve </dev/tty
+    fi
+    if [ "$ENABLE_KUEUE" != "true" ]; then
+        read -p "Do you want to enable CPU and memory quotas with Kueue? [y/n] " use_kueue </dev/tty
     fi
 fi
 
@@ -924,6 +927,35 @@ if [ $(echo $use_knative | tr '[:upper:]' '[:lower:]') == "y" ]; then
     deployKnative
 fi
 
+if [ $(echo $ENABLE_KSERVE | tr '[:upper:]' '[:lower:]') == "true" ]; then
+    if [ "$GATEWAY_CONTROLLER" != "traefik" ]; then
+        echo -e "\n$RED[!]$END_COLOR KServe installer script currently targets Traefik gateway. Please use --traefik to enable KServe installation."
+        exit 1
+    fi
+    echo -e "\n[*] Installing KServe using $SCRIPT_DIR/kind-oscar-kserve.sh ..."
+    if [ ! -f "$SCRIPT_DIR/kind-oscar-kserve.sh" ]; then
+        echo -e "$RED[!]$END_COLOR KServe script not found: $SCRIPT_DIR/kind-oscar-kserve.sh"
+        exit 1
+    fi
+    if ! bash "$SCRIPT_DIR/kind-oscar-kserve.sh"; then
+        echo -e "$RED[!]$END_COLOR KServe installation failed"
+        exit 1
+    fi
+fi
+
+if [ `echo $ENABLE_KUEUE | tr '[:upper:]' '[:lower:]'` == "true" ]; then
+    #echo -e "\n[*] Deploying Kueue (workload admission) ..."
+    #kubectl apply --server-side -k "github.com/kubernetes-sigs/kueue/config/default?ref=v0.15.0"
+    #kubectl -n kueue-system rollout status deployment/kueue-controller-manager --timeout=120s
+    echo -e "\n[*] Deploying Kueue (workload admission) ..."
+    helm install kueue oci://registry.k8s.io/kueue/charts/kueue \
+    --version=0.17.2 \
+    --namespace  kueue-system \
+    --create-namespace \
+    --wait --timeout 300s
+fi
+
+
 echo -e "\n[*] Creating namespaces ..."
 #Create namespaces
 kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/yaml/oscar-namespaces.yaml
@@ -972,32 +1004,6 @@ fi
 
 #Wait for OSCAR deployment
 checkOSCARDeploy
-
-if [ $(echo $ENABLE_KUEUE | tr '[:upper:]' '[:lower:]') == "true" ]; then
-    echo -e "\n[*] Deploying Kueue (workload admission) ..."
-    helm install kueue oci://registry.k8s.io/kueue/charts/kueue \
-    --version=0.17.2 \
-    --namespace  kueue-system \
-    --create-namespace \
-    --wait --timeout 300s
-    kubectl set env deployment/oscar -n oscar KUEUE_ENABLE=true 
-fi
-
-if [ $(echo $ENABLE_KSERVE | tr '[:upper:]' '[:lower:]') == "true" ]; then
-    if [ "$GATEWAY_CONTROLLER" != "traefik" ]; then
-        echo -e "\n$RED[!]$END_COLOR KServe installer script currently targets Traefik gateway. Please use --traefik to enable KServe installation."
-        exit 1
-    fi
-    echo -e "\n[*] Installing KServe using $SCRIPT_DIR/kind-oscar-kserve.sh ..."
-    if [ ! -f "$SCRIPT_DIR/kind-oscar-kserve.sh" ]; then
-        echo -e "$RED[!]$END_COLOR KServe script not found: $SCRIPT_DIR/kind-oscar-kserve.sh"
-        exit 1
-    fi
-    if ! bash "$SCRIPT_DIR/kind-oscar-kserve.sh"; then
-        echo -e "$RED[!]$END_COLOR KServe installation failed"
-        exit 1
-    fi
-fi
  
 echo -e "\n[*] Deployment details:"
 echo "  - Kind cluster name: $CLUSTER_NAME"
