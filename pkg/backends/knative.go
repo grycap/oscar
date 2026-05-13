@@ -255,6 +255,7 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		namespace = kn.config.ServicesNamespace
 	}
 	var isKserve bool = isKserveServiceAndSupported(&service, kn)
+	var oldService *types.Service
 
 	if isKserve {
 		if err := utils.ValidateKserveService(&service); err != nil {
@@ -267,6 +268,21 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		return err
 	}
 
+	// Get the old service's configMap
+	oldCm, err := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", service.Name)
+	}
+
+	if isKserve {
+		oldService, err = getServiceFromConfigMap(oldCm)
+		if err != nil {
+			return err
+		}
+		if err := utils.CheckKserveUpdate(oldService, &service); err != nil {
+			return err
+		}
+	}
 	// Get the old knative service
 	oldSvc, err := kn.knClientset.ServingV1().Services(namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
@@ -274,11 +290,6 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	}
 	// Preserve the original Knative Service state so it can be restored on KServe errors
 	originalKnSvc := oldSvc.DeepCopy()
-	// Get the old service's configMap
-	oldCm, err := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", service.Name)
-	}
 
 	// Update the configMap with FDL and user-script
 	if err := updateServiceConfigMap(&service, namespace, kn.kubeClientset); err != nil {
@@ -317,11 +328,11 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 
 	// If the service is a KServe service, update the associated InferenceService
 	if isKserve {
-		oldService, updateErr := getServiceFromConfigMap(oldCm)
-		if updateErr == nil {
-			// The Kserve service set an OwnerReference to the Knative service, so if the Knative service is deleted the KServe InferenceService will be automatically deleted by Kubernetes garbage collection
-			updateErr = utils.UpdateKserveService(&service, oldService, namespace)
+		if oldService == nil {
+			return fmt.Errorf("the service \"%s\" is a KServe service but the old service definition could not be retrieved", service.Name)
 		}
+		// The Kserve service set an OwnerReference to the Knative service, so if the Knative service is deleted the KServe InferenceService will be automatically deleted by Kubernetes garbage collection
+		updateErr := utils.UpdateKserveService(&service, oldService, namespace)
 		if updateErr != nil {
 			log.Printf("Error updating asociated KServe InferenceService: %v", updateErr)
 			// Restore the old Knative Service
