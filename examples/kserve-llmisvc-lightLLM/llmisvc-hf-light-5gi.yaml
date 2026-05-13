@@ -1,0 +1,44 @@
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  name: hf-light-5gi
+spec:
+  model:
+    # Small model that is compatible with vLLM attention head-size constraints.
+    uri: hf://distilbert/distilgpt2
+    name: distilbert/distilgpt2
+
+  replicas: 1
+
+  template:
+    containers:
+      - name: main
+        image: quay.io/pierdipi/vllm-cpu:latest
+        securityContext:
+          runAsNonRoot: false
+        env:
+          - name: VLLM_LOGGING_LEVEL
+            value: INFO
+          # Keep KV cache small on CPU to stay under memory budget.
+          - name: VLLM_CPU_KVCACHE_SPACE
+            value: "1"
+          # Keep context short to reduce memory pressure further.
+          - name: VLLM_MAX_MODEL_LEN
+            value: "512"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: 2Gi
+          limits:
+            cpu: "1"
+            memory: 5Gi
+        livenessProbe:
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 30
+          failureThreshold: 5
+
+  router:
+    gateway: {}
+    route: {}
+    scheduler: {}

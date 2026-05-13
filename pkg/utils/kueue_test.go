@@ -2,6 +2,8 @@ package utils
 
 import (
 	"context"
+	"math"
+	"strconv"
 	"testing"
 
 	"github.com/grycap/oscar/v3/pkg/types"
@@ -393,6 +395,194 @@ func TestVerifyWorkload(t *testing.T) {
 
 	// Note: MinScale modification happens inside VerifyWorkload on a copy
 	// so we don't test the external modification, just the return value
+}
+
+func TestGetResourceOnlyWorkloadSpec(t *testing.T) {
+	service := newTestService("test-service", "testuser")
+	service.Expose.MinScale = 2
+	cfg := newTestConfig()
+
+	workload, err := getResourceOnlyWorkloadSpec(&service, cfg, "test-ns", "verify-test-service", "oscar-lq-test-service")
+	if err != nil {
+		t.Fatalf("getResourceOnlyWorkloadSpec() returned error: %v", err)
+	}
+
+	if workload == nil {
+		t.Fatal("getResourceOnlyWorkloadSpec() returned nil workload")
+	}
+
+	if workload.Spec.QueueName != kueuev1.LocalQueueName("oscar-lq-test-service") {
+		t.Fatalf("QueueName = %q, want %q", workload.Spec.QueueName, "oscar-lq-test-service")
+	}
+
+	if len(workload.Spec.PodSets) != 1 {
+		t.Fatalf("PodSets length = %d, want 1", len(workload.Spec.PodSets))
+	}
+	if workload.Spec.PodSets[0].Count != service.Expose.MinScale {
+		t.Fatalf("service podset replicas = %d, want %d", workload.Spec.PodSets[0].Count, service.Expose.MinScale)
+	}
+
+	resources := workload.Spec.PodSets[0].Template.Spec.Resources
+	if resources == nil {
+		t.Fatal("expected pod-level resources to be set")
+	}
+
+	if _, ok := resources.Requests[v1.ResourceCPU]; !ok {
+		t.Fatal("expected CPU request in resource-only workload")
+	}
+
+	if _, ok := resources.Requests[v1.ResourceMemory]; !ok {
+		t.Fatal("expected memory request in resource-only workload")
+	}
+}
+
+func TestGetResourceOnlyWorkloadSpecUsesSynchronousMinScale(t *testing.T) {
+	service := newTestService("test-service", "testuser")
+	service.Expose.APIPort = 0
+	service.Synchronous.MinScale = 3
+	cfg := newTestConfig()
+
+	workload, err := getResourceOnlyWorkloadSpec(&service, cfg, "test-ns", "verify-test-service", "oscar-lq-test-service")
+	if err != nil {
+		t.Fatalf("getResourceOnlyWorkloadSpec() returned error: %v", err)
+	}
+
+	if workload.Spec.PodSets[0].Count != int32(service.Synchronous.MinScale) {
+		t.Fatalf("service podset replicas = %d, want %d", workload.Spec.PodSets[0].Count, service.Synchronous.MinScale)
+	}
+}
+
+func TestGetResourceOnlyWorkloadSpecSynchronousMinScaleOverflow(t *testing.T) {
+	if strconv.IntSize <= 32 {
+		t.Skip("int overflow test requires 64-bit int")
+	}
+
+	service := newTestService("test-service", "testuser")
+	service.Expose.APIPort = 0
+	overflowMinScale := int64(math.MaxInt32) + 1
+	service.Synchronous.MinScale = int(overflowMinScale)
+	cfg := newTestConfig()
+
+	workload, err := getResourceOnlyWorkloadSpec(&service, cfg, "test-ns", "verify-test-service", "oscar-lq-test-service")
+	if err == nil {
+		t.Fatalf("getResourceOnlyWorkloadSpec() expected overflow error, got workload: %#v", workload)
+	}
+}
+
+func TestGetResourceOnlyWorkloadSpecWithoutResources(t *testing.T) {
+	service := newTestService("test-service", "testuser")
+	service.CPU = ""
+	service.Memory = ""
+
+	cfg := newTestConfig()
+	workload, err := getResourceOnlyWorkloadSpec(&service, cfg, "test-ns", "verify-test-service", "oscar-lq-test-service")
+	if err != nil {
+		t.Fatalf("getResourceOnlyWorkloadSpec() returned error: %v", err)
+	}
+	if workload == nil {
+		t.Fatal("getResourceOnlyWorkloadSpec() returned nil workload")
+	}
+
+	resources := workload.Spec.PodSets[0].Template.Spec.Resources
+	if resources == nil {
+		t.Fatal("expected pod-level resources to be set")
+	}
+
+	cpuReq, ok := resources.Requests[v1.ResourceCPU]
+	if !ok {
+		t.Fatal("expected CPU request in resource-only workload")
+	}
+	memReq, ok := resources.Requests[v1.ResourceMemory]
+	if !ok {
+		t.Fatal("expected memory request in resource-only workload")
+	}
+
+	if !cpuReq.Equal(defaultCpuRequest) {
+		t.Fatalf("CPU request = %s, want %s", cpuReq.String(), defaultCpuRequest.String())
+	}
+	if !memReq.Equal(defaultMemoryRequest) {
+		t.Fatalf("memory request = %s, want %s", memReq.String(), defaultMemoryRequest.String())
+	}
+}
+
+func TestGetResourceOnlyWorkloadSpecWithKServePodSet(t *testing.T) {
+	service := newTestService("test-service", "testuser")
+	service.Expose.MinScale = 2
+	service.Kserve = &types.Kserve{
+		ModelFormat: "sklearn",
+		StorageUri:  "s3://models/sklearn",
+		MinScale:    3,
+		CPU:         "1",
+		Memory:      "2Gi",
+		EnableGPU:   true,
+	}
+
+	cfg := newTestConfig()
+	cfg.KserveEnable = true
+	cfg.ExposedServicesRouteKind = "httproute"
+
+	workload, err := getResourceOnlyWorkloadSpec(&service, cfg, "test-ns", "verify-test-service", "oscar-lq-test-service")
+	if err != nil {
+		t.Fatalf("getResourceOnlyWorkloadSpec() returned error: %v", err)
+	}
+	if workload == nil {
+		t.Fatal("getResourceOnlyWorkloadSpec() returned nil workload")
+	}
+
+	if len(workload.Spec.PodSets) != 2 {
+		t.Fatalf("PodSets length = %d, want 2", len(workload.Spec.PodSets))
+	}
+
+	servicePodSet := workload.Spec.PodSets[0]
+	if servicePodSet.Count != service.Expose.MinScale {
+		t.Fatalf("service podset replicas = %d, want %d", servicePodSet.Count, service.Expose.MinScale)
+	}
+
+	kservePodSet := workload.Spec.PodSets[1]
+	if kservePodSet.Count != service.Kserve.MinScale {
+		t.Fatalf("kserve podset replicas = %d, want %d", kservePodSet.Count, service.Kserve.MinScale)
+	}
+
+	kserveResources := kservePodSet.Template.Spec.Resources
+	if kserveResources == nil {
+		t.Fatal("expected KServe podset resources to be set")
+	}
+
+	cpuReq, ok := kserveResources.Requests[v1.ResourceCPU]
+	if !ok {
+		t.Fatal("expected KServe CPU request in resource-only workload")
+	}
+	if cpuReq.String() != "1" {
+		t.Fatalf("KServe CPU request = %s, want %s", cpuReq.String(), "1")
+	}
+
+	memReq, ok := kserveResources.Requests[v1.ResourceMemory]
+	if !ok {
+		t.Fatal("expected KServe memory request in resource-only workload")
+	}
+	if memReq.String() != "2Gi" {
+		t.Fatalf("KServe memory request = %s, want %s", memReq.String(), "2Gi")
+	}
+
+	gpuReq, ok := kserveResources.Requests["nvidia.com/gpu"]
+	if !ok {
+		t.Fatal("expected KServe GPU request in resource-only workload")
+	}
+	if gpuReq.String() != "1" {
+		t.Fatalf("KServe GPU request = %s, want %s", gpuReq.String(), "1")
+	}
+}
+
+func TestVerifyWorkloadByResources(t *testing.T) {
+	cfg := newTestConfig()
+	service := newTestService("test-service", "testuser")
+
+	result := VerifyWorkloadByResources(service, cfg)
+
+	// Should return false when not in-cluster (test environment)
+	if result {
+		t.Error("Expected VerifyWorkloadByResources() to return false in test environment")
+	}
 }
 
 func TestWorkloadIsAdmitted(t *testing.T) {
