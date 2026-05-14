@@ -125,9 +125,9 @@ func DefaultSources(cfg *types.Config, back types.ServerlessBackend, kubeClients
 			}
 			sources.ExposedRequestLogs = &KubeRequestLogSource{
 				Client:     kubeClientset,
-				Namespace:  "ingress-nginx",
+				Namespace:  cfg.LokiExposedNamespace,
 				LabelKey:   "app.kubernetes.io/name",
-				LabelValue: "ingress-nginx",
+				LabelValue: cfg.LokiExposedAppLabel,
 				ParseFunc:  parseIngressAccessLog,
 				SourceName: "exposed-request-logs",
 			}
