@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -326,6 +327,67 @@ type Service struct {
 	// Deployment exposes an optional deployment summary in list/read API responses.
 	// Internal/API use only, not part of FDL.
 	Deployment *ServiceDeploymentSummary `json:"deployment,omitempty" yaml:"-"`
+
+	// Kserve configuration to deploy the service using KServe InferenceService CRD
+	Kserve *Kserve `json:"kserve,omitempty"`
+}
+
+type Kserve struct {
+	// ModelFormat the model format to use for KServe InferenceService
+	// ("onnx", "sklearn", "xgboost", "pytorch", "tensorflow", "triton", "huggingface").
+	ModelFormat string `json:"model_format"`
+	// StorageUri the URI of the model storage for KServe
+	StorageUri string `json:"storage_uri"`
+	// Can be used to specify the protocol version for KServe (e.g., "v1", "v2").
+	// Optional. (default: "v1")
+	APIVersion string `json:"api_version,omitempty" default:"v1"`
+	// MinScale minimum number of active replicas (pods) for the service
+	// Optional. (default: 0)
+	MinScale int32 `json:"min_scale,omitempty" default:"0"`
+	// MaxScale maximum number of active replicas (pods) for the service
+	// Optional. (default: 0 [Unlimited])
+	MaxScale int32 `json:"max_scale,omitempty" default:"0"`
+	// CPU cpu limit for the service following the kubernetes format
+	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
+	// Optional. (default: 0.2)
+	CPU string `json:"cpu" default:"0.2"`
+	// Memory memory limit for the service following the kubernetes format
+	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
+	// Optional. (default: 256Mi)
+	Memory string `json:"memory" default:"256Mi"`
+	// Args command-line arguments to be passed to the container
+	// Optional
+	Args []string `json:"args,omitempty"`
+	// Environment variables to be passed to the container
+	// Optional
+	Env map[string]string `json:"env,omitempty"`
+	// EnableGPU parameter to request gpu usage in KServe InferenceService
+	// Optional. (default: false)
+	EnableGPU bool `json:"enable_gpu,omitempty" default:"false"`
+	// SetAuth parameter to set the authentication for the KServe InferenceService
+	// Optional. (default: true)
+	SetAuth bool `json:"set_auth,omitempty" default:"true"`
+	// LLM configuration for LLM-specific KServe deployments
+	// Only if ModelFormat is "llm"
+	// Optional
+	LLM *LLMConfig `json:"llm,omitempty"`
+}
+
+// UnmarshalJSON sets KServe defaults for fields that may be omitted in API requests.
+func (k *Kserve) UnmarshalJSON(data []byte) error {
+	type kserveAlias Kserve
+
+	// Keep auth enabled by default unless it is explicitly set to false.
+	k.SetAuth = true
+	k.CPU = "0.2"
+	k.Memory = "256Mi"
+
+	return json.Unmarshal(data, (*kserveAlias)(k))
+}
+
+type LLMConfig struct {
+	ModelName    string `json:"model_name,omitempty"`
+	RuntimeImage string `json:"runtime_image,omitempty"`
 }
 
 // ServiceVolumeConfig stores the requested size and mount path for a managed volume.

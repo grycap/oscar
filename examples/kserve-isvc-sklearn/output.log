@@ -1,0 +1,97 @@
+2026-02-10 14:55:23,387 - supervisor - DEBUG - EVENT received: {"EventName":"s3:ObjectCreated:Put","Key":"isvc-sklearn-request/input/iris-input.json","Records":[{"eventVersion":"2.0","eventSource":"minio:s3","awsRegion":"","eventTime":"2026-02-10T14:55:21.674Z","eventName":"s3:ObjectCreated:Put","userIdentity":{"principalId":"minio"},"requestParameters":{"principalId":"minio","region":"","sourceIPAddress":"10.244.0.1"},"responseElements":{"content-length":"0","x-amz-request-id":"1892EA64AF849CFE","x-minio-deployment-id":"f8bf2f74-33b4-4a04-b647-f846b28fc9d8","x-minio-origin-endpoint":"http://10.244.0.10:9000"},"s3":{"s3SchemaVersion":"1.0","configurationId":"Config","bucket":{"name":"isvc-sklearn-request","ownerIdentity":{"principalId":"minio"},"arn":"arn:aws:s3:::isvc-sklearn-request"},"object":{"key":"input%2Firis-input.json","size":82,"eTag":"f51e7d241f34ad633b5714169b959cc2","contentType":"application/octet-stream","userMetadata":{"content-type":"application/octet-stream"},"sequencer":"1892EA64AFA3DA2A"}},"source":{"host":"10.244.0.1","port":"","userAgent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}}]}
+
+2026-02-10 14:55:23,387 - supervisor - INFO - Storage event found.
+2026-02-10 14:55:23,388 - supervisor - INFO - event_records = {'eventVersion': '2.0', 'eventSource': 'minio:s3', 'awsRegion': '', 'eventTime': '2026-02-10T14:55:21.674Z', 'eventName': 's3:ObjectCreated:Put', 'userIdentity': {'principalId': 'minio'}, 'requestParameters': {'principalId': 'minio', 'region': '', 'sourceIPAddress': '10.244.0.1'}, 'responseElements': {'content-length': '0', 'x-amz-request-id': '1892EA64AF849CFE', 'x-minio-deployment-id': 'f8bf2f74-33b4-4a04-b647-f846b28fc9d8', 'x-minio-origin-endpoint': 'http://10.244.0.10:9000'}, 's3': {'s3SchemaVersion': '1.0', 'configurationId': 'Config', 'bucket': {'name': 'isvc-sklearn-request', 'ownerIdentity': {'principalId': 'minio'}, 'arn': 'arn:aws:s3:::isvc-sklearn-request'}, 'object': {'key': 'input%2Firis-input.json', 'size': 82, 'eTag': 'f51e7d241f34ad633b5714169b959cc2', 'contentType': 'application/octet-stream', 'userMetadata': {'content-type': 'application/octet-stream'}, 'sequencer': '1892EA64AFA3DA2A'}}, 'source': {'host': '10.244.0.1', 'port': '', 'userAgent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'}} 
+
+2026-02-10 14:55:23,388 - supervisor - INFO - MINIO event created
+2026-02-10 14:55:23,388 - supervisor - INFO - Reading storage configuration
+2026-02-10 14:55:23,412 - supervisor - INFO - Using MinIO credentials for user: 'minio'
+2026-02-10 14:55:23,412 - supervisor - INFO - SUPERVISOR: Initializing Binary supervisor
+2026-02-10 14:55:23,592 - supervisor - INFO - Found 'MINIO' input provider
+2026-02-10 14:55:23,592 - supervisor - INFO - Downloading item from bucket 'isvc-sklearn-request' with key 'input/iris-input.json'
+2026-02-10 14:55:23,602 - supervisor - INFO - Successful download of file 'input/iris-input.json' from bucket 'isvc-sklearn-request' in path '/tmp/tmpmubikjdk/iris-input.json'
+2026-02-10 14:55:23,602 - supervisor - INFO - INPUT_FILE_PATH variable set to '/tmp/tmpmubikjdk/iris-input.json'
+2026-02-10 14:55:23,602 - supervisor - INFO - Script file found in '/oscar/config/script.sh'
+2026-02-10 14:55:23,604 - supervisor - DEBUG - CONTAINER OUTPUT:
+ 
+2026-02-10 14:55:23,605 - supervisor - DEBUG - Invoked isvc sklearn. File available in /tmp/tmpmubikjdk/iris-input.json
+2026-02-10 14:55:23,605 - supervisor - DEBUG - {
+2026-02-10 14:55:23,605 - supervisor - DEBUG - "instances": [
+2026-02-10 14:55:23,605 - supervisor - DEBUG - [6.8,  2.8,  4.8,  1.4],
+2026-02-10 14:55:23,605 - supervisor - DEBUG - [6.0,  3.4,  4.5,  1.6]
+2026-02-10 14:55:23,605 - supervisor - DEBUG - ]
+2026-02-10 14:55:23,605 - supervisor - DEBUG - }
+2026-02-10 14:55:23,608 - supervisor - DEBUG - % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+2026-02-10 14:55:23,608 - supervisor - DEBUG - Dload  Upload  Total   Spent   Left   Speed
+2026-02-10 14:55:23,608 - supervisor - DEBUG - 
+2026-02-10 14:55:23,609 - supervisor - DEBUG - 0      0   0      0   0      0      0      0                              0* Host sklearn-iris.kserve-test.svc.cluster.local:80 was resolved.
+2026-02-10 14:55:23,609 - supervisor - DEBUG - * IPv6: (none)
+2026-02-10 14:55:23,609 - supervisor - DEBUG - * IPv4: 10.96.255.149
+2026-02-10 14:55:23,609 - supervisor - DEBUG - *   Trying 10.96.255.149:80...
+2026-02-10 14:55:23,609 - supervisor - DEBUG - * Established connection to sklearn-iris.kserve-test.svc.cluster.local (10.96.255.149 port 80) from 10.244.0.45 port 56768
+2026-02-10 14:55:23,609 - supervisor - DEBUG - * using HTTP/1.x
+2026-02-10 14:55:23,609 - supervisor - DEBUG - > POST /v1/models/sklearn-iris:predict HTTP/1.1
+2026-02-10 14:55:23,609 - supervisor - DEBUG - > Host: sklearn-iris.kserve-test.svc.cluster.local
+2026-02-10 14:55:23,609 - supervisor - DEBUG - > User-Agent: curl/8.18.0
+2026-02-10 14:55:23,609 - supervisor - DEBUG - > Accept: */*
+2026-02-10 14:55:23,609 - supervisor - DEBUG - > Content-Type: application/json
+2026-02-10 14:55:23,609 - supervisor - DEBUG - > Content-Length: 76
+2026-02-10 14:55:23,609 - supervisor - DEBUG - >
+2026-02-10 14:55:23,609 - supervisor - DEBUG - } [76 bytes data]
+2026-02-10 14:55:23,609 - supervisor - DEBUG - * upload completely sent off: 76 bytes
+2026-02-10 14:55:23,612 - supervisor - DEBUG - < HTTP/1.1 200 OK
+2026-02-10 14:55:23,612 - supervisor - DEBUG - < content-length: 21
+2026-02-10 14:55:23,612 - supervisor - DEBUG - < content-type: application/json
+2026-02-10 14:55:23,612 - supervisor - DEBUG - < date: Tue, 10 Feb 2026 14:55:22 GMT
+2026-02-10 14:55:23,612 - supervisor - DEBUG - < server: istio-envoy
+2026-02-10 14:55:23,612 - supervisor - DEBUG - < x-envoy-upstream-service-time: 2
+2026-02-10 14:55:23,612 - supervisor - DEBUG - <
+2026-02-10 14:55:23,612 - supervisor - DEBUG - { [21 bytes data]
+2026-02-10 14:55:23,612 - supervisor - DEBUG - 
+2026-02-10 14:55:23,612 - supervisor - DEBUG - 100     97 100     21 100     76   5622  20348                              0
+2026-02-10 14:55:23,612 - supervisor - DEBUG - 100     97 100     21 100     76   5582  20202                              0
+2026-02-10 14:55:23,612 - supervisor - DEBUG - 100     97 100     21 100     76   5543  20063                              0
+2026-02-10 14:55:23,612 - supervisor - DEBUG - * Connection #0 to host sklearn-iris.kserve-test.svc.cluster.local:80 left intact
+2026-02-10 14:55:23,613 - supervisor - DEBUG - {"predictions":[1,1]}
+2026-02-10 14:55:23,613 - supervisor - INFO - Searching for files to upload in folder '/tmp/tmp8qbb8y7h'
+2026-02-10 14:55:23,613 - supervisor - INFO - Checking files for uploading to 'minio' on path: 'isvc-sklearn-request/output'
+2026-02-10 14:55:23,621 - supervisor - INFO - Creating response
+Invoked isvc sklearn. File available in /tmp/tmpmubikjdk/iris-input.json
+{
+  "instances": [
+    [6.8,  2.8,  4.8,  1.4],
+    [6.0,  3.4,  4.5,  1.6]
+  ]
+}
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+
+  0      0   0      0   0      0      0      0                              0* Host sklearn-iris.kserve-test.svc.cluster.local:80 was resolved.
+* IPv6: (none)
+* IPv4: 10.96.255.149
+*   Trying 10.96.255.149:80...
+* Established connection to sklearn-iris.kserve-test.svc.cluster.local (10.96.255.149 port 80) from 10.244.0.45 port 56768 
+* using HTTP/1.x
+> POST /v1/models/sklearn-iris:predict HTTP/1.1
+> Host: sklearn-iris.kserve-test.svc.cluster.local
+> User-Agent: curl/8.18.0
+> Accept: */*
+> Content-Type: application/json
+> Content-Length: 76
+> 
+} [76 bytes data]
+* upload completely sent off: 76 bytes
+< HTTP/1.1 200 OK
+< content-length: 21
+< content-type: application/json
+< date: Tue, 10 Feb 2026 14:55:22 GMT
+< server: istio-envoy
+< x-envoy-upstream-service-time: 2
+< 
+{ [21 bytes data]
+
+100     97 100     21 100     76   5622  20348                              0
+100     97 100     21 100     76   5582  20202                              0
+100     97 100     21 100     76   5543  20063                              0
+* Connection #0 to host sklearn-iris.kserve-test.svc.cluster.local:80 left intact
+{"predictions":[1,1]}

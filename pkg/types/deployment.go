@@ -26,6 +26,7 @@ const (
 	DeploymentStateUnavailable = "unavailable"
 
 	DeploymentResourceKindExposedService = "exposed_service"
+	DeploymentResourceKindKserveService  = "kserve_service"
 	DeploymentResourceKindKnativeService = "knative_service"
 	DeploymentResourceKindUnavailable    = "unavailable"
 )

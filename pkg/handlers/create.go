@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -263,6 +264,14 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				createLogger.Printf("error ensuring Kueue queues for service %s: %v\n", service.Name, err)
 			}
 			service.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
+			// At the moment check only for KServe service
+			if cfg.KserveEnable && service.Kserve != nil && !utils.VerifyWorkloadByResources(service, cfg) {
+				if err := utils.DeleteKueueLocalQueue(context.TODO(), cfg, service.Namespace, service.Name); err != nil {
+					createLogger.Printf("Error deleting Kueue local queue: %v", err)
+				}
+				c.String(http.StatusBadRequest, fmt.Sprintf("Error creating service %s: workload is NOT admitted", service.Name))
+				return
+			}
 		}
 
 		ownerName := "oscar"
@@ -411,6 +420,15 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	}
 	if service.CPU == "" {
 		service.CPU = defaultCPU
+	}
+
+	if utils.IsKserveService(service) && utils.IsKserveSupported(cfg) {
+		if service.Kserve.CPU == "" {
+			service.Kserve.CPU = defaultCPU
+		}
+		if service.Kserve.Memory == "" {
+			service.Kserve.Memory = defaultMemory
+		}
 	}
 	// Check if visibility has been set. If not set default private.
 	if service.Visibility == "" {

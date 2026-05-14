@@ -420,14 +420,19 @@ func getDeploymentSpec(service types.Service, namespace string, cfg *types.Confi
 	}
 	if service.Owner != types.DefaultOwner && cfg.KueueEnable {
 		deployment.Spec.Template.ObjectMeta.Labels[types.KueueOwnerLabel] = uid
-		deployment.Spec.Template.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
+
+		// TO DO: In KUEUE v0.16.0+ you can simply add quque name to use KUEUE
+		// But here we have separate Workload for the service
+		// if we set the label it will count to times the consumed resources
+		//deployment.Spec.Template.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 		deployment.Spec.Template.ObjectMeta.Annotations = map[string]string{
 			"kueue.x-k8s.io/queue-name": utils.BuildLocalQueueName(service.Name),
 		}
-		deployment.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
+		//deployment.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 		deployment.ObjectMeta.Annotations = map[string]string{
 			"kueue.x-k8s.io/queue-name": utils.BuildLocalQueueName(service.Name),
 		}
+
 	}
 
 	return deployment
