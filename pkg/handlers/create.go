@@ -236,7 +236,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			service.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 			// At the moment check only for KServe service
-			if cfg.KserveEnable && service.Kserve != nil && !utils.VerifyWorkloadByResources(service, cfg) {
+			if utils.IsKserveService(&service) && utils.IsKserveSupported(cfg) && !utils.VerifyWorkloadByResources(service, cfg) {
 				if err := utils.DeleteKueueLocalQueue(context.TODO(), cfg, service.Namespace, service.Name); err != nil {
 					createLogger.Printf("Error deleting Kueue local queue: %v", err)
 				}
