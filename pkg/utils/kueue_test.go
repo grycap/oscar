@@ -422,10 +422,7 @@ func TestGetResourceOnlyWorkloadSpec(t *testing.T) {
 		t.Fatalf("service podset replicas = %d, want %d", workload.Spec.PodSets[0].Count, service.Expose.MinScale)
 	}
 
-	resources := workload.Spec.PodSets[0].Template.Spec.Resources
-	if resources == nil {
-		t.Fatal("expected pod-level resources to be set")
-	}
+	resources := workload.Spec.PodSets[0].Template.Spec.Containers[0].Resources
 
 	if _, ok := resources.Requests[v1.ResourceCPU]; !ok {
 		t.Fatal("expected CPU request in resource-only workload")
@@ -483,10 +480,7 @@ func TestGetResourceOnlyWorkloadSpecWithoutResources(t *testing.T) {
 		t.Fatal("getResourceOnlyWorkloadSpec() returned nil workload")
 	}
 
-	resources := workload.Spec.PodSets[0].Template.Spec.Resources
-	if resources == nil {
-		t.Fatal("expected pod-level resources to be set")
-	}
+	resources := workload.Spec.PodSets[0].Template.Spec.Containers[0].Resources
 
 	cpuReq, ok := resources.Requests[v1.ResourceCPU]
 	if !ok {
@@ -543,10 +537,7 @@ func TestGetResourceOnlyWorkloadSpecWithKServePodSet(t *testing.T) {
 		t.Fatalf("kserve podset replicas = %d, want %d", kservePodSet.Count, service.Kserve.MinScale)
 	}
 
-	kserveResources := kservePodSet.Template.Spec.Resources
-	if kserveResources == nil {
-		t.Fatal("expected KServe podset resources to be set")
-	}
+	kserveResources := kservePodSet.Template.Spec.Containers[0].Resources
 
 	cpuReq, ok := kserveResources.Requests[v1.ResourceCPU]
 	if !ok {
