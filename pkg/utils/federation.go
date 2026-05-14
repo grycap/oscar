@@ -337,5 +337,5 @@ func sendFederatedDeleteService(serviceName string, cluster types.Cluster, authH
 }
 
 func buildTLSConfig(verify bool) *tls.Config {
-	return &tls.Config{InsecureSkipVerify: !verify}
+	return &tls.Config{InsecureSkipVerify: !verify} // #nosec G402
 }

@@ -299,7 +299,7 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			// Make HTTP client
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify}, // #nosec G402
 			}
 
 			client := &http.Client{
@@ -459,7 +459,7 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			// Make HTTP client
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify}, // #nosec G402
 			}
 
 			client := &http.Client{
@@ -525,7 +525,7 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			// Make HTTP client
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: !replica.SSLVerify},
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !replica.SSLVerify}, // #nosec G402
 			}
 			client := &http.Client{
 				Transport: transport,
@@ -692,7 +692,9 @@ func exchangeRefreshToken(cfg *types.Config, refreshToken string) (string, error
 		return "", fmt.Errorf("error in the request : %v", err)
 	}
 	buf := new(bytes.Buffer)
-	buf.ReadFrom(res.Body)
+	if _, err := buf.ReadFrom(res.Body); err != nil {
+		return "", fmt.Errorf("error reading response body: %v", err)
+	}
 	respBytes := buf.String()
 
 	respString := string(respBytes)
@@ -769,7 +771,7 @@ func updateServiceToken(replica types.Replica, cluster types.Cluster) (string, e
 
 	var transport http.RoundTripper = &http.Transport{
 		// Enable/disable SSL verification
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify}, // #nosec G402
 	}
 	client := &http.Client{
 		Transport: transport,
@@ -845,7 +847,7 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 			// Make HTTP client
 			var transport http.RoundTripper = &http.Transport{
 				// Enable/disable SSL verification
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify},
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify}, // #nosec G402
 			}
 			client := &http.Client{
 				Transport: transport,

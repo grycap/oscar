@@ -624,7 +624,7 @@ func fetchMinIOProvider(originEndpoint string, authHeader string, sslVerify bool
 		req.Header.Set("Authorization", authHeader)
 	}
 	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: !sslVerify},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: !sslVerify}, // #nosec G402
 	}
 	client := &http.Client{
 		Transport: transport,
