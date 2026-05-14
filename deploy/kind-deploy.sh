@@ -38,6 +38,10 @@ OSCAR_IMAGE_BRANCH="master"
 OSCAR_HELM_IMAGE_OVERRIDES=""
 OSCAR_POST_DEPLOYMENT_IMAGE=""
 OSCAR_TARGET_REPLICAS=1
+CERT_MANAGER_VERSION="v1.18.2"
+TRAEFIK_TLS_SECRET_NAME="traefik-default-cert"
+TRAEFIK_CERTIFICATE_NAME="traefik-gateway-cert"
+TRAEFIK_SELF_SIGNED_ISSUER="oscar-selfsigned-issuer"
 SKIP_PROMPTS="false"
 USE_METRICS="n"
 ENABLE_METRICS="false"
@@ -311,20 +315,82 @@ checkKind(){
     fi
 }
 
-checkIngressStatus(){
+checkTraefikStatus(){
     timeout=500
-    echo -e "\n[*] Waiting for running ingress-controller pod ..."
+    echo -e "\n[*] Waiting for Traefik pod to be running ..."
     sleep 5
     start=$(date +%s)
-    while [ "$ing_status" != "Running" ]; do
-        ing_status=`kubectl get pods -n ingress-nginx 2>/dev/null | awk '/controller/ {print $3}'`
+    while [ "$traefik_status" != "Running" ]; do
+        traefik_status=$(kubectl get pods -n traefik 2>/dev/null | awk '/traefik/ {print $3}' | head -1)
         actual=$(date +%s)
-        if [ `expr $actual - $start` -gt $timeout ]; then
-            echo -e "\n$RED[!]$END_COLOR Error: Timeout: Pod status: $status"
+        if [ $((actual - start)) -gt $timeout ]; then
+            echo -e "\n$RED[!]$END_COLOR Error: Timeout: Traefik pod status: $traefik_status"
             exit
         fi
+        sleep 5
     done
-    echo -e "\n[$GREEN$CHECK$END_COLOR] ingress-controller pod running correctly"
+    echo -e "\n[$GREEN$CHECK$END_COLOR] Traefik pod running correctly"
+}
+
+deployCertManager(){
+        echo -e "\n[*] Deploying cert-manager ..."
+        if ! kubectl apply -f "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml"; then
+                echo -e "$RED[!]$END_COLOR Failed to deploy cert-manager"
+                exit 1
+        fi
+
+        echo -e "\n[*] Waiting for cert-manager components to be ready ..."
+        if ! kubectl wait --namespace cert-manager --for=condition=Available deployment/cert-manager --timeout=300s; then
+                echo -e "$RED[!]$END_COLOR cert-manager deployment is not ready"
+                exit 1
+        fi
+        if ! kubectl wait --namespace cert-manager --for=condition=Available deployment/cert-manager-webhook --timeout=300s; then
+                echo -e "$RED[!]$END_COLOR cert-manager-webhook deployment is not ready"
+                exit 1
+        fi
+        if ! kubectl wait --namespace cert-manager --for=condition=Available deployment/cert-manager-cainjector --timeout=300s; then
+                echo -e "$RED[!]$END_COLOR cert-manager-cainjector deployment is not ready"
+                exit 1
+        fi
+}
+
+createTraefikGatewayCertificate(){
+        echo -e "\n[*] Creating self-signed certificate for Traefik Gateway ..."
+        kubectl create namespace traefik >/dev/null 2>&1 || true
+
+        if ! cat <<EOF | kubectl apply -f -
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+    name: ${TRAEFIK_SELF_SIGNED_ISSUER}
+spec:
+    selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+    name: ${TRAEFIK_CERTIFICATE_NAME}
+    namespace: traefik
+spec:
+    secretName: ${TRAEFIK_TLS_SECRET_NAME}
+    commonName: localhost
+    dnsNames:
+        - localhost
+    ipAddresses:
+        - 127.0.0.1
+    issuerRef:
+        name: ${TRAEFIK_SELF_SIGNED_ISSUER}
+        kind: ClusterIssuer
+EOF
+        then
+                echo -e "$RED[!]$END_COLOR Failed to create cert-manager issuer/certificate for Traefik"
+                exit 1
+        fi
+
+        if ! kubectl wait --namespace traefik --for=condition=Ready certificate/${TRAEFIK_CERTIFICATE_NAME} --timeout=180s; then
+                echo -e "$RED[!]$END_COLOR Traefik TLS certificate was not issued in time"
+                exit 1
+        fi
 }
 
 checkOSCARDeploy(){
@@ -669,12 +735,12 @@ HOST_MINIO_API_PORT=$(findAvailablePort "$DEFAULT_MINIO_API_PORT" "${MINIO_API_P
 HOST_MINIO_CONSOLE_PORT=$(findAvailablePortExclude "$DEFAULT_MINIO_CONSOLE_PORT" "$HOST_MINIO_API_PORT" "${MINIO_CONSOLE_PORT_FALLBACKS[@]}")
 
 if [ -z "$HOST_HTTP_PORT" ]; then
-    echo -e "$RED[!]$END_COLOR Error: Unable to find a free port for HTTP ingress"
+    echo -e "$RED[!]$END_COLOR Error: Unable to find a free port for HTTP gateway"
     exit 1
 fi
 
 if [ -z "$HOST_HTTPS_PORT" ]; then
-    echo -e "$RED[!]$END_COLOR Error: Unable to find a free port for HTTPS ingress"
+    echo -e "$RED[!]$END_COLOR Error: Unable to find a free port for HTTPS gateway"
     exit 1
 fi
 
@@ -689,11 +755,11 @@ if [ -z "$HOST_MINIO_CONSOLE_PORT" ]; then
 fi
 
 if [ "$HOST_HTTP_PORT" != "$DEFAULT_HTTP_PORT" ]; then
-    echo -e "$ORANGE[*]$END_COLOR Port 80 is busy. Using $HOST_HTTP_PORT for ingress HTTP instead."
+    echo -e "$ORANGE[*]$END_COLOR Port 80 is busy. Using $HOST_HTTP_PORT for gateway HTTP instead."
 fi
 
 if [ "$HOST_HTTPS_PORT" != "$DEFAULT_HTTPS_PORT" ]; then
-    echo -e "$ORANGE[*]$END_COLOR Port 443 is busy. Using $HOST_HTTPS_PORT for ingress HTTPS instead."
+    echo -e "$ORANGE[*]$END_COLOR Port 443 is busy. Using $HOST_HTTPS_PORT for gateway HTTPS instead."
 fi
 
 if [ "$HOST_MINIO_API_PORT" != "$DEFAULT_MINIO_API_PORT" ]; then
@@ -740,12 +806,6 @@ containerdConfigPatches:
     endpoint = ["http://${reg_name}:5000"]
 nodes:
 - role: control-plane
-  kubeadmConfigPatches:
-  - |
-    kind: InitConfiguration
-    nodeRegistration:
-      kubeletExtraArgs:
-        node-labels: "ingress-ready=true"
   extraPortMappings:
   - containerPort: 80
     hostPort: ${HOST_HTTP_PORT}
@@ -791,12 +851,6 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
 - role: control-plane
-  kubeadmConfigPatches:
-  - |
-    kind: InitConfiguration
-    nodeRegistration:
-      kubeletExtraArgs:
-        node-labels: "ingress-ready=true"
   extraPortMappings:
   - containerPort: 80
     hostPort: ${HOST_HTTP_PORT}
@@ -815,10 +869,32 @@ EOF
     createKindCluster
 fi
 
-#Deploy nginx ingress
-echo -e "\n[*] Deploying NGINX Ingress ..."
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/kind/deploy.yaml
-checkIngressStatus
+#Deploy Gateway API CRDs and Traefik
+echo -e "\n[*] Deploying Gateway API CRDs ..."
+kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+
+deployCertManager
+createTraefikGatewayCertificate
+
+echo -e "\n[*] Deploying Traefik ..."
+helm repo add --force-update traefik https://traefik.github.io/charts
+helm repo update
+helm upgrade --install traefik traefik/traefik \
+    --namespace traefik --create-namespace \
+    --version 39.0.9 \
+    --set deployment.kind=DaemonSet \
+    --set providers.kubernetesGateway.enabled=true \
+    --set gateway.enabled=true \
+    --set gateway.listeners.web.namespacePolicy.from=All \
+    --set gateway.listeners.websecure.port=8443 \
+    --set gateway.listeners.websecure.protocol=HTTPS \
+    --set gateway.listeners.websecure.certificateRefs[0].name=$TRAEFIK_TLS_SECRET_NAME \
+    --set gateway.listeners.websecure.certificateRefs[0].kind=Secre \
+    --set gateway.listeners.websecure.namespacePolicy.from=All \
+    --set logs.access.enabled=true \
+    --set "ports.web.hostPort=$HOST_HTTP_PORT" \
+    --set "ports.websecure.hostPort=$HOST_HTTPS_PORT"
+checkTraefikStatus
 
 #Deploy MinIO
 echo -e "\n[*] Deploying MinIO storage provider ..."
@@ -858,9 +934,9 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 echo -e "\n[*] Deploying OSCAR ..."
 helm repo add --force-update grycap https://grycap.github.io/helm-charts/
 if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set httproute.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative $OSCAR_HELM_IMAGE_OVERRIDES
 else
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set httproute.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD $OSCAR_HELM_IMAGE_OVERRIDES
 fi
 
 if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
