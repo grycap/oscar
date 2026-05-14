@@ -55,8 +55,8 @@ var (
 		"pytorch":     {kserveType: "predictor", framework: "mlserver", protocolV1: true, protocolV2: true},
 		"tensorflow":  {kserveType: "predictor", framework: "mlserver", protocolV1: true, protocolV2: true},
 		"triton":      {kserveType: "predictor", framework: "triton", protocolV1: true, protocolV2: true},
-		"huggingface": {kserveType: "predictor", framework: "vllm", protocolV1: true, protocolV2: true},
-		"llm":         {kserveType: "llm", framework: "vllm", protocolV1: true, protocolV2: true},
+		"huggingface": {kserveType: "predictor", framework: "vllm", protocolV1: true, protocolV2: false},
+		"llm":         {kserveType: "llm", framework: "vllm", protocolV1: true, protocolV2: false},
 	}
 
 	defaultKserveCpuRequest    = resource.MustParse("0.2")
@@ -232,10 +232,6 @@ func NewKserveInferenceServiceDefinition(service *types.Service, knSvc *knv1.Ser
 
 	predictor := map[string]any{
 		"model": modelSpec,
-		"labels": map[string]any{
-			types.KueueOwnerLabel:       formatUID(service.Owner),
-			"kueue.x-k8s.io/queue-name": BuildLocalQueueName(service.Name),
-		},
 	}
 	minScale, maxScale := normalizeScaleFromKserveService(service.Kserve)
 	predictor["minReplicas"] = minScale
@@ -245,8 +241,14 @@ func NewKserveInferenceServiceDefinition(service *types.Service, knSvc *knv1.Ser
 		kserveKeyLabelApp:           prefixLabelApp + service.Name,
 		types.OscarUserServiceLabel: "true",
 	}
+
 	if cfg.KueueEnable {
-		labels["kueue.x-k8s.io/queue-name"] = BuildLocalQueueName(service.Name)
+		localQueueName, ok := service.Labels["kueue.x-k8s.io/queue-name"]
+		if ok && localQueueName != "" {
+			labels["kueue.x-k8s.io/queue-name"] = localQueueName
+		} else if service.Owner != types.DefaultOwner {
+			return nil, fmt.Errorf("missing required label 'kueue.x-k8s.io/queue-name' for KServe service with Kueue enabled")
+		}
 	}
 
 	return &unstructured.Unstructured{Object: map[string]any{
@@ -287,14 +289,15 @@ func UpdateKserveInferenceServiceDefinition(service *types.Service, oldIsvc *uns
 
 	predictor := map[string]any{
 		"model": modelSpec,
-		"labels": map[string]any{
-			types.KueueOwnerLabel:       formatUID(service.Owner),
-			"kueue.x-k8s.io/queue-name": BuildLocalQueueName(service.Name),
-		},
 	}
 	minScale, maxScale := normalizeScaleFromKserveService(service.Kserve)
 	predictor["minReplicas"] = minScale
 	predictor["maxReplicas"] = maxScale
+
+	oldLabels, ok := oldIsvc.Object["spec"].(map[string]any)["predictor"].(map[string]any)["labels"]
+	if ok {
+		predictor["labels"] = oldLabels
+	}
 
 	oldIsvc.Object["spec"] = map[string]any{
 		"predictor": predictor,
@@ -379,8 +382,14 @@ func NewKserveLLMInferenceServiceDefinition(service *types.Service, knSvc *knv1.
 		kserveKeyLabelApp:           prefixLabelApp + service.Name,
 		types.OscarUserServiceLabel: "true",
 	}
+
 	if cfg.KueueEnable {
-		labels["kueue.x-k8s.io/queue-name"] = BuildLocalQueueName(service.Name)
+		localQueueName, ok := service.Labels["kueue.x-k8s.io/queue-name"]
+		if ok && localQueueName != "" {
+			labels["kueue.x-k8s.io/queue-name"] = localQueueName
+		} else if service.Owner != types.DefaultOwner {
+			return nil, fmt.Errorf("missing required label 'kueue.x-k8s.io/queue-name' for KServe service with Kueue enabled")
+		}
 	}
 
 	return &unstructured.Unstructured{Object: map[string]any{
@@ -445,13 +454,18 @@ func UpdateKserveLLMInferenceServiceDefinition(service *types.Service, oldLLMIsv
 
 	minScale, _ := normalizeScaleFromKserveService(service.Kserve)
 
+	labels := map[string]any{}
+	if oldlabels, ok := oldLLMIsvc.Object["spec"].(map[string]any)["labels"]; ok {
+		labels = oldlabels.(map[string]any)
+	}
+
 	oldLLMIsvc.Object["spec"] = map[string]any{
 		"model": map[string]any{
 			"uri":  service.Kserve.StorageUri,
 			"name": modelName,
 		},
 		"replicas": minScale,
-		"labels":   oldLLMIsvc.Object["spec"].(map[string]any)["labels"],
+		"labels":   labels,
 		"template": map[string]any{
 			"containers": []any{container},
 		},
@@ -743,6 +757,11 @@ func createHTTPRoute(gatewayClientset dynamic.Interface, service *types.Service,
 	namespace := knSvc.Namespace
 	apiPath := getAPIPath(isvcName)
 	svcName := GetKserveSvcName(isvcName, service.Kserve.ModelFormat)
+	gwName := strings.TrimSpace(cfg.HTTPRouteGatewayName)
+	gwNamespace := strings.TrimSpace(cfg.HTTPRouteGatewayNamespace)
+	if gwNamespace == "" || gwName == "" {
+		return fmt.Errorf("gateway namespace and name must be provided in config to create HTTPRoute for KServe service")
+	}
 
 	filters := []any{
 		map[string]any{
@@ -806,12 +825,10 @@ func createHTTPRoute(gatewayClientset dynamic.Interface, service *types.Service,
 	}
 
 	parentRef := map[string]any{
-		"group": "gateway.networking.k8s.io",
-		"kind":  "Gateway",
-		"name":  strings.TrimSpace(cfg.HTTPRouteGatewayName),
-	}
-	if gwNamespace := strings.TrimSpace(cfg.HTTPRouteGatewayNamespace); gwNamespace != "" {
-		parentRef["namespace"] = gwNamespace
+		"group":     "gateway.networking.k8s.io",
+		"kind":      "Gateway",
+		"name":      gwName,
+		"namespace": gwNamespace,
 	}
 	spec["parentRefs"] = []any{parentRef}
 
@@ -868,13 +885,19 @@ func createKserveResources(service *types.Kserve) (v1.ResourceRequirements, erro
 		if err != nil {
 			return resources, err
 		}
-		resources.Limits["nvidia.com/gpu"] = gpu
+		resources.Requests["nvidia.com/gpu"] = gpu
 	}
 
 	return resources, nil
 }
 
 func buildKserveLLMServiceRouter(service *types.Service, knSvc *knv1.Service, cfg *types.Config) (map[string]any, error) {
+	gwName := strings.TrimSpace(cfg.HTTPRouteGatewayName)
+	gwNamespace := strings.TrimSpace(cfg.HTTPRouteGatewayNamespace)
+	if gwNamespace == "" || gwName == "" {
+		return nil, fmt.Errorf("gateway namespace and name must be provided in config to create HTTPRoute for KServe service")
+	}
+
 	if service.Kserve.SetAuth {
 		gatewayClientset, err := getDynamicClient()
 		if err != nil {
@@ -887,12 +910,12 @@ func buildKserveLLMServiceRouter(service *types.Service, knSvc *knv1.Service, cf
 			return nil, fmt.Errorf("failed to create Auth middleware: %v", err)
 		}
 	}
-	return getKserveLLMServiceRouterSpec(service, knSvc.Namespace), nil
+	return getKserveLLMServiceRouterSpec(service, knSvc.Namespace, cfg), nil
 }
 
 // getKserveLLMServiceRouterSpec returns a router configuration for LLM InferenceServices
 // to route requests based on the service name (use inference Pool).
-func getKserveLLMServiceRouterSpec(service *types.Service, namespace string) map[string]any {
+func getKserveLLMServiceRouterSpec(service *types.Service, namespace string, cfg *types.Config) map[string]any {
 	filters := []any{
 		map[string]any{
 			"type": "RequestHeaderModifier",
@@ -926,24 +949,49 @@ func getKserveLLMServiceRouterSpec(service *types.Service, namespace string) map
 		},
 	})
 
-	return map[string]any{
-		"route": map[string]any{
-			"http": map[string]any{
-				"spec": map[string]any{
-					"rules": []any{
-						map[string]any{
-							"matches": []any{
-								map[string]any{
-									"path": map[string]any{
-										"type":  "PathPrefix",
-										"value": getAPIPath(service.Name),
-									},
-								},
-							},
-							"filters": filters,
+	// TO DO: Evaluate the use of InferencePool
+	// Traefik do not support InferencePool
+	// https://gateway-api-inference-extension.sigs.k8s.io/implementations/gateways/
+	backendRefs := []any{
+		map[string]any{
+			"group": "",
+			"kind":  "Service",
+			"name":  GetKserveSvcName(service.Name, service.Kserve.ModelFormat),
+			"port":  8000,
+		},
+	}
+
+	spec := map[string]any{
+		"rules": []any{
+			map[string]any{
+				"matches": []any{
+					map[string]any{
+						"path": map[string]any{
+							"type":  "PathPrefix",
+							"value": getAPIPath(service.Name),
 						},
 					},
 				},
+				"filters":     filters,
+				"backendRefs": backendRefs,
+			},
+		},
+	}
+
+	if cfg != nil {
+		if host := strings.TrimSpace(cfg.IngressHost); host != "" {
+			spec["hostnames"] = []any{host}
+		}
+	}
+
+	return map[string]any{
+		"gateway": map[string]any{
+			"name":      strings.TrimSpace(cfg.HTTPRouteGatewayName),
+			"namespace": strings.TrimSpace(cfg.HTTPRouteGatewayNamespace),
+		},
+		"route": map[string]any{
+			"http": map[string]any{
+				"spec": spec,
 			},
 		},
 	}

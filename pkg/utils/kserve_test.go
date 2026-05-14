@@ -16,6 +16,7 @@ import (
 // knativeServiceWithUID returns a minimal Knative service with the given UID.
 func knativeServiceWithUID(uid types.UID) *knv1.Service {
 	return &knv1.Service{
+
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-kn-svc",
 			Namespace: "oscar-svc",
@@ -322,7 +323,10 @@ func TestNewKserveLLMInferenceServiceDefinition(t *testing.T) {
 			tt.mutateService(svc)
 			knSvc := knativeServiceWithUID("uid-llm")
 
-			isvc, err := NewKserveLLMInferenceServiceDefinition(svc, knSvc, &oscarType.Config{})
+			isvc, err := NewKserveLLMInferenceServiceDefinition(svc, knSvc, &oscarType.Config{
+				HTTPRouteGatewayName:      "name",
+				HTTPRouteGatewayNamespace: "namespace",
+			})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -793,9 +797,9 @@ func TestCreateKserveResources(t *testing.T) {
 				t.Errorf("requests.memory = %q, want %q", got, tt.wantMem)
 			}
 
-			_, hasGPU := resources.Limits[corev1.ResourceName("nvidia.com/gpu")]
+			_, hasGPU := resources.Requests[corev1.ResourceName("nvidia.com/gpu")]
 			if hasGPU != tt.wantGPU {
-				t.Errorf("gpu limit present = %v, want %v", hasGPU, tt.wantGPU)
+				t.Errorf("gpu request present = %v, want %v", hasGPU, tt.wantGPU)
 			}
 		})
 	}
@@ -986,12 +990,14 @@ func TestUpdateKserveLLMInferenceServiceDefinition_InvalidCPU(t *testing.T) {
 
 func TestGetKserveLLMServiceRouterSpec(t *testing.T) {
 	tests := []struct {
-		name     string
-		setAuth  bool
-		wantAuth bool
+		name          string
+		setAuth       bool
+		ingressHost   string
+		wantAuth      bool
+		wantHostnames bool
 	}{
-		{name: "without auth", setAuth: false, wantAuth: false},
-		{name: "with auth", setAuth: true, wantAuth: true},
+		{name: "without auth and without host", setAuth: false, ingressHost: "", wantAuth: false, wantHostnames: false},
+		{name: "with auth and host", setAuth: true, ingressHost: "example.org", wantAuth: true, wantHostnames: true},
 	}
 
 	for _, tt := range tests {
@@ -999,11 +1005,26 @@ func TestGetKserveLLMServiceRouterSpec(t *testing.T) {
 			svc := llmKserveService()
 			svc.Name = "router-service"
 			svc.Kserve.SetAuth = tt.setAuth
+			cfg := &oscarType.Config{IngressHost: tt.ingressHost}
 
-			routerSpec := getKserveLLMServiceRouterSpec(svc, "router-ns")
+			routerSpec := getKserveLLMServiceRouterSpec(svc, "router-ns", cfg)
 			routerObj := &unstructured.Unstructured{Object: routerSpec}
 
-			rulesAny := getRawNested(t, routerObj, "route", "http", "spec", "rules")
+			specAny := getRawNested(t, routerObj, "route", "http", "spec")
+			spec, ok := specAny.(map[string]any)
+			if !ok {
+				t.Fatalf("expected spec map, got %T", specAny)
+			}
+
+			_, hasHostnames := spec["hostnames"]
+			if hasHostnames != tt.wantHostnames {
+				t.Errorf("hostnames present = %v, want %v", hasHostnames, tt.wantHostnames)
+			}
+
+			rulesAny, ok := spec["rules"]
+			if !ok {
+				t.Fatal("expected rules in router spec")
+			}
 			rules, ok := rulesAny.([]any)
 			if !ok || len(rules) != 1 {
 				t.Fatalf("expected one rule, got %T (%v)", rulesAny, rulesAny)
