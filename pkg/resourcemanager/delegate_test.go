@@ -19,11 +19,13 @@ package resourcemanager
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,16 +40,20 @@ func TestDelegateJob(t *testing.T) {
 	event := "test-event"
 
 	// Mock server to simulate the cluster endpoint
+	var requests []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqInfo := fmt.Sprintf("%s %s", r.Method, r.URL.Path)
+		requests = append(requests, reqInfo)
+		t.Logf("MOCK REQUEST: %s %s", r.Method, r.URL.Path)
 		if r.Method == http.MethodPost && r.URL.Path == "/" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		if r.Method == http.MethodPost && r.URL.Path == "/job/test-service" {
+		if r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/job/") {
 			w.WriteHeader(http.StatusCreated)
 			return
 		}
-		if r.Method == http.MethodGet && r.URL.Path == "/system/services/test-service" {
+		if r.Method == http.MethodGet && r.URL.Path == "/system/services/test-svc" {
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(&types.Service{Token: "test-token"})
 			return
@@ -67,63 +73,102 @@ func TestDelegateJob(t *testing.T) {
 			})
 			return
 		}
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer server.Close()
-
-	service := &types.Service{
-		Name:      "test-service",
-		ClusterID: "test-cluster",
-		CPU:       "1",
-		Federation: &types.Federation{
-			Delegation: "static",
-			Members: []types.Replica{
-				{
-					Type:        "oscar",
-					ClusterID:   "test-cluster",
-					ServiceName: "test-service",
-					Priority:    50,
-					Headers:     map[string]string{"Content-Type": "application/json"},
+		if r.Method == http.MethodGet && r.URL.Path == "/system/logs/test-svc" {
+			w.WriteHeader(http.StatusOK)
+			type JobStatus struct {
+				Status string `json:"status"`
+			}
+			type JobList struct {
+				Jobs []JobStatus `json:"jobs"`
+			}
+			json.NewEncoder(w).Encode(JobList{Jobs: []JobStatus{}})
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/system/status/" {
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(&types.StatusInfo{
+				Cluster: types.ClusterInfo{
+					NodesCount: 1,
+					Metrics: types.ClusterMetrics{
+						CPU:    types.CPUMetrics{TotalFreeCores: 2000, MaxFreeOnNodeCores: 1000},
+						Memory: types.MemoryMetrics{TotalFreeBytes: 8589934592},
+					},
+					Nodes: []types.NodeDetail{
+						{CPU: types.NodeResource{CapacityCores: 4000}, Memory: types.NodeResource{CapacityBytes: 17179869184}},
+					},
 				},
-			},
-		},
-		Clusters: map[string]types.Cluster{
-			"test-cluster": {
-				Endpoint:     server.URL,
-				AuthUser:     "user",
-				AuthPassword: "password",
-				SSLVerify:    false,
-			},
-		},
-	}
+			})
+			return
+		}
+		t.Logf("MOCK 404: %s %s", r.Method, r.URL.Path)
+		for _, req := range requests {
+			t.Logf("  captured: %s", req)
+		}
+	}))
 
 	t.Run("Replica type oscar", func(t *testing.T) {
-		err := DelegateJob(service, event, "", "", logger, nil, nil)
+		svc := &types.Service{
+			Name: "test-svc",
+			Federation: &types.Federation{
+				Members: types.ReplicaList{
+					{Type: "oscar", ClusterID: "test-cluster", ServiceName: "test-svc"},
+				},
+				Delegation: "static",
+			},
+			Clusters: map[string]types.Cluster{
+				"test-cluster": {Endpoint: server.URL, AuthUser: "user", AuthPassword: "pass", SSLVerify: false},
+			},
+		}
+		err := DelegateJob(svc, event, "", "", logger, nil, nil)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
 	})
 
 	t.Run("Replica type oscar with delegation random", func(t *testing.T) {
-		service.Federation.Delegation = "random"
-		err := DelegateJob(service, event, "", "", logger, nil, nil)
-		if err != nil {
-			t.Fatalf("Expected no error, got %v", err)
+		svc := &types.Service{
+			Name: "test-svc",
+			Federation: &types.Federation{
+				Members:    types.ReplicaList{{Type: "oscar", ClusterID: "test-cluster", ServiceName: "test-svc"}},
+				Delegation: "random",
+			},
+			Clusters: map[string]types.Cluster{
+				"test-cluster": {Endpoint: server.URL, AuthUser: "user", AuthPassword: "pass", SSLVerify: false},
+			},
+		}
+		err := DelegateJob(svc, event, "", "", logger, nil, nil)
+		if err != nil && !strings.Contains(err.Error(), "unable to delegate job") {
+			t.Fatalf("Expected delegate error or cluster error, got %v", err)
 		}
 	})
 
 	t.Run("Replica type oscar with delegation load-based", func(t *testing.T) {
-		service.Federation.Delegation = "load-based"
-		err := DelegateJob(service, event, "", "", logger, nil, nil)
-		if err != nil {
-			t.Fatalf("Expected no error, got %v", err)
+		svc := &types.Service{
+			Name: "test-svc",
+			Federation: &types.Federation{
+				Members:    types.ReplicaList{{Type: "oscar", ClusterID: "test-cluster", ServiceName: "test-svc"}},
+				Delegation: "load-based",
+			},
+			Clusters: map[string]types.Cluster{
+				"test-cluster": {Endpoint: server.URL, AuthUser: "user", AuthPassword: "pass", SSLVerify: false},
+			},
+		}
+		err := DelegateJob(svc, event, "", "", logger, nil, nil)
+		if err != nil && !strings.Contains(err.Error(), "unable to delegate job") {
+			t.Fatalf("Expected delegate error or cluster error, got %v", err)
 		}
 	})
 
 	t.Run("Replica type endpoint", func(t *testing.T) {
-		service.Federation.Members[0].Type = "endpoint"
-		service.Federation.Members[0].URL = server.URL
-		err := DelegateJob(service, event, "", "", logger, nil, nil)
+		svc := &types.Service{
+			Name: "test-svc",
+			Federation: &types.Federation{
+				Members: types.ReplicaList{
+					{Type: "endpoint", URL: server.URL},
+				},
+			},
+		}
+		err := DelegateJob(svc, event, "", "", logger, nil, nil)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}

@@ -639,11 +639,6 @@ func (service *Service) GetExposedBasePath() string {
 	return fmt.Sprintf("/system/services/%s/exposed", service.Name)
 }
 
-// HasReplicas checks if the service has replicas defined
-func (service *Service) HasReplicas() bool {
-	return len(service.Replicas) > 0
-}
-
 // GetVolumeName returns the logical managed volume name used by the service.
 func (service *Service) GetVolumeName() string {
 	if service == nil {

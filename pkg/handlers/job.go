@@ -241,14 +241,16 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			minIOSecretKey = service.Owner
 		}
 
-		secretName := auth.FormatUID(minIOSecretKey)
-		originSecretName, err := ensureOriginMinIODefaultSecretIfNeeded(c, cfg, service, serviceNamespace, kubeClientset, authHeader)
-		if err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
 		if minIOSecretKey == service.Owner {
 			minIOSecretKey = "minio"
 		}
 
+		secretName := auth.FormatUID(minIOSecretKey)
+		originSecretName, err := ensureOriginMinIODefaultSecretIfNeeded(c, cfg, service, serviceNamespace, kubeClientset, authHeader)
+		if err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
 		if originSecretName != "" {
 			secretName = originSecretName
 		} else {
