@@ -302,7 +302,7 @@ checkKind(){
     if  ! command -v kind &> /dev/null; then
         echo -e "$ORANGE[*]$END_COLOR Kind installation not found."
         #Forced to accept insecure cert
-        curl -k -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-$SO-amd64
+        curl -k -Lo ./kind https://kind.sigs.k8s.io/dl/v0.31.0/kind-$SO-amd64
         chmod +x ./kind
 
         if `whoami` 2>/dev/null != "root"; then
