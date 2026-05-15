@@ -889,7 +889,7 @@ helm upgrade --install traefik traefik/traefik \
     --set gateway.listeners.websecure.port=8443 \
     --set gateway.listeners.websecure.protocol=HTTPS \
     --set gateway.listeners.websecure.certificateRefs[0].name=$TRAEFIK_TLS_SECRET_NAME \
-    --set gateway.listeners.websecure.certificateRefs[0].kind=Secre \
+    --set gateway.listeners.websecure.certificateRefs[0].kind=Secret \
     --set gateway.listeners.websecure.namespacePolicy.from=All \
     --set logs.access.enabled=true \
     --set "ports.web.hostPort=$HOST_HTTP_PORT" \
