@@ -341,9 +341,9 @@ deployGatewayController(){
       checkIngressStatus
   else
       echo -e "\n[*] Installing Traefik Gateway ..."
-      kubectl create namespace traefik >/dev/null 2>&1 || true
+      kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml
       helm repo add --force-update  traefik https://traefik.github.io/charts
-      helm install --namespace=traefik traefik traefik/traefik --wait \
+      helm install --namespace=traefik traefik traefik/traefik --wait --create-namespace \
         --set providers.kubernetesGateway.enabled=true \
         --set providers.kubernetesCRD.allowCrossNamespace=true \
         --set gateway.enabled=true \
@@ -781,7 +781,7 @@ if [ "$HOST_MINIO_CONSOLE_PORT" != "$DEFAULT_MINIO_CONSOLE_PORT" ]; then
     echo -e "$ORANGE[*]$END_COLOR Port $DEFAULT_MINIO_CONSOLE_PORT is busy. Using $HOST_MINIO_CONSOLE_PORT for MinIO console instead."
 fi
 
-fi [ "$GATEWAY_CONTROLLER" == "traefik" ] && [ "$HOST_TRAEFIK_DASHBOARD_PORT" != "$DEFAULT_TRAEFIK_DASHBOARD_PORT" ]; then
+if [ "$GATEWAY_CONTROLLER" == "traefik" ] && [ "$HOST_TRAEFIK_DASHBOARD_PORT" != "$DEFAULT_TRAEFIK_DASHBOARD_PORT" ]; then
     echo -e "$ORANGE[*]$END_COLOR Port $DEFAULT_TRAEFIK_DASHBOARD_PORT is busy. Using $HOST_TRAEFIK_DASHBOARD_PORT for Traefik dashboard instead."
 fi
 
