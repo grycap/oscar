@@ -9,7 +9,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types" // for UID
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	knv1 "knative.dev/serving/pkg/apis/serving/v1"
 )
 
@@ -1193,4 +1196,52 @@ func TestKserveInjectRootPath(t *testing.T) {
 			tt.check(t, tt.svc)
 		})
 	}
+}
+
+func setDynamicClientFactoryForTest(t *testing.T, factory dynamicClientFactory) {
+	t.Helper()
+	original := newDynamicClient
+	newDynamicClient = factory
+	t.Cleanup(func() {
+		newDynamicClient = original
+	})
+}
+
+func newHTTPRouteForTest(name, namespace, path string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "gateway.networking.k8s.io/v1",
+		"kind":       "HTTPRoute",
+		"metadata": map[string]any{
+			"name":      name,
+			"namespace": namespace,
+		},
+		"spec": map[string]any{
+			"rules": []any{
+				map[string]any{
+					"matches": []any{
+						map[string]any{
+							"path": map[string]any{
+								"type":  "PathPrefix",
+								"value": path,
+							},
+						},
+					},
+				},
+			},
+		},
+	}}
+}
+
+func newFakeDynamicClientForHTTPRoutes(routes ...*unstructured.Unstructured) *dynamicfake.FakeDynamicClient {
+	scheme := runtime.NewScheme()
+	objects := make([]runtime.Object, 0, len(routes))
+	for _, route := range routes {
+		objects = append(objects, route)
+	}
+
+	return dynamicfake.NewSimpleDynamicClientWithCustomListKinds(
+		scheme,
+		map[schema.GroupVersionResource]string{kserveHTTPRouteGVR: "HTTPRouteList"},
+		objects...,
+	)
 }

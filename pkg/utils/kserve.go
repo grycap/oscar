@@ -114,6 +114,14 @@ func CreateKserveService(service *types.Service, knativeService *knv1.Service, c
 		return err
 	}
 
+	ok, err := existsKserveHTTPRouteByServiceName(service.Name, service.Namespace)
+	if err != nil {
+		return fmt.Errorf("failed to check HTTPRoute availability for service %s: %v", service.Name, err)
+	}
+	if ok {
+		return fmt.Errorf("HTTPRoute for service %s already taken, change the service name", service.Name)
+	}
+
 	dynClient, err := getDynamicClient()
 	if err != nil {
 		return fmt.Errorf("failed to create dynamic client: %v", err)
@@ -844,7 +852,7 @@ func createHTTPRoute(gatewayClientset dynamic.Interface, service *types.Service,
 	}}
 
 	_, err := gatewayClientset.Resource(kserveHTTPRouteGVR).Namespace(namespace).Create(context.Background(), httpRoute, metav1.CreateOptions{})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
+	if err != nil {
 		return fmt.Errorf("failed to create HTTPRoute: %v", err)
 	}
 	return nil
@@ -1047,12 +1055,20 @@ func injectRootPath(service *types.Service) {
 	}
 }
 
-/*
-if service.Expose.SetAuth {
-		if err := createTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
-			return err
-		}
-		if err := createTraefikAuthMiddleware(service, namespace); err != nil {
-			return err
-		}
-	}*/
+// existsKserveHTTPRouteByServiceName checks whether there is any HTTPRoute in the
+// cluster that matches the expected name and API path for the given service name, and returns an error if there are any conflicts (e.g. same name but different path, or same path but different name). It returns true if a matching HTTPRoute exists in the same namespace, false if no matching HTTPRoute exists, and an error if there is a conflict.
+func existsKserveHTTPRouteByServiceName(serviceName, namespace string) (bool, error) {
+	routeName := getHTTPRouteName(serviceName)
+
+	dynClient, err := getDynamicClient()
+	if err != nil {
+		return false, fmt.Errorf("failed to create dynamic client: %v", err)
+	}
+
+	routeList, err := dynClient.Resource(kserveHTTPRouteGVR).Namespace(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{FieldSelector: "metadata.name=" + routeName})
+	if err != nil {
+		return false, fmt.Errorf("failed to list HTTPRoutes: %v", err)
+	}
+
+	return (len(routeList.Items) > 0), nil
+}
