@@ -67,7 +67,7 @@ If you want to do it manually you can follow the listed steps.
 
 ### Create the cluster
 
-To create a single node cluster with MinIO and Ingress controller ports
+To create a single node cluster with MinIO and Gateway controller ports
 locally accessible, run:
 
 ```sh
@@ -76,12 +76,6 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
 - role: control-plane
-  kubeadmConfigPatches:
-  - |
-    kind: InitConfiguration
-    nodeRegistration:
-      kubeletExtraArgs:
-        node-labels: "ingress-ready=true"
   extraPortMappings:
   - containerPort: 80
     hostPort: 80
@@ -98,13 +92,79 @@ nodes:
 EOF
 ```
 
-### Deploy NGINX Ingress
+### Deploy Traefik Gateway API
 
-To enable Ingress support for accessing the OSCAR server, we must deploy the
-[NGINX Ingress](https://kubernetes.github.io/ingress-nginx/):
+To enable Gateway API support for accessing the OSCAR server, we must deploy the
+[Traefik Gateway API](https://doc.traefik.io/traefik/reference/install-configuration/providers/kubernetes/kubernetes-gateway/):
+
+#### Deploy Cert-Manager
+
+Cert-Manager is needed to enable HTTPS endpoints in Traefik Gateway API.
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/kind/deploy.yaml
+kubectl apply -f "https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml"
+```
+
+#### Create self signed certificate
+
+Once deployed, create a self signed issuer and certificate, that will be used in the Traefik helm deployment.
+
+```sh
+cat <<EOF | kubectl apply -f -
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+    name: self-signed
+spec:
+    selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+    name: default-tls
+    namespace: traefik
+spec:
+    secretName: default-tls
+    commonName: localhost
+    dnsNames:
+        - localhost
+    ipAddresses:
+        - 127.0.0.1
+    issuerRef:
+        name: self-signed
+        kind: ClusterIssuer
+EOF
+```
+
+#### Deploy Traefik
+
+Now add the Gateway API CRDs:
+
+```sh
+kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+```
+
+And then install the Traefik helm chart:
+
+```sh
+helm repo add --force-update traefik https://traefik.github.io/charts
+helm repo update
+helm upgrade --install traefik traefik/traefik \
+    --namespace traefik --create-namespace \
+    --version 39.0.9 \
+    --set deployment.kind=DaemonSet \
+    --set providers.kubernetesGateway.enabled=true \
+    --set gateway.enabled=true \
+    --set gateway.listeners.web.namespacePolicy.from=All \
+    --set gateway.listeners.websecure.port=8443 \
+    --set gateway.listeners.websecure.protocol=HTTPS \
+    --set gateway.listeners.websecure.certificateRefs[0].name=default-tls \
+    --set gateway.listeners.websecure.certificateRefs[0].kind=Secret \
+    --set gateway.listeners.websecure.namespacePolicy.from=All \
+    --set logs.access.enabled=true \
+    --set "ports.web.hostPort=80" \
+    --set "ports.websecure.hostPort=443"
 ```
 
 ### Deploy MinIO
@@ -164,7 +224,6 @@ kubectl -n kube-system patch deployment metrics-server --type='json' -p='[{"op":
 
 > Note that the local testing environment uses Kind, therefore the metrics will not work as expected.
 
-<<<<<<< HEAD
 ### Monitoring stack (Prometheus + Loki + Alloy)
 
 Monitoring deployment and verification steps were moved to
@@ -227,8 +286,6 @@ subjects:
 EOF
 ```
 
-=======
->>>>>>> 478f4b4a11475418256e28140153fd408ff4afcd
 ### Deploy Knative Serving as Serverless Backend (OPTIONAL)
 
 OSCAR supports [Knative Serving](https://knative.dev/docs/serving/) as
@@ -294,7 +351,7 @@ helm repo add grycap https://grycap.github.io/helm-charts/
 helm repo update 
 helm install --namespace=oscar oscar grycap/oscar \
  --set authPass=<OSCAR_PASSWORD> --set service.type=ClusterIP \
- --set ingress.create=true --set volume.storageClassName=nfs \
+ --set httproute.create=true --set volume.storageClassName=nfs \
  --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false \
  --set minIO.accessKey=minio --set minIO.secretKey=<MINIO_PASSWORD> \
  --set resourceManager.enable=true
