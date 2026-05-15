@@ -781,7 +781,7 @@ if [ "$HOST_MINIO_CONSOLE_PORT" != "$DEFAULT_MINIO_CONSOLE_PORT" ]; then
     echo -e "$ORANGE[*]$END_COLOR Port $DEFAULT_MINIO_CONSOLE_PORT is busy. Using $HOST_MINIO_CONSOLE_PORT for MinIO console instead."
 fi
 
-fi [ "$GATEWAY_CONTROLLER" == "traefik" ] && [ "$HOST_TRAEFIK_DASHBOARD_PORT" != "$DEFAULT_TRAEFIK_DASHBOARD_PORT" ]; then
+if [ "$GATEWAY_CONTROLLER" == "traefik" ] && [ "$HOST_TRAEFIK_DASHBOARD_PORT" != "$DEFAULT_TRAEFIK_DASHBOARD_PORT" ]; then
     echo -e "$ORANGE[*]$END_COLOR Port $DEFAULT_TRAEFIK_DASHBOARD_PORT is busy. Using $HOST_TRAEFIK_DASHBOARD_PORT for Traefik dashboard instead."
 fi
 
