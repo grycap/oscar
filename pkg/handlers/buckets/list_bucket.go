@@ -101,6 +101,11 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", err))
 			return
 		}
+		dataUsage, err := minIOAdminClient.GetDataUsageInfo()
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error getting MinIO data usage: %v", err))
+			return
+		}
 
 		for _, b := range bucketsList.Buckets {
 			var allowedUsers []string
@@ -129,13 +134,18 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 			// Remove owner from metadata as it is already included in the response
 			delete(metadata, "owner")
 
-			bucketsInfo = append(bucketsInfo, utils.MinIOBucket{
+			bucketInfo := utils.MinIOBucket{
 				BucketName:   path,
 				Visibility:   bucketVisibility,
 				Owner:        bowner,
 				AllowedUsers: allowedUsers,
 				Metadata:     metadata,
-			})
+			}
+			if err := minIOAdminClient.EnrichBucketQuotaAndUsage(&bucketInfo, dataUsage); err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error getting bucket quota or usage for bucket '%s': %v", path, err))
+				return
+			}
+			bucketsInfo = append(bucketsInfo, bucketInfo)
 		}
 		c.JSON(http.StatusOK, bucketsInfo)
 

@@ -31,6 +31,16 @@ func TestMakeListBucketHandlerAdmin(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/datausageinfo" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"bucketsUsageInfo":{"bucket-one":{"size":42,"objectsCount":1}}}`))
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/get-bucket-quota" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"quota":0}`))
+			return
+		}
 		if r.Method == http.MethodGet && r.URL.Path == "/" {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(listXML))
@@ -62,7 +72,7 @@ func TestMakeListBucketHandlerAdmin(t *testing.T) {
 	router.ServeHTTP(res, req)
 
 	if res.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d", http.StatusOK, res.Code)
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, res.Code, res.Body.String())
 	}
 
 	Buckets := []struct {
@@ -70,12 +80,29 @@ func TestMakeListBucketHandlerAdmin(t *testing.T) {
 		Visibility   string `json:"visibility"`
 		AllowedUsers string `json:"allowed_users"`
 		Owner        string `json:"owner"`
+		StorageQuota struct {
+			Source string `json:"source"`
+		} `json:"storage_quota"`
+		StorageUsage struct {
+			UsedBytes int64 `json:"used_bytes"`
+			Objects   int64 `json:"objects"`
+		} `json:"storage_usage"`
+		Attribution string `json:"attribution"`
 	}{}
 	if err := json.Unmarshal(res.Body.Bytes(), &Buckets); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 	if len(Buckets) != 1 || Buckets[0].BucketName != "bucket-one" {
 		t.Fatalf("unexpected response payload: %v", Buckets)
+	}
+	if Buckets[0].StorageQuota.Source != "unset" {
+		t.Fatalf("expected unset storage quota, got %+v", Buckets[0].StorageQuota)
+	}
+	if Buckets[0].StorageUsage.UsedBytes != 42 || Buckets[0].StorageUsage.Objects != 1 {
+		t.Fatalf("unexpected storage usage: %+v", Buckets[0].StorageUsage)
+	}
+	if Buckets[0].Attribution != "complete" {
+		t.Fatalf("expected complete attribution, got %s", Buckets[0].Attribution)
 	}
 }
 

@@ -28,6 +28,7 @@ import (
 
 	"net/http"
 	"net/http/httptest"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
@@ -39,8 +40,26 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
+
+type createMinIORecorder struct {
+	mu    sync.Mutex
+	calls []string
+}
+
+func (r *createMinIORecorder) add(call string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls = append(r.calls, call)
+}
+
+func (r *createMinIORecorder) snapshot() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.calls...)
+}
 
 func TestMakeCreateHandler(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
@@ -467,6 +486,147 @@ func TestMakeCreateHandlerVolumeFlows(t *testing.T) {
 	})
 }
 
+func TestMakeCreateHandlerEnforcesMinIOQuotaForServiceBuckets(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+	gin.SetMode(gin.TestMode)
+
+	user := "owner@example.com"
+	recorder := &createMinIORecorder{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		recorder.add(r.Method + " " + r.URL.RequestURI())
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/":
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<ListAllMyBucketsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Buckets><Bucket><Name>existing</Name></Bucket></Buckets></ListAllMyBucketsResult>`))
+		case r.Method == http.MethodGet && strings.Contains(r.URL.RawQuery, "tagging"):
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<Tagging><TagSet><Tag><Key>owner</Key><Value>` + user + `</Value></Tag></TagSet></Tagging>`))
+		default:
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"Status":"success"}`))
+		}
+	}))
+	defer server.Close()
+
+	cfg, back, kubeClientset := newServiceQuotaTestContext(t, user, server.URL, map[string]string{"buckets": "1"})
+	router := newServiceQuotaTestRouter(cfg, back, kubeClientset, user)
+
+	req := httptest.NewRequest(http.MethodPost, "/system/services", strings.NewReader(`{"name":"svc","image":"img","script":"echo","mount":{"storage_provider":"minio","path":"new-bucket/mount"},"visibility":"public"}`))
+	req.Header.Set("Authorization", "Bearer token")
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if back.CreatedService != nil {
+		t.Fatalf("service was created despite bucket quota rejection")
+	}
+	for _, call := range recorder.snapshot() {
+		if strings.HasPrefix(call, "PUT /new-bucket") {
+			t.Fatalf("bucket was created despite bucket quota rejection: %v", recorder.snapshot())
+		}
+	}
+}
+
+func TestMakeCreateHandlerAppliesStoragePerBucketQuotaForServiceBuckets(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+	gin.SetMode(gin.TestMode)
+
+	user := "owner@example.com"
+	recorder := &createMinIORecorder{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		recorder.add(r.Method + " " + r.URL.RequestURI())
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/":
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<ListAllMyBucketsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Buckets></Buckets></ListAllMyBucketsResult>`))
+		case r.Method == http.MethodGet && strings.Contains(r.URL.RawQuery, "location"):
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
+		case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/info-canned-policy"):
+			w.WriteHeader(http.StatusNotFound)
+		default:
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"Status":"success"}`))
+		}
+	}))
+	defer server.Close()
+
+	cfg, back, kubeClientset := newServiceQuotaTestContext(t, user, server.URL, map[string]string{"buckets": "2", "storage_per_bucket": "100Gi"})
+	router := newServiceQuotaTestRouter(cfg, back, kubeClientset, user)
+
+	req := httptest.NewRequest(http.MethodPost, "/system/services", strings.NewReader(`{"name":"svc","image":"img","script":"echo","mount":{"storage_provider":"minio","path":"new-bucket/mount"},"visibility":"public"}`))
+	req.Header.Set("Authorization", "Bearer token")
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var sawQuota bool
+	for _, call := range recorder.snapshot() {
+		if strings.Contains(call, "set-bucket-quota") {
+			sawQuota = true
+			break
+		}
+	}
+	if !sawQuota {
+		t.Fatalf("expected set-bucket-quota admin call, got %v", recorder.snapshot())
+	}
+}
+
+func TestMakeCreateHandlerPreservesServiceBucketsWithoutMinIOQuota(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+	gin.SetMode(gin.TestMode)
+
+	user := "owner@example.com"
+	recorder := &createMinIORecorder{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		recorder.add(r.Method + " " + r.URL.RequestURI())
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/":
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<ListAllMyBucketsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Buckets></Buckets></ListAllMyBucketsResult>`))
+		case r.Method == http.MethodGet && strings.Contains(r.URL.RawQuery, "location"):
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
+		case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/info-canned-policy"):
+			w.WriteHeader(http.StatusNotFound)
+		default:
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"Status":"success"}`))
+		}
+	}))
+	defer server.Close()
+
+	cfg, back, kubeClientset := newServiceQuotaTestContext(t, user, server.URL, nil)
+	router := newServiceQuotaTestRouter(cfg, back, kubeClientset, user)
+
+	req := httptest.NewRequest(http.MethodPost, "/system/services", strings.NewReader(`{"name":"svc","image":"img","script":"echo","mount":{"storage_provider":"minio","path":"new-bucket/mount"},"visibility":"public"}`))
+	req.Header.Set("Authorization", "Bearer token")
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
+	}
+	for _, call := range recorder.snapshot() {
+		if strings.Contains(call, "set-bucket-quota") {
+			t.Fatalf("unexpected set-bucket-quota admin call without quota config: %v", recorder.snapshot())
+		}
+	}
+}
+
 func TestCheckValuesLegacyStorageFlowsPreserveNilVolume(t *testing.T) {
 	cfg := &types.Config{
 		MinIOProvider: &types.MinIOProvider{
@@ -508,6 +668,90 @@ func TestCheckValuesLegacyStorageFlowsPreserveNilVolume(t *testing.T) {
 	if len(service.Output) != 1 || service.Output[0].Path != "test/output" {
 		t.Fatalf("expected output configuration to be preserved, got %+v", service.Output)
 	}
+}
+
+func newServiceQuotaTestContext(t *testing.T, user, minIOEndpoint string, quotaData map[string]string) (*types.Config, *backends.FakeBackend, *testclient.Clientset) {
+	t.Helper()
+	cfg := &types.Config{
+		Namespace:         "oscar",
+		ServicesNamespace: "oscar-svc",
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  minIOEndpoint,
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+	userNamespace := utils.BuildUserNamespace(cfg, user)
+	storageClass := "nfs"
+	basePV := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: "oscar-runtime-pv"},
+		Spec: corev1.PersistentVolumeSpec{
+			Capacity: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse("2Gi"),
+			},
+			AccessModes:                   []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
+			PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimRetain,
+			StorageClassName:              storageClass,
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				NFS: &corev1.NFSVolumeSource{Server: "nfs.example.com", Path: "/exports/oscar"},
+			},
+		},
+	}
+	basePV.Spec.ClaimRef = &corev1.ObjectReference{
+		Kind:      "PersistentVolumeClaim",
+		Namespace: cfg.ServicesNamespace,
+		Name:      types.PVCName,
+	}
+	basePVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: types.PVCName, Namespace: cfg.ServicesNamespace},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("2Gi")},
+			},
+			VolumeName:       basePV.Name,
+			StorageClassName: &storageClass,
+		},
+		Status: corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound},
+	}
+	objects := []runtime.Object{
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: cfg.ServicesNamespace}},
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: userNamespace}},
+		basePV,
+		basePVC,
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: auth.FormatUID(user), Namespace: cfg.ServicesNamespace},
+			Data: map[string][]byte{
+				"oidc_uid":  []byte(user),
+				"accessKey": []byte(user),
+				"secretKey": []byte("secret"),
+			},
+		},
+	}
+	if quotaData != nil {
+		objects = append(objects, &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: minIOQuotaConfigMapName, Namespace: userNamespace},
+			Data:       quotaData,
+		})
+	}
+	kubeClientset := testclient.NewSimpleClientset(objects...)
+	back := backends.MakeFakeBackend()
+	back.SetKubeClientset(kubeClientset)
+	return cfg, back, kubeClientset
+}
+
+func newServiceQuotaTestRouter(cfg *types.Config, back *backends.FakeBackend, kubeClientset *testclient.Clientset, user string) *gin.Engine {
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", user)
+		c.Set("userName", "Alice")
+		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, user))
+		c.Next()
+	})
+	router.POST("/system/services", MakeCreateHandler(cfg, back))
+	return router
 }
 
 func TestCheckValuesDefaults(t *testing.T) {

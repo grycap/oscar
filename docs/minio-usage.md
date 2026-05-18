@@ -52,3 +52,33 @@ MinIO buckets can also be managed through [oscar-cli command-line](https://githu
   ```bash
   mc cp /path/to/your/images/*.jpg myminio/fish-detector/input/
   ```
+
+## Bucket quotas
+
+OSCAR can store per-user MinIO quota settings through the `/system/quotas`
+API. The MinIO quota block includes:
+
+- `buckets`: maximum number of OSCAR-managed buckets for the user and current
+  usage.
+- `storage_per_bucket`: storage limit applied to each OSCAR-managed bucket.
+- `storage_total`: aggregate storage usage reported for buckets attributed to
+  the user.
+
+Example admin update:
+
+```bash
+curl -k -u oscar:<OSCAR_PASSWORD> \
+  -X PUT https://<OSCAR_ENDPOINT>/system/quotas/user/<USER_ID> \
+  -H "Content-Type: application/json" \
+  -d '{"minio":{"buckets":"3","storage_per_bucket":"50Mi"}}'
+```
+
+The bucket count limit is enforced before bucket creation through OSCAR APIs,
+such as `/system/buckets` and service creation. Buckets created directly with
+MinIO credentials or the MinIO Console bypass OSCAR's pre-creation bucket
+count check.
+
+The `storage_per_bucket` limit is enforced using MinIO's native bucket quota
+support. That MinIO admin API requires an erasure-coded MinIO deployment; the
+local deployment script provides this layout through the `--minio-quotas`
+option.

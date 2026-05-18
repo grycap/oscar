@@ -51,6 +51,14 @@ func TestMakeGetBucketHandlerAdmin(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"PolicyName": "demo", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::demo/*"]}]}}`))
 			return
+		} else if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/datausageinfo" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"bucketsUsageInfo":{"demo":{"size":42,"objectsCount":1}}}`))
+			return
+		} else if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/get-bucket-quota" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"quota":0}`))
+			return
 		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"success"}`))
@@ -96,6 +104,14 @@ func TestMakeGetBucketHandlerAdmin(t *testing.T) {
 		NextPage      string `json:"next_page"`
 		ReturnedItems int    `json:"returned_items"`
 		IsTruncated   bool   `json:"is_truncated"`
+		StorageQuota  struct {
+			Source string `json:"source"`
+		} `json:"storage_quota"`
+		StorageUsage struct {
+			UsedBytes int64 `json:"used_bytes"`
+			Objects   int64 `json:"objects"`
+		} `json:"storage_usage"`
+		Attribution string `json:"attribution"`
 	}
 	if err := json.Unmarshal(res.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
@@ -114,6 +130,15 @@ func TestMakeGetBucketHandlerAdmin(t *testing.T) {
 	}
 	if response.IsTruncated {
 		t.Fatalf("expected is_truncated false")
+	}
+	if response.StorageQuota.Source != "unset" {
+		t.Fatalf("expected unset storage quota, got %+v", response.StorageQuota)
+	}
+	if response.StorageUsage.UsedBytes != 42 || response.StorageUsage.Objects != 1 {
+		t.Fatalf("unexpected storage usage: %+v", response.StorageUsage)
+	}
+	if response.Attribution != "complete" {
+		t.Fatalf("expected complete attribution, got %s", response.Attribution)
 	}
 
 	var raw struct {

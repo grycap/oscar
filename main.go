@@ -137,7 +137,7 @@ func main() {
 		system.DELETE("/volumes/:volumeName", handlers.MakeDeleteVolumeHandler(cfg, back))
 	}
 	// CRUD Buckets
-	system.POST("/buckets", buckets.MakeCreateHandler(cfg))
+	system.POST("/buckets", buckets.MakeCreateHandler(cfg, kubeClientset))
 	system.GET("/buckets", buckets.MakeListHandler(cfg))
 	system.GET("/buckets/:bucket", buckets.MakeGetHandler(cfg))
 	system.PUT("/buckets", buckets.MakeUpdateHandler(cfg))

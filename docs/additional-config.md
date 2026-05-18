@@ -25,3 +25,7 @@ Additionally, this property can be added when creating an OSCAR cluster through 
 ![allowed-prefixes](images/im-dashboard/im-additional-config.png)
 
 Managed volumes do not require extra entries in this additional configuration file. Volume provisioning uses the cluster storage integration already configured for OSCAR.
+
+MinIO bucket quotas also do not require entries in this additional
+configuration file. Per-user MinIO quota settings are managed through
+`/system/quotas/user/{userId}` and stored by OSCAR in each user's namespace.

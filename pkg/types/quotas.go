@@ -33,6 +33,7 @@ type QuotaResponse struct {
 	ClusterQueue string                 `json:"cluster_queue,omitempty"`
 	Resources    map[string]QuotaValues `json:"resources,omitempty"`
 	Volumes      *VolumeQuotaResponse   `json:"volumes,omitempty"`
+	MinIO        *MinIOQuotaResponse    `json:"minio,omitempty"`
 }
 
 type QuotaValues struct {
@@ -58,6 +59,7 @@ type QuotaUpdateRequest struct {
 	CPU     string             `json:"cpu"`
 	Memory  string             `json:"memory"`
 	Volumes *VolumeQuotaUpdate `json:"volumes,omitempty"`
+	MinIO   *MinIOQuotaUpdate  `json:"minio,omitempty"`
 }
 
 type VolumeQuotaUpdate struct {
@@ -67,6 +69,30 @@ type VolumeQuotaUpdate struct {
 	Volumes          string `json:"volumes,omitempty"`
 	MaxDiskperVolume string `json:"max_disk_per_volume,omitempty"`
 	MinDiskperVolume string `json:"min_disk_per_volume,omitempty"`
+}
+
+type MinIOQuotaResponse struct {
+	Buckets          MinIOBucketCountQuota      `json:"buckets"`
+	StoragePerBucket MinIOStoragePerBucketQuota `json:"storage_per_bucket"`
+	StorageTotal     MinIOStorageTotalUsage     `json:"storage_total"`
+}
+
+type MinIOBucketCountQuota struct {
+	Max  int64 `json:"max"`
+	Used int64 `json:"used"`
+}
+
+type MinIOStoragePerBucketQuota struct {
+	Max string `json:"max"`
+}
+
+type MinIOStorageTotalUsage struct {
+	Used string `json:"used"`
+}
+
+type MinIOQuotaUpdate struct {
+	Buckets          string `json:"buckets,omitempty"`
+	StoragePerBucket string `json:"storage_per_bucket,omitempty"`
 }
 
 func CreateQuotaBackend(kubeConfig *rest.Config, kubeClientset *kubernetes.Clientset) *QuotaBackend {

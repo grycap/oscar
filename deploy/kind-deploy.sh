@@ -45,6 +45,7 @@ ENABLE_METRICS="false"
 ENABLE_OIDC="false"
 ENABLE_KUEUE="false"
 ENABLE_KSERVE="false"
+ENABLE_MINIO_QUOTAS="false"
 OIDC_ISSUERS_DEFAULT="https://keycloak.grycap.net/realms/grycap"
 OIDC_GROUPS_DEFAULT="/oscar-staff, /oscar-test"
 GATEWAY_CONTROLLER="traefik"
@@ -60,6 +61,7 @@ Options:
   --oidc         Enable OIDC support for OSCAR (default: disabled).
   --kueue        Enable Kueue support for CPU and memory quotas (default: disabled).
   --kserve       Install KServe using deploy/kind-oscar-kserve.sh (default: disabled).
+  --minio-quotas Deploy MinIO with 1 replica and 4 PVCs to support bucket quotas.
   --ingress      Use NGINX Ingress as gateway controller.
   --traefik      Use Traefik as gateway controller (default).
   -h, --help     Show this help message and exit.
@@ -636,6 +638,10 @@ while [ "$#" -gt 0 ]; do
             ENABLE_KSERVE="true"
             shift
             ;;
+        --minio-quotas)
+            ENABLE_MINIO_QUOTAS="true"
+            shift
+            ;;
         --ingress)
             GATEWAY_CONTROLLER="ingress"
             GATEWAY_CONTROLLER_SET="true"
@@ -674,6 +680,7 @@ use_devel_branch="n"
 use_oidc="n"
 use_kserve="n"
 use_kueue="n"
+use_minio_quotas="n"
 if [ "$SKIP_PROMPTS" == "true" ]; then
     echo "[*] Running in non-interactive mode: Knative, local registry, and OSCAR devel branch enabled."
 else
@@ -705,6 +712,9 @@ else
     if [ "$ENABLE_KUEUE" != "true" ]; then
         read -p "Do you want to enable CPU and memory quotas with Kueue? [y/n] " use_kueue </dev/tty
     fi
+    if [ "$ENABLE_MINIO_QUOTAS" != "true" ]; then
+        read -p "Do you want to enable MinIO bucket quotas? This deploys MinIO with 1 replica and 4 PVCs. [y/n] " use_minio_quotas </dev/tty
+    fi
 fi
 
 if [ $(echo $use_devel_branch | tr '[:upper:]' '[:lower:]') == "y" ]; then
@@ -718,6 +728,9 @@ if [ $(echo $use_oidc | tr '[:upper:]' '[:lower:]') == "y" ]; then
 fi
 if [ $(echo $use_kserve | tr '[:upper:]' '[:lower:]') == "y" ]; then
     ENABLE_KSERVE="true"
+fi
+if [ $(echo $use_minio_quotas | tr '[:upper:]' '[:lower:]') == "y" ]; then
+    ENABLE_MINIO_QUOTAS="true"
 fi
 if [ "$OSCAR_IMAGE_BRANCH" == "devel" ]; then
     OSCAR_HELM_IMAGE_OVERRIDES="--set replicas=0"
@@ -781,7 +794,7 @@ if [ "$HOST_MINIO_CONSOLE_PORT" != "$DEFAULT_MINIO_CONSOLE_PORT" ]; then
     echo -e "$ORANGE[*]$END_COLOR Port $DEFAULT_MINIO_CONSOLE_PORT is busy. Using $HOST_MINIO_CONSOLE_PORT for MinIO console instead."
 fi
 
-fi [ "$GATEWAY_CONTROLLER" == "traefik" ] && [ "$HOST_TRAEFIK_DASHBOARD_PORT" != "$DEFAULT_TRAEFIK_DASHBOARD_PORT" ]; then
+if [ "$GATEWAY_CONTROLLER" == "traefik" ] && [ "$HOST_TRAEFIK_DASHBOARD_PORT" != "$DEFAULT_TRAEFIK_DASHBOARD_PORT" ]; then
     echo -e "$ORANGE[*]$END_COLOR Port $DEFAULT_TRAEFIK_DASHBOARD_PORT is busy. Using $HOST_TRAEFIK_DASHBOARD_PORT for Traefik dashboard instead."
 fi
 
@@ -907,7 +920,11 @@ deployGatewayController
 #Deploy MinIO
 echo -e "\n[*] Deploying MinIO storage provider ..."
 helm repo add --force-update minio https://charts.min.io
-helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT --create-namespace --version 4.0.7
+MINIO_HELM_MODE_ARGS="--set mode=standalone"
+if [ "$ENABLE_MINIO_QUOTAS" == "true" ]; then
+    MINIO_HELM_MODE_ARGS="--set mode=distributed --set replicas=1 --set drivesPerNode=4 --set persistence.size=2Gi"
+fi
+helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT $MINIO_HELM_MODE_ARGS --create-namespace --version 4.0.7
 
 
 #Deploy NFS server provisioner
@@ -1030,6 +1047,7 @@ echo "  - OSCAR HTTP port: $HOST_HTTP_PORT ($oscar_http_url)"
 echo "  - OSCAR HTTPS port: $HOST_HTTPS_PORT ($oscar_https_url)"
 echo "  - MinIO API NodePort/host port: $HOST_MINIO_API_PORT ($minio_api_url)"
 echo "  - MinIO console NodePort/host port: $HOST_MINIO_CONSOLE_PORT ($minio_console_url)"
+echo "  - MinIO bucket quotas enabled: $ENABLE_MINIO_QUOTAS"
 echo "  - Gateway controller: $GATEWAY_CONTROLLER"
 echo "  - KServe enabled: $ENABLE_KSERVE"
 echo "  - OSCAR image branch: $OSCAR_IMAGE_BRANCH"
