@@ -22,11 +22,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grycap/oscar/v3/pkg/backends"
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/backends"
+	"github.com/grycap/oscar/v4/pkg/types"
 	jobv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -177,7 +178,7 @@ func TestStartReScheduler(t *testing.T) {
 
 	// Mock the Delegate function using test hook variable
 	origDelegate := delegateJobFunc
-	delegateJobFunc = func(*types.Service, string, *log.Logger) error {
+	delegateJobFunc = func(*types.Service, string, string, string, *log.Logger, *types.Config, kubernetes.Interface) error {
 		return nil
 	}
 	t.Cleanup(func() { delegateJobFunc = origDelegate })

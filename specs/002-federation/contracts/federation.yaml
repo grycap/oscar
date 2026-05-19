@@ -1,0 +1,189 @@
+openapi: 3.0.3
+info:
+  title: OSCAR Federation API
+  version: 0.1.0
+paths:
+  /system/federation/{serviceName}:
+    get:
+      summary: Get federation members for a service
+      parameters:
+        - name: serviceName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Federation member list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FederationResponse'
+    post:
+      summary: Add member(s) to a service federation
+      parameters:
+        - name: serviceName
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+              schema:
+                $ref: '#/components/schemas/FederationAddRequest'
+      responses:
+        '200':
+          description: Member(s) added
+    put:
+      summary: Update member(s) for a service federation
+      parameters:
+        - name: serviceName
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+              schema:
+                $ref: '#/components/schemas/FederationUpdateRequest'
+      responses:
+        '200':
+          description: Member(s) updated
+    delete:
+      summary: Remove member(s) from a service federation
+      parameters:
+        - name: serviceName
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+              schema:
+                $ref: '#/components/schemas/FederationDeleteRequest'
+      responses:
+        '200':
+          description: Member(s) removed
+  /system/status:
+    get:
+      summary: Get cluster status for delegation
+      responses:
+        '200':
+          description: Cluster status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterStatus'
+
+components:
+  schemas:
+    ReplicaRef:
+      type: object
+      properties:
+        type:
+          type: string
+          example: oscar
+        cluster_id:
+          type: string
+        service_name:
+          type: string
+        priority:
+          type: integer
+      required: [type, cluster_id, service_name]
+
+    FederationResponse:
+      type: object
+      properties:
+        topology:
+          type: string
+          enum: [none, star, mesh]
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReplicaRef'
+      required: [topology, members]
+
+    FederationAddRequest:
+      type: object
+      properties:
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReplicaRef'
+        clusters:
+          type: object
+          additionalProperties:
+            type: object
+        storage_providers:
+          type: object
+      required: [members]
+
+    FederationUpdateRequest:
+      type: object
+      properties:
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReplicaRef'
+        update:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReplicaRef'
+        clusters:
+          type: object
+          additionalProperties:
+            type: object
+        storage_providers:
+          type: object
+      required: [members, update]
+
+    FederationDeleteRequest:
+      type: object
+      properties:
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReplicaRef'
+      required: [members]
+
+    ClusterStatus:
+      type: object
+      properties:
+        cluster:
+          type: object
+          properties:
+            nodes_count:
+              type: integer
+            has_gpu_nodes:
+              type: boolean
+            metrics:
+              type: object
+              properties:
+                cpu:
+                  type: object
+                  properties:
+                    total_free:
+                      type: integer
+                    max_free_on_node:
+                      type: integer
+                memory:
+                  type: object
+                  properties:
+                    total_free_bytes:
+                      type: integer
+                    max_free_on_node_bytes:
+                      type: integer
+            nodes:
+              type: array
+              items:
+                type: object
+        oscar:
+          type: object
+        minio:
+          type: object

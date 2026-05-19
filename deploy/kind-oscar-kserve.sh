@@ -24,6 +24,7 @@ helm upgrade --install kserve-resources oci://ghcr.io/kserve/charts/kserve-resou
   --namespace kserve \
   --set kserve.controller.deploymentMode=Standard \
   --set kserve.controller.gateway.disableIngressCreation=true \
+  --set kserve.controller.gateway.disableIstioVirtualHost=true \
   --set 'kserve.controller.gateway.domainTemplate=\{\{ .Name \}\}.\{\{ .IngressDomain \}\}' \
   --set kserve.controller.gateway.ingressGateway.enableGatewayApi=true \
   --set kserve.controller.gateway.ingressGateway.kserveGateway="traefik/traefik-gateway" \

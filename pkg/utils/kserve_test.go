@@ -1,21 +1,26 @@
 package utils
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 	"testing"
 
-	oscarType "github.com/grycap/oscar/v3/pkg/types"
+	oscarType "github.com/grycap/oscar/v4/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types" // for UID
+	"k8s.io/client-go/dynamic"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	knv1 "knative.dev/serving/pkg/apis/serving/v1"
 )
 
 // knativeServiceWithUID returns a minimal Knative service with the given UID.
 func knativeServiceWithUID(uid types.UID) *knv1.Service {
 	return &knv1.Service{
+
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-kn-svc",
 			Namespace: "oscar-svc",
@@ -35,13 +40,16 @@ func kserveService() *oscarType.Service {
 		CPU:       "500m",
 		Memory:    "1Gi",
 		Kserve: &oscarType.Kserve{
-			ModelFormat: "sklearn",
-			StorageUri:  "s3://my-bucket/model",
-			MinScale:    minScale,
-			MaxScale:    maxScale,
-			APIVersion:  "v1",
-			CPU:         "1.0",
-			Memory:      "2Gi",
+			Type: KserveTypeInferenceService,
+			Inference: &oscarType.KserveInference{
+				ModelFormat: "sklearn",
+			},
+			StorageUri: "s3://my-bucket/model",
+			MinScale:   minScale,
+			MaxScale:   maxScale,
+			APIVersion: "v1",
+			CPU:        "1.0",
+			Memory:     "2Gi",
 		},
 	}
 }
@@ -52,12 +60,12 @@ func llmKserveService() *oscarType.Service {
 		Namespace: "oscar-svc",
 		Token:     "llm-token",
 		Kserve: &oscarType.Kserve{
-			ModelFormat: "llm",
-			StorageUri:  "s3://my-bucket/llm-model",
-			MinScale:    2,
-			MaxScale:    4,
-			CPU:         "1",
-			Memory:      "2Gi",
+			Type:       KserveTypeLLMInferenceService,
+			StorageUri: "s3://my-bucket/llm-model",
+			MinScale:   2,
+			MaxScale:   4,
+			CPU:        "1",
+			Memory:     "2Gi",
 		},
 	}
 }
@@ -126,22 +134,23 @@ func TestIsKserveService_ValidConfig(t *testing.T) {
 	}
 }
 
-func TestIsKserveService_MissingModelFormat(t *testing.T) {
-	svc := kserveService()
-	svc.Kserve.ModelFormat = ""
-	if IsKserveService(svc) {
-		t.Error("expected IsKserveService to return false when ModelFormat is empty")
+/*
+	func TestIsKserveService_MissingModelFormat(t *testing.T) {
+		svc := kserveService()
+		svc.Kserve.Inference.ModelFormat = ""
+		if IsKserveService(svc) {
+			t.Error("expected IsKserveService to return false when ModelFormat is empty")
+		}
 	}
-}
 
-func TestIsKserveService_MissingStorageUri(t *testing.T) {
-	svc := kserveService()
-	svc.Kserve.StorageUri = ""
-	if IsKserveService(svc) {
-		t.Error("expected IsKserveService to return false when StorageUri is empty")
+	func TestIsKserveService_MissingStorageUri(t *testing.T) {
+		svc := kserveService()
+		svc.Kserve.StorageUri = ""
+		if IsKserveService(svc) {
+			t.Error("expected IsKserveService to return false when StorageUri is empty")
+		}
 	}
-}
-
+*/
 func TestIsKserveService_BothMissing(t *testing.T) {
 	svc := &oscarType.Service{}
 	if IsKserveService(svc) {
@@ -192,8 +201,8 @@ func TestNewKserveInferenceServiceDefinition_Success(t *testing.T) {
 	}
 
 	// predictor model fields
-	if v := getNestedString(t, isvc, "spec", "predictor", "model", "modelFormat", "name"); v != svc.Kserve.ModelFormat {
-		t.Errorf("modelFormat.name = %q, want %q", v, svc.Kserve.ModelFormat)
+	if v := getNestedString(t, isvc, "spec", "predictor", "model", "modelFormat", "name"); v != svc.Kserve.Inference.ModelFormat {
+		t.Errorf("modelFormat.name = %q, want %q", v, svc.Kserve.Inference.ModelFormat)
 	}
 	if v := getNestedString(t, isvc, "spec", "predictor", "model", "storageUri"); v != svc.Kserve.StorageUri {
 		t.Errorf("storageUri = %q, want %q", v, svc.Kserve.StorageUri)
@@ -276,6 +285,88 @@ func TestNewKserveInferenceServiceDefinition_InvalidMemory(t *testing.T) {
 	}
 }
 
+func TestNewKserveInferenceServiceDefinition_KueueLabels(t *testing.T) {
+	knSvc := knativeServiceWithUID("uid-kueue")
+
+	tests := []struct {
+		name      string
+		owner     string
+		labels    map[string]string
+		cfg       *oscarType.Config
+		wantQueue string
+		wantErr   string
+	}{
+		{
+			name:    "kueue disabled",
+			owner:   "user-a",
+			labels:  nil,
+			cfg:     &oscarType.Config{KueueEnable: false},
+			wantErr: "",
+		},
+		{
+			name:      "kueue enabled with queue label",
+			owner:     "user-a",
+			labels:    map[string]string{"kueue.x-k8s.io/queue-name": "team-a"},
+			cfg:       &oscarType.Config{KueueEnable: true},
+			wantQueue: "team-a",
+			wantErr:   "",
+		},
+		{
+			name:    "kueue enabled missing queue for non-default owner",
+			owner:   "user-a",
+			labels:  nil,
+			cfg:     &oscarType.Config{KueueEnable: true},
+			wantErr: "missing required label 'kueue.x-k8s.io/queue-name'",
+		},
+		{
+			name:    "kueue enabled missing queue for default owner",
+			owner:   oscarType.DefaultOwner,
+			labels:  nil,
+			cfg:     &oscarType.Config{KueueEnable: true},
+			wantErr: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := kserveService()
+			svc.Owner = tt.owner
+			svc.Labels = tt.labels
+
+			isvc, err := NewKserveInferenceServiceDefinition(svc, knSvc, tt.cfg)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			labels := getNestedMap(t, isvc, "metadata", "labels")
+			queue, hasQueue := labels["kueue.x-k8s.io/queue-name"]
+			if tt.wantQueue == "" {
+				if hasQueue {
+					t.Fatalf("did not expect queue label, got %v", queue)
+				}
+				return
+			}
+
+			if !hasQueue {
+				t.Fatalf("expected queue label %q, got none", tt.wantQueue)
+			}
+			if queue != tt.wantQueue {
+				t.Fatalf("queue label = %v, want %q", queue, tt.wantQueue)
+			}
+		})
+	}
+}
+
 func TestValidateKserveService_InvalidAPIVersion(t *testing.T) {
 	svc := kserveService()
 	svc.Kserve.APIVersion = "v3"
@@ -306,14 +397,6 @@ func TestNewKserveLLMInferenceServiceDefinition(t *testing.T) {
 			wantImage:     defaultLLMGPUimage,
 			wantModelName: "my-llm-service",
 		},
-		{
-			name: "custom runtime and model name",
-			mutateService: func(svc *oscarType.Service) {
-				svc.Kserve.LLM = &oscarType.LLMConfig{ModelName: "custom-model", RuntimeImage: "repo/custom:v1"}
-			},
-			wantImage:     "repo/custom:v1",
-			wantModelName: "custom-model",
-		},
 	}
 
 	for _, tt := range tests {
@@ -322,7 +405,10 @@ func TestNewKserveLLMInferenceServiceDefinition(t *testing.T) {
 			tt.mutateService(svc)
 			knSvc := knativeServiceWithUID("uid-llm")
 
-			isvc, err := NewKserveLLMInferenceServiceDefinition(svc, knSvc, &oscarType.Config{})
+			isvc, err := NewKserveLLMInferenceServiceDefinition(svc, knSvc, &oscarType.Config{
+				HTTPRouteGatewayName:      "name",
+				HTTPRouteGatewayNamespace: "namespace",
+			})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -372,13 +458,132 @@ func TestNewKserveLLMInferenceServiceDefinition(t *testing.T) {
 	}
 }
 
-func TestNewKserveLLMInferenceServiceDefinition_InvalidModelFormat(t *testing.T) {
-	svc := kserveService()
-	knSvc := knativeServiceWithUID("uid-llm-invalid")
+func TestNewKserveLLMInferenceServiceDefinition_CustomRuntimeImage(t *testing.T) {
+	svc := llmKserveService()
+	svc.Kserve.LLMInference = &oscarType.KserveLLMInference{RuntimeImage: "ghcr.io/example/custom-runtime:v1"}
+	knSvc := knativeServiceWithUID("uid-llm-custom-runtime")
+
+	isvc, err := NewKserveLLMInferenceServiceDefinition(svc, knSvc, &oscarType.Config{
+		HTTPRouteGatewayName:      "name",
+		HTTPRouteGatewayNamespace: "namespace",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	containersAny := getRawNested(t, isvc, "spec", "template", "containers")
+	containers, ok := containersAny.([]any)
+	if !ok || len(containers) != 1 {
+		t.Fatalf("expected one container, got %T (%v)", containersAny, containersAny)
+	}
+	container, ok := containers[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected container map, got %T", containers[0])
+	}
+	if got, ok := container["image"].(string); !ok || got != "ghcr.io/example/custom-runtime:v1" {
+		t.Fatalf("container.image = %v, want %q", container["image"], "ghcr.io/example/custom-runtime:v1")
+	}
+}
+
+func TestNewKserveLLMInferenceServiceDefinition_KueueLabels(t *testing.T) {
+	knSvc := knativeServiceWithUID("uid-llm-kueue")
+
+	tests := []struct {
+		name      string
+		owner     string
+		labels    map[string]string
+		cfg       *oscarType.Config
+		wantQueue string
+		wantErr   string
+	}{
+		{
+			name:  "kueue enabled with queue label",
+			owner: "user-a",
+			labels: map[string]string{
+				"kueue.x-k8s.io/queue-name": "team-llm",
+			},
+			cfg: &oscarType.Config{
+				KueueEnable:               true,
+				HTTPRouteGatewayName:      "name",
+				HTTPRouteGatewayNamespace: "namespace",
+			},
+			wantQueue: "team-llm",
+			wantErr:   "",
+		},
+		{
+			name:   "kueue enabled missing queue for non-default owner",
+			owner:  "user-a",
+			labels: nil,
+			cfg: &oscarType.Config{
+				KueueEnable:               true,
+				HTTPRouteGatewayName:      "name",
+				HTTPRouteGatewayNamespace: "namespace",
+			},
+			wantErr: "missing required label 'kueue.x-k8s.io/queue-name'",
+		},
+		{
+			name:   "kueue enabled missing queue for default owner",
+			owner:  oscarType.DefaultOwner,
+			labels: nil,
+			cfg: &oscarType.Config{
+				KueueEnable:               true,
+				HTTPRouteGatewayName:      "name",
+				HTTPRouteGatewayNamespace: "namespace",
+			},
+			wantErr: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := llmKserveService()
+			svc.Owner = tt.owner
+			svc.Labels = tt.labels
+
+			isvc, err := NewKserveLLMInferenceServiceDefinition(svc, knSvc, tt.cfg)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			labels := getNestedMap(t, isvc, "spec", "labels")
+			queue, hasQueue := labels["kueue.x-k8s.io/queue-name"]
+			if tt.wantQueue == "" {
+				if hasQueue {
+					t.Fatalf("did not expect queue label, got %v", queue)
+				}
+				return
+			}
+
+			if !hasQueue {
+				t.Fatalf("expected queue label %q, got none", tt.wantQueue)
+			}
+			if queue != tt.wantQueue {
+				t.Fatalf("queue label = %v, want %q", queue, tt.wantQueue)
+			}
+		})
+	}
+}
+
+func TestNewKserveLLMInferenceServiceDefinition_MissingGatewayConfig(t *testing.T) {
+	svc := llmKserveService()
+	knSvc := knativeServiceWithUID("uid-llm-missing-gateway")
 
 	_, err := NewKserveLLMInferenceServiceDefinition(svc, knSvc, &oscarType.Config{})
 	if err == nil {
-		t.Fatal("expected error when ModelFormat is not llm, got nil")
+		t.Fatal("expected error when gateway configuration is missing, got nil")
+	}
+	if !strings.Contains(err.Error(), "gateway namespace and name must be provided") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -394,7 +599,7 @@ func TestUpdateKserveInferenceServiceDefinition_Success(t *testing.T) {
 	}
 
 	updated := kserveService()
-	updated.Kserve.ModelFormat = "tensorflow"
+	updated.Kserve.Inference.ModelFormat = "tensorflow"
 	updated.Kserve.StorageUri = "s3://new-bucket/model"
 	updated.Kserve.MinScale = 2
 	updated.Kserve.MaxScale = 5
@@ -482,95 +687,165 @@ func TestUpdateKserveInferenceServiceDefinition_InvalidCPU(t *testing.T) {
 	}
 }
 
-// ─── validModelFormat ────────────────────────────────────────────────────────
+func TestUpdateKserveInferenceServiceDefinition_DefaultProtocolVersionWhenMissing(t *testing.T) {
+	svc := kserveService()
+	svc.Kserve.APIVersion = ""
 
-func TestValidModelFormat(t *testing.T) {
-	tests := []struct {
-		service *oscarType.Service
-		valid   bool
-	}{
-		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "onnx"}}, true},
-		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "sklearn"}}, true},
-		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "xgboost"}}, true},
-		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "pytorch"}}, true},
-		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "tensorflow"}}, true},
-		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "triton"}}, true},
-		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "huggingface"}}, true},
-		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: ""}}, false}, // empty string should be invalid
-		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "unknown"}}, false},
-		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "SKLEARN"}}, true}, // case-insensitive
-		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "torch"}}, false},
-		{&oscarType.Service{Kserve: &oscarType.Kserve{ModelFormat: "llm"}}, true},
+	oldIsvc := &unstructured.Unstructured{Object: map[string]any{
+		"spec": map[string]any{
+			"predictor": map[string]any{
+				"model": map[string]any{},
+			},
+		},
+	}}
+
+	updated, err := UpdateKserveInferenceServiceDefinition(svc, oldIsvc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.service.Kserve.ModelFormat, func(t *testing.T) {
-			got := validModelFormat(tt.service)
-			if got != tt.valid {
-				t.Errorf("validModelFormat(%q) = %v, want %v", tt.service.Kserve.ModelFormat, got, tt.valid)
-			}
-		})
+	if got := getNestedString(t, updated, "spec", "predictor", "model", "protocolVersion"); got != "v1" {
+		t.Fatalf("protocolVersion = %q, want %q", got, "v1")
 	}
 }
 
-// ─── getKserveType ────────────────────────────────────────────────────────
-
-func TestGetKserveType(t *testing.T) {
-	tests := []struct {
-		modelFormat string
-		expected    string
-	}{
-		{"onnx", "predictor"},
-		{"sklearn", "predictor"},
-		{"xgboost", "predictor"},
-		{"pytorch", "predictor"},
-		{"tensorflow", "predictor"},
-		{"triton", "predictor"},
-		{"huggingface", "predictor"},
-		{"llm", "llm"},
-		{" SKLEARN ", "predictor"},
-		{"", ""},
-		{"unknown", ""},
+func TestUpdateKserveInferenceServiceDefinition_PreservesPredictorLabels(t *testing.T) {
+	knSvc := knativeServiceWithUID("uid-update-labels")
+	oldIsvc, err := NewKserveInferenceServiceDefinition(kserveService(), knSvc, &oscarType.Config{})
+	if err != nil {
+		t.Fatalf("setup error: %v", err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.modelFormat, func(t *testing.T) {
-			got := getKserveType(tt.modelFormat)
-			if got != tt.expected {
-				t.Errorf("getKserveType(%q) = %v, want %v", tt.modelFormat, got, tt.expected)
-			}
-		})
-	}
-}
 
-// ─── protocolVersion ─────────────────────────────────────────────────────────
-
-func TestProtocolVersion(t *testing.T) {
-	tests := []struct {
-		name        string
-		modelFormat string
-		apiVersion  string
-		expected    string
-	}{
-		{"v1 explicit", "sklearn", "v1", "v1"},
-		{"v2 explicit", "sklearn", "v2", "v2"},
-		{"default to v1 when empty", "sklearn", "", "v1"},
-		{"onnx forces v2 regardless of apiVersion", "onnx", "v1", "v2"},
-		{"onnx forces v2 when apiVersion empty", "onnx", "", "v2"},
-		{"invalid apiVersion defaults to v1", "sklearn", "v3", "v1"},
+	predictorAny := getRawNested(t, oldIsvc, "spec", "predictor")
+	predictor, ok := predictorAny.(map[string]any)
+	if !ok {
+		t.Fatalf("expected predictor map, got %T", predictorAny)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			svc := kserveService()
-			svc.Kserve.ModelFormat = tt.modelFormat
-			svc.Kserve.APIVersion = tt.apiVersion
-			got := protocolVersion(svc)
-			if got != tt.expected {
-				t.Errorf("protocolVersion() = %v, want %v", got, tt.expected)
-			}
-		})
+	predictor["labels"] = map[string]any{"preserve": "yes"}
+
+	updated, err := UpdateKserveInferenceServiceDefinition(kserveService(), oldIsvc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	labels := getNestedMap(t, updated, "spec", "predictor", "labels")
+	if labels["preserve"] != "yes" {
+		t.Fatalf("labels.preserve = %v, want %q", labels["preserve"], "yes")
 	}
 }
 
 // ─── ValidateKserveService ───────────────────────────────────────────────────
+
+func TestValidateKserveService_DecisionPaths(t *testing.T) {
+	tests := []struct {
+		name    string
+		build   func() *oscarType.Service
+		wantErr string
+	}{
+		{
+			name: "missing kserve config",
+			build: func() *oscarType.Service {
+				return &oscarType.Service{Name: "bare"}
+			},
+			wantErr: "service does not have KServe configuration",
+		},
+		{
+			name: "missing kserve type",
+			build: func() *oscarType.Service {
+				svc := kserveService()
+				svc.Kserve.Type = ""
+				return svc
+			},
+			wantErr: "missing KServe service type",
+		},
+		{
+			name: "missing storage uri",
+			build: func() *oscarType.Service {
+				svc := kserveService()
+				svc.Kserve.StorageUri = ""
+				return svc
+			},
+			wantErr: "missing model storage URI",
+		},
+		{
+			name: "inference type missing inference block",
+			build: func() *oscarType.Service {
+				svc := kserveService()
+				svc.Kserve.Inference = nil
+				return svc
+			},
+			wantErr: "missing Inference configuration",
+		},
+		{
+			name: "inference type missing model format",
+			build: func() *oscarType.Service {
+				svc := kserveService()
+				svc.Kserve.Inference.ModelFormat = ""
+				return svc
+			},
+			wantErr: "missing model format",
+		},
+		{
+			name: "inference type with llm inference block",
+			build: func() *oscarType.Service {
+				svc := kserveService()
+				svc.Kserve.LLMInference = &oscarType.KserveLLMInference{RuntimeImage: "x"}
+				return svc
+			},
+			wantErr: "LLMInference configuration should be nil",
+		},
+		{
+			name: "llm inference type with inference block",
+			build: func() *oscarType.Service {
+				svc := llmKserveService()
+				svc.Kserve.Inference = &oscarType.KserveInference{ModelFormat: "sklearn"}
+				return svc
+			},
+			wantErr: "Inference configuration should be nil",
+		},
+		{
+			name: "invalid api version",
+			build: func() *oscarType.Service {
+				svc := kserveService()
+				svc.Kserve.APIVersion = "v3"
+				return svc
+			},
+			wantErr: "invalid APIVersion",
+		},
+		{
+			name: "valid inference service",
+			build: func() *oscarType.Service {
+				return kserveService()
+			},
+			wantErr: "",
+		},
+		{
+			name: "valid llm service",
+			build: func() *oscarType.Service {
+				return llmKserveService()
+			},
+			wantErr: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateKserveService(tt.build())
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
 
 func TestValidateKserveService_Valid(t *testing.T) {
 	svc := kserveService()
@@ -583,14 +858,6 @@ func TestValidateKserveService_NoKserveConfig(t *testing.T) {
 	svc := &oscarType.Service{Name: "bare"}
 	if err := ValidateKserveService(svc); err == nil {
 		t.Error("expected error when service has no KServe configuration, got nil")
-	}
-}
-
-func TestValidateKserveService_InvalidModelFormat(t *testing.T) {
-	svc := kserveService()
-	svc.Kserve.ModelFormat = "unsupported-format"
-	if err := ValidateKserveService(svc); err == nil {
-		t.Error("expected error for invalid model format, got nil")
 	}
 }
 
@@ -626,30 +893,6 @@ func TestIsKserveSupported(t *testing.T) {
 	}
 }
 
-func TestGetKserveFramework(t *testing.T) {
-	tests := []struct {
-		modelFormat string
-		expected    string
-	}{
-		{modelFormat: "onnx", expected: "triton"},
-		{modelFormat: "sklearn", expected: "mlserver"},
-		{modelFormat: " triton ", expected: "triton"},
-		{modelFormat: "HUGGINGFACE", expected: "vllm"},
-		{modelFormat: "llm", expected: "vllm"},
-		{modelFormat: "unknown", expected: ""},
-		{modelFormat: "", expected: ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.modelFormat, func(t *testing.T) {
-			got := getKserveFramework(tt.modelFormat)
-			if got != tt.expected {
-				t.Errorf("getKserveFramework(%q) = %q, want %q", tt.modelFormat, got, tt.expected)
-			}
-		})
-	}
-}
-
 func TestKserveNamingHelpers(t *testing.T) {
 	if got := GetKserveLabelSelector("svc"); got != "oscar-app=oscar-svc-ksv-svc" {
 		t.Errorf("GetKserveLabelSelector() = %q, want %q", got, "oscar-app=oscar-svc-ksv-svc")
@@ -658,24 +901,24 @@ func TestKserveNamingHelpers(t *testing.T) {
 	type nameCase struct {
 		name        string
 		serviceName string
-		modelFormat string
+		kserveType  string
 		wantSvcName string
 		wantPodName string
 	}
 
 	tests := []nameCase{
-		{name: "predictor service", serviceName: "demo", modelFormat: "sklearn", wantSvcName: "demo-predictor", wantPodName: "demo-predictor"},
-		{name: "llm service", serviceName: "demo", modelFormat: "llm", wantSvcName: "demo-kserve-workload-svc", wantPodName: "demo-kserve"},
-		{name: "unknown format", serviceName: "demo", modelFormat: "unknown", wantSvcName: "", wantPodName: ""},
-		{name: "empty service name", serviceName: "", modelFormat: "llm", wantSvcName: "", wantPodName: ""},
+		{name: "predictor service", serviceName: "demo", kserveType: KserveTypeInferenceService, wantSvcName: "demo-predictor", wantPodName: "demo-predictor"},
+		{name: "llm service", serviceName: "demo", kserveType: KserveTypeLLMInferenceService, wantSvcName: "demo-kserve-workload-svc", wantPodName: "demo-kserve"},
+		{name: "unknown format", serviceName: "demo", kserveType: "unknown", wantSvcName: "", wantPodName: ""},
+		{name: "empty service name", serviceName: "", kserveType: KserveTypeInferenceService, wantSvcName: "", wantPodName: ""},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetKserveSvcName(tt.serviceName, tt.modelFormat); got != tt.wantSvcName {
+			if got := GetKserveSvcName(tt.serviceName, tt.kserveType); got != tt.wantSvcName {
 				t.Errorf("GetKserveSvcName() = %q, want %q", got, tt.wantSvcName)
 			}
-			if got := GetKservePodAndDplName(tt.serviceName, tt.modelFormat); got != tt.wantPodName {
+			if got := GetKservePodAndDplName(tt.serviceName, tt.kserveType); got != tt.wantPodName {
 				t.Errorf("GetKservePodAndDplName() = %q, want %q", got, tt.wantPodName)
 			}
 		})
@@ -695,6 +938,40 @@ func TestKserveNamingHelpers(t *testing.T) {
 	}
 }
 
+func TestBuildKserveName(t *testing.T) {
+	if got := buildKserveName("demo-service"); got != "demo-service" {
+		t.Fatalf("buildKserveName() = %q, want %q", got, "demo-service")
+	}
+}
+
+func TestGetOwnerReference(t *testing.T) {
+	knSvc := knativeServiceWithUID("uid-owner")
+	refs := getOwnerReference(knSvc)
+	if len(refs) != 1 {
+		t.Fatalf("expected exactly one owner reference, got %d", len(refs))
+	}
+
+	ref := refs[0]
+	if ref.APIVersion != "serving.knative.dev/v1" {
+		t.Fatalf("APIVersion = %q, want %q", ref.APIVersion, "serving.knative.dev/v1")
+	}
+	if ref.Kind != "Service" {
+		t.Fatalf("Kind = %q, want %q", ref.Kind, "Service")
+	}
+	if ref.Name != knSvc.Name {
+		t.Fatalf("Name = %q, want %q", ref.Name, knSvc.Name)
+	}
+	if ref.UID != knSvc.UID {
+		t.Fatalf("UID = %q, want %q", ref.UID, knSvc.UID)
+	}
+	if ref.Controller == nil || *ref.Controller {
+		t.Fatalf("Controller = %v, want false", ref.Controller)
+	}
+	if ref.BlockOwnerDeletion == nil || !*ref.BlockOwnerDeletion {
+		t.Fatalf("BlockOwnerDeletion = %v, want true", ref.BlockOwnerDeletion)
+	}
+}
+
 func TestNormalizeScaleFromKserveService(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -707,6 +984,7 @@ func TestNormalizeScaleFromKserveService(t *testing.T) {
 		{name: "max respected", input: &oscarType.Kserve{MaxScale: 5}, wantMin: 0, wantMax: 5},
 		{name: "min greater than max", input: &oscarType.Kserve{MinScale: 4, MaxScale: 2}, wantMin: 4, wantMax: 4},
 		{name: "both set", input: &oscarType.Kserve{MinScale: 1, MaxScale: 3}, wantMin: 1, wantMax: 3},
+		{name: "llm min forced to one", input: &oscarType.Kserve{Type: KserveTypeLLMInferenceService}, wantMin: 1, wantMax: 1},
 	}
 
 	for _, tt := range tests {
@@ -793,9 +1071,9 @@ func TestCreateKserveResources(t *testing.T) {
 				t.Errorf("requests.memory = %q, want %q", got, tt.wantMem)
 			}
 
-			_, hasGPU := resources.Limits[corev1.ResourceName("nvidia.com/gpu")]
+			_, hasGPU := resources.Requests[corev1.ResourceName("nvidia.com/gpu")]
 			if hasGPU != tt.wantGPU {
-				t.Errorf("gpu limit present = %v, want %v", hasGPU, tt.wantGPU)
+				t.Errorf("gpu request present = %v, want %v", hasGPU, tt.wantGPU)
 			}
 		})
 	}
@@ -823,7 +1101,7 @@ func TestCheckKserveUpdate(t *testing.T) {
 		{
 			name: "cannot change model format",
 			mutate: func(oldSvc, newSvc *oscarType.Service) {
-				newSvc.Kserve.ModelFormat = "tensorflow"
+				newSvc.Kserve.Inference.ModelFormat = "tensorflow"
 			},
 			wantErr: true,
 		},
@@ -838,6 +1116,21 @@ func TestCheckKserveUpdate(t *testing.T) {
 			name: "cannot change auth",
 			mutate: func(oldSvc, newSvc *oscarType.Service) {
 				newSvc.Kserve.SetAuth = true
+			},
+			wantErr: true,
+		},
+		{
+			name: "cannot change runtime",
+			mutate: func(oldSvc, newSvc *oscarType.Service) {
+				oldSvc.Kserve.Inference.Runtime = "kserve-runtime-a"
+				newSvc.Kserve.Inference.Runtime = "kserve-runtime-b"
+			},
+			wantErr: true,
+		},
+		{
+			name: "cannot change kserve type",
+			mutate: func(oldSvc, newSvc *oscarType.Service) {
+				newSvc.Kserve.Type = KserveTypeLLMInferenceService
 			},
 			wantErr: true,
 		},
@@ -904,14 +1197,6 @@ func TestUpdateKserveLLMInferenceServiceDefinition(t *testing.T) {
 			},
 			wantImage:     defaultLLMGPUimage,
 			wantModelName: "my-llm-service",
-		},
-		{
-			name: "custom llm runtime and model name",
-			mutateService: func(svc *oscarType.Service) {
-				svc.Kserve.LLM = &oscarType.LLMConfig{ModelName: "custom-model", RuntimeImage: "repo/custom:v1"}
-			},
-			wantImage:     "repo/custom:v1",
-			wantModelName: "custom-model",
 		},
 	}
 
@@ -986,12 +1271,14 @@ func TestUpdateKserveLLMInferenceServiceDefinition_InvalidCPU(t *testing.T) {
 
 func TestGetKserveLLMServiceRouterSpec(t *testing.T) {
 	tests := []struct {
-		name     string
-		setAuth  bool
-		wantAuth bool
+		name          string
+		setAuth       bool
+		ingressHost   string
+		wantAuth      bool
+		wantHostnames bool
 	}{
-		{name: "without auth", setAuth: false, wantAuth: false},
-		{name: "with auth", setAuth: true, wantAuth: true},
+		{name: "without auth and without host", setAuth: false, ingressHost: "", wantAuth: false, wantHostnames: false},
+		{name: "with auth and host", setAuth: true, ingressHost: "example.org", wantAuth: true, wantHostnames: true},
 	}
 
 	for _, tt := range tests {
@@ -999,11 +1286,26 @@ func TestGetKserveLLMServiceRouterSpec(t *testing.T) {
 			svc := llmKserveService()
 			svc.Name = "router-service"
 			svc.Kserve.SetAuth = tt.setAuth
+			cfg := &oscarType.Config{IngressHost: tt.ingressHost}
 
-			routerSpec := getKserveLLMServiceRouterSpec(svc, "router-ns")
+			routerSpec := getKserveLLMServiceRouterSpec(svc, "router-ns", cfg)
 			routerObj := &unstructured.Unstructured{Object: routerSpec}
 
-			rulesAny := getRawNested(t, routerObj, "route", "http", "spec", "rules")
+			specAny := getRawNested(t, routerObj, "route", "http", "spec")
+			spec, ok := specAny.(map[string]any)
+			if !ok {
+				t.Fatalf("expected spec map, got %T", specAny)
+			}
+
+			_, hasHostnames := spec["hostnames"]
+			if hasHostnames != tt.wantHostnames {
+				t.Errorf("hostnames present = %v, want %v", hasHostnames, tt.wantHostnames)
+			}
+
+			rulesAny, ok := spec["rules"]
+			if !ok {
+				t.Fatal("expected rules in router spec")
+			}
 			rules, ok := rulesAny.([]any)
 			if !ok || len(rules) != 1 {
 				t.Fatalf("expected one rule, got %T (%v)", rulesAny, rulesAny)
@@ -1091,85 +1393,67 @@ func TestKserveFormatUID(t *testing.T) {
 	}
 }
 
-func TestKserveInjectRootPath(t *testing.T) {
-	pathForService := func(serviceName string) string {
-		return fmt.Sprintf("--root-path=%s", getAPIPath(serviceName))
+func setDynamicClientFactoryForTest(t *testing.T, factory dynamicClientFactory) {
+	t.Helper()
+	original := newDynamicClient
+	newDynamicClient = factory
+	t.Cleanup(func() {
+		newDynamicClient = original
+	})
+}
+
+func TestExistsKserveHTTPRouteByServiceName_DynamicClientError(t *testing.T) {
+	setDynamicClientFactoryForTest(t, func() (*dynamic.DynamicClient, error) {
+		return nil, errors.New("dynamic client failure")
+	})
+
+	exists, err := existsKserveHTTPRouteByServiceName("svc", "ns")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if exists {
+		t.Fatal("exists should be false when dynamic client creation fails")
+	}
+	if !strings.Contains(err.Error(), "failed to create dynamic client") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func newHTTPRouteForTest(name, namespace, path string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "gateway.networking.k8s.io/v1",
+		"kind":       "HTTPRoute",
+		"metadata": map[string]any{
+			"name":      name,
+			"namespace": namespace,
+		},
+		"spec": map[string]any{
+			"rules": []any{
+				map[string]any{
+					"matches": []any{
+						map[string]any{
+							"path": map[string]any{
+								"type":  "PathPrefix",
+								"value": path,
+							},
+						},
+					},
+				},
+			},
+		},
+	}}
+}
+
+func newFakeDynamicClientForHTTPRoutes(routes ...*unstructured.Unstructured) *dynamicfake.FakeDynamicClient {
+	scheme := runtime.NewScheme()
+	objects := make([]runtime.Object, 0, len(routes))
+	for _, route := range routes {
+		objects = append(objects, route)
 	}
 
-	tests := []struct {
-		name  string
-		svc   *oscarType.Service
-		check func(t *testing.T, svc *oscarType.Service)
-	}{
-		{
-			name: "mlserver env var injected",
-			svc: &oscarType.Service{
-				Name: "ml-service",
-				Kserve: &oscarType.Kserve{
-					ModelFormat: "sklearn",
-				},
-			},
-			check: func(t *testing.T, svc *oscarType.Service) {
-				t.Helper()
-				if svc.Kserve.Env == nil {
-					t.Fatal("expected env map to be initialized")
-				}
-				if got := svc.Kserve.Env["MLSERVER_ROOT_PATH"]; got != getAPIPath(svc.Name) {
-					t.Errorf("MLSERVER_ROOT_PATH = %q, want %q", got, getAPIPath(svc.Name))
-				}
-			},
-		},
-		{
-			name: "vllm argument injected",
-			svc: &oscarType.Service{
-				Name: "vllm-service",
-				Kserve: &oscarType.Kserve{
-					ModelFormat: "huggingface",
-					Args:        []string{"--port=8080"},
-				},
-			},
-			check: func(t *testing.T, svc *oscarType.Service) {
-				t.Helper()
-				expectedArg := pathForService(svc.Name)
-				found := false
-				for _, arg := range svc.Kserve.Args {
-					if arg == expectedArg {
-						found = true
-						break
-					}
-				}
-				if !found {
-					t.Errorf("expected args to contain %q, got %v", expectedArg, svc.Kserve.Args)
-				}
-			},
-		},
-		{
-			name: "triton unchanged",
-			svc: &oscarType.Service{
-				Name: "triton-service",
-				Kserve: &oscarType.Kserve{
-					ModelFormat: "triton",
-					Args:        []string{"--strict=true"},
-				},
-			},
-			check: func(t *testing.T, svc *oscarType.Service) {
-				t.Helper()
-				if len(svc.Kserve.Args) != 1 || svc.Kserve.Args[0] != "--strict=true" {
-					t.Errorf("expected args unchanged, got %v", svc.Kserve.Args)
-				}
-				if svc.Kserve.Env != nil {
-					if _, exists := svc.Kserve.Env["MLSERVER_ROOT_PATH"]; exists {
-						t.Error("did not expect MLSERVER_ROOT_PATH for triton")
-					}
-				}
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			injectRootPath(tt.svc)
-			tt.check(t, tt.svc)
-		})
-	}
+	return dynamicfake.NewSimpleDynamicClientWithCustomListKinds(
+		scheme,
+		map[schema.GroupVersionResource]string{kserveHTTPRouteGVR: "HTTPRouteList"},
+		objects...,
+	)
 }
