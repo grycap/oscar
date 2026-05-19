@@ -71,7 +71,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 
-		service, err = back.ReadService("", serviceName)
+		service, err = back.ReadService(utils.BuildUserNamespace(cfg, uid), serviceName)
 		if err != nil {
 			if errors.IsNotFound(err) || errors.IsGone(err) {
 				c.Status(http.StatusNotFound)
