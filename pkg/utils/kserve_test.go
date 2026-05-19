@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	oscarType "github.com/grycap/oscar/v3/pkg/types"
+	oscarType "github.com/grycap/oscar/v4/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

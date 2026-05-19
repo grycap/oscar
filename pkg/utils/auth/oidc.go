@@ -28,8 +28,8 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
 	"golang.org/x/oauth2"
 	"k8s.io/client-go/kubernetes"
 )

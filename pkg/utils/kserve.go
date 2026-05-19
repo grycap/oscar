@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/foomo/htpasswd"
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -91,7 +91,7 @@ func IsKserveService(service *types.Service) bool {
 }
 
 func IsKserveSupported(cfg *types.Config) bool {
-	return cfg.KserveEnable && cfg.ExposedServicesRouteKind == "httproute"
+	return cfg.KserveEnable && cfg.ExposedServicesRouteKind == types.HTTPROUTE
 }
 
 // ValidateKserveService checks if the provided service has valid KServe configuration.

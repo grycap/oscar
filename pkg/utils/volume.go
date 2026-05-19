@@ -21,7 +21,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation"
 )

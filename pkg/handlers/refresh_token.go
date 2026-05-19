@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )

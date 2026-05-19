@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -519,7 +519,7 @@ func TestGetResourceOnlyWorkloadSpecWithKServePodSet(t *testing.T) {
 
 	cfg := newTestConfig()
 	cfg.KserveEnable = true
-	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 
 	workload, err := getResourceOnlyWorkloadSpec(&service, cfg, "test-ns", "verify-test-service", "oscar-lq-test-service")
 	if err != nil {

@@ -47,6 +47,8 @@ const (
 	serverlessBackendType = "serverlessBackend"
 	routeKindType         = "routeKind"
 	AIR                   = "allowed_image_repositories"
+	Ingress               = "ingress"
+	HTTPROUTE             = "httproute"
 )
 
 type configVar struct {
@@ -463,11 +465,11 @@ func parseServerlessBackend(s string) (string, error) {
 
 func parseRouteKind(s string) (string, error) {
 	if len(s) == 0 {
-		return "ingress", nil
+		return Ingress, nil
 	}
 
 	str := strings.ToLower(strings.TrimSpace(s))
-	if str != "ingress" && str != "httproute" {
+	if str != Ingress && str != HTTPROUTE {
 		return "", fmt.Errorf("must be \"ingress\" or \"httproute\"")
 	}
 

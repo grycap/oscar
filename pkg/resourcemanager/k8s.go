@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/grycap/oscar/v3/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/utils"
 )
 
 type nodeResources struct {

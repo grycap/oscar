@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -226,7 +226,7 @@ func TestCreateExposeHTTPRouteWithAuth(t *testing.T) {
 	useFakeGatewayClient(t)
 
 	cfg := newTestConfig()
-	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 	cfg.HTTPRouteGatewayName = "public-gateway"
 	cfg.HTTPRouteGatewayNamespace = "gateway-system"
 	cfg.IngressHost = "example.org"
@@ -268,7 +268,7 @@ func TestCreateExposeHTTPRouteWithoutAuth(t *testing.T) {
 	useFakeGatewayClient(t)
 
 	cfg := newTestConfig()
-	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 	cfg.HTTPRouteGatewayName = "public-gateway"
 
 	svc := newExposeService("httproute-no-auth", 0, false)
@@ -528,13 +528,13 @@ func TestGetProbePath(t *testing.T) {
 
 func TestRouteKindSelection(t *testing.T) {
 	cfgIngress := newTestConfig()
-	cfgIngress.ExposedServicesRouteKind = "ingress"
+	cfgIngress.ExposedServicesRouteKind = types.Ingress
 	if getRouteKind(cfgIngress) == routeKindHTTPRoute {
 		t.Fatalf("expected ingress route kind")
 	}
 
 	cfgHTTPRoute := newTestConfig()
-	cfgHTTPRoute.ExposedServicesRouteKind = "httproute"
+	cfgHTTPRoute.ExposedServicesRouteKind = types.HTTPROUTE
 	if getRouteKind(cfgHTTPRoute) != routeKindHTTPRoute {
 		t.Fatalf("expected httproute route kind")
 	}
@@ -542,7 +542,7 @@ func TestRouteKindSelection(t *testing.T) {
 
 func TestGetHTTPRouteSpec(t *testing.T) {
 	cfg := newTestConfig()
-	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 	cfg.IngressHost = "example.org"
 	cfg.HTTPRouteGatewayName = "public-gateway"
 	cfg.HTTPRouteGatewayNamespace = "gateway-system"
@@ -649,7 +649,7 @@ func TestGetHTTPRouteSpec(t *testing.T) {
 func TestValidateHTTPRouteConfig(t *testing.T) {
 	svc := newExposeService("validation", 0, false)
 	cfg := newTestConfig()
-	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 
 	if err := validateHTTPRouteConfig(svc, cfg); err == nil {
 		t.Fatalf("expected error when HTTPROUTE_GATEWAY_NAME is empty")
@@ -669,7 +669,7 @@ func TestValidateHTTPRouteConfig(t *testing.T) {
 
 func TestGetHTTPRouteSpecWithAuth(t *testing.T) {
 	cfg := newTestConfig()
-	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 	cfg.HTTPRouteGatewayName = "public-gateway"
 
 	svc := newExposeService("http-route-auth", 0, true)

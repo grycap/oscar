@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 )
 
 type mockServiceInventorySource struct {
 	services []ServiceDescriptor
-	err     error
+	err      error
 }
 
 func (m *mockServiceInventorySource) Name() string {
@@ -63,8 +63,8 @@ func TestScopeSourcesWithAllowed(t *testing.T) {
 				{ID: "svc2"},
 			},
 		},
-		UsageMetrics:    &mockUsageMetricsSource{},
-		RequestLogs:   &mockRequestLogSource{},
+		UsageMetrics:       &mockUsageMetricsSource{},
+		RequestLogs:        &mockRequestLogSource{},
 		ExposedRequestLogs: &mockRequestLogSource{},
 	}
 

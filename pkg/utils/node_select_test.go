@@ -10,7 +10,7 @@ import (
 func TestIsControlPlaneNode(t *testing.T) {
 	tests := []struct {
 		name     string
-		labels  map[string]string
+		labels   map[string]string
 		expected bool
 	}{
 		{"Control plane label", map[string]string{"node-role.kubernetes.io/control-plane": ""}, true},
