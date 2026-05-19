@@ -61,6 +61,13 @@ To enable OIDC authentication support in the deployed OSCAR (disabled by default
 bash oscar/deploy/kind-deploy.sh --oidc
 ```
 
+To enable Kueue support for CPU and memory quotas in the deployed OSCAR
+(disabled by default), add:
+
+```sh
+bash oscar/deploy/kind-deploy.sh --kueue
+```
+
 ## Steps for manual local deployment
 
 If you want to do it manually you can follow the listed steps.

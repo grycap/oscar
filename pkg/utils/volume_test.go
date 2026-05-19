@@ -3,13 +3,13 @@ package utils
 import (
 	"testing"
 
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 )
 
 func TestValidateManagedVolumeCreateRequest(t *testing.T) {
 	tests := []struct {
 		name    string
-		req    *types.ManagedVolumeCreateRequest
+		req     *types.ManagedVolumeCreateRequest
 		wantErr bool
 	}{
 		{"Valid request", &types.ManagedVolumeCreateRequest{Name: "my-volume", Size: "10Gi"}, false},
@@ -32,7 +32,7 @@ func TestValidateManagedVolumeCreateRequest(t *testing.T) {
 func TestValidateVolumeConfig(t *testing.T) {
 	tests := []struct {
 		name    string
-		volume *types.ServiceVolumeConfig
+		volume  *types.ServiceVolumeConfig
 		wantErr bool
 	}{
 		{"Valid config", &types.ServiceVolumeConfig{Name: "vol", Size: "10Gi", MountPath: "/data"}, false},
@@ -88,7 +88,7 @@ func TestValidationName(t *testing.T) {
 
 func TestValidateSize(t *testing.T) {
 	tests := []struct {
-		size   string
+		size    string
 		wantErr bool
 	}{
 		{"10Gi", false},
@@ -113,8 +113,8 @@ func TestValidateSize(t *testing.T) {
 
 func TestSameVolumeConfig(t *testing.T) {
 	tests := []struct {
-		name  string
-		a, b  *types.ServiceVolumeConfig
+		name     string
+		a, b     *types.ServiceVolumeConfig
 		expected bool
 	}{
 		{"Both nil", nil, nil, true},

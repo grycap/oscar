@@ -3,7 +3,7 @@ package metrics
 import (
 	"context"
 
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 )
 
 type scopedServiceInventorySource struct {

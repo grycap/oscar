@@ -19,7 +19,7 @@ import (
 	"testing"
 
 	"github.com/apache/yunikorn-core/pkg/common/configs"
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -41,12 +41,12 @@ func getFakeClientset() (*types.Config, *fake.Clientset) {
 			cfg.YunikornConfigFileName: `
 partitions:
   - name: default
-	queues:
-	  - name: root
-		queues:
-		  - name: oscar
-			queues:
-			  - name: test-service
+    queues:
+      - name: root
+        queues:
+          - name: oscar
+            queues:
+              - name: test-service
 `,
 		},
 	}

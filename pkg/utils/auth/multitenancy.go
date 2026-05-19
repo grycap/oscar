@@ -26,7 +26,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/grycap/oscar/v3/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/utils"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -132,6 +132,9 @@ func (mc *MultitenancyConfig) CreateSecretForOIDC(uid string, sk string) error {
 }
 
 func (mc *MultitenancyConfig) GetUserCredentials(uid string) (string, string, error) {
+	//fmt.Println("+++++++++")
+	//fmt.Println(uid)
+	//fmt.Println("+++++++")
 	secretName := FormatUID((uid))
 	secret, err := mc.kubeClientset.CoreV1().Secrets(ServicesNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {

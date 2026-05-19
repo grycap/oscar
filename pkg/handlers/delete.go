@@ -28,9 +28,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
-	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -98,6 +98,14 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			return
 		}
+
+		refreshSecretName := utils.RefreshTokenSecretName(service.Name)
+		if refreshSecretName != "" {
+			if err := utils.DeleteSecret(refreshSecretName, service.Namespace, back.GetKubeClientset()); err != nil {
+				log.Printf("error deleting refresh-token secret %s/%s: %v", service.Namespace, refreshSecretName, err)
+			}
+		}
+
 		minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
 		if err != nil {
 			log.Printf("the provided MinIO configuration is not valid: %v", err)

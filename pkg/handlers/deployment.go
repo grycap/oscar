@@ -27,8 +27,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/backends"
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/backends"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -164,6 +165,10 @@ func inspectDeploymentRuntime(back types.ServerlessBackend, kubeClientset kubern
 	namespace := resolveServiceNamespace(service, cfg)
 	service.Namespace = namespace
 
+	if utils.IsKserveService(service) && utils.IsKserveSupported(cfg) {
+		return inspectKserveDeploymentRuntime(kubeClientset, service)
+	}
+
 	if service.Expose.APIPort != 0 {
 		return inspectExposedDeploymentRuntime(kubeClientset, service)
 	}
@@ -258,6 +263,31 @@ func inspectPodBackedDeploymentRuntime(kubeClientset kubernetes.Interface, servi
 	}, nil
 }
 
+func inspectKserveDeploymentRuntime(kubeClientset kubernetes.Interface, service *types.Service) (deploymentRuntimeContext, error) {
+	pods, err := backends.ListKserveServicePods(kubeClientset, service.Namespace, service.Name)
+	if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+		return deploymentRuntimeContext{}, err
+	}
+
+	deployment, err := backends.GetKserveServiceDeployment(kubeClientset, service.Namespace, service.Name, service.Kserve.Type)
+	if err != nil {
+		if apierrors.IsNotFound(err) || apierrors.IsGone(err) {
+			items := podItems(pods)
+			return deploymentRuntimeContext{
+				status:        unavailableDeploymentStatus(service, "Current deployment resources are unavailable."),
+				logPods:       items,
+				usingLastLogs: len(items) > 0,
+			}, nil
+		}
+		return deploymentRuntimeContext{}, err
+	}
+
+	return deploymentRuntimeContext{
+		status:  deploymentStatusFromDeployment(service, deployment),
+		logPods: podItems(pods),
+	}, nil
+}
+
 func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.Deployment) types.ServiceDeploymentStatus {
 	var desired int32 = 1
 	if deployment.Spec.Replicas != nil {
@@ -299,6 +329,11 @@ func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.D
 		reason = "Deployment is ready."
 	}
 
+	resourcesKind := types.DeploymentResourceKindExposedService
+	if utils.IsKserveService(service) {
+		resourcesKind = types.DeploymentResourceKindKserveService
+	}
+
 	return types.ServiceDeploymentStatus{
 		ServiceName:        service.Name,
 		Namespace:          service.Namespace,
@@ -307,7 +342,7 @@ func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.D
 		LastTransitionTime: transitioned,
 		ActiveInstances:    int(observed),
 		AffectedInstances:  affected,
-		ResourceKind:       types.DeploymentResourceKindExposedService,
+		ResourceKind:       resourcesKind,
 	}
 }
 
@@ -554,7 +589,7 @@ func parseTailLines(value string) int64 {
 func collectDeploymentLogs(kubeClientset kubernetes.Interface, namespace string, pods []corev1.Pod, tailLines int64, includeTimestamps bool) []types.DeploymentLogEntry {
 	entries := make([]logEntryWithTime, 0, len(pods))
 	for _, pod := range pods {
-		podEntries, err := getPodDeploymentLogs(kubeClientset, namespace, pod.Name, tailLines)
+		podEntries, err := getPodDeploymentLogs(kubeClientset, &pod, namespace, tailLines)
 		if err != nil {
 			continue
 		}
@@ -589,9 +624,20 @@ func collectDeploymentLogs(kubeClientset kubernetes.Interface, namespace string,
 	return responseEntries
 }
 
-func getPodDeploymentLogs(kubeClientset kubernetes.Interface, namespace, podName string, tailLines int64) ([]logEntryWithTime, error) {
-	req := kubeClientset.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{
-		Container:  types.ContainerName,
+func getPodDeploymentLogs(kubeClientset kubernetes.Interface, pod *corev1.Pod, namespace string, tailLines int64) ([]logEntryWithTime, error) {
+	containerName := types.ContainerName
+
+	if len(pod.Spec.Containers) > 0 {
+		// TO DO: See somthing better
+		if pod.Spec.Containers[0].Name == utils.KserveISVCContainerName {
+			containerName = utils.KserveISVCContainerName
+		} else if pod.Labels[utils.KserveLLMISVCLabelKey] == utils.KserveLLMISVCLabelValue && pod.Spec.Containers[0].Name == utils.KserveLLMISVCContainerName {
+			containerName = utils.KserveLLMISVCContainerName
+		}
+	}
+
+	req := kubeClientset.CoreV1().Pods(namespace).GetLogs(pod.Name, &corev1.PodLogOptions{
+		Container:  containerName,
 		Timestamps: true,
 		TailLines:  &tailLines,
 	})
@@ -656,6 +702,10 @@ func inspectDeploymentRuntimeStatusOnly(back types.ServerlessBackend, kubeClient
 	namespace := resolveServiceNamespace(service, cfg)
 	service.Namespace = namespace
 
+	if utils.IsKserveService(service) && utils.IsKserveSupported(cfg) {
+		return inspectKserveDeploymentRuntimeStatusOnly(kubeClientset, service)
+	}
+
 	if service.Expose.APIPort != 0 {
 		return inspectExposedDeploymentRuntimeStatusOnly(kubeClientset, service)
 	}
@@ -698,6 +748,18 @@ func inspectKnativeDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interfac
 
 func inspectExposedDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interface, service *types.Service) (types.ServiceDeploymentStatus, error) {
 	deployment, err := backends.GetExposedServiceDeployment(kubeClientset, service.Namespace, service.Name)
+	if err != nil {
+		if apierrors.IsNotFound(err) || apierrors.IsGone(err) {
+			return unavailableDeploymentStatus(service, "Current deployment resources are unavailable."), nil
+		}
+		return types.ServiceDeploymentStatus{}, err
+	}
+
+	return deploymentStatusFromDeployment(service, deployment), nil
+}
+
+func inspectKserveDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interface, service *types.Service) (types.ServiceDeploymentStatus, error) {
+	deployment, err := backends.GetKserveServiceDeployment(kubeClientset, service.Namespace, service.Name, service.Kserve.Type)
 	if err != nil {
 		if apierrors.IsNotFound(err) || apierrors.IsGone(err) {
 			return unavailableDeploymentStatus(service, "Current deployment resources are unavailable."), nil

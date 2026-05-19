@@ -19,8 +19,8 @@ COPY pkg ./pkg
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${GOOS} CGO_ENABLED=0 go build --ldflags "-s -w \
--X \"github.com/grycap/oscar/v3/pkg/version.Version=${VERSION}\" \
--X \"github.com/grycap/oscar/v3/pkg/version.GitCommit=${GIT_COMMIT}\"" \
+-X \"github.com/grycap/oscar/v4/pkg/version.Version=${VERSION}\" \
+-X \"github.com/grycap/oscar/v4/pkg/version.GitCommit=${GIT_COMMIT}\"" \
     -o oscar .
 
 

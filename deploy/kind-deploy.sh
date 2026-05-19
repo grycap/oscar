@@ -12,20 +12,20 @@ MINIO_HELM_NAME="minio"
 NFS_HELM_NAME="nfs-server-provisioner"
 OSCAR_HELM_NAME="oscar"
 
-ARCH=`uname -m`
-SO=`uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]'`
+ARCH=$(uname -m)
+SO=$(uname -a | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
 
 #Generate simple random passwords for OSCAR and MinIO
-OSCAR_PASSWORD=`date +%s | sha256sum | base64 | head -c 8`
+OSCAR_PASSWORD=$(date +%s | sha256sum | base64 | head -c 8)
 sleep 1
-MINIO_PASSWORD=`date +%s | sha256sum | base64 | head -c 8` 
+MINIO_PASSWORD=$(date +%s | sha256sum | base64 | head -c 8) 
 
 #Not use knative by default
 use_knative="n"
 
-RANDOM_SUFFIX=`echo $OSCAR_PASSWORD | cut -c1-3 | tr '[:upper:]' '[:lower:]'`
+RANDOM_SUFFIX=$(echo $OSCAR_PASSWORD | cut -c1-3 | tr '[:upper:]' '[:lower:]')
 if [ -z "$RANDOM_SUFFIX" ]; then
-    RANDOM_SUFFIX=`LC_CTYPE=C tr -dc 'a-z0-9' </dev/urandom | head -c 3`
+    RANDOM_SUFFIX=$(LC_CTYPE=C tr -dc 'a-z0-9' </dev/urandom | head -c 3)
 fi
 CLUSTER_NAME="oscar-test-$RANDOM_SUFFIX"
 KIND_CONTEXT="kind-$CLUSTER_NAME"
@@ -34,6 +34,7 @@ DEFAULT_HTTPS_PORT=443
 DEFAULT_MINIO_API_PORT=30300
 DEFAULT_MINIO_CONSOLE_PORT=30301
 DEFAULT_REGISTRY_PORT=5001
+DEFAULT_TRAEFIK_DASHBOARD_PORT=9080
 OSCAR_IMAGE_BRANCH="master"
 OSCAR_HELM_IMAGE_OVERRIDES=""
 OSCAR_POST_DEPLOYMENT_IMAGE=""
@@ -43,8 +44,11 @@ USE_METRICS="n"
 ENABLE_METRICS="false"
 ENABLE_OIDC="false"
 ENABLE_KUEUE="false"
+ENABLE_KSERVE="false"
 OIDC_ISSUERS_DEFAULT="https://keycloak.grycap.net/realms/grycap"
 OIDC_GROUPS_DEFAULT="/oscar-staff, /oscar-test"
+GATEWAY_CONTROLLER="traefik"
+GATEWAY_CONTROLLER_SET="false"
 
 usage(){
     cat <<EOF
@@ -54,7 +58,10 @@ Options:
   --devel        Deploy using the OSCAR devel branch without interactive prompts.
   --metrics      Deploy metrics stack (Prometheus + Loki + Alloy) for reporting.
   --oidc         Enable OIDC support for OSCAR (default: disabled).
-  --kueue        Enable Kueue support for OSCAR (default: disabled).
+  --kueue        Enable Kueue support for CPU and memory quotas (default: disabled).
+  --kserve       Install KServe using deploy/kind-oscar-kserve.sh (default: disabled).
+  --ingress      Use NGINX Ingress as gateway controller.
+  --traefik      Use Traefik as gateway controller (default).
   -h, --help     Show this help message and exit.
 EOF
 }
@@ -301,7 +308,7 @@ checkKind(){
         curl -k -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-$SO-amd64
         chmod +x ./kind
 
-        if `whoami` 2>/dev/null != "root"; then
+        if [ "$(whoami 2>/dev/null)" != "root" ]; then
             sudo mv ./kind /usr/local/bin/kind
         else
             mv ./kind /usr/local/bin/kind
@@ -320,36 +327,154 @@ checkIngressStatus(){
         ing_status=`kubectl get pods -n ingress-nginx 2>/dev/null | awk '/controller/ {print $3}'`
         actual=$(date +%s)
         if [ `expr $actual - $start` -gt $timeout ]; then
-            echo -e "\n$RED[!]$END_COLOR Error: Timeout: Pod status: $status"
+            echo -e "\n$RED[!]$END_COLOR Error: Timeout: Pod status: $ing_status"
             exit
         fi
     done
     echo -e "\n[$GREEN$CHECK$END_COLOR] ingress-controller pod running correctly"
 }
 
+checkTraefikStatus(){
+    timeout=500
+    echo -e "\n[*] Waiting for Traefik pod to be running ..."
+    sleep 5
+    start=$(date +%s)
+    while [ "$traefik_status" != "Running" ]; do
+        traefik_status=$(kubectl get pods -n traefik 2>/dev/null | awk '/traefik/ {print $3}' | head -1)
+        actual=$(date +%s)
+        if [ $((actual - start)) -gt $timeout ]; then
+            echo -e "\n$RED[!]$END_COLOR Error: Timeout: Traefik pod status: $traefik_status"
+            exit
+        fi
+        sleep 5
+    done
+    echo -e "\n[$GREEN$CHECK$END_COLOR] Traefik pod running correctly"
+}
+
+deployCertManager(){
+        echo -e "\n[*] Deploying cert-manager ..."
+        if ! kubectl apply -f "https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml"; then
+                echo -e "$RED[!]$END_COLOR Failed to deploy cert-manager"
+                exit 1
+        fi
+
+        echo -e "\n[*] Waiting for cert-manager components to be ready ..."
+        wait_for_cert_manager
+}
+
+wait_for_cert_manager() {
+	kubectl -n cert-manager wait --for=condition=Available deployment/cert-manager deployment/cert-manager-cainjector deployment/cert-manager-webhook --timeout=180s
+	kubectl wait --for=condition=Established crd/certificaterequests.cert-manager.io crd/certificates.cert-manager.io crd/clusterissuers.cert-manager.io crd/issuers.cert-manager.io --timeout=120s
+	ensure_webhook_ca_bundle
+}
+
+ensure_webhook_ca_bundle() {
+	for _ in $(seq 1 30); do
+		if kubectl get validatingwebhookconfiguration cert-manager-webhook -o jsonpath="{.webhooks[*].clientConfig.caBundle}" | grep -qE '[A-Za-z0-9+/]{10,}'; then
+			return 0
+		fi
+		sleep 5
+	done
+	echo "Error: cert-manager webhook CA bundle was not injected in time." >&2
+	exit 1
+}
+
+createTraefikGatewayCertificate(){
+        echo -e "\n[*] Creating self-signed certificate for Traefik Gateway ..."
+
+        if ! cat <<EOF | kubectl apply -f -
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+    name: self-signed-issuer
+spec:
+    selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+    name: self-signed-cert
+    namespace: traefik
+spec:
+    secretName: traefik-gateway-tls
+    commonName: localhost
+    dnsNames:
+        - localhost
+    ipAddresses:
+        - 127.0.0.1
+    issuerRef:
+        name: self-signed-issuer
+        kind: ClusterIssuer
+EOF
+        then
+                echo -e "$RED[!]$END_COLOR Failed to create cert-manager issuer/certificate for Traefik"
+                exit 1
+        fi
+
+        if ! kubectl wait --namespace traefik --for=condition=Ready certificate/self-signed-cert --timeout=180s; then
+                echo -e "$RED[!]$END_COLOR Traefik TLS certificate was not issued in time"
+                exit 1
+        fi
+}
+
+deployGatewayController(){
+  if [ "$GATEWAY_CONTROLLER" == "ingress" ]; then
+      echo -e "\n[*] Deploying NGINX Ingress ..."
+      kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/kind/deploy.yaml
+      checkIngressStatus
+  else
+      deployCertManager
+      kubectl create namespace traefik >/dev/null 2>&1 || true
+      createTraefikGatewayCertificate
+      echo -e "\n[*] Deploying Gateway API CRDs ..."
+      kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+      echo -e "\n[*] Installing Traefik Gateway ..."
+      helm repo add --force-update  traefik https://traefik.github.io/charts
+      helm install --namespace=traefik traefik traefik/traefik --create-namespace \
+        --version 39.0.9 \
+        --set providers.kubernetesGateway.enabled=true \
+        --set providers.kubernetesCRD.allowCrossNamespace=true \
+        --set gateway.enabled=true \
+        --set gateway.listeners.web.namespacePolicy.from=All \
+        --set gateway.listeners.websecure.port=8443 \
+        --set gateway.listeners.websecure.protocol=HTTPS \
+        --set gateway.listeners.websecure.certificateRefs[0].name=traefik-gateway-tls \
+        --set gateway.listeners.websecure.certificateRefs[0].kind=Secret \
+        --set gateway.listeners.websecure.namespacePolicy.from=All \
+        --set service.type=NodePort \
+        --set ports.web.nodePort=30080 \
+        --set ports.websecure.nodePort=30443 \
+        --set ports.traefik.expose.default=true \
+        --set ports.traefik.nodePort=31080 \
+        --set ports.traefik.exposedPort=31080 \
+        --set api.dashboard=true \
+        --set api.insecure=true
+        checkTraefikStatus
+  fi
+}
+
 checkOSCARDeploy(){
     creation_timeout=120
     readiness_timeout=600
     start=$(date +%s)
-    echo -e "\n[*] Waiting for OSCAR pods to be scheduled ..."
+    echo -e "\n[*] Waiting for OSCAR deployment to be created ..."
     while true; do
-        pod_info=$(kubectl get pods -n oscar -l app=oscar --no-headers 2>/dev/null)
-        if [ -n "$pod_info" ]; then
-            pod_count=$(echo "$pod_info" | wc -l | tr -d ' ')
-            echo -e "\n[*] Detected $pod_count OSCAR pod(s). Waiting for them to become ready (timeout ${readiness_timeout}s) ..."
+        if kubectl get deployment -n oscar oscar >/dev/null 2>&1; then
+            echo -e "\n[*] OSCAR deployment detected. Waiting for rollout to complete (timeout ${readiness_timeout}s) ..."
             break
         fi
         actual=$(date +%s)
         if [ $((actual - start)) -gt $creation_timeout ]; then
-            echo -e "\n$RED[!]$END_COLOR Error: OSCAR pods were not created after ${creation_timeout}s."
-            kubectl get pods -n oscar
+            echo -e "\n$RED[!]$END_COLOR Error: OSCAR deployment was not created after ${creation_timeout}s."
+            kubectl get deployment -n oscar
             exit 1
         fi
         sleep 5
     done
 
-    if ! kubectl wait --namespace oscar --for=condition=Ready pod -l app=oscar --timeout="${readiness_timeout}s"; then
-        echo -e "\n$RED[!]$END_COLOR Error: OSCAR pods did not become ready after ${readiness_timeout}s."
+    if ! kubectl -n oscar rollout status deployment/oscar --timeout="${readiness_timeout}s"; then
+        echo -e "\n$RED[!]$END_COLOR Error: OSCAR deployment rollout did not complete after ${readiness_timeout}s."
+        kubectl get deployment -n oscar oscar
         kubectl get pods -n oscar
         failing_pods=$(kubectl get pods -n oscar -l app=oscar --no-headers | awk '{
             split($2, ready, "/");
@@ -603,6 +728,20 @@ while [ "$#" -gt 0 ]; do
             ENABLE_KUEUE="true"
             shift
             ;;
+        --kserve)
+            ENABLE_KSERVE="true"
+            shift
+            ;;
+        --ingress)
+            GATEWAY_CONTROLLER="ingress"
+            GATEWAY_CONTROLLER_SET="true"
+            shift
+            ;;
+        --traefik)
+            GATEWAY_CONTROLLER="traefik"
+            GATEWAY_CONTROLLER_SET="true"
+            shift
+            ;;
         -h|--help)
             usage
             exit 0
@@ -629,6 +768,8 @@ local_reg="y"
 use_metrics="$USE_METRICS"
 use_devel_branch="n"
 use_oidc="n"
+use_kserve="n"
+use_kueue="n"
 if [ "$SKIP_PROMPTS" == "true" ]; then
     echo "[*] Running in non-interactive mode: Knative, local registry, and OSCAR devel branch enabled."
 else
@@ -636,6 +777,17 @@ else
     read -p "Do you want suport for local docker images? [y/n] " local_reg </dev/tty
     read -p "Do you want to install OSCAR from the devel branch? [y/n] (default uses master) " use_devel_branch </dev/tty
     read -p "Do you want to deploy the metrics stack (Prometheus + Loki + Alloy)? [y/n] " use_metrics </dev/tty
+    if [ "$GATEWAY_CONTROLLER_SET" != "true" ]; then
+        read -p "Do you want to use Traefik or Ingress as gateway controller? [traefik/ingress] (default: traefik) " gateway_controller_choice </dev/tty
+        gateway_controller_choice=$(echo "$gateway_controller_choice" | tr '[:upper:]' '[:lower:]')
+        if [ -n "$gateway_controller_choice" ]; then
+            if [ "$gateway_controller_choice" != "traefik" ] && [ "$gateway_controller_choice" != "ingress" ]; then
+                echo -e "$RED[!]$END_COLOR Invalid gateway controller: $gateway_controller_choice (expected: traefik|ingress)"
+                exit 1
+            fi
+            GATEWAY_CONTROLLER="$gateway_controller_choice"
+        fi
+    fi
     if [ "$ENABLE_OIDC" != "true" ]; then
         echo -e "\n[*] OIDC defaults to be applied if enabled:"
         echo -e "  - OIDC_ENABLE=true"
@@ -643,30 +795,51 @@ else
         echo -e "  - OIDC_GROUPS=$OIDC_GROUPS_DEFAULT"
         read -p "Do you want to enable OIDC authentication support with these defaults? [y/n] " use_oidc </dev/tty
     fi
+    if [ "$ENABLE_KSERVE" != "true" ]; then
+        read -p "Do you want to install KServe with deploy/kind-oscar-kserve.sh? [y/n] " use_kserve </dev/tty
+    fi
+    if [ "$ENABLE_KUEUE" != "true" ]; then
+        read -p "Do you want to enable CPU and memory quotas with Kueue? [y/n] " use_kueue </dev/tty
+    fi
 fi
 
-if [ `echo $use_devel_branch | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+if [ $(echo $use_devel_branch | tr '[:upper:]' '[:lower:]') == "y" ]; then
     OSCAR_IMAGE_BRANCH="devel"
 fi
-if [ `echo $use_metrics | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+if [ $(echo $use_metrics | tr '[:upper:]' '[:lower:]') == "y" ]; then
     ENABLE_METRICS="true"
 fi
-if [ `echo $use_oidc | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+if [ $(echo $use_oidc | tr '[:upper:]' '[:lower:]') == "y" ]; then
     ENABLE_OIDC="true"
+fi
+if [ $(echo $use_kserve | tr '[:upper:]' '[:lower:]') == "y" ]; then
+    ENABLE_KSERVE="true"
 fi
 if [ "$OSCAR_IMAGE_BRANCH" == "devel" ]; then
     OSCAR_HELM_IMAGE_OVERRIDES="--set replicas=0"
     OSCAR_POST_DEPLOYMENT_IMAGE="ghcr.io/grycap/oscar:devel"
 fi
 
+if [ "$GATEWAY_CONTROLLER" == "traefik" ]; then
+    OSCAR_EXPOSURE_HELM_ARGS="--set httproute.create=true --set ingress.create=false --set httproute.type=traefik --set httproute.gatewayName=traefik-gateway --set httproute.gatewayNamespace=traefik --set exposedServices.routeKind=httproute"
+    KIND_HTTP_CONTAINER_PORT=30080
+    KIND_HTTPS_CONTAINER_PORT=30443
+else
+    OSCAR_EXPOSURE_HELM_ARGS="--set httproute.create=false --set ingress.create=true "
+    KIND_HTTP_CONTAINER_PORT=80
+    KIND_HTTPS_CONTAINER_PORT=443
+fi
+
 HTTP_PORT_FALLBACKS=(8080 8081 8082 8880 9080 10080)
-HTTPS_PORT_FALLBACKS=(444 8443 9443 10443)
+HTTPS_PORT_FALLBACKS=(444 8443 9443 10443 11443 12443)
 MINIO_API_PORT_FALLBACKS=(30302 30304 30306 31300 32000 32500)
 MINIO_CONSOLE_PORT_FALLBACKS=(30303 30305 30307 31301 32001 32501)
+TRAEFIK_DASHBOARD_PORT_FALLBACKS=(9081 9082 9090 9091 9092)
 HOST_HTTP_PORT=$(findAvailablePort "$DEFAULT_HTTP_PORT" "${HTTP_PORT_FALLBACKS[@]}")
 HOST_HTTPS_PORT=$(findAvailablePort "$DEFAULT_HTTPS_PORT" "${HTTPS_PORT_FALLBACKS[@]}")
 HOST_MINIO_API_PORT=$(findAvailablePort "$DEFAULT_MINIO_API_PORT" "${MINIO_API_PORT_FALLBACKS[@]}")
 HOST_MINIO_CONSOLE_PORT=$(findAvailablePortExclude "$DEFAULT_MINIO_CONSOLE_PORT" "$HOST_MINIO_API_PORT" "${MINIO_CONSOLE_PORT_FALLBACKS[@]}")
+HOST_TRAEFIK_DASHBOARD_PORT=$(findAvailablePort "$DEFAULT_TRAEFIK_DASHBOARD_PORT" "${TRAEFIK_DASHBOARD_PORT_FALLBACKS[@]}")
 
 if [ -z "$HOST_HTTP_PORT" ]; then
     echo -e "$RED[!]$END_COLOR Error: Unable to find a free port for HTTP ingress"
@@ -704,8 +877,12 @@ if [ "$HOST_MINIO_CONSOLE_PORT" != "$DEFAULT_MINIO_CONSOLE_PORT" ]; then
     echo -e "$ORANGE[*]$END_COLOR Port $DEFAULT_MINIO_CONSOLE_PORT is busy. Using $HOST_MINIO_CONSOLE_PORT for MinIO console instead."
 fi
 
+if [ "$GATEWAY_CONTROLLER" == "traefik" ] && [ "$HOST_TRAEFIK_DASHBOARD_PORT" != "$DEFAULT_TRAEFIK_DASHBOARD_PORT" ]; then
+    echo -e "$ORANGE[*]$END_COLOR Port $DEFAULT_TRAEFIK_DASHBOARD_PORT is busy. Using $HOST_TRAEFIK_DASHBOARD_PORT for Traefik dashboard instead."
+fi
+
 #Deploy Knative Serving
-if [ `echo $local_reg | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
+if [ $(echo $local_reg | tr '[:upper:]' '[:lower:]') == "y" ]; then 
     reg_name='local-registry'
     registry_status="created"
     reg_port=$DEFAULT_REGISTRY_PORT
@@ -742,16 +919,22 @@ nodes:
 - role: control-plane
   kubeadmConfigPatches:
   - |
+    kind: ClusterConfiguration
+    controlPlaneEndpoint: "${CLUSTER_NAME}-control-plane:6443"
+  - |
     kind: InitConfiguration
     nodeRegistration:
       kubeletExtraArgs:
         node-labels: "ingress-ready=true"
   extraPortMappings:
-  - containerPort: 80
+  - containerPort: ${KIND_HTTP_CONTAINER_PORT}
     hostPort: ${HOST_HTTP_PORT}
     protocol: TCP
-  - containerPort: 443
+  - containerPort: ${KIND_HTTPS_CONTAINER_PORT}
     hostPort: ${HOST_HTTPS_PORT}
+    protocol: TCP
+  - containerPort: 31080
+    hostPort: ${HOST_TRAEFIK_DASHBOARD_PORT}
     protocol: TCP
   - containerPort: ${HOST_MINIO_API_PORT}
     hostPort: ${HOST_MINIO_API_PORT}
@@ -793,16 +976,22 @@ nodes:
 - role: control-plane
   kubeadmConfigPatches:
   - |
+    kind: ClusterConfiguration
+    controlPlaneEndpoint: "${CLUSTER_NAME}-control-plane:6443"
+  - |
     kind: InitConfiguration
     nodeRegistration:
       kubeletExtraArgs:
         node-labels: "ingress-ready=true"
   extraPortMappings:
-  - containerPort: 80
+  - containerPort: ${KIND_HTTP_CONTAINER_PORT}
     hostPort: ${HOST_HTTP_PORT}
     protocol: TCP
-  - containerPort: 443
+  - containerPort: ${KIND_HTTPS_CONTAINER_PORT}
     hostPort: ${HOST_HTTPS_PORT}
+    protocol: TCP
+  - containerPort: 31080
+    hostPort: ${HOST_TRAEFIK_DASHBOARD_PORT}
     protocol: TCP
   - containerPort: ${HOST_MINIO_API_PORT}
     hostPort: ${HOST_MINIO_API_PORT}
@@ -815,15 +1004,12 @@ EOF
     createKindCluster
 fi
 
-#Deploy nginx ingress
-echo -e "\n[*] Deploying NGINX Ingress ..."
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/kind/deploy.yaml
-checkIngressStatus
-
+deployGatewayController
+  
 #Deploy MinIO
 echo -e "\n[*] Deploying MinIO storage provider ..."
 helm repo add --force-update minio https://charts.min.io
-helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT --create-namespace --version 4.0.7
+helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,mode=standalone,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT --create-namespace --version 5.4.0
 
 
 #Deploy NFS server provisioner
@@ -846,8 +1032,20 @@ if [ "$ENABLE_METRICS" == "true" ]; then
 fi
 
 #Deploy Knative Serving
-if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
+if [ $(echo $use_knative | tr '[:upper:]' '[:lower:]') == "y" ]; then 
     deployKnative
+fi
+
+if [ `echo $ENABLE_KUEUE | tr '[:upper:]' '[:lower:]'` == "true" ]; then
+    #echo -e "\n[*] Deploying Kueue (workload admission) ..."
+    #kubectl apply --server-side -k "github.com/kubernetes-sigs/kueue/config/default?ref=v0.15.0"
+    #kubectl -n kueue-system rollout status deployment/kueue-controller-manager --timeout=120s
+    echo -e "\n[*] Deploying Kueue (workload admission) ..."
+    helm install kueue oci://registry.k8s.io/kueue/charts/kueue \
+    --version=0.17.2 \
+    --namespace  kueue-system \
+    --create-namespace \
+    --wait --timeout 300s
 fi
 
 echo -e "\n[*] Creating namespaces ..."
@@ -857,10 +1055,10 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 #Deploy oscar using helm
 echo -e "\n[*] Deploying OSCAR ..."
 helm repo add --force-update grycap https://grycap.github.io/helm-charts/
-if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative $OSCAR_HELM_IMAGE_OVERRIDES
+if [ $(echo $use_knative | tr '[:upper:]' '[:lower:]') == "y" ]; then 
+    helm install --namespace=oscar oscar grycap/oscar $OSCAR_EXPOSURE_HELM_ARGS --set httproute.host=localhost --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative --set resourceManager.enable=true --set kueue.enable=$ENABLE_KUEUE $OSCAR_HELM_IMAGE_OVERRIDES
 else
-    helm install --namespace=oscar oscar grycap/oscar --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set ingress.create=true --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar $OSCAR_EXPOSURE_HELM_ARGS --set httproute.host=localhost --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set resourceManager.enable=true --set kueue.enable=$ENABLE_KUEUE $OSCAR_HELM_IMAGE_OVERRIDES
 fi
 
 if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
@@ -896,13 +1094,24 @@ if [ "$ENABLE_OIDC" == "true" ]; then
     fi
 fi
 
+if [ $(echo $ENABLE_KSERVE | tr '[:upper:]' '[:lower:]') == "true" ]; then
+    if [ "$GATEWAY_CONTROLLER" != "traefik" ]; then
+        echo -e "\n$RED[!]$END_COLOR KServe installer script currently targets Traefik gateway. Please use --traefik to enable KServe installation."
+        exit 1
+    fi
+    echo -e "\n[*] Installing KServe using $SCRIPT_DIR/kind-oscar-kserve.sh ..."
+    if [ ! -f "$SCRIPT_DIR/kind-oscar-kserve.sh" ]; then
+        echo -e "$RED[!]$END_COLOR KServe script not found: $SCRIPT_DIR/kind-oscar-kserve.sh"
+        exit 1
+    fi
+    if ! bash "$SCRIPT_DIR/kind-oscar-kserve.sh"; then
+        echo -e "$RED[!]$END_COLOR KServe installation failed"
+        exit 1
+    fi
+fi
+
 #Wait for OSCAR deployment
 checkOSCARDeploy
-
-if [ `echo $ENABLE_KUEUE | tr '[:upper:]' '[:lower:]'` == "true" ]; then
-    echo -e "\n[*] Deploying Kueue (workload admission) ..."
-    kubectl apply --server-side -k "github.com/kubernetes-sigs/kueue/config/default?ref=v0.15.0"
-fi
  
 echo -e "\n[*] Deployment details:"
 echo "  - Kind cluster name: $CLUSTER_NAME"
@@ -923,10 +1132,12 @@ echo "  - OSCAR HTTP port: $HOST_HTTP_PORT ($oscar_http_url)"
 echo "  - OSCAR HTTPS port: $HOST_HTTPS_PORT ($oscar_https_url)"
 echo "  - MinIO API NodePort/host port: $HOST_MINIO_API_PORT ($minio_api_url)"
 echo "  - MinIO console NodePort/host port: $HOST_MINIO_CONSOLE_PORT ($minio_console_url)"
+echo "  - Gateway controller: $GATEWAY_CONTROLLER"
+echo "  - KServe enabled: $ENABLE_KSERVE"
 echo "  - OSCAR image branch: $OSCAR_IMAGE_BRANCH"
 echo "  - OSCAR credentials: username='oscar', password='$OSCAR_PASSWORD'"
 echo "  - MinIO credentials: username='minio', password='$MINIO_PASSWORD'"
-if [ `echo $local_reg | tr '[:upper:]' '[:lower:]'` == "y" ]; then
+if [ $(echo $local_reg | tr '[:upper:]' '[:lower:]') == "y" ]; then
     echo "  - Local registry: ${reg_name} (port ${reg_port}, ${registry_status})"
 else
     echo "  - Local registry: not configured"
@@ -936,6 +1147,6 @@ echo -e "\n[$GREEN$CHECK$END_COLOR] Deployment completed successfully"
 
 rm $CONFIG_FILEPATH
 
-if [ `echo $use_knative | tr '[:upper:]' '[:lower:]'` == "y" ]; then 
+if [ $(echo $use_knative | tr '[:upper:]' '[:lower:]') == "y" ]; then 
     rm $KNATIVE_FILEPATH
 fi

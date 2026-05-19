@@ -24,9 +24,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
-	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 )
 
 // MakeListHandler godoc
@@ -91,7 +91,7 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 						return
 					}
 				}
-				c.String(http.StatusInternalServerError, "Error reading buckets from user: ", uid)
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error reading buckets from user: %s", uid))
 				return
 			}
 		}

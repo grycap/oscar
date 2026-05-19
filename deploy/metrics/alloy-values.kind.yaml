@@ -45,19 +45,13 @@ alloy:
 
         rule {
           source_labels = ["__meta_kubernetes_namespace"]
-          regex         = "ingress-nginx"
-          action        = "keep"
-        }
-
-        rule {
-          source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_component"]
-          regex         = "controller"
+          regex         = "traefik"
           action        = "keep"
         }
 
         rule {
           source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
-          regex         = "ingress-nginx"
+          regex         = "traefik"
           action        = "keep"
         }
 

@@ -25,10 +25,10 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/handlers"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
-	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	"github.com/grycap/oscar/v4/pkg/handlers"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 )
 
 var ALL_USERS_GROUP = "all_users_group"
@@ -96,8 +96,17 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", err))
 			return
 		}
-		v := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: uid})
-		if (uid == types.DefaultOwner) || (v == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucketName)) {
+
+		var bucketOwner string = ""
+		metadata, metaErr := minIOAdminClient.GetTaggedMetadata(bucketName)
+		if metaErr == nil {
+			if owner := strings.TrimSpace(metadata["owner"]); owner != "" {
+				bucketOwner = owner
+			}
+		}
+
+		if (uid == types.DefaultOwner) || (bucketOwner == uid) {
+			v := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: uid})
 			err := handlers.DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
 				BucketName: bucketName,
 				Visibility: v,

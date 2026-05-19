@@ -24,10 +24,10 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
-	"github.com/grycap/oscar/v3/pkg/backends/resources"
-	"github.com/grycap/oscar/v3/pkg/imagepuller"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/backends/resources"
+	"github.com/grycap/oscar/v4/pkg/imagepuller"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -382,6 +382,16 @@ func GetExposedServiceDeployment(kubeClientset kubernetes.Interface, namespace, 
 func ListExposedServicePods(kubeClientset kubernetes.Interface, namespace, serviceName string) (*v1.PodList, error) {
 	return kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: string(resources.KeyLabelApp) + "=" + resources.GetKeyLabelApp(serviceName),
+	})
+}
+
+func GetKserveServiceDeployment(kubeClientset kubernetes.Interface, namespace, serviceName, kserveType string) (*appsv1.Deployment, error) {
+	return kubeClientset.AppsV1().Deployments(namespace).Get(context.TODO(), utils.GetKservePodAndDplName(serviceName, kserveType), metav1.GetOptions{})
+}
+
+func ListKserveServicePods(kubeClientset kubernetes.Interface, namespace, serviceName string) (*v1.PodList, error) {
+	return kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: utils.GetKserveLabelSelector(serviceName),
 	})
 }
 
