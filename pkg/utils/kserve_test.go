@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types" // for UID
+	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	knv1 "knative.dev/serving/pkg/apis/serving/v1"
 )
@@ -283,6 +285,88 @@ func TestNewKserveInferenceServiceDefinition_InvalidMemory(t *testing.T) {
 	}
 }
 
+func TestNewKserveInferenceServiceDefinition_KueueLabels(t *testing.T) {
+	knSvc := knativeServiceWithUID("uid-kueue")
+
+	tests := []struct {
+		name      string
+		owner     string
+		labels    map[string]string
+		cfg       *oscarType.Config
+		wantQueue string
+		wantErr   string
+	}{
+		{
+			name:    "kueue disabled",
+			owner:   "user-a",
+			labels:  nil,
+			cfg:     &oscarType.Config{KueueEnable: false},
+			wantErr: "",
+		},
+		{
+			name:      "kueue enabled with queue label",
+			owner:     "user-a",
+			labels:    map[string]string{"kueue.x-k8s.io/queue-name": "team-a"},
+			cfg:       &oscarType.Config{KueueEnable: true},
+			wantQueue: "team-a",
+			wantErr:   "",
+		},
+		{
+			name:    "kueue enabled missing queue for non-default owner",
+			owner:   "user-a",
+			labels:  nil,
+			cfg:     &oscarType.Config{KueueEnable: true},
+			wantErr: "missing required label 'kueue.x-k8s.io/queue-name'",
+		},
+		{
+			name:    "kueue enabled missing queue for default owner",
+			owner:   oscarType.DefaultOwner,
+			labels:  nil,
+			cfg:     &oscarType.Config{KueueEnable: true},
+			wantErr: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := kserveService()
+			svc.Owner = tt.owner
+			svc.Labels = tt.labels
+
+			isvc, err := NewKserveInferenceServiceDefinition(svc, knSvc, tt.cfg)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			labels := getNestedMap(t, isvc, "metadata", "labels")
+			queue, hasQueue := labels["kueue.x-k8s.io/queue-name"]
+			if tt.wantQueue == "" {
+				if hasQueue {
+					t.Fatalf("did not expect queue label, got %v", queue)
+				}
+				return
+			}
+
+			if !hasQueue {
+				t.Fatalf("expected queue label %q, got none", tt.wantQueue)
+			}
+			if queue != tt.wantQueue {
+				t.Fatalf("queue label = %v, want %q", queue, tt.wantQueue)
+			}
+		})
+	}
+}
+
 func TestValidateKserveService_InvalidAPIVersion(t *testing.T) {
 	svc := kserveService()
 	svc.Kserve.APIVersion = "v3"
@@ -374,13 +458,132 @@ func TestNewKserveLLMInferenceServiceDefinition(t *testing.T) {
 	}
 }
 
-func TestNewKserveLLMInferenceServiceDefinition_InvalidModelFormat(t *testing.T) {
-	svc := kserveService()
-	knSvc := knativeServiceWithUID("uid-llm-invalid")
+func TestNewKserveLLMInferenceServiceDefinition_CustomRuntimeImage(t *testing.T) {
+	svc := llmKserveService()
+	svc.Kserve.LLMInference = &oscarType.KserveLLMInference{RuntimeImage: "ghcr.io/example/custom-runtime:v1"}
+	knSvc := knativeServiceWithUID("uid-llm-custom-runtime")
+
+	isvc, err := NewKserveLLMInferenceServiceDefinition(svc, knSvc, &oscarType.Config{
+		HTTPRouteGatewayName:      "name",
+		HTTPRouteGatewayNamespace: "namespace",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	containersAny := getRawNested(t, isvc, "spec", "template", "containers")
+	containers, ok := containersAny.([]any)
+	if !ok || len(containers) != 1 {
+		t.Fatalf("expected one container, got %T (%v)", containersAny, containersAny)
+	}
+	container, ok := containers[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected container map, got %T", containers[0])
+	}
+	if got, ok := container["image"].(string); !ok || got != "ghcr.io/example/custom-runtime:v1" {
+		t.Fatalf("container.image = %v, want %q", container["image"], "ghcr.io/example/custom-runtime:v1")
+	}
+}
+
+func TestNewKserveLLMInferenceServiceDefinition_KueueLabels(t *testing.T) {
+	knSvc := knativeServiceWithUID("uid-llm-kueue")
+
+	tests := []struct {
+		name      string
+		owner     string
+		labels    map[string]string
+		cfg       *oscarType.Config
+		wantQueue string
+		wantErr   string
+	}{
+		{
+			name:  "kueue enabled with queue label",
+			owner: "user-a",
+			labels: map[string]string{
+				"kueue.x-k8s.io/queue-name": "team-llm",
+			},
+			cfg: &oscarType.Config{
+				KueueEnable:               true,
+				HTTPRouteGatewayName:      "name",
+				HTTPRouteGatewayNamespace: "namespace",
+			},
+			wantQueue: "team-llm",
+			wantErr:   "",
+		},
+		{
+			name:   "kueue enabled missing queue for non-default owner",
+			owner:  "user-a",
+			labels: nil,
+			cfg: &oscarType.Config{
+				KueueEnable:               true,
+				HTTPRouteGatewayName:      "name",
+				HTTPRouteGatewayNamespace: "namespace",
+			},
+			wantErr: "missing required label 'kueue.x-k8s.io/queue-name'",
+		},
+		{
+			name:   "kueue enabled missing queue for default owner",
+			owner:  oscarType.DefaultOwner,
+			labels: nil,
+			cfg: &oscarType.Config{
+				KueueEnable:               true,
+				HTTPRouteGatewayName:      "name",
+				HTTPRouteGatewayNamespace: "namespace",
+			},
+			wantErr: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := llmKserveService()
+			svc.Owner = tt.owner
+			svc.Labels = tt.labels
+
+			isvc, err := NewKserveLLMInferenceServiceDefinition(svc, knSvc, tt.cfg)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			labels := getNestedMap(t, isvc, "spec", "labels")
+			queue, hasQueue := labels["kueue.x-k8s.io/queue-name"]
+			if tt.wantQueue == "" {
+				if hasQueue {
+					t.Fatalf("did not expect queue label, got %v", queue)
+				}
+				return
+			}
+
+			if !hasQueue {
+				t.Fatalf("expected queue label %q, got none", tt.wantQueue)
+			}
+			if queue != tt.wantQueue {
+				t.Fatalf("queue label = %v, want %q", queue, tt.wantQueue)
+			}
+		})
+	}
+}
+
+func TestNewKserveLLMInferenceServiceDefinition_MissingGatewayConfig(t *testing.T) {
+	svc := llmKserveService()
+	knSvc := knativeServiceWithUID("uid-llm-missing-gateway")
 
 	_, err := NewKserveLLMInferenceServiceDefinition(svc, knSvc, &oscarType.Config{})
 	if err == nil {
-		t.Fatal("expected error when ModelFormat is not llm, got nil")
+		t.Fatal("expected error when gateway configuration is missing, got nil")
+	}
+	if !strings.Contains(err.Error(), "gateway namespace and name must be provided") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -484,7 +687,165 @@ func TestUpdateKserveInferenceServiceDefinition_InvalidCPU(t *testing.T) {
 	}
 }
 
+func TestUpdateKserveInferenceServiceDefinition_DefaultProtocolVersionWhenMissing(t *testing.T) {
+	svc := kserveService()
+	svc.Kserve.APIVersion = ""
+
+	oldIsvc := &unstructured.Unstructured{Object: map[string]any{
+		"spec": map[string]any{
+			"predictor": map[string]any{
+				"model": map[string]any{},
+			},
+		},
+	}}
+
+	updated, err := UpdateKserveInferenceServiceDefinition(svc, oldIsvc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := getNestedString(t, updated, "spec", "predictor", "model", "protocolVersion"); got != "v1" {
+		t.Fatalf("protocolVersion = %q, want %q", got, "v1")
+	}
+}
+
+func TestUpdateKserveInferenceServiceDefinition_PreservesPredictorLabels(t *testing.T) {
+	knSvc := knativeServiceWithUID("uid-update-labels")
+	oldIsvc, err := NewKserveInferenceServiceDefinition(kserveService(), knSvc, &oscarType.Config{})
+	if err != nil {
+		t.Fatalf("setup error: %v", err)
+	}
+
+	predictorAny := getRawNested(t, oldIsvc, "spec", "predictor")
+	predictor, ok := predictorAny.(map[string]any)
+	if !ok {
+		t.Fatalf("expected predictor map, got %T", predictorAny)
+	}
+	predictor["labels"] = map[string]any{"preserve": "yes"}
+
+	updated, err := UpdateKserveInferenceServiceDefinition(kserveService(), oldIsvc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	labels := getNestedMap(t, updated, "spec", "predictor", "labels")
+	if labels["preserve"] != "yes" {
+		t.Fatalf("labels.preserve = %v, want %q", labels["preserve"], "yes")
+	}
+}
+
 // ─── ValidateKserveService ───────────────────────────────────────────────────
+
+func TestValidateKserveService_DecisionPaths(t *testing.T) {
+	tests := []struct {
+		name    string
+		build   func() *oscarType.Service
+		wantErr string
+	}{
+		{
+			name: "missing kserve config",
+			build: func() *oscarType.Service {
+				return &oscarType.Service{Name: "bare"}
+			},
+			wantErr: "service does not have KServe configuration",
+		},
+		{
+			name: "missing kserve type",
+			build: func() *oscarType.Service {
+				svc := kserveService()
+				svc.Kserve.Type = ""
+				return svc
+			},
+			wantErr: "missing KServe service type",
+		},
+		{
+			name: "missing storage uri",
+			build: func() *oscarType.Service {
+				svc := kserveService()
+				svc.Kserve.StorageUri = ""
+				return svc
+			},
+			wantErr: "missing model storage URI",
+		},
+		{
+			name: "inference type missing inference block",
+			build: func() *oscarType.Service {
+				svc := kserveService()
+				svc.Kserve.Inference = nil
+				return svc
+			},
+			wantErr: "missing Inference configuration",
+		},
+		{
+			name: "inference type missing model format",
+			build: func() *oscarType.Service {
+				svc := kserveService()
+				svc.Kserve.Inference.ModelFormat = ""
+				return svc
+			},
+			wantErr: "missing model format",
+		},
+		{
+			name: "inference type with llm inference block",
+			build: func() *oscarType.Service {
+				svc := kserveService()
+				svc.Kserve.LLMInference = &oscarType.KserveLLMInference{RuntimeImage: "x"}
+				return svc
+			},
+			wantErr: "LLMInference configuration should be nil",
+		},
+		{
+			name: "llm inference type with inference block",
+			build: func() *oscarType.Service {
+				svc := llmKserveService()
+				svc.Kserve.Inference = &oscarType.KserveInference{ModelFormat: "sklearn"}
+				return svc
+			},
+			wantErr: "Inference configuration should be nil",
+		},
+		{
+			name: "invalid api version",
+			build: func() *oscarType.Service {
+				svc := kserveService()
+				svc.Kserve.APIVersion = "v3"
+				return svc
+			},
+			wantErr: "invalid APIVersion",
+		},
+		{
+			name: "valid inference service",
+			build: func() *oscarType.Service {
+				return kserveService()
+			},
+			wantErr: "",
+		},
+		{
+			name: "valid llm service",
+			build: func() *oscarType.Service {
+				return llmKserveService()
+			},
+			wantErr: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateKserveService(tt.build())
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
 
 func TestValidateKserveService_Valid(t *testing.T) {
 	svc := kserveService()
@@ -577,6 +938,40 @@ func TestKserveNamingHelpers(t *testing.T) {
 	}
 }
 
+func TestBuildKserveName(t *testing.T) {
+	if got := buildKserveName("demo-service"); got != "demo-service" {
+		t.Fatalf("buildKserveName() = %q, want %q", got, "demo-service")
+	}
+}
+
+func TestGetOwnerReference(t *testing.T) {
+	knSvc := knativeServiceWithUID("uid-owner")
+	refs := getOwnerReference(knSvc)
+	if len(refs) != 1 {
+		t.Fatalf("expected exactly one owner reference, got %d", len(refs))
+	}
+
+	ref := refs[0]
+	if ref.APIVersion != "serving.knative.dev/v1" {
+		t.Fatalf("APIVersion = %q, want %q", ref.APIVersion, "serving.knative.dev/v1")
+	}
+	if ref.Kind != "Service" {
+		t.Fatalf("Kind = %q, want %q", ref.Kind, "Service")
+	}
+	if ref.Name != knSvc.Name {
+		t.Fatalf("Name = %q, want %q", ref.Name, knSvc.Name)
+	}
+	if ref.UID != knSvc.UID {
+		t.Fatalf("UID = %q, want %q", ref.UID, knSvc.UID)
+	}
+	if ref.Controller == nil || *ref.Controller {
+		t.Fatalf("Controller = %v, want false", ref.Controller)
+	}
+	if ref.BlockOwnerDeletion == nil || !*ref.BlockOwnerDeletion {
+		t.Fatalf("BlockOwnerDeletion = %v, want true", ref.BlockOwnerDeletion)
+	}
+}
+
 func TestNormalizeScaleFromKserveService(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -589,6 +984,7 @@ func TestNormalizeScaleFromKserveService(t *testing.T) {
 		{name: "max respected", input: &oscarType.Kserve{MaxScale: 5}, wantMin: 0, wantMax: 5},
 		{name: "min greater than max", input: &oscarType.Kserve{MinScale: 4, MaxScale: 2}, wantMin: 4, wantMax: 4},
 		{name: "both set", input: &oscarType.Kserve{MinScale: 1, MaxScale: 3}, wantMin: 1, wantMax: 3},
+		{name: "llm min forced to one", input: &oscarType.Kserve{Type: KserveTypeLLMInferenceService}, wantMin: 1, wantMax: 1},
 	}
 
 	for _, tt := range tests {
@@ -720,6 +1116,21 @@ func TestCheckKserveUpdate(t *testing.T) {
 			name: "cannot change auth",
 			mutate: func(oldSvc, newSvc *oscarType.Service) {
 				newSvc.Kserve.SetAuth = true
+			},
+			wantErr: true,
+		},
+		{
+			name: "cannot change runtime",
+			mutate: func(oldSvc, newSvc *oscarType.Service) {
+				oldSvc.Kserve.Inference.Runtime = "kserve-runtime-a"
+				newSvc.Kserve.Inference.Runtime = "kserve-runtime-b"
+			},
+			wantErr: true,
+		},
+		{
+			name: "cannot change kserve type",
+			mutate: func(oldSvc, newSvc *oscarType.Service) {
+				newSvc.Kserve.Type = KserveTypeLLMInferenceService
 			},
 			wantErr: true,
 		},
@@ -989,6 +1400,23 @@ func setDynamicClientFactoryForTest(t *testing.T, factory dynamicClientFactory) 
 	t.Cleanup(func() {
 		newDynamicClient = original
 	})
+}
+
+func TestExistsKserveHTTPRouteByServiceName_DynamicClientError(t *testing.T) {
+	setDynamicClientFactoryForTest(t, func() (*dynamic.DynamicClient, error) {
+		return nil, errors.New("dynamic client failure")
+	})
+
+	exists, err := existsKserveHTTPRouteByServiceName("svc", "ns")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if exists {
+		t.Fatal("exists should be false when dynamic client creation fails")
+	}
+	if !strings.Contains(err.Error(), "failed to create dynamic client") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func newHTTPRouteForTest(name, namespace, path string) *unstructured.Unstructured {
