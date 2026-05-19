@@ -11,6 +11,7 @@ import (
 	"github.com/grycap/oscar/v4/pkg/backends"
 	"github.com/grycap/oscar/v4/pkg/testsupport"
 	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 )
 
