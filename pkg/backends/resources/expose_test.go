@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 type kueueMock struct {
@@ -135,6 +136,18 @@ func useFakeGatewayClient(t *testing.T) {
 	t.Helper()
 
 	client := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+
+	gatewayClientsetProvider = func() (dynamic.Interface, error) {
+		return client, nil
+	}
+
+	t.Cleanup(func() {
+		gatewayClientsetProvider = getGatewayClientset
+	})
+}
+
+func useGatewayClient(t *testing.T, client dynamic.Interface) {
+	t.Helper()
 
 	gatewayClientsetProvider = func() (dynamic.Interface, error) {
 		return client, nil
@@ -775,6 +788,77 @@ func TestGetTraefikCORSMiddlewareSpec(t *testing.T) {
 	}
 	if len(headers) != 2 || headers[0] != "Authorization" || headers[1] != "Content-Type" {
 		t.Fatalf("unexpected headers list: %v", headers)
+	}
+}
+
+func TestUpdateTraefikCORSMiddlewareSetsResourceVersion(t *testing.T) {
+	cfg := newTestConfig()
+	svc := newExposeService("cors-update-rv", 0, false)
+	namespace := cfg.ServicesNamespace
+
+	existing := getTraefikCORSMiddlewareSpec(svc, namespace, cfg)
+	existing.SetResourceVersion("42")
+
+	gatewayClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), existing)
+	gatewayClient.PrependReactor("update", "middlewares", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		updateAction, ok := action.(k8stesting.UpdateAction)
+		if !ok {
+			t.Fatalf("expected update action, got %T", action)
+		}
+
+		updatedObj, ok := updateAction.GetObject().(*unstructured.Unstructured)
+		if !ok {
+			t.Fatalf("expected unstructured object on update, got %T", updateAction.GetObject())
+		}
+
+		if updatedObj.GetResourceVersion() != "42" {
+			t.Fatalf("expected resourceVersion 42 on middleware update, got %q", updatedObj.GetResourceVersion())
+		}
+
+		return false, nil, nil
+	})
+
+	useGatewayClient(t, gatewayClient)
+
+	if err := updateTraefikCORSMiddleware(svc, namespace, cfg); err != nil {
+		t.Fatalf("updateTraefikCORSMiddleware returned error: %v", err)
+	}
+}
+
+func TestUpdateHTTPRouteSetsResourceVersion(t *testing.T) {
+	cfg := newTestConfig()
+	cfg.ExposedServicesRouteKind = routeKindHTTPRoute
+	cfg.HTTPRouteGatewayName = "public-gateway"
+
+	svc := newExposeService("httproute-update-rv", 0, false)
+	namespace := cfg.ServicesNamespace
+
+	existingRoute := getHTTPRouteSpec(svc, namespace, cfg)
+	existingRoute.SetResourceVersion("99")
+
+	gatewayClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), existingRoute)
+	gatewayClient.PrependReactor("update", "httproutes", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		updateAction, ok := action.(k8stesting.UpdateAction)
+		if !ok {
+			t.Fatalf("expected update action, got %T", action)
+		}
+
+		updatedObj, ok := updateAction.GetObject().(*unstructured.Unstructured)
+		if !ok {
+			t.Fatalf("expected unstructured object on update, got %T", updateAction.GetObject())
+		}
+
+		if updatedObj.GetResourceVersion() != "99" {
+			t.Fatalf("expected resourceVersion 99 on httproute update, got %q", updatedObj.GetResourceVersion())
+		}
+
+		return false, nil, nil
+	})
+
+	useGatewayClient(t, gatewayClient)
+
+	if err := updateHTTPRoute(svc, namespace, fake.NewSimpleClientset(), cfg); err != nil {
+		t.Fatalf("updateHTTPRoute returned error: %v", err)
 	}
 }
 
