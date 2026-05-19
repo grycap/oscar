@@ -795,6 +795,12 @@ func updateHTTPRoute(service types.Service, namespace string, kubeClientset kube
 	}
 
 	httpRoute := getHTTPRouteSpec(service, namespace, cfg)
+	currentHTTPRoute, err := gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Get(context.TODO(), httpRoute.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	httpRoute.SetResourceVersion(currentHTTPRoute.GetResourceVersion())
+
 	_, err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Update(context.TODO(), httpRoute, metav1.UpdateOptions{})
 	return err
 }
@@ -1029,6 +1035,12 @@ func updateTraefikCORSMiddleware(service types.Service, namespace string, cfg *t
 	}
 
 	middleware := getTraefikCORSMiddlewareSpec(service, namespace, cfg)
+	currentMiddleware, err := gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Get(context.TODO(), middleware.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	middleware.SetResourceVersion(currentMiddleware.GetResourceVersion())
+
 	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Update(context.TODO(), middleware, metav1.UpdateOptions{})
 	return err
 }
@@ -1059,6 +1071,12 @@ func updateTraefikAuthMiddleware(service types.Service, namespace string) error 
 	}
 
 	middleware := getTraefikAuthMiddlewareSpec(service, namespace)
+	currentMiddleware, err := gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Get(context.TODO(), middleware.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	middleware.SetResourceVersion(currentMiddleware.GetResourceVersion())
+
 	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Update(context.TODO(), middleware, metav1.UpdateOptions{})
 	return err
 }
