@@ -255,7 +255,14 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		namespace = kn.config.ServicesNamespace
 	}
 	var isKserve bool = isKserveServiceAndSupported(&service, kn)
-	
+	var oldService *types.Service
+
+	if isKserve {
+		if err := utils.ValidateKserveService(&service); err != nil {
+			return err
+		}
+	}
+
 	// Check if there is some user defined settings for OSCAR
 	if err := checkAdditionalConfig(ConfigMapNameOSCAR, kn.config.ServicesNamespace, service, kn.config, kn.kubeClientset); err != nil {
 		return err
@@ -268,16 +275,18 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	}
 
 	if isKserve {
-		if err := utils.ValidateKserveService(&service); err != nil {
-			return err
-		}
-		oldService, err := getServiceFromConfigMap(oldCm)
+		oldService, err = getServiceFromConfigMap(oldCm)
 		if err != nil {
 			return err
 		}
 		if err := utils.CheckKserveUpdate(oldService, &service); err != nil {
 			return err
 		}
+	}
+
+	// Update the configMap with FDL and user-script
+	if err := updateServiceConfigMap(&service, namespace, kn.kubeClientset); err != nil {
+		return err
 	}
 
 	// If the service is exposed update its configuration
@@ -292,75 +301,63 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 			return err
 		}
 	} else {
-	// Get the old knative service
-	oldSvc, err := kn.knClientset.ServingV1().Services(namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	// Preserve the original Knative Service state so it can be restored on KServe errors
-	originalKnSvc := oldSvc.DeepCopy()
-
-	// Update the configMap with FDL and user-script
-	if err := updateServiceConfigMap(&service, namespace, kn.kubeClientset); err != nil {
-		return err
-	}
-
-	// Create the Knative service definition
-	knSvc, err := kn.createKNServiceDefinition(&service, namespace)
-	if err != nil {
-		// Restore the old configMap
-		_, resErr := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
-		if resErr != nil {
-			log.Println(resErr.Error())
+		// Get the old knative service
+		oldSvc, err := kn.knClientset.ServingV1().Services(namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
 		}
-		return err
-	}
+		// Preserve the original Knative Service state so it can be restored on KServe errors
+		originalKnSvc := oldSvc.DeepCopy()
 
-	// Set the new service's values on the old Knative service to avoid update issues
-	oldSvc.ObjectMeta.Labels = knSvc.ObjectMeta.Labels
-	oldSvc.Spec = knSvc.Spec
-	// Update the annotations
-	for k, v := range knSvc.ObjectMeta.Annotations {
-		oldSvc.ObjectMeta.Annotations[k] = v
-	}
-
-	// Update the Knative service
-	_, err = kn.knClientset.ServingV1().Services(namespace).Update(context.TODO(), oldSvc, metav1.UpdateOptions{})
-	if err != nil {
-		// Restore the old configMap
-		_, resErr := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
-		if resErr != nil {
-			log.Println(resErr.Error())
-		}
-		return err
-	}
-
-	// If the service is a KServe service, update the associated InferenceService
-	if isKserve {
-		if oldService == nil {
-			return fmt.Errorf("the service \"%s\" is a KServe service but the old service definition could not be retrieved", service.Name)
-		}
-		// The Kserve service set an OwnerReference to the Knative service, so if the Knative service is deleted the KServe InferenceService will be automatically deleted by Kubernetes garbage collection
-		updateErr := utils.UpdateKserveService(&service, oldService, namespace)
-		if updateErr != nil {
-			log.Printf("Error updating asociated KServe InferenceService: %v", updateErr)
-			// Restore the old Knative Service
-			if _, resErr := kn.knClientset.ServingV1().Services(namespace).Update(context.TODO(), originalKnSvc, metav1.UpdateOptions{}); resErr != nil {
-				log.Println(resErr.Error())
-			}
-			// Restore the old configMap
-			if _, resErr := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{}); resErr != nil {
-				log.Println(resErr.Error())
-			}
-			return updateErr
-		}
-	}= nil {
+		// Create the Knative service definition
+		knSvc, err := kn.createKNServiceDefinition(&service, namespace)
+		if err != nil {
 			// Restore the old configMap
 			_, resErr := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
 			if resErr != nil {
 				log.Println(resErr.Error())
 			}
 			return err
+		}
+
+		// Set the new service's values on the old Knative service to avoid update issues
+		oldSvc.ObjectMeta.Labels = knSvc.ObjectMeta.Labels
+		oldSvc.Spec = knSvc.Spec
+		// Update the annotations
+		for k, v := range knSvc.ObjectMeta.Annotations {
+			oldSvc.ObjectMeta.Annotations[k] = v
+		}
+
+		// Update the Knative service
+		_, err = kn.knClientset.ServingV1().Services(namespace).Update(context.TODO(), oldSvc, metav1.UpdateOptions{})
+		if err != nil {
+			// Restore the old configMap
+			_, resErr := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})
+			if resErr != nil {
+				log.Println(resErr.Error())
+			}
+			return err
+		}
+
+		// If the service is a KServe service, update the associated InferenceService
+		if isKserve {
+			if oldService == nil {
+				return fmt.Errorf("the service \"%s\" is a KServe service but the old service definition could not be retrieved", service.Name)
+			}
+			// The Kserve service set an OwnerReference to the Knative service, so if the Knative service is deleted the KServe InferenceService will be automatically deleted by Kubernetes garbage collection
+			updateErr := utils.UpdateKserveService(&service, oldService, namespace)
+			if updateErr != nil {
+				log.Printf("Error updating asociated KServe InferenceService: %v", updateErr)
+				// Restore the old Knative Service
+				if _, resErr := kn.knClientset.ServingV1().Services(namespace).Update(context.TODO(), originalKnSvc, metav1.UpdateOptions{}); resErr != nil {
+					log.Println(resErr.Error())
+				}
+				// Restore the old configMap
+				if _, resErr := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{}); resErr != nil {
+					log.Println(resErr.Error())
+				}
+				return updateErr
+			}
 		}
 	}
 	//Create deaemonset to cache the service image on all the nodes
