@@ -31,14 +31,20 @@ const (
 
 const (
 	//	defaultAuthMiddlewareName = "oidc-auth"
-	httpRouteSuffix      = "-route"
-	authMiddlewareSuffix = "-auth-mdw"
-	authSecretSuffix     = "-auth-traefik" // #nosec G101
-	corsMiddlewareSuffix = "-cors-mdw"
-	defaultLLMCPUimage   = "vllm/vllm-openai-cpu:latest"
-	defaultLLMGPUimage   = "vllm/vllm-openai:latest"
-	kserveKeyLabelApp    = "oscar-app"
-	prefixLabelApp       = "oscar-svc-ksv-"
+	httpRouteSuffix               = "-route"
+	authMiddlewareSuffix          = "-auth-mdw"
+	authSecretSuffix              = "-auth-traefik" // #nosec G101
+	corsMiddlewareSuffix          = "-cors-mdw"
+	defaultLLMCPUimage            = "vllm/vllm-openai-cpu:latest"
+	defaultLLMGPUimage            = "vllm/vllm-openai:latest"
+	kserveKeyLabelApp             = "oscar-app"
+	prefixLabelApp                = "oscar-svc-ksv-"
+	kserveIsvcSuffix              = "-predictor"
+	kserveIsvcPodDplSuffix        = "-predictor"
+	kserveLLMIsvcSuffix           = "-kserve-workload-svc"
+	kserveLLMIsvcPodDplSuffix     = "-kserve"
+	KserveTypeInferenceService    = "inference"
+	KserveTypeLLMInferenceService = "llm_inference"
 )
 
 var (
@@ -47,18 +53,6 @@ var (
 	kserveHTTPRouteGVR         = schema.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "httproutes"}
 	kserveTraefikMiddlewareGVR = schema.GroupVersionResource{Group: "traefik.io", Version: "v1alpha1", Resource: "middlewares"}
 	kserveSecretGVR            = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
-	// Mapping of supported model formats to their corresponding KServe runtime types and frameworks
-	kserveTypeByFormat = map[string]kserveRuntime{
-		"onnx":        {kserveType: "predictor", framework: "triton", protocolV1: false, protocolV2: true},
-		"sklearn":     {kserveType: "predictor", framework: "mlserver", protocolV1: true, protocolV2: true},
-		"xgboost":     {kserveType: "predictor", framework: "mlserver", protocolV1: true, protocolV2: true},
-		"pytorch":     {kserveType: "predictor", framework: "mlserver", protocolV1: true, protocolV2: true},
-		"tensorflow":  {kserveType: "predictor", framework: "mlserver", protocolV1: true, protocolV2: true},
-		"triton":      {kserveType: "predictor", framework: "triton", protocolV1: true, protocolV2: true},
-		"huggingface": {kserveType: "predictor", framework: "vllm", protocolV1: true, protocolV2: false},
-		"llm":         {kserveType: "llm", framework: "vllm", protocolV1: true, protocolV2: false},
-	}
-
 	defaultKserveCpuRequest    = resource.MustParse("0.2")
 	defaultKserveMemoryRequest = resource.MustParse("256Mi")
 )
@@ -75,18 +69,14 @@ var newDynamicClient dynamicClientFactory = func() (*dynamic.DynamicClient, erro
 
 var kserveLogger = log.New(os.Stdout, "[KSERVE-SERVICE] ", log.Flags())
 
-type kserveRuntime struct {
-	kserveType string
-	framework  string
-	protocolV1 bool
-	protocolV2 bool
-}
-
 func IsKserveService(service *types.Service) bool {
 	// If the service has KServe configuration
-	if service.Kserve == nil || (service.Kserve.ModelFormat == "" || service.Kserve.StorageUri == "") {
+	if service.Kserve == nil /* || service.Kserve.StorageUri == "" || service.Kserve.Type == ""*/ {
 		return false
 	}
+	/*if service.Kserve.Type == KserveTypeInferenceService && (service.Kserve.Inference == nil || service.Kserve.Inference.ModelFormat == "") {
+		return false
+	}*/
 	return true
 }
 
@@ -99,11 +89,35 @@ func ValidateKserveService(service *types.Service) error {
 	if !IsKserveService(service) {
 		return fmt.Errorf("service does not have KServe configuration")
 	}
-	if !validModelFormat(service) {
-		return fmt.Errorf("invalid ModelFormat: %s", service.Kserve.ModelFormat)
+
+	if service.Kserve.Type == "" {
+		return fmt.Errorf("missing KServe service type %s | %s", KserveTypeInferenceService, KserveTypeLLMInferenceService)
 	}
-	if service.Kserve.APIVersion != "" && service.Kserve.APIVersion != protocolVersion(service) {
-		return fmt.Errorf("invalid APIVersion: %s for ModelFormat: %s", service.Kserve.APIVersion, service.Kserve.ModelFormat)
+
+	if service.Kserve.StorageUri == "" {
+		return fmt.Errorf("missing model storage URI in KServe configuration")
+	}
+
+	if service.Kserve.Type == KserveTypeInferenceService {
+		if service.Kserve.Inference == nil {
+			return fmt.Errorf("missing Inference configuration for KServe service")
+		}
+		if service.Kserve.Inference.ModelFormat == "" {
+			return fmt.Errorf("missing model format in KServe configuration")
+		}
+		if service.Kserve.LLMInference != nil {
+			return fmt.Errorf("LLMInference configuration should be nil for Inference type")
+		}
+	}
+
+	if service.Kserve.Type == KserveTypeLLMInferenceService {
+		if service.Kserve.Inference != nil {
+			return fmt.Errorf("Inference configuration should be nil for LLMInference type")
+		}
+	}
+
+	if service.Kserve.APIVersion != "" && !(service.Kserve.APIVersion == "v1" || service.Kserve.APIVersion == "v2") {
+		return fmt.Errorf("invalid APIVersion: %s", service.Kserve.APIVersion)
 	}
 	return nil
 }
@@ -128,7 +142,7 @@ func CreateKserveService(service *types.Service, knativeService *knv1.Service, c
 	}
 	//kserveLogger.Printf("Creating KServe service '%s' for user '%s' with model format %s", service.Name, service.Owner, service.Kserve.ModelFormat)
 
-	if getKserveType(service.Kserve.ModelFormat) == "llm" {
+	if service.Kserve.Type == KserveTypeLLMInferenceService {
 		// For LLM services, we use a different InferenceService definition (LLMInferenceService)
 		llmIsvc, err := NewKserveLLMInferenceServiceDefinition(service, knativeService, cfg)
 		if err != nil {
@@ -176,7 +190,7 @@ func UpdateKserveService(service *types.Service, oldService *types.Service, name
 		return fmt.Errorf("failed to create dynamic client: %v", err)
 	}
 
-	if getKserveType(service.Kserve.ModelFormat) == "llm" {
+	if service.Kserve.Type == KserveTypeLLMInferenceService {
 		// For LLM services, we use a different InferenceService definition (LLMInferenceService)
 		// Get existing object to preserve resourceVersion
 		oldLLMIsvc, err := dynClient.Resource(llmInferenceServiceGVR).Namespace(namespace).Get(context.Background(), buildKserveName(service.Name), metav1.GetOptions{})
@@ -226,10 +240,19 @@ func NewKserveInferenceServiceDefinition(service *types.Service, knSvc *knv1.Ser
 		return nil, err
 	}
 
+	apiVersion := "v1"
+	if service.Kserve.APIVersion != "" {
+		apiVersion = service.Kserve.APIVersion
+	}
+
 	modelSpec := map[string]any{
-		"modelFormat":     map[string]any{"name": service.Kserve.ModelFormat},
+		"modelFormat":     map[string]any{"name": service.Kserve.Inference.ModelFormat},
 		"storageUri":      service.Kserve.StorageUri,
-		"protocolVersion": protocolVersion(service),
+		"protocolVersion": apiVersion,
+	}
+
+	if service.Kserve.Inference.Runtime != "" {
+		modelSpec["runtime"] = service.Kserve.Inference.Runtime
 	}
 	// TO DO: consider if we want to inject root path for LLM services as well, and if so, how to handle the case when the framework is vllm that expects the prefix to be preserved for routing
 	//injectRootPath(service)
@@ -286,11 +309,25 @@ func UpdateKserveInferenceServiceDefinition(service *types.Service, oldIsvc *uns
 		return nil, err
 	}
 
-	modelSpec := map[string]any{
-		"modelFormat":     map[string]any{"name": service.Kserve.ModelFormat},
-		"storageUri":      service.Kserve.StorageUri,
-		"protocolVersion": protocolVersion(service),
+	apiVersion := service.Kserve.APIVersion
+	if apiVersion == "" {
+		oldApiVersion, ok := oldIsvc.Object["spec"].(map[string]any)["predictor"].(map[string]any)["model"].(map[string]any)["protocolVersion"]
+		if !ok {
+			apiVersion = "v1"
+		} else {
+			apiVersion = oldApiVersion.(string)
+		}
 	}
+
+	modelSpec := map[string]any{
+		"modelFormat":     map[string]any{"name": service.Kserve.Inference.ModelFormat},
+		"storageUri":      service.Kserve.StorageUri,
+		"protocolVersion": apiVersion,
+	}
+	if service.Kserve.Inference.Runtime != "" {
+		modelSpec["runtime"] = service.Kserve.Inference.Runtime
+	}
+
 	modelSpec["resources"] = resources
 	modelSpec["args"] = service.Kserve.Args
 	modelSpec["env"] = types.ConvertEnvVars(service.Kserve.Env)
@@ -342,24 +379,15 @@ func NewKserveLLMInferenceServiceDefinition(service *types.Service, knSvc *knv1.
 	if err := ValidateKserveService(service); err != nil {
 		return nil, err
 	}
-	if service.Kserve.ModelFormat != "llm" {
-		return nil, fmt.Errorf("invalid ModelFormat for LLMInferenceService: %s", service.Kserve.ModelFormat)
-	}
 
 	runtimeImage := defaultLLMCPUimage
 	if service.Kserve.EnableGPU {
 		runtimeImage = defaultLLMGPUimage
 	}
-
-	modelName := service.Name
-	if service.Kserve.LLM != nil {
-		if service.Kserve.LLM.ModelName != "" {
-			modelName = service.Kserve.LLM.ModelName
-		}
-		if service.Kserve.LLM.RuntimeImage != "" {
-			runtimeImage = service.Kserve.LLM.RuntimeImage
-		}
+	if service.Kserve.LLMInference != nil && service.Kserve.LLMInference.RuntimeImage != "" {
+		runtimeImage = service.Kserve.LLMInference.RuntimeImage
 	}
+
 	// TO DO: consider if we want to inject root path for LLM services as well, and if so, how to handle the case when the framework is vllm that expects the prefix to be preserved for routing
 	//injectRootPath(service)
 
@@ -411,7 +439,7 @@ func NewKserveLLMInferenceServiceDefinition(service *types.Service, knSvc *knv1.
 		"spec": map[string]any{
 			"model": map[string]any{
 				"uri":  service.Kserve.StorageUri,
-				"name": modelName,
+				"name": service.Name,
 			},
 			"replicas": minScale,
 			"labels":   labels,
@@ -434,15 +462,8 @@ func UpdateKserveLLMInferenceServiceDefinition(service *types.Service, oldLLMIsv
 	if service.Kserve.EnableGPU {
 		runtimeImage = defaultLLMGPUimage
 	}
-
-	modelName := service.Name
-	if service.Kserve.LLM != nil {
-		if service.Kserve.LLM.ModelName != "" {
-			modelName = service.Kserve.LLM.ModelName
-		}
-		if service.Kserve.LLM.RuntimeImage != "" {
-			runtimeImage = service.Kserve.LLM.RuntimeImage
-		}
+	if service.Kserve.LLMInference != nil && service.Kserve.LLMInference.RuntimeImage != "" {
+		runtimeImage = service.Kserve.LLMInference.RuntimeImage
 	}
 
 	container := map[string]any{
@@ -470,7 +491,7 @@ func UpdateKserveLLMInferenceServiceDefinition(service *types.Service, oldLLMIsv
 	oldLLMIsvc.Object["spec"] = map[string]any{
 		"model": map[string]any{
 			"uri":  service.Kserve.StorageUri,
-			"name": modelName,
+			"name": service.Name,
 		},
 		"replicas": minScale,
 		"labels":   labels,
@@ -485,71 +506,33 @@ func GetKserveLabelSelector(serviceName string) string {
 	return fmt.Sprintf("%s=%s", kserveKeyLabelApp, prefixLabelApp+serviceName)
 }
 
-func GetKserveSvcName(serviceName, kserveModelFormat string) string {
+func GetKserveSvcName(serviceName, kserveType string) string {
 	if serviceName == "" {
 		return ""
 	}
 
-	switch getKserveType(kserveModelFormat) {
-	case "predictor":
-		return serviceName + "-predictor"
-	case "llm":
-		return serviceName + "-kserve-workload-svc"
+	switch kserveType {
+	case KserveTypeInferenceService:
+		return serviceName + kserveIsvcSuffix
+	case KserveTypeLLMInferenceService:
+		return serviceName + kserveLLMIsvcSuffix
 	default:
 		return ""
 	}
 }
 
-func GetKservePodAndDplName(serviceName, kserveModelFormat string) string {
+func GetKservePodAndDplName(serviceName, kserveType string) string {
 	if serviceName == "" {
 		return ""
 	}
 
-	switch getKserveType(kserveModelFormat) {
-	case "predictor":
-		return serviceName + "-predictor"
-	case "llm":
-		return serviceName + "-kserve"
+	switch kserveType {
+	case KserveTypeInferenceService:
+		return serviceName + kserveIsvcPodDplSuffix
+	case KserveTypeLLMInferenceService:
+		return serviceName + kserveLLMIsvcPodDplSuffix
 	default:
 		return ""
-	}
-}
-
-func getKserveType(kserveModelFormat string) string {
-	modelFormat := strings.ToLower(strings.TrimSpace(kserveModelFormat))
-	if modelFormat == "" {
-		return ""
-	}
-
-	if kserveType, ok := kserveTypeByFormat[modelFormat]; ok {
-		return kserveType.kserveType
-	}
-
-	return ""
-}
-
-func getKserveFramework(kserveModelFormat string) string {
-	modelFormat := strings.ToLower(strings.TrimSpace(kserveModelFormat))
-	if modelFormat == "" {
-		return ""
-	}
-
-	if kserveType, ok := kserveTypeByFormat[modelFormat]; ok {
-		return kserveType.framework
-	}
-
-	return ""
-}
-
-func validModelFormat(service *types.Service) bool {
-	KserveDef := service.Kserve
-	switch getKserveType(KserveDef.ModelFormat) {
-	case "predictor":
-		return true
-	case "llm": // TO DO: add more validation for LLM services
-		return true
-	default:
-		return false
 	}
 }
 
@@ -563,7 +546,7 @@ func exposeKserveInferenceService(service *types.Service, knSvc *knv1.Service, c
 		if err = createTraefikAuthMiddleware(gatewayClientset, service, knSvc); err != nil {
 			return fmt.Errorf("failed to create OIDC middleware: %v", err)
 		}
-		// Create OIDC forwardAuth Traefik Middleware
+		// TO DO: Create OIDC forwardAuth Traefik Middleware
 		/*
 			if err = createTraefikOIDCMiddleware(gatewayClientset, service, knSvc, cfg); err != nil {
 				return fmt.Errorf("failed to create OIDC middleware: %v", err)
@@ -594,22 +577,28 @@ func CheckKserveUpdate(oldService *types.Service, newService *types.Service) err
 	// it's a not allowed change in KServe configuration
 	if oldKserve == nil || newKserve == nil {
 		return fmt.Errorf("cannot add or remove KServe configuration")
-
-	}
-	// ModelFormat is the only field we allow to be set at creation
-	// and not changed afterwards, so if it changes we return false
-	// We also check StorageUri and SetAuth because changing them would require changes to the InferenceService spec
-	// that are not supported in an update, and we want to prevent users from making changes that would lead to an
-	// inconsistent state where the spec does not match the service configuration
-	if oldKserve.ModelFormat != newKserve.ModelFormat {
-		return fmt.Errorf("cannot update model format for KServe")
 	}
 	if oldKserve.StorageUri != newKserve.StorageUri {
 		return fmt.Errorf("cannot update model storage configuration for KServe")
 	}
+	if oldKserve.Inference.Runtime != newKserve.Inference.Runtime {
+		return fmt.Errorf("cannot update runtime for KServe")
+	}
 	if oldKserve.SetAuth != newKserve.SetAuth {
 		return fmt.Errorf("cannot update authentication configuration for KServe")
 	}
+	if oldKserve.Type != newKserve.Type {
+		return fmt.Errorf("cannot change KServe service type")
+
+	} else if newKserve.Type == KserveTypeInferenceService {
+		if oldKserve.Inference == nil || newKserve.Inference == nil {
+			return fmt.Errorf("inference configuration cannot be nil for KServe service")
+
+		} else if oldKserve.Inference.ModelFormat != newKserve.Inference.ModelFormat {
+			return fmt.Errorf("cannot update model format for KServe")
+		}
+	}
+
 	return nil
 }
 
@@ -633,7 +622,7 @@ func normalizeScaleFromKserveService(service *types.Kserve) (int32, int32) {
 	if minScale > maxScale {
 		maxScale = minScale
 	}
-	if service.ModelFormat == "llm" && minScale == 0 {
+	if service.Type == KserveTypeLLMInferenceService && minScale == 0 {
 		minScale = 1
 	}
 	return minScale, maxScale
@@ -642,23 +631,6 @@ func normalizeScaleFromKserveService(service *types.Kserve) (int32, int32) {
 func buildKserveName(serviceName string) string {
 	// TODO
 	return serviceName
-}
-
-// Helper function to determine the protocol version for KServe based on service configuration
-// Defaults to "v1" if not specified or invalid
-func protocolVersion(service *types.Service) string {
-	modelFormat := strings.ToLower(strings.TrimSpace(service.Kserve.ModelFormat))
-	switch {
-	case service.Kserve.APIVersion == "v1" && kserveTypeByFormat[modelFormat].protocolV1:
-		return "v1"
-	case service.Kserve.APIVersion == "v2" && kserveTypeByFormat[modelFormat].protocolV2:
-		return "v2"
-	// For model formats that do not support v1, default to v2
-	case (service.Kserve.APIVersion == "" || service.Kserve.APIVersion == "v1") && !kserveTypeByFormat[modelFormat].protocolV1:
-		return "v2"
-	default:
-		return "v1"
-	}
 }
 
 // createTraefikOIDCMiddleware creates a Traefik Middleware of type ForwardAuth for OIDC authentication,
@@ -764,7 +736,7 @@ func createHTTPRoute(gatewayClientset dynamic.Interface, service *types.Service,
 	httpRouteName := isvcName + httpRouteSuffix
 	namespace := knSvc.Namespace
 	apiPath := getAPIPath(isvcName)
-	svcName := GetKserveSvcName(isvcName, service.Kserve.ModelFormat)
+	svcName := GetKserveSvcName(isvcName, service.Kserve.Type)
 	gwName := strings.TrimSpace(cfg.HTTPRouteGatewayName)
 	gwNamespace := strings.TrimSpace(cfg.HTTPRouteGatewayNamespace)
 	if gwNamespace == "" || gwName == "" {
@@ -964,7 +936,7 @@ func getKserveLLMServiceRouterSpec(service *types.Service, namespace string, cfg
 		map[string]any{
 			"group": "",
 			"kind":  "Service",
-			"name":  GetKserveSvcName(service.Name, service.Kserve.ModelFormat),
+			"name":  GetKserveSvcName(service.Name, service.Kserve.Type),
 			"port":  8000,
 		},
 	}
@@ -1041,6 +1013,7 @@ func formatUID(uid string) string {
 	return uid
 }
 
+/*
 func injectRootPath(service *types.Service) {
 	kserveServiceFramework := getKserveFramework(service.Kserve.ModelFormat)
 	if kserveServiceFramework != "triton" {
@@ -1054,7 +1027,7 @@ func injectRootPath(service *types.Service) {
 		}
 	}
 }
-
+*/
 // existsKserveHTTPRouteByServiceName checks whether there is any HTTPRoute in the
 // cluster that matches the expected name and API path for the given service name, and returns an error if there are any conflicts (e.g. same name but different path, or same path but different name). It returns true if a matching HTTPRoute exists in the same namespace, false if no matching HTTPRoute exists, and an error if there is a conflict.
 func existsKserveHTTPRouteByServiceName(serviceName, namespace string) (bool, error) {
