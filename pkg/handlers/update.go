@@ -60,11 +60,18 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
+		rawInput := cloneStorageIOConfigs(newService.Input)
+		rawOutput := cloneStorageIOConfigs(newService.Output)
+		if err := normalizeStoragePaths(&newService); err != nil {
+			c.String(http.StatusBadRequest, err.Error())
+			return
+		}
 		newService.AllowedUsers = sanitizeUsers(newService.AllowedUsers)
 		newService.Script = utils.NormalizeLineEndings(newService.Script)
 
 		// Check service values and set defaults
 		checkValues(&newService, cfg)
+		utils.ApplyFederation(&newService)
 		if err := utils.ValidateVolumeConfig(newService.Name, newService.Volume); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
@@ -325,6 +332,31 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 
+		refreshToken := extractRefreshTokenSecret(&newService)
+		if newService.HasFederationMembers() {
+			refreshTokenSecretName := utils.RefreshTokenSecretName(newService.Name)
+			if refreshToken == "" && !utils.SecretExists(refreshTokenSecretName, serviceNamespace, back.GetKubeClientset()) {
+				c.String(http.StatusBadRequest, "refresh_token secret is required for federated services")
+				return
+			}
+		}
+		if refreshToken != "" {
+			if err := upsertRefreshTokenSecret(&newService, serviceNamespace, refreshToken, back.GetKubeClientset()); err != nil {
+				c.String(http.StatusInternalServerError, "error updating refresh-token secret: %v", err)
+				return
+			}
+		}
+
+		federationRefreshToken := refreshToken
+		if federationRefreshToken == "" && newService.HasFederationMembers() {
+			var err error
+			federationRefreshToken, err = readRefreshTokenSecretValue(newService.Name, serviceNamespace, back.GetKubeClientset())
+			if err != nil {
+				c.String(http.StatusInternalServerError, "error reading refresh-token secret: %v", err)
+				return
+			}
+		}
+
 		// Update service secret data or create it
 		if len(newService.Environment.Secrets) > 0 {
 			if utils.SecretExists(newService.Name, serviceNamespace, back.GetKubeClientset()) {
@@ -344,7 +376,6 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 
-		// Update the service
 		if err := back.UpdateService(newService); err != nil {
 			uerr := back.UpdateService(*oldService)
 			if uerr != nil {
@@ -352,6 +383,26 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
 			return
+		}
+
+		if newService.Annotations != nil &&
+			strings.EqualFold(strings.TrimSpace(newService.Annotations[types.FederationWorkerAnnotation]), "true") &&
+			newService.Federation != nil &&
+			strings.EqualFold(strings.TrimSpace(newService.Federation.Topology), "mesh") {
+			// Worker services should not trigger federation expansion or manage origin buckets.
+			c.Status(http.StatusNoContent)
+			return
+		}
+
+		if newService.HasFederationMembers() {
+			authHeader := c.GetHeader("Authorization")
+			federated := newService
+			federated.Input = rawInput
+			federated.Output = rawOutput
+			if errs := utils.ExpandFederation(&federated, authHeader, http.MethodPut, federationRefreshToken); len(errs) > 0 {
+				c.String(http.StatusOK, fmt.Sprintf("Updated with federation warnings: %v", errs))
+				return
+			}
 		}
 
 		c.Status(http.StatusNoContent)

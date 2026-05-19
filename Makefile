@@ -23,6 +23,7 @@ help:
 	@echo "  build    - Build Docker image $(IMAGE)"
 	@echo "  push     - Push image $(IMAGE) to registry"
 	@echo "  rollout  - Restart Kubernetes deployment $(DEPLOYMENT) in namespace $(NAMESPACE)"
+	@echo "            Optional: set KUBE_CONTEXT to target a specific kube context"
 	@echo "  deploy   - Build, push, and rollout (default pipeline)"
 	@echo ""
 	@echo "Optional variables:"

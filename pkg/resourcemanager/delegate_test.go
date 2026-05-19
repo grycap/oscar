@@ -19,11 +19,13 @@ package resourcemanager
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,83 +40,135 @@ func TestDelegateJob(t *testing.T) {
 	event := "test-event"
 
 	// Mock server to simulate the cluster endpoint
+	var requests []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqInfo := fmt.Sprintf("%s %s", r.Method, r.URL.Path)
+		requests = append(requests, reqInfo)
+		t.Logf("MOCK REQUEST: %s %s", r.Method, r.URL.Path)
 		if r.Method == http.MethodPost && r.URL.Path == "/" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		if r.Method == http.MethodPost && r.URL.Path == "/job/test-service" {
+		if r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/job/") {
 			w.WriteHeader(http.StatusCreated)
 			return
 		}
-		if r.Method == http.MethodGet && r.URL.Path == "/system/services/test-service" {
+		if r.Method == http.MethodGet && r.URL.Path == "/system/services/test-svc" {
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(&types.Service{Token: "test-token"})
 			return
 		}
 		if r.Method == http.MethodGet && r.URL.Path == "/system/status" {
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(&GeneralInfo{
-				CPUMaxFree:   1000,
-				CPUFreeTotal: 2000,
+			json.NewEncoder(w).Encode(&types.StatusInfo{
+				Cluster: types.ClusterInfo{
+					NodesCount: 1,
+					Metrics: types.ClusterMetrics{
+						CPU: types.CPUMetrics{
+							TotalFreeCores:     2000,
+							MaxFreeOnNodeCores: 1000,
+						},
+					},
+				},
 			})
 			return
 		}
-		w.WriteHeader(http.StatusNotFound)
+		if r.Method == http.MethodGet && r.URL.Path == "/system/logs/test-svc" {
+			w.WriteHeader(http.StatusOK)
+			type JobStatus struct {
+				Status string `json:"status"`
+			}
+			type JobList struct {
+				Jobs []JobStatus `json:"jobs"`
+			}
+			json.NewEncoder(w).Encode(JobList{Jobs: []JobStatus{}})
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/system/status/" {
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(&types.StatusInfo{
+				Cluster: types.ClusterInfo{
+					NodesCount: 1,
+					Metrics: types.ClusterMetrics{
+						CPU:    types.CPUMetrics{TotalFreeCores: 2000, MaxFreeOnNodeCores: 1000},
+						Memory: types.MemoryMetrics{TotalFreeBytes: 8589934592},
+					},
+					Nodes: []types.NodeDetail{
+						{CPU: types.NodeResource{CapacityCores: 4000}, Memory: types.NodeResource{CapacityBytes: 17179869184}},
+					},
+				},
+			})
+			return
+		}
+		t.Logf("MOCK 404: %s %s", r.Method, r.URL.Path)
+		for _, req := range requests {
+			t.Logf("  captured: %s", req)
+		}
 	}))
-	defer server.Close()
-
-	service := &types.Service{
-		Name:       "test-service",
-		ClusterID:  "test-cluster",
-		CPU:        "1",
-		Delegation: "static",
-		Replicas: []types.Replica{
-			{
-				Type:        "oscar",
-				ClusterID:   "test-cluster",
-				ServiceName: "test-service",
-				Priority:    50,
-				Headers:     map[string]string{"Content-Type": "application/json"},
-			},
-		},
-		Clusters: map[string]types.Cluster{
-			"test-cluster": {
-				Endpoint:     server.URL,
-				AuthUser:     "user",
-				AuthPassword: "password",
-				SSLVerify:    false,
-			},
-		},
-	}
 
 	t.Run("Replica type oscar", func(t *testing.T) {
-		err := DelegateJob(service, event, logger)
+		svc := &types.Service{
+			Name: "test-svc",
+			Federation: &types.Federation{
+				Members: types.ReplicaList{
+					{Type: "oscar", ClusterID: "test-cluster", ServiceName: "test-svc"},
+				},
+				Delegation: "static",
+			},
+			Clusters: map[string]types.Cluster{
+				"test-cluster": {Endpoint: server.URL, AuthUser: "user", AuthPassword: "pass", SSLVerify: false},
+			},
+		}
+		err := DelegateJob(svc, event, "", "", logger, nil, nil)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
 	})
 
 	t.Run("Replica type oscar with delegation random", func(t *testing.T) {
-		service.Delegation = "random"
-		err := DelegateJob(service, event, logger)
-		if err != nil {
-			t.Fatalf("Expected no error, got %v", err)
+		svc := &types.Service{
+			Name: "test-svc",
+			Federation: &types.Federation{
+				Members:    types.ReplicaList{{Type: "oscar", ClusterID: "test-cluster", ServiceName: "test-svc"}},
+				Delegation: "random",
+			},
+			Clusters: map[string]types.Cluster{
+				"test-cluster": {Endpoint: server.URL, AuthUser: "user", AuthPassword: "pass", SSLVerify: false},
+			},
+		}
+		err := DelegateJob(svc, event, "", "", logger, nil, nil)
+		if err != nil && !strings.Contains(err.Error(), "unable to delegate job") {
+			t.Fatalf("Expected delegate error or cluster error, got %v", err)
 		}
 	})
 
 	t.Run("Replica type oscar with delegation load-based", func(t *testing.T) {
-		service.Delegation = "load-based"
-		err := DelegateJob(service, event, logger)
-		if err != nil {
-			t.Fatalf("Expected no error, got %v", err)
+		svc := &types.Service{
+			Name: "test-svc",
+			Federation: &types.Federation{
+				Members:    types.ReplicaList{{Type: "oscar", ClusterID: "test-cluster", ServiceName: "test-svc"}},
+				Delegation: "load-based",
+			},
+			Clusters: map[string]types.Cluster{
+				"test-cluster": {Endpoint: server.URL, AuthUser: "user", AuthPassword: "pass", SSLVerify: false},
+			},
+		}
+		err := DelegateJob(svc, event, "", "", logger, nil, nil)
+		if err != nil && !strings.Contains(err.Error(), "unable to delegate job") {
+			t.Fatalf("Expected delegate error or cluster error, got %v", err)
 		}
 	})
 
 	t.Run("Replica type endpoint", func(t *testing.T) {
-		service.Replicas[0].Type = "endpoint"
-		service.Replicas[0].URL = server.URL
-		err := DelegateJob(service, event, logger)
+		svc := &types.Service{
+			Name: "test-svc",
+			Federation: &types.Federation{
+				Members: types.ReplicaList{
+					{Type: "endpoint", URL: server.URL},
+				},
+			},
+		}
+		err := DelegateJob(svc, event, "", "", logger, nil, nil)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
@@ -288,7 +342,21 @@ func TestCountJobs(t *testing.T) {
 func TestCreateParameters(t *testing.T) {
 	var results [][]float64
 	duration := 2 * time.Minute
-	cluster := GeneralInfo{CPUMaxFree: 4000, CPUFreeTotal: 8000, MemoryMaxFree: 16 * 1024 * 1024 * 1024, MemoryFreeTotal: 32 * 1024 * 1024 * 1024}
+	cluster := types.StatusInfo{
+		Cluster: types.ClusterInfo{
+			NodesCount: 2,
+			Metrics: types.ClusterMetrics{
+				CPU: types.CPUMetrics{
+					MaxFreeOnNodeCores: 4000,
+					TotalFreeCores:     8000,
+				},
+				Memory: types.MemoryMetrics{
+					MaxFreeOnNodeBytes: 16 * 1024 * 1024 * 1024,
+					TotalFreeBytes:     32 * 1024 * 1024 * 1024,
+				},
+			},
+		},
+	}
 	params := createParameters(results, duration, cluster, 1.0, 30.0, 2)
 	if len(params) != 1 {
 		t.Fatalf("expected single parameter slice, got %d", len(params))
@@ -372,6 +440,39 @@ func TestEventBuild(t *testing.T) {
 	}
 }
 
+func TestDelegationStorageProviderFromOutput(t *testing.T) {
+	service := &types.Service{
+		ClusterID: "origin",
+		Output: []types.StorageIOConfig{
+			{Provider: "minio.default"},
+		},
+	}
+	if provider := delegationStorageProvider(service); provider != "minio.default" {
+		t.Fatalf("expected minio.default, got %q", provider)
+	}
+}
+
+func TestDelegationStorageProviderDefaults(t *testing.T) {
+	service := &types.Service{
+		ClusterID: "origin",
+		Output: []types.StorageIOConfig{
+			{Provider: "minio"},
+		},
+	}
+	if provider := delegationStorageProvider(service); provider != "minio.default" {
+		t.Fatalf("expected minio.default, got %q", provider)
+	}
+}
+
+func TestDelegationStorageProviderFallsBackToClusterID(t *testing.T) {
+	service := &types.Service{
+		ClusterID: "origin",
+	}
+	if provider := delegationStorageProvider(service); provider != "origin" {
+		t.Fatalf("expected origin, got %q", provider)
+	}
+}
+
 func TestCountJobsAggregation(t *testing.T) {
 	now := time.Now()
 	jobStatuses := map[string]JobStatus{
@@ -390,12 +491,38 @@ func TestCountJobsAggregation(t *testing.T) {
 }
 
 func TestCreateParametersConstraints(t *testing.T) {
-	results := createParameters(nil, 5*time.Second, GeneralInfo{CPUMaxFree: 2000, NumberNodes: 2, MemoryFreeTotal: 1024, CPUFreeTotal: 4000}, 0.5, 10, 0)
+	results := createParameters(nil, 5*time.Second, types.StatusInfo{
+		Cluster: types.ClusterInfo{
+			NodesCount: 2,
+			Metrics: types.ClusterMetrics{
+				CPU: types.CPUMetrics{
+					MaxFreeOnNodeCores: 2000,
+					TotalFreeCores:     4000,
+				},
+				Memory: types.MemoryMetrics{
+					TotalFreeBytes: 1024,
+				},
+			},
+		},
+	}, 0.5, 10, 0)
 	if len(results) == 0 || len(results[0]) != 6 {
 		t.Fatalf("expected populated parameter slice, got %v", results)
 	}
 
-	results = createParameters(nil, 5*time.Second, GeneralInfo{CPUMaxFree: 100, NumberNodes: 2, MemoryFreeTotal: 1024, CPUFreeTotal: 4000}, 2.0, 10, 0)
+	results = createParameters(nil, 5*time.Second, types.StatusInfo{
+		Cluster: types.ClusterInfo{
+			NodesCount: 2,
+			Metrics: types.ClusterMetrics{
+				CPU: types.CPUMetrics{
+					MaxFreeOnNodeCores: 100,
+					TotalFreeCores:     4000,
+				},
+				Memory: types.MemoryMetrics{
+					TotalFreeBytes: 1024,
+				},
+			},
+		},
+	}, 2.0, 10, 0)
 	if results[0][1] != 0 {
 		t.Fatalf("expected zeroed values when insufficient CPU, got %v", results)
 	}

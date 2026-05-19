@@ -129,6 +129,12 @@ func main() {
 	system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
 	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
 
+	// CRUD Replicas (federation)
+	system.GET("/federation/:serviceName", handlers.MakeFederationGetHandler(back))
+	system.POST("/federation/:serviceName", handlers.MakeFederationPostHandler(back))
+	system.PUT("/federation/:serviceName", handlers.MakeFederationPutHandler(back))
+	system.DELETE("/federation/:serviceName", handlers.MakeFederationDeleteHandler(back))
+
 	// CRUD Volumes
 	if cfg.VolumeEnable {
 		system.GET("/volumes", handlers.MakeListVolumesHandler(cfg, back))

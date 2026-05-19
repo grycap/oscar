@@ -216,6 +216,12 @@ type Config struct {
 	// as described here: https://docs.egi.eu/providers/check-in/sp/#10-groups
 	OIDCGroups []string `json:"oidc_groups"`
 
+	// OIDCClientID OpenID Connect client ID used for token exchange
+	OIDCClientID string `json:"-"`
+
+	// OIDCClientSecret OpenID Connect client secret used for token exchange
+	OIDCClientSecret string `json:"-"`
+
 	UsersAdmin []string `json:"-"`
 
 	//
@@ -251,6 +257,8 @@ type Config struct {
 	//Job listing limit
 	JobListingLimit int `json:"-"`
 
+	// KserveEnable option to enable KServe integration to deploy services using KServe InferenceService CRD
+	KserveEnable bool `json:"-"`
 	// PrometheusBaseURL base URL for Prometheus HTTP API
 	PrometheusBaseURL string `json:"-"`
 
@@ -332,12 +340,14 @@ var configVars = []configVar{
 	//{"ResourceManager", "RESOURCE_MANAGER", false, resourceManagerType, "kubernetes"},
 	{"ResourceManagerInterval", "RESOURCE_MANAGER_INTERVAL", false, intType, "15"},
 	{"ReSchedulerEnable", "RESCHEDULER_ENABLE", false, boolType, "false"},
-	{"ReSchedulerInterval", "RESCHEDULER_INTERVAL", false, intType, "15"},
-	{"ReSchedulerThreshold", "RESCHEDULER_THRESHOLD", false, intType, "30"},
+	{"ReSchedulerInterval", "RESCHEDULER_INTERVAL", false, intType, "10"},
+	{"ReSchedulerThreshold", "RESCHEDULER_THRESHOLD", false, intType, "10"},
 	{"OIDCEnable", "OIDC_ENABLE", false, boolType, "false"},
 	{"OIDCValidIssuers", "OIDC_ISSUERS", false, stringSliceType, ""},
 	{"OIDCSubject", "OIDC_SUBJECT", false, stringType, ""},
 	{"OIDCGroups", "OIDC_GROUPS", false, stringSliceType, ""},
+	{"OIDCClientID", "OIDC_CLIENT_ID", false, stringType, ""},
+	{"OIDCClientSecret", "OIDC_CLIENT_SECRET", false, stringType, ""},
 	{"UsersAdmin", "USERS_ADMIN", false, stringSliceType, ""},
 	{"IngressHost", "INGRESS_HOST", false, stringType, ""},
 	{"ExposedServicesRouteKind", "EXPOSED_SERVICES_ROUTE_KIND", false, routeKindType, "ingress"},
@@ -350,6 +360,7 @@ var configVars = []configVar{
 	{"AdditionalConfigPath", "ADDITIONAL_CONFIG_PATH", false, stringType, "config.yaml"},
 	{"TTLJob", "TTL_JOB", false, intType, "2592000"},
 	{"JobListingLimit", "JOB_LISTING_LIMIT", false, intType, "70"},
+	{"KserveEnable", "KSERVE_ENABLE", false, boolType, "false"},
 	{"PrometheusBaseURL", "PROMETHEUS_URL", false, urlType, ""},
 	{"PrometheusCPUQuery", "PROMETHEUS_CPU_QUERY", false, stringType, "sum(increase(container_cpu_usage_seconds_total{namespace=~\"{{services_namespace}}.*\",service=~\"{{service}}\"}[{{range}}])) / 3600"},
 	{"PrometheusGPUQuery", "PROMETHEUS_GPU_QUERY", false, stringType, "sum(increase(container_gpu_usage_seconds_total{namespace=~\"{{services_namespace}}.*\",service=~\"{{service}}\"}[{{range}}])) / 3600"},

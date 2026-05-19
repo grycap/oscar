@@ -107,7 +107,7 @@ Configure it to mount the same bucket used by the ImageMagick service.
 
 ## 6. Access the Jupyter Environment
 
-Wait until the notebook instance is ready, then open it from the Dashboard.
+Wait until the notebook instance is ready, then open it from the Dashboard by clicking on the link icon.
 
 - A newly deployed notebook may take a short time to become reachable.
 - Once it opens, confirm that the mounted workspace already contains the `input` and `output` directories from the bucket.

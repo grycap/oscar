@@ -102,7 +102,7 @@ Open the service invocation view from the Dashboard and upload [a sample image](
 
 ![Synchronous invocation view in the OSCAR Dashboard](images/hands-on/lab-01/06-oscar-dashboard-service-invoke-sync.png)
 
-*Upload the input payload from the Dashboard invocation view.*
+*Upload the input image from the Dashboard invocation view.*
 
 ![Synchronous invocation result in the OSCAR Dashboard](images/hands-on/lab-01/07-oscar-dashboard-service-invoke-result.png)
 
