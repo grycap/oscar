@@ -7,7 +7,7 @@ import (
 func TestJoinErrors(t *testing.T) {
 	tests := []struct {
 		name     string
-		errs    []error
+		errs     []error
 		expected string
 	}{
 		{"Nil and error", []error{nil, nil}, ""},
@@ -28,7 +28,7 @@ func TestJoinErrors(t *testing.T) {
 
 func TestParseServiceFromPath(t *testing.T) {
 	tests := []struct {
-		name       string
+		name      string
 		path      string
 		serviceID string
 		reqType   RequestType
@@ -54,10 +54,10 @@ func TestParseServiceFromPath(t *testing.T) {
 
 func TestParseExposedServiceFromPath(t *testing.T) {
 	tests := []struct {
-		name       string
-		path       string
-		serviceID  string
-		ok         bool
+		name      string
+		path      string
+		serviceID string
+		ok        bool
 	}{
 		{"Valid path", "/system/services/svc/exposed", "svc", true},
 		{"Invalid path", "/system/services/svc", "", false},
@@ -80,7 +80,7 @@ func TestParseExposedServiceFromPath(t *testing.T) {
 
 func TestCountryFromLokiLabels(t *testing.T) {
 	tests := []struct {
-		name     string
+		name    string
 		labels  map[string]string
 		country string
 	}{

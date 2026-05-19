@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grycap/oscar/v3/pkg/backends"
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/backends"
+	"github.com/grycap/oscar/v4/pkg/types"
 	jobv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

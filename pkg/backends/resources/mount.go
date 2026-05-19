@@ -19,8 +19,8 @@ package resources
 import (
 	"strings"
 
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	v1 "k8s.io/api/core/v1"
 )
 
