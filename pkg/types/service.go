@@ -61,6 +61,12 @@ const (
 	// WatchdogProcess name of the environment variable used by the watchdog to handle requests
 	WatchdogProcess = "fprocess"
 
+	// RefreshTokenSecretKey secret key used for federation refresh tokens
+	RefreshTokenSecretKey = "refresh_token"
+
+	// RefreshTokenSecretSuffix suffix for per-service refresh token secrets
+	RefreshTokenSecretSuffix = "refresh-token"
+
 	// SupervisorName name of the FaaS Supervisor binary
 	SupervisorName = "supervisor"
 
@@ -147,6 +153,10 @@ const (
 	DefaultOwner = "cluster_admin"
 
 	JobOwnerExecutionAnnotation = "oscar.grycap/job-owner"
+
+	OriginClusterAnnotation    = "oscar.grycap/origin-cluster"
+	OriginServiceAnnotation    = "oscar.grycap/origin-service"
+	FederationWorkerAnnotation = "oscar.grycap/federation-worker"
 )
 
 // YAMLMarshal package-level yaml marshal function
@@ -207,20 +217,9 @@ type Service struct {
 		MaxScale int `json:"max_scale"`
 	} `json:"synchronous"`
 
-	// Replicas list of replicas to delegate jobs
+	// Federation defines a service federation across clusters
 	// Optional
-	Replicas ReplicaList `json:"replicas,omitempty"`
-
-	//Delegation Mode of job delegation for replicas
-	// Opcional (default: manual)
-	//"static" The user select the priority to delegate jobs to the replicas.
-	//"random" The job delegation priority is generated randomly among the clusters of the available replicas.
-	//"load-based" The job delegation priority is generated depending on the CPU and Memory available in the replica clusters.
-	Delegation string `json:"delegation"`
-
-	// ReSchedulerThreshold time (in seconds) that a job (with replicas) can be queued before delegating it
-	// Optional
-	ReSchedulerThreshold int `json:"rescheduler_threshold"`
+	Federation *Federation `json:"federation,omitempty"`
 
 	// LogLevel log level for the FaaS Supervisor
 	// Optional. (default: INFO)
@@ -688,17 +687,18 @@ func (service *Service) GetSupervisorPath() string {
 	return fmt.Sprintf("%s/%s", VolumePath, SupervisorName)
 }
 
+// HasFederationMembers checks if the service defines federation members.
+func (service *Service) HasFederationMembers() bool {
+	return service.Federation != nil && len(service.Federation.Members) > 0
+
+}
+
 // GetExposedBasePath returns the OSCAR exposed-service base path or an empty string.
 func (service *Service) GetExposedBasePath() string {
 	if service == nil || service.Expose.APIPort == 0 {
 		return ""
 	}
 	return fmt.Sprintf("/system/services/%s/exposed", service.Name)
-}
-
-// HasReplicas checks if the service has replicas defined
-func (service *Service) HasReplicas() bool {
-	return len(service.Replicas) > 0
 }
 
 // GetVolumeName returns the logical managed volume name used by the service.

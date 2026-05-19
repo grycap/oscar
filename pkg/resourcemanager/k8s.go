@@ -24,6 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/grycap/oscar/v3/pkg/utils"
 )
 
 type nodeResources struct {
@@ -42,8 +44,8 @@ type KubeResourceManager struct {
 
 // UpdateResources update the available resources in the cluster
 func (krm *KubeResourceManager) UpdateResources() error {
-	// List all (working) nodes
-	nodes, err := krm.kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: "!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master"})
+	// List all nodes; eligibility handled consistently with /system/status.
+	nodes, err := krm.kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("error getting node list: %v", err)
 	}
@@ -57,7 +59,7 @@ func (krm *KubeResourceManager) UpdateResources() error {
 	// Define new nodeResources slice
 	res := []nodeResources{}
 
-	for _, node := range nodes.Items {
+	for _, node := range utils.SelectEligibleNodes(nodes.Items) {
 		// Only count Schedulable and Ready nodes
 		if !node.Spec.Unschedulable && isNodeReady(node) {
 			nodeCPU, nodeMemory := getNodeAvailableResources(node, pods)
