@@ -359,10 +359,24 @@ deployCertManager(){
         fi
 
         echo -e "\n[*] Waiting for cert-manager components to be ready ..."
-        if ! kubectl wait --namespace cert-manager --for=condition=Available deployment/cert-manager --timeout=300s; then
-                echo -e "$RED[!]$END_COLOR cert-manager deployment is not ready"
-                exit 1
-        fi
+        wait_for_cert_manager
+}
+
+wait_for_cert_manager() {
+	kubectl -n cert-manager wait --for=condition=Available deployment/cert-manager deployment/cert-manager-cainjector deployment/cert-manager-webhook --timeout=180s
+	kubectl wait --for=condition=Established crd/certificaterequests.cert-manager.io crd/certificates.cert-manager.io crd/clusterissuers.cert-manager.io crd/issuers.cert-manager.io --timeout=120s
+	ensure_webhook_ca_bundle
+}
+
+ensure_webhook_ca_bundle() {
+	for _ in $(seq 1 30); do
+		if kubectl get validatingwebhookconfiguration cert-manager-webhook -o jsonpath="{.webhooks[*].clientConfig.caBundle}" | grep -qE '[A-Za-z0-9+/]{10,}'; then
+			return 0
+		fi
+		sleep 5
+	done
+	echo "Error: cert-manager webhook CA bundle was not injected in time." >&2
+	exit 1
 }
 
 createTraefikGatewayCertificate(){
