@@ -11,6 +11,7 @@ import (
 	"github.com/grycap/oscar/v4/pkg/backends"
 	"github.com/grycap/oscar/v4/pkg/testsupport"
 	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -199,6 +200,57 @@ func TestMakeDeleteHandlerPassesVolumeLifecycleService(t *testing.T) {
 			}
 			if back.DeletedService.Volume.LifecyclePolicy != tt.lifecycle {
 				t.Fatalf("expected lifecycle %q, got %q", tt.lifecycle, back.DeletedService.Volume.LifecyclePolicy)
+			}
+		})
+	}
+}
+
+func TestMakeDeleteHandlerForbidsVisibleServicesForNonOwners(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name         string
+		visibility   string
+		allowedUsers []string
+	}{
+		{
+			name:       "public service",
+			visibility: utils.PUBLIC,
+		},
+		{
+			name:         "restricted service with allowed user",
+			visibility:   utils.RESTRICTED,
+			allowedUsers: []string{"user-b@example.com"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			back := backends.MakeFakeBackend()
+			back.Service = &types.Service{
+				Name:         "svc",
+				Owner:        "user-a@example.com",
+				Visibility:   tt.visibility,
+				AllowedUsers: tt.allowedUsers,
+			}
+
+			r := gin.New()
+			r.Use(func(c *gin.Context) {
+				c.Set("uidOrigin", "user-b@example.com")
+				c.Next()
+			})
+			r.DELETE("/system/services/:serviceName", MakeDeleteHandler(&types.Config{}, back))
+
+			req := httptest.NewRequest(http.MethodDelete, "/system/services/svc", nil)
+			req.Header.Set("Authorization", "Bearer token")
+			resp := httptest.NewRecorder()
+			r.ServeHTTP(resp, req)
+
+			if resp.Code != http.StatusForbidden {
+				t.Fatalf("expected 403, got %d: %s", resp.Code, resp.Body.String())
+			}
+			if back.DeletedService != nil {
+				t.Fatalf("expected service not to be deleted by non-owner")
 			}
 		})
 	}
