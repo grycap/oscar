@@ -7,7 +7,9 @@ functions:
       image: ghcr.io/grycap/kserve-yolo8n-onnx-script
       script: script.sh
       kserve:
-        model_format: onnx
+        type: inference
+        inference:
+          model_format: onnx
         storage_uri: "oci://ghcr.io/grycap/kserve-yolo8n-onnx"
         min_scale: 1
         api_version: "v2"

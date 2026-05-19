@@ -269,7 +269,7 @@ func inspectKserveDeploymentRuntime(kubeClientset kubernetes.Interface, service 
 		return deploymentRuntimeContext{}, err
 	}
 
-	deployment, err := backends.GetKserveServiceDeployment(kubeClientset, service.Namespace, service.Name, service.Kserve.ModelFormat)
+	deployment, err := backends.GetKserveServiceDeployment(kubeClientset, service.Namespace, service.Name, service.Kserve.Type)
 	if err != nil {
 		if apierrors.IsNotFound(err) || apierrors.IsGone(err) {
 			items := podItems(pods)
@@ -759,7 +759,7 @@ func inspectExposedDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interfac
 }
 
 func inspectKserveDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interface, service *types.Service) (types.ServiceDeploymentStatus, error) {
-	deployment, err := backends.GetKserveServiceDeployment(kubeClientset, service.Namespace, service.Name, service.Kserve.ModelFormat)
+	deployment, err := backends.GetKserveServiceDeployment(kubeClientset, service.Namespace, service.Name, service.Kserve.Type)
 	if err != nil {
 		if apierrors.IsNotFound(err) || apierrors.IsGone(err) {
 			return unavailableDeploymentStatus(service, "Current deployment resources are unavailable."), nil

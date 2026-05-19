@@ -439,9 +439,14 @@ func buildResourceCheckPodSet(name string, replicas int32, requests v1.ResourceL
 		Count: replicas,
 		Template: v1.PodTemplateSpec{
 			Spec: v1.PodSpec{
-				Containers: []v1.Container{{Name: "resource-check"}},
-				Resources: &v1.ResourceRequirements{
-					Requests: requests,
+				Containers: []v1.Container{
+					{
+						Name: "resource-check",
+						Resources: v1.ResourceRequirements{
+							Requests: requests,
+							Limits:   requests,
+						},
+					},
 				},
 			},
 		},

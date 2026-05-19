@@ -134,7 +134,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		if service.Environment.Vars == nil {
 			service.Environment.Vars = make(map[string]string)
 		}
-		service.Environment.Vars["KSERVE_HOST"] = fmt.Sprintf("%s.%s.svc.cluster.local", utils.GetKserveSvcName(service.Name, service.Kserve.ModelFormat), namespace)
+		service.Environment.Vars["KSERVE_HOST"] = fmt.Sprintf("%s.%s.svc.cluster.local", utils.GetKserveSvcName(service.Name, service.Kserve.Type), namespace)
 	}
 
 	// Check if there is some user defined settings for OSCAR
