@@ -69,8 +69,10 @@ func MakeMetricValueHandler(back types.ServerlessBackend, agg *metrics.Aggregato
 			c.JSON(http.StatusBadRequest, gin.H{"error": "serviceName is required"})
 			return
 		}
-		if _, ok := getAuthorizedServiceForMetrics(c, back, serviceName); !ok {
-			return
+		if isBearerRequest(c) {
+			if _, ok := getAuthorizedServiceForMetrics(c, back, serviceName); !ok {
+				return
+			}
 		}
 
 		tr, ok := parseTimeRange(c)
