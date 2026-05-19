@@ -334,26 +334,108 @@ checkIngressStatus(){
     echo -e "\n[$GREEN$CHECK$END_COLOR] ingress-controller pod running correctly"
 }
 
+checkTraefikStatus(){
+    timeout=500
+    echo -e "\n[*] Waiting for Traefik pod to be running ..."
+    sleep 5
+    start=$(date +%s)
+    while [ "$traefik_status" != "Running" ]; do
+        traefik_status=$(kubectl get pods -n traefik 2>/dev/null | awk '/traefik/ {print $3}' | head -1)
+        actual=$(date +%s)
+        if [ $((actual - start)) -gt $timeout ]; then
+            echo -e "\n$RED[!]$END_COLOR Error: Timeout: Traefik pod status: $traefik_status"
+            exit
+        fi
+        sleep 5
+    done
+    echo -e "\n[$GREEN$CHECK$END_COLOR] Traefik pod running correctly"
+}
+
+deployCertManager(){
+        echo -e "\n[*] Deploying cert-manager ..."
+        if ! kubectl apply -f "https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml"; then
+                echo -e "$RED[!]$END_COLOR Failed to deploy cert-manager"
+                exit 1
+        fi
+
+        echo -e "\n[*] Waiting for cert-manager components to be ready ..."
+        if ! kubectl wait --namespace cert-manager --for=condition=Available deployment/cert-manager --timeout=300s; then
+                echo -e "$RED[!]$END_COLOR cert-manager deployment is not ready"
+                exit 1
+        fi
+}
+
+createTraefikGatewayCertificate(){
+        echo -e "\n[*] Creating self-signed certificate for Traefik Gateway ..."
+
+        if ! cat <<EOF | kubectl apply -f -
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+    name: self-signed-issuer
+spec:
+    selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+    name: self-signed-cert
+    namespace: traefik
+spec:
+    secretName: traefik-gateway-tls
+    commonName: localhost
+    dnsNames:
+        - localhost
+    ipAddresses:
+        - 127.0.0.1
+    issuerRef:
+        name: self-signed-issuer
+        kind: ClusterIssuer
+EOF
+        then
+                echo -e "$RED[!]$END_COLOR Failed to create cert-manager issuer/certificate for Traefik"
+                exit 1
+        fi
+
+        if ! kubectl wait --namespace traefik --for=condition=Ready certificate/self-signed-cert --timeout=180s; then
+                echo -e "$RED[!]$END_COLOR Traefik TLS certificate was not issued in time"
+                exit 1
+        fi
+}
+
 deployGatewayController(){
   if [ "$GATEWAY_CONTROLLER" == "ingress" ]; then
       echo -e "\n[*] Deploying NGINX Ingress ..."
       kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/kind/deploy.yaml
       checkIngressStatus
   else
-      echo -e "\n[*] Installing Traefik Gateway ..."
+      deployCertManager
       kubectl create namespace traefik >/dev/null 2>&1 || true
+      createTraefikGatewayCertificate
+      echo -e "\n[*] Deploying Gateway API CRDs ..."
+      kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+      echo -e "\n[*] Installing Traefik Gateway ..."
       helm repo add --force-update  traefik https://traefik.github.io/charts
-      helm install --namespace=traefik traefik traefik/traefik --wait \
+      helm install --namespace=traefik traefik traefik/traefik --create-namespace \
+        --version 39.0.9 \
         --set providers.kubernetesGateway.enabled=true \
         --set providers.kubernetesCRD.allowCrossNamespace=true \
         --set gateway.enabled=true \
         --set gateway.listeners.web.namespacePolicy.from=All \
+        --set gateway.listeners.websecure.port=8443 \
+        --set gateway.listeners.websecure.protocol=HTTPS \
+        --set gateway.listeners.websecure.certificateRefs[0].name=traefik-gateway-tls \
+        --set gateway.listeners.websecure.certificateRefs[0].kind=Secret \
+        --set gateway.listeners.websecure.namespacePolicy.from=All \
         --set service.type=NodePort \
         --set ports.web.nodePort=30080 \
         --set ports.websecure.nodePort=30443 \
-        --set ports.traefik.expose.default=true --set ports.traefik.nodePort=31080 --set ports.traefik.exposedPort=31080 \
+        --set ports.traefik.expose.default=true \
+        --set ports.traefik.nodePort=31080 \
+        --set ports.traefik.exposedPort=31080 \
         --set api.dashboard=true \
         --set api.insecure=true
+        checkTraefikStatus
   fi
 }
 
@@ -781,7 +863,7 @@ if [ "$HOST_MINIO_CONSOLE_PORT" != "$DEFAULT_MINIO_CONSOLE_PORT" ]; then
     echo -e "$ORANGE[*]$END_COLOR Port $DEFAULT_MINIO_CONSOLE_PORT is busy. Using $HOST_MINIO_CONSOLE_PORT for MinIO console instead."
 fi
 
-fi [ "$GATEWAY_CONTROLLER" == "traefik" ] && [ "$HOST_TRAEFIK_DASHBOARD_PORT" != "$DEFAULT_TRAEFIK_DASHBOARD_PORT" ]; then
+if [ "$GATEWAY_CONTROLLER" == "traefik" ] && [ "$HOST_TRAEFIK_DASHBOARD_PORT" != "$DEFAULT_TRAEFIK_DASHBOARD_PORT" ]; then
     echo -e "$ORANGE[*]$END_COLOR Port $DEFAULT_TRAEFIK_DASHBOARD_PORT is busy. Using $HOST_TRAEFIK_DASHBOARD_PORT for Traefik dashboard instead."
 fi
 
