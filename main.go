@@ -17,7 +17,7 @@ limitations under the License.
 */
 
 // @title OSCAR API
-// @version v2.0.0
+// @version v4.0.0
 // @description Secure REST API to manage OSCAR services, storage and executions.
 // @contact.name GRyCAP
 // @contact.email products@grycap.upv.es
@@ -128,6 +128,12 @@ func main() {
 	system.GET("/services/:serviceName/deployment/logs", handlers.MakeGetDeploymentLogsHandler(back, kubeClientset, cfg))
 	system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
 	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
+
+	// CRUD Replicas (federation)
+	system.GET("/federation/:serviceName", handlers.MakeFederationGetHandler(back))
+	system.POST("/federation/:serviceName", handlers.MakeFederationPostHandler(back))
+	system.PUT("/federation/:serviceName", handlers.MakeFederationPutHandler(back))
+	system.DELETE("/federation/:serviceName", handlers.MakeFederationDeleteHandler(back))
 
 	// CRUD Volumes
 	if cfg.VolumeEnable {
