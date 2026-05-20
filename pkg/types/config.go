@@ -541,7 +541,7 @@ func (cfg *Config) CheckAvailableGPUs(kubeClientset kubernetes.Interface) {
 	}
 }
 
-// CheckAvailableInterLink checks if there is a node with the virtual kubelet annotation
+// CheckAvailableInterLink checks if there is a node with a virtual-kubelet label
 func (cfg *Config) CheckAvailableInterLink(kubeClientset kubernetes.Interface) {
 	selectors := []string{
 		"!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master,type=virtual-kubelet",
@@ -550,7 +550,8 @@ func (cfg *Config) CheckAvailableInterLink(kubeClientset kubernetes.Interface) {
 	for _, selector := range selectors {
 		nodes, err := kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: selector})
 		if err != nil {
-			log.Printf("Error getting list of nodes: %v\n", err)
+			log.Printf("Error listing nodes with selector %q: %v\n", selector, err)
+			continue
 		}
 		if len(nodes.Items) > 0 {
 			cfg.InterLinkAvailable = true
