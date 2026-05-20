@@ -17,7 +17,7 @@ func TestIsBearerRequest(t *testing.T) {
 	tests := []struct {
 		name       string
 		authHeader string
-		expected  bool
+		expected   bool
 	}{
 		{"Empty header", "", false},
 		{"No Bearer prefix", "Basic token", false},
@@ -44,29 +44,29 @@ func TestIsBearerRequest(t *testing.T) {
 
 func TestIsServiceAccessibleByUser(t *testing.T) {
 	publicSvc := &types.Service{
-		Name:       "public",
-		Visibility:  utils.PUBLIC,
-		Owner:      "owner",
+		Name:         "public",
+		Visibility:   utils.PUBLIC,
+		Owner:        "owner",
 		AllowedUsers: []string{},
 	}
 	restrictedSvc := &types.Service{
-		Name:       "restricted",
-		Visibility:  utils.RESTRICTED,
-		Owner:      "owner",
+		Name:         "restricted",
+		Visibility:   utils.RESTRICTED,
+		Owner:        "owner",
 		AllowedUsers: []string{"user1", "user2"},
 	}
 	privateSvc := &types.Service{
-		Name:       "private",
-		Visibility:  utils.PRIVATE,
-		Owner:      "owner",
+		Name:         "private",
+		Visibility:   utils.PRIVATE,
+		Owner:        "owner",
 		AllowedUsers: []string{},
 	}
 
 	tests := []struct {
-		name      string
-		service   *types.Service
-		uid       string
-		expected  bool
+		name     string
+		service  *types.Service
+		uid      string
+		expected bool
 	}{
 		{"Nil service", nil, "user", false},
 		{"Public service any user", publicSvc, "anyone", true},

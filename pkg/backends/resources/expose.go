@@ -420,14 +420,19 @@ func getDeploymentSpec(service types.Service, namespace string, cfg *types.Confi
 	}
 	if service.Owner != types.DefaultOwner && cfg.KueueEnable {
 		deployment.Spec.Template.ObjectMeta.Labels[types.KueueOwnerLabel] = uid
-		deployment.Spec.Template.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
+
+		// TO DO: In KUEUE v0.16.0+ you can simply add quque name to use KUEUE
+		// But here we have separate Workload for the service
+		// if we set the label it will count to times the consumed resources
+		//deployment.Spec.Template.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 		deployment.Spec.Template.ObjectMeta.Annotations = map[string]string{
 			"kueue.x-k8s.io/queue-name": utils.BuildLocalQueueName(service.Name),
 		}
-		deployment.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
+		//deployment.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 		deployment.ObjectMeta.Annotations = map[string]string{
 			"kueue.x-k8s.io/queue-name": utils.BuildLocalQueueName(service.Name),
 		}
+
 	}
 
 	return deployment
@@ -790,6 +795,12 @@ func updateHTTPRoute(service types.Service, namespace string, kubeClientset kube
 	}
 
 	httpRoute := getHTTPRouteSpec(service, namespace, cfg)
+	currentHTTPRoute, err := gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Get(context.TODO(), httpRoute.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	httpRoute.SetResourceVersion(currentHTTPRoute.GetResourceVersion())
+
 	_, err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Update(context.TODO(), httpRoute, metav1.UpdateOptions{})
 	return err
 }
@@ -1024,6 +1035,12 @@ func updateTraefikCORSMiddleware(service types.Service, namespace string, cfg *t
 	}
 
 	middleware := getTraefikCORSMiddlewareSpec(service, namespace, cfg)
+	currentMiddleware, err := gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Get(context.TODO(), middleware.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	middleware.SetResourceVersion(currentMiddleware.GetResourceVersion())
+
 	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Update(context.TODO(), middleware, metav1.UpdateOptions{})
 	return err
 }
@@ -1054,6 +1071,12 @@ func updateTraefikAuthMiddleware(service types.Service, namespace string) error 
 	}
 
 	middleware := getTraefikAuthMiddlewareSpec(service, namespace)
+	currentMiddleware, err := gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Get(context.TODO(), middleware.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	middleware.SetResourceVersion(currentMiddleware.GetResourceVersion())
+
 	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Update(context.TODO(), middleware, metav1.UpdateOptions{})
 	return err
 }

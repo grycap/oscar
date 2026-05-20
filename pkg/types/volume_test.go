@@ -70,8 +70,8 @@ func TestManagedVolume(t *testing.T) {
 		Size:             "10Gi",
 		OwnerUser:        "user1",
 		CreatedByService: "test-service",
-		CreationMode:    VolumeCreationModeService,
-		LifecyclePolicy: VolumeLifecycleRetain,
+		CreationMode:     VolumeCreationModeService,
+		LifecyclePolicy:  VolumeLifecycleRetain,
 		Attachments: []VolumeAttachmentReference{
 			{ServiceName: "svc1", MountPath: "/data"},
 		},

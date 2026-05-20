@@ -41,12 +41,12 @@ func getFakeClientset() (*types.Config, *fake.Clientset) {
 			cfg.YunikornConfigFileName: `
 partitions:
   - name: default
-	queues:
-	  - name: root
-		queues:
-		  - name: oscar
-			queues:
-			  - name: test-service
+    queues:
+      - name: root
+        queues:
+          - name: oscar
+            queues:
+              - name: test-service
 `,
 		},
 	}

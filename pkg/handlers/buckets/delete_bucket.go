@@ -96,8 +96,17 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", err))
 			return
 		}
-		v := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: uid})
-		if (uid == types.DefaultOwner) || (v == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucketName)) {
+
+		var bucketOwner string = ""
+		metadata, metaErr := minIOAdminClient.GetTaggedMetadata(bucketName)
+		if metaErr == nil {
+			if owner := strings.TrimSpace(metadata["owner"]); owner != "" {
+				bucketOwner = owner
+			}
+		}
+
+		if (uid == types.DefaultOwner) || (bucketOwner == uid) {
+			v := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: uid})
 			err := handlers.DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
 				BucketName: bucketName,
 				Visibility: v,

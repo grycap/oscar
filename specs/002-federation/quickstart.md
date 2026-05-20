@@ -1,0 +1,105 @@
+# Quickstart: Federated OSCAR Service Replicas
+
+## Prerequisites
+- OIDC bearer token valid across target OSCAR clusters.
+- An OSCAR service definition (FDL) you can deploy.
+- Input data stored in the origin cluster MinIO; target replicas retrieve
+  credentials via `/system/config` using the delegated bearer token.
+
+## 1) Create a federated service (coordinator FDL)
+
+Create a service FDL with federation settings (example placeholders):
+
+```yaml
+functions:
+  oscar:
+    - name: grayifyr0
+      image: ghcr.io/grycap/imagemagick
+      cpu: "0.5"
+      memory: 0.5Gi
+      script: script.sh
+      federation:
+        topology: mesh
+        delegation: random
+        members:
+          - type: oscar
+            cluster_id: oscar-cluster-a
+            service_name: grayifyr1
+          - type: oscar
+            cluster_id: oscar-cluster-b
+            service_name: grayifyr2
+      input:
+        - storage_provider: minio.default
+          path: grayifyr0/in
+      output:
+        - storage_provider: minio.default
+          path: grayifyr0/out
+      storage_providers:
+        minio:
+          default:
+            endpoint: http://<origin-minio-nodeport>
+            verify: false
+            region: us-east-1
+```
+
+Submit the FDL to the coordinator cluster (via existing OSCAR create service API
+or CLI). OSCAR Manager expands the FDL and deploys replicas to all clusters.
+
+## 2) Find the replica endpoint (kind)
+
+In kind, OSCAR is exposed via the ingress controller NodePort (not the `oscar`
+service ClusterIP). Use the replica cluster context and node IP:
+
+```bash
+kubectl --context <replica-context> get ingress -n oscar oscar
+kubectl --context <replica-context> get svc -n ingress-nginx ingress-nginx-controller
+kubectl --context <replica-context> get nodes -o wide
+```
+
+Build the endpoint as:
+
+- HTTPS: `https://<node-ip>:<ingress-https-nodeport>`
+- HTTP: `http://<node-ip>:<ingress-http-nodeport>`
+
+Example (kind):
+
+- node IP: `172.18.0.3`
+- ingress HTTPS NodePort: `31445`
+- endpoint: `https://172.18.0.3:31445`
+
+## 3) Verify federation members
+
+Use the federation API to confirm topology and members:
+
+```bash
+curl -H "Authorization: Bearer <SERVICE_TOKEN>" \
+  https://<cluster-endpoint>/system/federation/grayifyr0
+```
+
+## 4) Add or update federation members
+
+Add a replica:
+
+```bash
+curl -X POST -H "Authorization: Bearer <SERVICE_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"members":[{"type":"oscar","cluster_id":"oscar-cluster-c","service_name":"grayifyr3"}]}' \
+  https://<cluster-endpoint>/system/federation/grayifyr0
+```
+
+Updates apply to the whole topology and are propagated by OSCAR Manager.
+
+## Notes
+- Initial deployment is transactional: if any replica fails to deploy, OSCAR
+  removes the coordinator service and any replicas that were created. Replica
+  updates via `/system/federation` are best-effort per member.
+- Delegation uses bearer tokens that are valid across federation clusters.
+- Offloading only happens when the local cluster cannot schedule the job. To
+  force delegation during testing, set `federation.rescheduler_threshold: 10` (seconds)
+  on the service and enable the rescheduler on the coordinator so pending jobs
+  are delegated after ~10s. Example:
+
+  ```bash
+  kubectl -n oscar set env deployment/oscar RESCHEDULER_ENABLE=true
+  kubectl -n oscar rollout status deployment/oscar
+  ```

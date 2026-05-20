@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"github.com/grycap/oscar/v4/pkg/backends"
 	"github.com/grycap/oscar/v4/pkg/metrics"
 	"github.com/grycap/oscar/v4/pkg/types"
@@ -159,6 +161,60 @@ func TestMetricValueHandlerAllMetrics(t *testing.T) {
 	}
 	if !foundCPU {
 		t.Fatalf("expected cpu-hours metric in response")
+	}
+}
+
+func TestMetricValueHandlerBasicAuthAllowsDeletedServiceHistory(t *testing.T) {
+	back := backends.MakeFakeBackend()
+	back.AddError("ReadService", apierrors.NewNotFound(schema.GroupResource{Resource: "services"}, "deleted-svc"))
+	agg := &metrics.Aggregator{
+		Sources: metrics.Sources{
+			RequestLogs: &fakeRequestLogs{records: []metrics.RequestRecord{
+				{ServiceID: "deleted-svc", UserID: "u1", Type: metrics.RequestSync},
+			}},
+		},
+	}
+	router := setupMetricsRouter(back, agg)
+
+	req := httptest.NewRequest(http.MethodGet, "/system/metrics/deleted-svc?metric=requests-sync-per-service&start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z", nil)
+	req.Header.Set("Authorization", "Basic b3NjYXI6cGFzcw==")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	var resp types.MetricValueResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unexpected json error: %v", err)
+	}
+	if resp.Value != 1 {
+		t.Fatalf("expected sync count 1, got %v", resp.Value)
+	}
+}
+
+func TestMetricValueHandlerOIDCDeletedServiceNotFound(t *testing.T) {
+	back := backends.MakeFakeBackend()
+	back.AddError("ReadService", apierrors.NewNotFound(schema.GroupResource{Resource: "services"}, "deleted-svc"))
+	agg := &metrics.Aggregator{
+		Sources: metrics.Sources{
+			RequestLogs: &fakeRequestLogs{records: []metrics.RequestRecord{
+				{ServiceID: "deleted-svc", UserID: "u1", Type: metrics.RequestSync},
+			}},
+		},
+	}
+	router := setupMetricsRouter(back, agg, func(c *gin.Context) {
+		c.Set("uidOrigin", "u1")
+		c.Next()
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/system/metrics/deleted-svc?metric=requests-sync-per-service&start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z", nil)
+	req.Header.Set("Authorization", "Bearer token")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
 	}
 }
 
@@ -384,6 +440,7 @@ func TestMetricsSummaryHandlerBasicAuthSeesAllServices(t *testing.T) {
 			RequestLogs: &fakeRequestLogs{records: []metrics.RequestRecord{
 				{ServiceID: "svc-public", UserID: "u1", Type: metrics.RequestSync, Country: "ES"},
 				{ServiceID: "svc-private", UserID: "u2", Type: metrics.RequestSync, Country: "FR"},
+				{ServiceID: "deleted-svc", UserID: "u3", Type: metrics.RequestAsync, Country: "DE"},
 			}},
 			CountrySource: &fakeCountrySource{},
 		},
@@ -406,11 +463,14 @@ func TestMetricsSummaryHandlerBasicAuthSeesAllServices(t *testing.T) {
 	if resp.Totals.ServicesCountActive != 2 {
 		t.Fatalf("expected 2 services for basic auth, got %d", resp.Totals.ServicesCountActive)
 	}
+	if resp.Totals.ServicesCountTotal != 3 {
+		t.Fatalf("expected 3 total services from historical request logs, got %d", resp.Totals.ServicesCountTotal)
+	}
 	if resp.Totals.CPUHoursTotal != 5 {
 		t.Fatalf("expected unscoped CPU total 5, got %v", resp.Totals.CPUHoursTotal)
 	}
-	if resp.Totals.RequestsCountTotal != 2 {
-		t.Fatalf("expected unscoped request total 2, got %d", resp.Totals.RequestsCountTotal)
+	if resp.Totals.RequestsCountTotal != 3 {
+		t.Fatalf("expected unscoped request total 3, got %d", resp.Totals.RequestsCountTotal)
 	}
 }
 

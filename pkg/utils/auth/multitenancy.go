@@ -132,6 +132,9 @@ func (mc *MultitenancyConfig) CreateSecretForOIDC(uid string, sk string) error {
 }
 
 func (mc *MultitenancyConfig) GetUserCredentials(uid string) (string, string, error) {
+	//fmt.Println("+++++++++")
+	//fmt.Println(uid)
+	//fmt.Println("+++++++")
 	secretName := FormatUID((uid))
 	secret, err := mc.kubeClientset.CoreV1().Secrets(ServicesNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {

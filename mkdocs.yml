@@ -45,6 +45,10 @@ nav:
   - integration-jupyter.md
 
 - Training:
+  - Hands-on Labs:
+    - hands-on.md
+    - Lab 01 - Deploy & Execute: hands-on-deploy-execute.md
+    - Lab 02 - Interactive Analysis: hands-on-interactive-analysis.md
   - Tutorials: tutorials.md
   - Webinars: training.md
   - faq.md

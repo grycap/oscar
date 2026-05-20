@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -59,6 +60,12 @@ const (
 
 	// WatchdogProcess name of the environment variable used by the watchdog to handle requests
 	WatchdogProcess = "fprocess"
+
+	// RefreshTokenSecretKey secret key used for federation refresh tokens
+	RefreshTokenSecretKey = "refresh_token"
+
+	// RefreshTokenSecretSuffix suffix for per-service refresh token secrets
+	RefreshTokenSecretSuffix = "refresh-token"
 
 	// SupervisorName name of the FaaS Supervisor binary
 	SupervisorName = "supervisor"
@@ -146,6 +153,10 @@ const (
 	DefaultOwner = "cluster_admin"
 
 	JobOwnerExecutionAnnotation = "oscar.grycap/job-owner"
+
+	OriginClusterAnnotation    = "oscar.grycap/origin-cluster"
+	OriginServiceAnnotation    = "oscar.grycap/origin-service"
+	FederationWorkerAnnotation = "oscar.grycap/federation-worker"
 )
 
 // YAMLMarshal package-level yaml marshal function
@@ -206,20 +217,9 @@ type Service struct {
 		MaxScale int `json:"max_scale"`
 	} `json:"synchronous"`
 
-	// Replicas list of replicas to delegate jobs
+	// Federation defines a service federation across clusters
 	// Optional
-	Replicas ReplicaList `json:"replicas,omitempty"`
-
-	//Delegation Mode of job delegation for replicas
-	// Opcional (default: manual)
-	//"static" The user select the priority to delegate jobs to the replicas.
-	//"random" The job delegation priority is generated randomly among the clusters of the available replicas.
-	//"load-based" The job delegation priority is generated depending on the CPU and Memory available in the replica clusters.
-	Delegation string `json:"delegation"`
-
-	// ReSchedulerThreshold time (in seconds) that a job (with replicas) can be queued before delegating it
-	// Optional
-	ReSchedulerThreshold int `json:"rescheduler_threshold"`
+	Federation *Federation `json:"federation,omitempty"`
 
 	// LogLevel log level for the FaaS Supervisor
 	// Optional. (default: INFO)
@@ -327,6 +327,130 @@ type Service struct {
 	// Deployment exposes an optional deployment summary in list/read API responses.
 	// Internal/API use only, not part of FDL.
 	Deployment *ServiceDeploymentSummary `json:"deployment,omitempty" yaml:"-"`
+
+	// Kserve configuration to deploy the service using KServe InferenceService CRD
+	Kserve *Kserve `json:"kserve,omitempty"`
+}
+
+type Kserve struct {
+	// Type the type of KServe service to deploy
+	// Required. Set the type of KServe service, either "inference" for a standard InferenceService
+	// or "llm_inference" for an LLMInferenceService
+	Type string `json:"type,omitempty" default:"inference"`
+
+	// Inference configuration for KServe InferenceService.
+	// It is required when Type is set to "inference"
+	Inference *KserveInference `json:"inference,omitempty"`
+
+	// LLMInference configuration for KServe LLMInferenceService.
+	// It is required when Type is set to "llm_inference"
+	LLMInference *KserveLLMInference `json:"llm_inference,omitempty"`
+
+	// StorageUri the URI of the model storage for KServe
+	// Required. It should follow the format expected by KServe, for example:
+	StorageUri string `json:"storage_uri"`
+
+	// Can be used to specify the protocol version for KServe (e.g., "v1", "v2").
+	// Optional. (default: "v1")
+	APIVersion string `json:"api_version,omitempty" default:"v1"`
+
+	// MinScale minimum number of active replicas (pods) for the service
+	// Optional. (default: 0)
+	MinScale int32 `json:"min_scale,omitempty" default:"0"`
+
+	// MaxScale maximum number of active replicas (pods) for the service
+	// Optional. (default: 10)
+	MaxScale int32 `json:"max_scale,omitempty" default:"10"`
+
+	// CPU cpu limit for the service following the kubernetes format
+	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
+	// Optional. (default: 0.2)
+	CPU string `json:"cpu" default:"0.2"`
+
+	// Memory memory limit for the service following the kubernetes format
+	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
+	// Optional. (default: 256Mi)
+	Memory string `json:"memory" default:"256Mi"`
+
+	// Args command-line arguments to be passed to the container
+	// Optional
+	Args []string `json:"args,omitempty"`
+
+	// Environment variables to be passed to the container
+	// Optional
+	Env map[string]string `json:"env,omitempty"`
+
+	// EnableGPU parameter to request gpu usage in KServe InferenceService
+	// Optional. (default: false)
+	EnableGPU bool `json:"enable_gpu,omitempty" default:"false"`
+
+	// SetAuth parameter to set the authentication for the KServe InferenceService
+	// Optional. (default: false)
+	SetAuth bool `json:"set_auth,omitempty" default:"false"`
+}
+
+// UnmarshalJSON sets KServe defaults for fields that may be omitted in API requests.
+func (k *Kserve) UnmarshalJSON(data []byte) error {
+	type Alias Kserve
+
+	// Set default values for optional fields
+	aux := Alias{
+		APIVersion: "v1",
+		CPU:        "0.2",
+		Memory:     "256Mi",
+		SetAuth:    false,
+		MinScale:   0,
+		MaxScale:   10,
+		EnableGPU:  false,
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	// Validate required fields
+	if strings.TrimSpace(aux.StorageUri) == "" {
+		return fmt.Errorf("Kserve StorageUri is required")
+	}
+	if strings.TrimSpace(aux.Type) == "" {
+		return fmt.Errorf("Kserve Type is required")
+	}
+
+	*k = Kserve(aux)
+	return nil
+}
+
+type KserveInference struct {
+	// ModelFormat the model format to use for KServe InferenceService
+	// ("onnx", "sklearn", "xgboost", "pytorch", "tensorflow", "triton", "huggingface").
+	ModelFormat string `json:"model_format,omitempty"`
+	// Runtime the KServe runtime to use
+	// Optional.
+	Runtime string `json:"runtime,omitempty"`
+}
+
+func (k *KserveInference) UnmarshalJSON(data []byte) error {
+	type Alias KserveInference
+
+	aux := Alias{}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// ModelFormat is required for KServe InferenceService
+	if strings.TrimSpace(aux.ModelFormat) == "" {
+		return fmt.Errorf("Kserve Inference ModelFormat is required")
+	}
+
+	*k = KserveInference(aux)
+	return nil
+}
+
+type KserveLLMInference struct {
+	// At the moment only supported for LLMInferenceService,
+	// the runtime image to use for KServe when IsLLM is true
+	// Optional. (default: a custom image based on vLLM for CPU and another one with GPU support)
+	RuntimeImage string `json:"runtime_image,omitempty"`
 }
 
 // ServiceVolumeConfig stores the requested size and mount path for a managed volume.
@@ -626,17 +750,18 @@ func (service *Service) GetSupervisorPath() string {
 	return fmt.Sprintf("%s/%s", VolumePath, SupervisorName)
 }
 
+// HasFederationMembers checks if the service defines federation members.
+func (service *Service) HasFederationMembers() bool {
+	return service.Federation != nil && len(service.Federation.Members) > 0
+
+}
+
 // GetExposedBasePath returns the OSCAR exposed-service base path or an empty string.
 func (service *Service) GetExposedBasePath() string {
 	if service == nil || service.Expose.APIPort == 0 {
 		return ""
 	}
 	return fmt.Sprintf("/system/services/%s/exposed", service.Name)
-}
-
-// HasReplicas checks if the service has replicas defined
-func (service *Service) HasReplicas() bool {
-	return len(service.Replicas) > 0
 }
 
 // GetVolumeName returns the logical managed volume name used by the service.
