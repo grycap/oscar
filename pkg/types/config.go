@@ -543,17 +543,22 @@ func (cfg *Config) CheckAvailableGPUs(kubeClientset kubernetes.Interface) {
 
 // CheckAvailableInterLink checks if there is a node with the virtual kubelet annotation
 func (cfg *Config) CheckAvailableInterLink(kubeClientset kubernetes.Interface) {
-	nodes, err := kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: "!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master,type=virtual-kubelet"})
-	if err != nil {
-		log.Printf("Error getting list of nodes: %v\n", err)
+	selectors := []string{
+		"!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master,type=virtual-kubelet",
+		"!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master,virtual-node.interlink/type=virtual-kubelet",
 	}
-	if len(nodes.Items) > 0 {
-		cfg.InterLinkAvailable = true
-		log.Printf("INFO: InterLink Available")
-	} else {
-		cfg.InterLinkAvailable = false
-		log.Printf("INFO: InterLink Unavailable")
+	for _, selector := range selectors {
+		nodes, err := kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: selector})
+		if err != nil {
+			log.Printf("Error getting list of nodes: %v\n", err)
+		}
+		if len(nodes.Items) > 0 {
+			cfg.InterLinkAvailable = true
+			log.Printf("INFO: InterLink Available")
+			return
+		}
 	}
-	//cfg.InterLinkAvailable = true
+	cfg.InterLinkAvailable = false
+	log.Printf("INFO: InterLink Unavailable")
 
 }
