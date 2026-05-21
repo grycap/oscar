@@ -865,6 +865,7 @@ func createKserveResources(service *types.Kserve) (v1.ResourceRequirements, erro
 		if err != nil {
 			return resources, err
 		}
+		resources.Limits["nvidia.com/gpu"] = gpu
 		resources.Requests["nvidia.com/gpu"] = gpu
 	}
 
