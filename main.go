@@ -17,7 +17,7 @@ limitations under the License.
 */
 
 // @title OSCAR API
-// @version v2.0.0
+// @version v4.0.0
 // @description Secure REST API to manage OSCAR services, storage and executions.
 // @contact.name GRyCAP
 // @contact.email products@grycap.upv.es
