@@ -180,7 +180,7 @@ func TestMakeReadHandlerIncludeDeploymentSummary(t *testing.T) {
 		Name:      "svc",
 		Namespace: "default",
 		Expose: types.Expose{
-			APIPort: 8080,
+			APIPort: []int{8080},
 		},
 	}
 

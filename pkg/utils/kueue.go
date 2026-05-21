@@ -396,7 +396,8 @@ func getResourceOnlyWorkloadSpec(service *types.Service, cfg *types.Config, name
 		return nil, err
 	}
 	var serviceReplicas int32 = 1
-	if service.Expose.APIPort != 0 && service.Expose.MinScale > 1 {
+
+	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 && service.Expose.MinScale > 1 {
 		serviceReplicas = service.Expose.MinScale
 	} else if service.Synchronous.MinScale > 1 {
 		if service.Synchronous.MinScale > math.MaxInt32 {

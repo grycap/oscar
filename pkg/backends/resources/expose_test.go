@@ -55,9 +55,9 @@ func newExposeService(name string, nodePort int32, setAuth bool) types.Service {
 		Expose: types.Expose{
 			MinScale:      1,
 			MaxScale:      3,
-			APIPort:       9090,
+			APIPort:       []int{9090},
 			CpuThreshold:  55,
-			NodePort:      nodePort,
+			NodePort:      []int32{nodePort},
 			SetAuth:       setAuth,
 			RewriteTarget: false,
 		},
@@ -226,7 +226,7 @@ func TestCreateExposeNodePort(t *testing.T) {
 		t.Fatalf("expected NodePort service, got %s", kubeSvc.Spec.Type)
 	}
 
-	if kubeSvc.Spec.Ports[0].NodePort != svc.Expose.NodePort {
+	if kubeSvc.Spec.Ports[0].NodePort != svc.Expose.NodePort[0] {
 		t.Fatalf("expected nodePort %d, got %d", svc.Expose.NodePort, kubeSvc.Spec.Ports[0].NodePort)
 	}
 

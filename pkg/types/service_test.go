@@ -464,7 +464,7 @@ func TestGetExposedBasePath(t *testing.T) {
 			service: &Service{
 				Name: "demo",
 				Expose: Expose{
-					APIPort: 8080,
+					APIPort: []int{8080},
 				},
 			},
 			want: "/system/services/demo/exposed",
@@ -537,7 +537,7 @@ func TestToPodSpecWithExposeMetadataEnvVars(t *testing.T) {
 	}
 	svc := copy.(Service)
 	svc.Token = "test-token"
-	svc.Expose.APIPort = 8080
+	svc.Expose.APIPort = []int{8080}
 
 	podSpec, err := svc.ToPodSpec(&testConfig)
 	if err != nil {

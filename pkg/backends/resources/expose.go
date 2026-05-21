@@ -102,7 +102,12 @@ func CreateExpose(service types.Service, namespace string, kubeClientset kuberne
 	if err != nil {
 		return fmt.Errorf("error creating svc for exposed service '%s': %v", service.Name, err)
 	}
-	if service.Expose.NodePort == 0 {
+	// 1. We securely validate if the primary port (index 0) has a static NodePort assigned
+	hasFirstNodePort := len(service.Expose.NodePort) > 0 && service.Expose.NodePort[0] != 0
+
+	// 2. If the user did not define ports (for security reasons) or if the first port does NOT have a fixed NodePort,
+	// we proceed to expose the HTTP service through OSCAR's Ingress..
+	if len(service.Expose.APIPort) == 0 || !hasFirstNodePort {
 		err = createRoute(service, targetNamespace, kubeClientset, cfg)
 		if err != nil {
 			return fmt.Errorf("error creating route for exposed service '%s': %v", service.Name, err)
@@ -174,12 +179,19 @@ func UpdateExpose(service types.Service, namespace string, kubeClientset kuberne
 		return err
 	}
 
-	if service.Expose.NodePort != 0 {
+	// 1. We securely validate if the primary port (index 0) has a static NodePort assigned
+	hasFirstNodePort := len(service.Expose.NodePort) > 0 && service.Expose.NodePort[0] != 0
+
+	// 2. We adapt the Ingress (Route) update/removal logic
+	// If the main port DOES have a fixed static NodePort, we remove the Ingress/Route if it existed previously.
+	if len(service.Expose.APIPort) > 0 && hasFirstNodePort {
 		if err = deleteRouteResources(service.Name, targetNamespace, kubeClientset, cfg); err != nil {
 			log.Printf("error deleting route service: %v\n", err)
 			return err
 		}
 	} else {
+		// If no ports were defined or the primary port does NOT have a fixed NodePort (i.e., it uses Ingress),
+		// we create or update the public route using upsertRoute.
 		if err = upsertRoute(service, targetNamespace, kubeClientset, cfg); err != nil {
 			log.Printf("error updating route service: %v\n", err)
 			return err
@@ -468,12 +480,14 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 	podSpec, _ := service.ToPodSpec(cfg)
 
 	for i := range podSpec.Containers {
-		podSpec.Containers[i].Ports = []v1.ContainerPort{
-			{
-				Name:          podPortName,
-				ContainerPort: int32(service.Expose.APIPort), // #nosec G115
-			},
+		containerPorts := []v1.ContainerPort{}
+		for index, port := range service.Expose.APIPort {
+			containerPorts = append(containerPorts, v1.ContainerPort{
+				Name:          fmt.Sprintf("%s-%d", podPortName, index),
+				ContainerPort: int32(port), // #nosec G115
+			})
 		}
+		podSpec.Containers[i].Ports = containerPorts
 		podSpec.Containers[i].VolumeMounts[0].ReadOnly = false
 		if service.Expose.DefaultCommand {
 			podSpec.Containers[i].Command = nil
@@ -613,32 +627,54 @@ func createService(service types.Service, namespace string, kubeClientset kubern
 // Return a kubernetes service component, ready to deploy or update
 func getServiceSpec(service types.Service, namespace string, cfg *types.Config) *v1.Service {
 	name_service := getServiceName(service.Name)
-	var port v1.ServicePort = v1.ServicePort{
-		Name: servicePortName,
-		Port: servicePortNumber,
-		TargetPort: intstr.IntOrString{
-			Type:   0,
-			IntVal: int32(service.Expose.APIPort), // #nosec G115
-		},
-	}
+	servicePorts := []v1.ServicePort{}
 	service_type := v1.ServiceType(typeClusterIP)
-	if service.Expose.NodePort != 0 {
-		service_type = typeNodePort
-		port.NodePort = service.Expose.NodePort
+
+	for index, apiPort := range service.Expose.APIPort {
+		currentServicePort := int32(servicePortNumber + index)
+
+		portSpec := v1.ServicePort{
+			Name: fmt.Sprintf("%s-%d", servicePortName, index),
+			Port: currentServicePort,
+			TargetPort: intstr.IntOrString{
+				Type:   0,
+				IntVal: int32(apiPort),
+			},
+		}
+
+		// Protection: Check if the NodePort array has an element for this index
+		if index < len(service.Expose.NodePort) {
+			currentNodePort := service.Expose.NodePort[index]
+			if currentNodePort != 0 {
+				service_type = typeNodePort
+				portSpec.NodePort = currentNodePort
+			}
+		}
+
+		servicePorts = append(servicePorts, portSpec)
 	}
+
+	// Fallback in case the array was empty
+	if len(servicePorts) == 0 {
+		servicePorts = append(servicePorts, v1.ServicePort{
+			Name:       servicePortName,
+			Port:       servicePortNumber,
+			TargetPort: intstr.IntOrString{Type: 0, IntVal: 8080},
+		})
+	}
+
 	service_spec := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name_service,
 			Namespace: namespace,
 		},
 		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{port},
+			Ports: servicePorts,
 			Type:  service_type,
 			Selector: map[string]string{
 				KeyLabelApp: GetKeyLabelApp(service.Name),
 			},
 		},
-		Status: v1.ServiceStatus{},
 	}
 	return service_spec
 }

@@ -824,7 +824,7 @@ func TestKubeDeleteService(t *testing.T) {
 		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "horizontalpodautoscalers", errorReaction)
 
 		exposedService := testService
-		exposedService.Expose.APIPort = 8080
+		exposedService.Expose.APIPort = []int{8080}
 
 		// Call
 		err := back.DeleteService(exposedService)

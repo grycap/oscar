@@ -169,7 +169,7 @@ func inspectDeploymentRuntime(back types.ServerlessBackend, kubeClientset kubern
 		return inspectKserveDeploymentRuntime(kubeClientset, service)
 	}
 
-	if service.Expose.APIPort != 0 {
+	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 {
 		return inspectExposedDeploymentRuntime(kubeClientset, service)
 	}
 
@@ -706,7 +706,7 @@ func inspectDeploymentRuntimeStatusOnly(back types.ServerlessBackend, kubeClient
 		return inspectKserveDeploymentRuntimeStatusOnly(kubeClientset, service)
 	}
 
-	if service.Expose.APIPort != 0 {
+	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 {
 		return inspectExposedDeploymentRuntimeStatusOnly(kubeClientset, service)
 	}
 
