@@ -543,15 +543,13 @@ func exposeKserveInferenceService(service *types.Service, knSvc *knv1.Service, c
 	}
 
 	if service.Kserve.SetAuth {
-		if err = createTraefikAuthMiddleware(gatewayClientset, service, knSvc); err != nil {
-			return fmt.Errorf("failed to create OIDC middleware: %v", err)
-		}
 		// TO DO: Create OIDC forwardAuth Traefik Middleware
-		/*
-			if err = createTraefikOIDCMiddleware(gatewayClientset, service, knSvc, cfg); err != nil {
-				return fmt.Errorf("failed to create OIDC middleware: %v", err)
-			}
-		*/
+		//err = createTraefikAuthMiddleware(gatewayClientset, service, knSvc)
+		err = createTraefikOIDCMiddleware(gatewayClientset, service, knSvc, cfg)
+		if err != nil {
+			return fmt.Errorf("failed to create Auth middleware: %v", err)
+		}
+
 	}
 
 	// Create HTTPRoute
@@ -637,12 +635,12 @@ func buildKserveName(serviceName string) string {
 // which will be used in the HTTPRoute to protect the KServe service.
 // TO DO: change implementation when decided how to handle authentication for KServe services
 func createTraefikOIDCMiddleware(gatewayClientset dynamic.Interface, service *types.Service, knSvc *knv1.Service, cfg *types.Config) error {
-	authEndpointAddress := fmt.Sprintf("http://%s.%s.svc.cluster.local:%d/system/config", cfg.Name, cfg.Namespace, cfg.ServicePort)
+	authEndpointAddress := fmt.Sprintf("http://%s.%s.svc.cluster.local:%d/system/services/%s", cfg.Name, cfg.Namespace, cfg.ServicePort, service.Name)
 	middleware := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "traefik.io/v1alpha1",
 		"kind":       "Middleware",
 		"metadata": map[string]any{
-			"name":            getTraefikCORSMiddlewareName(knSvc.Name),
+			"name":            getTraefikAuthMiddlewareName(knSvc.Name),
 			"namespace":       knSvc.Namespace,
 			"ownerReferences": getOwnerReference(knSvc),
 		},
@@ -885,8 +883,8 @@ func buildKserveLLMServiceRouter(service *types.Service, knSvc *knv1.Service, cf
 			return nil, fmt.Errorf("failed to create dynamic client: %v", err)
 		}
 
-		//err := createTraefikOIDCMiddleware(gatewayClientset, service, knSvc, cfg)
-		err = createTraefikAuthMiddleware(gatewayClientset, service, knSvc)
+		err = createTraefikOIDCMiddleware(gatewayClientset, service, knSvc, cfg)
+		//err = createTraefikAuthMiddleware(gatewayClientset, service, knSvc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Auth middleware: %v", err)
 		}
