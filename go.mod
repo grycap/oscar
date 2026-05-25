@@ -35,7 +35,7 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/minio/sha256-simd v1.0.0 // indirect
 	github.com/rs/xid v1.4.0 // indirect
-	github.com/shoenig/go-m1cpu v0.1.6 // indirect
+	github.com/shoenig/go-m1cpu v0.2.1 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20260127142750-a19766b6e2d4 // indirect
