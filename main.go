@@ -126,6 +126,9 @@ func main() {
 	system.GET("/services/:serviceName", handlers.MakeReadHandler(back, kubeClientset, cfg))
 	system.GET("/services/:serviceName/deployment", handlers.MakeGetDeploymentStatusHandler(back, kubeClientset, cfg))
 	system.GET("/services/:serviceName/deployment/logs", handlers.MakeGetDeploymentLogsHandler(back, kubeClientset, cfg))
+	system.POST("/services/:serviceName/stop", handlers.MakeStopExposedServiceHandler(back, kubeClientset, cfg))
+	system.POST("/services/:serviceName/start", handlers.MakeStartExposedServiceHandler(back, kubeClientset, cfg))
+	system.POST("/services/:serviceName/restart", handlers.MakeRestartExposedServiceHandler(back, kubeClientset, cfg))
 	system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
 	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
 

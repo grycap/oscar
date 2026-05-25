@@ -310,7 +310,7 @@ func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.D
 	state := types.DeploymentStatePending
 	switch {
 	case desired == 0:
-		state = types.DeploymentStatePending
+		state = types.DeploymentStateStopped
 	case available >= desired:
 		state = types.DeploymentStateReady
 	case available > 0:
@@ -322,6 +322,9 @@ func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.D
 	}
 
 	reason, transitioned := latestDeploymentCondition(deployment.Status.Conditions)
+	if state == types.DeploymentStateStopped {
+		reason = "Deployment is stopped."
+	}
 	if reason == "" && state == types.DeploymentStateDegraded {
 		reason = fmt.Sprintf("%d of %d instances are affected.", affected, desired)
 	}
