@@ -174,7 +174,7 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 
 	//Create an expose service
 	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 {
-		err = resources.CreateExpose(service, namespace, k.kubeClientset, k.config)
+		err = resources.CreateExpose(&service, namespace, k.kubeClientset, k.config)
 		if err != nil {
 			return err
 		}
@@ -285,6 +285,10 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 		err = resources.UpdateExpose(service, namespace, k.kubeClientset, k.config)
 		if err != nil {
 			return err
+		}
+		err = updateServiceConfigMap(&service, namespace, k.kubeClientset)
+		if err != nil {
+			log.Printf("Warning: failed to update ConfigMap with runtime NodePorts: %v\n", err)
 		}
 	}
 

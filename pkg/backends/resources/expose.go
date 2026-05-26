@@ -87,32 +87,66 @@ An exposed service can be of to types:
 - Ingress */
 
 // CreateExpose creates all the kubernetes components
-func CreateExpose(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
-	//ExposeLogger.Printf("Creating exposed service: \n%v\n", service)
+func CreateExpose(service *types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	ExposeLogger.Printf("Creating exposed service: \n%v\n", service.Name)
 	targetNamespace := namespace
 	if targetNamespace == "" {
 		targetNamespace = cfg.ServicesNamespace
 	}
+	if len(service.Expose.APIPort) != len(service.Expose.NodePort) {
+		return fmt.Errorf("The length of nodePort (%d) must be equal to that of api_port (%d)",
+			len(service.Expose.NodePort), len(service.Expose.APIPort))
+	}
 
-	err := createDeployment(service, targetNamespace, kubeClientset, cfg)
+	isFirstPortDynamic := len(service.Expose.NodePort) > 0 && service.Expose.NodePort[0] == 0
+	err := createDeployment(*service, targetNamespace, kubeClientset, cfg)
 	if err != nil {
 		return fmt.Errorf("error creating deployment for exposed service '%s': %v", service.Name, err)
 	}
-	err = createService(service, targetNamespace, kubeClientset, cfg)
+
+	ports, err := createService(service, targetNamespace, kubeClientset, cfg)
 	if err != nil {
 		return fmt.Errorf("error creating svc for exposed service '%s': %v", service.Name, err)
 	}
-	// 1. We securely validate if the primary port (index 0) has a static NodePort assigned
-	hasFirstNodePort := len(service.Expose.NodePort) > 0 && service.Expose.NodePort[0] != 0
 
-	// 2. If the user did not define ports (for security reasons) or if the first port does NOT have a fixed NodePort,
-	// we proceed to expose the HTTP service through OSCAR's Ingress..
-	if len(service.Expose.APIPort) == 0 || !hasFirstNodePort {
-		err = createRoute(service, targetNamespace, kubeClientset, cfg)
+	// 2. Secure Ingress Control
+	//hasFirstNodePort := len(service.Expose.NodePort) > 0 && service.Expose.NodePort[0] != 0
+	if len(service.Expose.NodePort) == 0 || isFirstPortDynamic {
+		err = createRoute(*service, targetNamespace, kubeClientset, cfg)
 		if err != nil {
 			return fmt.Errorf("error creating route for exposed service '%s': %v", service.Name, err)
 		}
 	}
+
+	// DIRECT SAVE IN CONFIGMAP
+	// At this point, 'service.Expose.NodePort' contains the exact actual ports (e.g., 33544, 1477, 6760)
+	if len(ports) > 0 {
+		cm, errCM := kubeClientset.CoreV1().ConfigMaps(targetNamespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
+		if errCM == nil {
+			// We temporarily clean up the script to avoid duplications in the YAML
+			scriptTmp := service.Script
+			service.Script = ""
+
+			// We force structured serialization with the newly injected ports
+			fdlUpdated, errYAML := service.ToYAML()
+			service.Script = scriptTmp
+
+			if errYAML == nil {
+				cm.Data[types.FDLFileName] = fdlUpdated
+				_, errUpdate := kubeClientset.CoreV1().ConfigMaps(targetNamespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
+				if errUpdate != nil {
+					log.Printf("[ERROR] Could not update final ConfigMap: %v\n", errUpdate)
+				} else {
+					log.Println("[SUCCESS] ConfigMap permanently synchronized with the actual assigned NodePorts!")
+				}
+			} else {
+				log.Printf("[ERROR] Failed to convert structure to YAML: %v\n", errYAML)
+			}
+		} else {
+			log.Printf("[ERROR] Could not read ConfigMap '%s' in namespace '%s': %v\n", service.Name, targetNamespace, errCM)
+		}
+	}
+	// ===========
 	return nil
 }
 
@@ -615,13 +649,29 @@ func updateDeployment(service types.Service, namespace string, kubeClientset kub
 /////////// Service
 
 // Create a kubernetes service component
-func createService(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
-	service_spec := getServiceSpec(service, namespace, cfg)
-	_, err := kubeClientset.CoreV1().Services(namespace).Create(context.TODO(), service_spec, metav1.CreateOptions{})
+func createService(service *types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) ([]int32, error) {
+	service_spec := getServiceSpec(*service, namespace, cfg)
+	createdService, err := kubeClientset.CoreV1().Services(namespace).Create(context.TODO(), service_spec, metav1.CreateOptions{})
+
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+
+	var realPorts []int32
+	if createdService.Spec.Type == v1.ServiceTypeNodePort {
+		// We create a temporary array of the same size to dump the real ports
+		realPorts = make([]int32, len(createdService.Spec.Ports))
+
+		for index, port := range createdService.Spec.Ports {
+			// We save the port returned by Kubernetes (it is converted from int32 to int)
+			realPorts[index] = port.NodePort
+			log.Printf("Real port assigned by Kubernetes (Index: %d): %d\n", index, port.NodePort)
+		}
+
+		service.Expose.NodePort = realPorts
+	}
+
+	return realPorts, nil
 }
 
 // Return a kubernetes service component, ready to deploy or update
@@ -629,6 +679,10 @@ func getServiceSpec(service types.Service, namespace string, cfg *types.Config) 
 	name_service := getServiceName(service.Name)
 	servicePorts := []v1.ServicePort{}
 	service_type := v1.ServiceType(typeClusterIP)
+	//service_type := typeClusterIP
+	if len(service.Expose.NodePort) > 0 && len(service.Expose.NodePort) == len(service.Expose.APIPort) {
+		service_type = v1.ServiceType(typeNodePort)
+	}
 
 	for index, apiPort := range service.Expose.APIPort {
 		currentServicePort := int32(servicePortNumber + index)
@@ -643,10 +697,20 @@ func getServiceSpec(service types.Service, namespace string, cfg *types.Config) 
 		}
 
 		// Protection: Check if the NodePort array has an element for this index
+		/*
+			if index < len(service.Expose.NodePort) {
+				currentNodePort := service.Expose.NodePort[index]
+				if currentNodePort != 0 {
+					service_type = typeNodePort
+					portSpec.NodePort = currentNodePort
+				}
+			}
+
+			servicePorts = append(servicePorts, portSpec)
+		*/
 		if index < len(service.Expose.NodePort) {
 			currentNodePort := service.Expose.NodePort[index]
 			if currentNodePort != 0 {
-				service_type = typeNodePort
 				portSpec.NodePort = currentNodePort
 			}
 		}

@@ -158,7 +158,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 
 	// For exposed services, skip Knative Service creation and deploy only exposed resources.
 	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 {
-		err = resources.CreateExpose(service, namespace, kn.kubeClientset, kn.config)
+		err = resources.CreateExpose(&service, namespace, kn.kubeClientset, kn.config)
 		if err != nil {
 			return err
 		}

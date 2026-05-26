@@ -759,7 +759,7 @@ func (service *Service) HasFederationMembers() bool {
 // GetExposedBasePath returns the OSCAR exposed-service base path or an empty string.
 func (service *Service) GetExposedBasePath() string {
 
-	if service == nil || len(service.Expose.APIPort) == 0 || service.Expose.APIPort[0] == 0 {
+	if service == nil || len(service.Expose.APIPort) == 0 {
 		return ""
 	}
 	return fmt.Sprintf("/system/services/%s/exposed", service.Name)
