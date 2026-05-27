@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/backends"
-	"github.com/grycap/oscar/v3/pkg/testsupport"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	"github.com/grycap/oscar/v4/pkg/backends"
+	"github.com/grycap/oscar/v4/pkg/testsupport"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
 
@@ -172,8 +172,8 @@ func TestMakeUpdateHandlerForbiddenOwner(t *testing.T) {
 	resp := httptest.NewRecorder()
 	r.ServeHTTP(resp, req)
 
-	if resp.Code == http.StatusOK {
-		t.Fatalf("expected error status for different owner, got %d", resp.Code)
+	if resp.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for different owner, got %d: %s", resp.Code, resp.Body.String())
 	}
 }
 

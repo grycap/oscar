@@ -47,6 +47,8 @@ const (
 	serverlessBackendType = "serverlessBackend"
 	routeKindType         = "routeKind"
 	AIR                   = "allowed_image_repositories"
+	Ingress               = "ingress"
+	HTTPROUTE             = "httproute"
 )
 
 type configVar struct {
@@ -216,6 +218,12 @@ type Config struct {
 	// as described here: https://docs.egi.eu/providers/check-in/sp/#10-groups
 	OIDCGroups []string `json:"oidc_groups"`
 
+	// OIDCClientID OpenID Connect client ID used for token exchange
+	OIDCClientID string `json:"-"`
+
+	// OIDCClientSecret OpenID Connect client secret used for token exchange
+	OIDCClientSecret string `json:"-"`
+
 	UsersAdmin []string `json:"-"`
 
 	//
@@ -334,12 +342,14 @@ var configVars = []configVar{
 	//{"ResourceManager", "RESOURCE_MANAGER", false, resourceManagerType, "kubernetes"},
 	{"ResourceManagerInterval", "RESOURCE_MANAGER_INTERVAL", false, intType, "15"},
 	{"ReSchedulerEnable", "RESCHEDULER_ENABLE", false, boolType, "false"},
-	{"ReSchedulerInterval", "RESCHEDULER_INTERVAL", false, intType, "15"},
-	{"ReSchedulerThreshold", "RESCHEDULER_THRESHOLD", false, intType, "30"},
+	{"ReSchedulerInterval", "RESCHEDULER_INTERVAL", false, intType, "10"},
+	{"ReSchedulerThreshold", "RESCHEDULER_THRESHOLD", false, intType, "10"},
 	{"OIDCEnable", "OIDC_ENABLE", false, boolType, "false"},
 	{"OIDCValidIssuers", "OIDC_ISSUERS", false, stringSliceType, ""},
 	{"OIDCSubject", "OIDC_SUBJECT", false, stringType, ""},
 	{"OIDCGroups", "OIDC_GROUPS", false, stringSliceType, ""},
+	{"OIDCClientID", "OIDC_CLIENT_ID", false, stringType, ""},
+	{"OIDCClientSecret", "OIDC_CLIENT_SECRET", false, stringType, ""},
 	{"UsersAdmin", "USERS_ADMIN", false, stringSliceType, ""},
 	{"IngressHost", "INGRESS_HOST", false, stringType, ""},
 	{"ExposedServicesRouteKind", "EXPOSED_SERVICES_ROUTE_KIND", false, routeKindType, "ingress"},
@@ -455,11 +465,11 @@ func parseServerlessBackend(s string) (string, error) {
 
 func parseRouteKind(s string) (string, error) {
 	if len(s) == 0 {
-		return "ingress", nil
+		return Ingress, nil
 	}
 
 	str := strings.ToLower(strings.TrimSpace(s))
-	if str != "ingress" && str != "httproute" {
+	if str != Ingress && str != HTTPROUTE {
 		return "", fmt.Errorf("must be \"ingress\" or \"httproute\"")
 	}
 
@@ -531,19 +541,25 @@ func (cfg *Config) CheckAvailableGPUs(kubeClientset kubernetes.Interface) {
 	}
 }
 
-// CheckAvailableInterLink checks if there is a node with the virtual kubelet annotation
+// CheckAvailableInterLink checks if there is a node with a virtual-kubelet label
 func (cfg *Config) CheckAvailableInterLink(kubeClientset kubernetes.Interface) {
-	nodes, err := kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: "!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master,type=virtual-kubelet"})
-	if err != nil {
-		log.Printf("Error getting list of nodes: %v\n", err)
+	selectors := []string{
+		"!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master,type=virtual-kubelet",
+		"!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master,virtual-node.interlink/type=virtual-kubelet",
 	}
-	if len(nodes.Items) > 0 {
-		cfg.InterLinkAvailable = true
-		log.Printf("INFO: InterLink Available")
-	} else {
-		cfg.InterLinkAvailable = false
-		log.Printf("INFO: InterLink Unavailable")
+	for _, selector := range selectors {
+		nodes, err := kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: selector})
+		if err != nil {
+			log.Printf("Error listing nodes with selector %q: %v\n", selector, err)
+			continue
+		}
+		if len(nodes.Items) > 0 {
+			cfg.InterLinkAvailable = true
+			log.Printf("INFO: InterLink Available")
+			return
+		}
 	}
-	//cfg.InterLinkAvailable = true
+	cfg.InterLinkAvailable = false
+	log.Printf("INFO: InterLink Unavailable")
 
 }

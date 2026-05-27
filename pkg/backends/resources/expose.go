@@ -24,9 +24,9 @@ import (
 	"strings"
 
 	htpasswd "github.com/foomo/htpasswd"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
-	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	apps "k8s.io/api/apps/v1"
 	autos "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
@@ -256,6 +256,23 @@ func upsertRoute(service types.Service, namespace string, kubeClientset kubernet
 	}
 
 	return createIngress(service, namespace, kubeClientset, cfg)
+}
+
+// EnsureExposeAuthResources recreates or refreshes authentication resources for an exposed service.
+func EnsureExposeAuthResources(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	if !service.Expose.SetAuth {
+		return nil
+	}
+	if getRouteKind(cfg) == routeKindHTTPRoute {
+		if err := upsertTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
+			return err
+		}
+		return upsertTraefikAuthMiddleware(service, namespace)
+	}
+	if existsSecret(service.Name, namespace, kubeClientset, cfg) {
+		return updateSecret(service, namespace, kubeClientset, cfg)
+	}
+	return createSecret(service, namespace, kubeClientset, cfg)
 }
 
 func deleteRouteResources(serviceName string, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
@@ -795,6 +812,12 @@ func updateHTTPRoute(service types.Service, namespace string, kubeClientset kube
 	}
 
 	httpRoute := getHTTPRouteSpec(service, namespace, cfg)
+	currentHTTPRoute, err := gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Get(context.TODO(), httpRoute.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	httpRoute.SetResourceVersion(currentHTTPRoute.GetResourceVersion())
+
 	_, err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Update(context.TODO(), httpRoute, metav1.UpdateOptions{})
 	return err
 }
@@ -1029,6 +1052,12 @@ func updateTraefikCORSMiddleware(service types.Service, namespace string, cfg *t
 	}
 
 	middleware := getTraefikCORSMiddlewareSpec(service, namespace, cfg)
+	currentMiddleware, err := gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Get(context.TODO(), middleware.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	middleware.SetResourceVersion(currentMiddleware.GetResourceVersion())
+
 	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Update(context.TODO(), middleware, metav1.UpdateOptions{})
 	return err
 }
@@ -1059,6 +1088,12 @@ func updateTraefikAuthMiddleware(service types.Service, namespace string) error 
 	}
 
 	middleware := getTraefikAuthMiddlewareSpec(service, namespace)
+	currentMiddleware, err := gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Get(context.TODO(), middleware.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	middleware.SetResourceVersion(currentMiddleware.GetResourceVersion())
+
 	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Update(context.TODO(), middleware, metav1.UpdateOptions{})
 	return err
 }

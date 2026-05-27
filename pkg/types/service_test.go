@@ -41,13 +41,19 @@ var (
 		Alpine:    false,
 		Memory:    "1Gi",
 		CPU:       "1.0",
-		Replicas: []Replica{
-			{
-				Type:        "oscar",
-				ClusterID:   "test",
-				ServiceName: "testreplicaname",
-				Headers: map[string]string{
-					"Authorization": "Bearer testtoken",
+		Federation: &Federation{
+			GroupID:              "testgroup",
+			Topology:             "star",
+			Delegation:           "",
+			ReschedulerThreshold: 0,
+			Members: []Replica{
+				{
+					Type:        "oscar",
+					ClusterID:   "test",
+					ServiceName: "testreplicaname",
+					Headers: map[string]string{
+						"Authorization": "Bearer testtoken",
+					},
 				},
 			},
 		},
@@ -225,17 +231,18 @@ image_prefetch: false
 synchronous:
   min_scale: 0
   max_scale: 0
-replicas:
-- type: oscar
-  cluster_id: test
-  service_name: testreplicaname
-  url: ""
-  ssl_verify: false
-  priority: 0
-  headers:
-    Authorization: Bearer testtoken
-delegation: ""
-rescheduler_threshold: 0
+federation:
+  group_id: testgroup
+  topology: star
+  members:
+  - type: oscar
+    cluster_id: test
+    service_name: testreplicaname
+    url: ""
+    ssl_verify: false
+    priority: 0
+    headers:
+      Authorization: Bearer testtoken
 log_level: ""
 image: testimage
 alpine: false
@@ -422,15 +429,17 @@ func TestSetSecurityContext(t *testing.T) {
 	}
 }
 
-func TestHasReplicas(t *testing.T) {
+func TestHasFederationMembers(t *testing.T) {
 	svc := Service{}
-	if svc.HasReplicas() {
-		t.Fatalf("expected HasReplicas to be false with no replicas")
+	if svc.HasFederationMembers() {
+		t.Fatalf("expected HasFederationMembers to be false with no members")
 	}
 
-	svc.Replicas = []Replica{{Type: "oscar", ClusterID: "a", ServiceName: "svc"}}
-	if !svc.HasReplicas() {
-		t.Fatalf("expected HasReplicas to be true when replicas are defined")
+	svc.Federation = &Federation{
+		Members: []Replica{{Type: "oscar", ClusterID: "a", ServiceName: "svc"}},
+	}
+	if !svc.HasFederationMembers() {
+		t.Fatalf("expected HasFederationMembers to be true when members are defined")
 	}
 }
 

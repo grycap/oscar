@@ -1,4 +1,4 @@
-module github.com/grycap/oscar/v3
+module github.com/grycap/oscar/v4
 
 go 1.25.0
 
@@ -30,13 +30,12 @@ require (
 require (
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/fatih/color v1.16.0 // indirect
-	github.com/go-kit/log v0.2.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/minio/sha256-simd v1.0.0 // indirect
 	github.com/rs/xid v1.4.0 // indirect
-	github.com/shoenig/go-m1cpu v0.1.6 // indirect
+	github.com/shoenig/go-m1cpu v0.2.1 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20260127142750-a19766b6e2d4 // indirect
@@ -50,7 +49,6 @@ require (
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/foomo/htpasswd v0.0.0-20200116085101-e3a90e78da9c
 	github.com/golang-jwt/jwt/v4 v4.5.2
-	google.golang.org/genproto v0.0.0-20230803162519-f966b187b2e5 // indirect
 	k8s.io/metrics v0.35.3
 	knative.dev/serving v0.36.0
 )
@@ -61,9 +59,9 @@ require (
 )
 
 require (
-	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
+	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-openapi/swag/cmdutils v0.25.4 // indirect
 	github.com/go-openapi/swag/conv v0.25.4 // indirect
 	github.com/go-openapi/swag/fileutils v0.25.4 // indirect

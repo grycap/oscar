@@ -8,7 +8,7 @@ import (
 func TestIsMetricKeyValid(t *testing.T) {
 	tests := []struct {
 		name     string
-		key     MetricKey
+		key      MetricKey
 		expected bool
 	}{
 		{"Valid services count", MetricServicesCount, true},
@@ -109,21 +109,21 @@ func TestServiceMetricsResponse(t *testing.T) {
 
 func TestSummaryTotals(t *testing.T) {
 	totals := SummaryTotals{
-		ServicesCountActive:   10,
+		ServicesCountActive:  10,
 		ServicesCountTotal:   20,
-		CPUHoursTotal:         100,
+		CPUHoursTotal:        100,
 		GPUHoursTotal:        50,
-		RequestsCountTotal:     1000,
+		RequestsCountTotal:   1000,
 		RequestsCountSync:    600,
 		RequestsCountAsync:   300,
 		RequestsCountExposed: 100,
-		CountriesCount:      5,
+		CountriesCount:       5,
 		Countries: []CountryCount{
 			{Country: "US", RequestCount: 500},
 			{Country: "ES", RequestCount: 300},
 		},
 		UsersCount: 50,
-		Users:     []string{"user1", "user2"},
+		Users:      []string{"user1", "user2"},
 	}
 
 	if totals.ServicesCountActive != 10 {
@@ -148,11 +148,11 @@ func TestMetricsBreakdownResponse(t *testing.T) {
 		Items: []BreakdownItem{
 			{
 				Key:                "service-1",
-				ExecutionsCount:     100,
-				RequestsCountTotal:  100,
-				UniqueUsersCount:    10,
-				Users:             []string{"user1", "user2"},
-				Countries:         []CountryCount{{Country: "US", RequestCount: 50}},
+				ExecutionsCount:    100,
+				RequestsCountTotal: 100,
+				UniqueUsersCount:   10,
+				Users:              []string{"user1", "user2"},
+				Countries:          []CountryCount{{Country: "US", RequestCount: 50}},
 			},
 		},
 	}

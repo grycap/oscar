@@ -11,17 +11,17 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/backends"
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/backends"
+	"github.com/grycap/oscar/v4/pkg/types"
 	batchv1 "k8s.io/api/batch/v1"
 )
 
 func TestMakeJobHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
 	back.Services = []*types.Service{{
-		Name:  "testName",
-		Token: "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf",
-		CPU:   "100m",
+		Name:   "testName",
+		Token:  "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf",
+		CPU:    "100m",
 		Memory: "128Mi",
 	}}
 	cfg := types.Config{}

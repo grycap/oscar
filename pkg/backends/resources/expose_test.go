@@ -6,13 +6,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 type kueueMock struct {
@@ -145,6 +146,18 @@ func useFakeGatewayClient(t *testing.T) {
 	})
 }
 
+func useGatewayClient(t *testing.T, client dynamic.Interface) {
+	t.Helper()
+
+	gatewayClientsetProvider = func() (dynamic.Interface, error) {
+		return client, nil
+	}
+
+	t.Cleanup(func() {
+		gatewayClientsetProvider = getGatewayClientset
+	})
+}
+
 func TestCreateExposeWithIngressAndAuth(t *testing.T) {
 	mock := newKueueMock()
 	server := httptest.NewServer(mock)
@@ -226,7 +239,7 @@ func TestCreateExposeHTTPRouteWithAuth(t *testing.T) {
 	useFakeGatewayClient(t)
 
 	cfg := newTestConfig()
-	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 	cfg.HTTPRouteGatewayName = "public-gateway"
 	cfg.HTTPRouteGatewayNamespace = "gateway-system"
 	cfg.IngressHost = "example.org"
@@ -268,7 +281,7 @@ func TestCreateExposeHTTPRouteWithoutAuth(t *testing.T) {
 	useFakeGatewayClient(t)
 
 	cfg := newTestConfig()
-	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 	cfg.HTTPRouteGatewayName = "public-gateway"
 
 	svc := newExposeService("httproute-no-auth", 0, false)
@@ -528,13 +541,13 @@ func TestGetProbePath(t *testing.T) {
 
 func TestRouteKindSelection(t *testing.T) {
 	cfgIngress := newTestConfig()
-	cfgIngress.ExposedServicesRouteKind = "ingress"
+	cfgIngress.ExposedServicesRouteKind = types.Ingress
 	if getRouteKind(cfgIngress) == routeKindHTTPRoute {
 		t.Fatalf("expected ingress route kind")
 	}
 
 	cfgHTTPRoute := newTestConfig()
-	cfgHTTPRoute.ExposedServicesRouteKind = "httproute"
+	cfgHTTPRoute.ExposedServicesRouteKind = types.HTTPROUTE
 	if getRouteKind(cfgHTTPRoute) != routeKindHTTPRoute {
 		t.Fatalf("expected httproute route kind")
 	}
@@ -542,7 +555,7 @@ func TestRouteKindSelection(t *testing.T) {
 
 func TestGetHTTPRouteSpec(t *testing.T) {
 	cfg := newTestConfig()
-	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 	cfg.IngressHost = "example.org"
 	cfg.HTTPRouteGatewayName = "public-gateway"
 	cfg.HTTPRouteGatewayNamespace = "gateway-system"
@@ -649,7 +662,7 @@ func TestGetHTTPRouteSpec(t *testing.T) {
 func TestValidateHTTPRouteConfig(t *testing.T) {
 	svc := newExposeService("validation", 0, false)
 	cfg := newTestConfig()
-	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 
 	if err := validateHTTPRouteConfig(svc, cfg); err == nil {
 		t.Fatalf("expected error when HTTPROUTE_GATEWAY_NAME is empty")
@@ -669,7 +682,7 @@ func TestValidateHTTPRouteConfig(t *testing.T) {
 
 func TestGetHTTPRouteSpecWithAuth(t *testing.T) {
 	cfg := newTestConfig()
-	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 	cfg.HTTPRouteGatewayName = "public-gateway"
 
 	svc := newExposeService("http-route-auth", 0, true)
@@ -775,6 +788,77 @@ func TestGetTraefikCORSMiddlewareSpec(t *testing.T) {
 	}
 	if len(headers) != 2 || headers[0] != "Authorization" || headers[1] != "Content-Type" {
 		t.Fatalf("unexpected headers list: %v", headers)
+	}
+}
+
+func TestUpdateTraefikCORSMiddlewareSetsResourceVersion(t *testing.T) {
+	cfg := newTestConfig()
+	svc := newExposeService("cors-update-rv", 0, false)
+	namespace := cfg.ServicesNamespace
+
+	existing := getTraefikCORSMiddlewareSpec(svc, namespace, cfg)
+	existing.SetResourceVersion("42")
+
+	gatewayClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), existing)
+	gatewayClient.PrependReactor("update", "middlewares", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		updateAction, ok := action.(k8stesting.UpdateAction)
+		if !ok {
+			t.Fatalf("expected update action, got %T", action)
+		}
+
+		updatedObj, ok := updateAction.GetObject().(*unstructured.Unstructured)
+		if !ok {
+			t.Fatalf("expected unstructured object on update, got %T", updateAction.GetObject())
+		}
+
+		if updatedObj.GetResourceVersion() != "42" {
+			t.Fatalf("expected resourceVersion 42 on middleware update, got %q", updatedObj.GetResourceVersion())
+		}
+
+		return false, nil, nil
+	})
+
+	useGatewayClient(t, gatewayClient)
+
+	if err := updateTraefikCORSMiddleware(svc, namespace, cfg); err != nil {
+		t.Fatalf("updateTraefikCORSMiddleware returned error: %v", err)
+	}
+}
+
+func TestUpdateHTTPRouteSetsResourceVersion(t *testing.T) {
+	cfg := newTestConfig()
+	cfg.ExposedServicesRouteKind = routeKindHTTPRoute
+	cfg.HTTPRouteGatewayName = "public-gateway"
+
+	svc := newExposeService("httproute-update-rv", 0, false)
+	namespace := cfg.ServicesNamespace
+
+	existingRoute := getHTTPRouteSpec(svc, namespace, cfg)
+	existingRoute.SetResourceVersion("99")
+
+	gatewayClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), existingRoute)
+	gatewayClient.PrependReactor("update", "httproutes", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		updateAction, ok := action.(k8stesting.UpdateAction)
+		if !ok {
+			t.Fatalf("expected update action, got %T", action)
+		}
+
+		updatedObj, ok := updateAction.GetObject().(*unstructured.Unstructured)
+		if !ok {
+			t.Fatalf("expected unstructured object on update, got %T", updateAction.GetObject())
+		}
+
+		if updatedObj.GetResourceVersion() != "99" {
+			t.Fatalf("expected resourceVersion 99 on httproute update, got %q", updatedObj.GetResourceVersion())
+		}
+
+		return false, nil, nil
+	})
+
+	useGatewayClient(t, gatewayClient)
+
+	if err := updateHTTPRoute(svc, namespace, fake.NewSimpleClientset(), cfg); err != nil {
+		t.Fatalf("updateHTTPRoute returned error: %v", err)
 	}
 }
 

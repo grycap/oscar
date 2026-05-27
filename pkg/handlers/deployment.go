@@ -27,9 +27,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/backends"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/backends"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -269,7 +269,7 @@ func inspectKserveDeploymentRuntime(kubeClientset kubernetes.Interface, service 
 		return deploymentRuntimeContext{}, err
 	}
 
-	deployment, err := backends.GetKserveServiceDeployment(kubeClientset, service.Namespace, service.Name, service.Kserve.ModelFormat)
+	deployment, err := backends.GetKserveServiceDeployment(kubeClientset, service.Namespace, service.Name, service.Kserve.Type)
 	if err != nil {
 		if apierrors.IsNotFound(err) || apierrors.IsGone(err) {
 			items := podItems(pods)
@@ -310,7 +310,7 @@ func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.D
 	state := types.DeploymentStatePending
 	switch {
 	case desired == 0:
-		state = types.DeploymentStatePending
+		state = types.DeploymentStateStopped
 	case available >= desired:
 		state = types.DeploymentStateReady
 	case available > 0:
@@ -322,6 +322,9 @@ func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.D
 	}
 
 	reason, transitioned := latestDeploymentCondition(deployment.Status.Conditions)
+	if state == types.DeploymentStateStopped {
+		reason = "Deployment is stopped."
+	}
 	if reason == "" && state == types.DeploymentStateDegraded {
 		reason = fmt.Sprintf("%d of %d instances are affected.", affected, desired)
 	}
@@ -759,7 +762,7 @@ func inspectExposedDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interfac
 }
 
 func inspectKserveDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interface, service *types.Service) (types.ServiceDeploymentStatus, error) {
-	deployment, err := backends.GetKserveServiceDeployment(kubeClientset, service.Namespace, service.Name, service.Kserve.ModelFormat)
+	deployment, err := backends.GetKserveServiceDeployment(kubeClientset, service.Namespace, service.Name, service.Kserve.Type)
 	if err != nil {
 		if apierrors.IsNotFound(err) || apierrors.IsGone(err) {
 			return unavailableDeploymentStatus(service, "Current deployment resources are unavailable."), nil

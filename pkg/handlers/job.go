@@ -18,22 +18,26 @@ package handlers
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/grycap/oscar/v3/pkg/backends/resources"
-	"github.com/grycap/oscar/v3/pkg/resourcemanager"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
-	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	"github.com/grycap/oscar/v4/pkg/backends/resources"
+	"github.com/grycap/oscar/v4/pkg/resourcemanager"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	genericErrors "github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -58,12 +62,16 @@ const (
 	NodeSelectorKey       = "kubernetes.io/hostname"
 	MinIODefaultPath      = "/var/run/secrets/providers/minio.default"
 	MinIOSecretVolumeName = "minio-user"
+	MinIOSecretKeyName    = "accessKey"
+	MinIOSecretValueName  = "secretKey"
 
 	// Annotations for InterLink nodes
 	InterLinkDNSPolicy          = "ClusterFirst"
 	InterLinkRestartPolicy      = "OnFailure"
 	InterLinkTolerationKey      = "virtual-node.interlink/no-schedule"
 	InterLinkTolerationOperator = "Exists"
+
+	DelegationHeader = "X-Delegated-Job-ID"
 )
 
 // MakeJobHandler godoc
@@ -176,6 +184,11 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
 				return
 			}
+			mc := auth.NewMultitenancyConfig(kubeClientset, cfg.OIDCSubject)
+			if !mc.UserExists(uidFromToken) {
+				c.String(http.StatusForbidden, fmt.Sprintf("MinIO user not provisioned for %s; submit a direct request first", uidFromToken))
+				return
+			}
 		}
 		// Add secrets as environment variables if defined
 		if utils.SecretExists(service.Name, serviceNamespace, back.GetKubeClientset()) {
@@ -195,6 +208,8 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
+
+		c.Set("eventBytes", eventBytes)
 
 		// Check if it has the MinIO event format
 		requestUserUID, sourceIPAddress, err := decodeEventBytes(eventBytes)
@@ -230,9 +245,19 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			minIOSecretKey = "minio"
 		}
 
-		if err := ensureMinIOSecret(kubeClientset, minIOSecretKey, serviceNamespace); err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", minIOSecretKey, err))
+		secretName := auth.FormatUID(minIOSecretKey)
+		originSecretName, err := ensureOriginMinIODefaultSecretIfNeeded(c, cfg, service, serviceNamespace, kubeClientset, authHeader)
+		if err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
 			return
+		}
+		if originSecretName != "" {
+			secretName = originSecretName
+		} else {
+			if err := ensureMinIOSecret(kubeClientset, minIOSecretKey, serviceNamespace); err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", minIOSecretKey, err))
+				return
+			}
 		}
 
 		c.Next()
@@ -242,7 +267,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			Name: MinIOSecretVolumeName,
 			VolumeSource: v1.VolumeSource{
 				Secret: &v1.SecretVolumeSource{
-					SecretName: auth.FormatUID(minIOSecretKey),
+					SecretName: secretName,
 				},
 			},
 		})
@@ -252,6 +277,11 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			ReadOnly:  true,
 			MountPath: MinIODefaultPath,
 		})
+
+		if err := configureDelegatedMinIOProvider(c, serviceNamespace, service, podSpec, kubeClientset, authHeader); err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
 
 		// Initialize event envVar and args var
 		var event v1.EnvVar
@@ -274,15 +304,30 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			}
 		}
 
-		// Make JOB_UUID envVar
-		serviceNameLenght := len(service.Name)
-		serviceName := service.Name
-		jobUUID := uuid.New().String()
+		//extract delegation header
+		delegateUID := c.GetHeader(DelegationHeader)
+		var jobUUID string
 
-		if serviceNameLenght >= 25 {
-			serviceName = serviceName[:16]
+		if delegateUID != "" {
+			jobUUID = delegateUID
+			delegateFrom := c.GetHeader("X-Delegated-From")
+			jobLogger.Printf("Creating job \"%s\" delegated from cluster \"%s\" ", jobUUID, delegateFrom)
+
+		} else {
+
+			serviceNameLenght := len(service.Name)
+			serviceName := service.Name
+			jobUUID = uuid.New().String()
+
+			if serviceNameLenght >= 25 {
+				serviceName = serviceName[:16]
+			}
+			jobUUID = serviceName + "-" + jobUUID
+			jobLogger.Printf("Creating job \"%s\". ", jobUUID)
+
 		}
-		jobUUID = serviceName + "-" + jobUUID
+
+		// Make JOB_UUID envVar
 		jobUUIDVar := v1.EnvVar{
 			Name:  types.JobUUIDVariable,
 			Value: jobUUID,
@@ -311,9 +356,10 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		}
 
 		// Delegate job if can't be scheduled and has defined replicas
-		if rm != nil && service.HasReplicas() {
+		if rm != nil && service.HasFederationMembers() {
 			if !rm.IsSchedulable(podSpec.Containers[0].Resources) {
-				err := resourcemanager.DelegateJob(service, event.Value, resourcemanager.ResourceManagerLogger)
+				authHeader := c.GetHeader("Authorization")
+				err := resourcemanager.DelegateJob(service, event.Value, jobUUID, authHeader, resourcemanager.ResourceManagerLogger, cfg, back.GetKubeClientset())
 				if err == nil {
 					// TODO: check if another status code suits better
 					c.Status(http.StatusCreated)
@@ -353,9 +399,9 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		}
 
 		// Add ReScheduler label if there are replicas defined and the cfg.ReSchedulerEnable is true
-		if service.HasReplicas() && cfg.ReSchedulerEnable {
-			if service.ReSchedulerThreshold != 0 {
-				job.Labels[types.ReSchedulerLabelKey] = strconv.Itoa(service.ReSchedulerThreshold)
+		if service.HasFederationMembers() && cfg.ReSchedulerEnable {
+			if service.Federation != nil && service.Federation.ReschedulerThreshold != 0 {
+				job.Labels[types.ReSchedulerLabelKey] = strconv.Itoa(service.Federation.ReschedulerThreshold)
 			} else {
 				job.Labels[types.ReSchedulerLabelKey] = strconv.Itoa(cfg.ReSchedulerThreshold)
 			}
@@ -379,6 +425,10 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		}
 		c.Status(http.StatusCreated)
 	}
+}
+
+type configForUser struct {
+	MinIOProvider *types.MinIOProvider `json:"minio_provider"`
 }
 
 func decodeEventBytes(eventBytes []byte) (string, string, error) {
@@ -407,6 +457,240 @@ func decodeEventBytes(eventBytes []byte) (string, string, error) {
 		return "", "", genericErrors.New("Failed to decode records")
 	}
 
+}
+
+func ensureOriginMinIODefaultSecretIfNeeded(c *gin.Context, cfg *types.Config, service *types.Service, serviceNamespace string, kubeClientset kubernetes.Interface, authHeader string) (string, error) {
+	if service == nil || service.StorageProviders == nil || service.StorageProviders.MinIO == nil {
+		return "", nil
+	}
+	defaultProvider, ok := service.StorageProviders.MinIO[types.DefaultProvider]
+	if !ok || defaultProvider == nil {
+		return "", nil
+	}
+	if cfg == nil || cfg.MinIOProvider == nil {
+		return "", nil
+	}
+	if strings.TrimSpace(defaultProvider.Endpoint) == "" || defaultProvider.Endpoint == cfg.MinIOProvider.Endpoint {
+		return "", nil
+	}
+	if service.Annotations == nil {
+		return "", nil
+	}
+	originClusterID := strings.TrimSpace(service.Annotations[types.OriginClusterAnnotation])
+	if originClusterID == "" {
+		return "", nil
+	}
+	if service.Clusters == nil {
+		return "", nil
+	}
+	cluster, ok := service.Clusters[originClusterID]
+	if !ok {
+		return "", fmt.Errorf("origin cluster %q not defined in service clusters", originClusterID)
+	}
+	originEndpoint := strings.TrimSpace(cluster.Endpoint)
+	if originEndpoint == "" {
+		return "", fmt.Errorf("origin cluster %q endpoint is empty", originClusterID)
+	}
+
+	minIOProvider, err := fetchMinIOProvider(originEndpoint, authHeader, cluster.SSLVerify)
+	if err != nil {
+		return "", fmt.Errorf("error fetching origin MinIO credentials: %v", err)
+	}
+	if minIOProvider.AccessKey == "" || minIOProvider.SecretKey == "" {
+		return "", fmt.Errorf("origin MinIO credentials are empty for cluster %q", originClusterID)
+	}
+
+	uidOrigin, _ := c.Get("uidOrigin")
+	uid, _ := uidOrigin.(string)
+	uid = strings.TrimSpace(uid)
+	if uid == "" || uid == "nil" {
+		return "", fmt.Errorf("origin user id is missing for delegated job")
+	}
+
+	secretName := fmt.Sprintf("%s-origin-minio-%s", auth.FormatUID(uid), sanitizeSecretSuffix(originClusterID))
+	if err := upsertMinIOProviderSecret(kubeClientset, serviceNamespace, secretName, minIOProvider); err != nil {
+		return "", err
+	}
+
+	return secretName, nil
+}
+
+func configureDelegatedMinIOProvider(c *gin.Context, serviceNamespace string, service *types.Service, podSpec *v1.PodSpec, kubeClientset kubernetes.Interface, authHeader string) error {
+	providerType, providerID, ok := parseDelegatedStorageProvider(c)
+	if !ok || providerType != types.MinIOName || providerID == types.DefaultProvider {
+		return nil
+	}
+	if service == nil || service.Clusters == nil {
+		return nil
+	}
+	cluster, ok := service.Clusters[providerID]
+	if !ok {
+		return nil
+	}
+	endpoint := strings.TrimSpace(cluster.Endpoint)
+	if endpoint == "" {
+		return nil
+	}
+
+	minIOProvider, err := fetchMinIOProvider(endpoint, authHeader, cluster.SSLVerify)
+	if err != nil {
+		return err
+	}
+	if minIOProvider.AccessKey == "" || minIOProvider.SecretKey == "" {
+		return fmt.Errorf("origin MinIO credentials are empty for provider %q", providerID)
+	}
+
+	if service.StorageProviders == nil {
+		service.StorageProviders = &types.StorageProviders{}
+	}
+	if service.StorageProviders.MinIO == nil {
+		service.StorageProviders.MinIO = map[string]*types.MinIOProvider{}
+	}
+	if _, ok := service.StorageProviders.MinIO[providerID]; !ok {
+		providerCopy := *minIOProvider
+		providerCopy.AccessKey = ""
+		providerCopy.SecretKey = ""
+		service.StorageProviders.MinIO[providerID] = &providerCopy
+	}
+
+	secretName := buildMinIOProviderSecretName(c, providerID)
+	if secretName == "" {
+		return fmt.Errorf("unable to build MinIO secret name for provider %q", providerID)
+	}
+
+	if err := upsertMinIOProviderSecret(kubeClientset, serviceNamespace, secretName, minIOProvider); err != nil {
+		return err
+	}
+
+	volumeName := fmt.Sprintf("minio-provider-%s", sanitizeSecretSuffix(providerID))
+	podSpec.Volumes = append(podSpec.Volumes, v1.Volume{
+		Name: volumeName,
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName: secretName,
+			},
+		},
+	})
+	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
+		Name:      volumeName,
+		ReadOnly:  true,
+		MountPath: fmt.Sprintf("/var/run/secrets/providers/minio.%s", providerID),
+	})
+
+	return nil
+}
+
+func parseDelegatedStorageProvider(c *gin.Context) (string, string, bool) {
+	eventBytes, ok := c.Get("eventBytes")
+	if !ok {
+		return "", "", false
+	}
+	raw, ok := eventBytes.([]byte)
+	if !ok || len(raw) == 0 {
+		return "", "", false
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return "", "", false
+	}
+	rawProvider, ok := payload["storage_provider"].(string)
+	if !ok {
+		return "", "", false
+	}
+	rawProvider = strings.TrimSpace(rawProvider)
+	if rawProvider == "" {
+		return "", "", false
+	}
+	parts := strings.SplitN(rawProvider, types.ProviderSeparator, 2)
+	providerType := strings.ToLower(strings.TrimSpace(parts[0]))
+	providerID := types.DefaultProvider
+	if len(parts) == 2 && strings.TrimSpace(parts[1]) != "" {
+		providerID = strings.TrimSpace(parts[1])
+	}
+	return providerType, providerID, true
+}
+
+func fetchMinIOProvider(originEndpoint string, authHeader string, sslVerify bool) (*types.MinIOProvider, error) {
+	targetURL, err := url.Parse(originEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("invalid origin endpoint %q: %v", originEndpoint, err)
+	}
+	targetURL.Path = path.Join(targetURL.Path, "system", "config")
+	req, err := http.NewRequest(http.MethodGet, targetURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(authHeader) != "" {
+		req.Header.Set("Authorization", authHeader)
+	}
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: !sslVerify}, // #nosec G402
+	}
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   time.Second * 20,
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("origin /system/config returned status %d", res.StatusCode)
+	}
+	var cfgResp configForUser
+	if err := json.NewDecoder(res.Body).Decode(&cfgResp); err != nil {
+		return nil, err
+	}
+	if cfgResp.MinIOProvider == nil {
+		return nil, fmt.Errorf("origin /system/config did not include minio_provider")
+	}
+	return cfgResp.MinIOProvider, nil
+}
+
+func buildMinIOProviderSecretName(c *gin.Context, providerID string) string {
+	uidOrigin, _ := c.Get("uidOrigin")
+	uid, _ := uidOrigin.(string)
+	uid = strings.TrimSpace(uid)
+	if uid == "" || uid == "nil" {
+		return ""
+	}
+	return fmt.Sprintf("%s-minio-%s", auth.FormatUID(uid), sanitizeSecretSuffix(providerID))
+}
+
+func sanitizeSecretSuffix(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	value = strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+			return r
+		case r >= '0' && r <= '9':
+			return r
+		case r == '-' || r == '.':
+			return r
+		default:
+			return '-'
+		}
+	}, value)
+	value = strings.Trim(value, "-.")
+	if value == "" {
+		return "provider"
+	}
+	return value
+}
+
+func upsertMinIOProviderSecret(kubeClientset kubernetes.Interface, namespace string, secretName string, minioProvider *types.MinIOProvider) error {
+	if namespace == "" {
+		return fmt.Errorf("namespace is empty")
+	}
+	secretData := map[string]string{
+		MinIOSecretKeyName:   minioProvider.AccessKey,
+		MinIOSecretValueName: minioProvider.SecretKey,
+	}
+	if utils.SecretExists(secretName, namespace, kubeClientset) {
+		return utils.UpdateSecretData(secretName, namespace, secretData, kubeClientset)
+	}
+	return utils.CreateSecret(secretName, namespace, secretData, kubeClientset)
 }
 
 func ensureMinIOSecret(kubeClientset kubernetes.Interface, uid, namespace string) error {

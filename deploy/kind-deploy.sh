@@ -336,26 +336,122 @@ checkIngressStatus(){
     echo -e "\n[$GREEN$CHECK$END_COLOR] ingress-controller pod running correctly"
 }
 
+checkTraefikStatus(){
+    timeout=500
+    echo -e "\n[*] Waiting for Traefik pod to be running ..."
+    sleep 5
+    start=$(date +%s)
+    while [ "$traefik_status" != "Running" ]; do
+        traefik_status=$(kubectl get pods -n traefik 2>/dev/null | awk '/traefik/ {print $3}' | head -1)
+        actual=$(date +%s)
+        if [ $((actual - start)) -gt $timeout ]; then
+            echo -e "\n$RED[!]$END_COLOR Error: Timeout: Traefik pod status: $traefik_status"
+            exit
+        fi
+        sleep 5
+    done
+    echo -e "\n[$GREEN$CHECK$END_COLOR] Traefik pod running correctly"
+}
+
+deployCertManager(){
+        echo -e "\n[*] Deploying cert-manager ..."
+        if ! kubectl apply -f "https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml"; then
+                echo -e "$RED[!]$END_COLOR Failed to deploy cert-manager"
+                exit 1
+        fi
+
+        echo -e "\n[*] Waiting for cert-manager components to be ready ..."
+        wait_for_cert_manager
+}
+
+wait_for_cert_manager() {
+	kubectl -n cert-manager wait --for=condition=Available deployment/cert-manager deployment/cert-manager-cainjector deployment/cert-manager-webhook --timeout=180s
+	kubectl wait --for=condition=Established crd/certificaterequests.cert-manager.io crd/certificates.cert-manager.io crd/clusterissuers.cert-manager.io crd/issuers.cert-manager.io --timeout=120s
+	ensure_webhook_ca_bundle
+}
+
+ensure_webhook_ca_bundle() {
+	for _ in $(seq 1 30); do
+		if kubectl get validatingwebhookconfiguration cert-manager-webhook -o jsonpath="{.webhooks[*].clientConfig.caBundle}" | grep -qE '[A-Za-z0-9+/]{10,}'; then
+			return 0
+		fi
+		sleep 5
+	done
+	echo "Error: cert-manager webhook CA bundle was not injected in time." >&2
+	exit 1
+}
+
+createTraefikGatewayCertificate(){
+        echo -e "\n[*] Creating self-signed certificate for Traefik Gateway ..."
+
+        if ! cat <<EOF | kubectl apply -f -
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+    name: self-signed-issuer
+spec:
+    selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+    name: self-signed-cert
+    namespace: traefik
+spec:
+    secretName: traefik-gateway-tls
+    commonName: localhost
+    dnsNames:
+        - localhost
+    ipAddresses:
+        - 127.0.0.1
+    issuerRef:
+        name: self-signed-issuer
+        kind: ClusterIssuer
+EOF
+        then
+                echo -e "$RED[!]$END_COLOR Failed to create cert-manager issuer/certificate for Traefik"
+                exit 1
+        fi
+
+        if ! kubectl wait --namespace traefik --for=condition=Ready certificate/self-signed-cert --timeout=180s; then
+                echo -e "$RED[!]$END_COLOR Traefik TLS certificate was not issued in time"
+                exit 1
+        fi
+}
+
 deployGatewayController(){
   if [ "$GATEWAY_CONTROLLER" == "ingress" ]; then
       echo -e "\n[*] Deploying NGINX Ingress ..."
       kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/kind/deploy.yaml
       checkIngressStatus
   else
-      echo -e "\n[*] Installing Traefik Gateway ..."
+      deployCertManager
       kubectl create namespace traefik >/dev/null 2>&1 || true
+      createTraefikGatewayCertificate
+      echo -e "\n[*] Deploying Gateway API CRDs ..."
+      kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+      echo -e "\n[*] Installing Traefik Gateway ..."
       helm repo add --force-update  traefik https://traefik.github.io/charts
-      helm install --namespace=traefik traefik traefik/traefik --wait \
+      helm install --namespace=traefik traefik traefik/traefik --create-namespace \
+        --version 39.0.9 \
         --set providers.kubernetesGateway.enabled=true \
         --set providers.kubernetesCRD.allowCrossNamespace=true \
         --set gateway.enabled=true \
         --set gateway.listeners.web.namespacePolicy.from=All \
+        --set gateway.listeners.websecure.port=8443 \
+        --set gateway.listeners.websecure.protocol=HTTPS \
+        --set gateway.listeners.websecure.certificateRefs[0].name=traefik-gateway-tls \
+        --set gateway.listeners.websecure.certificateRefs[0].kind=Secret \
+        --set gateway.listeners.websecure.namespacePolicy.from=All \
         --set service.type=NodePort \
         --set ports.web.nodePort=30080 \
         --set ports.websecure.nodePort=30443 \
-        --set ports.traefik.expose.default=true --set ports.traefik.nodePort=31080 --set ports.traefik.exposedPort=31080 \
+        --set ports.traefik.expose.default=true \
+        --set ports.traefik.nodePort=31080 \
+        --set ports.traefik.exposedPort=31080 \
         --set api.dashboard=true \
         --set api.insecure=true
+        checkTraefikStatus
   fi
 }
 
@@ -836,6 +932,9 @@ nodes:
 - role: control-plane
   kubeadmConfigPatches:
   - |
+    kind: ClusterConfiguration
+    controlPlaneEndpoint: "${CLUSTER_NAME}-control-plane:6443"
+  - |
     kind: InitConfiguration
     nodeRegistration:
       kubeletExtraArgs:
@@ -890,6 +989,9 @@ nodes:
 - role: control-plane
   kubeadmConfigPatches:
   - |
+    kind: ClusterConfiguration
+    controlPlaneEndpoint: "${CLUSTER_NAME}-control-plane:6443"
+  - |
     kind: InitConfiguration
     nodeRegistration:
       kubeletExtraArgs:
@@ -924,7 +1026,7 @@ MINIO_HELM_MODE_ARGS="--set mode=standalone"
 if [ "$ENABLE_MINIO_QUOTAS" == "true" ]; then
     MINIO_HELM_MODE_ARGS="--set mode=distributed --set replicas=1 --set drivesPerNode=4 --set persistence.size=2Gi"
 fi
-helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT $MINIO_HELM_MODE_ARGS --create-namespace --version 4.0.7
+helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT $MINIO_HELM_MODE_ARGS --create-namespace --version 5.4.0
 
 
 #Deploy NFS server provisioner

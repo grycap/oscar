@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -439,9 +439,14 @@ func buildResourceCheckPodSet(name string, replicas int32, requests v1.ResourceL
 		Count: replicas,
 		Template: v1.PodTemplateSpec{
 			Spec: v1.PodSpec{
-				Containers: []v1.Container{{Name: "resource-check"}},
-				Resources: &v1.ResourceRequirements{
-					Requests: requests,
+				Containers: []v1.Container{
+					{
+						Name: "resource-check",
+						Resources: v1.ResourceRequirements{
+							Requests: requests,
+							Limits:   requests,
+						},
+					},
 				},
 			},
 		},

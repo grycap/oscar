@@ -8,7 +8,9 @@ functions:
       script: script.sh
       alpine: true
       kserve:
-        model_format: sklearn
+        type: inference
+        inference:
+          model_format: sklearn
         storage_uri: "gs://kfserving-examples/models/sklearn/1.0/model"
         min_scale: 1
       log_level: CRITICAL
