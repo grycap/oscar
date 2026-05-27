@@ -39,6 +39,32 @@ func GetAuthMiddleware(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 	return CustomAuth(cfg, kubeClientset)
 }
 
+func BuildServiceAuthMiddlewareChain(cfg *types.Config, kubeClientset kubernetes.Interface, back types.ServerlessBackend) []gin.HandlerFunc {
+	var authHandler gin.HandlerFunc
+	fmt.Printf("OIDC authentication enabled: %v\n", cfg.OIDCEnable)
+	if !cfg.OIDCEnable {
+		authHandler = gin.BasicAuth(gin.Accounts{
+			// Use the config's username and password for basic auth
+			cfg.Username: cfg.Password,
+		})
+	} else {
+		authHandler = CustomAuth(cfg, kubeClientset)
+	}
+
+	var wrapperHandler gin.HandlerFunc = func(c *gin.Context) {
+		if isServiceToken, exists := c.Get(isServiceTokenKey); exists {
+			if validServiceToken, ok := isServiceToken.(bool); ok && validServiceToken {
+				c.Next()
+				return
+			}
+		}
+
+		authHandler(c)
+	}
+
+	return []gin.HandlerFunc{GetServiceTokenMiddleware(back), wrapperHandler, GetServicePermissionsMiddleware(back)}
+}
+
 // CustomAuth returns a custom auth handler (gin middleware)
 func CustomAuth(cfg *types.Config, kubeClientset kubernetes.Interface) gin.HandlerFunc {
 	basicAuthHandler := gin.BasicAuth(gin.Accounts{
