@@ -229,7 +229,7 @@ func TestMinIOQuotaConfigMapHelpers(t *testing.T) {
 		t.Fatalf("unexpected minio quota config: %+v", got)
 	}
 
-	cm, err := client.CoreV1().ConfigMaps(namespace).Get(t.Context(), minIOQuotaConfigMapName, metav1.GetOptions{})
+	cm, err := client.CoreV1().ConfigMaps(namespace).Get(t.Context(), utils.GetDefaultMinIOQuotaConfigMapName(), metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("unexpected configmap get error: %v", err)
 	}
@@ -369,7 +369,7 @@ func TestFetchQuotaIncludesMinIOQuotas(t *testing.T) {
 	client := fake.NewSimpleClientset(
 		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}},
 		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Name: minIOQuotaConfigMapName, Namespace: namespace},
+			ObjectMeta: metav1.ObjectMeta{Name: utils.GetDefaultMinIOQuotaConfigMapName(), Namespace: namespace},
 			Data: map[string]string{
 				minIOQuotaBucketsKey: "10",
 				minIOQuotaStorageKey: "100Gi",

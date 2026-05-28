@@ -40,11 +40,10 @@ var (
 )
 
 const (
-	minIOQuotaConfigMapName = "oscar-minio-quota"
-	minIOQuotaLabelKey      = "oscar.grycap.upv.es/quota"
-	minIOQuotaLabelValue    = "minio"
-	minIOQuotaBucketsKey    = "buckets"
-	minIOQuotaStorageKey    = "storage_per_bucket"
+	minIOQuotaLabelKey   = "oscar.grycap.upv.es/quota"
+	minIOQuotaLabelValue = "minio"
+	minIOQuotaBucketsKey = "buckets"
+	minIOQuotaStorageKey = "storage_per_bucket"
 
 	defaultMinIOBucketMax           int64  = 0
 	defaultMinIOStoragePerBucketMax string = "0"
@@ -558,12 +557,12 @@ func ValidateMinIOBucketCountQuota(cfg *types.Config, minIOAdminClient *utils.Mi
 
 func GetMinIOQuotaConfig(ctx context.Context, cfg *types.Config, kubeClientset kubernetes.Interface, user string) (*types.MinIOQuotaUpdate, bool, error) {
 	namespace := utils.BuildUserNamespace(cfg, user)
-	cm, err := kubeClientset.CoreV1().ConfigMaps(namespace).Get(ctx, minIOQuotaConfigMapName, metav1.GetOptions{})
+	cm, err := kubeClientset.CoreV1().ConfigMaps(namespace).Get(ctx, utils.GetDefaultMinIOQuotaConfigMapName(), metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil, false, nil
 	}
 	if err != nil {
-		return nil, false, fmt.Errorf("getting MinIO quota ConfigMap %s/%s: %w", namespace, minIOQuotaConfigMapName, err)
+		return nil, false, fmt.Errorf("getting MinIO quota ConfigMap %s/%s: %w", namespace, utils.GetDefaultMinIOQuotaConfigMapName(), err)
 	}
 	quota := &types.MinIOQuotaUpdate{
 		Buckets:          strings.TrimSpace(cm.Data[minIOQuotaBucketsKey]),
@@ -581,11 +580,11 @@ func upsertMinIOQuotaConfig(ctx context.Context, cfg *types.Config, kubeClientse
 	if quota.StoragePerBucket != "" {
 		data[minIOQuotaStorageKey] = quota.StoragePerBucket
 	}
-	cm, err := kubeClientset.CoreV1().ConfigMaps(namespace).Get(ctx, minIOQuotaConfigMapName, metav1.GetOptions{})
+	cm, err := kubeClientset.CoreV1().ConfigMaps(namespace).Get(ctx, utils.GetDefaultMinIOQuotaConfigMapName(), metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		_, err = kubeClientset.CoreV1().ConfigMaps(namespace).Create(ctx, &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      minIOQuotaConfigMapName,
+				Name:      utils.GetDefaultMinIOQuotaConfigMapName(),
 				Namespace: namespace,
 				Labels: map[string]string{
 					minIOQuotaLabelKey: minIOQuotaLabelValue,
@@ -594,12 +593,12 @@ func upsertMinIOQuotaConfig(ctx context.Context, cfg *types.Config, kubeClientse
 			Data: data,
 		}, metav1.CreateOptions{})
 		if err != nil {
-			return fmt.Errorf("creating MinIO quota ConfigMap %s/%s: %w", namespace, minIOQuotaConfigMapName, err)
+			return fmt.Errorf("creating MinIO quota ConfigMap %s/%s: %w", namespace, utils.GetDefaultMinIOQuotaConfigMapName(), err)
 		}
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("getting MinIO quota ConfigMap %s/%s: %w", namespace, minIOQuotaConfigMapName, err)
+		return fmt.Errorf("getting MinIO quota ConfigMap %s/%s: %w", namespace, utils.GetDefaultMinIOQuotaConfigMapName(), err)
 	}
 	if cm.Labels == nil {
 		cm.Labels = map[string]string{}
@@ -608,7 +607,7 @@ func upsertMinIOQuotaConfig(ctx context.Context, cfg *types.Config, kubeClientse
 	cm.Data = data
 	_, err = kubeClientset.CoreV1().ConfigMaps(namespace).Update(ctx, cm, metav1.UpdateOptions{})
 	if err != nil {
-		return fmt.Errorf("updating MinIO quota ConfigMap %s/%s: %w", namespace, minIOQuotaConfigMapName, err)
+		return fmt.Errorf("updating MinIO quota ConfigMap %s/%s: %w", namespace, utils.GetDefaultMinIOQuotaConfigMapName(), err)
 	}
 	return nil
 }

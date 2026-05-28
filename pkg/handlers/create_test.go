@@ -732,7 +732,7 @@ func newServiceQuotaTestContext(t *testing.T, user, minIOEndpoint string, quotaD
 	}
 	if quotaData != nil {
 		objects = append(objects, &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Name: minIOQuotaConfigMapName, Namespace: userNamespace},
+			ObjectMeta: metav1.ObjectMeta{Name: utils.GetDefaultMinIOQuotaConfigMapName(), Namespace: userNamespace},
 			Data:       quotaData,
 		})
 	}

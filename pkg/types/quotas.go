@@ -23,6 +23,12 @@ import (
 	kueueclientset "sigs.k8s.io/kueue/client-go/clientset/versioned"
 )
 
+const MinIOQuotaConfigMapName = "oscar-minio-quota"
+
+func GetDefaultMinIOQuotaConfigMapName() string {
+	return MinIOQuotaConfigMapName
+}
+
 type QuotaBackend struct {
 	Kueueclient   *kueueclientset.Clientset
 	KubeClientset kubernetes.Interface
