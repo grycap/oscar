@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -39,6 +40,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/minio/minio-go/v7/pkg/tags"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -71,6 +73,9 @@ type MinIOBucket struct {
 	Owner        string            `json:"owner"`
 	Metadata     map[string]string `json:"metadata"`
 	Objects      []MinIOObject     `json:"objects,omitempty"`
+	StorageQuota *MinIOQuota       `json:"storage_quota,omitempty"`
+	StorageUsage *MinIOUsage       `json:"storage_usage,omitempty"`
+	Attribution  string            `json:"attribution,omitempty"`
 }
 
 // MinIOObject captures object level metadata inside a MinIO bucket
@@ -79,6 +84,18 @@ type MinIOObject struct {
 	SizeBytes    int64  `json:"size_bytes"`
 	Owner        string `json:"owner,omitempty"`
 	LastModified string `json:"last_modified,omitempty"`
+}
+
+type MinIOQuota struct {
+	Max      string `json:"max,omitempty"`
+	MaxBytes int64  `json:"max_bytes,omitempty"`
+	Source   string `json:"source"`
+}
+
+type MinIOUsage struct {
+	Used      string `json:"used"`
+	UsedBytes int64  `json:"used_bytes"`
+	Objects   int64  `json:"objects,omitempty"`
 }
 
 // Define the policy structure using Go structs
@@ -548,7 +565,7 @@ func (minIOAdminClient *MinIOAdminClient) SetTags(bucket string, newtags map[str
 func (minIOAdminClient *MinIOAdminClient) GetTaggedMetadata(bucket string) (map[string]string, error) {
 	btags, err := minIOAdminClient.simpleClient.GetBucketTagging(context.TODO(), bucket)
 	if err != nil {
-		return map[string]string{}, fmt.Errorf("error getting tags on bucket %s", bucket)
+		return map[string]string{}, fmt.Errorf("error getting tags on bucket %s: %w", bucket, err)
 	}
 
 	return btags.ToMap(), nil
@@ -560,6 +577,222 @@ func (minIOAdminClient *MinIOAdminClient) GetBucketMembers(bucket string) ([]str
 		return []string{}, fmt.Errorf("error getting group description for %s: %v", bucket, err)
 	}
 	return groupDescription.Members, nil
+}
+
+func (minIOAdminClient *MinIOAdminClient) ListBucketsByOwner(s3Client *s3.S3, owner string) (map[string]struct{}, error) {
+	bucketInfo, err := s3Client.ListBuckets(&s3.ListBucketsInput{})
+	if err != nil {
+		return nil, fmt.Errorf("error listing MinIO buckets: %w", err)
+	}
+	ownedBuckets := map[string]struct{}{}
+	for _, bucket := range bucketInfo.Buckets {
+		if bucket.Name == nil {
+			continue
+		}
+		tags, err := minIOAdminClient.GetTaggedMetadata(*bucket.Name)
+		if err != nil {
+			if IsMinIOTagSetNotFound(err) {
+				continue
+			}
+			return nil, fmt.Errorf("error reading MinIO tags for bucket %s: %w", *bucket.Name, err)
+		}
+		if tags["owner"] == owner {
+			ownedBuckets[*bucket.Name] = struct{}{}
+		}
+	}
+	return ownedBuckets, nil
+}
+
+func (minIOAdminClient *MinIOAdminClient) GetDataUsageInfo() (madmin.DataUsageInfo, error) {
+	usage, err := minIOAdminClient.adminClient.DataUsageInfo(context.TODO())
+	if err != nil {
+		return madmin.DataUsageInfo{}, fmt.Errorf("error getting MinIO data usage info: %w", err)
+	}
+	return usage, nil
+}
+
+func BucketStorageUsage(dataUsage madmin.DataUsageInfo, bucket string) (*MinIOUsage, bool, error) {
+	bucketUsage, ok := dataUsage.BucketsUsage[bucket]
+	if !ok {
+		return &MinIOUsage{Used: "0", UsedBytes: 0}, false, nil
+	}
+	size, err := uint64ToInt64(bucketUsage.Size)
+	if err != nil {
+		return nil, false, fmt.Errorf("bucket %s usage size exceeds supported range: %w", bucket, err)
+	}
+	objects, err := uint64ToInt64(bucketUsage.ObjectsCount)
+	if err != nil {
+		return nil, false, fmt.Errorf("bucket %s object count exceeds supported range: %w", bucket, err)
+	}
+	return &MinIOUsage{
+		Used:      FormatStorageBytes(size),
+		UsedBytes: size,
+		Objects:   objects,
+	}, true, nil
+}
+
+func AggregateBucketStorageUsage(dataUsage madmin.DataUsageInfo, bucketNames map[string]struct{}) (MinIOUsage, string, error) {
+	var totalBytes int64
+	var totalObjects int64
+	attribution := "complete"
+	if len(bucketNames) == 0 {
+		return MinIOUsage{Used: "0", UsedBytes: 0}, attribution, nil
+	}
+	for bucketName := range bucketNames {
+		usage, found, err := BucketStorageUsage(dataUsage, bucketName)
+		if err != nil {
+			return MinIOUsage{}, attribution, err
+		}
+		if !found {
+			attribution = "partial"
+			continue
+		}
+		if totalBytes > math.MaxInt64-usage.UsedBytes {
+			return MinIOUsage{}, attribution, fmt.Errorf("aggregate bucket storage usage exceeds supported range")
+		}
+		if totalObjects > math.MaxInt64-usage.Objects {
+			return MinIOUsage{}, attribution, fmt.Errorf("aggregate bucket object count exceeds supported range")
+		}
+		totalBytes += usage.UsedBytes
+		totalObjects += usage.Objects
+	}
+	return MinIOUsage{
+		Used:      FormatStorageBytes(totalBytes),
+		UsedBytes: totalBytes,
+		Objects:   totalObjects,
+	}, attribution, nil
+}
+
+func FormatStorageBytes(value int64) string {
+	if value < 0 {
+		return fmt.Sprintf("%d", value)
+	}
+	units := []struct {
+		suffix string
+		bytes  float64
+	}{
+		{suffix: "Ti", bytes: 1024 * 1024 * 1024 * 1024},
+		{suffix: "Gi", bytes: 1024 * 1024 * 1024},
+		{suffix: "Mi", bytes: 1024 * 1024},
+		{suffix: "Ki", bytes: 1024},
+	}
+	for _, unit := range units {
+		if float64(value) >= unit.bytes {
+			formatted := fmt.Sprintf("%.1f", float64(value)/unit.bytes)
+			formatted = strings.TrimSuffix(formatted, ".0")
+			return formatted + unit.suffix
+		}
+	}
+	return fmt.Sprintf("%d", value)
+}
+
+func ParseStorageBytes(value string) (int64, error) {
+	q, err := resource.ParseQuantity(value)
+	if err != nil {
+		return 0, err
+	}
+	if q.Sign() < 0 {
+		return 0, fmt.Errorf("quantity must be greater than or equal to zero")
+	}
+	return q.Value(), nil
+}
+
+func int64ToUint64(value int64) (uint64, error) {
+	if value < 0 {
+		return 0, fmt.Errorf("value must be greater than or equal to zero")
+	}
+	return uint64(value), nil
+}
+
+func uint64ToInt64(value uint64) (int64, error) {
+	if value > math.MaxInt64 {
+		return 0, fmt.Errorf("value %d exceeds maximum supported value %d", value, int64(math.MaxInt64))
+	}
+	return int64(value), nil
+}
+
+func (minIOAdminClient *MinIOAdminClient) SetBucketStorageQuota(bucket, size string) error {
+	bytes, err := ParseStorageBytes(size)
+	if err != nil {
+		return fmt.Errorf("invalid bucket storage quota: %w", err)
+	}
+	quotaBytes, err := int64ToUint64(bytes)
+	if err != nil {
+		return fmt.Errorf("invalid bucket storage quota: %w", err)
+	}
+	quota := &madmin.BucketQuota{
+		Quota: quotaBytes,
+		Type:  madmin.HardQuota,
+	}
+	if bytes == 0 {
+		quota.Type = ""
+	}
+	if err := minIOAdminClient.adminClient.SetBucketQuota(context.TODO(), bucket, quota); err != nil {
+		return fmt.Errorf("error setting bucket quota for %s: %w", bucket, err)
+	}
+	return nil
+}
+
+func (minIOAdminClient *MinIOAdminClient) GetBucketStorageQuota(bucket string) (*MinIOQuota, error) {
+	quota, err := minIOAdminClient.adminClient.GetBucketQuota(context.TODO(), bucket)
+	if err != nil {
+		if IsMinIOAdminAPINotSupported(err) {
+			return &MinIOQuota{Max: "0", Source: "unsupported"}, nil
+		}
+		return nil, fmt.Errorf("error getting bucket quota for %s: %w", bucket, err)
+	}
+	if quota.Quota == 0 {
+		return &MinIOQuota{Source: "unset"}, nil
+	}
+	quotaBytes, err := uint64ToInt64(quota.Quota)
+	if err != nil {
+		return nil, fmt.Errorf("bucket quota for %s exceeds supported range: %w", bucket, err)
+	}
+	return &MinIOQuota{
+		Max:      FormatStorageBytes(quotaBytes),
+		MaxBytes: quotaBytes,
+		Source:   "bucket",
+	}, nil
+}
+
+func IsMinIOAdminAPINotSupported(err error) bool {
+	if err == nil {
+		return false
+	}
+	errResp := madmin.ToErrorResponse(err)
+	if strings.EqualFold(errResp.Code, "NotImplemented") || strings.EqualFold(errResp.Code, "NotSupported") || strings.EqualFold(errResp.Code, "MethodNotAllowed") {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "not supported") || strings.Contains(msg, "not implemented")
+}
+
+func IsMinIOTagSetNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	errText := err.Error()
+	return strings.Contains(errText, "The TagSet does not exist") ||
+		strings.Contains(errText, "NoSuchTagSet")
+}
+
+func (minIOAdminClient *MinIOAdminClient) EnrichBucketQuotaAndUsage(bucket *MinIOBucket, dataUsage madmin.DataUsageInfo) error {
+	quota, err := minIOAdminClient.GetBucketStorageQuota(bucket.BucketName)
+	if err != nil {
+		return err
+	}
+	usage, found, err := BucketStorageUsage(dataUsage, bucket.BucketName)
+	if err != nil {
+		return err
+	}
+	bucket.StorageQuota = quota
+	bucket.StorageUsage = usage
+	if found {
+		bucket.Attribution = "complete"
+	} else {
+		bucket.Attribution = "partial"
+	}
+	return nil
 }
 
 // CreateAddPolicy creates a policy asociated to a bucket to set its visibility

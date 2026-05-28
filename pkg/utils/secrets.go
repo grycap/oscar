@@ -74,7 +74,5 @@ func RefreshTokenSecretName(serviceName string) string {
 	if serviceName == "" {
 		return ""
 	}
-
 	return serviceName
-
 }

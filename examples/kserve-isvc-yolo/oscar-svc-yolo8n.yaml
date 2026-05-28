@@ -13,6 +13,8 @@ functions:
         storage_uri: "oci://ghcr.io/grycap/kserve-yolo8n-onnx"
         min_scale: 1
         api_version: "v2"
+        cpu: '1.0'
+        memory: 2Gi
       log_level: CRITICAL
       input:
       - storage_provider: minio

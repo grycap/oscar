@@ -17,7 +17,7 @@ limitations under the License.
 */
 
 // @title OSCAR API
-// @version v2.0.0
+// @version v4.0.0
 // @description Secure REST API to manage OSCAR services, storage and executions.
 // @contact.name GRyCAP
 // @contact.email products@grycap.upv.es
@@ -126,6 +126,9 @@ func main() {
 	system.GET("/services/:serviceName", handlers.MakeReadHandler(back, kubeClientset, cfg))
 	system.GET("/services/:serviceName/deployment", handlers.MakeGetDeploymentStatusHandler(back, kubeClientset, cfg))
 	system.GET("/services/:serviceName/deployment/logs", handlers.MakeGetDeploymentLogsHandler(back, kubeClientset, cfg))
+	system.POST("/services/:serviceName/stop", handlers.MakeStopExposedServiceHandler(back, kubeClientset, cfg))
+	system.POST("/services/:serviceName/start", handlers.MakeStartExposedServiceHandler(back, kubeClientset, cfg))
+	system.POST("/services/:serviceName/restart", handlers.MakeRestartExposedServiceHandler(back, kubeClientset, cfg))
 	system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
 	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
 
@@ -143,7 +146,7 @@ func main() {
 		system.DELETE("/volumes/:volumeName", handlers.MakeDeleteVolumeHandler(cfg, back))
 	}
 	// CRUD Buckets
-	system.POST("/buckets", buckets.MakeCreateHandler(cfg))
+	system.POST("/buckets", buckets.MakeCreateHandler(cfg, kubeClientset))
 	system.GET("/buckets", buckets.MakeListHandler(cfg))
 	system.GET("/buckets/:bucket", buckets.MakeGetHandler(cfg))
 	system.PUT("/buckets", buckets.MakeUpdateHandler(cfg))

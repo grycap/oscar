@@ -359,8 +359,8 @@ type Kserve struct {
 	MinScale int32 `json:"min_scale,omitempty" default:"0"`
 
 	// MaxScale maximum number of active replicas (pods) for the service
-	// Optional. (default: 10)
-	MaxScale int32 `json:"max_scale,omitempty" default:"10"`
+	// Optional. (default: 1)
+	MaxScale int32 `json:"max_scale,omitempty" default:"1"`
 
 	// CPU cpu limit for the service following the kubernetes format
 	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
@@ -400,7 +400,7 @@ func (k *Kserve) UnmarshalJSON(data []byte) error {
 		Memory:     "256Mi",
 		SetAuth:    false,
 		MinScale:   0,
-		MaxScale:   10,
+		MaxScale:   1,
 		EnableGPU:  false,
 	}
 

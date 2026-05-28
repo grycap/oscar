@@ -304,6 +304,23 @@ func upsertRoute(service types.Service, namespace string, kubeClientset kubernet
 	return createIngress(service, namespace, kubeClientset, cfg)
 }
 
+// EnsureExposeAuthResources recreates or refreshes authentication resources for an exposed service.
+func EnsureExposeAuthResources(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	if !service.Expose.SetAuth {
+		return nil
+	}
+	if getRouteKind(cfg) == routeKindHTTPRoute {
+		if err := upsertTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
+			return err
+		}
+		return upsertTraefikAuthMiddleware(service, namespace)
+	}
+	if existsSecret(service.Name, namespace, kubeClientset, cfg) {
+		return updateSecret(service, namespace, kubeClientset, cfg)
+	}
+	return createSecret(service, namespace, kubeClientset, cfg)
+}
+
 func deleteRouteResources(serviceName string, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
 	if existsIngress(serviceName, namespace, kubeClientset) {
 		if err := deleteIngress(getIngressName(serviceName), namespace, kubeClientset, cfg); err != nil {
