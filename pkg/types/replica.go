@@ -72,4 +72,5 @@ type FederationRequest struct {
 	Update           ReplicaList        `json:"update,omitempty"`
 	Clusters         map[string]Cluster `json:"clusters,omitempty"`
 	StorageProviders *StorageProviders  `json:"storage_providers,omitempty"`
+	Delete           bool               `json:"delete,omitempty"`
 }

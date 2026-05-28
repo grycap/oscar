@@ -18,9 +18,7 @@ package utils
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/grycap/oscar/v4/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,5 +74,7 @@ func RefreshTokenSecretName(serviceName string) string {
 	if serviceName == "" {
 		return ""
 	}
-	return fmt.Sprintf("%s-%s", serviceName, types.RefreshTokenSecretSuffix)
+
+	return serviceName
+
 }

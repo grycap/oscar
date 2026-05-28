@@ -154,6 +154,29 @@ func MakeFederationDeleteHandler(back types.ServerlessBackend) gin.HandlerFunc {
 			if service.Federation == nil {
 				service.Federation = &types.Federation{}
 			}
+			//Possibility of deleting service in a federation
+			if req.Delete {
+				// We safely iterate through each member sent in the JSON
+				for d := 0; d < len(req.Members); d++ {
+					targetServiceName := req.Members[d].ServiceName
+
+					if targetServiceName != "" {
+						// We create a temporary struct of type types.Service
+						serviceToDelete := types.Service{
+							Name:      targetServiceName,
+							Namespace: service.Namespace,
+						}
+
+						// We pass the complete object to DeleteService
+						errDelete := back.DeleteService(serviceToDelete)
+						if errDelete != nil {
+							fmt.Printf("Error removing the federated service %s: %v\n", targetServiceName, errDelete)
+						} else {
+							fmt.Printf(" Federated service removed: %s - %v\n", targetServiceName, errDelete)
+						}
+					}
+				}
+			}
 			service.Federation.Members = filterReplicas(service.Federation.Members, req.Members)
 		})
 		if err != nil {
