@@ -284,6 +284,15 @@ type Config struct {
 
 	// LokiExposedAppLabel app label for exposed-service logs
 	LokiExposedAppLabel string `json:"-"`
+
+	// MinIOQuotaEnabled option to enable the creation of ConfigMaps with MinIO quotas for each user
+	MinIOQuotaEnabled bool `json:"minio_quota_enabled"`
+
+	// MinIOQuotaBuckets default number of buckets allowed per user
+	MinIOQuotaBuckets string `json:"-"`
+
+	// MinIOQuotaStorage default storage allowed per bucket and user
+	MinIOQuotaStorage string `json:"-"`
 }
 
 type ConfigForUser struct {
@@ -305,13 +314,6 @@ var configVars = []configVar{
 	{"ServicesNamespace", "OSCAR_SERVICES_NAMESPACE", false, stringType, "oscar-svc"},
 	{"ControllerServiceAccount", "OSCAR_CONTROLLER_SERVICE_ACCOUNT", false, stringType, "oscar-sa"},
 	{"ServerlessBackend", "SERVERLESS_BACKEND", false, serverlessBackendType, ""},
-	//{"OpenfaasNamespace", "OPENFAAS_NAMESPACE", false, stringType, "openfaas"},
-	//{"OpenfaasPort", "OPENFAAS_PORT", false, intType, "8080"},
-	//{"OpenfaasBasicAuthSecret", "OPENFAAS_BASIC_AUTH_SECRET", false, stringType, "basic-auth"},
-	//{"OpenfaasPrometheusPort", "OPENFAAS_PROMETHEUS_PORT", false, intType, "9090"},
-	//{"OpenfaasScalerEnable", "OPENFAAS_SCALER_ENABLE", false, boolType, "false"},
-	//{"OpenfaasScalerInterval", "OPENFAAS_SCALER_INTERVAL", false, stringType, "2m"},
-	//{"OpenfaasScalerInactivityDuration", "OPENFAAS_SCALER_INACTIVITY_DURATION", false, stringType, "10m"},
 	{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
 	{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
 	{"WatchdogExecTimeout", "WATCHDOG_EXEC_TIMEOUT", false, intType, "0"},
@@ -371,6 +373,9 @@ var configVars = []configVar{
 	{"LokiExposedQuery", "LOKI_EXPOSED_QUERY", false, stringType, "{namespace=\"{{namespace}}\", app=\"{{app}}\"} |~ \"/system/services/.+/exposed\""},
 	{"LokiExposedNamespace", "LOKI_EXPOSED_NAMESPACE", false, stringType, "ingress-nginx"},
 	{"LokiExposedAppLabel", "LOKI_EXPOSED_APP", false, stringType, "ingress-nginx"},
+	{"MinIOQuotaEnabled", "MINIO_QUOTA_ENABLED", false, boolType, "false"},
+	{"MinIOQuotaBuckets", "MINIO_QUOTA_BUCKETS", false, stringType, "5"},
+	{"MinIOQuotaStorage", "MINIO_QUOTA_STORAGE", false, stringType, "5Gi"},
 }
 
 func readConfigVar(cfgVar configVar) (string, error) {

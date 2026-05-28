@@ -175,8 +175,8 @@ github.com/grpc-ecosystem/grpc-gateway v1.16.0 h1:gmcG1KaJ57LophUzW0Hy8NmPhnMZb4
 github.com/grpc-ecosystem/grpc-gateway v1.16.0/go.mod h1:BDjrQk3hbvj6Nolgz8mAMFbcEtjT1g+wF4CSlocrBnw=
 github.com/grycap/cdmi-client-go v0.1.1 h1:kHIrrLhvaCD0VyzEa5HOg7d/VgRE11yh9Ztdyoqii0o=
 github.com/grycap/cdmi-client-go v0.1.1/go.mod h1:ZqWeQS3YBJVXxg3HOIkAu1MLNJ4+7s848CyIPMFT5Gc=
-github.com/grycap/oscar/v3 v3.7.1 h1:aoZnj47OhVfPFvJNiKiInWo8QfNxgezQEUG6y7rYOAk=
-github.com/grycap/oscar/v3 v3.7.1/go.mod h1:rsa0sMzwRnN0gryR0IBT8lpSoD4gDYT1PT9uI/DysyM=
+github.com/grycap/oscar/v4 v4.0.0 h1:aoZnj47OhVfPFvJNiKiInWo8QfNxgezQEUG6y7rYOAk=
+github.com/grycap/oscar/v4 v4.0.0/go.mod h1:rsa0sMzwRnN0gryR0IBT8lpSoD4gDYT1PT9uI/DysyM=
 github.com/jmespath/go-jmespath v0.4.0 h1:BEgLn5cpjn8UN1mAw4NjwDrS35OdebyEtFe+9YPoQUg=
 github.com/jmespath/go-jmespath v0.4.0/go.mod h1:T8mJZnbsbmF+m6zOOFylbeCJqk5+pHWvzYPziyZiYoo=
 github.com/jmespath/go-jmespath/internal/testify v1.5.1 h1:shLQSRRSCCPj3f2gpwzGwWFoC7ycTf1rcQZHOlsJ6N8=
