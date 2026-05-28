@@ -474,16 +474,16 @@ type ServiceVolumeStatus struct {
 }
 
 type Expose struct {
-	MinScale       int32  `json:"min_scale" default:"1"`
-	MaxScale       int32  `json:"max_scale" default:"10"`
-	APIPort        int    `json:"api_port,omitempty" `
-	CpuThreshold   int32  `json:"cpu_threshold" default:"80" `
-	RewriteTarget  bool   `json:"rewrite_target" default:"false" `
-	NodePort       int32  `json:"nodePort" default:"0" `
-	DefaultCommand bool   `json:"default_command" `
-	SetAuth        bool   `json:"set_auth" `
-	HealthPath     string `json:"health_path" default:"/" `
-	ProbeMode      string `json:"probe_mode,omitempty" default:"legacy" `
+	MinScale       int32   `json:"min_scale" default:"1"`
+	MaxScale       int32   `json:"max_scale" default:"10"`
+	APIPort        []int   `json:"api_port,omitempty" `
+	CpuThreshold   int32   `json:"cpu_threshold" default:"80" `
+	RewriteTarget  bool    `json:"rewrite_target" default:"false" `
+	NodePort       []int32 `json:"nodePort,omitempty" `
+	DefaultCommand bool    `json:"default_command" `
+	SetAuth        bool    `json:"set_auth" `
+	HealthPath     string  `json:"health_path" default:"/" `
+	ProbeMode      string  `json:"probe_mode,omitempty" default:"legacy" `
 }
 
 // ToPodSpec returns a k8s podSpec from the Service
@@ -758,7 +758,8 @@ func (service *Service) HasFederationMembers() bool {
 
 // GetExposedBasePath returns the OSCAR exposed-service base path or an empty string.
 func (service *Service) GetExposedBasePath() string {
-	if service == nil || service.Expose.APIPort == 0 {
+
+	if service == nil || len(service.Expose.APIPort) == 0 {
 		return ""
 	}
 	return fmt.Sprintf("/system/services/%s/exposed", service.Name)

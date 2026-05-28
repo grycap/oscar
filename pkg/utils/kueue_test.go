@@ -44,9 +44,9 @@ func newTestService(name, owner string) types.Service {
 		Expose: types.Expose{
 			MinScale:      1,
 			MaxScale:      3,
-			APIPort:       9090,
+			APIPort:       []int{9090},
 			CpuThreshold:  55,
-			NodePort:      0,
+			NodePort:      []int32{0},
 			SetAuth:       false,
 			RewriteTarget: false,
 		},
@@ -437,7 +437,7 @@ func TestGetResourceOnlyWorkloadSpec(t *testing.T) {
 
 func TestGetResourceOnlyWorkloadSpecUsesSynchronousMinScale(t *testing.T) {
 	service := newTestService("test-service", "testuser")
-	service.Expose.APIPort = 0
+	service.Expose.APIPort = []int{0}
 	service.Synchronous.MinScale = 3
 	cfg := newTestConfig()
 
@@ -457,7 +457,7 @@ func TestGetResourceOnlyWorkloadSpecSynchronousMinScaleOverflow(t *testing.T) {
 	}
 
 	service := newTestService("test-service", "testuser")
-	service.Expose.APIPort = 0
+	service.Expose.APIPort = []int{0}
 	overflowMinScale := int64(math.MaxInt32) + 1
 	service.Synchronous.MinScale = int(overflowMinScale)
 	cfg := newTestConfig()

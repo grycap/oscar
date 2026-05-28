@@ -55,9 +55,9 @@ func newExposeService(name string, nodePort int32, setAuth bool) types.Service {
 		Expose: types.Expose{
 			MinScale:      1,
 			MaxScale:      3,
-			APIPort:       9090,
+			APIPort:       []int{9090},
 			CpuThreshold:  55,
-			NodePort:      nodePort,
+			NodePort:      []int32{nodePort},
 			SetAuth:       setAuth,
 			RewriteTarget: false,
 		},
@@ -167,7 +167,7 @@ func TestCreateExposeWithIngressAndAuth(t *testing.T) {
 	svc.Namespace = cfg.ServicesNamespace
 	client := fake.NewSimpleClientset()
 
-	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
+	if err := CreateExpose(&svc, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("CreateExpose returned error: %v", err)
 	}
 
@@ -213,7 +213,7 @@ func TestCreateExposeNodePort(t *testing.T) {
 	svc.Namespace = cfg.ServicesNamespace
 	client := fake.NewSimpleClientset()
 
-	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
+	if err := CreateExpose(&svc, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("CreateExpose returned error: %v", err)
 	}
 
@@ -226,7 +226,7 @@ func TestCreateExposeNodePort(t *testing.T) {
 		t.Fatalf("expected NodePort service, got %s", kubeSvc.Spec.Type)
 	}
 
-	if kubeSvc.Spec.Ports[0].NodePort != svc.Expose.NodePort {
+	if kubeSvc.Spec.Ports[0].NodePort != svc.Expose.NodePort[0] {
 		t.Fatalf("expected nodePort %d, got %d", svc.Expose.NodePort, kubeSvc.Spec.Ports[0].NodePort)
 	}
 
@@ -248,7 +248,7 @@ func TestCreateExposeHTTPRouteWithAuth(t *testing.T) {
 	svc.Namespace = cfg.ServicesNamespace
 	client := fake.NewSimpleClientset()
 
-	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
+	if err := CreateExpose(&svc, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("CreateExpose returned error: %v", err)
 	}
 
@@ -288,7 +288,7 @@ func TestCreateExposeHTTPRouteWithoutAuth(t *testing.T) {
 	svc.Namespace = cfg.ServicesNamespace
 	client := fake.NewSimpleClientset()
 
-	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
+	if err := CreateExpose(&svc, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("CreateExpose returned error: %v", err)
 	}
 
@@ -315,7 +315,7 @@ func TestUpdateExposeTransitions(t *testing.T) {
 
 	ingressSvc := newExposeService("transition", 0, true)
 	ingressSvc.Namespace = cfg.ServicesNamespace
-	if err := CreateExpose(ingressSvc, ingressSvc.Namespace, client, cfg); err != nil {
+	if err := CreateExpose(&ingressSvc, ingressSvc.Namespace, client, cfg); err != nil {
 		t.Fatalf("failed to create ingress expose: %v", err)
 	}
 
@@ -364,7 +364,7 @@ func TestDeleteExposeRemovesResources(t *testing.T) {
 
 	svc := newExposeService("cleanup", 0, true)
 	svc.Namespace = cfg.ServicesNamespace
-	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
+	if err := CreateExpose(&svc, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("failed to create expose: %v", err)
 	}
 
@@ -399,7 +399,7 @@ func TestDeleteExposeIsIdempotent(t *testing.T) {
 
 	svc := newExposeService("cleanup-idempotent", 0, true)
 	svc.Namespace = cfg.ServicesNamespace
-	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
+	if err := CreateExpose(&svc, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("failed to create expose: %v", err)
 	}
 

@@ -311,7 +311,7 @@ func TestKnativeCreateService(t *testing.T) {
 			Script: "echo test",
 			Labels: map[string]string{},
 			Expose: types.Expose{
-				APIPort: 80,
+				APIPort: []int{80},
 			},
 		}
 
@@ -749,7 +749,7 @@ func TestKnativeDeleteService(t *testing.T) {
 			service: types.Service{
 				Name: "test",
 				Expose: types.Expose{
-					APIPort: 8080,
+					APIPort: []int{8080},
 				},
 			},
 			k8sReactors: []k8stesting.SimpleReactor{

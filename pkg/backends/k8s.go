@@ -173,8 +173,8 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 	}
 
 	//Create an expose service
-	if service.Expose.APIPort != 0 {
-		err = resources.CreateExpose(service, namespace, k.kubeClientset, k.config)
+	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 {
+		err = resources.CreateExpose(&service, namespace, k.kubeClientset, k.config)
 		if err != nil {
 			return err
 		}
@@ -281,10 +281,14 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 	}
 
 	// If the service is exposed update its configuration
-	if service.Expose.APIPort != 0 {
+	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 {
 		err = resources.UpdateExpose(service, namespace, k.kubeClientset, k.config)
 		if err != nil {
 			return err
+		}
+		err = updateServiceConfigMap(&service, namespace, k.kubeClientset)
+		if err != nil {
+			log.Printf("Warning: failed to update ConfigMap with runtime NodePorts: %v\n", err)
 		}
 	}
 
@@ -332,7 +336,7 @@ func (k *KubeBackend) DeleteService(service types.Service) error {
 	}
 
 	// If service is exposed delete the exposed k8s components
-	if service.Expose.APIPort != 0 {
+	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 {
 		if err := resources.DeleteExpose(name, namespace, k.kubeClientset, k.config); err != nil {
 			return fmt.Errorf("error deleting all associated kubernetes components of exposed service \"%s\": %v", name, err)
 		}
