@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strings"
 
@@ -703,6 +704,10 @@ func getServiceSpec(service types.Service, namespace string, cfg *types.Config) 
 
 	for index, apiPort := range service.Expose.APIPort {
 		currentServicePort := int32(servicePortNumber + index)
+
+		if apiPort > math.MaxInt32 || apiPort < 0 {
+			continue
+		}
 
 		portSpec := v1.ServicePort{
 			Name: fmt.Sprintf("%s-%d", servicePortName, index),
