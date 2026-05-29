@@ -158,7 +158,7 @@ storage_providers:
 | `cpu_threshold` </br> *integer* | Percent of use of CPU before creating other pod (default: 80 max:100). Optional.  |
 | `nodePort` </br> *integer* | Change the access method from the domain name to the public ip. Optional.   |
 | `set_auth` </br> *bool* | Create credentials for the service, composed of the service name as the user and the service token as the password. (default: false). Optional.  |
-| `rewrite_target` </br> *bool* | rewrite_target is an expose boolean in the FDL that controls how OSCAR configures the NGINX Ingress/HTTProute rewrite for exposed services. If rewrite_target: false, ingress rewrites to /$1. If rewrite_target: true, ingress rewrites to /system/services/<service>/exposed/$1 (default: false). Optional.  |
+| `rewrite_target` </br> *bool* | It is an expose boolean in the FDL that controls how OSCAR configures the NGINX Ingress/HTTProute rewrite for exposed services. If rewrite_target: false, ingress rewrites to /$1. If rewrite_target: true, ingress rewrites to /system/services/<service>/exposed/$1 (default: false). Optional.  |
 | `default_command` </br> *bool* | Select between executing the container's default command and executing the script inside the container. (default: false). Optional.  |
 | `health_path` </br> *string* | Change the service readiness and liveness check path/endpoint. (default: "/"). Optional.  |
 | `probe_mode` </br> *string* | Probe path mode for exposed-service pod health checks. `legacy` (default) keeps current behavior; `direct` probes only `health_path` on the container without the OSCAR ingress prefix. Optional. |
