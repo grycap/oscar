@@ -27,7 +27,7 @@ func MakeServerlessBackend(kubeClientset kubernetes.Interface, kubeConfig *rest.
 	switch cfg.ServerlessBackend {
 	/*case "openfaas":
 	return MakeOpenfaasBackend(kubeClientset, kubeConfig, cfg)*/
-	case "knative":
+	case types.KnativeBackendName:
 		return MakeKnativeBackend(kubeClientset, kubeConfig, cfg)
 	}
 

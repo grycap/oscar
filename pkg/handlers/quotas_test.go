@@ -859,3 +859,17 @@ func TestQuotaJSONTags(t *testing.T) {
 		}
 	})
 }
+
+func TestValidateMinIOBucketCountQuotaNilQuota(t *testing.T) {
+	err := ValidateMinIOBucketCountQuota(nil, nil, nil, "", nil)
+	if err != nil {
+		t.Fatalf("expected nil error for nil quota, got %v", err)
+	}
+}
+
+func TestValidateMinIOBucketCountQuotaEmptyBuckets(t *testing.T) {
+	err := ValidateMinIOBucketCountQuota(nil, nil, &types.MinIOQuotaUpdate{Buckets: ""}, "", nil)
+	if err != nil {
+		t.Fatalf("expected nil error for empty buckets, got %v", err)
+	}
+}

@@ -22,6 +22,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const (
+	// KnativeBackendName is the name of the Knative backend
+	KnativeBackendName = "knative"
+)
+
 // ServerlessBackend define an interface for OSCAR's backends
 type ServerlessBackend interface {
 	GetInfo() *ServerlessBackendInfo

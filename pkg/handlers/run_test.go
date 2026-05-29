@@ -135,6 +135,12 @@ func TestMakeRunHandlerOIDCPath(t *testing.T) {
 		Owner:        "somelonguid@egi.eu",
 		AllowedUsers: []string{}}
 	back.Services = []*types.Service{svc}
+	back.ProxyDirector = func(req *http.Request) {
+		req.URL.Scheme = "http"
+		req.URL.Host = server.Listener.Addr().String()
+		req.URL.Path = "/input"
+		req.Host = req.URL.Host
+	}
 	cfg := types.Config{
 		MinIOProvider: &types.MinIOProvider{
 			Region:    "us-east-1",
@@ -244,6 +250,12 @@ func TestMakeRunHandlerWithServiceToken(t *testing.T) {
 		Owner:        "somelonguid@egi.eu",
 		AllowedUsers: []string{}}
 	back.Services = []*types.Service{svc}
+	back.ProxyDirector = func(req *http.Request) {
+		req.URL.Scheme = "http"
+		req.URL.Host = server.Listener.Addr().String()
+		req.URL.Path = "/input"
+		req.Host = req.URL.Host
+	}
 	cfg := types.Config{
 		MinIOProvider: &types.MinIOProvider{
 			Region:    "us-east-1",

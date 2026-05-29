@@ -1060,6 +1060,58 @@ func TestDisableInputNotificationsRemovesQueue(t *testing.T) {
 	}
 }
 
+// ─── Nil client panic tests ─────────────────────────────────────────────────
+
+func TestGetDataUsageInfo_NilClientPanics(t *testing.T) {
+	var client *MinIOAdminClient
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic when calling GetDataUsageInfo on nil client")
+		}
+	}()
+	client.GetDataUsageInfo()
+}
+
+func TestEnrichBucketQuotaAndUsage_NilClientPanics(t *testing.T) {
+	var client *MinIOAdminClient
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic when calling EnrichBucketQuotaAndUsage on nil client")
+		}
+	}()
+	client.EnrichBucketQuotaAndUsage(&MinIOBucket{}, madmin.DataUsageInfo{})
+}
+
+func TestCreateAddPolicy_NilClientPanics(t *testing.T) {
+	var client *MinIOAdminClient
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic when calling CreateAddPolicy on nil client")
+		}
+	}()
+	client.CreateAddPolicy("bucket", "policy", nil, false)
+}
+
+func TestRemoveResource_NilClientPanics(t *testing.T) {
+	var client *MinIOAdminClient
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic when calling RemoveResource on nil client")
+		}
+	}()
+	client.RemoveResource("bucket", "policy", false)
+}
+
+func TestRemoveGroupPolicy_NilClientPanics(t *testing.T) {
+	var client *MinIOAdminClient
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic when calling RemoveGroupPolicy on nil client")
+		}
+	}()
+	client.RemoveGroupPolicy("policy")
+}
+
 func TestDeleteBucketRemovesResources(t *testing.T) {
 	fake := newFakeS3Client(t)
 	client := &MinIOAdminClient{}

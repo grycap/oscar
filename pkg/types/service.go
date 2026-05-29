@@ -529,7 +529,7 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 			},
 		},
 	}
-	if cfg.InterLinkAvailable && service.InterLinkNodeName != "" {
+	if IsInterLinkService(service, cfg) {
 		// Add specs of InterLink
 		SetInterlinkService(podSpec)
 	} else {
