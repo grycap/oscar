@@ -993,7 +993,7 @@ func getOwnerReference(knSvc *knv1.Service) []metav1.OwnerReference {
 }
 
 func getAPIPath(serviceName string) string {
-	return fmt.Sprintf("/system/services/%s/exposed", serviceName)
+	return fmt.Sprintf("/system/services/%s/models", serviceName)
 }
 
 func formatUID(uid string) string {
