@@ -93,7 +93,7 @@ func CreateExpose(service *types.Service, namespace string, kubeClientset kubern
 	if targetNamespace == "" {
 		targetNamespace = cfg.ServicesNamespace
 	}
-	if len(service.Expose.APIPort) != len(service.Expose.NodePort) {
+	if len(service.Expose.NodePort) > 0 && len(service.Expose.APIPort) != len(service.Expose.NodePort) {
 		return fmt.Errorf("The length of nodePort (%d) must be equal to that of api_port (%d)",
 			len(service.Expose.NodePort), len(service.Expose.APIPort))
 	}

@@ -228,7 +228,7 @@ func exposedLifecycleTestService() *types.Service {
 		Owner:     "owner@example.org",
 		Token:     "service-token",
 		Expose: types.Expose{
-			APIPort:      8080,
+			APIPort:      []int{8080},
 			MinScale:     1,
 			MaxScale:     5,
 			CpuThreshold: 80,
