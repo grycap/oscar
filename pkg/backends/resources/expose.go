@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strings"
 
@@ -93,7 +94,7 @@ func CreateExpose(service *types.Service, namespace string, kubeClientset kubern
 	if targetNamespace == "" {
 		targetNamespace = cfg.ServicesNamespace
 	}
-	if len(service.Expose.APIPort) != len(service.Expose.NodePort) {
+	if len(service.Expose.NodePort) > 0 && len(service.Expose.APIPort) != len(service.Expose.NodePort) {
 		return fmt.Errorf("The length of nodePort (%d) must be equal to that of api_port (%d)",
 			len(service.Expose.NodePort), len(service.Expose.APIPort))
 	}
@@ -703,6 +704,10 @@ func getServiceSpec(service types.Service, namespace string, cfg *types.Config) 
 
 	for index, apiPort := range service.Expose.APIPort {
 		currentServicePort := int32(servicePortNumber + index)
+
+		if apiPort > math.MaxInt32 || apiPort < 0 {
+			continue
+		}
 
 		portSpec := v1.ServicePort{
 			Name: fmt.Sprintf("%s-%d", servicePortName, index),

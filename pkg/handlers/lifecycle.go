@@ -111,7 +111,7 @@ func makeExposedServiceLifecycleHandler(back types.ServerlessBackend, kubeClient
 		if !ok {
 			return
 		}
-		if service.Expose.APIPort == 0 {
+		if len(service.Expose.APIPort) == 0 {
 			c.String(http.StatusBadRequest, "service %q is not exposed", service.Name)
 			return
 		}

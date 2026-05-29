@@ -259,7 +259,6 @@ expose:
   max_scale: 0
   cpu_threshold: 0
   rewrite_target: false
-  nodePort: 0
   default_command: false
   set_auth: false
   health_path: ""

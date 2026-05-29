@@ -311,7 +311,8 @@ func TestKnativeCreateService(t *testing.T) {
 			Script: "echo test",
 			Labels: map[string]string{},
 			Expose: types.Expose{
-				APIPort: []int{80},
+				APIPort:  []int{80},
+				NodePort: []int32{0},
 			},
 		}
 

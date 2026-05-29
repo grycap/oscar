@@ -57,10 +57,12 @@ func newExposeService(name string, nodePort int32, setAuth bool) types.Service {
 			MaxScale:      3,
 			APIPort:       []int{9090},
 			CpuThreshold:  55,
-			NodePort:      []int32{nodePort},
 			SetAuth:       setAuth,
 			RewriteTarget: false,
 		},
+	}
+	if nodePort != 0 {
+		svc.Expose.NodePort = []int32{nodePort}
 	}
 	svc.Environment.Vars = map[string]string{}
 	svc.Environment.Secrets = map[string]string{}
