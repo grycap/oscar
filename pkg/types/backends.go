@@ -25,10 +25,6 @@ import (
 const (
 	// KnativeBackendName is the name of the Knative backend
 	KnativeBackendName = "knative"
-	// OpenFaaSBackendName is the name of the OpenFaaS backend
-	OpenFaaSBackendName = "openfaas"
-	// KserveBackendName is the name of the KServe backend
-	KserveBackendName = "kserve"
 )
 
 // ServerlessBackend define an interface for OSCAR's backends
