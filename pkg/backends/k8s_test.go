@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -914,5 +915,62 @@ func TestListServicePodsHelpers(t *testing.T) {
 	}
 	if len(knativePods.Items) != 1 || knativePods.Items[0].Name != "knative-pod" {
 		t.Fatalf("unexpected knative service pods: %#v", knativePods.Items)
+	}
+}
+
+func TestGetKserveServiceDeployment(t *testing.T) {
+	client := fake.NewSimpleClientset(&appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      utils.GetKservePodAndDplName("test-svc", utils.KserveTypeInferenceService),
+			Namespace: "ns",
+		},
+	})
+
+	deployment, err := GetKserveServiceDeployment(client, "ns", "test-svc", utils.KserveTypeInferenceService)
+	if err != nil {
+		t.Fatalf("get kserve deployment: %v", err)
+	}
+	if deployment.Name != utils.GetKservePodAndDplName("test-svc", utils.KserveTypeInferenceService) {
+		t.Fatalf("expected deployment name %s, got %s", utils.GetKservePodAndDplName("test-svc", utils.KserveTypeInferenceService), deployment.Name)
+	}
+}
+
+func TestGetKserveServiceDeploymentNotFound(t *testing.T) {
+	client := fake.NewSimpleClientset()
+
+	_, err := GetKserveServiceDeployment(client, "ns", "non-existent", utils.KserveTypeInferenceService)
+	if err == nil {
+		t.Fatal("expected error for non-existent deployment, got nil")
+	}
+}
+
+func TestListKserveServicePods(t *testing.T) {
+	client := fake.NewSimpleClientset(
+		&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "kserve-pod",
+				Namespace: "ns",
+				Labels: map[string]string{
+					"oscar-app": "oscar-svc-ksv-test-svc",
+				},
+			},
+		},
+		&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "other-pod",
+				Namespace: "ns",
+				Labels: map[string]string{
+					"app": "other",
+				},
+			},
+		},
+	)
+
+	pods, err := ListKserveServicePods(client, "ns", "test-svc")
+	if err != nil {
+		t.Fatalf("list kserve pods: %v", err)
+	}
+	if len(pods.Items) != 1 || pods.Items[0].Name != "kserve-pod" {
+		t.Fatalf("unexpected kserve pods: %#v", pods.Items)
 	}
 }

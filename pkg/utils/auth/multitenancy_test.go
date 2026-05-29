@@ -135,6 +135,82 @@ func TestGenerateRandomKey(t *testing.T) {
 	}
 }
 
+func TestEnsureSecretInNamespace(t *testing.T) {
+	t.Run("empty namespace", func(t *testing.T) {
+		clientset := fake.NewSimpleClientset()
+		mc := NewMultitenancyConfig(clientset, "oscar-svc")
+		err := mc.EnsureSecretInNamespace("test-uid", "")
+		if err != nil {
+			t.Errorf("expected nil, got %v", err)
+		}
+	})
+
+	t.Run("same as ServicesNamespace", func(t *testing.T) {
+		clientset := fake.NewSimpleClientset()
+		mc := NewMultitenancyConfig(clientset, "oscar-svc")
+		err := mc.EnsureSecretInNamespace("test-uid", ServicesNamespace)
+		if err != nil {
+			t.Errorf("expected nil, got %v", err)
+		}
+	})
+
+	t.Run("empty uid", func(t *testing.T) {
+		clientset := fake.NewSimpleClientset()
+		mc := NewMultitenancyConfig(clientset, "oscar-svc")
+		err := mc.EnsureSecretInNamespace("", "target-ns")
+		if err != nil {
+			t.Errorf("expected nil, got %v", err)
+		}
+	})
+
+	t.Run("secret already exists", func(t *testing.T) {
+		clientset := fake.NewSimpleClientset()
+		mc := NewMultitenancyConfig(clientset, "oscar-svc")
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-uid",
+				Namespace: "target-ns",
+			},
+		}
+		clientset.CoreV1().Secrets("target-ns").Create(context.TODO(), secret, metav1.CreateOptions{})
+		err := mc.EnsureSecretInNamespace("test-uid", "target-ns")
+		if err != nil {
+			t.Errorf("expected nil, got %v", err)
+		}
+	})
+
+	t.Run("secret copied from base", func(t *testing.T) {
+		clientset := fake.NewSimpleClientset()
+		mc := NewMultitenancyConfig(clientset, "oscar-svc")
+		baseSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-uid",
+				Namespace: ServicesNamespace,
+				Labels:    map[string]string{"key": "val"},
+			},
+			Data: map[string][]byte{
+				"accessKey": []byte("access"),
+				"secretKey": []byte("secret"),
+			},
+		}
+		clientset.CoreV1().Secrets(ServicesNamespace).Create(context.TODO(), baseSecret, metav1.CreateOptions{})
+		err := mc.EnsureSecretInNamespace("test-uid", "target-ns")
+		if err != nil {
+			t.Errorf("expected nil, got %v", err)
+		}
+		secret, err := clientset.CoreV1().Secrets("target-ns").Get(context.TODO(), "test-uid", metav1.GetOptions{})
+		if err != nil {
+			t.Errorf("expected secret to exist in target namespace, got error: %v", err)
+		}
+		if string(secret.Data["accessKey"]) != "access" {
+			t.Errorf("expected accessKey 'access', got '%s'", string(secret.Data["accessKey"]))
+		}
+		if secret.Labels["key"] != "val" {
+			t.Errorf("expected label 'key'='val', got '%s'", secret.Labels["key"])
+		}
+	})
+}
+
 func TestCheckUsersInCache(t *testing.T) {
 	clientset := fake.NewSimpleClientset()
 	mc := NewMultitenancyConfig(clientset, "test-uid")

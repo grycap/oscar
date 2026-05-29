@@ -897,3 +897,22 @@ func TestGetTraefikAuthSecretSpec(t *testing.T) {
 		t.Fatalf("expected users entry in traefik auth secret")
 	}
 }
+
+func TestEnsureExposeAuthResourcesNoAuth(t *testing.T) {
+	svc := newExposeService("no-auth-svc", 0, false)
+	client := fake.NewSimpleClientset()
+	cfg := newTestConfig()
+
+	err := EnsureExposeAuthResources(svc, cfg.ServicesNamespace, client, cfg)
+	if err != nil {
+		t.Fatalf("expected no error when SetAuth is false, got: %v", err)
+	}
+}
+
+func TestGetKeyLabelApp(t *testing.T) {
+	got := GetKeyLabelApp("my-service")
+	want := "oscar-svc-exp-my-service"
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}

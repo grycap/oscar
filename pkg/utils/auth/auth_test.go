@@ -103,6 +103,25 @@ func TestGetMultitenancyConfigFromContext(t *testing.T) {
 	}
 }
 
+func TestGetUserNameFromContext(t *testing.T) {
+	t.Run("set", func(t *testing.T) {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Set("userName", "test-user")
+		userName := GetUserNameFromContext(c)
+		if userName != "test-user" {
+			t.Errorf("expected 'test-user', got '%s'", userName)
+		}
+	})
+
+	t.Run("not set", func(t *testing.T) {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		userName := GetUserNameFromContext(c)
+		if userName != "" {
+			t.Errorf("expected empty string, got '%s'", userName)
+		}
+	})
+}
+
 func TestCustomAuth(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
 

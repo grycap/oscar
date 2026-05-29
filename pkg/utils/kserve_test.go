@@ -54,6 +54,12 @@ func kserveService() *oscarType.Service {
 	}
 }
 
+func invalidKserveService() *oscarType.Service {
+	svc := kserveService()
+	svc.Kserve.StorageUri = ""
+	return svc
+}
+
 func llmKserveService() *oscarType.Service {
 	return &oscarType.Service{
 		Name:      "my-llm-service",
@@ -1456,4 +1462,56 @@ func newFakeDynamicClientForHTTPRoutes(routes ...*unstructured.Unstructured) *dy
 		map[schema.GroupVersionResource]string{kserveHTTPRouteGVR: "HTTPRouteList"},
 		objects...,
 	)
+}
+
+// ─── CreateKserveService ────────────────────────────────────────────────────
+
+func TestCreateKserveService_InvalidService(t *testing.T) {
+	err := CreateKserveService(invalidKserveService(), knativeServiceWithUID("uid"), &oscarType.Config{})
+	if err == nil {
+		t.Fatal("expected error due to invalid service, got nil")
+	}
+}
+
+// ─── UpdateKserveService ────────────────────────────────────────────────────
+
+func TestUpdateKserveService_InvalidService(t *testing.T) {
+	err := UpdateKserveService(invalidKserveService(), kserveService(), "oscar-svc")
+	if err == nil {
+		t.Fatal("expected error due to invalid service, got nil")
+	}
+}
+
+func TestUpdateKserveService_UpdateNotAllowed(t *testing.T) {
+	oldSvc := kserveService()
+	newSvc := kserveService()
+	newSvc.Token = "different-token"
+	err := UpdateKserveService(newSvc, oldSvc, "oscar-svc")
+	if err == nil {
+		t.Fatal("expected error due to immutable field change, got nil")
+	}
+}
+
+// ─── DeleteKserveInferenceService ───────────────────────────────────────────
+
+func TestDeleteKserveInferenceService_DynamicClientError(t *testing.T) {
+	setDynamicClientFactoryForTest(t, func() (*dynamic.DynamicClient, error) {
+		return nil, errors.New("client error")
+	})
+	err := DeleteKserveInferenceService("my-service", "oscar-svc")
+	if err == nil {
+		t.Fatal("expected error due to dynamic client failure, got nil")
+	}
+}
+
+// ─── GetKserveInferenceService ──────────────────────────────────────────────
+
+func TestGetKserveInferenceService_DynamicClientError(t *testing.T) {
+	setDynamicClientFactoryForTest(t, func() (*dynamic.DynamicClient, error) {
+		return nil, errors.New("client error")
+	})
+	_, err := GetKserveInferenceService("my-service", "oscar-svc")
+	if err == nil {
+		t.Fatal("expected error due to dynamic client failure, got nil")
+	}
 }
