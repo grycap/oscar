@@ -14,13 +14,13 @@ kubectl wait --namespace cert-manager \
   --timeout=300s
 
 helm upgrade --install kserve-crd oci://ghcr.io/kserve/charts/kserve-crd \
-  --version v0.18.0 \
+  --version v0.19.0-rc0 \
   --namespace kserve \
   --create-namespace \
   --wait
 
 helm upgrade --install kserve-resources oci://ghcr.io/kserve/charts/kserve-resources \
-  --version v0.18.0 \
+  --version v0.19.0-rc0 \
   --namespace kserve \
   --set kserve.controller.deploymentMode=Standard \
   --set kserve.controller.gateway.disableIngressCreation=true \
@@ -32,20 +32,20 @@ helm upgrade --install kserve-resources oci://ghcr.io/kserve/charts/kserve-resou
   --wait
 
 helm upgrade --install kserve-llmisvc-crd oci://ghcr.io/kserve/charts/kserve-llmisvc-crd \
-  --version v0.18.0 \
+  --version v0.19.0-rc0 \
   --namespace kserve \
   --create-namespace \
   --wait
 
 helm upgrade --install kserve-llmisvc-resources oci://ghcr.io/kserve/charts/kserve-llmisvc-resources \
-  --version v0.18.0 \
+  --version v0.19.0-rc0 \
   --create-namespace \
   --namespace kserve \
   --set kserve.createSharedResources=false \
   --wait
 
 helm upgrade --install kserve-runtime-configs oci://ghcr.io/kserve/charts/kserve-runtime-configs \
-  --version v0.18.0 \
+  --version v0.19.0-rc0 \
   --namespace kserve \
   --set kserve.llmisvcConfigs.enabled=true \
   --set kserve.servingruntime.enabled=true \

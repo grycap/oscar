@@ -1370,8 +1370,8 @@ func TestGetKserveLLMServiceRouterSpec(t *testing.T) {
 }
 
 func TestKserveGetAPIPath(t *testing.T) {
-	if got := getAPIPath("service-a"); got != "/system/services/service-a/exposed" {
-		t.Errorf("getAPIPath() = %q, want %q", got, "/system/services/service-a/exposed")
+	if got := getAPIPath("service-a"); got != "/system/services/service-a/models" {
+		t.Errorf("getAPIPath() = %q, want %q", got, "/system/services/service-a/models")
 	}
 }
 
