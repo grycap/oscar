@@ -99,3 +99,10 @@ func addInitContainer(podSpec *v1.PodSpec, cfg *Config) {
 	}
 	podSpec.InitContainers = []v1.Container{initContainer}
 }
+
+func IsInterLinkService(service *Service, cfg *Config) bool {
+	if cfg.InterLinkAvailable {
+		return service.InterLinkNodeName != ""
+	}
+	return false
+}

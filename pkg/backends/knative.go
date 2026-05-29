@@ -162,7 +162,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		if err != nil {
 			return err
 		}
-	} else {
+	} else if !types.IsInterLinkService(&service, kn.config) {
 		// Create the Knative service definition
 		knSvc, err := kn.createKNServiceDefinition(&service, namespace)
 		if err != nil {
