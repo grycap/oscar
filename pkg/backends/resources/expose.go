@@ -535,7 +535,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 		containerPorts := []v1.ContainerPort{}
 		for index, port := range service.Expose.APIPort {
 			containerPorts = append(containerPorts, v1.ContainerPort{
-				Name:          fmt.Sprintf("%s-%d", podPortName, index),
+				Name:          getPodPortName(index),
 				ContainerPort: int32(port), // #nosec G115
 			})
 		}
@@ -555,7 +555,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path: probePath,
-				Port: intstr.FromString(podPortName),
+				Port: intstr.FromString(getPodPortName(0)),
 			},
 		}
 
@@ -1461,6 +1461,10 @@ func getHTTPRouteName(name_container string) string {
 
 func getTraefikCORSMiddlewareName(name_container string) string {
 	return name_container + "-cors-mdw"
+}
+
+func getPodPortName(index int) string {
+	return fmt.Sprintf("%s-%d", podPortName, index)
 }
 
 func getTraefikAuthMiddlewareName(name_container string) string {
