@@ -802,6 +802,29 @@ func TestKnativeDeleteService(t *testing.T) {
 	}
 }
 
+func TestKnativeDeleteServiceRemovesServiceSecret(t *testing.T) {
+	service := types.Service{
+		Name:      "service-with-secret",
+		Namespace: testConfig.ServicesNamespace,
+	}
+	fakeClientset := fake.NewSimpleClientset(&v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+	})
+	back := MakeKnativeBackend(fakeClientset, fakeConfig, testConfig)
+	back.knClientset = knFake.NewSimpleClientset(&knv1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+	})
+
+	if err := back.DeleteService(service); err != nil {
+		t.Fatalf("unexpected error deleting service: %v", err)
+	}
+
+	_, err := fakeClientset.CoreV1().Secrets(service.Namespace).Get(t.Context(), service.Name, metav1.GetOptions{})
+	if !apierrors.IsNotFound(err) {
+		t.Fatalf("expected service secret to be removed, got err: %v", err)
+	}
+}
+
 func TestKnativeGetProxyDirector(t *testing.T) {
 	clientset := fake.NewSimpleClientset()
 
