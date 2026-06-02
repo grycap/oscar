@@ -38,9 +38,11 @@ import (
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	corev1 "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
 
@@ -807,6 +809,65 @@ func TestGetProviderInfo(t *testing.T) {
 	provID, provName = getProviderInfo("rucio")
 	if provName != types.RucioName || provID != types.DefaultProvider {
 		t.Fatalf("expected default provider id, got %s %s", provName, provID)
+	}
+}
+
+func TestServiceWithSameNameExists(t *testing.T) {
+	tests := []struct {
+		name          string
+		services      []*types.Service
+		backendErr    error
+		expectedExist bool
+		expectErr     bool
+	}{
+		{
+			name:          "service exists",
+			services:      []*types.Service{{Name: "svc"}},
+			expectedExist: true,
+			expectErr:     false,
+		},
+		{
+			name:          "service does not exist",
+			services:      []*types.Service{{Name: "other"}},
+			expectedExist: false,
+			expectErr:     false,
+		},
+		{
+			name:          "not found error treated as not existing",
+			backendErr:    k8serr.NewNotFound(schema.GroupResource{Group: "serving.knative.dev", Resource: "services"}, "svc"),
+			expectedExist: false,
+			expectErr:     false,
+		},
+		{
+			name:          "gone error treated as not existing",
+			backendErr:    k8serr.NewGone("resource gone"),
+			expectedExist: false,
+			expectErr:     false,
+		},
+		{
+			name:          "generic backend error is returned",
+			backendErr:    fmt.Errorf("boom"),
+			expectedExist: false,
+			expectErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			back := backends.MakeFakeBackend()
+			back.Services = tt.services
+			if tt.backendErr != nil {
+				back.AddError("ListServicesByName", tt.backendErr)
+			}
+
+			exists, err := serviceWithSameNameExists("svc", back)
+			if (err != nil) != tt.expectErr {
+				t.Fatalf("unexpected error state, got err=%v expectErr=%v", err, tt.expectErr)
+			}
+			if exists != tt.expectedExist {
+				t.Fatalf("unexpected exists result, got=%v expected=%v", exists, tt.expectedExist)
+			}
+		})
 	}
 }
 
