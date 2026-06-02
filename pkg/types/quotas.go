@@ -64,6 +64,7 @@ type VolumeQuotaValues struct {
 type QuotaUpdateRequest struct {
 	CPU     string             `json:"cpu"`
 	Memory  string             `json:"memory"`
+	GPU     string             `json:"gpu,omitempty"`
 	Volumes *VolumeQuotaUpdate `json:"volumes,omitempty"`
 	MinIO   *MinIOQuotaUpdate  `json:"minio,omitempty"`
 }

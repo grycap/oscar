@@ -167,6 +167,9 @@ type Config struct {
 	// KueueDefaultMemory default per-user ClusterQueue memory quota
 	KueueDefaultMemory string `json:"-"`
 
+	// KueueDefaultGPU default per-user ClusterQueue GPU quota
+	KueueDefaultGPU string `json:"-"`
+
 	// KueueDefaultFlavor default ResourceFlavor name used for ClusterQueues
 	KueueDefaultFlavor string `json:"-"`
 
@@ -331,6 +334,7 @@ var configVars = []configVar{
 	{"KueueEnable", "KUEUE_ENABLE", false, boolType, "true"},
 	{"KueueDefaultCPU", "KUEUE_DEFAULT_CPU", false, stringType, "2"},
 	{"KueueDefaultMemory", "KUEUE_DEFAULT_MEMORY", false, stringType, "2Gi"},
+	{"KueueDefaultGPU", "KUEUE_DEFAULT_GPU", false, stringType, "0"},
 	{"KueueDefaultFlavor", "KUEUE_DEFAULT_FLAVOR", false, stringType, "oscar-default-flavor"},
 
 	{"VolumeEnable", "VOLUME_ENABLE", false, boolType, "true"},
