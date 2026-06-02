@@ -363,11 +363,13 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				secretsErr := utils.UpdateSecretData(newService.Name, serviceNamespace, newService.Environment.Secrets, back.GetKubeClientset())
 				if secretsErr != nil {
 					c.String(http.StatusInternalServerError, "error updating asociated secret: %v", secretsErr)
+					return
 				}
 			} else {
 				secretsErr := utils.CreateSecret(newService.Name, serviceNamespace, newService.Environment.Secrets, back.GetKubeClientset())
 				if secretsErr != nil {
 					c.String(http.StatusInternalServerError, "error adding asociated secret: %v", secretsErr)
+					return
 				}
 			}
 			// Empty the secrets content from the Configmap

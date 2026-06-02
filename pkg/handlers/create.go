@@ -248,10 +248,12 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		if len(service.Environment.Secrets) > 0 {
 			if utils.SecretExists(service.Name, service.Namespace, back.GetKubeClientset()) {
 				c.String(http.StatusConflict, "A secret with the given name already exists")
+				return
 			}
 			secretsErr := utils.CreateSecret(service.Name, service.Namespace, service.Environment.Secrets, back.GetKubeClientset())
 			if secretsErr != nil {
 				c.String(http.StatusConflict, "Error creating secrets for service: %v", secretsErr)
+				return
 			}
 
 			// Empty the secrets content from the Configmap
