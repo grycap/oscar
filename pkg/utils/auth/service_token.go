@@ -38,18 +38,8 @@ func GetServiceTokenMiddleware(back types.ServerlessBackend) gin.HandlerFunc {
 			return
 		}
 
-		// Check if any request token is the service token. Exposed services may use
-		// their own "token" query parameter, so keep checking the auth cookie too.
-		tokens := getServiceTokenCandidates(c)
-		hasServiceTokenCandidate := false
-		for _, token := range tokens {
-			if len(token) == tokenLength {
-				hasServiceTokenCandidate = true
-				break
-			}
-		}
-		if hasServiceTokenCandidate {
-			serviceList, err := back.ListServicesByName(c.Param("serviceName"), "")
+		if tokens := getServiceTokenCandidates(c); len(tokens) > 0 {
+			serviceList, err := back.ListServicesByName(c.Param("serviceName"))
 			if err != nil {
 				// Check if error is caused because the service is not found
 				if errors.IsNotFound(err) || errors.IsGone(err) {
@@ -60,23 +50,20 @@ func GetServiceTokenMiddleware(back types.ServerlessBackend) gin.HandlerFunc {
 				return
 			}
 
-			for _, serviceIter := range serviceList {
-				for _, token := range tokens {
-					if len(token) != tokenLength {
-						continue
-					}
-					if token == serviceIter.Token {
-						c.Set(isServiceTokenKey, true)
-						setServiceTokenCookie(c, serviceIter.Name, token)
-						c.Next()
-						return
-					}
+			// only one service should be returned
+			// the restriction for unique service names is enforced in the service creation and update handlers
+			service := serviceList[0]
+			for _, token := range tokens {
+				if token == service.Token {
+					c.Set(isServiceTokenKey, true)
+					setServiceTokenCookie(c, service.Name, token)
+					c.Next()
+					return
 				}
 			}
-			if hasServiceTokenCandidate {
-				c.AbortWithStatus(http.StatusUnauthorized)
-				return
-			}
+
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
 		}
 
 		c.Next()
@@ -87,19 +74,23 @@ func GetServiceTokenMiddleware(back types.ServerlessBackend) gin.HandlerFunc {
 func getServiceTokenCandidates(c *gin.Context) []string {
 	tokens := []string{}
 
+	// Prioritise the token in the authorization header over other sources of service tokens
 	if token, ok := isAuthBearer(c); ok {
+		if len(strings.TrimSpace(token)) == tokenLength {
+			tokens = append(tokens, token)
+		}
+		return tokens
+	}
+
+	if token := strings.TrimSpace(c.Query("token")); len(token) == tokenLength {
 		tokens = append(tokens, token)
 	}
 
-	if token := strings.TrimSpace(c.Query("token")); token != "" {
+	if token := serviceTokenFromForwardedURI(c.GetHeader("X-Forwarded-Uri")); len(token) == tokenLength {
 		tokens = append(tokens, token)
 	}
 
-	if token := serviceTokenFromForwardedURI(c.GetHeader("X-Forwarded-Uri")); token != "" {
-		tokens = append(tokens, token)
-	}
-
-	if token, err := c.Cookie(getServiceTokenCookieName(c.Param("serviceName"))); err == nil && strings.TrimSpace(token) != "" {
+	if token, err := c.Cookie(getServiceTokenCookieName(c.Param("serviceName"))); err == nil && len(strings.TrimSpace(token)) == tokenLength {
 		tokens = append(tokens, strings.TrimSpace(token))
 	}
 

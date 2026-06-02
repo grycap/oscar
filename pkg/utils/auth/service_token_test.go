@@ -121,6 +121,18 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			wantServiceTokenCtx: false,
 		},
 		{
+			name:         "denies request with bearer token of invalid length and valid query token present, bearer token is prioritised",
+			forwardedURI: "/system/services/svc/exposed/api/ws?token=" + validToken,
+			authHeader:   "Bearer user-token",
+			backendServices: []*types.Service{
+				{Name: "svc", Token: validToken},
+			},
+			wantLookup:          false,
+			wantStatus:          http.StatusOK,
+			wantNextHandler:     true,
+			wantServiceTokenCtx: false,
+		},
+		{
 			name:       "sets service token context from query token",
 			targetPath: "/system/services/svc/auth?token=" + validToken,
 			backendServices: []*types.Service{
@@ -216,6 +228,30 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			wantStatus:          http.StatusUnauthorized,
 			wantNextHandler:     false,
 			wantServiceTokenCtx: false,
+		},
+		{
+			name:         "both bearer token and query token present, bearer token is prioritised",
+			forwardedURI: "/system/services/svc/exposed/api/ws?token=app-session-token",
+			authHeader:   "Bearer " + validToken,
+			backendServices: []*types.Service{
+				{Name: "svc", Token: validToken},
+			},
+			wantLookup:          true,
+			wantStatus:          http.StatusOK,
+			wantNextHandler:     true,
+			wantServiceTokenCtx: true,
+		},
+		{
+			name:         "both bearer token and valid query token present, bearer token is prioritised",
+			forwardedURI: "/system/services/svc/exposed/api/ws?token=" + validToken,
+			authHeader:   "Bearer " + validToken,
+			backendServices: []*types.Service{
+				{Name: "svc", Token: validToken},
+			},
+			wantLookup:          true,
+			wantStatus:          http.StatusOK,
+			wantNextHandler:     true,
+			wantServiceTokenCtx: true,
 		},
 	}
 
