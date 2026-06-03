@@ -121,4 +121,6 @@ jobs:
     steps:
       - name: Trigger pkg.go.dev indexing
         run: |
-          curl -s "https://proxy.golang.org/github.com/grycap/oscar/v4/@v/${{ github.event.release.tag_name }}.info"
+          TAG="${{ github.event.release.tag_name }}"
+          MAJOR="${TAG%%.*}"
+          curl -s "https://proxy.golang.org/github.com/grycap/oscar/${MAJOR}/@v/${TAG}.info"
