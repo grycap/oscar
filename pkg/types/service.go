@@ -482,6 +482,7 @@ type Expose struct {
 	NodePort       []int32 `json:"nodePort,omitempty" `
 	DefaultCommand bool    `json:"default_command" `
 	SetAuth        bool    `json:"set_auth" `
+	AuthType       string  `json:"auth_type,omitempty" default:"basic" `
 	HealthPath     string  `json:"health_path" default:"/" `
 	ProbeMode      string  `json:"probe_mode,omitempty" default:"legacy" `
 }

@@ -158,6 +158,7 @@ storage_providers:
 | `cpu_threshold` </br> *integer* | Percent of use of CPU before creating other pod (default: 80 max:100). Optional.  |
 | `nodePort` </br> *integer* | Change the access method from the domain name to the public ip. Optional.   |
 | `set_auth` </br> *bool* | Create credentials for the service, composed of the service name as the user and the service token as the password. (default: false). Optional.  |
+| `auth_type` </br> *string* | Authentication middleware used when `set_auth` is enabled. Supported values are `basic` (default) and `forward`. `forward` is only supported for Gateway API/Traefik exposed services and delegates checks to OSCAR service authorization. Optional. |
 | `rewrite_target` </br> *bool* | It is an expose boolean in the FDL that controls how OSCAR configures the NGINX Ingress/HTTProute rewrite for exposed services. If rewrite_target: false, ingress rewrites to /$1. If rewrite_target: true, ingress rewrites to /system/services/<service>/exposed/$1 (default: false). Optional.  |
 | `default_command` </br> *bool* | Select between executing the container's default command and executing the script inside the container. (default: false). Optional.  |
 | `health_path` </br> *string* | Change the service readiness and liveness check path/endpoint. (default: "/"). Optional.  |

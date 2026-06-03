@@ -76,16 +76,19 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 
 	// Decision graph paths for GetServiceTokenMiddleware:
 	// 1) basic auth -> pass through
-	// 2) no bearer token -> pass through
-	// 3) bearer token with invalid length -> pass through
-	// 4) valid bearer + backend not found -> 404
-	// 5) valid bearer + backend error -> 500
-	// 6) valid bearer + token match -> set context + pass through
-	// 7) valid bearer + no match -> 401
+	// 2) no service token -> pass through
+	// 3) service token with invalid length -> pass through
+	// 4) valid service token + backend not found -> 404
+	// 5) valid service token + backend error -> 500
+	// 6) valid service token + token match -> set context + pass through
+	// 7) valid service token + no match -> 401
 	tests := []struct {
 		name                string
 		basicAuth           bool
 		authHeader          string
+		targetPath          string
+		forwardedURI        string
+		cookieToken         string
 		backendServices     []*types.Service
 		backendErr          error
 		wantLookup          bool
@@ -116,6 +119,75 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			wantStatus:          http.StatusOK,
 			wantNextHandler:     true,
 			wantServiceTokenCtx: false,
+		},
+		{
+			name:         "denies request with bearer token of invalid length and valid query token present, bearer token is prioritised",
+			forwardedURI: "/system/services/svc/exposed/api/ws?token=" + validToken,
+			authHeader:   "Bearer user-token",
+			backendServices: []*types.Service{
+				{Name: "svc", Token: validToken},
+			},
+			wantLookup:          false,
+			wantStatus:          http.StatusOK,
+			wantNextHandler:     true,
+			wantServiceTokenCtx: false,
+		},
+		{
+			name:       "sets service token context from query token",
+			targetPath: "/system/services/svc/auth?token=" + validToken,
+			backendServices: []*types.Service{
+				{Name: "svc", Token: validToken},
+			},
+			wantLookup:          true,
+			wantStatus:          http.StatusOK,
+			wantNextHandler:     true,
+			wantServiceTokenCtx: true,
+		},
+		{
+			name:         "sets service token context from forwarded uri token",
+			forwardedURI: "/system/services/svc/exposed/?token=" + validToken,
+			backendServices: []*types.Service{
+				{Name: "svc", Token: validToken},
+			},
+			wantLookup:          true,
+			wantStatus:          http.StatusOK,
+			wantNextHandler:     true,
+			wantServiceTokenCtx: true,
+		},
+		{
+			name:        "sets service token context from service cookie",
+			cookieToken: validToken,
+			backendServices: []*types.Service{
+				{Name: "svc", Token: validToken},
+			},
+			wantLookup:          true,
+			wantStatus:          http.StatusOK,
+			wantNextHandler:     true,
+			wantServiceTokenCtx: true,
+		},
+		{
+			name:        "sets service token context from cookie when query token belongs to exposed app",
+			targetPath:  "/system/services/svc/auth?token=app-session-token",
+			cookieToken: validToken,
+			backendServices: []*types.Service{
+				{Name: "svc", Token: validToken},
+			},
+			wantLookup:          true,
+			wantStatus:          http.StatusOK,
+			wantNextHandler:     true,
+			wantServiceTokenCtx: true,
+		},
+		{
+			name:         "sets service token context from cookie when forwarded uri token belongs to exposed app",
+			forwardedURI: "/system/services/svc/exposed/api/ws?token=app-session-token",
+			cookieToken:  validToken,
+			backendServices: []*types.Service{
+				{Name: "svc", Token: validToken},
+			},
+			wantLookup:          true,
+			wantStatus:          http.StatusOK,
+			wantNextHandler:     true,
+			wantServiceTokenCtx: true,
 		},
 		{
 			name:                "returns not found when backend returns not found",
@@ -157,6 +229,30 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			wantNextHandler:     false,
 			wantServiceTokenCtx: false,
 		},
+		{
+			name:         "both bearer token and query token present, bearer token is prioritised",
+			forwardedURI: "/system/services/svc/exposed/api/ws?token=app-session-token",
+			authHeader:   "Bearer " + validToken,
+			backendServices: []*types.Service{
+				{Name: "svc", Token: validToken},
+			},
+			wantLookup:          true,
+			wantStatus:          http.StatusOK,
+			wantNextHandler:     true,
+			wantServiceTokenCtx: true,
+		},
+		{
+			name:         "both bearer token and valid query token present, bearer token is prioritised",
+			forwardedURI: "/system/services/svc/exposed/api/ws?token=" + validToken,
+			authHeader:   "Bearer " + validToken,
+			backendServices: []*types.Service{
+				{Name: "svc", Token: validToken},
+			},
+			wantLookup:          true,
+			wantStatus:          http.StatusOK,
+			wantNextHandler:     true,
+			wantServiceTokenCtx: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -183,12 +279,22 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 				},
 			)
 
-			req, err := http.NewRequest(http.MethodGet, "/system/services/svc/auth", nil)
+			targetPath := tt.targetPath
+			if targetPath == "" {
+				targetPath = "/system/services/svc/auth"
+			}
+			req, err := http.NewRequest(http.MethodGet, targetPath, nil)
 			if err != nil {
 				t.Fatalf("unexpected error creating request: %v", err)
 			}
 			if tt.authHeader != "" {
 				req.Header.Set("Authorization", tt.authHeader)
+			}
+			if tt.forwardedURI != "" {
+				req.Header.Set("X-Forwarded-Uri", tt.forwardedURI)
+			}
+			if tt.cookieToken != "" {
+				req.AddCookie(&http.Cookie{Name: getServiceTokenCookieName("svc"), Value: tt.cookieToken})
 			}
 			if tt.basicAuth {
 				req.SetBasicAuth("user", "password")
