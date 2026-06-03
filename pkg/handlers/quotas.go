@@ -212,6 +212,7 @@ func fetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, u
 
 		var maxCPU int64
 		var maxMem int64
+		var maxGPU int64
 		if len(cq.Spec.ResourceGroups) > 0 && len(cq.Spec.ResourceGroups[0].Flavors) > 0 {
 			for _, res := range cq.Spec.ResourceGroups[0].Flavors[0].Resources {
 				switch res.Name {
@@ -219,12 +220,15 @@ func fetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, u
 					maxCPU = res.NominalQuota.MilliValue()
 				case corev1.ResourceMemory:
 					maxMem = res.NominalQuota.Value()
+				case corev1.ResourceName("nvidia.com/gpu"):
+					maxGPU = res.NominalQuota.Value()
 				}
 			}
 		}
 
 		var usedCPU int64
 		var usedMem int64
+		var usedGPU int64
 		if len(cq.Status.FlavorsUsage) > 0 {
 			for _, res := range cq.Status.FlavorsUsage[0].Resources {
 				switch res.Name {
@@ -232,12 +236,15 @@ func fetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, u
 					usedCPU = res.Total.MilliValue()
 				case corev1.ResourceMemory:
 					usedMem = res.Total.Value()
+				case corev1.ResourceName("nvidia.com/gpu"):
+					usedGPU = res.Total.Value()
 				}
 			}
 		}
 
 		resp.Resources["cpu"] = types.QuotaValues{Max: maxCPU, Used: usedCPU}
 		resp.Resources["memory"] = types.QuotaValues{Max: maxMem, Used: usedMem}
+		resp.Resources["gpu"] = types.QuotaValues{Max: maxGPU, Used: usedGPU}
 	}
 
 	if cfg.VolumeEnable {
@@ -331,6 +338,14 @@ func updateKueueQuota(ctx context.Context, qb types.QuotaBackend, user string, r
 				q, err := resource.ParseQuantity(req.Memory)
 				if err != nil {
 					return fmt.Errorf("invalid memory quantity: %w", err)
+				}
+				flavor.Resources[i].NominalQuota = q
+			}
+		case corev1.ResourceName("nvidia.com/gpu"):
+			if req.GPU != "" {
+				q, err := resource.ParseQuantity(req.GPU)
+				if err != nil {
+					return fmt.Errorf("invalid gpu quantity: %w", err)
 				}
 				flavor.Resources[i].NominalQuota = q
 			}
