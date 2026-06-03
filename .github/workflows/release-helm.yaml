@@ -113,3 +113,12 @@ jobs:
       - name: Send notification
         run: |
           echo "Helm chart released successfully: ${{ github.event.release.tag_name }}"
+
+  update-pkgdev:
+    needs: release
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'release'
+    steps:
+      - name: Trigger pkg.go.dev indexing
+        run: |
+          curl -s "https://proxy.golang.org/github.com/grycap/oscar/v4/@v/${{ github.event.release.tag_name }}.info"
