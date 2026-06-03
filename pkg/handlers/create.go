@@ -301,6 +301,15 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 
+		// Check if a service with the same name already exists in the cluster
+		if exists, err := serviceWithSameNameExists(service.Name, back); err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error checking for existing service: %v", err))
+			return
+		} else if exists {
+			c.String(http.StatusBadRequest, "A service with the provided name already exists")
+			return
+		}
+
 		// Create service
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
@@ -977,4 +986,17 @@ func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider,
 	}
 
 	return minIOAdminClient.RestartServer()
+}
+
+func serviceWithSameNameExists(name string, back types.ServerlessBackend) (bool, error) {
+	services, err := back.ListServicesByName(name)
+	if err != nil {
+		// Check if error is caused because the service is not found
+		if k8sErrors.IsNotFound(err) || k8sErrors.IsGone(err) {
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+	return len(services) > 0, nil
 }
