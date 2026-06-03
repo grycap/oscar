@@ -83,3 +83,38 @@ jobs:
           git add docs/ index.yaml
           git commit -m "chore: release oscar ${{ steps.vars.outputs.VERSION }}"
           git push
+
+  update-ansible:
+    needs: release
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'release'
+    steps:
+      - name: Checkout ansible-role-kubeoscar (devel)
+        uses: actions/checkout@v3
+        with:
+          repository: grycap/ansible-role-kubeoscar
+          ref: devel
+          path: ansible-role-kubeoscar
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+        working-directory: ansible-role-kubeoscar
+
+      - name: Update values.yaml tag
+        run: 'sed -i "s/^oscar_version:.*/oscar_version: \"${{ github.event.release.tag_name }}\"/" defaults/main.yaml'
+
+      - name: Push devel to main
+        run: |
+          git push https://x-access-token:${{ secrets.HELM_CHARTS_TOKEN }}@github.com/grycap/ansible-role-kubeoscar.git HEAD:main
+        working-directory: ansible-role-kubeoscar
+
+  notify:
+    needs: release
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'release'
+    steps:
+      - name: Send notification
+        run: |
+          echo "Helm chart released successfully: ${{ github.event.release.tag_name }}"
