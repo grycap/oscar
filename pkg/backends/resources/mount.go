@@ -28,7 +28,7 @@ import (
 
 // validMountOptsRe matches only safe characters for rclone mount flags.
 // Allows alphanumeric, dash, underscore, dot, colon, equals, comma, slash, and whitespace.
-var validMountOptsRe = regexp.MustCompile(`^[a-zA-Z0-9\-_.:=,/\s]+$`)
+var validMountOptsRe = regexp.MustCompile(`^[a-zA-Z0-9\-_.:=,/ ]+$`)
 
 var (
 	// Don't restart jobs in order to keep logs
