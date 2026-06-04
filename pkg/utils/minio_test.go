@@ -57,6 +57,269 @@ func newMinioMock() *minioMock {
 	}
 }
 
+func TestParseStorageBytes(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   string
+		wantErr bool
+	}{
+		{name: "gibibytes", value: "100Gi"},
+		{name: "zero", value: "0"},
+		{name: "invalid", value: "not-a-size", wantErr: true},
+		{name: "negative", value: "-1Gi", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseStorageBytes(tt.value)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got < 0 {
+				t.Fatalf("expected non-negative bytes, got %d", got)
+			}
+		})
+	}
+}
+
+func TestMinIOBucketQuotaJSONFields(t *testing.T) {
+	bucket := MinIOBucket{
+		BucketName: "bucket",
+		Owner:      "owner",
+		StorageQuota: &MinIOQuota{
+			Max:      "100Gi",
+			MaxBytes: 107374182400,
+			Source:   "bucket",
+		},
+		StorageUsage: &MinIOUsage{
+			Used:      "1Gi",
+			UsedBytes: 1073741824,
+			Objects:   2,
+		},
+		Attribution: "tagged",
+	}
+	payload, err := json.Marshal(bucket)
+	if err != nil {
+		t.Fatalf("unexpected marshal error: %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+	for _, field := range []string{"storage_quota", "storage_usage", "attribution"} {
+		if _, ok := decoded[field]; !ok {
+			t.Fatalf("expected %s field in JSON: %s", field, string(payload))
+		}
+	}
+}
+
+func TestAggregateBucketStorageUsage(t *testing.T) {
+	dataUsage := madmin.DataUsageInfo{
+		BucketsUsage: map[string]madmin.BucketUsageInfo{
+			"bucket-a": {Size: 42, ObjectsCount: 2},
+			"bucket-b": {Size: 100, ObjectsCount: 1},
+		},
+	}
+
+	usage, attribution, err := AggregateBucketStorageUsage(dataUsage, map[string]struct{}{
+		"bucket-a": {},
+		"bucket-b": {},
+	})
+	if err != nil {
+		t.Fatalf("unexpected aggregate error: %v", err)
+	}
+	if usage.UsedBytes != 142 || usage.Objects != 3 {
+		t.Fatalf("unexpected aggregate usage: %+v", usage)
+	}
+	if attribution != "complete" {
+		t.Fatalf("expected complete attribution, got %s", attribution)
+	}
+
+	usage, attribution, err = AggregateBucketStorageUsage(dataUsage, map[string]struct{}{
+		"bucket-a": {},
+		"missing":  {},
+	})
+	if err != nil {
+		t.Fatalf("unexpected aggregate error: %v", err)
+	}
+	if usage.UsedBytes != 42 || usage.Objects != 2 {
+		t.Fatalf("unexpected partial usage: %+v", usage)
+	}
+	if attribution != "partial" {
+		t.Fatalf("expected partial attribution, got %s", attribution)
+	}
+}
+
+func TestFormatStorageBytes(t *testing.T) {
+	tests := []struct {
+		name  string
+		value int64
+		want  string
+	}{
+		{name: "bytes", value: 42, want: "42"},
+		{name: "kibibytes", value: 1536, want: "1.5Ki"},
+		{name: "mebibytes", value: 50 * 1024 * 1024, want: "50Mi"},
+		{name: "fractional mebibytes", value: 281126871, want: "268.1Mi"},
+		{name: "gibibytes", value: 2 * 1024 * 1024 * 1024, want: "2Gi"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := FormatStorageBytes(tt.value); got != tt.want {
+				t.Fatalf("expected %s, got %s", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestIsMinIOAdminAPINotSupported(t *testing.T) {
+	err := madmin.ErrorResponse{
+		Code:    "NotImplemented",
+		Message: "This 'admin' API is not supported by server in 'mode-server-fs'",
+	}
+	if !IsMinIOAdminAPINotSupported(err) {
+		t.Fatalf("expected unsupported admin API error to be detected")
+	}
+	if IsMinIOAdminAPINotSupported(fmt.Errorf("ordinary failure")) {
+		t.Fatalf("unexpected unsupported admin API detection")
+	}
+}
+
+func TestIsMinIOTagSetNotFound(t *testing.T) {
+	if !IsMinIOTagSetNotFound(fmt.Errorf("error getting tags on bucket quota-smoke: The TagSet does not exist")) {
+		t.Fatalf("expected missing tag set error to be detected")
+	}
+	if !IsMinIOTagSetNotFound(fmt.Errorf("NoSuchTagSet")) {
+		t.Fatalf("expected NoSuchTagSet error to be detected")
+	}
+	if IsMinIOTagSetNotFound(fmt.Errorf("ordinary failure")) {
+		t.Fatalf("unexpected missing tag set detection")
+	}
+}
+
+func TestBucketStorageQuotaHelpers(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	var setPayload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPut && r.URL.Path == "/minio/admin/v3/set-bucket-quota":
+			if got := r.URL.Query().Get("bucket"); got != "bucket" {
+				t.Fatalf("expected bucket query bucket, got %q", got)
+			}
+			if err := json.NewDecoder(r.Body).Decode(&setPayload); err != nil {
+				t.Fatalf("unexpected set quota payload: %v", err)
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"Status":"success"}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/get-bucket-quota":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"quota":104857600,"quotatype":"hard"}`))
+		default:
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"Status":"success"}`))
+		}
+	}))
+	defer server.Close()
+
+	cfg := types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+	client, err := MakeMinIOAdminClient(&cfg)
+	if err != nil {
+		t.Fatalf("unexpected client error: %v", err)
+	}
+	if err := client.SetBucketStorageQuota("bucket", "100Mi"); err != nil {
+		t.Fatalf("unexpected set quota error: %v", err)
+	}
+	if setPayload["quota"].(float64) != 104857600 {
+		t.Fatalf("unexpected set quota payload: %#v", setPayload)
+	}
+	quota, err := client.GetBucketStorageQuota("bucket")
+	if err != nil {
+		t.Fatalf("unexpected get quota error: %v", err)
+	}
+	if quota.Max != "100Mi" || quota.MaxBytes != 104857600 || quota.Source != "bucket" {
+		t.Fatalf("unexpected quota: %+v", quota)
+	}
+}
+
+func TestListBucketsByOwner(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	owner := "alice@example.org"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/":
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<ListAllMyBucketsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Buckets><Bucket><Name>owned</Name></Bucket><Bucket><Name>other</Name></Bucket><Bucket><Name>untagged</Name></Bucket></Buckets></ListAllMyBucketsResult>`))
+		default:
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"Status":"success"}`))
+		}
+	}))
+	defer server.Close()
+
+	simpleClient, err := minio.New("localhost:9000", &minio.Options{
+		Creds:        miniocreds.NewStaticV4("minioadmin", "minioadmin", ""),
+		BucketLookup: minio.BucketLookupPath,
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			bucket := strings.Trim(req.URL.Path, "/")
+			if _, ok := req.URL.Query()["location"]; ok {
+				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`)), Header: http.Header{}}, nil
+			}
+			switch bucket {
+			case "owned":
+				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`<Tagging><TagSet><Tag><Key>owner</Key><Value>` + owner + `</Value></Tag></TagSet></Tagging>`)), Header: http.Header{}}, nil
+			case "other":
+				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`<Tagging><TagSet><Tag><Key>owner</Key><Value>bob@example.org</Value></Tag></TagSet></Tagging>`)), Header: http.Header{}}, nil
+			default:
+				return &http.Response{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`<Error><Code>NoSuchTagSet</Code><Message>The TagSet does not exist</Message></Error>`)), Header: http.Header{}}, nil
+			}
+		}),
+	})
+	if err != nil {
+		t.Fatalf("unexpected client error: %v", err)
+	}
+	client := &MinIOAdminClient{simpleClient: simpleClient}
+	cfg := types.Config{MinIOProvider: &types.MinIOProvider{
+		Endpoint:  server.URL,
+		Region:    "us-east-1",
+		AccessKey: "minioadmin",
+		SecretKey: "minioadmin",
+		Verify:    false,
+	}}
+	owned, err := client.ListBucketsByOwner(cfg.MinIOProvider.GetS3Client(), owner)
+	if err != nil {
+		t.Fatalf("unexpected list error: %v", err)
+	}
+	if len(owned) != 1 {
+		t.Fatalf("expected one owned bucket, got %v", owned)
+	}
+	if _, ok := owned["owned"]; !ok {
+		t.Fatalf("expected owned bucket, got %v", owned)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
 func (m *minioMock) policyResponse(name string) []byte {
 	resources := m.policies[name]
 	resJSON, _ := json.Marshal(resources)
@@ -795,6 +1058,58 @@ func TestDisableInputNotificationsRemovesQueue(t *testing.T) {
 	if len(fake.notifications["bucket"]) != 0 {
 		t.Fatalf("expected notifications to be cleared, got %v", fake.notifications["bucket"])
 	}
+}
+
+// ─── Nil client panic tests ─────────────────────────────────────────────────
+
+func TestGetDataUsageInfo_NilClientPanics(t *testing.T) {
+	var client *MinIOAdminClient
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic when calling GetDataUsageInfo on nil client")
+		}
+	}()
+	client.GetDataUsageInfo()
+}
+
+func TestEnrichBucketQuotaAndUsage_NilClientPanics(t *testing.T) {
+	var client *MinIOAdminClient
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic when calling EnrichBucketQuotaAndUsage on nil client")
+		}
+	}()
+	client.EnrichBucketQuotaAndUsage(&MinIOBucket{}, madmin.DataUsageInfo{})
+}
+
+func TestCreateAddPolicy_NilClientPanics(t *testing.T) {
+	var client *MinIOAdminClient
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic when calling CreateAddPolicy on nil client")
+		}
+	}()
+	client.CreateAddPolicy("bucket", "policy", nil, false)
+}
+
+func TestRemoveResource_NilClientPanics(t *testing.T) {
+	var client *MinIOAdminClient
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic when calling RemoveResource on nil client")
+		}
+	}()
+	client.RemoveResource("bucket", "policy", false)
+}
+
+func TestRemoveGroupPolicy_NilClientPanics(t *testing.T) {
+	var client *MinIOAdminClient
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic when calling RemoveGroupPolicy on nil client")
+		}
+	}()
+	client.RemoveGroupPolicy("policy")
 }
 
 func TestDeleteBucketRemovesResources(t *testing.T) {

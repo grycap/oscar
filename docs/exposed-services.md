@@ -52,6 +52,7 @@ Additional options can be defined in the "expose" section of the FDL (some previ
 - `NodePort`: The access method from the domain name to the public ip `<cluster_ip>:<NodePort>`.
 - `default_command`: Selects between executing the container's default command and executing the script inside the container. (default: false, it executes the script)
 - `set_auth`: The credentials are composed of the service name as the user and the service token as the password. Turn off this field if the container provides its own authentication method. It does not work with `NodePort` (default: false, it has no authentication).
+- `auth_type`: Authentication middleware used when `set_auth` is enabled. `basic` keeps the existing Basic Auth behavior. `forward` uses Traefik ForwardAuth to delegate checks to OSCAR service authorization and can bootstrap browser sessions from `?token=<service-token>` on Gateway API/Traefik exposed services.
 - `health_path`: The path where the service readiness and liveness status are checked. Only if the root path `/` returns status 4XX or 5XX.
 
 
@@ -142,3 +143,22 @@ Two active pods of the deployment will be shown with the command `kubectl get po
 oscar-svc            nginx-dlp-6b9ddddbd7-cm6c9                         1/1     Running     0             2m1s
 oscar-svc            nginx-dlp-6b9ddddbd7-f4ml6                         1/1     Running     0             2m1s
 ```
+
+## Lifecycle operations
+
+Exposed services can be stopped, started, and restarted without deleting the
+OSCAR service definition:
+
+- `POST /system/services/{serviceName}/stop`
+- `POST /system/services/{serviceName}/start`
+- `POST /system/services/{serviceName}/restart`
+
+`stop` scales the exposed service Deployment to zero replicas and suspends its
+autoscaler so it does not immediately create pods again. `start` restores the
+previous replica count, or the exposed service `min_scale` when there is no
+stored previous value, and recreates the autoscaler if needed. `restart`
+performs a rolling pod restart by updating the Deployment pod template.
+
+These operations only apply to services with an `expose` section. They preserve
+the service definition, route, Kubernetes Service, and mounted persistent
+volumes, but they do not preserve in-memory process state inside the old pods.

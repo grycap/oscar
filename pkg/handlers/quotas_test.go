@@ -19,6 +19,9 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/grycap/oscar/v4/pkg/types"
@@ -161,6 +164,13 @@ func TestQuotaResponseStructures(t *testing.T) {
 				},
 				isValid: true,
 			},
+			{
+				name: "only minio",
+				req: types.QuotaUpdateRequest{
+					MinIO: &types.MinIOQuotaUpdate{Buckets: "10", StoragePerBucket: "100Gi"},
+				},
+				isValid: true,
+			},
 		}
 
 		for _, tt := range tests {
@@ -177,13 +187,79 @@ func TestQuotaResponseStructures(t *testing.T) {
 				}
 
 				// Test validation logic (CPU, memory or volume quotas must be provided)
-				hasValidField := unmarshaled.CPU != "" || unmarshaled.Memory != "" || hasVolumeQuotaUpdate(unmarshaled.Volumes)
+				hasValidField := unmarshaled.CPU != "" ||
+					unmarshaled.Memory != "" ||
+					hasVolumeQuotaUpdate(unmarshaled.Volumes) ||
+					hasMinIOQuotaUpdate(unmarshaled.MinIO)
 				if hasValidField != tt.isValid {
 					t.Errorf("Expected valid=%t, got valid=%t", tt.isValid, hasValidField)
 				}
 			})
 		}
 	})
+}
+
+func TestMinIOQuotaConfigMapHelpers(t *testing.T) {
+	user := "user@example.org"
+	cfg := &types.Config{ServicesNamespace: "oscar-svc"}
+	namespace := utils.BuildUserNamespace(cfg, user)
+	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})
+
+	_, found, err := GetMinIOQuotaConfig(t.Context(), cfg, client, user)
+	if err != nil {
+		t.Fatalf("unexpected get error: %v", err)
+	}
+	if found {
+		t.Fatalf("expected missing configmap to return found=false")
+	}
+
+	update := &types.MinIOQuotaUpdate{Buckets: "10", StoragePerBucket: "100Gi"}
+	if err := updateMinIOQuota(t.Context(), user, update, cfg, client); err != nil {
+		t.Fatalf("unexpected updateMinIOQuota error: %v", err)
+	}
+
+	got, found, err := GetMinIOQuotaConfig(t.Context(), cfg, client, user)
+	if err != nil {
+		t.Fatalf("unexpected get after update error: %v", err)
+	}
+	if !found {
+		t.Fatalf("expected configmap to exist")
+	}
+	if got.Buckets != "10" || got.StoragePerBucket != "100Gi" {
+		t.Fatalf("unexpected minio quota config: %+v", got)
+	}
+
+	cm, err := client.CoreV1().ConfigMaps(namespace).Get(t.Context(), utils.GetDefaultMinIOQuotaConfigMapName(), metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected configmap get error: %v", err)
+	}
+	if cm.Labels[minIOQuotaLabelKey] != minIOQuotaLabelValue {
+		t.Fatalf("expected quota label on configmap, got %v", cm.Labels)
+	}
+}
+
+func TestUpdateMinIOQuotaValidation(t *testing.T) {
+	user := "user@example.org"
+	cfg := &types.Config{ServicesNamespace: "oscar-svc"}
+	namespace := utils.BuildUserNamespace(cfg, user)
+	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})
+
+	tests := []struct {
+		name   string
+		update *types.MinIOQuotaUpdate
+	}{
+		{name: "negative bucket count", update: &types.MinIOQuotaUpdate{Buckets: "-1"}},
+		{name: "invalid bucket count", update: &types.MinIOQuotaUpdate{Buckets: "many"}},
+		{name: "invalid storage", update: &types.MinIOQuotaUpdate{StoragePerBucket: "not-a-size"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := updateMinIOQuota(t.Context(), user, tt.update, cfg, client); err == nil {
+				t.Fatalf("expected validation error")
+			}
+		})
+	}
 }
 
 func TestFetchQuotaSkipped(t *testing.T) {
@@ -283,6 +359,114 @@ func TestFetchQuotaIncludesVolumeQuotas(t *testing.T) {
 	}
 	if resp.Volumes.MaxDiskperVolume != "5Gi" || resp.Volumes.MinDiskperVolume != "200Mi" {
 		t.Fatalf("unexpected per-volume quota values: %+v", resp.Volumes)
+	}
+}
+
+func TestFetchQuotaIncludesMinIOQuotas(t *testing.T) {
+	user := "user@example.org"
+	cfg := &types.Config{ServicesNamespace: "oscar-svc"}
+	namespace := utils.BuildUserNamespace(cfg, user)
+	client := fake.NewSimpleClientset(
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}},
+		&corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: utils.GetDefaultMinIOQuotaConfigMapName(), Namespace: namespace},
+			Data: map[string]string{
+				minIOQuotaBucketsKey: "10",
+				minIOQuotaStorageKey: "100Gi",
+			},
+		},
+	)
+
+	resp, err := fetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
+	if err != nil {
+		t.Fatalf("unexpected fetchQuota error: %v", err)
+	}
+	if resp.MinIO == nil {
+		t.Fatalf("expected minio quotas in response")
+	}
+	if resp.MinIO.Buckets.Max != 10 {
+		t.Fatalf("expected bucket max 10, got %d", resp.MinIO.Buckets.Max)
+	}
+	if resp.MinIO.StoragePerBucket.Max != "100Gi" {
+		t.Fatalf("expected storage_per_bucket 100Gi, got %s", resp.MinIO.StoragePerBucket.Max)
+	}
+}
+
+func TestFetchQuotaIncludesUnsetMinIOQuotas(t *testing.T) {
+	user := "user@example.org"
+	cfg := &types.Config{ServicesNamespace: "oscar-svc"}
+	namespace := utils.BuildUserNamespace(cfg, user)
+	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})
+
+	resp, err := fetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
+	if err != nil {
+		t.Fatalf("unexpected fetchQuota error: %v", err)
+	}
+	if resp.MinIO == nil {
+		t.Fatalf("expected unset minio quotas in response")
+	}
+	if resp.MinIO.Buckets.Max != defaultMinIOBucketMax {
+		t.Fatalf("expected default bucket max %d, got %d", defaultMinIOBucketMax, resp.MinIO.Buckets.Max)
+	}
+	if resp.MinIO.StoragePerBucket.Max != defaultMinIOStoragePerBucketMax {
+		t.Fatalf("expected default storage_per_bucket max %s, got %s", defaultMinIOStoragePerBucketMax, resp.MinIO.StoragePerBucket.Max)
+	}
+}
+
+func TestFetchQuotaCountsMinIOBucketsWithoutConfiguredLimit(t *testing.T) {
+	user := "user@example.org"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && strings.Contains(r.URL.RawQuery, "tagging"):
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<Tagging><TagSet><Tag><Key>owner</Key><Value>` + user + `</Value></Tag></TagSet></Tagging>`))
+		case r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/datausageinfo":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"bucketsUsageInfo":{"owned":{"size":42,"objectsCount":1}}}`))
+		case r.Method == http.MethodGet && strings.HasPrefix(r.Host, "owned."):
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<Tagging><TagSet><Tag><Key>owner</Key><Value>` + user + `</Value></Tag></TagSet></Tagging>`))
+		case r.Method == http.MethodGet && r.URL.Path == "/":
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<ListAllMyBucketsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Buckets><Bucket><Name>owned</Name></Bucket></Buckets></ListAllMyBucketsResult>`))
+		case r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/info":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"Mode":"mode","Region":"us-east-1"}`))
+		default:
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<Tagging><TagSet><Tag><Key>owner</Key><Value>` + user + `</Value></Tag></TagSet></Tagging>`))
+		}
+	}))
+	defer server.Close()
+
+	cfg := &types.Config{
+		ServicesNamespace: "oscar-svc",
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+	namespace := utils.BuildUserNamespace(cfg, user)
+	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})
+
+	resp, err := fetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
+	if err != nil {
+		t.Fatalf("unexpected fetchQuota error: %v", err)
+	}
+	if resp.MinIO == nil {
+		t.Fatalf("expected minio quotas in response")
+	}
+	if resp.MinIO.Buckets.Used != 1 {
+		t.Fatalf("expected used bucket count 1, got %d", resp.MinIO.Buckets.Used)
+	}
+	if resp.MinIO.StorageTotal.Used != "42" {
+		t.Fatalf("expected storage_total used 42, got %s", resp.MinIO.StorageTotal.Used)
 	}
 }
 
@@ -541,6 +725,15 @@ func TestQuotaJSONTags(t *testing.T) {
 			Resources: map[string]types.QuotaValues{
 				"cpu": {Max: 1000, Used: 500},
 			},
+			MinIO: &types.MinIOQuotaResponse{
+				Buckets: types.MinIOBucketCountQuota{Max: 10, Used: 2},
+				StoragePerBucket: types.MinIOStoragePerBucketQuota{
+					Max: "100Gi",
+				},
+				StorageTotal: types.MinIOStorageTotalUsage{
+					Used: "0",
+				},
+			},
 		}
 
 		data, err := json.Marshal(resp)
@@ -555,11 +748,59 @@ func TestQuotaJSONTags(t *testing.T) {
 		}
 
 		// Check JSON field names match tags
-		expectedFields := []string{"user_id", "cluster_queue", "resources"}
+		expectedFields := []string{"user_id", "cluster_queue", "resources", "minio"}
 		for _, field := range expectedFields {
 			if _, exists := raw[field]; !exists {
 				t.Errorf("Expected '%s' field in JSON", field)
 			}
+		}
+		minio, ok := raw["minio"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected 'minio' field in JSON")
+		}
+		if _, exists := minio["storage_per_bucket"]; !exists {
+			t.Error("Expected minio.storage_per_bucket field in JSON")
+		}
+		if _, exists := minio["storage_total"]; !exists {
+			t.Error("Expected minio.storage_total field in JSON")
+		}
+		for _, oldField := range []string{"direct_creation_enforced", "message"} {
+			if _, exists := minio[oldField]; exists {
+				t.Errorf("Unexpected minio.%s field in JSON", oldField)
+			}
+		}
+		buckets, ok := minio["buckets"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected minio.buckets field in JSON")
+		}
+		if _, exists := buckets["max"]; !exists {
+			t.Error("Expected minio.buckets.max field in JSON")
+		}
+		if _, exists := buckets["exceeded"]; exists {
+			t.Error("Unexpected minio.buckets.exceeded field in JSON")
+		}
+		storagePerBucket, ok := minio["storage_per_bucket"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected minio.storage_per_bucket field in JSON")
+		}
+		if _, exists := storagePerBucket["max"]; !exists {
+			t.Error("Expected minio.storage_per_bucket.max field in JSON")
+		}
+		if _, exists := storagePerBucket["max_bytes"]; exists {
+			t.Error("Unexpected minio.storage_per_bucket.max_bytes field in JSON")
+		}
+		if _, exists := storagePerBucket["source"]; exists {
+			t.Error("Unexpected minio.storage_per_bucket.source field in JSON")
+		}
+		storageTotal, ok := minio["storage_total"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected minio.storage_total field in JSON")
+		}
+		if _, exists := storageTotal["used_bytes"]; exists {
+			t.Error("Unexpected minio.storage_total.used_bytes field in JSON")
+		}
+		if _, exists := storageTotal["attribution"]; exists {
+			t.Error("Unexpected minio.storage_total.attribution field in JSON")
 		}
 	})
 
@@ -572,6 +813,10 @@ func TestQuotaJSONTags(t *testing.T) {
 				Volumes:          "5",
 				MaxDiskperVolume: "5Gi",
 				MinDiskperVolume: "200Mi",
+			},
+			MinIO: &types.MinIOQuotaUpdate{
+				Buckets:          "10",
+				StoragePerBucket: "100Gi",
 			},
 		}
 
@@ -594,6 +839,15 @@ func TestQuotaJSONTags(t *testing.T) {
 		if _, exists := raw["memory"]; !exists {
 			t.Error("Expected 'memory' field in JSON")
 		}
+		minio, ok := raw["minio"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected 'minio' field in JSON")
+		}
+		for _, field := range []string{"buckets", "storage_per_bucket"} {
+			if _, exists := minio[field]; !exists {
+				t.Errorf("Expected minio.%s field in JSON", field)
+			}
+		}
 		volumes, ok := raw["volumes"].(map[string]interface{})
 		if !ok {
 			t.Fatalf("Expected 'volumes' field in JSON")
@@ -604,4 +858,18 @@ func TestQuotaJSONTags(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestValidateMinIOBucketCountQuotaNilQuota(t *testing.T) {
+	err := ValidateMinIOBucketCountQuota(nil, nil, nil, "", nil)
+	if err != nil {
+		t.Fatalf("expected nil error for nil quota, got %v", err)
+	}
+}
+
+func TestValidateMinIOBucketCountQuotaEmptyBuckets(t *testing.T) {
+	err := ValidateMinIOBucketCountQuota(nil, nil, &types.MinIOQuotaUpdate{Buckets: ""}, "", nil)
+	if err != nil {
+		t.Fatalf("expected nil error for empty buckets, got %v", err)
+	}
 }

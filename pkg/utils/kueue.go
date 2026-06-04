@@ -141,6 +141,14 @@ func ensureClusterQueue(ctx context.Context, kueueClient *kueueclientset.Clients
 		return fmt.Errorf("invalid Kueue default memory quota %q: %w", cfg.KueueDefaultMemory, err)
 	}
 
+	gpuQuota := resource.MustParse("0")
+	if cfg.GPUAvailable {
+		gpuQuota, err = resource.ParseQuantity(cfg.KueueDefaultGPU)
+		if err != nil {
+			return fmt.Errorf("invalid Kueue default GPU quota %q: %w", cfg.KueueDefaultGPU, err)
+		}
+	}
+
 	cq := &kueuev1.ClusterQueue{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: cqName,
@@ -156,7 +164,7 @@ func ensureClusterQueue(ctx context.Context, kueueClient *kueueclientset.Clients
 			},
 			ResourceGroups: []kueuev1.ResourceGroup{
 				{
-					CoveredResources: []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
+					CoveredResources: []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourceName("nvidia.com/gpu")},
 					Flavors: []kueuev1.FlavorQuotas{
 						{
 							Name: kueuev1.ResourceFlavorReference(flavorName),
@@ -168,6 +176,10 @@ func ensureClusterQueue(ctx context.Context, kueueClient *kueueclientset.Clients
 								{
 									Name:         v1.ResourceMemory,
 									NominalQuota: memoryQuota,
+								},
+								{
+									Name:         v1.ResourceName("nvidia.com/gpu"),
+									NominalQuota: gpuQuota,
 								},
 							},
 						},
@@ -396,7 +408,8 @@ func getResourceOnlyWorkloadSpec(service *types.Service, cfg *types.Config, name
 		return nil, err
 	}
 	var serviceReplicas int32 = 1
-	if service.Expose.APIPort != 0 && service.Expose.MinScale > 1 {
+
+	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 && service.Expose.MinScale > 1 {
 		serviceReplicas = service.Expose.MinScale
 	} else if service.Synchronous.MinScale > 1 {
 		if service.Synchronous.MinScale > math.MaxInt32 {

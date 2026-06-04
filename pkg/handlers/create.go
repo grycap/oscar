@@ -97,12 +97,13 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 		// Check if users in allowed_users have a MinIO associated user
-		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+		minIOAdminClient, minIOAdminErr := utils.MakeMinIOAdminClient(cfg)
 
 		// Service is created by an EGI user
 		var uid string
 		var err error
 		var mc *auth.MultitenancyConfig
+		var minIOQuota *types.MinIOQuotaUpdate
 		namespace := cfg.ServicesNamespace
 		if !isAdminUser {
 			uid, err = auth.GetUIDFromContext(c)
@@ -248,10 +249,12 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		if len(service.Environment.Secrets) > 0 {
 			if utils.SecretExists(service.Name, service.Namespace, back.GetKubeClientset()) {
 				c.String(http.StatusConflict, "A secret with the given name already exists")
+				return
 			}
 			secretsErr := utils.CreateSecret(service.Name, service.Namespace, service.Environment.Secrets, back.GetKubeClientset())
 			if secretsErr != nil {
 				c.String(http.StatusConflict, "Error creating secrets for service: %v", secretsErr)
+				return
 			}
 
 			// Empty the secrets content from the Configmap
@@ -281,6 +284,32 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			ownerName = utils.RemoveAccents(ownerName)
 		}
 		service.Labels["owner_name"] = strings.ReplaceAll(ownerName, " ", "_")
+		if !isAdminUser {
+			minIOQuota, _, err = GetMinIOQuotaConfig(c.Request.Context(), cfg, back.GetKubeClientset(), uid)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error reading MinIO quota: %v", err))
+				return
+			}
+			if minIOQuota != nil {
+				if minIOAdminErr != nil {
+					c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", minIOAdminErr))
+					return
+				}
+				if err := ValidateMinIOBucketCountQuota(cfg, minIOAdminClient, minIOQuota, uid, collectMinIOBucketCandidates(&service)); err != nil {
+					c.String(http.StatusForbidden, err.Error())
+					return
+				}
+			}
+		}
+
+		// Check if a service with the same name already exists in the cluster
+		if exists, err := serviceWithSameNameExists(service.Name, back); err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error checking for existing service: %v", err))
+			return
+		} else if exists {
+			c.String(http.StatusBadRequest, "A service with the provided name already exists")
+			return
+		}
 
 		// Create service
 		if err := back.CreateService(service); err != nil {
@@ -368,6 +397,17 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 				if err := minIOAdminClient.SetTags(b.BucketName, tags); err != nil {
 					c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
+					return
+				}
+				if minIOQuota != nil && minIOQuota.StoragePerBucket != "" {
+					if err := minIOAdminClient.SetBucketStorageQuota(b.BucketName, minIOQuota.StoragePerBucket); err != nil {
+						derr := back.DeleteService(service)
+						if derr != nil {
+							log.Printf("Error deleting service: %v\n", derr)
+						}
+						c.String(http.StatusInternalServerError, fmt.Sprintf("Error setting bucket quota: %v", err))
+						return
+					}
 				}
 			}
 		}
@@ -839,6 +879,46 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	return minIOBuckets, nil
 }
 
+func collectMinIOBucketCandidates(service *types.Service) []string {
+	buckets := map[string]struct{}{}
+	addPathBucket := func(path string) {
+		path = strings.Trim(path, " /")
+		if path == "" {
+			return
+		}
+		splitPath := strings.SplitN(path, "/", 2)
+		if splitPath[0] != "" {
+			buckets[splitPath[0]] = struct{}{}
+		}
+	}
+	for _, in := range service.Input {
+		_, provName := getProviderInfo(in.Provider)
+		if provName == types.MinIOName {
+			addPathBucket(in.Path)
+		}
+	}
+	for _, out := range service.Output {
+		_, provName := getProviderInfo(out.Provider)
+		if provName == types.MinIOName {
+			addPathBucket(out.Path)
+		}
+	}
+	provID, provName := getProviderInfo(service.Mount.Provider)
+	if provName == types.MinIOName && provID == types.DefaultProvider {
+		addPathBucket(service.Mount.Path)
+	}
+	for _, bucket := range service.BucketList {
+		if strings.TrimSpace(bucket) != "" {
+			buckets[bucket] = struct{}{}
+		}
+	}
+	result := make([]string, 0, len(buckets))
+	for bucket := range buckets {
+		result = append(result, bucket)
+	}
+	return result
+}
+
 func isStorageProviderDefined(storageName string, storageID string, providers *types.StorageProviders) bool {
 	var ok = false
 	switch storageName {
@@ -910,4 +990,17 @@ func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider,
 	}
 
 	return minIOAdminClient.RestartServer()
+}
+
+func serviceWithSameNameExists(name string, back types.ServerlessBackend) (bool, error) {
+	services, err := back.ListServicesByName(name)
+	if err != nil {
+		// Check if error is caused because the service is not found
+		if k8sErrors.IsNotFound(err) || k8sErrors.IsGone(err) {
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+	return len(services) > 0, nil
 }

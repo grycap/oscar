@@ -169,7 +169,7 @@ func inspectDeploymentRuntime(back types.ServerlessBackend, kubeClientset kubern
 		return inspectKserveDeploymentRuntime(kubeClientset, service)
 	}
 
-	if service.Expose.APIPort != 0 {
+	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 {
 		return inspectExposedDeploymentRuntime(kubeClientset, service)
 	}
 
@@ -310,7 +310,7 @@ func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.D
 	state := types.DeploymentStatePending
 	switch {
 	case desired == 0:
-		state = types.DeploymentStatePending
+		state = types.DeploymentStateStopped
 	case available >= desired:
 		state = types.DeploymentStateReady
 	case available > 0:
@@ -322,6 +322,9 @@ func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.D
 	}
 
 	reason, transitioned := latestDeploymentCondition(deployment.Status.Conditions)
+	if state == types.DeploymentStateStopped {
+		reason = "Deployment is stopped."
+	}
 	if reason == "" && state == types.DeploymentStateDegraded {
 		reason = fmt.Sprintf("%d of %d instances are affected.", affected, desired)
 	}
@@ -706,7 +709,7 @@ func inspectDeploymentRuntimeStatusOnly(back types.ServerlessBackend, kubeClient
 		return inspectKserveDeploymentRuntimeStatusOnly(kubeClientset, service)
 	}
 
-	if service.Expose.APIPort != 0 {
+	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 {
 		return inspectExposedDeploymentRuntimeStatusOnly(kubeClientset, service)
 	}
 

@@ -2,6 +2,8 @@ package types
 
 import (
 	"testing"
+
+	"k8s.io/client-go/rest"
 )
 
 func TestQuotaBackend(t *testing.T) {
@@ -146,5 +148,17 @@ func TestVolumeQuotaUpdate(t *testing.T) {
 	}
 	if vqu.MinDiskperVolume != "1Gi" {
 		t.Errorf("Expected MinDiskperVolume = 1Gi, got %s", vqu.MinDiskperVolume)
+	}
+}
+
+func TestCreateQuotaBackend(t *testing.T) {
+	qb := CreateQuotaBackend(&rest.Config{
+		TLSClientConfig: rest.TLSClientConfig{
+			CertData: []byte("invalid"),
+			KeyData:  []byte("invalid"),
+		},
+	}, nil)
+	if qb != nil {
+		t.Errorf("CreateQuotaBackend() = %v, want nil", qb)
 	}
 }

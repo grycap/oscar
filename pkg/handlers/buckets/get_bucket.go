@@ -130,16 +130,26 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			allObjects = append(allObjects, singleObject)
 			returnedItemCount++
 		}
+		dataUsage, err := adminClient.GetDataUsageInfo()
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error getting MinIO data usage: %v", err))
+			return
+		}
+		bucketInfo := utils.MinIOBucket{
+			BucketName:   bucketName,
+			Visibility:   visibility,
+			Owner:        ownerCandidate,
+			AllowedUsers: allowedUsers,
+			Metadata:     metadata,
+			Objects:      allObjects,
+		}
+		if err := adminClient.EnrichBucketQuotaAndUsage(&bucketInfo, dataUsage); err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error getting bucket quota or usage for bucket '%s': %v", bucketName, err))
+			return
+		}
 
 		response := BucketListResponse{
-			MinIOBucket: utils.MinIOBucket{
-				BucketName:   bucketName,
-				Visibility:   visibility,
-				Owner:        ownerCandidate,
-				AllowedUsers: allowedUsers,
-				Metadata:     metadata,
-				Objects:      allObjects,
-			},
+			MinIOBucket:   bucketInfo,
 			IsTruncated:   *listResult.IsTruncated,
 			ReturnedItems: returnedItemCount,
 		}

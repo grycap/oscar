@@ -44,9 +44,9 @@ func newTestService(name, owner string) types.Service {
 		Expose: types.Expose{
 			MinScale:      1,
 			MaxScale:      3,
-			APIPort:       9090,
+			APIPort:       []int{9090},
 			CpuThreshold:  55,
-			NodePort:      0,
+			NodePort:      []int32{0},
 			SetAuth:       false,
 			RewriteTarget: false,
 		},
@@ -437,7 +437,7 @@ func TestGetResourceOnlyWorkloadSpec(t *testing.T) {
 
 func TestGetResourceOnlyWorkloadSpecUsesSynchronousMinScale(t *testing.T) {
 	service := newTestService("test-service", "testuser")
-	service.Expose.APIPort = 0
+	service.Expose.APIPort = []int{0}
 	service.Synchronous.MinScale = 3
 	cfg := newTestConfig()
 
@@ -457,7 +457,7 @@ func TestGetResourceOnlyWorkloadSpecSynchronousMinScaleOverflow(t *testing.T) {
 	}
 
 	service := newTestService("test-service", "testuser")
-	service.Expose.APIPort = 0
+	service.Expose.APIPort = []int{0}
 	overflowMinScale := int64(math.MaxInt32) + 1
 	service.Synchronous.MinScale = int(overflowMinScale)
 	cfg := newTestConfig()
@@ -754,6 +754,7 @@ func TestGetServiceResourceRequestsDecisionGraph(t *testing.T) {
 		wantCPU     string
 		wantMemory  string
 		wantGPU     bool
+		wantGPUQty  string
 		wantSGX     bool
 	}{
 		{
@@ -809,6 +810,7 @@ func TestGetServiceResourceRequestsDecisionGraph(t *testing.T) {
 			wantCPU:    "500m",
 			wantMemory: "1Gi",
 			wantGPU:    true,
+			wantGPUQty: "1",
 			wantSGX:    true,
 		},
 	}
@@ -850,6 +852,16 @@ func TestGetServiceResourceRequestsDecisionGraph(t *testing.T) {
 			if hasGPU != tt.wantGPU {
 				t.Fatalf("gpu request present = %v, want %v", hasGPU, tt.wantGPU)
 			}
+			if tt.wantGPU {
+				gpuReq := requests["nvidia.com/gpu"]
+				expectedGPU, err := resource.ParseQuantity(tt.wantGPUQty)
+				if err != nil {
+					t.Fatalf("invalid expected GPU quantity %q: %v", tt.wantGPUQty, err)
+				}
+				if !gpuReq.Equal(expectedGPU) {
+					t.Fatalf("gpu request quantity = %s, want %s", gpuReq.String(), expectedGPU.String())
+				}
+			}
 
 			_, hasSGX := requests["sgx.intel.com/enclave"]
 			if hasSGX != tt.wantSGX {
@@ -871,6 +883,7 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 		wantCPU     string
 		wantMemory  string
 		wantGPU     bool
+		wantGPUQty  string
 	}{
 		{
 			name: "not a kserve service",
@@ -951,6 +964,7 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 			wantCPU:    "1",
 			wantMemory: "2Gi",
 			wantGPU:    true,
+			wantGPUQty: "1",
 		},
 		{
 			name: "kserve invalid cpu",
@@ -1031,6 +1045,16 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 			_, hasGPU := requests["nvidia.com/gpu"]
 			if hasGPU != tt.wantGPU {
 				t.Fatalf("KServe GPU request present = %v, want %v", hasGPU, tt.wantGPU)
+			}
+			if tt.wantGPU {
+				gpuReq := requests["nvidia.com/gpu"]
+				expectedGPU, err := resource.ParseQuantity(tt.wantGPUQty)
+				if err != nil {
+					t.Fatalf("invalid expected KServe GPU quantity %q: %v", tt.wantGPUQty, err)
+				}
+				if !gpuReq.Equal(expectedGPU) {
+					t.Fatalf("KServe GPU request quantity = %s, want %s", gpuReq.String(), expectedGPU.String())
+				}
 			}
 		})
 	}

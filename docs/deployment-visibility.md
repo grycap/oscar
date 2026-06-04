@@ -21,3 +21,5 @@ service-access rules, return `unavailable` when OSCAR cannot inspect a current
 runtime representation, and keep deployment evidence separate from job
 execution logs under `/system/logs/...`.
 
+For exposed services, a Deployment scaled to zero replicas is reported as
+`stopped`.

@@ -311,7 +311,8 @@ func TestKnativeCreateService(t *testing.T) {
 			Script: "echo test",
 			Labels: map[string]string{},
 			Expose: types.Expose{
-				APIPort: 80,
+				APIPort:  []int{80},
+				NodePort: []int32{0},
 			},
 		}
 
@@ -749,7 +750,7 @@ func TestKnativeDeleteService(t *testing.T) {
 			service: types.Service{
 				Name: "test",
 				Expose: types.Expose{
-					APIPort: 8080,
+					APIPort: []int{8080},
 				},
 			},
 			k8sReactors: []k8stesting.SimpleReactor{
@@ -798,6 +799,29 @@ func TestKnativeDeleteService(t *testing.T) {
 			}
 
 		})
+	}
+}
+
+func TestKnativeDeleteServiceRemovesServiceSecret(t *testing.T) {
+	service := types.Service{
+		Name:      "service-with-secret",
+		Namespace: testConfig.ServicesNamespace,
+	}
+	fakeClientset := fake.NewSimpleClientset(&v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+	})
+	back := MakeKnativeBackend(fakeClientset, fakeConfig, testConfig)
+	back.knClientset = knFake.NewSimpleClientset(&knv1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+	})
+
+	if err := back.DeleteService(service); err != nil {
+		t.Fatalf("unexpected error deleting service: %v", err)
+	}
+
+	_, err := fakeClientset.CoreV1().Secrets(service.Namespace).Get(t.Context(), service.Name, metav1.GetOptions{})
+	if !apierrors.IsNotFound(err) {
+		t.Fatalf("expected service secret to be removed, got err: %v", err)
 	}
 }
 

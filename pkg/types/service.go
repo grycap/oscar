@@ -359,8 +359,8 @@ type Kserve struct {
 	MinScale int32 `json:"min_scale,omitempty" default:"0"`
 
 	// MaxScale maximum number of active replicas (pods) for the service
-	// Optional. (default: 10)
-	MaxScale int32 `json:"max_scale,omitempty" default:"10"`
+	// Optional. (default: 1)
+	MaxScale int32 `json:"max_scale,omitempty" default:"1"`
 
 	// CPU cpu limit for the service following the kubernetes format
 	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
@@ -385,8 +385,8 @@ type Kserve struct {
 	EnableGPU bool `json:"enable_gpu,omitempty" default:"false"`
 
 	// SetAuth parameter to set the authentication for the KServe InferenceService
-	// Optional. (default: false)
-	SetAuth bool `json:"set_auth,omitempty" default:"false"`
+	// Optional. (default: true)
+	SetAuth bool `json:"set_auth,omitempty" default:"true"`
 }
 
 // UnmarshalJSON sets KServe defaults for fields that may be omitted in API requests.
@@ -398,9 +398,9 @@ func (k *Kserve) UnmarshalJSON(data []byte) error {
 		APIVersion: "v1",
 		CPU:        "0.2",
 		Memory:     "256Mi",
-		SetAuth:    false,
+		SetAuth:    true,
 		MinScale:   0,
-		MaxScale:   10,
+		MaxScale:   1,
 		EnableGPU:  false,
 	}
 
@@ -474,16 +474,17 @@ type ServiceVolumeStatus struct {
 }
 
 type Expose struct {
-	MinScale       int32  `json:"min_scale" default:"1"`
-	MaxScale       int32  `json:"max_scale" default:"10"`
-	APIPort        int    `json:"api_port,omitempty" `
-	CpuThreshold   int32  `json:"cpu_threshold" default:"80" `
-	RewriteTarget  bool   `json:"rewrite_target" default:"false" `
-	NodePort       int32  `json:"nodePort" default:"0" `
-	DefaultCommand bool   `json:"default_command" `
-	SetAuth        bool   `json:"set_auth" `
-	HealthPath     string `json:"health_path" default:"/" `
-	ProbeMode      string `json:"probe_mode,omitempty" default:"legacy" `
+	MinScale       int32   `json:"min_scale" default:"1"`
+	MaxScale       int32   `json:"max_scale" default:"10"`
+	APIPort        []int   `json:"api_port,omitempty" `
+	CpuThreshold   int32   `json:"cpu_threshold" default:"80" `
+	RewriteTarget  bool    `json:"rewrite_target" default:"false" `
+	NodePort       []int32 `json:"nodePort,omitempty" `
+	DefaultCommand bool    `json:"default_command" `
+	SetAuth        bool    `json:"set_auth" `
+	AuthType       string  `json:"auth_type,omitempty" default:"basic" `
+	HealthPath     string  `json:"health_path" default:"/" `
+	ProbeMode      string  `json:"probe_mode,omitempty" default:"legacy" `
 }
 
 // ToPodSpec returns a k8s podSpec from the Service
@@ -529,7 +530,7 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 			},
 		},
 	}
-	if cfg.InterLinkAvailable && service.InterLinkNodeName != "" {
+	if IsInterLinkService(service, cfg) {
 		// Add specs of InterLink
 		SetInterlinkService(podSpec)
 	} else {
@@ -758,7 +759,8 @@ func (service *Service) HasFederationMembers() bool {
 
 // GetExposedBasePath returns the OSCAR exposed-service base path or an empty string.
 func (service *Service) GetExposedBasePath() string {
-	if service == nil || service.Expose.APIPort == 0 {
+
+	if service == nil || len(service.Expose.APIPort) == 0 {
 		return ""
 	}
 	return fmt.Sprintf("/system/services/%s/exposed", service.Name)

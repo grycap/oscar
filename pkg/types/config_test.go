@@ -22,8 +22,19 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 )
+
+func TestGetDefaultMinIOQuotaConfigMapName(t *testing.T) {
+	name := GetDefaultMinIOQuotaConfigMapName()
+	if name != MinIOQuotaConfigMapName {
+		t.Fatalf("expected %q, got %q", MinIOQuotaConfigMapName, name)
+	}
+	if name != "oscar-minio-quota" {
+		t.Fatalf("expected oscar-minio-quota, got %q", name)
+	}
+}
 
 func TestParseSeconds(t *testing.T) {
 	scenarios := []struct {
@@ -84,6 +95,75 @@ func TestCheckAvailableResources(t *testing.T) {
 	cfg.CheckAvailableInterLink(client)
 	if !cfg.InterLinkAvailable {
 		t.Fatalf("expected InterLink availability to be detected")
+	}
+}
+
+func TestCheckAvailableInterLink(t *testing.T) {
+	scenarios := []struct {
+		name     string
+		nodes    []*v1.Node
+		expected bool
+	}{
+		{
+			name: "detected via type label",
+			nodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "vk-node",
+						Labels: map[string]string{
+							"type": "virtual-kubelet",
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "detected via virtual-node.interlink/type label",
+			nodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "interlink-node",
+						Labels: map[string]string{
+							"virtual-node.interlink/type": "virtual-kubelet",
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "not detected without matching labels",
+			nodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "regular-node",
+						Labels: map[string]string{"some-other-label": "value"},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name:     "not detected with no nodes",
+			nodes:    []*v1.Node{},
+			expected: false,
+		},
+	}
+
+	for _, s := range scenarios {
+		t.Run(s.name, func(t *testing.T) {
+			cfg := &Config{}
+			objects := make([]runtime.Object, len(s.nodes))
+			for i, node := range s.nodes {
+				objects[i] = node
+			}
+			client := fake.NewSimpleClientset(objects...)
+			cfg.CheckAvailableInterLink(client)
+			if cfg.InterLinkAvailable != s.expected {
+				t.Errorf("expected InterLinkAvailable = %v, got %v", s.expected, cfg.InterLinkAvailable)
+			}
+		})
 	}
 }
 

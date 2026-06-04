@@ -287,7 +287,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		var event v1.EnvVar
 		var args []string
 
-		if cfg.InterLinkAvailable && service.InterLinkNodeName != "" {
+		if types.IsInterLinkService(service, cfg) {
 			command, event, args = types.SetInterlinkJob(podSpec, service, cfg, eventBytes)
 		} else {
 

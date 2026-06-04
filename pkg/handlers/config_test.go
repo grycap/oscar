@@ -47,6 +47,7 @@ func createExpectedBody(access_key string, secret_key string, cfg *types.Config)
 			"kueue_enable":               false,
 			"volume_enable":              false,
 			"oidc_groups":                nil,
+			"minio_quota_enabled":        false,
 		},
 		"minio_provider": map[string]interface{}{
 			"endpoint":   cfg.MinIOProvider.Endpoint,
