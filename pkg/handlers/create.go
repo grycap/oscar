@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/grycap/oscar/v4/pkg/backends/resources"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/cdmi-client-go"
 	"github.com/grycap/oscar/v4/pkg/types"
@@ -768,6 +769,9 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	}
 
 	if service.Mount.Provider != "" {
+		if resources.ValidateMountOpts(service.Mount.Options) == "" && service.Mount.Options != "" {
+			return nil, fmt.Errorf("mount options contain invalid characters")
+		}
 		provID, provName = getProviderInfo(service.Mount.Provider)
 		if provName == types.MinIOName {
 			// Check if the provider identifier is defined in StorageProviders
