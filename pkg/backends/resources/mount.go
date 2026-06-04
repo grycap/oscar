@@ -17,12 +17,18 @@ limitations under the License.
 package resources
 
 import (
+	"log"
+	"regexp"
 	"strings"
 
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	v1 "k8s.io/api/core/v1"
 )
+
+// validMountOptsRe matches only safe characters for rclone mount flags.
+// Allows alphanumeric, dash, underscore, dot, colon, equals, comma, slash, and whitespace.
+var validMountOptsRe = regexp.MustCompile(`^[a-zA-Z0-9\-_.:=,/\s]+$`)
 
 var (
 	// Don't restart jobs in order to keep logs
@@ -70,6 +76,16 @@ func addVolume(podSpec *v1.PodSpec) {
 	podSpec.Volumes = append(podSpec.Volumes, volumeshare)
 }
 
+// ValidateMountOpts sanitizes mount options to prevent shell injection.
+// Only allows characters valid for rclone CLI flags.
+func ValidateMountOpts(opts string) string {
+	if opts != "" && !validMountOptsRe.MatchString(opts) {
+		log.Printf("WARNING: mount options contain invalid characters, ignoring: %q", opts)
+		return ""
+	}
+	return opts
+}
+
 func sidecarPodSpec(service types.Service, cfg *types.Config) v1.Container {
 	bidirectional := v1.MountPropagationBidirectional
 	var ptr *bool // Uninitialized pointer
@@ -103,23 +119,28 @@ func sidecarPodSpec(service types.Service, cfg *types.Config) v1.Container {
 	}
 
 	provider := strings.Split(service.Mount.Provider, ".")
+	mountOpts := ValidateMountOpts(service.Mount.Options)
+	if mountOpts != "" {
+		mountOpts = " " + mountOpts
+	}
+
 	if provider[0] == types.MinIOName {
 		if len(provider) == 1 {
 			provider = append(provider, types.DefaultProvider)
 		}
 		MinIOEnvVars := setMinIOEnvVars(service, provider[1], cfg)
 		container.Env = append(container.Env, MinIOEnvVars...)
-		container.Args = []string{"-c", minioCommand + communCommand}
+		container.Args = []string{"-c", minioCommand + communCommand + mountOpts}
 	}
 	if provider[0] == types.S3Name {
 		S3EnvVars := setS3Vars(service, provider[1], cfg)
 		container.Env = append(container.Env, S3EnvVars...)
-		container.Args = []string{"-c", s3Command + communCommand}
+		container.Args = []string{"-c", s3Command + communCommand + mountOpts}
 	}
 	if provider[0] == types.WebDavName {
 		WebDavEnvVars := setWebDavEnvVars(service, provider[1])
 		container.Env = append(container.Env, WebDavEnvVars...)
-		container.Args = []string{"-c", webdavCommand + communCommand}
+		container.Args = []string{"-c", webdavCommand + communCommand + mountOpts}
 	}
 	return container
 
