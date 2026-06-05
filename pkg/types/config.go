@@ -173,6 +173,9 @@ type Config struct {
 	// KueueDefaultFlavor default ResourceFlavor name used for ClusterQueues
 	KueueDefaultFlavor string `json:"-"`
 
+	// KueueDefaultEphemeralStorage default per-user ClusterQueue ephemeral storage quota
+	KueueDefaultEphemeralStorage string `json:"-"`
+
 	// ResourceManagerEnable option to enable the Resource Manager to delegate jobs
 	// when there are no available resources in the cluster (if the service has replicas)
 	ResourceManagerEnable bool `json:"-"`
@@ -336,6 +339,7 @@ var configVars = []configVar{
 	{"KueueDefaultMemory", "KUEUE_DEFAULT_MEMORY", false, stringType, "2Gi"},
 	{"KueueDefaultGPU", "KUEUE_DEFAULT_GPU", false, stringType, "0"},
 	{"KueueDefaultFlavor", "KUEUE_DEFAULT_FLAVOR", false, stringType, "oscar-default-flavor"},
+	{"KueueDefaultEphemeralStorage", "KUEUE_DEFAULT_EPHEMERAL_STORAGE", false, stringType, "1Gi"},
 
 	{"VolumeEnable", "VOLUME_ENABLE", false, boolType, "true"},
 	{"StorageClassName", "STORAGE_CLASS_NAME", false, stringType, "nfs"},
