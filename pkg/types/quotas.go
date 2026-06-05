@@ -62,10 +62,14 @@ type VolumeQuotaValues struct {
 }
 
 type QuotaUpdateRequest struct {
-	CPU              string             `json:"cpu"`
-	Memory           string             `json:"memory"`
-	EphemeralStorage string             `json:"ephemeral_storage"`
-	GPU              string             `json:"gpu,omitempty"`
+	// CPU millicores quota for the user's ClusterQueue
+	CPU string `json:"cpu"`
+	// Memory bytes quota for the user's ClusterQueue
+	Memory string `json:"memory"`
+	// EphemeralStorage bytes quota for the user's ClusterQueue
+	EphemeralStorage string `json:"ephemeral_storage"`
+	// GPU units quota for the user's ClusterQueue
+	GPU string `json:"gpu,omitempty"`
 	Volumes          *VolumeQuotaUpdate `json:"volumes,omitempty"`
 	MinIO            *MinIOQuotaUpdate  `json:"minio,omitempty"`
 }
