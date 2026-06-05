@@ -635,7 +635,7 @@ func buildKserveName(serviceName string) string {
 // which will be used in the HTTPRoute to protect the KServe service.
 // TO DO: change implementation when decided how to handle authentication for KServe services
 func createTraefikOIDCMiddleware(gatewayClientset dynamic.Interface, service *types.Service, knSvc *knv1.Service, cfg *types.Config) error {
-	authEndpointAddress := fmt.Sprintf("http://%s.%s.svc.cluster.local:%d/system/services/%s", cfg.Name, cfg.Namespace, cfg.ServicePort, service.Name)
+	authEndpointAddress := fmt.Sprintf("http://%s.%s.svc.cluster.local:%d/system/services/%s/auth", cfg.Name, cfg.Namespace, cfg.ServicePort, service.Name)
 	middleware := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "traefik.io/v1alpha1",
 		"kind":       "Middleware",
@@ -993,7 +993,7 @@ func getOwnerReference(knSvc *knv1.Service) []metav1.OwnerReference {
 }
 
 func getAPIPath(serviceName string) string {
-	return fmt.Sprintf("/system/services/%s/exposed", serviceName)
+	return fmt.Sprintf("/system/services/%s/models", serviceName)
 }
 
 func formatUID(uid string) string {

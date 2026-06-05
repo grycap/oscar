@@ -835,6 +835,31 @@ func TestKubeDeleteService(t *testing.T) {
 	})
 }
 
+func TestKubeDeleteServiceRemovesServiceSecret(t *testing.T) {
+	service := types.Service{
+		Name:      "service-with-secret",
+		Namespace: testConfig.ServicesNamespace,
+	}
+	clientset := fake.NewSimpleClientset(
+		&v1.PodTemplate{
+			ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+		},
+		&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+		},
+	)
+
+	back := MakeKubeBackend(clientset, testConfig)
+
+	if err := back.DeleteService(service); err != nil {
+		t.Fatalf("unexpected error deleting service: %v", err)
+	}
+
+	if utils.SecretExists(service.Name, service.Namespace, clientset) {
+		t.Fatalf("expected service secret to be removed")
+	}
+}
+
 func TestKubeGetKubeClientset(t *testing.T) {
 	clientset := fake.NewSimpleClientset()
 

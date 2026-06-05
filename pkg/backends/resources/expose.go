@@ -52,6 +52,8 @@ const (
 	servicePortNumber  = 80
 	routeKindIngress   = "ingress"
 	routeKindHTTPRoute = "httproute"
+	authTypeBasic      = "basic"
+	authTypeForward    = "forward"
 
 	livenessInitialDelaySeconds  = 60
 	livenessFailureThreshold     = 12
@@ -257,6 +259,9 @@ func getRouteKind(cfg *types.Config) string {
 }
 
 func createRoute(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	if err := validateExposeAuthConfig(service, cfg); err != nil {
+		return err
+	}
 	if getRouteKind(cfg) == routeKindHTTPRoute {
 		return createHTTPRoute(service, namespace, kubeClientset, cfg)
 	}
@@ -311,10 +316,12 @@ func EnsureExposeAuthResources(service types.Service, namespace string, kubeClie
 		return nil
 	}
 	if getRouteKind(cfg) == routeKindHTTPRoute {
-		if err := upsertTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
-			return err
+		if normalizeExposeAuthType(service.Expose.AuthType) == authTypeBasic {
+			if err := upsertTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
+				return err
+			}
 		}
-		return upsertTraefikAuthMiddleware(service, namespace)
+		return upsertTraefikAuthMiddleware(service, namespace, cfg)
 	}
 	if existsSecret(service.Name, namespace, kubeClientset, cfg) {
 		return updateSecret(service, namespace, kubeClientset, cfg)
@@ -379,6 +386,18 @@ func validateHTTPRouteConfig(service types.Service, cfg *types.Config) error {
 
 	if strings.TrimSpace(cfg.HTTPRouteGatewayName) == "" {
 		return fmt.Errorf("HTTPROUTE_GATEWAY_NAME must be defined when EXPOSED_SERVICES_ROUTE_KIND=httproute")
+	}
+
+	return validateExposeAuthConfig(service, cfg)
+}
+
+func validateExposeAuthConfig(service types.Service, cfg *types.Config) error {
+	authType := normalizeExposeAuthType(service.Expose.AuthType)
+	if authType != authTypeBasic && authType != authTypeForward {
+		return fmt.Errorf("unsupported expose auth_type %q", service.Expose.AuthType)
+	}
+	if service.Expose.SetAuth && authType == authTypeForward && getRouteKind(cfg) != routeKindHTTPRoute {
+		return fmt.Errorf("expose auth_type %q requires EXPOSED_SERVICES_ROUTE_KIND=httproute", authTypeForward)
 	}
 
 	return nil
@@ -535,7 +554,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 		containerPorts := []v1.ContainerPort{}
 		for index, port := range service.Expose.APIPort {
 			containerPorts = append(containerPorts, v1.ContainerPort{
-				Name:          fmt.Sprintf("%s-%d", podPortName, index),
+				Name:          getPodPortName(index),
 				ContainerPort: int32(port), // #nosec G115
 			})
 		}
@@ -555,7 +574,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path: probePath,
-				Port: intstr.FromString(podPortName),
+				Port: intstr.FromString(getPodPortName(0)),
 			},
 		}
 
@@ -864,10 +883,12 @@ func createHTTPRoute(service types.Service, namespace string, kubeClientset kube
 	}
 
 	if service.Expose.SetAuth {
-		if err := createTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
-			return err
+		if normalizeExposeAuthType(service.Expose.AuthType) == authTypeBasic {
+			if err := createTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
+				return err
+			}
 		}
-		if err := createTraefikAuthMiddleware(service, namespace); err != nil {
+		if err := createTraefikAuthMiddleware(service, namespace, cfg); err != nil {
 			return err
 		}
 	}
@@ -892,10 +913,12 @@ func updateHTTPRoute(service types.Service, namespace string, kubeClientset kube
 	}
 
 	if service.Expose.SetAuth {
-		if err := upsertTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
-			return err
+		if normalizeExposeAuthType(service.Expose.AuthType) == authTypeBasic {
+			if err := upsertTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
+				return err
+			}
 		}
-		if err := upsertTraefikAuthMiddleware(service, namespace); err != nil {
+		if err := upsertTraefikAuthMiddleware(service, namespace, cfg); err != nil {
 			return err
 		}
 	} else {
@@ -1175,24 +1198,24 @@ func upsertTraefikCORSMiddleware(service types.Service, namespace string, cfg *t
 	return createTraefikCORSMiddleware(service, namespace, cfg)
 }
 
-func createTraefikAuthMiddleware(service types.Service, namespace string) error {
+func createTraefikAuthMiddleware(service types.Service, namespace string, cfg *types.Config) error {
 	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return err
 	}
 
-	middleware := getTraefikAuthMiddlewareSpec(service, namespace)
+	middleware := getTraefikAuthMiddlewareSpec(service, namespace, cfg)
 	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Create(context.TODO(), middleware, metav1.CreateOptions{})
 	return err
 }
 
-func updateTraefikAuthMiddleware(service types.Service, namespace string) error {
+func updateTraefikAuthMiddleware(service types.Service, namespace string, cfg *types.Config) error {
 	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return err
 	}
 
-	middleware := getTraefikAuthMiddlewareSpec(service, namespace)
+	middleware := getTraefikAuthMiddlewareSpec(service, namespace, cfg)
 	currentMiddleware, err := gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Get(context.TODO(), middleware.GetName(), metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -1203,12 +1226,12 @@ func updateTraefikAuthMiddleware(service types.Service, namespace string) error 
 	return err
 }
 
-func upsertTraefikAuthMiddleware(service types.Service, namespace string) error {
+func upsertTraefikAuthMiddleware(service types.Service, namespace string, cfg *types.Config) error {
 	if existsTraefikAuthMiddleware(service.Name, namespace) {
-		return updateTraefikAuthMiddleware(service, namespace)
+		return updateTraefikAuthMiddleware(service, namespace, cfg)
 	}
 
-	return createTraefikAuthMiddleware(service, namespace)
+	return createTraefikAuthMiddleware(service, namespace, cfg)
 }
 
 func getTraefikCORSMiddlewareSpec(service types.Service, namespace string, cfg *types.Config) *unstructured.Unstructured {
@@ -1232,8 +1255,23 @@ func getTraefikCORSMiddlewareSpec(service types.Service, namespace string, cfg *
 	}}
 }
 
-func getTraefikAuthMiddlewareSpec(service types.Service, namespace string) *unstructured.Unstructured {
+func getTraefikAuthMiddlewareSpec(service types.Service, namespace string, cfg *types.Config) *unstructured.Unstructured {
 	nameMiddleware := getTraefikAuthMiddlewareName(service.Name)
+	authSpec := map[string]any{
+		"basicAuth": map[string]any{
+			"secret": getTraefikAuthSecretName(service.Name),
+		},
+	}
+
+	if normalizeExposeAuthType(service.Expose.AuthType) == authTypeForward {
+		authSpec = map[string]any{
+			"forwardAuth": map[string]any{
+				"address":                  getServiceAuthEndpoint(service, cfg),
+				"trustForwardHeader":       true,
+				"addAuthCookiesToResponse": []any{getServiceAuthCookieName(service.Name)},
+			},
+		}
+	}
 
 	return &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "traefik.io/v1alpha1",
@@ -1242,11 +1280,7 @@ func getTraefikAuthMiddlewareSpec(service types.Service, namespace string) *unst
 			"name":      nameMiddleware,
 			"namespace": namespace,
 		},
-		"spec": map[string]any{
-			"basicAuth": map[string]any{
-				"secret": getTraefikAuthSecretName(service.Name),
-			},
-		},
+		"spec": authSpec,
 	}}
 }
 
@@ -1463,12 +1497,35 @@ func getTraefikCORSMiddlewareName(name_container string) string {
 	return name_container + "-cors-mdw"
 }
 
+func getPodPortName(index int) string {
+	return fmt.Sprintf("%s-%d", podPortName, index)
+}
+
 func getTraefikAuthMiddlewareName(name_container string) string {
 	return name_container + "-auth-mdw"
 }
 
 func getTraefikAuthSecretName(name_container string) string {
 	return name_container + "-auth-traefik"
+}
+
+func getServiceAuthCookieName(name_container string) string {
+	return "oscar_service_" + strings.ReplaceAll(name_container, "-", "_") + "_auth"
+}
+
+func normalizeExposeAuthType(authType string) string {
+	authType = strings.ToLower(strings.TrimSpace(authType))
+	if authType == "" {
+		return authTypeBasic
+	}
+	return authType
+}
+
+func getServiceAuthEndpoint(service types.Service, cfg *types.Config) string {
+	if cfg == nil {
+		return "/system/services/" + service.Name + "/auth"
+	}
+	return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d/system/services/%s/auth", cfg.Name, cfg.Namespace, cfg.ServicePort, service.Name)
 }
 
 func getAPIPath(name_container string) string {

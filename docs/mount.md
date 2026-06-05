@@ -38,6 +38,17 @@ functions:
       cpu_threshold: 90
       rewrite_target: true
 ```
+Additionally, you can pass extra flags to the `rclone mount` command using the `options` field:
+
+``` yaml
+mount:
+  storage_provider: minio.default
+  path: /notebook
+  options: "--buffer-size 128M --vfs-read-chunk-size 64M"
+```
+
+These options are appended after the default mount flags, so they can override any built-in setting.
+
 **Note**: You can find the files of this example on [OSCAR's repository examples](https://github.com/grycap/oscar/tree/master/examples/expose_services/jupyter)
 
 As OSCAR has the credentials of the default MinIO instance internally, if you want to use a different one or a different storage provider, you need to set these credentials on the service [FDL](fdl.md). Currently, the storage providers supported on this functionality are:

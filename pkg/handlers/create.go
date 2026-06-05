@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/grycap/oscar/v4/pkg/backends/resources"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/cdmi-client-go"
 	"github.com/grycap/oscar/v4/pkg/types"
@@ -248,10 +249,12 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		if len(service.Environment.Secrets) > 0 {
 			if utils.SecretExists(service.Name, service.Namespace, back.GetKubeClientset()) {
 				c.String(http.StatusConflict, "A secret with the given name already exists")
+				return
 			}
 			secretsErr := utils.CreateSecret(service.Name, service.Namespace, service.Environment.Secrets, back.GetKubeClientset())
 			if secretsErr != nil {
 				c.String(http.StatusConflict, "Error creating secrets for service: %v", secretsErr)
+				return
 			}
 
 			// Empty the secrets content from the Configmap
@@ -297,6 +300,15 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					return
 				}
 			}
+		}
+
+		// Check if a service with the same name already exists in the cluster
+		if exists, err := serviceWithSameNameExists(service.Name, back); err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error checking for existing service: %v", err))
+			return
+		} else if exists {
+			c.String(http.StatusBadRequest, "A service with the provided name already exists")
+			return
 		}
 
 		// Create service
@@ -757,6 +769,9 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	}
 
 	if service.Mount.Provider != "" {
+		if resources.ValidateMountOpts(service.Mount.Options) == "" && service.Mount.Options != "" {
+			return nil, fmt.Errorf("mount options contain invalid characters")
+		}
 		provID, provName = getProviderInfo(service.Mount.Provider)
 		if provName == types.MinIOName {
 			// Check if the provider identifier is defined in StorageProviders
@@ -975,4 +990,17 @@ func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider,
 	}
 
 	return minIOAdminClient.RestartServer()
+}
+
+func serviceWithSameNameExists(name string, back types.ServerlessBackend) (bool, error) {
+	services, err := back.ListServicesByName(name)
+	if err != nil {
+		// Check if error is caused because the service is not found
+		if k8sErrors.IsNotFound(err) || k8sErrors.IsGone(err) {
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+	return len(services) > 0, nil
 }

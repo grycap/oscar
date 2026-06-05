@@ -680,6 +680,17 @@ func TestValidateHTTPRouteConfig(t *testing.T) {
 	if err := validateHTTPRouteConfig(svc, cfg); err != nil {
 		t.Fatalf("expected valid config, got error: %v", err)
 	}
+
+	svc.Expose.SetAuth = true
+	svc.Expose.AuthType = "forward"
+	if err := validateHTTPRouteConfig(svc, cfg); err != nil {
+		t.Fatalf("expected forward auth_type to be valid, got: %v", err)
+	}
+
+	svc.Expose.AuthType = "unknown"
+	if err := validateHTTPRouteConfig(svc, cfg); err == nil {
+		t.Fatalf("expected invalid auth_type to fail")
+	}
 }
 
 func TestGetHTTPRouteSpecWithAuth(t *testing.T) {
@@ -867,7 +878,7 @@ func TestUpdateHTTPRouteSetsResourceVersion(t *testing.T) {
 func TestGetTraefikAuthMiddlewareSpec(t *testing.T) {
 	cfg := newTestConfig()
 	svc := newExposeService("auth-svc", 0, true)
-	middleware := getTraefikAuthMiddlewareSpec(svc, cfg.ServicesNamespace)
+	middleware := getTraefikAuthMiddlewareSpec(svc, cfg.ServicesNamespace, cfg)
 
 	if middleware.GetName() != getTraefikAuthMiddlewareName(svc.Name) {
 		t.Fatalf("expected middleware name %s, got %s", getTraefikAuthMiddlewareName(svc.Name), middleware.GetName())
@@ -880,6 +891,33 @@ func TestGetTraefikAuthMiddlewareSpec(t *testing.T) {
 
 	if secretName != getTraefikAuthSecretName(svc.Name) {
 		t.Fatalf("expected basicAuth secret %s, got %s", getTraefikAuthSecretName(svc.Name), secretName)
+	}
+}
+
+func TestGetTraefikAuthMiddlewareSpecForward(t *testing.T) {
+	cfg := newTestConfig()
+	svc := newExposeService("forward-auth-svc", 0, true)
+	svc.Expose.AuthType = "forward"
+
+	middleware := getTraefikAuthMiddlewareSpec(svc, cfg.ServicesNamespace, cfg)
+
+	address, found, err := unstructured.NestedString(middleware.Object, "spec", "forwardAuth", "address")
+	if err != nil || !found {
+		t.Fatalf("expected forwardAuth.address in middleware")
+	}
+
+	expectedAddress := "http://oscar.oscar.svc.cluster.local:8080/system/services/forward-auth-svc/auth"
+	if address != expectedAddress {
+		t.Fatalf("expected forwardAuth address %s, got %s", expectedAddress, address)
+	}
+
+	cookies, found, err := unstructured.NestedStringSlice(middleware.Object, "spec", "forwardAuth", "addAuthCookiesToResponse")
+	if err != nil || !found || len(cookies) != 1 {
+		t.Fatalf("expected one addAuthCookiesToResponse entry, got %v", cookies)
+	}
+
+	if cookies[0] != getServiceAuthCookieName(svc.Name) {
+		t.Fatalf("expected auth cookie %s, got %s", getServiceAuthCookieName(svc.Name), cookies[0])
 	}
 }
 

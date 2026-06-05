@@ -390,8 +390,8 @@ type Kserve struct {
 	EnableGPU bool `json:"enable_gpu,omitempty" default:"false"`
 
 	// SetAuth parameter to set the authentication for the KServe InferenceService
-	// Optional. (default: false)
-	SetAuth bool `json:"set_auth,omitempty" default:"false"`
+	// Optional. (default: true)
+	SetAuth bool `json:"set_auth,omitempty" default:"true"`
 }
 
 // UnmarshalJSON sets KServe defaults for fields that may be omitted in API requests.
@@ -403,7 +403,7 @@ func (k *Kserve) UnmarshalJSON(data []byte) error {
 		APIVersion: "v1",
 		CPU:        "0.2",
 		Memory:     "256Mi",
-		SetAuth:    false,
+		SetAuth:    true,
 		MinScale:   0,
 		MaxScale:   1,
 		EnableGPU:  false,
@@ -487,6 +487,7 @@ type Expose struct {
 	NodePort       []int32 `json:"nodePort,omitempty" `
 	DefaultCommand bool    `json:"default_command" `
 	SetAuth        bool    `json:"set_auth" `
+	AuthType       string  `json:"auth_type,omitempty" default:"basic" `
 	HealthPath     string  `json:"health_path" default:"/" `
 	ProbeMode      string  `json:"probe_mode,omitempty" default:"legacy" `
 }
