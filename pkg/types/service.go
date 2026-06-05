@@ -193,16 +193,6 @@ type Service struct {
 	// Optional. (default: "")
 	TotalCPU string `json:"total_cpu"`
 
-	// EphemeralStorageRequest request size for ephemeral storage following the kubernetes format
-	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-ephemeral-storage
-	// Optional. (default: "")
-	EphemeralStorageRequest string `json:"ephemeral_storage_request"`
-
-	// EphemeralStorageLimit limit size for ephemeral storage following the kubernetes format
-	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-ephemeral-storage
-	// Optional. (default: "")
-	EphemeralStorageLimit string `json:"ephemeral_storage_limit"`
-
 	// EnableGPU parameter to request gpu usage in service's executions (synchronous and asynchronous)
 	// Optional. (default: false)
 	EnableGPU bool `json:"enable_gpu"`
@@ -667,22 +657,6 @@ func CreateResources(service *Service) (v1.ResourceRequirements, error) {
 			return resources, err
 		}
 		resources.Limits[v1.ResourceMemory] = memory
-	}
-
-	if len(service.EphemeralStorageRequest) > 0 {
-		ephemeral, err := resource.ParseQuantity(service.EphemeralStorageRequest)
-		if err != nil {
-			return resources, err
-		}
-		resources.Requests[v1.ResourceEphemeralStorage] = ephemeral
-	}
-
-	if len(service.EphemeralStorageLimit) > 0 {
-		ephemeral, err := resource.ParseQuantity(service.EphemeralStorageLimit)
-		if err != nil {
-			return resources, err
-		}
-		resources.Limits[v1.ResourceEphemeralStorage] = ephemeral
 	}
 
 	if service.EnableGPU {

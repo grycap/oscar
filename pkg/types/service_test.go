@@ -225,8 +225,6 @@ memory: 1Gi
 cpu: "1.0"
 total_memory: ""
 total_cpu: ""
-ephemeral_storage_request: ""
-ephemeral_storage_limit: ""
 enable_gpu: false
 enable_sgx: false
 image_prefetch: false

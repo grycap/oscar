@@ -608,7 +608,6 @@ func makeFakeClients() (*fake.Clientset, *metricsfake.Clientset) {
 				v1.ResourceCPU:              *resource.NewMilliQuantity(4000, resource.DecimalSI),
 				v1.ResourceMemory:           *resource.NewQuantity(16*1024*1024*1024, resource.BinarySI),
 				"nvidia.com/gpu":            *resource.NewQuantity(2, resource.DecimalSI),
-				v1.ResourceEphemeralStorage: *resource.NewQuantity(100, resource.BinarySI),
 			},
 			Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
 		},
