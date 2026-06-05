@@ -145,8 +145,8 @@ func MakeUpdateUserQuotaHandler(qb types.QuotaBackend, cfg *types.Config) gin.Ha
 			c.String(http.StatusBadRequest, fmt.Sprintf("invalid payload: %v", err))
 			return
 		}
-		if req.CPU == "" && req.Memory == "" && !hasVolumeQuotaUpdate(req.Volumes) && !hasMinIOQuotaUpdate(req.MinIO) {
-			c.String(http.StatusBadRequest, "cpu, memory, volumes or minio must be provided")
+		if req.CPU == "" && req.Memory == "" && req.EphemeralStorage == "" && !hasVolumeQuotaUpdate(req.Volumes) && !hasMinIOQuotaUpdate(req.MinIO) {
+			c.String(http.StatusBadRequest, "cpu, memory, ephemeral_storage, volumes or minio must be provided")
 			return
 		}
 		if err := ensureQuotasEnabled(cfg); err != nil {
@@ -236,8 +236,29 @@ func fetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, u
 			}
 		}
 
+		var maxEphemeral int64
+		if len(cq.Spec.ResourceGroups) > 0 && len(cq.Spec.ResourceGroups[0].Flavors) > 0 {
+			for _, res := range cq.Spec.ResourceGroups[0].Flavors[0].Resources {
+				switch res.Name {
+				case corev1.ResourceEphemeralStorage:
+					maxEphemeral = res.NominalQuota.Value()
+				}
+			}
+		}
+
+		var usedEphemeral int64
+		if len(cq.Status.FlavorsUsage) > 0 {
+			for _, res := range cq.Status.FlavorsUsage[0].Resources {
+				switch res.Name {
+				case corev1.ResourceEphemeralStorage:
+					usedEphemeral = res.Total.Value()
+				}
+			}
+		}
+
 		resp.Resources["cpu"] = types.QuotaValues{Max: maxCPU, Used: usedCPU}
 		resp.Resources["memory"] = types.QuotaValues{Max: maxMem, Used: usedMem}
+		resp.Resources["ephemeral-storage"] = types.QuotaValues{Max: maxEphemeral, Used: usedEphemeral}
 	}
 
 	if cfg.VolumeEnable {
@@ -263,7 +284,7 @@ func fetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, u
 }
 
 func updateQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, user string, req types.QuotaUpdateRequest) error {
-	if req.CPU != "" || req.Memory != "" {
+	if req.CPU != "" || req.Memory != "" || req.EphemeralStorage != "" {
 		if err := ensureKueueQuotasEnabled(cfg); err != nil {
 			return err
 		}
@@ -331,6 +352,14 @@ func updateKueueQuota(ctx context.Context, qb types.QuotaBackend, user string, r
 				q, err := resource.ParseQuantity(req.Memory)
 				if err != nil {
 					return fmt.Errorf("invalid memory quantity: %w", err)
+				}
+				flavor.Resources[i].NominalQuota = q
+			}
+		case corev1.ResourceEphemeralStorage:
+			if req.EphemeralStorage != "" {
+				q, err := resource.ParseQuantity(req.EphemeralStorage)
+				if err != nil {
+					return fmt.Errorf("invalid ephemeral storage quantity: %w", err)
 				}
 				flavor.Resources[i].NominalQuota = q
 			}

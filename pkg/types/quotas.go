@@ -62,10 +62,11 @@ type VolumeQuotaValues struct {
 }
 
 type QuotaUpdateRequest struct {
-	CPU     string             `json:"cpu"`
-	Memory  string             `json:"memory"`
-	Volumes *VolumeQuotaUpdate `json:"volumes,omitempty"`
-	MinIO   *MinIOQuotaUpdate  `json:"minio,omitempty"`
+	CPU               string             `json:"cpu"`
+	Memory            string             `json:"memory"`
+	EphemeralStorage  string             `json:"ephemeral_storage"`
+	Volumes           *VolumeQuotaUpdate `json:"volumes,omitempty"`
+	MinIO             *MinIOQuotaUpdate  `json:"minio,omitempty"`
 }
 
 type VolumeQuotaUpdate struct {
