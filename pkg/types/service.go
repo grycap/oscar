@@ -639,8 +639,7 @@ func SetSecurityContext(podSpec *v1.PodSpec) {
 
 func CreateResources(service *Service) (v1.ResourceRequirements, error) {
 	resources := v1.ResourceRequirements{
-		Limits:   v1.ResourceList{},
-		Requests: v1.ResourceList{},
+		Limits: v1.ResourceList{},
 	}
 
 	if len(service.CPU) > 0 {
