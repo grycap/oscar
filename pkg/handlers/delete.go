@@ -45,6 +45,7 @@ var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
 // @Tags services
 // @Produce json
 // @Param serviceName path string true "Service name"
+// @Param namespace query string false "Namespace (admin only - if omitted searches across all namespaces)"
 // @Success 204 {string} string "No Content"
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 403 {string} string "Forbidden"
