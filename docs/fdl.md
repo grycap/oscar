@@ -57,6 +57,28 @@ functions:
         path: result-example-workflow
       - storage_provider: webdav.dcache
         path: example-workflow/res
+  - oscar-kserve:
+      name: inference
+      memory: 200Mi
+      cpu: '0.5'
+      image: grycap/procces
+      script: script.sh
+      kserve:
+        type: inference
+        inference:
+          model_format: onnx
+        storage_uri: "oci://ghcr.io/grycap/kserve-yolo8n-onnx"
+        min_scale: 1
+        api_version: "v2"
+        cpu: '1.0'
+        memory: 2Gi
+      log_level: CRITICAL
+      input:
+      - storage_provider: minio
+        path: kserve-isvc-yolo8n-onnx/input
+      output:
+      - storage_provider: minio
+        path: kserve-isvc-yolo8n-onnx/output
 
 storage_providers:
   onedata:
@@ -131,6 +153,7 @@ storage_providers:
 | `visibility` </br> *string*                              |  Select the visibility level of service: `private`, `restricted` or `public` (`private` by default) Optional 
 | `mount` </br> *[MountSettings](#mountsettings)*                   | Configuration to mount a storage provider path inside the service container. Optional. 
 | `volume` </br> *[VolumeSettings](#volumesettings)*       | Configuration for an OSCAR-managed persistent volume attached to the service. Optional. 
+| `kserve` </br> *[KServeSettings](#kservesettings)*       | Configuration to deploy the service using KServe (`InferenceService` or `LLMInferenceService`). Optional. Depends on cluster configuration.
 
 ## SynchronousSettings
 
@@ -164,6 +187,37 @@ storage_providers:
 | `default_command` </br> *bool* | Select between executing the container's default command and executing the script inside the container. (default: false). Optional.  |
 | `health_path` </br> *string* | Change the service readiness and liveness check path/endpoint. (default: "/"). Optional.  |
 | `probe_mode` </br> *string* | Probe path mode for exposed-service pod health checks. `legacy` (default) keeps current behavior; `direct` probes only `health_path` on the container without the OSCAR ingress prefix. Optional. |
+
+## KServeSettings
+
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
+| `type` </br> *string* | KServe service type. Allowed values: `inference` and `llm_inference`. Required. |
+| `storage_uri` </br> *string* | Model storage URI consumed by KServe (for example `hf://...`, `oci://...`, or other KServe-compatible URIs). Required. |
+| `inference` </br> *[KServeInferenceSettings](#kserveinferencesettings)* | Inference-specific configuration. Required when `type` is `inference`. It must be omitted when `type` is `llm_inference`. |
+| `llm_inference` </br> *[KServeLLMInferenceSettings](#kservellminferencesettings)* | LLM inference configuration used with `llm_inference` services. Optional. |
+| `api_version` </br> *string* | Protocol version used by KServe predictors. Allowed values: `v1`, `v2`. Optional. (default: `v1`) |
+| `min_scale` </br> *integer* | Minimum number of predictor replicas. Optional. (default: `0`; for `llm_inference`, OSCAR enforces at least `1`) |
+| `max_scale` </br> *integer* | Maximum number of predictor replicas. Optional. (default: `1`). If `min_scale` is greater than `max_scale`, OSCAR sets `max_scale` equal to `min_scale`. |
+| `cpu` </br> *string* | CPU resources for the KServe workload in Kubernetes quantity format. Optional. (default: `0.2`) |
+| `memory` </br> *string* | Memory resources for the KServe workload in Kubernetes quantity format. Optional. (default: `256Mi`) |
+| `args` </br> *string array* | Command-line arguments passed to the KServe model container. Optional. |
+| `env` </br> *map[string]string* | Environment variables passed to the KServe model container. Optional. |
+| `enable_gpu` </br> *bool* | Requests one GPU for the KServe workload (`nvidia.com/gpu: 1`). Optional. (default: false) |
+| `set_auth` </br> *bool* | Enables authentication middleware for the exposed KServe route. Optional. (default: true) |
+
+## KServeInferenceSettings
+
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
+| `model_format` </br> *string* | Model format expected by KServe for `inference` services. Required when `type` is `inference`. Typical values include: `onnx`, `sklearn`, `xgboost`, `pytorch`, `tensorflow`, `triton`, `huggingface`. |
+| `runtime` </br> *string* | Explicit KServe ServingRuntime name to use for `inference` services. Optional. |
+
+## KServeLLMInferenceSettings
+
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
+| `runtime_image` </br> *string* | Runtime image for `llm_inference` services. Optional. If omitted, OSCAR uses the default vLLM-based runtime image. |
 
 ## MountSettings
 | Field                        | Description                                 |
