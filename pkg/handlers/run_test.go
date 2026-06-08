@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/backends"
-	"github.com/grycap/oscar/v3/pkg/testsupport"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	"github.com/grycap/oscar/v4/pkg/backends"
+	"github.com/grycap/oscar/v4/pkg/testsupport"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
@@ -135,6 +135,12 @@ func TestMakeRunHandlerOIDCPath(t *testing.T) {
 		Owner:        "somelonguid@egi.eu",
 		AllowedUsers: []string{}}
 	back.Services = []*types.Service{svc}
+	back.ProxyDirector = func(req *http.Request) {
+		req.URL.Scheme = "http"
+		req.URL.Host = server.Listener.Addr().String()
+		req.URL.Path = "/input"
+		req.Host = req.URL.Host
+	}
 	cfg := types.Config{
 		MinIOProvider: &types.MinIOProvider{
 			Region:    "us-east-1",
@@ -244,6 +250,12 @@ func TestMakeRunHandlerWithServiceToken(t *testing.T) {
 		Owner:        "somelonguid@egi.eu",
 		AllowedUsers: []string{}}
 	back.Services = []*types.Service{svc}
+	back.ProxyDirector = func(req *http.Request) {
+		req.URL.Scheme = "http"
+		req.URL.Host = server.Listener.Addr().String()
+		req.URL.Path = "/input"
+		req.Host = req.URL.Host
+	}
 	cfg := types.Config{
 		MinIOProvider: &types.MinIOProvider{
 			Region:    "us-east-1",

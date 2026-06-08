@@ -17,7 +17,7 @@ limitations under the License.
 package backends
 
 import (
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -27,7 +27,7 @@ func MakeServerlessBackend(kubeClientset kubernetes.Interface, kubeConfig *rest.
 	switch cfg.ServerlessBackend {
 	/*case "openfaas":
 	return MakeOpenfaasBackend(kubeClientset, kubeConfig, cfg)*/
-	case "knative":
+	case types.KnativeBackendName:
 		return MakeKnativeBackend(kubeClientset, kubeConfig, cfg)
 	}
 

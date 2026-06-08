@@ -2,12 +2,14 @@ package metrics
 
 import (
 	"testing"
+
+	"github.com/grycap/oscar/v4/pkg/types"
 )
 
 func TestJoinErrors(t *testing.T) {
 	tests := []struct {
 		name     string
-		errs    []error
+		errs     []error
 		expected string
 	}{
 		{"Nil and error", []error{nil, nil}, ""},
@@ -28,7 +30,7 @@ func TestJoinErrors(t *testing.T) {
 
 func TestParseServiceFromPath(t *testing.T) {
 	tests := []struct {
-		name       string
+		name      string
 		path      string
 		serviceID string
 		reqType   RequestType
@@ -54,10 +56,10 @@ func TestParseServiceFromPath(t *testing.T) {
 
 func TestParseExposedServiceFromPath(t *testing.T) {
 	tests := []struct {
-		name       string
-		path       string
-		serviceID  string
-		ok         bool
+		name      string
+		path      string
+		serviceID string
+		ok        bool
 	}{
 		{"Valid path", "/system/services/svc/exposed", "svc", true},
 		{"Invalid path", "/system/services/svc", "", false},
@@ -80,7 +82,7 @@ func TestParseExposedServiceFromPath(t *testing.T) {
 
 func TestCountryFromLokiLabels(t *testing.T) {
 	tests := []struct {
-		name     string
+		name    string
 		labels  map[string]string
 		country string
 	}{
@@ -121,6 +123,67 @@ func TestMissingStatus(t *testing.T) {
 	if status.Status != "missing" {
 		t.Errorf("missingStatus() Status = %q, want %q", status.Status, "missing")
 	}
+}
+
+func TestDefaultSources(t *testing.T) {
+	t.Run("nil config", func(t *testing.T) {
+		sources := DefaultSources(nil, nil, nil)
+		if sources.ServiceInventory == nil {
+			t.Error("DefaultSources() ServiceInventory should not be nil")
+		}
+		if _, ok := sources.RequestLogs.(*NoopRequestLogSource); !ok {
+			t.Error("DefaultSources() RequestLogs should be NoopRequestLogSource")
+		}
+	})
+
+	t.Run("config with LokiBaseURL", func(t *testing.T) {
+		cfg := &types.Config{
+			LokiBaseURL: "http://loki:3100",
+		}
+		sources := DefaultSources(cfg, nil, nil)
+		if _, ok := sources.RequestLogs.(*LokiRequestLogSource); !ok {
+			t.Error("DefaultSources() with LokiBaseURL should create LokiRequestLogSource")
+		}
+	})
+
+	t.Run("config with PrometheusBaseURL", func(t *testing.T) {
+		cfg := &types.Config{
+			PrometheusBaseURL: "http://prometheus:9090",
+			ServicesNamespace: "oscar-svc",
+		}
+		sources := DefaultSources(cfg, nil, nil)
+		if _, ok := sources.UsageMetrics.(*PrometheusUsageMetricsSource); !ok {
+			t.Error("DefaultSources() with PrometheusBaseURL should create PrometheusUsageMetricsSource")
+		}
+	})
+}
+
+func TestNewPrometheusUsageMetricsSource(t *testing.T) {
+	t.Run("invalid URL", func(t *testing.T) {
+		source, err := NewPrometheusUsageMetricsSource("://invalid", "", "", "")
+		if err == nil {
+			t.Error("NewPrometheusUsageMetricsSource() with invalid URL should return error")
+		}
+		if source != nil {
+			t.Error("NewPrometheusUsageMetricsSource() with invalid URL should return nil source")
+		}
+	})
+
+	t.Run("valid URL", func(t *testing.T) {
+		source, err := NewPrometheusUsageMetricsSource("http://prometheus:9090", "cpu_query", "gpu_query", "oscar-svc")
+		if err != nil {
+			t.Fatalf("NewPrometheusUsageMetricsSource() unexpected error: %v", err)
+		}
+		if source == nil {
+			t.Fatal("NewPrometheusUsageMetricsSource() source should not be nil")
+		}
+		if source.API == nil {
+			t.Error("NewPrometheusUsageMetricsSource() API should not be nil")
+		}
+		if source.CPUQuery != "cpu_query" {
+			t.Errorf("NewPrometheusUsageMetricsSource() CPUQuery = %q, want %q", source.CPUQuery, "cpu_query")
+		}
+	})
 }
 
 type errNoop struct {

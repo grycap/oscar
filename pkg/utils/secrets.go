@@ -69,3 +69,10 @@ func getPodSecretSpec(secretName string, secretData map[string]string, namespace
 		StringData: secretData,
 	}
 }
+
+func RefreshTokenSecretName(serviceName string) string {
+	if serviceName == "" {
+		return ""
+	}
+	return serviceName
+}

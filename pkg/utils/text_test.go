@@ -2,6 +2,43 @@ package utils
 
 import "testing"
 
+func TestRemoveAccents(t *testing.T) {
+	tests := map[string]struct {
+		input    string
+		expected string
+	}{
+		"empty string": {
+			input:    "",
+			expected: "",
+		},
+		"string without accents": {
+			input:    "hello",
+			expected: "hello",
+		},
+		"string with accents": {
+			input:    "café",
+			expected: "cafe",
+		},
+		"string with multiple accents": {
+			input:    "àéìóú",
+			expected: "aeiou",
+		},
+		"string with ñ": {
+			input:    "ñ",
+			expected: "n",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := RemoveAccents(tc.input)
+			if got != tc.expected {
+				t.Fatalf("expected %q, got %q", tc.expected, got)
+			}
+		})
+	}
+}
+
 func TestNormalizeLineEndings(t *testing.T) {
 	tests := map[string]struct {
 		input    string

@@ -61,6 +61,9 @@ type StorageIOConfig struct {
 	Path     string   `json:"path"`
 	Suffix   []string `json:"suffix,omitempty"`
 	Prefix   []string `json:"prefix,omitempty"`
+	// Options defines additional flags for the rclone mount command.
+	// Optional.
+	Options string `json:"options,omitempty"`
 }
 
 // StorageProviders stores the credentials of all supported storage providers

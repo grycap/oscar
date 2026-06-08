@@ -57,6 +57,28 @@ functions:
         path: result-example-workflow
       - storage_provider: webdav.dcache
         path: example-workflow/res
+  - oscar-kserve:
+      name: inference
+      memory: 200Mi
+      cpu: '0.5'
+      image: grycap/procces
+      script: script.sh
+      kserve:
+        type: inference
+        inference:
+          model_format: onnx
+        storage_uri: "oci://ghcr.io/grycap/kserve-yolo8n-onnx"
+        min_scale: 1
+        api_version: "v2"
+        cpu: '1.0'
+        memory: 2Gi
+      log_level: CRITICAL
+      input:
+      - storage_provider: minio
+        path: kserve-isvc-yolo8n-onnx/input
+      output:
+      - storage_provider: minio
+        path: kserve-isvc-yolo8n-onnx/output
 
 storage_providers:
   onedata:
@@ -115,11 +137,11 @@ storage_providers:
 | `image_prefetch` </br> *bool*                                         | Enable the use of image prefetching (retrieve the container image in the nodes when creating the service). Optional (default: false) |
 | `total_memory` </br> *string*                                     | Limit for the memory used by all the service's jobs running simultaneously. [Apache YuniKorn](https://yunikorn.apache.org)'s scheduler is required to work. Same format as Memory, but internally translated to MB (integer). Optional (default: "")                                          |
 | `total_cpu` </br> *string*                                        | Limit for the virtual CPUs used by all the service's jobs running simultaneously. [Apache YuniKorn](https://yunikorn.apache.org)'s scheduler is required to work. Same format as CPU, but internally translated to millicores (integer). Optional (default: "")                               |
+| `ephemeral_storage_request` </br> *string*                        | Request size for ephemeral storage following the [kubernetes format](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-ephemeral-storage). Optional (default: "")                |
 | `delegation` </br> *string*                                       | Mode of job delegation for replicas. Optional. Values: `static` (default), `random`, `load-based`, `topsis`.                                                                                                                    |
 | `synchronous` </br> *[SynchronousSettings](#synchronoussettings)* | Struct to configure specific sync parameters. These settings are only applied on Knative ServerlessBackend. Optional.                                                                                                                                         |
 | `expose` </br> *[ExposeSettings](#exposesettings)* | Allows to expose the API or UI of the application run in the OSCAR service outside of the Kubernetes cluster. Optional.                                                                                                                                         |
-| `replicas` </br> *[Replica](#replica) array*                      | List of replicas to delegate jobs. Optional.                                                                                                                                                                                                                 |
-| `rescheduler_threshold` </br> *integer*                            | Time (in seconds) that a job (with replicas) can be queued before delegating it. Optional.                                                                                                                                                                   |
+| `federation` </br> *[Federation](#federation)*                     | Federation configuration (topology, members, delegation, rescheduler threshold). Optional.                                                                                                                                                                  |
 | `log_level` </br> *string*                                        | Log level for the [faas-supervisor](https://github.com/grycap/faas-supervisor). Available levels: NOTSET, DEBUG, INFO, WARNING, ERROR and CRITICAL. Optional (default: INFO)                                                                                                                              |
 | `input` </br> *[StorageIOConfig](#storageioconfig) array*         | Array with the input configuration for the service. Optional                                                                                                                                                                                                 |
 | `output` </br> *[StorageIOConfig](#storageioconfig) array*        | Array with the output configuration for the service. Optional                                                                                                                                                                                                |
@@ -131,6 +153,7 @@ storage_providers:
 | `visibility` </br> *string*                              |  Select the visibility level of service: `private`, `restricted` or `public` (`private` by default) Optional 
 | `mount` </br> *[MountSettings](#mountsettings)*                   | Configuration to mount a storage provider path inside the service container. Optional. 
 | `volume` </br> *[VolumeSettings](#volumesettings)*       | Configuration for an OSCAR-managed persistent volume attached to the service. Optional. 
+| `kserve` </br> *[KServeSettings](#kservesettings)*       | Configuration to deploy the service using KServe (`InferenceService` or `LLMInferenceService`). Optional. Depends on cluster configuration.
 
 ## SynchronousSettings
 
@@ -138,6 +161,16 @@ storage_providers:
 |------------------------------| --------------------------------------------|
 | `min_scale` </br> *integer* | Minimum number of active replicas (pods) for the service. Optional. (default: 0)             |
 | `max_scale` </br> *integer* | Maximum number of active replicas (pods) for the service. Optional. (default: 0 (Unlimited)) |
+
+## Federation
+
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
+| `group_id` </br> *string*                                       | Identifier for the federation group. Optional (default: service name). |
+| `topology` </br> *string*                                       | Federation topology: `none`, `star`, `mesh`. Optional. |
+| `delegation` </br> *string*                                     | Mode of job delegation for federation members. Optional. Values: `static` (default), `random`, `load-based`, `topsis`. |
+| `rescheduler_threshold` </br> *integer*                         | Time (in seconds) that a job (with members) can be queued before delegating it. Optional. |
+| `members` </br> *[Replica](#replica) array*                    | List of federation members to delegate jobs. Optional. |
 
 ## ExposeSettings
 
@@ -149,10 +182,42 @@ storage_providers:
 | `cpu_threshold` </br> *integer* | Percent of use of CPU before creating other pod (default: 80 max:100). Optional.  |
 | `nodePort` </br> *integer* | Change the access method from the domain name to the public ip. Optional.   |
 | `set_auth` </br> *bool* | Create credentials for the service, composed of the service name as the user and the service token as the password. (default: false). Optional.  |
-| `rewrite_target` </br> *bool* | Target the URI where the traffic is redirected. (default: false). Optional.  |
+| `auth_type` </br> *string* | Authentication middleware used when `set_auth` is enabled. Supported values are `basic` (default) and `forward`. `forward` is only supported for Gateway API/Traefik exposed services and delegates checks to OSCAR service authorization. Optional. |
+| `rewrite_target` </br> *bool* | It is an expose boolean in the FDL that controls how OSCAR configures the NGINX Ingress/HTTProute rewrite for exposed services. If rewrite_target: false, ingress rewrites to /$1. If rewrite_target: true, ingress rewrites to /system/services/<service>/exposed/$1 (default: false). Optional.  |
 | `default_command` </br> *bool* | Select between executing the container's default command and executing the script inside the container. (default: false). Optional.  |
 | `health_path` </br> *string* | Change the service readiness and liveness check path/endpoint. (default: "/"). Optional.  |
 | `probe_mode` </br> *string* | Probe path mode for exposed-service pod health checks. `legacy` (default) keeps current behavior; `direct` probes only `health_path` on the container without the OSCAR ingress prefix. Optional. |
+
+## KServeSettings
+
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
+| `type` </br> *string* | KServe service type. Allowed values: `inference` and `llm_inference`. Required. |
+| `storage_uri` </br> *string* | Model storage URI consumed by KServe (for example `hf://...`, `oci://...`, or other KServe-compatible URIs). Required. |
+| `inference` </br> *[KServeInferenceSettings](#kserveinferencesettings)* | Inference-specific configuration. Required when `type` is `inference`. It must be omitted when `type` is `llm_inference`. |
+| `llm_inference` </br> *[KServeLLMInferenceSettings](#kservellminferencesettings)* | LLM inference configuration used with `llm_inference` services. Optional. |
+| `api_version` </br> *string* | Protocol version used by KServe predictors. Allowed values: `v1`, `v2`. Optional. (default: `v1`) |
+| `min_scale` </br> *integer* | Minimum number of predictor replicas. Optional. (default: `0`; for `llm_inference`, OSCAR enforces at least `1`) |
+| `max_scale` </br> *integer* | Maximum number of predictor replicas. Optional. (default: `1`). If `min_scale` is greater than `max_scale`, OSCAR sets `max_scale` equal to `min_scale`. |
+| `cpu` </br> *string* | CPU resources for the KServe workload in Kubernetes quantity format. Optional. (default: `0.2`) |
+| `memory` </br> *string* | Memory resources for the KServe workload in Kubernetes quantity format. Optional. (default: `256Mi`) |
+| `args` </br> *string array* | Command-line arguments passed to the KServe model container. Optional. |
+| `env` </br> *map[string]string* | Environment variables passed to the KServe model container. Optional. |
+| `enable_gpu` </br> *bool* | Requests one GPU for the KServe workload (`nvidia.com/gpu: 1`). Optional. (default: false) |
+| `set_auth` </br> *bool* | Enables authentication middleware for the exposed KServe route. Optional. (default: true) |
+
+## KServeInferenceSettings
+
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
+| `model_format` </br> *string* | Model format expected by KServe for `inference` services. Required when `type` is `inference`. Typical values include: `onnx`, `sklearn`, `xgboost`, `pytorch`, `tensorflow`, `triton`, `huggingface`. |
+| `runtime` </br> *string* | Explicit KServe ServingRuntime name to use for `inference` services. Optional. |
+
+## KServeLLMInferenceSettings
+
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
+| `runtime_image` </br> *string* | Runtime image for `llm_inference` services. Optional. If omitted, OSCAR uses the default vLLM-based runtime image. |
 
 ## MountSettings
 | Field                        | Description                                 |
@@ -196,6 +261,8 @@ storage_providers:
 |`variables` </br> *map[string]string* | Map to define the environment variables that will be available in the service container |
 |`secrets` </br> *map[string]string* | Map to define the secret environment variables that will be available in the service container |
 
+> ℹ️ For federated services, `secrets.refresh_token` is required. OSCAR Manager
+> stores this value in the user namespace and does not mount it into service pods.
 OSCAR also injects a small set of reserved environment variables in every service container:
 
 | Variable | Description |

@@ -17,7 +17,7 @@ limitations under the License.
 */
 
 // @title OSCAR API
-// @version v2.0.0
+// @version v4.0.0
 // @description Secure REST API to manage OSCAR services, storage and executions.
 // @contact.name GRyCAP
 // @contact.email products@grycap.upv.es
@@ -37,13 +37,13 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/backends"
-	"github.com/grycap/oscar/v3/pkg/handlers"
-	"github.com/grycap/oscar/v3/pkg/handlers/buckets"
-	"github.com/grycap/oscar/v3/pkg/metrics"
-	"github.com/grycap/oscar/v3/pkg/resourcemanager"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	"github.com/grycap/oscar/v4/pkg/backends"
+	"github.com/grycap/oscar/v4/pkg/handlers"
+	"github.com/grycap/oscar/v4/pkg/handlers/buckets"
+	"github.com/grycap/oscar/v4/pkg/metrics"
+	"github.com/grycap/oscar/v4/pkg/resourcemanager"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	versioned "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
@@ -110,6 +110,10 @@ func main() {
 	// Create the router
 	r := gin.Default()
 
+	r.GET("/system/services/:serviceName/auth",
+		append(auth.BuildServiceAuthMiddlewareChain(cfg, kubeClientset, back), handlers.MakeServiceAuthHandler())...,
+	)
+
 	// Swagger UI endpoint (disabled in production)
 	// r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
@@ -126,8 +130,17 @@ func main() {
 	system.GET("/services/:serviceName", handlers.MakeReadHandler(back, kubeClientset, cfg))
 	system.GET("/services/:serviceName/deployment", handlers.MakeGetDeploymentStatusHandler(back, kubeClientset, cfg))
 	system.GET("/services/:serviceName/deployment/logs", handlers.MakeGetDeploymentLogsHandler(back, kubeClientset, cfg))
+	system.POST("/services/:serviceName/stop", handlers.MakeStopExposedServiceHandler(back, kubeClientset, cfg))
+	system.POST("/services/:serviceName/start", handlers.MakeStartExposedServiceHandler(back, kubeClientset, cfg))
+	system.POST("/services/:serviceName/restart", handlers.MakeRestartExposedServiceHandler(back, kubeClientset, cfg))
 	system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
 	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
+
+	// CRUD Replicas (federation)
+	system.GET("/federation/:serviceName", handlers.MakeFederationGetHandler(back))
+	system.POST("/federation/:serviceName", handlers.MakeFederationPostHandler(back))
+	system.PUT("/federation/:serviceName", handlers.MakeFederationPutHandler(back))
+	system.DELETE("/federation/:serviceName", handlers.MakeFederationDeleteHandler(back))
 
 	// CRUD Volumes
 	if cfg.VolumeEnable {
@@ -137,7 +150,7 @@ func main() {
 		system.DELETE("/volumes/:volumeName", handlers.MakeDeleteVolumeHandler(cfg, back))
 	}
 	// CRUD Buckets
-	system.POST("/buckets", buckets.MakeCreateHandler(cfg))
+	system.POST("/buckets", buckets.MakeCreateHandler(cfg, kubeClientset))
 	system.GET("/buckets", buckets.MakeListHandler(cfg))
 	system.GET("/buckets/:bucket", buckets.MakeGetHandler(cfg))
 	system.PUT("/buckets", buckets.MakeUpdateHandler(cfg))

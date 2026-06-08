@@ -20,13 +20,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strings"
 
 	htpasswd "github.com/foomo/htpasswd"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
-	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	apps "k8s.io/api/apps/v1"
 	autos "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
@@ -51,6 +52,8 @@ const (
 	servicePortNumber  = 80
 	routeKindIngress   = "ingress"
 	routeKindHTTPRoute = "httproute"
+	authTypeBasic      = "basic"
+	authTypeForward    = "forward"
 
 	livenessInitialDelaySeconds  = 60
 	livenessFailureThreshold     = 12
@@ -87,27 +90,66 @@ An exposed service can be of to types:
 - Ingress */
 
 // CreateExpose creates all the kubernetes components
-func CreateExpose(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
-	//ExposeLogger.Printf("Creating exposed service: \n%v\n", service)
+func CreateExpose(service *types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	ExposeLogger.Printf("Creating exposed service: \n%v\n", service.Name)
 	targetNamespace := namespace
 	if targetNamespace == "" {
 		targetNamespace = cfg.ServicesNamespace
 	}
+	if len(service.Expose.NodePort) > 0 && len(service.Expose.APIPort) != len(service.Expose.NodePort) {
+		return fmt.Errorf("The length of nodePort (%d) must be equal to that of api_port (%d)",
+			len(service.Expose.NodePort), len(service.Expose.APIPort))
+	}
 
-	err := createDeployment(service, targetNamespace, kubeClientset, cfg)
+	isFirstPortDynamic := len(service.Expose.NodePort) > 0 && service.Expose.NodePort[0] == 0
+	err := createDeployment(*service, targetNamespace, kubeClientset, cfg)
 	if err != nil {
 		return fmt.Errorf("error creating deployment for exposed service '%s': %v", service.Name, err)
 	}
-	err = createService(service, targetNamespace, kubeClientset, cfg)
+
+	ports, err := createService(service, targetNamespace, kubeClientset, cfg)
 	if err != nil {
 		return fmt.Errorf("error creating svc for exposed service '%s': %v", service.Name, err)
 	}
-	if service.Expose.NodePort == 0 {
-		err = createRoute(service, targetNamespace, kubeClientset, cfg)
+
+	// 2. Secure Ingress Control
+	//hasFirstNodePort := len(service.Expose.NodePort) > 0 && service.Expose.NodePort[0] != 0
+	if len(service.Expose.NodePort) == 0 || isFirstPortDynamic {
+		err = createRoute(*service, targetNamespace, kubeClientset, cfg)
 		if err != nil {
 			return fmt.Errorf("error creating route for exposed service '%s': %v", service.Name, err)
 		}
 	}
+
+	// DIRECT SAVE IN CONFIGMAP
+	// At this point, 'service.Expose.NodePort' contains the exact actual ports (e.g., 33544, 1477, 6760)
+	if len(ports) > 0 {
+		cm, errCM := kubeClientset.CoreV1().ConfigMaps(targetNamespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
+		if errCM == nil {
+			// We temporarily clean up the script to avoid duplications in the YAML
+			scriptTmp := service.Script
+			service.Script = ""
+
+			// We force structured serialization with the newly injected ports
+			fdlUpdated, errYAML := service.ToYAML()
+			service.Script = scriptTmp
+
+			if errYAML == nil {
+				cm.Data[types.FDLFileName] = fdlUpdated
+				_, errUpdate := kubeClientset.CoreV1().ConfigMaps(targetNamespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
+				if errUpdate != nil {
+					log.Printf("[ERROR] Could not update final ConfigMap: %v\n", errUpdate)
+				} else {
+					log.Println("[SUCCESS] ConfigMap permanently synchronized with the actual assigned NodePorts!")
+				}
+			} else {
+				log.Printf("[ERROR] Failed to convert structure to YAML: %v\n", errYAML)
+			}
+		} else {
+			log.Printf("[ERROR] Could not read ConfigMap '%s' in namespace '%s': %v\n", service.Name, targetNamespace, errCM)
+		}
+	}
+	// ===========
 	return nil
 }
 
@@ -174,12 +216,19 @@ func UpdateExpose(service types.Service, namespace string, kubeClientset kuberne
 		return err
 	}
 
-	if service.Expose.NodePort != 0 {
+	// 1. We securely validate if the primary port (index 0) has a static NodePort assigned
+	hasFirstNodePort := len(service.Expose.NodePort) > 0 && service.Expose.NodePort[0] != 0
+
+	// 2. We adapt the Ingress (Route) update/removal logic
+	// If the main port DOES have a fixed static NodePort, we remove the Ingress/Route if it existed previously.
+	if len(service.Expose.APIPort) > 0 && hasFirstNodePort {
 		if err = deleteRouteResources(service.Name, targetNamespace, kubeClientset, cfg); err != nil {
 			log.Printf("error deleting route service: %v\n", err)
 			return err
 		}
 	} else {
+		// If no ports were defined or the primary port does NOT have a fixed NodePort (i.e., it uses Ingress),
+		// we create or update the public route using upsertRoute.
 		if err = upsertRoute(service, targetNamespace, kubeClientset, cfg); err != nil {
 			log.Printf("error updating route service: %v\n", err)
 			return err
@@ -210,6 +259,9 @@ func getRouteKind(cfg *types.Config) string {
 }
 
 func createRoute(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	if err := validateExposeAuthConfig(service, cfg); err != nil {
+		return err
+	}
 	if getRouteKind(cfg) == routeKindHTTPRoute {
 		return createHTTPRoute(service, namespace, kubeClientset, cfg)
 	}
@@ -256,6 +308,25 @@ func upsertRoute(service types.Service, namespace string, kubeClientset kubernet
 	}
 
 	return createIngress(service, namespace, kubeClientset, cfg)
+}
+
+// EnsureExposeAuthResources recreates or refreshes authentication resources for an exposed service.
+func EnsureExposeAuthResources(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
+	if !service.Expose.SetAuth {
+		return nil
+	}
+	if getRouteKind(cfg) == routeKindHTTPRoute {
+		if normalizeExposeAuthType(service.Expose.AuthType) == authTypeBasic {
+			if err := upsertTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
+				return err
+			}
+		}
+		return upsertTraefikAuthMiddleware(service, namespace, cfg)
+	}
+	if existsSecret(service.Name, namespace, kubeClientset, cfg) {
+		return updateSecret(service, namespace, kubeClientset, cfg)
+	}
+	return createSecret(service, namespace, kubeClientset, cfg)
 }
 
 func deleteRouteResources(serviceName string, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
@@ -315,6 +386,18 @@ func validateHTTPRouteConfig(service types.Service, cfg *types.Config) error {
 
 	if strings.TrimSpace(cfg.HTTPRouteGatewayName) == "" {
 		return fmt.Errorf("HTTPROUTE_GATEWAY_NAME must be defined when EXPOSED_SERVICES_ROUTE_KIND=httproute")
+	}
+
+	return validateExposeAuthConfig(service, cfg)
+}
+
+func validateExposeAuthConfig(service types.Service, cfg *types.Config) error {
+	authType := normalizeExposeAuthType(service.Expose.AuthType)
+	if authType != authTypeBasic && authType != authTypeForward {
+		return fmt.Errorf("unsupported expose auth_type %q", service.Expose.AuthType)
+	}
+	if service.Expose.SetAuth && authType == authTypeForward && getRouteKind(cfg) != routeKindHTTPRoute {
+		return fmt.Errorf("expose auth_type %q requires EXPOSED_SERVICES_ROUTE_KIND=httproute", authTypeForward)
 	}
 
 	return nil
@@ -420,14 +503,19 @@ func getDeploymentSpec(service types.Service, namespace string, cfg *types.Confi
 	}
 	if service.Owner != types.DefaultOwner && cfg.KueueEnable {
 		deployment.Spec.Template.ObjectMeta.Labels[types.KueueOwnerLabel] = uid
-		deployment.Spec.Template.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
+
+		// TO DO: In KUEUE v0.16.0+ you can simply add quque name to use KUEUE
+		// But here we have separate Workload for the service
+		// if we set the label it will count to times the consumed resources
+		//deployment.Spec.Template.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 		deployment.Spec.Template.ObjectMeta.Annotations = map[string]string{
 			"kueue.x-k8s.io/queue-name": utils.BuildLocalQueueName(service.Name),
 		}
-		deployment.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
+		//deployment.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 		deployment.ObjectMeta.Annotations = map[string]string{
 			"kueue.x-k8s.io/queue-name": utils.BuildLocalQueueName(service.Name),
 		}
+
 	}
 
 	return deployment
@@ -463,12 +551,14 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 	podSpec, _ := service.ToPodSpec(cfg)
 
 	for i := range podSpec.Containers {
-		podSpec.Containers[i].Ports = []v1.ContainerPort{
-			{
-				Name:          podPortName,
-				ContainerPort: int32(service.Expose.APIPort), // #nosec G115
-			},
+		containerPorts := []v1.ContainerPort{}
+		for index, port := range service.Expose.APIPort {
+			containerPorts = append(containerPorts, v1.ContainerPort{
+				Name:          getPodPortName(index),
+				ContainerPort: int32(port), // #nosec G115
+			})
 		}
+		podSpec.Containers[i].Ports = containerPorts
 		podSpec.Containers[i].VolumeMounts[0].ReadOnly = false
 		if service.Expose.DefaultCommand {
 			podSpec.Containers[i].Command = nil
@@ -484,7 +574,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path: probePath,
-				Port: intstr.FromString(podPortName),
+				Port: intstr.FromString(getPodPortName(0)),
 			},
 		}
 
@@ -596,44 +686,100 @@ func updateDeployment(service types.Service, namespace string, kubeClientset kub
 /////////// Service
 
 // Create a kubernetes service component
-func createService(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
-	service_spec := getServiceSpec(service, namespace, cfg)
-	_, err := kubeClientset.CoreV1().Services(namespace).Create(context.TODO(), service_spec, metav1.CreateOptions{})
+func createService(service *types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) ([]int32, error) {
+	service_spec := getServiceSpec(*service, namespace, cfg)
+	createdService, err := kubeClientset.CoreV1().Services(namespace).Create(context.TODO(), service_spec, metav1.CreateOptions{})
+
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+
+	var realPorts []int32
+	if createdService.Spec.Type == v1.ServiceTypeNodePort {
+		// We create a temporary array of the same size to dump the real ports
+		realPorts = make([]int32, len(createdService.Spec.Ports))
+
+		for index, port := range createdService.Spec.Ports {
+			// We save the port returned by Kubernetes (it is converted from int32 to int)
+			realPorts[index] = port.NodePort
+			log.Printf("Real port assigned by Kubernetes (Index: %d): %d\n", index, port.NodePort)
+		}
+
+		service.Expose.NodePort = realPorts
+	}
+
+	return realPorts, nil
 }
 
 // Return a kubernetes service component, ready to deploy or update
 func getServiceSpec(service types.Service, namespace string, cfg *types.Config) *v1.Service {
 	name_service := getServiceName(service.Name)
-	var port v1.ServicePort = v1.ServicePort{
-		Name: servicePortName,
-		Port: servicePortNumber,
-		TargetPort: intstr.IntOrString{
-			Type:   0,
-			IntVal: int32(service.Expose.APIPort), // #nosec G115
-		},
-	}
+	servicePorts := []v1.ServicePort{}
 	service_type := v1.ServiceType(typeClusterIP)
-	if service.Expose.NodePort != 0 {
-		service_type = typeNodePort
-		port.NodePort = service.Expose.NodePort
+	//service_type := typeClusterIP
+	if len(service.Expose.NodePort) > 0 && len(service.Expose.NodePort) == len(service.Expose.APIPort) {
+		service_type = v1.ServiceType(typeNodePort)
 	}
+
+	for index, apiPort := range service.Expose.APIPort {
+		currentServicePort := int32(servicePortNumber + index)
+
+		if apiPort > math.MaxInt32 || apiPort < 0 {
+			continue
+		}
+
+		portSpec := v1.ServicePort{
+			Name: fmt.Sprintf("%s-%d", servicePortName, index),
+			Port: currentServicePort,
+			TargetPort: intstr.IntOrString{
+				Type:   0,
+				IntVal: int32(apiPort),
+			},
+		}
+
+		// Protection: Check if the NodePort array has an element for this index
+		/*
+			if index < len(service.Expose.NodePort) {
+				currentNodePort := service.Expose.NodePort[index]
+				if currentNodePort != 0 {
+					service_type = typeNodePort
+					portSpec.NodePort = currentNodePort
+				}
+			}
+
+			servicePorts = append(servicePorts, portSpec)
+		*/
+		if index < len(service.Expose.NodePort) {
+			currentNodePort := service.Expose.NodePort[index]
+			if currentNodePort != 0 {
+				portSpec.NodePort = currentNodePort
+			}
+		}
+
+		servicePorts = append(servicePorts, portSpec)
+	}
+
+	// Fallback in case the array was empty
+	if len(servicePorts) == 0 {
+		servicePorts = append(servicePorts, v1.ServicePort{
+			Name:       servicePortName,
+			Port:       servicePortNumber,
+			TargetPort: intstr.IntOrString{Type: 0, IntVal: 8080},
+		})
+	}
+
 	service_spec := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name_service,
 			Namespace: namespace,
 		},
 		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{port},
+			Ports: servicePorts,
 			Type:  service_type,
 			Selector: map[string]string{
 				KeyLabelApp: GetKeyLabelApp(service.Name),
 			},
 		},
-		Status: v1.ServiceStatus{},
 	}
 	return service_spec
 }
@@ -737,10 +883,12 @@ func createHTTPRoute(service types.Service, namespace string, kubeClientset kube
 	}
 
 	if service.Expose.SetAuth {
-		if err := createTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
-			return err
+		if normalizeExposeAuthType(service.Expose.AuthType) == authTypeBasic {
+			if err := createTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
+				return err
+			}
 		}
-		if err := createTraefikAuthMiddleware(service, namespace); err != nil {
+		if err := createTraefikAuthMiddleware(service, namespace, cfg); err != nil {
 			return err
 		}
 	}
@@ -765,10 +913,12 @@ func updateHTTPRoute(service types.Service, namespace string, kubeClientset kube
 	}
 
 	if service.Expose.SetAuth {
-		if err := upsertTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
-			return err
+		if normalizeExposeAuthType(service.Expose.AuthType) == authTypeBasic {
+			if err := upsertTraefikAuthSecret(service, namespace, kubeClientset); err != nil {
+				return err
+			}
 		}
-		if err := upsertTraefikAuthMiddleware(service, namespace); err != nil {
+		if err := upsertTraefikAuthMiddleware(service, namespace, cfg); err != nil {
 			return err
 		}
 	} else {
@@ -790,6 +940,12 @@ func updateHTTPRoute(service types.Service, namespace string, kubeClientset kube
 	}
 
 	httpRoute := getHTTPRouteSpec(service, namespace, cfg)
+	currentHTTPRoute, err := gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Get(context.TODO(), httpRoute.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	httpRoute.SetResourceVersion(currentHTTPRoute.GetResourceVersion())
+
 	_, err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Update(context.TODO(), httpRoute, metav1.UpdateOptions{})
 	return err
 }
@@ -1024,6 +1180,12 @@ func updateTraefikCORSMiddleware(service types.Service, namespace string, cfg *t
 	}
 
 	middleware := getTraefikCORSMiddlewareSpec(service, namespace, cfg)
+	currentMiddleware, err := gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Get(context.TODO(), middleware.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	middleware.SetResourceVersion(currentMiddleware.GetResourceVersion())
+
 	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Update(context.TODO(), middleware, metav1.UpdateOptions{})
 	return err
 }
@@ -1036,34 +1198,40 @@ func upsertTraefikCORSMiddleware(service types.Service, namespace string, cfg *t
 	return createTraefikCORSMiddleware(service, namespace, cfg)
 }
 
-func createTraefikAuthMiddleware(service types.Service, namespace string) error {
+func createTraefikAuthMiddleware(service types.Service, namespace string, cfg *types.Config) error {
 	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return err
 	}
 
-	middleware := getTraefikAuthMiddlewareSpec(service, namespace)
+	middleware := getTraefikAuthMiddlewareSpec(service, namespace, cfg)
 	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Create(context.TODO(), middleware, metav1.CreateOptions{})
 	return err
 }
 
-func updateTraefikAuthMiddleware(service types.Service, namespace string) error {
+func updateTraefikAuthMiddleware(service types.Service, namespace string, cfg *types.Config) error {
 	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return err
 	}
 
-	middleware := getTraefikAuthMiddlewareSpec(service, namespace)
+	middleware := getTraefikAuthMiddlewareSpec(service, namespace, cfg)
+	currentMiddleware, err := gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Get(context.TODO(), middleware.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	middleware.SetResourceVersion(currentMiddleware.GetResourceVersion())
+
 	_, err = gatewayClientset.Resource(traefikMiddlewareGVR).Namespace(namespace).Update(context.TODO(), middleware, metav1.UpdateOptions{})
 	return err
 }
 
-func upsertTraefikAuthMiddleware(service types.Service, namespace string) error {
+func upsertTraefikAuthMiddleware(service types.Service, namespace string, cfg *types.Config) error {
 	if existsTraefikAuthMiddleware(service.Name, namespace) {
-		return updateTraefikAuthMiddleware(service, namespace)
+		return updateTraefikAuthMiddleware(service, namespace, cfg)
 	}
 
-	return createTraefikAuthMiddleware(service, namespace)
+	return createTraefikAuthMiddleware(service, namespace, cfg)
 }
 
 func getTraefikCORSMiddlewareSpec(service types.Service, namespace string, cfg *types.Config) *unstructured.Unstructured {
@@ -1087,8 +1255,23 @@ func getTraefikCORSMiddlewareSpec(service types.Service, namespace string, cfg *
 	}}
 }
 
-func getTraefikAuthMiddlewareSpec(service types.Service, namespace string) *unstructured.Unstructured {
+func getTraefikAuthMiddlewareSpec(service types.Service, namespace string, cfg *types.Config) *unstructured.Unstructured {
 	nameMiddleware := getTraefikAuthMiddlewareName(service.Name)
+	authSpec := map[string]any{
+		"basicAuth": map[string]any{
+			"secret": getTraefikAuthSecretName(service.Name),
+		},
+	}
+
+	if normalizeExposeAuthType(service.Expose.AuthType) == authTypeForward {
+		authSpec = map[string]any{
+			"forwardAuth": map[string]any{
+				"address":                  getServiceAuthEndpoint(service, cfg),
+				"trustForwardHeader":       true,
+				"addAuthCookiesToResponse": []any{getServiceAuthCookieName(service.Name)},
+			},
+		}
+	}
 
 	return &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "traefik.io/v1alpha1",
@@ -1097,11 +1280,7 @@ func getTraefikAuthMiddlewareSpec(service types.Service, namespace string) *unst
 			"name":      nameMiddleware,
 			"namespace": namespace,
 		},
-		"spec": map[string]any{
-			"basicAuth": map[string]any{
-				"secret": getTraefikAuthSecretName(service.Name),
-			},
-		},
+		"spec": authSpec,
 	}}
 }
 
@@ -1318,12 +1497,35 @@ func getTraefikCORSMiddlewareName(name_container string) string {
 	return name_container + "-cors-mdw"
 }
 
+func getPodPortName(index int) string {
+	return fmt.Sprintf("%s-%d", podPortName, index)
+}
+
 func getTraefikAuthMiddlewareName(name_container string) string {
 	return name_container + "-auth-mdw"
 }
 
 func getTraefikAuthSecretName(name_container string) string {
 	return name_container + "-auth-traefik"
+}
+
+func getServiceAuthCookieName(name_container string) string {
+	return "oscar_service_" + strings.ReplaceAll(name_container, "-", "_") + "_auth"
+}
+
+func normalizeExposeAuthType(authType string) string {
+	authType = strings.ToLower(strings.TrimSpace(authType))
+	if authType == "" {
+		return authTypeBasic
+	}
+	return authType
+}
+
+func getServiceAuthEndpoint(service types.Service, cfg *types.Config) string {
+	if cfg == nil {
+		return "/system/services/" + service.Name + "/auth"
+	}
+	return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d/system/services/%s/auth", cfg.Name, cfg.Namespace, cfg.ServicePort, service.Name)
 }
 
 func getAPIPath(name_container string) string {

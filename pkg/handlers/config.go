@@ -23,9 +23,9 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/backends"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	"github.com/grycap/oscar/v4/pkg/backends"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -128,7 +128,7 @@ func MakeConfigUpdateHandler(cfg *types.Config, back kubernetes.Interface) gin.H
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) > 1 {
 			c.JSON(http.StatusUnauthorized, "")
-
+			return
 		}
 		configInput := types.ConfigForUser{}
 		if err := c.ShouldBindJSON(&configInput); err != nil {

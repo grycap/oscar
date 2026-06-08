@@ -22,7 +22,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
@@ -41,6 +41,8 @@ type FakeBackend struct {
 	// DeletedService stores the last service received through DeleteService.
 	DeletedService *types.Service
 	kubeClientset  kubernetes.Interface
+	// ProxyDirector overrides the default proxy director when set.
+	ProxyDirector func(req *http.Request)
 }
 
 // MakeFakeBackend returns the pointer of a new FakeBackend struct
@@ -151,6 +153,9 @@ func (f *FakeBackend) SetKubeClientset(client kubernetes.Interface) {
 
 // GetProxyDirector returns the ProxyDirector (fake)
 func (f *FakeBackend) GetProxyDirector(serviceName string, serviceNamespace string) func(req *http.Request) {
+	if f.ProxyDirector != nil {
+		return f.ProxyDirector
+	}
 	return func(req *http.Request) {
 		host := "httpbin.org"
 		req.Host = host

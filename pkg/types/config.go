@@ -47,6 +47,8 @@ const (
 	serverlessBackendType = "serverlessBackend"
 	routeKindType         = "routeKind"
 	AIR                   = "allowed_image_repositories"
+	Ingress               = "ingress"
+	HTTPROUTE             = "httproute"
 )
 
 type configVar struct {
@@ -165,8 +167,14 @@ type Config struct {
 	// KueueDefaultMemory default per-user ClusterQueue memory quota
 	KueueDefaultMemory string `json:"-"`
 
+	// KueueDefaultGPU default per-user ClusterQueue GPU quota
+	KueueDefaultGPU string `json:"-"`
+
 	// KueueDefaultFlavor default ResourceFlavor name used for ClusterQueues
 	KueueDefaultFlavor string `json:"-"`
+
+	// KueueDefaultEphemeralStorage default per-user ClusterQueue ephemeral storage quota
+	KueueDefaultEphemeralStorage string `json:"-"`
 
 	// ResourceManagerEnable option to enable the Resource Manager to delegate jobs
 	// when there are no available resources in the cluster (if the service has replicas)
@@ -216,6 +224,12 @@ type Config struct {
 	// as described here: https://docs.egi.eu/providers/check-in/sp/#10-groups
 	OIDCGroups []string `json:"oidc_groups"`
 
+	// OIDCClientID OpenID Connect client ID used for token exchange
+	OIDCClientID string `json:"-"`
+
+	// OIDCClientSecret OpenID Connect client secret used for token exchange
+	OIDCClientSecret string `json:"-"`
+
 	UsersAdmin []string `json:"-"`
 
 	//
@@ -251,6 +265,8 @@ type Config struct {
 	//Job listing limit
 	JobListingLimit int `json:"-"`
 
+	// KserveEnable option to enable KServe integration to deploy services using KServe InferenceService CRD
+	KserveEnable bool `json:"-"`
 	// PrometheusBaseURL base URL for Prometheus HTTP API
 	PrometheusBaseURL string `json:"-"`
 
@@ -274,6 +290,15 @@ type Config struct {
 
 	// LokiExposedAppLabel app label for exposed-service logs
 	LokiExposedAppLabel string `json:"-"`
+
+	// MinIOQuotaEnabled option to enable the creation of ConfigMaps with MinIO quotas for each user
+	MinIOQuotaEnabled bool `json:"minio_quota_enabled"`
+
+	// MinIOQuotaBuckets default number of buckets allowed per user
+	MinIOQuotaBuckets string `json:"-"`
+
+	// MinIOQuotaStorage default storage allowed per bucket and user
+	MinIOQuotaStorage string `json:"-"`
 }
 
 type ConfigForUser struct {
@@ -295,13 +320,6 @@ var configVars = []configVar{
 	{"ServicesNamespace", "OSCAR_SERVICES_NAMESPACE", false, stringType, "oscar-svc"},
 	{"ControllerServiceAccount", "OSCAR_CONTROLLER_SERVICE_ACCOUNT", false, stringType, "oscar-sa"},
 	{"ServerlessBackend", "SERVERLESS_BACKEND", false, serverlessBackendType, ""},
-	//{"OpenfaasNamespace", "OPENFAAS_NAMESPACE", false, stringType, "openfaas"},
-	//{"OpenfaasPort", "OPENFAAS_PORT", false, intType, "8080"},
-	//{"OpenfaasBasicAuthSecret", "OPENFAAS_BASIC_AUTH_SECRET", false, stringType, "basic-auth"},
-	//{"OpenfaasPrometheusPort", "OPENFAAS_PROMETHEUS_PORT", false, intType, "9090"},
-	//{"OpenfaasScalerEnable", "OPENFAAS_SCALER_ENABLE", false, boolType, "false"},
-	//{"OpenfaasScalerInterval", "OPENFAAS_SCALER_INTERVAL", false, stringType, "2m"},
-	//{"OpenfaasScalerInactivityDuration", "OPENFAAS_SCALER_INACTIVITY_DURATION", false, stringType, "10m"},
 	{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
 	{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
 	{"WatchdogExecTimeout", "WATCHDOG_EXEC_TIMEOUT", false, intType, "0"},
@@ -319,7 +337,9 @@ var configVars = []configVar{
 	{"KueueEnable", "KUEUE_ENABLE", false, boolType, "true"},
 	{"KueueDefaultCPU", "KUEUE_DEFAULT_CPU", false, stringType, "2"},
 	{"KueueDefaultMemory", "KUEUE_DEFAULT_MEMORY", false, stringType, "2Gi"},
+	{"KueueDefaultGPU", "KUEUE_DEFAULT_GPU", false, stringType, "0"},
 	{"KueueDefaultFlavor", "KUEUE_DEFAULT_FLAVOR", false, stringType, "oscar-default-flavor"},
+	{"KueueDefaultEphemeralStorage", "KUEUE_DEFAULT_EPHEMERAL_STORAGE", false, stringType, "1Gi"},
 
 	{"VolumeEnable", "VOLUME_ENABLE", false, boolType, "true"},
 	{"StorageClassName", "STORAGE_CLASS_NAME", false, stringType, "nfs"},
@@ -332,12 +352,14 @@ var configVars = []configVar{
 	//{"ResourceManager", "RESOURCE_MANAGER", false, resourceManagerType, "kubernetes"},
 	{"ResourceManagerInterval", "RESOURCE_MANAGER_INTERVAL", false, intType, "15"},
 	{"ReSchedulerEnable", "RESCHEDULER_ENABLE", false, boolType, "false"},
-	{"ReSchedulerInterval", "RESCHEDULER_INTERVAL", false, intType, "15"},
-	{"ReSchedulerThreshold", "RESCHEDULER_THRESHOLD", false, intType, "30"},
+	{"ReSchedulerInterval", "RESCHEDULER_INTERVAL", false, intType, "10"},
+	{"ReSchedulerThreshold", "RESCHEDULER_THRESHOLD", false, intType, "10"},
 	{"OIDCEnable", "OIDC_ENABLE", false, boolType, "false"},
 	{"OIDCValidIssuers", "OIDC_ISSUERS", false, stringSliceType, ""},
 	{"OIDCSubject", "OIDC_SUBJECT", false, stringType, ""},
 	{"OIDCGroups", "OIDC_GROUPS", false, stringSliceType, ""},
+	{"OIDCClientID", "OIDC_CLIENT_ID", false, stringType, ""},
+	{"OIDCClientSecret", "OIDC_CLIENT_SECRET", false, stringType, ""},
 	{"UsersAdmin", "USERS_ADMIN", false, stringSliceType, ""},
 	{"IngressHost", "INGRESS_HOST", false, stringType, ""},
 	{"ExposedServicesRouteKind", "EXPOSED_SERVICES_ROUTE_KIND", false, routeKindType, "ingress"},
@@ -350,6 +372,7 @@ var configVars = []configVar{
 	{"AdditionalConfigPath", "ADDITIONAL_CONFIG_PATH", false, stringType, "config.yaml"},
 	{"TTLJob", "TTL_JOB", false, intType, "2592000"},
 	{"JobListingLimit", "JOB_LISTING_LIMIT", false, intType, "70"},
+	{"KserveEnable", "KSERVE_ENABLE", false, boolType, "false"},
 	{"PrometheusBaseURL", "PROMETHEUS_URL", false, urlType, ""},
 	{"PrometheusCPUQuery", "PROMETHEUS_CPU_QUERY", false, stringType, "sum(increase(container_cpu_usage_seconds_total{namespace=~\"{{services_namespace}}.*\",service=~\"{{service}}\"}[{{range}}])) / 3600"},
 	{"PrometheusGPUQuery", "PROMETHEUS_GPU_QUERY", false, stringType, "sum(increase(container_gpu_usage_seconds_total{namespace=~\"{{services_namespace}}.*\",service=~\"{{service}}\"}[{{range}}])) / 3600"},
@@ -358,6 +381,9 @@ var configVars = []configVar{
 	{"LokiExposedQuery", "LOKI_EXPOSED_QUERY", false, stringType, "{namespace=\"{{namespace}}\", app=\"{{app}}\"} |~ \"/system/services/.+/exposed\""},
 	{"LokiExposedNamespace", "LOKI_EXPOSED_NAMESPACE", false, stringType, "ingress-nginx"},
 	{"LokiExposedAppLabel", "LOKI_EXPOSED_APP", false, stringType, "ingress-nginx"},
+	{"MinIOQuotaEnabled", "MINIO_QUOTA_ENABLED", false, boolType, "false"},
+	{"MinIOQuotaBuckets", "MINIO_QUOTA_BUCKETS", false, stringType, "5"},
+	{"MinIOQuotaStorage", "MINIO_QUOTA_STORAGE", false, stringType, "5Gi"},
 }
 
 func readConfigVar(cfgVar configVar) (string, error) {
@@ -452,11 +478,11 @@ func parseServerlessBackend(s string) (string, error) {
 
 func parseRouteKind(s string) (string, error) {
 	if len(s) == 0 {
-		return "ingress", nil
+		return Ingress, nil
 	}
 
 	str := strings.ToLower(strings.TrimSpace(s))
-	if str != "ingress" && str != "httproute" {
+	if str != Ingress && str != HTTPROUTE {
 		return "", fmt.Errorf("must be \"ingress\" or \"httproute\"")
 	}
 
@@ -528,19 +554,25 @@ func (cfg *Config) CheckAvailableGPUs(kubeClientset kubernetes.Interface) {
 	}
 }
 
-// CheckAvailableInterLink checks if there is a node with the virtual kubelet annotation
+// CheckAvailableInterLink checks if there is a node with a virtual-kubelet label
 func (cfg *Config) CheckAvailableInterLink(kubeClientset kubernetes.Interface) {
-	nodes, err := kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: "!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master,type=virtual-kubelet"})
-	if err != nil {
-		log.Printf("Error getting list of nodes: %v\n", err)
+	selectors := []string{
+		"!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master,type=virtual-kubelet",
+		"!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master,virtual-node.interlink/type=virtual-kubelet",
 	}
-	if len(nodes.Items) > 0 {
-		cfg.InterLinkAvailable = true
-		log.Printf("INFO: InterLink Available")
-	} else {
-		cfg.InterLinkAvailable = false
-		log.Printf("INFO: InterLink Unavailable")
+	for _, selector := range selectors {
+		nodes, err := kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: selector})
+		if err != nil {
+			log.Printf("Error listing nodes with selector %q: %v\n", selector, err)
+			continue
+		}
+		if len(nodes.Items) > 0 {
+			cfg.InterLinkAvailable = true
+			log.Printf("INFO: InterLink Available")
+			return
+		}
 	}
-	//cfg.InterLinkAvailable = true
+	cfg.InterLinkAvailable = false
+	log.Printf("INFO: InterLink Unavailable")
 
 }

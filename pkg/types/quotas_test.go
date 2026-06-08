@@ -2,6 +2,8 @@ package types
 
 import (
 	"testing"
+
+	"k8s.io/client-go/rest"
 )
 
 func TestQuotaBackend(t *testing.T) {
@@ -27,8 +29,8 @@ func TestQuotaResponse(t *testing.T) {
 			"memory": {Max: 2000, Used: 1000},
 		},
 		Volumes: &VolumeQuotaResponse{
-			Disk:           VolumeQuotaValues{Max: "100Gi", Used: "50Gi"},
-			Volumes:        VolumeQuotaValues{Max: "10", Used: "5"},
+			Disk:             VolumeQuotaValues{Max: "100Gi", Used: "50Gi"},
+			Volumes:          VolumeQuotaValues{Max: "10", Used: "5"},
 			MaxDiskperVolume: "50Gi",
 			MinDiskperVolume: "1Gi",
 		},
@@ -67,8 +69,8 @@ func TestQuotaValues(t *testing.T) {
 
 func TestVolumeQuotaResponse(t *testing.T) {
 	vqr := VolumeQuotaResponse{
-		Disk:           VolumeQuotaValues{Max: "100Gi", Used: "50Gi"},
-		Volumes:        VolumeQuotaValues{Max: "10", Used: "5"},
+		Disk:             VolumeQuotaValues{Max: "100Gi", Used: "50Gi"},
+		Volumes:          VolumeQuotaValues{Max: "10", Used: "5"},
 		MaxDiskperVolume: "50Gi",
 		MinDiskperVolume: "1Gi",
 	}
@@ -106,8 +108,8 @@ func TestQuotaUpdateRequest(t *testing.T) {
 		CPU:    "1000m",
 		Memory: "2Gi",
 		Volumes: &VolumeQuotaUpdate{
-			Disk:           "100Gi",
-			Volumes:        "10",
+			Disk:             "100Gi",
+			Volumes:          "10",
 			MaxDiskperVolume: "50Gi",
 			MinDiskperVolume: "1Gi",
 		},
@@ -129,8 +131,8 @@ func TestQuotaUpdateRequest(t *testing.T) {
 
 func TestVolumeQuotaUpdate(t *testing.T) {
 	vqu := VolumeQuotaUpdate{
-		Disk:            "100Gi",
-		Volumes:         "10",
+		Disk:             "100Gi",
+		Volumes:          "10",
 		MaxDiskperVolume: "50Gi",
 		MinDiskperVolume: "1Gi",
 	}
@@ -146,5 +148,17 @@ func TestVolumeQuotaUpdate(t *testing.T) {
 	}
 	if vqu.MinDiskperVolume != "1Gi" {
 		t.Errorf("Expected MinDiskperVolume = 1Gi, got %s", vqu.MinDiskperVolume)
+	}
+}
+
+func TestCreateQuotaBackend(t *testing.T) {
+	qb := CreateQuotaBackend(&rest.Config{
+		TLSClientConfig: rest.TLSClientConfig{
+			CertData: []byte("invalid"),
+			KeyData:  []byte("invalid"),
+		},
+	}, nil)
+	if qb != nil {
+		t.Errorf("CreateQuotaBackend() = %v, want nil", qb)
 	}
 }

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/backends"
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/backends"
+	"github.com/grycap/oscar/v4/pkg/types"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +37,7 @@ func TestMakeGetDeploymentStatusHandlerReadyExposed(t *testing.T) {
 	back.Service = &types.Service{
 		Name: "svc",
 		Expose: types.Expose{
-			APIPort: 8080,
+			APIPort: []int{8080},
 		},
 		Namespace: "ns",
 	}
@@ -186,7 +186,7 @@ func TestMakeGetDeploymentStatusHandlerDegraded(t *testing.T) {
 	back.Service = &types.Service{
 		Name: "svc",
 		Expose: types.Expose{
-			APIPort: 8080,
+			APIPort: []int{8080},
 		},
 		Namespace: "ns",
 	}
@@ -242,7 +242,7 @@ func TestMakeGetDeploymentStatusHandlerPending(t *testing.T) {
 	back.Service = &types.Service{
 		Name: "svc",
 		Expose: types.Expose{
-			APIPort: 8080,
+			APIPort: []int{8080},
 		},
 		Namespace: "ns",
 	}
@@ -295,7 +295,7 @@ func TestMakeGetDeploymentStatusHandlerFailed(t *testing.T) {
 	back.Service = &types.Service{
 		Name: "svc",
 		Expose: types.Expose{
-			APIPort: 8080,
+			APIPort: []int{8080},
 		},
 		Namespace: "ns",
 	}
@@ -692,7 +692,7 @@ func TestMakeGetDeploymentLogsHandlerFallback(t *testing.T) {
 	back.Service = &types.Service{
 		Name: "svc",
 		Expose: types.Expose{
-			APIPort: 8080,
+			APIPort: []int{8080},
 		},
 		Namespace: "ns",
 	}

@@ -41,13 +41,19 @@ var (
 		Alpine:    false,
 		Memory:    "1Gi",
 		CPU:       "1.0",
-		Replicas: []Replica{
-			{
-				Type:        "oscar",
-				ClusterID:   "test",
-				ServiceName: "testreplicaname",
-				Headers: map[string]string{
-					"Authorization": "Bearer testtoken",
+		Federation: &Federation{
+			GroupID:              "testgroup",
+			Topology:             "star",
+			Delegation:           "",
+			ReschedulerThreshold: 0,
+			Members: []Replica{
+				{
+					Type:        "oscar",
+					ClusterID:   "test",
+					ServiceName: "testreplicaname",
+					Headers: map[string]string{
+						"Authorization": "Bearer testtoken",
+					},
 				},
 			},
 		},
@@ -219,23 +225,25 @@ memory: 1Gi
 cpu: "1.0"
 total_memory: ""
 total_cpu: ""
+ephemeral_storage_request: ""
 enable_gpu: false
 enable_sgx: false
 image_prefetch: false
 synchronous:
   min_scale: 0
   max_scale: 0
-replicas:
-- type: oscar
-  cluster_id: test
-  service_name: testreplicaname
-  url: ""
-  ssl_verify: false
-  priority: 0
-  headers:
-    Authorization: Bearer testtoken
-delegation: ""
-rescheduler_threshold: 0
+federation:
+  group_id: testgroup
+  topology: star
+  members:
+  - type: oscar
+    cluster_id: test
+    service_name: testreplicaname
+    url: ""
+    ssl_verify: false
+    priority: 0
+    headers:
+      Authorization: Bearer testtoken
 log_level: ""
 image: testimage
 alpine: false
@@ -252,7 +260,6 @@ expose:
   max_scale: 0
   cpu_threshold: 0
   rewrite_target: false
-  nodePort: 0
   default_command: false
   set_auth: false
   health_path: ""
@@ -422,15 +429,17 @@ func TestSetSecurityContext(t *testing.T) {
 	}
 }
 
-func TestHasReplicas(t *testing.T) {
+func TestHasFederationMembers(t *testing.T) {
 	svc := Service{}
-	if svc.HasReplicas() {
-		t.Fatalf("expected HasReplicas to be false with no replicas")
+	if svc.HasFederationMembers() {
+		t.Fatalf("expected HasFederationMembers to be false with no members")
 	}
 
-	svc.Replicas = []Replica{{Type: "oscar", ClusterID: "a", ServiceName: "svc"}}
-	if !svc.HasReplicas() {
-		t.Fatalf("expected HasReplicas to be true when replicas are defined")
+	svc.Federation = &Federation{
+		Members: []Replica{{Type: "oscar", ClusterID: "a", ServiceName: "svc"}},
+	}
+	if !svc.HasFederationMembers() {
+		t.Fatalf("expected HasFederationMembers to be true when members are defined")
 	}
 }
 
@@ -455,7 +464,7 @@ func TestGetExposedBasePath(t *testing.T) {
 			service: &Service{
 				Name: "demo",
 				Expose: Expose{
-					APIPort: 8080,
+					APIPort: []int{8080},
 				},
 			},
 			want: "/system/services/demo/exposed",
@@ -528,7 +537,7 @@ func TestToPodSpecWithExposeMetadataEnvVars(t *testing.T) {
 	}
 	svc := copy.(Service)
 	svc.Token = "test-token"
-	svc.Expose.APIPort = 8080
+	svc.Expose.APIPort = []int{8080}
 
 	podSpec, err := svc.ToPodSpec(&testConfig)
 	if err != nil {
@@ -544,5 +553,208 @@ func TestToPodSpecWithExposeMetadataEnvVars(t *testing.T) {
 	}
 	if envVars[OscarServiceBasePathEnvVar] != "/system/services/testname/exposed" {
 		t.Fatalf("expected %s to be %q, got %q", OscarServiceBasePathEnvVar, "/system/services/testname/exposed", envVars[OscarServiceBasePathEnvVar])
+	}
+}
+
+func TestKserveUnmarshalJSON(t *testing.T) {
+	t.Run("valid json", func(t *testing.T) {
+		data := []byte(`{"storage_uri":"s3://bucket/model","type":"inference","memory":"1Gi"}`)
+		k := Kserve{}
+		err := k.UnmarshalJSON(data)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if k.StorageUri != "s3://bucket/model" {
+			t.Errorf("expected StorageUri = s3://bucket/model, got %s", k.StorageUri)
+		}
+		if k.Type != "inference" {
+			t.Errorf("expected Type = inference, got %s", k.Type)
+		}
+		if k.APIVersion != "v1" {
+			t.Errorf("expected default APIVersion = v1, got %s", k.APIVersion)
+		}
+		if k.CPU != "0.2" {
+			t.Errorf("expected default CPU = 0.2, got %s", k.CPU)
+		}
+		if k.Memory != "1Gi" {
+			t.Errorf("expected Memory = 1Gi, got %s", k.Memory)
+		}
+		if k.MaxScale != 1 {
+			t.Errorf("expected default MaxScale = 1, got %d", k.MaxScale)
+		}
+	})
+
+	t.Run("missing storage uri", func(t *testing.T) {
+		data := []byte(`{"type":"inference"}`)
+		k := Kserve{}
+		err := k.UnmarshalJSON(data)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+
+	t.Run("missing type", func(t *testing.T) {
+		data := []byte(`{"storage_uri":"s3://bucket/model"}`)
+		k := Kserve{}
+		err := k.UnmarshalJSON(data)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+
+	t.Run("empty json", func(t *testing.T) {
+		data := []byte(`{}`)
+		k := Kserve{}
+		err := k.UnmarshalJSON(data)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+}
+
+func TestKserveInferenceUnmarshalJSON(t *testing.T) {
+	t.Run("valid json", func(t *testing.T) {
+		data := []byte(`{"model_format":"onnx","runtime":"kserve-runtime"}`)
+		ki := KserveInference{}
+		err := ki.UnmarshalJSON(data)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ki.ModelFormat != "onnx" {
+			t.Errorf("expected ModelFormat = onnx, got %s", ki.ModelFormat)
+		}
+		if ki.Runtime != "kserve-runtime" {
+			t.Errorf("expected Runtime = kserve-runtime, got %s", ki.Runtime)
+		}
+	})
+
+	t.Run("missing model format", func(t *testing.T) {
+		data := []byte(`{"runtime":"kserve-runtime"}`)
+		ki := KserveInference{}
+		err := ki.UnmarshalJSON(data)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+}
+
+func TestServiceGetVolumeName(t *testing.T) {
+	tests := []struct {
+		name    string
+		service *Service
+		want    string
+	}{
+		{
+			name:    "nil service",
+			service: nil,
+			want:    "",
+		},
+		{
+			name:    "volume nil",
+			service: &Service{Name: "test-svc"},
+			want:    "test-svc",
+		},
+		{
+			name: "volume name empty",
+			service: &Service{
+				Name:   "test-svc",
+				Volume: &ServiceVolumeConfig{Name: "", MountPath: "/data"},
+			},
+			want: "test-svc",
+		},
+		{
+			name: "volume name set",
+			service: &Service{
+				Name:   "test-svc",
+				Volume: &ServiceVolumeConfig{Name: "my-volume", MountPath: "/data"},
+			},
+			want: "my-volume",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.service.GetVolumeName(); got != tt.want {
+				t.Errorf("GetVolumeName() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestServiceCreatesManagedVolume(t *testing.T) {
+	tests := []struct {
+		name    string
+		service *Service
+		want    bool
+	}{
+		{
+			name:    "nil service",
+			service: nil,
+			want:    false,
+		},
+		{
+			name:    "volume nil",
+			service: &Service{Name: "test-svc"},
+			want:    false,
+		},
+		{
+			name: "volume size empty",
+			service: &Service{
+				Name:   "test-svc",
+				Volume: &ServiceVolumeConfig{MountPath: "/data"},
+			},
+			want: false,
+		},
+		{
+			name: "volume size set",
+			service: &Service{
+				Name:   "test-svc",
+				Volume: &ServiceVolumeConfig{Size: "1Gi", MountPath: "/data"},
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.service.CreatesManagedVolume(); got != tt.want {
+				t.Errorf("CreatesManagedVolume() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestServiceUsesManagedVolume(t *testing.T) {
+	tests := []struct {
+		name    string
+		service *Service
+		want    bool
+	}{
+		{
+			name:    "nil service",
+			service: nil,
+			want:    false,
+		},
+		{
+			name:    "volume nil",
+			service: &Service{Name: "test-svc"},
+			want:    false,
+		},
+		{
+			name: "volume non-nil",
+			service: &Service{
+				Name:   "test-svc",
+				Volume: &ServiceVolumeConfig{Size: "1Gi", MountPath: "/data"},
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.service.UsesManagedVolume(); got != tt.want {
+				t.Errorf("UsesManagedVolume() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

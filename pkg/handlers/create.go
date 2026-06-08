@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -26,11 +27,12 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/grycap/oscar/v4/pkg/backends/resources"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/cdmi-client-go"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
-	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -79,6 +81,12 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			service.Owner = types.DefaultOwner
 			createLogger.Printf("Creating service '%s' for user '%s'", service.Name, service.Owner)
 		}
+		rawInput := cloneStorageIOConfigs(service.Input)
+		rawOutput := cloneStorageIOConfigs(service.Output)
+		if err := normalizeStoragePaths(&service); err != nil {
+			c.String(http.StatusBadRequest, err.Error())
+			return
+		}
 		service.AllowedUsers = sanitizeUsers(service.AllowedUsers)
 		service.Script = utils.NormalizeLineEndings(service.Script)
 
@@ -89,12 +97,13 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 		// Check if users in allowed_users have a MinIO associated user
-		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+		minIOAdminClient, minIOAdminErr := utils.MakeMinIOAdminClient(cfg)
 
 		// Service is created by an EGI user
 		var uid string
 		var err error
 		var mc *auth.MultitenancyConfig
+		var minIOQuota *types.MinIOQuotaUpdate
 		namespace := cfg.ServicesNamespace
 		if !isAdminUser {
 			uid, err = auth.GetUIDFromContext(c)
@@ -214,13 +223,38 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				return
 			}
 		}
+
+		refreshToken := extractRefreshTokenSecret(&service)
+		//log.Printf("extractRefreshTokenSecret: %s", refreshToken)
+		if service.HasFederationMembers() && refreshToken == "" {
+			c.String(http.StatusBadRequest, "refresh_token secret is required for federated services")
+			return
+		}
+		if service.HasFederationMembers() {
+			authErrors := utils.VerifyFederationAuth(&service, authHeader)
+			if len(authErrors) > 0 {
+				c.String(http.StatusUnauthorized, fmt.Sprintf("federation auth failed: %v", authErrors))
+				return
+			}
+		}
+		/*if refreshToken != "" {
+			if err := upsertRefreshTokenSecret(&service, service.Namespace, refreshToken, back.GetKubeClientset()); err != nil {
+				c.String(http.StatusInternalServerError, "Error creating refresh-token secret: %v", err)
+				return
+			}
+		}*/
+
+		utils.ApplyFederation(&service)
+
 		if len(service.Environment.Secrets) > 0 {
 			if utils.SecretExists(service.Name, service.Namespace, back.GetKubeClientset()) {
 				c.String(http.StatusConflict, "A secret with the given name already exists")
+				return
 			}
 			secretsErr := utils.CreateSecret(service.Name, service.Namespace, service.Environment.Secrets, back.GetKubeClientset())
 			if secretsErr != nil {
 				c.String(http.StatusConflict, "Error creating secrets for service: %v", secretsErr)
+				return
 			}
 
 			// Empty the secrets content from the Configmap
@@ -234,6 +268,14 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				createLogger.Printf("error ensuring Kueue queues for service %s: %v\n", service.Name, err)
 			}
 			service.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
+			// At the moment check only for KServe service
+			if utils.IsKserveService(&service) && utils.IsKserveSupported(cfg) && !utils.VerifyWorkloadByResources(service, cfg) {
+				if err := utils.DeleteKueueLocalQueue(context.TODO(), cfg, service.Namespace, service.Name); err != nil {
+					createLogger.Printf("Error deleting Kueue local queue: %v", err)
+				}
+				c.String(http.StatusBadRequest, fmt.Sprintf("Error creating service %s: workload is NOT admitted", service.Name))
+				return
+			}
 		}
 
 		ownerName := "oscar"
@@ -242,6 +284,32 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			ownerName = utils.RemoveAccents(ownerName)
 		}
 		service.Labels["owner_name"] = strings.ReplaceAll(ownerName, " ", "_")
+		if !isAdminUser {
+			minIOQuota, _, err = GetMinIOQuotaConfig(c.Request.Context(), cfg, back.GetKubeClientset(), uid)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error reading MinIO quota: %v", err))
+				return
+			}
+			if minIOQuota != nil {
+				if minIOAdminErr != nil {
+					c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", minIOAdminErr))
+					return
+				}
+				if err := ValidateMinIOBucketCountQuota(cfg, minIOAdminClient, minIOQuota, uid, collectMinIOBucketCandidates(&service)); err != nil {
+					c.String(http.StatusForbidden, err.Error())
+					return
+				}
+			}
+		}
+
+		// Check if a service with the same name already exists in the cluster
+		if exists, err := serviceWithSameNameExists(service.Name, back); err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error checking for existing service: %v", err))
+			return
+		} else if exists {
+			c.String(http.StatusBadRequest, "A service with the provided name already exists")
+			return
+		}
 
 		// Create service
 		if err := back.CreateService(service); err != nil {
@@ -252,8 +320,16 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				} else {
 					c.String(http.StatusConflict, "A service with the provided name already exists")
 				}
-			} else if k8sErrors.IsNotFound(err) && service.Volume != nil && !service.CreatesManagedVolume() {
-				c.String(http.StatusBadRequest, "Referenced volume does not exist in the caller namespace")
+			} else if k8sErrors.IsNotFound(err) && service.Volume != nil {
+				if service.CreatesManagedVolume() {
+					errDelete := back.DeleteService(service)
+					if errDelete != nil {
+						log.Printf("Error deleting service: %v\n", errDelete)
+					}
+					c.String(http.StatusBadRequest, "Referenced volume size is not defined: Please add the volume size in service definition")
+				} else {
+					c.String(http.StatusBadRequest, "Referenced volume does not exist in the caller namespace")
+				}
 			} else {
 				errDelete := back.DeleteService(service)
 				if errDelete != nil {
@@ -266,6 +342,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Register minio webhook and restart the server
 		if err := registerMinIOWebhook(service.Name, service.Token, service.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
+			createLogger.Printf("Error registering MinIO webhook for service '%s': %v", service.Name, err)
 			derr := back.DeleteService(service)
 			if derr != nil {
 				log.Printf("Error deleting service: %v\n", derr)
@@ -274,27 +351,40 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
-		var buckets []utils.MinIOBucket
-		if buckets, err = createBuckets(&service, cfg, minIOAdminClient, false); err != nil {
-			if err == errInput {
-				c.String(http.StatusBadRequest, err.Error())
-			} else {
-				c.String(http.StatusInternalServerError, err.Error())
-			}
-			derr := back.DeleteService(service)
-			if derr != nil {
-				log.Printf("Error deleting service: %v\n", derr)
-			}
-
-			if !strings.Contains(err.Error(), " already exists") {
-				bderr := deleteBuckets(&service, cfg, minIOAdminClient)
-				if bderr != nil {
-					log.Printf("Error deleting buckets: %v\n", bderr)
+		buckets := []utils.MinIOBucket{}
+		if !(service.Annotations != nil &&
+			strings.EqualFold(strings.TrimSpace(service.Annotations[types.FederationWorkerAnnotation]), "true") &&
+			service.Federation != nil &&
+			strings.EqualFold(strings.TrimSpace(service.Federation.Topology), "mesh")) {
+			if buckets, err = createBuckets(&service, cfg, minIOAdminClient, false); err != nil {
+				createLogger.Printf("Error creating buckets for service '%s': %v", service.Name, err)
+				if err == errInput {
+					c.String(http.StatusBadRequest, err.Error())
+				} else {
+					c.String(http.StatusInternalServerError, err.Error())
 				}
+				derr := back.DeleteService(service)
+				if derr != nil {
+					log.Printf("Error deleting service: %v\n", derr)
+				}
+
+				if !strings.Contains(err.Error(), " already exists") {
+					bderr := deleteBuckets(&service, cfg, minIOAdminClient)
+					if bderr != nil {
+						log.Printf("Error deleting buckets: %v\n", bderr)
+					}
+				}
+				return
 			}
-			return
 		}
 		if len(buckets) > 0 {
+			if service.Annotations != nil &&
+				strings.EqualFold(strings.TrimSpace(service.Annotations[types.FederationWorkerAnnotation]), "true") &&
+				service.Federation != nil &&
+				strings.EqualFold(strings.TrimSpace(service.Federation.Topology), "mesh") {
+				// Worker services should not manage origin buckets.
+				goto skipBucketTags
+			}
 			for _, b := range buckets {
 				// If not specified default visibility is PRIVATE
 				if strings.ToLower(service.Visibility) == "" {
@@ -315,15 +405,55 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 				if err := minIOAdminClient.SetTags(b.BucketName, tags); err != nil {
 					c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
+					return
+				}
+				if minIOQuota != nil && minIOQuota.StoragePerBucket != "" {
+					if err := minIOAdminClient.SetBucketStorageQuota(b.BucketName, minIOQuota.StoragePerBucket); err != nil {
+						derr := back.DeleteService(service)
+						if derr != nil {
+							log.Printf("Error deleting service: %v\n", derr)
+						}
+						c.String(http.StatusInternalServerError, fmt.Sprintf("Error setting bucket quota: %v", err))
+						return
+					}
 				}
 			}
 		}
+	skipBucketTags:
 
 		// Add Yunikorn queue if enabled
 		if cfg.YunikornEnable {
 			if err := utils.AddYunikornQueue(cfg, back.GetKubeClientset(), &service); err != nil {
 				log.Println(err.Error())
 			}
+		}
+
+		var federationErrors []error
+		federated := service
+		if service.HasFederationMembers() {
+			if service.Annotations != nil &&
+				strings.EqualFold(strings.TrimSpace(service.Annotations[types.FederationWorkerAnnotation]), "true") &&
+				service.Federation != nil &&
+				strings.EqualFold(strings.TrimSpace(service.Federation.Topology), "mesh") {
+				goto skipFederationExpansion
+			}
+			federated.Input = rawInput
+			federated.Output = rawOutput
+			federationErrors = utils.ExpandFederation(&federated, authHeader, http.MethodPost, refreshToken)
+		}
+	skipFederationExpansion:
+
+		if len(federationErrors) > 0 {
+			rollbackErrors := utils.RollbackFederationCreate(&federated, authHeader)
+			if err := back.DeleteService(service); err != nil {
+				rollbackErrors = append(rollbackErrors, fmt.Errorf("local rollback failed: %v", err))
+			}
+			if len(rollbackErrors) > 0 {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Federation failed: %v; rollback errors: %v", federationErrors, rollbackErrors))
+				return
+			}
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Federation failed; rollback completed: %v", federationErrors))
+			return
 		}
 
 		createLogger.Printf("%s | %v | %s | %s | %s", "POST", 200, createPath, service.Name, uid)
@@ -339,6 +469,15 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	}
 	if service.CPU == "" {
 		service.CPU = defaultCPU
+	}
+
+	if utils.IsKserveService(service) && utils.IsKserveSupported(cfg) {
+		if service.Kserve.CPU == "" {
+			service.Kserve.CPU = defaultCPU
+		}
+		if service.Kserve.Memory == "" {
+			service.Kserve.Memory = defaultMemory
+		}
 	}
 	// Check if visibility has been set. If not set default private.
 	if service.Visibility == "" {
@@ -376,9 +515,24 @@ func checkValues(service *types.Service, cfg *types.Config) {
 		Region:    cfg.MinIOProvider.Region,
 	}
 
+	originMinIOOverride := false
+	if service.Annotations != nil {
+		if _, ok := service.Annotations[types.OriginClusterAnnotation]; ok {
+			originMinIOOverride = true
+		}
+	}
+	allowFederatedDefaultOverride := service.HasFederationMembers()
 	if service.StorageProviders != nil {
 		if service.StorageProviders.MinIO != nil {
-			service.StorageProviders.MinIO[types.DefaultProvider] = defaultMinIOInstanceInfo
+			if originMinIOOverride || allowFederatedDefaultOverride {
+				if existing := service.StorageProviders.MinIO[types.DefaultProvider]; existing != nil && strings.TrimSpace(existing.Endpoint) != "" {
+					// Keep origin MinIO endpoint for delegated services.
+				} else {
+					service.StorageProviders.MinIO[types.DefaultProvider] = defaultMinIOInstanceInfo
+				}
+			} else {
+				service.StorageProviders.MinIO[types.DefaultProvider] = defaultMinIOInstanceInfo
+			}
 		} else {
 			service.StorageProviders.MinIO = map[string]*types.MinIOProvider{
 				types.DefaultProvider: defaultMinIOInstanceInfo,
@@ -392,8 +546,74 @@ func checkValues(service *types.Service, cfg *types.Config) {
 		}
 	}
 
+	if service.Federation != nil {
+		if service.Federation.Topology == "" {
+			service.Federation.Topology = "none"
+		}
+	}
+
 	// Generate a new access token
-	service.Token = utils.GenerateToken()
+	if val, exist := service.Annotations[types.FederationWorkerAnnotation]; exist && val == "true" {
+		//fmt.Println(service.Token)
+	} else {
+		service.Token = utils.GenerateToken()
+	}
+}
+
+func normalizeStoragePaths(service *types.Service) error {
+	if service == nil {
+		return nil
+	}
+	originServiceName := ""
+	originClusterID := ""
+	if service.Annotations != nil {
+		originServiceName = strings.TrimSpace(service.Annotations[types.OriginServiceAnnotation])
+		originClusterID = strings.TrimSpace(service.Annotations[types.OriginClusterAnnotation])
+	}
+
+	for i := range service.Input {
+		path := strings.Trim(service.Input[i].Path, " /")
+		if path == "" {
+			return fmt.Errorf("input path cannot be empty")
+		}
+		_, provName := getProviderInfo(service.Input[i].Provider)
+		if provName == types.MinIOName || provName == types.S3Name {
+			if !strings.Contains(path, "/") {
+				path = fmt.Sprintf("%s/%s", service.Name, path)
+			}
+		}
+		service.Input[i].Path = path
+	}
+
+	for i := range service.Output {
+		path := strings.Trim(service.Output[i].Path, " /")
+		if path == "" {
+			return fmt.Errorf("output path cannot be empty")
+		}
+		provID, provName := getProviderInfo(service.Output[i].Provider)
+		if provName == types.MinIOName || provName == types.S3Name {
+			if !strings.Contains(path, "/") {
+				bucketName := service.Name
+				if provName == types.MinIOName &&
+					originServiceName != "" &&
+					originClusterID != "" &&
+					strings.TrimSpace(provID) == types.DefaultProvider {
+					bucketName = originServiceName
+				}
+				path = fmt.Sprintf("%s/%s", bucketName, path)
+			}
+		}
+		service.Output[i].Path = path
+	}
+
+	return nil
+}
+
+func cloneStorageIOConfigs(items []types.StorageIOConfig) []types.StorageIOConfig {
+	if len(items) == 0 {
+		return nil
+	}
+	return append([]types.StorageIOConfig(nil), items...)
 }
 
 func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient, isUpdate bool) ([]utils.MinIOBucket, error) {
@@ -434,7 +654,10 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		path := strings.Trim(in.Path, " /")
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
-		folderKey := fmt.Sprintf("%s/", splitPath[1])
+		folderKey := ""
+		if len(splitPath) > 1 && strings.TrimSpace(splitPath[1]) != "" {
+			folderKey = fmt.Sprintf("%s/", splitPath[1])
+		}
 
 		err := minIOAdminClient.CreateS3PathWithWebhook(s3Client, splitPath, service.GetMinIOWebhookARN(), false)
 
@@ -452,7 +675,11 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		if strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser && len(service.BucketList) > 0 {
 			for i, b := range service.BucketList {
 				// Create a bucket for each allowed user if allowed_users is not empty
-				err = minIOAdminClient.CreateS3PathWithWebhook(s3Client, []string{b, folderKey}, service.GetMinIOWebhookARN(), false)
+				if folderKey == "" {
+					err = minIOAdminClient.CreateS3PathWithWebhook(s3Client, []string{b}, service.GetMinIOWebhookARN(), false)
+				} else {
+					err = minIOAdminClient.CreateS3PathWithWebhook(s3Client, []string{b, folderKey}, service.GetMinIOWebhookARN(), false)
+				}
 				if err != nil && isUpdate {
 					continue
 				} else {
@@ -483,7 +710,10 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		path := strings.Trim(out.Path, " /")
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
-		folderKey := fmt.Sprintf("%s/", splitPath[1])
+		folderKey := ""
+		if len(splitPath) > 1 && strings.TrimSpace(splitPath[1]) != "" {
+			folderKey = fmt.Sprintf("%s/", splitPath[1])
+		}
 
 		switch provName {
 		case types.MinIOName, types.S3Name:
@@ -547,6 +777,9 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	}
 
 	if service.Mount.Provider != "" {
+		if resources.ValidateMountOpts(service.Mount.Options) == "" && service.Mount.Options != "" {
+			return nil, fmt.Errorf("mount options contain invalid characters")
+		}
 		provID, provName = getProviderInfo(service.Mount.Provider)
 		if provName == types.MinIOName {
 			// Check if the provider identifier is defined in StorageProviders
@@ -654,6 +887,46 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	return minIOBuckets, nil
 }
 
+func collectMinIOBucketCandidates(service *types.Service) []string {
+	buckets := map[string]struct{}{}
+	addPathBucket := func(path string) {
+		path = strings.Trim(path, " /")
+		if path == "" {
+			return
+		}
+		splitPath := strings.SplitN(path, "/", 2)
+		if splitPath[0] != "" {
+			buckets[splitPath[0]] = struct{}{}
+		}
+	}
+	for _, in := range service.Input {
+		_, provName := getProviderInfo(in.Provider)
+		if provName == types.MinIOName {
+			addPathBucket(in.Path)
+		}
+	}
+	for _, out := range service.Output {
+		_, provName := getProviderInfo(out.Provider)
+		if provName == types.MinIOName {
+			addPathBucket(out.Path)
+		}
+	}
+	provID, provName := getProviderInfo(service.Mount.Provider)
+	if provName == types.MinIOName && provID == types.DefaultProvider {
+		addPathBucket(service.Mount.Path)
+	}
+	for _, bucket := range service.BucketList {
+		if strings.TrimSpace(bucket) != "" {
+			buckets[bucket] = struct{}{}
+		}
+	}
+	result := make([]string, 0, len(buckets))
+	for bucket := range buckets {
+		result = append(result, bucket)
+	}
+	return result
+}
+
 func isStorageProviderDefined(storageName string, storageID string, providers *types.StorageProviders) bool {
 	var ok = false
 	switch storageName {
@@ -725,4 +998,17 @@ func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider,
 	}
 
 	return minIOAdminClient.RestartServer()
+}
+
+func serviceWithSameNameExists(name string, back types.ServerlessBackend) (bool, error) {
+	services, err := back.ListServicesByName(name)
+	if err != nil {
+		// Check if error is caused because the service is not found
+		if k8sErrors.IsNotFound(err) || k8sErrors.IsGone(err) {
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+	return len(services) > 0, nil
 }

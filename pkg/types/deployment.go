@@ -23,9 +23,11 @@ const (
 	DeploymentStateReady       = "ready"
 	DeploymentStateDegraded    = "degraded"
 	DeploymentStateFailed      = "failed"
+	DeploymentStateStopped     = "stopped"
 	DeploymentStateUnavailable = "unavailable"
 
 	DeploymentResourceKindExposedService = "exposed_service"
+	DeploymentResourceKindKserveService  = "kserve_service"
 	DeploymentResourceKindKnativeService = "knative_service"
 	DeploymentResourceKindUnavailable    = "unavailable"
 )

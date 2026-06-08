@@ -6,13 +6,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 type kueueMock struct {
@@ -54,12 +55,14 @@ func newExposeService(name string, nodePort int32, setAuth bool) types.Service {
 		Expose: types.Expose{
 			MinScale:      1,
 			MaxScale:      3,
-			APIPort:       9090,
+			APIPort:       []int{9090},
 			CpuThreshold:  55,
-			NodePort:      nodePort,
 			SetAuth:       setAuth,
 			RewriteTarget: false,
 		},
+	}
+	if nodePort != 0 {
+		svc.Expose.NodePort = []int32{nodePort}
 	}
 	svc.Environment.Vars = map[string]string{}
 	svc.Environment.Secrets = map[string]string{}
@@ -145,6 +148,18 @@ func useFakeGatewayClient(t *testing.T) {
 	})
 }
 
+func useGatewayClient(t *testing.T, client dynamic.Interface) {
+	t.Helper()
+
+	gatewayClientsetProvider = func() (dynamic.Interface, error) {
+		return client, nil
+	}
+
+	t.Cleanup(func() {
+		gatewayClientsetProvider = getGatewayClientset
+	})
+}
+
 func TestCreateExposeWithIngressAndAuth(t *testing.T) {
 	mock := newKueueMock()
 	server := httptest.NewServer(mock)
@@ -154,7 +169,7 @@ func TestCreateExposeWithIngressAndAuth(t *testing.T) {
 	svc.Namespace = cfg.ServicesNamespace
 	client := fake.NewSimpleClientset()
 
-	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
+	if err := CreateExpose(&svc, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("CreateExpose returned error: %v", err)
 	}
 
@@ -200,7 +215,7 @@ func TestCreateExposeNodePort(t *testing.T) {
 	svc.Namespace = cfg.ServicesNamespace
 	client := fake.NewSimpleClientset()
 
-	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
+	if err := CreateExpose(&svc, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("CreateExpose returned error: %v", err)
 	}
 
@@ -213,7 +228,7 @@ func TestCreateExposeNodePort(t *testing.T) {
 		t.Fatalf("expected NodePort service, got %s", kubeSvc.Spec.Type)
 	}
 
-	if kubeSvc.Spec.Ports[0].NodePort != svc.Expose.NodePort {
+	if kubeSvc.Spec.Ports[0].NodePort != svc.Expose.NodePort[0] {
 		t.Fatalf("expected nodePort %d, got %d", svc.Expose.NodePort, kubeSvc.Spec.Ports[0].NodePort)
 	}
 
@@ -226,7 +241,7 @@ func TestCreateExposeHTTPRouteWithAuth(t *testing.T) {
 	useFakeGatewayClient(t)
 
 	cfg := newTestConfig()
-	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 	cfg.HTTPRouteGatewayName = "public-gateway"
 	cfg.HTTPRouteGatewayNamespace = "gateway-system"
 	cfg.IngressHost = "example.org"
@@ -235,7 +250,7 @@ func TestCreateExposeHTTPRouteWithAuth(t *testing.T) {
 	svc.Namespace = cfg.ServicesNamespace
 	client := fake.NewSimpleClientset()
 
-	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
+	if err := CreateExpose(&svc, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("CreateExpose returned error: %v", err)
 	}
 
@@ -268,14 +283,14 @@ func TestCreateExposeHTTPRouteWithoutAuth(t *testing.T) {
 	useFakeGatewayClient(t)
 
 	cfg := newTestConfig()
-	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 	cfg.HTTPRouteGatewayName = "public-gateway"
 
 	svc := newExposeService("httproute-no-auth", 0, false)
 	svc.Namespace = cfg.ServicesNamespace
 	client := fake.NewSimpleClientset()
 
-	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
+	if err := CreateExpose(&svc, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("CreateExpose returned error: %v", err)
 	}
 
@@ -302,7 +317,7 @@ func TestUpdateExposeTransitions(t *testing.T) {
 
 	ingressSvc := newExposeService("transition", 0, true)
 	ingressSvc.Namespace = cfg.ServicesNamespace
-	if err := CreateExpose(ingressSvc, ingressSvc.Namespace, client, cfg); err != nil {
+	if err := CreateExpose(&ingressSvc, ingressSvc.Namespace, client, cfg); err != nil {
 		t.Fatalf("failed to create ingress expose: %v", err)
 	}
 
@@ -351,7 +366,7 @@ func TestDeleteExposeRemovesResources(t *testing.T) {
 
 	svc := newExposeService("cleanup", 0, true)
 	svc.Namespace = cfg.ServicesNamespace
-	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
+	if err := CreateExpose(&svc, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("failed to create expose: %v", err)
 	}
 
@@ -386,7 +401,7 @@ func TestDeleteExposeIsIdempotent(t *testing.T) {
 
 	svc := newExposeService("cleanup-idempotent", 0, true)
 	svc.Namespace = cfg.ServicesNamespace
-	if err := CreateExpose(svc, svc.Namespace, client, cfg); err != nil {
+	if err := CreateExpose(&svc, svc.Namespace, client, cfg); err != nil {
 		t.Fatalf("failed to create expose: %v", err)
 	}
 
@@ -528,13 +543,13 @@ func TestGetProbePath(t *testing.T) {
 
 func TestRouteKindSelection(t *testing.T) {
 	cfgIngress := newTestConfig()
-	cfgIngress.ExposedServicesRouteKind = "ingress"
+	cfgIngress.ExposedServicesRouteKind = types.Ingress
 	if getRouteKind(cfgIngress) == routeKindHTTPRoute {
 		t.Fatalf("expected ingress route kind")
 	}
 
 	cfgHTTPRoute := newTestConfig()
-	cfgHTTPRoute.ExposedServicesRouteKind = "httproute"
+	cfgHTTPRoute.ExposedServicesRouteKind = types.HTTPROUTE
 	if getRouteKind(cfgHTTPRoute) != routeKindHTTPRoute {
 		t.Fatalf("expected httproute route kind")
 	}
@@ -542,7 +557,7 @@ func TestRouteKindSelection(t *testing.T) {
 
 func TestGetHTTPRouteSpec(t *testing.T) {
 	cfg := newTestConfig()
-	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 	cfg.IngressHost = "example.org"
 	cfg.HTTPRouteGatewayName = "public-gateway"
 	cfg.HTTPRouteGatewayNamespace = "gateway-system"
@@ -649,7 +664,7 @@ func TestGetHTTPRouteSpec(t *testing.T) {
 func TestValidateHTTPRouteConfig(t *testing.T) {
 	svc := newExposeService("validation", 0, false)
 	cfg := newTestConfig()
-	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 
 	if err := validateHTTPRouteConfig(svc, cfg); err == nil {
 		t.Fatalf("expected error when HTTPROUTE_GATEWAY_NAME is empty")
@@ -665,11 +680,22 @@ func TestValidateHTTPRouteConfig(t *testing.T) {
 	if err := validateHTTPRouteConfig(svc, cfg); err != nil {
 		t.Fatalf("expected valid config, got error: %v", err)
 	}
+
+	svc.Expose.SetAuth = true
+	svc.Expose.AuthType = "forward"
+	if err := validateHTTPRouteConfig(svc, cfg); err != nil {
+		t.Fatalf("expected forward auth_type to be valid, got: %v", err)
+	}
+
+	svc.Expose.AuthType = "unknown"
+	if err := validateHTTPRouteConfig(svc, cfg); err == nil {
+		t.Fatalf("expected invalid auth_type to fail")
+	}
 }
 
 func TestGetHTTPRouteSpecWithAuth(t *testing.T) {
 	cfg := newTestConfig()
-	cfg.ExposedServicesRouteKind = "httproute"
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 	cfg.HTTPRouteGatewayName = "public-gateway"
 
 	svc := newExposeService("http-route-auth", 0, true)
@@ -778,10 +804,81 @@ func TestGetTraefikCORSMiddlewareSpec(t *testing.T) {
 	}
 }
 
+func TestUpdateTraefikCORSMiddlewareSetsResourceVersion(t *testing.T) {
+	cfg := newTestConfig()
+	svc := newExposeService("cors-update-rv", 0, false)
+	namespace := cfg.ServicesNamespace
+
+	existing := getTraefikCORSMiddlewareSpec(svc, namespace, cfg)
+	existing.SetResourceVersion("42")
+
+	gatewayClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), existing)
+	gatewayClient.PrependReactor("update", "middlewares", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		updateAction, ok := action.(k8stesting.UpdateAction)
+		if !ok {
+			t.Fatalf("expected update action, got %T", action)
+		}
+
+		updatedObj, ok := updateAction.GetObject().(*unstructured.Unstructured)
+		if !ok {
+			t.Fatalf("expected unstructured object on update, got %T", updateAction.GetObject())
+		}
+
+		if updatedObj.GetResourceVersion() != "42" {
+			t.Fatalf("expected resourceVersion 42 on middleware update, got %q", updatedObj.GetResourceVersion())
+		}
+
+		return false, nil, nil
+	})
+
+	useGatewayClient(t, gatewayClient)
+
+	if err := updateTraefikCORSMiddleware(svc, namespace, cfg); err != nil {
+		t.Fatalf("updateTraefikCORSMiddleware returned error: %v", err)
+	}
+}
+
+func TestUpdateHTTPRouteSetsResourceVersion(t *testing.T) {
+	cfg := newTestConfig()
+	cfg.ExposedServicesRouteKind = routeKindHTTPRoute
+	cfg.HTTPRouteGatewayName = "public-gateway"
+
+	svc := newExposeService("httproute-update-rv", 0, false)
+	namespace := cfg.ServicesNamespace
+
+	existingRoute := getHTTPRouteSpec(svc, namespace, cfg)
+	existingRoute.SetResourceVersion("99")
+
+	gatewayClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), existingRoute)
+	gatewayClient.PrependReactor("update", "httproutes", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		updateAction, ok := action.(k8stesting.UpdateAction)
+		if !ok {
+			t.Fatalf("expected update action, got %T", action)
+		}
+
+		updatedObj, ok := updateAction.GetObject().(*unstructured.Unstructured)
+		if !ok {
+			t.Fatalf("expected unstructured object on update, got %T", updateAction.GetObject())
+		}
+
+		if updatedObj.GetResourceVersion() != "99" {
+			t.Fatalf("expected resourceVersion 99 on httproute update, got %q", updatedObj.GetResourceVersion())
+		}
+
+		return false, nil, nil
+	})
+
+	useGatewayClient(t, gatewayClient)
+
+	if err := updateHTTPRoute(svc, namespace, fake.NewSimpleClientset(), cfg); err != nil {
+		t.Fatalf("updateHTTPRoute returned error: %v", err)
+	}
+}
+
 func TestGetTraefikAuthMiddlewareSpec(t *testing.T) {
 	cfg := newTestConfig()
 	svc := newExposeService("auth-svc", 0, true)
-	middleware := getTraefikAuthMiddlewareSpec(svc, cfg.ServicesNamespace)
+	middleware := getTraefikAuthMiddlewareSpec(svc, cfg.ServicesNamespace, cfg)
 
 	if middleware.GetName() != getTraefikAuthMiddlewareName(svc.Name) {
 		t.Fatalf("expected middleware name %s, got %s", getTraefikAuthMiddlewareName(svc.Name), middleware.GetName())
@@ -797,6 +894,33 @@ func TestGetTraefikAuthMiddlewareSpec(t *testing.T) {
 	}
 }
 
+func TestGetTraefikAuthMiddlewareSpecForward(t *testing.T) {
+	cfg := newTestConfig()
+	svc := newExposeService("forward-auth-svc", 0, true)
+	svc.Expose.AuthType = "forward"
+
+	middleware := getTraefikAuthMiddlewareSpec(svc, cfg.ServicesNamespace, cfg)
+
+	address, found, err := unstructured.NestedString(middleware.Object, "spec", "forwardAuth", "address")
+	if err != nil || !found {
+		t.Fatalf("expected forwardAuth.address in middleware")
+	}
+
+	expectedAddress := "http://oscar.oscar.svc.cluster.local:8080/system/services/forward-auth-svc/auth"
+	if address != expectedAddress {
+		t.Fatalf("expected forwardAuth address %s, got %s", expectedAddress, address)
+	}
+
+	cookies, found, err := unstructured.NestedStringSlice(middleware.Object, "spec", "forwardAuth", "addAuthCookiesToResponse")
+	if err != nil || !found || len(cookies) != 1 {
+		t.Fatalf("expected one addAuthCookiesToResponse entry, got %v", cookies)
+	}
+
+	if cookies[0] != getServiceAuthCookieName(svc.Name) {
+		t.Fatalf("expected auth cookie %s, got %s", getServiceAuthCookieName(svc.Name), cookies[0])
+	}
+}
+
 func TestGetTraefikAuthSecretSpec(t *testing.T) {
 	cfg := newTestConfig()
 	svc := newExposeService("auth-secret-svc", 0, true)
@@ -809,5 +933,24 @@ func TestGetTraefikAuthSecretSpec(t *testing.T) {
 	users, ok := secret.StringData["users"]
 	if !ok || users == "" {
 		t.Fatalf("expected users entry in traefik auth secret")
+	}
+}
+
+func TestEnsureExposeAuthResourcesNoAuth(t *testing.T) {
+	svc := newExposeService("no-auth-svc", 0, false)
+	client := fake.NewSimpleClientset()
+	cfg := newTestConfig()
+
+	err := EnsureExposeAuthResources(svc, cfg.ServicesNamespace, client, cfg)
+	if err != nil {
+		t.Fatalf("expected no error when SetAuth is false, got: %v", err)
+	}
+}
+
+func TestGetKeyLabelApp(t *testing.T) {
+	got := GetKeyLabelApp("my-service")
+	want := "oscar-svc-exp-my-service"
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
 	}
 }

@@ -24,9 +24,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
-	"github.com/grycap/oscar/v3/pkg/utils/auth"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 )
 
 // MakeListHandler godoc
@@ -91,7 +91,7 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 						return
 					}
 				}
-				c.String(http.StatusInternalServerError, "Error reading buckets from user: ", uid)
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error reading buckets from user: %s", uid))
 				return
 			}
 		}
@@ -99,6 +99,11 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 		minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", err))
+			return
+		}
+		dataUsage, err := minIOAdminClient.GetDataUsageInfo()
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error getting MinIO data usage: %v", err))
 			return
 		}
 
@@ -129,13 +134,18 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 			// Remove owner from metadata as it is already included in the response
 			delete(metadata, "owner")
 
-			bucketsInfo = append(bucketsInfo, utils.MinIOBucket{
+			bucketInfo := utils.MinIOBucket{
 				BucketName:   path,
 				Visibility:   bucketVisibility,
 				Owner:        bowner,
 				AllowedUsers: allowedUsers,
 				Metadata:     metadata,
-			})
+			}
+			if err := minIOAdminClient.EnrichBucketQuotaAndUsage(&bucketInfo, dataUsage); err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error getting bucket quota or usage for bucket '%s': %v", path, err))
+				return
+			}
+			bucketsInfo = append(bucketsInfo, bucketInfo)
 		}
 		c.JSON(http.StatusOK, bucketsInfo)
 

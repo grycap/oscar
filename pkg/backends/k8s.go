@@ -24,10 +24,10 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
-	"github.com/grycap/oscar/v3/pkg/backends/resources"
-	"github.com/grycap/oscar/v3/pkg/imagepuller"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/backends/resources"
+	"github.com/grycap/oscar/v4/pkg/imagepuller"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -173,8 +173,8 @@ func (k *KubeBackend) CreateService(service types.Service) error {
 	}
 
 	//Create an expose service
-	if service.Expose.APIPort != 0 {
-		err = resources.CreateExpose(service, namespace, k.kubeClientset, k.config)
+	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 {
+		err = resources.CreateExpose(&service, namespace, k.kubeClientset, k.config)
 		if err != nil {
 			return err
 		}
@@ -281,10 +281,14 @@ func (k *KubeBackend) UpdateService(service types.Service) error {
 	}
 
 	// If the service is exposed update its configuration
-	if service.Expose.APIPort != 0 {
+	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 {
 		err = resources.UpdateExpose(service, namespace, k.kubeClientset, k.config)
 		if err != nil {
 			return err
+		}
+		err = updateServiceConfigMap(&service, namespace, k.kubeClientset)
+		if err != nil {
+			log.Printf("Warning: failed to update ConfigMap with runtime NodePorts: %v\n", err)
 		}
 	}
 
@@ -332,7 +336,7 @@ func (k *KubeBackend) DeleteService(service types.Service) error {
 	}
 
 	// If service is exposed delete the exposed k8s components
-	if service.Expose.APIPort != 0 {
+	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 {
 		if err := resources.DeleteExpose(name, namespace, k.kubeClientset, k.config); err != nil {
 			return fmt.Errorf("error deleting all associated kubernetes components of exposed service \"%s\": %v", name, err)
 		}
@@ -382,6 +386,16 @@ func GetExposedServiceDeployment(kubeClientset kubernetes.Interface, namespace, 
 func ListExposedServicePods(kubeClientset kubernetes.Interface, namespace, serviceName string) (*v1.PodList, error) {
 	return kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: string(resources.KeyLabelApp) + "=" + resources.GetKeyLabelApp(serviceName),
+	})
+}
+
+func GetKserveServiceDeployment(kubeClientset kubernetes.Interface, namespace, serviceName, kserveType string) (*appsv1.Deployment, error) {
+	return kubeClientset.AppsV1().Deployments(namespace).Get(context.TODO(), utils.GetKservePodAndDplName(serviceName, kserveType), metav1.GetOptions{})
+}
+
+func ListKserveServicePods(kubeClientset kubernetes.Interface, namespace, serviceName string) (*v1.PodList, error) {
+	return kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: utils.GetKserveLabelSelector(serviceName),
 	})
 }
 

@@ -30,16 +30,11 @@
 
 ## Change Scope & Discipline
 - Stay within the scope of the request; avoid opportunistic cleanup.
-<<<<<<< HEAD
 - If a refactor is needed, ask before doing it unless the change is trivial and
   isolated.
 - Do not alter public APIs or configuration formats unless explicitly requested.
   See `docs/api.md`, `docs/api.yaml`, and `docs/additional-config.md` for
   references.
-=======
-- If a refactor is needed, ask before doing it unless the change is trivial and isolated.
-- Do not alter public APIs or configuration formats unless explicitly requested. See `docs/api.md` and `docs/additional-config.md` for references.
->>>>>>> 5abfd0d733c0251f4fe405721f828c61444ca0a9
 
 ## Testing & Validation
 - You MUST run tests for touched Go packages when feasible (e.g., `go test
@@ -80,6 +75,9 @@ For docs-only changes, tests may be skipped but must be stated explicitly.
 - Tests cannot be run or consistently fail.
 
 ## Active Technologies
+- Go 1.25 + gin-gonic, client-go, metrics.k8s.io clien (001-metrics-collection)
+- N/A (aggregation from existing data sources) (001-metrics-collection)
+- Kubernetes API resources; output storage via MinIO/external providers (002-federation)
 - Go 1.25.0 + Gin HTTP server, Kubernetes client-go/api/apimachinery, existing
   OSCAR backend/resource packages (001-persistent-volumes)
 - Kubernetes PersistentVolumeClaim-backed workspace per service

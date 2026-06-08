@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/grycap/oscar/v3/pkg/testsupport"
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/testsupport"
+	"github.com/grycap/oscar/v4/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -101,6 +101,25 @@ func TestGetMultitenancyConfigFromContext(t *testing.T) {
 	if mcFromContext != mc {
 		t.Errorf("expected multitenancyConfig %v, got %v", mc, mcFromContext)
 	}
+}
+
+func TestGetUserNameFromContext(t *testing.T) {
+	t.Run("set", func(t *testing.T) {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Set("userName", "test-user")
+		userName := GetUserNameFromContext(c)
+		if userName != "test-user" {
+			t.Errorf("expected 'test-user', got '%s'", userName)
+		}
+	})
+
+	t.Run("not set", func(t *testing.T) {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		userName := GetUserNameFromContext(c)
+		if userName != "" {
+			t.Errorf("expected empty string, got '%s'", userName)
+		}
+	})
 }
 
 func TestCustomAuth(t *testing.T) {

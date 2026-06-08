@@ -118,3 +118,45 @@ func TestAddInitContainer(t *testing.T) {
 		t.Errorf("Unexpected init container volume mounts: %v", initContainer.VolumeMounts)
 	}
 }
+
+func TestIsInterLinkService(t *testing.T) {
+	tests := []struct {
+		name    string
+		service *Service
+		cfg     *Config
+		want    bool
+	}{
+		{
+			name:    "interlink not available, node name set",
+			service: &Service{InterLinkNodeName: "test-node"},
+			cfg:     &Config{InterLinkAvailable: false},
+			want:    false,
+		},
+		{
+			name:    "interlink available, node name empty",
+			service: &Service{},
+			cfg:     &Config{InterLinkAvailable: true},
+			want:    false,
+		},
+		{
+			name:    "interlink available, node name set",
+			service: &Service{InterLinkNodeName: "test-node"},
+			cfg:     &Config{InterLinkAvailable: true},
+			want:    true,
+		},
+		{
+			name:    "nil service",
+			service: nil,
+			cfg:     &Config{InterLinkAvailable: false},
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsInterLinkService(tt.service, tt.cfg); got != tt.want {
+				t.Errorf("IsInterLinkService() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

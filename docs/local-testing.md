@@ -61,6 +61,24 @@ To enable OIDC authentication support in the deployed OSCAR (disabled by default
 bash oscar/deploy/kind-deploy.sh --oidc
 ```
 
+To enable Kueue support for CPU and memory quotas in the deployed OSCAR
+(disabled by default), add:
+
+```sh
+bash oscar/deploy/kind-deploy.sh --kueue
+```
+
+To enable MinIO bucket quotas in the deployed OSCAR, add:
+
+```sh
+bash oscar/deploy/kind-deploy.sh --minio-quotas
+```
+
+This option deploys MinIO in a local erasure-coded layout with one replica and
+four PVC-backed drives, which is required by the MinIO bucket quota admin API.
+Without this option, the local deployment keeps the simpler standalone MinIO
+mode.
+
 ## Steps for manual local deployment
 
 If you want to do it manually you can follow the listed steps.
@@ -120,6 +138,19 @@ helm repo add minio https://charts.min.io
 helm install minio minio/minio --namespace minio --set rootUser=minio,\
 rootPassword=<MINIO_PASSWORD>,service.type=NodePort,service.nodePort=30300,\
 consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,\
+resources.requests.memory=512Mi,\
+environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 \
+ --create-namespace
+```
+
+If you need to test MinIO bucket quotas locally, deploy MinIO with one replica
+and four drives instead:
+
+```sh
+helm install minio minio/minio --namespace minio --set rootUser=minio,\
+rootPassword=<MINIO_PASSWORD>,service.type=NodePort,service.nodePort=30300,\
+consoleService.type=NodePort,consoleService.nodePort=30301,mode=distributed,\
+replicas=1,drivesPerNode=4,persistence.size=2Gi,\
 resources.requests.memory=512Mi,\
 environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 \
  --create-namespace

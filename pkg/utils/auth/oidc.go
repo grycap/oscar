@@ -28,8 +28,8 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/grycap/oscar/v3/pkg/types"
-	"github.com/grycap/oscar/v3/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
 	"golang.org/x/oauth2"
 	"k8s.io/client-go/kubernetes"
 )
@@ -183,8 +183,13 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 		if err := utils.CreateKueueUserQueuesIfDontExist(cfg, uid); err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating Kueue ClusterQueue for user %s: %v", uid, err))
 		}
+		namespace := utils.BuildUserNamespace(cfg, uid)
+		// Ensure Volume Quotas for the user
+		if _, err := utils.CreateMinIOQuotaConfigMapIfDontExist(c.Request.Context(), cfg, kubeClientset, namespace); err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating Kueue ClusterQueue for user %s: %v", uid, err))
+		}
 
-		utils.EnsureVolumeLimits(FormatUID(uid), utils.BuildUserNamespace(cfg, uid), kubeClientset, cfg)
+		utils.EnsureVolumeLimits(FormatUID(uid), namespace, kubeClientset, cfg)
 
 		c.Set("uidOrigin", uid)
 		c.Set("userName", ui.Name)

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/grycap/oscar/v3/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -169,5 +169,95 @@ func TestListManagedVolumesAndAttachments(t *testing.T) {
 	}
 	if references[0].ServiceName != "consumer" || references[0].MountPath != "/data" {
 		t.Fatalf("unexpected attachment reference: %+v", references[0])
+	}
+}
+
+func TestGetManagedVolume(t *testing.T) {
+	client := fake.NewSimpleClientset(&v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-vol",
+			Namespace: "default",
+			Labels: map[string]string{
+				types.ManagedVolumeLabel:                 "true",
+				types.ManagedVolumeNameLabel:             "test-vol",
+				types.ManagedVolumeCreationModeLabel:     types.VolumeCreationModeService,
+				types.ManagedVolumeCreatedByServiceLabel: "creator",
+				types.ManagedVolumeLifecyclePolicyLabel:  types.VolumeLifecycleRetain,
+			},
+			Annotations: map[string]string{
+				"oscar.grycap/owner-user": "owner",
+			},
+		},
+	})
+
+	vol, err := GetManagedVolume(context.Background(), client, "default", "test-vol")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if vol.Name != "test-vol" {
+		t.Fatalf("expected volume name test-vol, got %s", vol.Name)
+	}
+}
+
+func TestGetManagedVolumeNotFound(t *testing.T) {
+	client := fake.NewSimpleClientset()
+
+	_, err := GetManagedVolume(context.Background(), client, "default", "non-existent")
+	if err == nil {
+		t.Fatal("expected error for non-existent volume, got nil")
+	}
+}
+
+func TestDeleteManagedVolume(t *testing.T) {
+	client := fake.NewSimpleClientset(&v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-vol",
+			Namespace: "default",
+		},
+	})
+
+	if err := DeleteManagedVolume(context.Background(), client, "default", "test-vol", true); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if _, err := client.CoreV1().PersistentVolumeClaims("default").Get(context.Background(), "test-vol", metav1.GetOptions{}); err == nil {
+		t.Fatal("expected PVC to be deleted")
+	}
+}
+
+func TestDeleteManagedVolumeForceFalseWithAttachments(t *testing.T) {
+	client := fake.NewSimpleClientset(
+		&v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "shared-vol",
+				Namespace: "default",
+				Labels: map[string]string{
+					types.ManagedVolumeLabel:     "true",
+					types.ManagedVolumeNameLabel: "shared-vol",
+				},
+			},
+		},
+		&v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "consumer",
+				Namespace: "default",
+			},
+			Data: map[string]string{
+				types.FDLFileName: "name: consumer\nvolume:\n  name: shared-vol\n  mount_path: /data\n",
+			},
+		},
+	)
+
+	err := DeleteManagedVolume(context.Background(), client, "default", "shared-vol", false)
+	if err != ErrManagedVolumeAttached {
+		t.Fatalf("expected ErrManagedVolumeAttached, got: %v", err)
+	}
+}
+
+func TestDeleteManagedVolumeNotFound(t *testing.T) {
+	client := fake.NewSimpleClientset()
+
+	if err := DeleteManagedVolume(context.Background(), client, "default", "non-existent", true); err != nil {
+		t.Fatalf("expected no error deleting non-existent volume, got: %v", err)
 	}
 }
