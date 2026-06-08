@@ -45,6 +45,7 @@ var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
 // @Tags services
 // @Produce json
 // @Param serviceName path string true "Service name"
+// @Param namespace query string false "Namespace (admin only - if omitted searches across all namespaces)"
 // @Success 204 {string} string "No Content"
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 403 {string} string "Forbidden"
@@ -58,6 +59,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// First get the Service
 		var service *types.Service
 		var uid string
+		var namespace string
 		var err error
 		serviceName := c.Param("serviceName")
 		authHeader := c.GetHeader("Authorization")
@@ -70,8 +72,12 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				return
 			}
 		}
-
-		service, err = back.ReadService(utils.BuildUserNamespace(cfg, uid), serviceName)
+		if isOIDC {
+			namespace = utils.BuildUserNamespace(cfg, uid)
+		} else {
+			namespace = c.Query("namespace")
+		}
+		service, err = back.ReadService(namespace, serviceName)
 		if err != nil {
 			if errors.IsNotFound(err) || errors.IsGone(err) {
 				c.Status(http.StatusNotFound)
