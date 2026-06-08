@@ -308,8 +308,16 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				} else {
 					c.String(http.StatusConflict, "A service with the provided name already exists")
 				}
-			} else if k8sErrors.IsNotFound(err) && service.Volume != nil && !service.CreatesManagedVolume() {
-				c.String(http.StatusBadRequest, "Referenced volume does not exist in the caller namespace")
+			} else if k8sErrors.IsNotFound(err) && service.Volume != nil {
+				if service.CreatesManagedVolume() {
+					errDelete := back.DeleteService(service)
+					if errDelete != nil {
+						log.Printf("Error deleting service: %v\n", errDelete)
+					}
+					c.String(http.StatusBadRequest, "Referenced volume size is not defined: Please add the volume size in service definition")
+				} else {
+					c.String(http.StatusBadRequest, "Referenced volume does not exist in the caller namespace")
+				}
 			} else {
 				errDelete := back.DeleteService(service)
 				if errDelete != nil {
