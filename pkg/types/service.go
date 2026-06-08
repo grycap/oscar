@@ -665,6 +665,7 @@ func CreateResources(service *Service) (v1.ResourceRequirements, error) {
 		resources.Limits[v1.ResourceMemory] = memory
 	}
 
+	// Include ephemeral storage request so Kueue can enforce per-user quotas.
 	if len(service.EphemeralStorageRequest) > 0 {
 		ephemeral, err := resource.ParseQuantity(service.EphemeralStorageRequest)
 		if err != nil {
