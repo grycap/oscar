@@ -9,8 +9,8 @@ vLLM on CPU, and an OCI modelcar image that contains the
 | File | Description |
 |---|---|
 | `fdl.yaml` | OSCAR service definition with a KServe `llm_inference` block. |
-| `Dockerfile.vllm` | vLLM CPU runtime wrapper with user `uid=1010` for KServe modelcar compatibility. |
-| `Dockerfile.model` | Modelcar image that downloads the model from Hugging Face. |
+| `docker/Dockerfile.vllm` | vLLM CPU runtime wrapper with user `uid=1010` for KServe modelcar compatibility. |
+| `docker/Dockerfile.model` | Modelcar image that downloads the model from Hugging Face. |
 
 ## Requirements
 
@@ -33,24 +33,41 @@ The service name in this example is `qwen2-5-05b-instruct`.
 
 ## 2. Test the OpenAI-compatible endpoint
 
-Once the service is ready, the model will be exposed on `https://<YOUR_CLUSTER>/system/services/<SERVICE_NAME>/models` and you can send a chat request:
+Once the service is ready, the model will be exposed on `https://<YOUR_CLUSTER>/system/services/<SERVICE_NAME>/models` and you can test your service in different ways:
 
-```bash
-curl -X POST "https://<YOUR_CLUSTER>/system/services/qwen2-5-05b-instruct/models/v1/chat/completions" \
-	-H "Content-Type: application/json" \
-	-H "Authorization: Bearer <TOKEN>" \
-	--data '{
-		"model": "qwen2-5-05b-instruct",
-		"messages": [
-			{
-				"role": "user",
-				"content": "Write a short explanation about KServe"
-			}
-		]
-	}'
-```
+### Direct request with `curl`
 
-> Note: If there is only one model, it will have the same name as the OSCAR service.
+1. Open a terminal and try:
+
+    ```bash
+    curl -X POST "https://<YOUR_CLUSTER>/system/services/qwen2-5-05b-instruct/models/v1/chat/completions" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer <TOKEN>" \
+        --data '{
+            "model": "qwen2-5-05b-instruct",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Write a short explanation about KServe"
+                }
+            ]
+        }'
+    ```
+    > Replace `<TOKEN>` with your service token or four personal OIDC token.  
+    
+    > Note: If there is only one model, it will have the same name as the OSCAR service.
+
+### Through Open WebUI
+
+1. Install [Docker](https://www.docker.com)
+2. Run Open WebUI:
+    ```bash
+    docker run -d -p 3000:8080 -e WEBUI_AUTH=False -v open-webui:/app/backend/data --name open-webui ghcr.io/open-webui/open-webui:main
+    ```
+3. Go to [http://localhost:3000/](http://localhost:3000/)
+4. Add a connection to the service:  
+    `Top right corner → Admin Panel → Settings → Connections → OpenAI API`
+5. Try it
 
 ## Build the images
 
@@ -74,3 +91,11 @@ the commands above and in `fdl.yaml` (`runtime_image` and `storage_uri`).
 - The first startup can take several minutes (model download and pod rollout).
 - The current example defines modest resources (`cpu: 2`, `memory: 6Gi`); adjust them for your cluster.
 - `fdl.yaml` uses `--dtype=auto` and `--enforce-eager` for more stable CPU execution.
+
+## Additional Resources
+
+- [vLLM Documentation](https://docs.vllm.ai/en/latest/)
+- [OSCAR Documentation](https://docs.oscar.grycap.net/)
+- [KServe](https://kserve.github.io/website/)
+- [API](https://docs.oscar.grycap.net/latest/api/)
+- [OSCAR CLI](https://github.com/grycap/oscar-cli)
