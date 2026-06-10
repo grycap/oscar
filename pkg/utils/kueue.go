@@ -169,7 +169,7 @@ func ensureClusterQueue(ctx context.Context, kueueClient *kueueclientset.Clients
 			},
 			ResourceGroups: []kueuev1.ResourceGroup{
 				{
-					CoveredResources: []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourceName("nvidia.com/gpu"), v1.ResourceEphemeralStorage},
+					CoveredResources: []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage, v1.ResourceName("nvidia.com/gpu")},
 					Flavors: []kueuev1.FlavorQuotas{
 						{
 							Name: kueuev1.ResourceFlavorReference(flavorName),
