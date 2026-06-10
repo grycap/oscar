@@ -127,7 +127,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 	}
 	var isKserve bool = isKserveServiceAndSupported(&service, kn)
 
-	if isKserve {
+	if isKserve && service.Kserve.Type == utils.KserveTypeInferenceService {
 		if err := utils.ValidateKserveService(&service); err != nil {
 			return err
 		}
@@ -160,6 +160,24 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 {
 		err = resources.CreateExpose(&service, namespace, kn.kubeClientset, kn.config)
 		if err != nil {
+			return err
+		}
+	} else if !types.IsInterLinkService(&service, kn.config) && isKserve && service.Kserve.Type == utils.KserveTypeLLMInferenceService {
+		// The Kserve service set an OwnerReference to the Knative service, so if the Knative service is deleted the KServe InferenceService will be automatically deleted by Kubernetes garbage collection
+		err := utils.CreateKserveService(&service, nil, kn.config)
+		if err != nil {
+			if knSvcDelErr := kn.knClientset.ServingV1().Services(namespace).Delete(context.TODO(), service.Name, metav1.DeleteOptions{}); knSvcDelErr != nil {
+				log.Println(knSvcDelErr.Error())
+			}
+			if delErr := deleteServiceConfigMap(service.Name, namespace, kn.kubeClientset); delErr != nil {
+				log.Println(delErr.Error())
+			}
+			if utils.SecretExists(service.Name, namespace, kn.kubeClientset) {
+				secretsErr := utils.DeleteSecret(service.Name, namespace, kn.kubeClientset)
+				if secretsErr != nil {
+					log.Printf("Error deleting associated secret: %v", secretsErr)
+				}
+			}
 			return err
 		}
 	} else if !types.IsInterLinkService(&service, kn.config) {

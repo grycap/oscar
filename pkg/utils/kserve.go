@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/foomo/htpasswd"
@@ -17,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8sTypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	knv1 "knative.dev/serving/pkg/apis/serving/v1"
@@ -56,6 +56,12 @@ var (
 	defaultKserveCpuRequest    = resource.MustParse("0.2")
 	defaultKserveMemoryRequest = resource.MustParse("256Mi")
 )
+
+type KserveServiceOwner struct {
+	Name      string
+	Namespace string
+	UID       k8sTypes.UID
+}
 
 type dynamicClientFactory func() (*dynamic.DynamicClient, error)
 
@@ -128,44 +134,50 @@ func CreateKserveService(service *types.Service, knativeService *knv1.Service, c
 		return err
 	}
 
-	ok, err := existsKserveHTTPRouteByServiceName(service.Name, service.Namespace)
-	if err != nil {
-		return fmt.Errorf("failed to check HTTPRoute availability for service %s: %v", service.Name, err)
-	}
-	if ok {
-		return fmt.Errorf("HTTPRoute for service %s already taken, change the service name", service.Name)
-	}
-
 	dynClient, err := getDynamicClient()
 	if err != nil {
 		return fmt.Errorf("failed to create dynamic client: %v", err)
 	}
 	//kserveLogger.Printf("Creating KServe service '%s' for user '%s' with model format %s", service.Name, service.Owner, service.Kserve.ModelFormat)
 
+	var kserveSvc *unstructured.Unstructured
 	if service.Kserve.Type == KserveTypeLLMInferenceService {
 		// For LLM services, we use a different InferenceService definition (LLMInferenceService)
-		llmIsvc, err := NewKserveLLMInferenceServiceDefinition(service, knativeService, cfg)
+		llmIsvc, err := NewKserveLLMInferenceServiceSpec(service, nil, cfg)
 		if err != nil {
 			return err
 		}
 
-		_, err = dynClient.Resource(llmInferenceServiceGVR).Namespace(knativeService.Namespace).Create(context.Background(), llmIsvc, metav1.CreateOptions{})
+		kserveSvc, err = dynClient.Resource(llmInferenceServiceGVR).Namespace(knativeService.Namespace).Create(context.Background(), llmIsvc, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to create InferenceService: %v", err)
 		}
-		return nil
+	} else if service.Kserve.Type != KserveTypeInferenceService && knativeService != nil {
+		var owner *KserveServiceOwner = &KserveServiceOwner{
+			Name:      knativeService.GetName(),
+			Namespace: knativeService.GetNamespace(),
+			UID:       knativeService.GetUID(),
+		}
+		rawIsvc, err := NewKserveInferenceServiceSpec(service, owner, cfg)
+		if err != nil {
+			return err
+		}
+
+		kserveSvc, err = dynClient.Resource(kserveIsvcGVR).Namespace(knativeService.Namespace).Create(context.Background(), rawIsvc, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to create InferenceService: %v", err)
+		}
+	} else {
+		return fmt.Errorf("unsupported KServe service type: %s", service.Kserve.Type)
 	}
 
-	rawIsvc, err := NewKserveInferenceServiceDefinition(service, knativeService, cfg)
-	if err != nil {
-		return err
-	}
-	_, err = dynClient.Resource(kserveIsvcGVR).Namespace(knativeService.Namespace).Create(context.Background(), rawIsvc, metav1.CreateOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to create InferenceService: %v", err)
+	var kserveSvcOwner *KserveServiceOwner = &KserveServiceOwner{
+		Name:      kserveSvc.GetName(),
+		Namespace: kserveSvc.GetNamespace(),
+		UID:       kserveSvc.GetUID(),
 	}
 
-	err = exposeKserveInferenceService(service, knativeService, cfg)
+	err = exposeKserveInferenceService(service, kserveSvcOwner, cfg)
 	if err != nil {
 		// If exposing the service fails, delete the created InferenceService to avoid orphaned resources
 		deleteErr := DeleteKserveInferenceService(service.Name, service.Namespace)
@@ -197,7 +209,7 @@ func UpdateKserveService(service *types.Service, oldService *types.Service, name
 		if err != nil {
 			return fmt.Errorf("failed to get LLMInferenceService: %v", err)
 		}
-		updatedLLMIsvc, err := UpdateKserveLLMInferenceServiceDefinition(service, oldLLMIsvc)
+		updatedLLMIsvc, err := UpdateKserveLLMInferenceServiceSpec(service, oldLLMIsvc)
 		if err != nil {
 			return err
 		}
@@ -215,7 +227,7 @@ func UpdateKserveService(service *types.Service, oldService *types.Service, name
 		return fmt.Errorf("failed to get InferenceService: %v", err)
 	}
 
-	updatedIsvc, err := UpdateKserveInferenceServiceDefinition(service, oldIsvc)
+	updatedIsvc, err := UpdateKserveInferenceServiceSpec(service, oldIsvc)
 	if err != nil {
 		return err
 	}
@@ -227,10 +239,10 @@ func UpdateKserveService(service *types.Service, oldService *types.Service, name
 	return nil
 }
 
-// NewKserveInferenceServiceDefinition builds an unstructured InferenceService
+// NewKserveInferenceServiceSpec builds an unstructured InferenceService
 // (serving.kserve.io/v1beta1) suitable for use with a dynamic Kubernetes client.
-// It is functionally equivalent to NewKserveInferenceServiceDefinition.
-func NewKserveInferenceServiceDefinition(service *types.Service, knSvc *knv1.Service, cfg *types.Config) (*unstructured.Unstructured, error) {
+// It is functionally equivalent to NewKserveInferenceServiceSpec.
+func NewKserveInferenceServiceSpec(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (*unstructured.Unstructured, error) {
 	if err := ValidateKserveService(service); err != nil {
 		return nil, err
 	}
@@ -287,8 +299,8 @@ func NewKserveInferenceServiceDefinition(service *types.Service, knSvc *knv1.Ser
 		"kind":       "InferenceService",
 		"metadata": map[string]any{
 			"name":            buildKserveName(service.Name),
-			"namespace":       knSvc.Namespace,
-			"ownerReferences": getOwnerReference(knSvc),
+			"namespace":       owner.Namespace,
+			"ownerReferences": getOwnerReference(owner),
 			"labels":          labels,
 		},
 		"spec": map[string]any{
@@ -297,9 +309,9 @@ func NewKserveInferenceServiceDefinition(service *types.Service, knSvc *knv1.Ser
 	}}, nil
 }
 
-// UpdateKserveInferenceServiceDefinition updates the spec fields of an existing
+// UpdateKserveInferenceServiceSpec updates the spec fields of an existing
 // unstructured InferenceService object in place, preserving metadata (including resourceVersion).
-func UpdateKserveInferenceServiceDefinition(service *types.Service, oldIsvc *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func UpdateKserveInferenceServiceSpec(service *types.Service, oldIsvc *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	if err := ValidateKserveService(service); err != nil {
 		return nil, err
 	}
@@ -375,7 +387,7 @@ func DeleteKserveInferenceService(serviceName, namespace string) error {
 	return nil
 }
 
-func NewKserveLLMInferenceServiceDefinition(service *types.Service, knSvc *knv1.Service, cfg *types.Config) (*unstructured.Unstructured, error) {
+func NewKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (*unstructured.Unstructured, error) {
 	if err := ValidateKserveService(service); err != nil {
 		return nil, err
 	}
@@ -388,9 +400,6 @@ func NewKserveLLMInferenceServiceDefinition(service *types.Service, knSvc *knv1.
 		runtimeImage = service.Kserve.LLMInference.RuntimeImage
 	}
 
-	// TO DO: consider if we want to inject root path for LLM services as well, and if so, how to handle the case when the framework is vllm that expects the prefix to be preserved for routing
-	//injectRootPath(service)
-
 	// Build container spec
 	container := map[string]any{
 		"name":  "main",
@@ -399,6 +408,7 @@ func NewKserveLLMInferenceServiceDefinition(service *types.Service, knSvc *knv1.
 			"runAsNonRoot": false,
 		},
 	}
+
 	resources, err := createKserveResources(service.Kserve)
 	if err != nil {
 		return nil, err
@@ -409,10 +419,10 @@ func NewKserveLLMInferenceServiceDefinition(service *types.Service, knSvc *knv1.
 
 	minScale, _ := normalizeScaleFromKserveService(service.Kserve)
 
-	router, err := buildKserveLLMServiceRouter(service, knSvc, cfg)
-	if err != nil {
-		return nil, err
-	}
+	/*	router, err := buildKserveLLMServiceRouter(service, owner, cfg)
+		if err != nil {
+			return nil, err
+		}*/
 
 	labels := map[string]any{
 		kserveKeyLabelApp:           prefixLabelApp + service.Name,
@@ -432,9 +442,9 @@ func NewKserveLLMInferenceServiceDefinition(service *types.Service, knSvc *knv1.
 		"apiVersion": llmInferenceServiceGVR.Group + "/" + llmInferenceServiceGVR.Version,
 		"kind":       "LLMInferenceService",
 		"metadata": map[string]any{
-			"name":            buildKserveName(service.Name),
-			"namespace":       knSvc.Namespace,
-			"ownerReferences": getOwnerReference(knSvc),
+			"name":      buildKserveName(service.Name),
+			"namespace": owner.Namespace,
+			//"ownerReferences": getOwnerReference(owner),
 		},
 		"spec": map[string]any{
 			"model": map[string]any{
@@ -446,14 +456,14 @@ func NewKserveLLMInferenceServiceDefinition(service *types.Service, knSvc *knv1.
 			"template": map[string]any{
 				"containers": []any{container},
 			},
-			"router": router,
+			//"router": router,
 		},
 	}}, nil
 }
 
-// UpdateKserveLLMInferenceServiceDefinition updates the spec fields of an existing
+// UpdateKserveLLMInferenceServiceSpec updates the spec fields of an existing
 // unstructured LLMInferenceService object in place, preserving metadata (including resourceVersion).
-func UpdateKserveLLMInferenceServiceDefinition(service *types.Service, oldLLMIsvc *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func UpdateKserveLLMInferenceServiceSpec(service *types.Service, oldLLMIsvc *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	if err := ValidateKserveService(service); err != nil {
 		return nil, err
 	}
@@ -536,30 +546,6 @@ func GetKservePodAndDplName(serviceName, kserveType string) string {
 	}
 }
 
-func exposeKserveInferenceService(service *types.Service, knSvc *knv1.Service, cfg *types.Config) error {
-	gatewayClientset, err := getDynamicClient()
-	if err != nil {
-		return fmt.Errorf("failed to create dynamic client: %v", err)
-	}
-
-	if service.Kserve.SetAuth {
-		// TO DO: Create OIDC forwardAuth Traefik Middleware
-		//err = createTraefikAuthMiddleware(gatewayClientset, service, knSvc)
-		err = createTraefikOIDCMiddleware(gatewayClientset, service, knSvc, cfg)
-		if err != nil {
-			return fmt.Errorf("failed to create Auth middleware: %v", err)
-		}
-
-	}
-
-	// Create HTTPRoute
-	if err = createHTTPRoute(gatewayClientset, service, knSvc, cfg); err != nil {
-		return fmt.Errorf("failed to create HTTPRoute: %v", err)
-	}
-
-	return nil
-}
-
 func CheckKserveUpdate(oldService *types.Service, newService *types.Service) error {
 	if oldService.Token != newService.Token {
 		return fmt.Errorf("unexpected error")
@@ -631,18 +617,60 @@ func buildKserveName(serviceName string) string {
 	return serviceName
 }
 
+func getHTTPRouteName(serviceName string) string {
+	return serviceName + "-route"
+}
+
+func getTraefikCORSMiddlewareName(serviceName string) string {
+	return serviceName + "-cors-mdw"
+}
+
+func exposeKserveInferenceService(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) error {
+	gatewayClientset, err := getDynamicClient()
+	if err != nil {
+		return fmt.Errorf("failed to create dynamic client: %v", err)
+	}
+
+	if service.Kserve.SetAuth {
+		// TO DO: Create OIDC forwardAuth Traefik Middleware
+		//err = createTraefikAuthMiddleware(gatewayClientset, service, knSvc)
+		err = createTraefikOIDCMiddleware(gatewayClientset, service, owner, cfg)
+		if err != nil {
+			return fmt.Errorf("failed to create Auth middleware: %v", err)
+		}
+
+	}
+
+	// Create HTTPRoute
+	if err = createHTTPRoute(gatewayClientset, service, owner, cfg); err != nil {
+		return fmt.Errorf("failed to create HTTPRoute: %v", err)
+	}
+
+	return nil
+}
+
 // createTraefikOIDCMiddleware creates a Traefik Middleware of type ForwardAuth for OIDC authentication,
 // which will be used in the HTTPRoute to protect the KServe service.
 // TO DO: change implementation when decided how to handle authentication for KServe services
-func createTraefikOIDCMiddleware(gatewayClientset dynamic.Interface, service *types.Service, knSvc *knv1.Service, cfg *types.Config) error {
+func createTraefikOIDCMiddleware(gatewayClientset dynamic.Interface, service *types.Service, owner *KserveServiceOwner, cfg *types.Config) error {
+	middleware := buildTraefikOIDCMiddlewareSpec(service, owner, cfg)
+
+	_, err := gatewayClientset.Resource(kserveTraefikMiddlewareGVR).Namespace(owner.Namespace).Create(context.Background(), middleware, metav1.CreateOptions{})
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create OIDC middleware: %v", err)
+	}
+	return nil
+}
+
+func buildTraefikOIDCMiddlewareSpec(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) *unstructured.Unstructured {
 	authEndpointAddress := fmt.Sprintf("http://%s.%s.svc.cluster.local:%d/system/services/%s/auth", cfg.Name, cfg.Namespace, cfg.ServicePort, service.Name)
-	middleware := &unstructured.Unstructured{Object: map[string]any{
+	return &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "traefik.io/v1alpha1",
 		"kind":       "Middleware",
 		"metadata": map[string]any{
-			"name":            getTraefikAuthMiddlewareName(knSvc.Name),
-			"namespace":       knSvc.Namespace,
-			"ownerReferences": getOwnerReference(knSvc),
+			"name":            getTraefikAuthMiddlewareName(owner.Name),
+			"namespace":       owner.Namespace,
+			"ownerReferences": getOwnerReference(owner),
 		},
 		"spec": map[string]any{
 			"forwardAuth": map[string]any{
@@ -651,27 +679,31 @@ func createTraefikOIDCMiddleware(gatewayClientset dynamic.Interface, service *ty
 			},
 		},
 	}}
-
-	_, err := gatewayClientset.Resource(kserveTraefikMiddlewareGVR).Namespace(knSvc.Namespace).Create(context.Background(), middleware, metav1.CreateOptions{})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return fmt.Errorf("failed to create OIDC middleware: %v", err)
-	}
-	return nil
 }
 
-func createTraefikAuthMiddleware(gatewayClientset dynamic.Interface, service *types.Service, knSvc *knv1.Service) error {
-	err := createTraefikAuthSecret(gatewayClientset, service, knSvc)
+func createTraefikAuthMiddleware(gatewayClientset dynamic.Interface, service *types.Service, owner *KserveServiceOwner) error {
+	err := createTraefikAuthSecret(gatewayClientset, service, owner)
 	if err != nil {
 		return fmt.Errorf("failed to create auth secret: %v", err)
 	}
 
-	middleware := &unstructured.Unstructured{Object: map[string]any{
+	middleware := buildTraefikAuthMiddlewareSpec(service, owner)
+
+	_, err = gatewayClientset.Resource(kserveTraefikMiddlewareGVR).Namespace(owner.Namespace).Create(context.TODO(), middleware, metav1.CreateOptions{})
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create basic auth middleware: %v", err)
+	}
+	return nil
+}
+
+func buildTraefikAuthMiddlewareSpec(service *types.Service, owner *KserveServiceOwner) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "traefik.io/v1alpha1",
 		"kind":       "Middleware",
 		"metadata": map[string]any{
 			"name":            getTraefikAuthMiddlewareName(service.Name),
-			"namespace":       knSvc.Namespace,
-			"ownerReferences": getOwnerReference(knSvc),
+			"namespace":       owner.Namespace,
+			"ownerReferences": getOwnerReference(owner),
 		},
 		"spec": map[string]any{
 			"basicAuth": map[string]any{
@@ -679,14 +711,9 @@ func createTraefikAuthMiddleware(gatewayClientset dynamic.Interface, service *ty
 			},
 		},
 	}}
-	_, err = gatewayClientset.Resource(kserveTraefikMiddlewareGVR).Namespace(knSvc.Namespace).Create(context.TODO(), middleware, metav1.CreateOptions{})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return fmt.Errorf("failed to create basic auth middleware: %v", err)
-	}
-	return nil
 }
 
-func createTraefikAuthSecret(gatewayClientset dynamic.Interface, service *types.Service, knSvc *knv1.Service) error {
+func createTraefikAuthSecret(gatewayClientset dynamic.Interface, service *types.Service, owner *KserveServiceOwner) error {
 	hash := make(htpasswd.HashedPasswords)
 	err := hash.SetPassword(service.Name, service.Token, htpasswd.HashAPR1)
 	if err != nil {
@@ -694,13 +721,20 @@ func createTraefikAuthSecret(gatewayClientset dynamic.Interface, service *types.
 		return fmt.Errorf("failed to hash password: %v", err)
 	}
 
-	secret := &unstructured.Unstructured{Object: map[string]any{
+	secret := buildTraefikAuthSecretSpec(service, owner, hash)
+
+	_, err = gatewayClientset.Resource(kserveSecretGVR).Namespace(owner.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	return err
+}
+
+func buildTraefikAuthSecretSpec(service *types.Service, owner *KserveServiceOwner, hash htpasswd.HashedPasswords) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "Secret",
 		"metadata": map[string]any{
 			"name":            getTraefikAuthSecretName(service.Name),
-			"namespace":       knSvc.Namespace,
-			"ownerReferences": getOwnerReference(knSvc),
+			"namespace":       owner.Namespace,
+			"ownerReferences": getOwnerReference(owner),
 		},
 		"immutable": true,
 		"stringData": map[string]any{
@@ -708,16 +742,6 @@ func createTraefikAuthSecret(gatewayClientset dynamic.Interface, service *types.
 		},
 		"type": "Opaque",
 	}}
-	_, err = gatewayClientset.Resource(kserveSecretGVR).Namespace(knSvc.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
-	return err
-}
-
-func getHTTPRouteName(serviceName string) string {
-	return serviceName + "-route"
-}
-
-func getTraefikCORSMiddlewareName(serviceName string) string {
-	return serviceName + "-cors-mdw"
 }
 
 func getTraefikAuthMiddlewareName(serviceName string) string {
@@ -729,24 +753,35 @@ func getTraefikAuthSecretName(serviceName string) string {
 }
 
 // createHTTPRoute creates a Gateway API HTTPRoute to expose the KServe InferenceService.
-func createHTTPRoute(gatewayClientset dynamic.Interface, service *types.Service, knSvc *knv1.Service, cfg *types.Config) error {
-	isvcName := service.Name
-	httpRouteName := isvcName + httpRouteSuffix
-	namespace := knSvc.Namespace
-	apiPath := getAPIPath(isvcName)
-	svcName := GetKserveSvcName(isvcName, service.Kserve.Type)
+func createHTTPRoute(gatewayClientset dynamic.Interface, service *types.Service, owner *KserveServiceOwner, cfg *types.Config) error {
+
 	gwName := strings.TrimSpace(cfg.HTTPRouteGatewayName)
 	gwNamespace := strings.TrimSpace(cfg.HTTPRouteGatewayNamespace)
 	if gwNamespace == "" || gwName == "" {
 		return fmt.Errorf("gateway namespace and name must be provided in config to create HTTPRoute for KServe service")
 	}
 
+	httpRoute := buildHTTPRouteSpec(service, owner, cfg)
+	_, err := gatewayClientset.Resource(kserveHTTPRouteGVR).Namespace(owner.Namespace).Create(context.Background(), httpRoute, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create HTTPRoute: %v", err)
+	}
+	return nil
+}
+
+func buildHTTPRouteSpec(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) *unstructured.Unstructured {
+	serviceName := service.Name
+	httpRouteName := serviceName + httpRouteSuffix
+	namespace := owner.Namespace
+	apiPath := getAPIPath(serviceName)
+	kserveSvcName := GetKserveSvcName(serviceName, service.Kserve.Type)
+
 	filters := []any{
 		map[string]any{
 			"type": "RequestHeaderModifier",
 			"requestHeaderModifier": map[string]any{
 				"set": []any{
-					map[string]any{"name": "KServe-Isvc-Name", "value": isvcName},
+					map[string]any{"name": "KServe-Isvc-Name", "value": serviceName},
 					map[string]any{"name": "KServe-Isvc-Namespace", "value": namespace},
 				},
 			},
@@ -787,7 +822,7 @@ func createHTTPRoute(gatewayClientset dynamic.Interface, service *types.Service,
 			map[string]any{
 				"group":     "",
 				"kind":      "Service",
-				"name":      svcName,
+				"name":      kserveSvcName,
 				"namespace": namespace,
 				"port":      int64(80),
 			},
@@ -805,27 +840,21 @@ func createHTTPRoute(gatewayClientset dynamic.Interface, service *types.Service,
 	parentRef := map[string]any{
 		"group":     "gateway.networking.k8s.io",
 		"kind":      "Gateway",
-		"name":      gwName,
-		"namespace": gwNamespace,
+		"name":      strings.TrimSpace(cfg.HTTPRouteGatewayName),
+		"namespace": strings.TrimSpace(cfg.HTTPRouteGatewayNamespace),
 	}
 	spec["parentRefs"] = []any{parentRef}
 
-	httpRoute := &unstructured.Unstructured{Object: map[string]any{
+	return &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "gateway.networking.k8s.io/v1",
 		"kind":       "HTTPRoute",
 		"metadata": map[string]any{
 			"name":            httpRouteName,
 			"namespace":       namespace,
-			"ownerReferences": getOwnerReference(knSvc),
+			"ownerReferences": getOwnerReference(owner),
 		},
 		"spec": spec,
 	}}
-
-	_, err := gatewayClientset.Resource(kserveHTTPRouteGVR).Namespace(namespace).Create(context.Background(), httpRoute, metav1.CreateOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to create HTTPRoute: %v", err)
-	}
-	return nil
 }
 
 func createKserveResources(service *types.Kserve) (v1.ResourceRequirements, error) {
@@ -870,7 +899,46 @@ func createKserveResources(service *types.Kserve) (v1.ResourceRequirements, erro
 	return resources, nil
 }
 
-func buildKserveLLMServiceRouter(service *types.Service, knSvc *knv1.Service, cfg *types.Config) (map[string]any, error) {
+func getOwnerReference(owner *KserveServiceOwner) []metav1.OwnerReference {
+	controller := false
+	blockOwnerDeletion := true
+
+	return []metav1.OwnerReference{
+		metav1.OwnerReference{
+			APIVersion:         "serving.knative.dev/v1",
+			Kind:               "Service",
+			Name:               owner.Name,
+			UID:                owner.UID,
+			Controller:         &controller,
+			BlockOwnerDeletion: &blockOwnerDeletion,
+		},
+	}
+}
+
+func getAPIPath(serviceName string) string {
+	return fmt.Sprintf("/system/services/%s/models", serviceName)
+}
+
+// existsKserveHTTPRouteByServiceName checks whether there is any HTTPRoute in the
+// cluster that matches the expected name and API path for the given service name, and returns an error if there are any conflicts (e.g. same name but different path, or same path but different name). It returns true if a matching HTTPRoute exists in the same namespace, false if no matching HTTPRoute exists, and an error if there is a conflict.
+func existsKserveHTTPRouteByServiceName(serviceName, namespace string) (bool, error) {
+	routeName := getHTTPRouteName(serviceName)
+
+	dynClient, err := getDynamicClient()
+	if err != nil {
+		return false, fmt.Errorf("failed to create dynamic client: %v", err)
+	}
+
+	routeList, err := dynClient.Resource(kserveHTTPRouteGVR).Namespace(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{FieldSelector: "metadata.name=" + routeName})
+	if err != nil {
+		return false, fmt.Errorf("failed to list HTTPRoutes: %v", err)
+	}
+
+	return (len(routeList.Items) > 0), nil
+}
+
+/*
+func buildKserveLLMServiceRouter(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (map[string]any, error) {
 	gwName := strings.TrimSpace(cfg.HTTPRouteGatewayName)
 	gwNamespace := strings.TrimSpace(cfg.HTTPRouteGatewayNamespace)
 	if gwNamespace == "" || gwName == "" {
@@ -883,17 +951,17 @@ func buildKserveLLMServiceRouter(service *types.Service, knSvc *knv1.Service, cf
 			return nil, fmt.Errorf("failed to create dynamic client: %v", err)
 		}
 
-		err = createTraefikOIDCMiddleware(gatewayClientset, service, knSvc, cfg)
+		err = createTraefikOIDCMiddleware(gatewayClientset, service, owner, cfg)
 		//err = createTraefikAuthMiddleware(gatewayClientset, service, knSvc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Auth middleware: %v", err)
 		}
 	}
-	return getKserveLLMServiceRouterSpec(service, knSvc.Namespace, cfg), nil
+	return getKserveLLMServiceRouterSpec(service, owner.Namespace, cfg), nil
 }
 
 // getKserveLLMServiceRouterSpec returns a router configuration for LLM InferenceServices
-// to route requests based on the service name (use inference Pool).
+// to route requests based on the service name.
 func getKserveLLMServiceRouterSpec(service *types.Service, namespace string, cfg *types.Config) map[string]any {
 	filters := []any{
 		map[string]any{
@@ -975,72 +1043,4 @@ func getKserveLLMServiceRouterSpec(service *types.Service, namespace string, cfg
 		},
 	}
 }
-
-func getOwnerReference(knSvc *knv1.Service) []metav1.OwnerReference {
-	controller := false
-	blockOwnerDeletion := true
-
-	return []metav1.OwnerReference{
-		metav1.OwnerReference{
-			APIVersion:         "serving.knative.dev/v1",
-			Kind:               "Service",
-			Name:               knSvc.Name,
-			UID:                knSvc.UID,
-			Controller:         &controller,
-			BlockOwnerDeletion: &blockOwnerDeletion,
-		},
-	}
-}
-
-func getAPIPath(serviceName string) string {
-	return fmt.Sprintf("/system/services/%s/models", serviceName)
-}
-
-func formatUID(uid string) string {
-	uidr, _ := regexp.Compile("[0-9a-z]+@")
-	idx := uidr.FindStringIndex(uid)
-	// If the regex is not matched assume it is not an EGI uid
-	// and return the original string
-	if idx == nil {
-		return uid
-	}
-
-	uid = uid[0 : idx[1]-1]
-	if len(uid) > 62 {
-		uid = uid[:62]
-	}
-	return uid
-}
-
-/*
-func injectRootPath(service *types.Service) {
-	kserveServiceFramework := getKserveFramework(service.Kserve.ModelFormat)
-	if kserveServiceFramework != "triton" {
-		if kserveServiceFramework == "mlserver" {
-			if service.Kserve.Env == nil {
-				service.Kserve.Env = make(map[string]string)
-			}
-			service.Kserve.Env["MLSERVER_ROOT_PATH"] = getAPIPath(service.Name)
-		} else if kserveServiceFramework == "vllm" {
-			service.Kserve.Args = append(service.Kserve.Args, fmt.Sprintf("--root-path=%s", getAPIPath(service.Name)))
-		}
-	}
-}
 */
-// existsKserveHTTPRouteByServiceName checks whether there is any HTTPRoute in the
-// cluster that matches the expected name and API path for the given service name, and returns an error if there are any conflicts (e.g. same name but different path, or same path but different name). It returns true if a matching HTTPRoute exists in the same namespace, false if no matching HTTPRoute exists, and an error if there is a conflict.
-func existsKserveHTTPRouteByServiceName(serviceName, namespace string) (bool, error) {
-	routeName := getHTTPRouteName(serviceName)
-
-	dynClient, err := getDynamicClient()
-	if err != nil {
-		return false, fmt.Errorf("failed to create dynamic client: %v", err)
-	}
-
-	routeList, err := dynClient.Resource(kserveHTTPRouteGVR).Namespace(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{FieldSelector: "metadata.name=" + routeName})
-	if err != nil {
-		return false, fmt.Errorf("failed to list HTTPRoutes: %v", err)
-	}
-
-	return (len(routeList.Items) > 0), nil
-}

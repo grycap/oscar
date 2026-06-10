@@ -429,6 +429,7 @@ type KserveInference struct {
 	// ("onnx", "sklearn", "xgboost", "pytorch", "tensorflow", "triton", "huggingface").
 	ModelFormat string `json:"model_format,omitempty"`
 	// Runtime the KServe runtime to use
+	// Ref: https://kserve.github.io/website/docs/concepts/resources/servingruntime
 	// Optional.
 	Runtime string `json:"runtime,omitempty"`
 }
