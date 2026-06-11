@@ -16,6 +16,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
@@ -31,6 +32,9 @@ import (
 	"github.com/grycap/oscar/v4/pkg/testsupport"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -243,6 +247,46 @@ func TestGetOIDCMiddleware(t *testing.T) {
 	}))
 
 	kubeClientset := fake.NewSimpleClientset()
+
+	// Create base PVC and PV needed by ensureSharedRuntimePVC
+	basePVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      types.PVCName,
+			Namespace: "oscar-svc",
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			VolumeName: "test-pv",
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
+	}
+	basePVC.Status.Phase = corev1.ClaimBound
+
+	basePV := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pv",
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			Capacity: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse("1Gi"),
+			},
+			AccessModes:                   []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
+			PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimRetain,
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				NFS: &corev1.NFSVolumeSource{
+					Server: "nfs.example.com",
+					Path:   "/exports",
+				},
+			},
+		},
+	}
+	kubeClientset.CoreV1().PersistentVolumeClaims("oscar-svc").Create(context.TODO(), basePVC, metav1.CreateOptions{})
+	kubeClientset.CoreV1().PersistentVolumes().Create(context.TODO(), basePV, metav1.CreateOptions{})
+
 	cfg := types.Config{
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint: server.URL,
