@@ -803,7 +803,7 @@ else
         read -p "Do you want to enable OIDC authentication support with these defaults? [y/n] " use_oidc </dev/tty
     fi
     if [ "$ENABLE_KSERVE" != "true" ]; then
-        read -p "Do you want to install KServe with deploy/kind-oscar-kserve.sh? [y/n] " use_kserve </dev/tty
+        read -p "Do you want to install KServe with deploy/scripts/kind-oscar-kserve.sh? [y/n] " use_kserve </dev/tty
     fi
     if [ "$ENABLE_KUEUE" != "true" ]; then
         read -p "Do you want to enable CPU and memory quotas with Kueue? [y/n] " use_kueue </dev/tty
@@ -1116,12 +1116,12 @@ if [ $(echo $ENABLE_KSERVE | tr '[:upper:]' '[:lower:]') == "true" ]; then
         echo -e "\n$RED[!]$END_COLOR KServe installer script currently targets Traefik gateway. Please use --traefik to enable KServe installation."
         exit 1
     fi
-    echo -e "\n[*] Installing KServe using $SCRIPT_DIR/kind-oscar-kserve.sh ..."
-    if [ ! -f "$SCRIPT_DIR/kind-oscar-kserve.sh" ]; then
-        echo -e "$RED[!]$END_COLOR KServe script not found: $SCRIPT_DIR/kind-oscar-kserve.sh"
+    echo -e "\n[*] Installing KServe using $SCRIPT_DIR/scripts/kind-oscar-kserve.sh ..."
+    if [ ! -f "$SCRIPT_DIR/scripts/kind-oscar-kserve.sh" ]; then
+        echo -e "$RED[!]$END_COLOR KServe script not found: $SCRIPT_DIR/scripts/kind-oscar-kserve.sh"
         exit 1
     fi
-    if ! bash "$SCRIPT_DIR/kind-oscar-kserve.sh"; then
+    if ! bash "$SCRIPT_DIR/scripts/kind-oscar-kserve.sh"; then
         echo -e "$RED[!]$END_COLOR KServe installation failed"
         exit 1
     fi
