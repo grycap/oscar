@@ -186,7 +186,12 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating Kueue ClusterQueue for user %s: %v", uid, err))
 			return
 		}
-		namespace := utils.BuildUserNamespace(cfg, uid)
+		namespace, err := utils.EnsureUserNamespace(c.Request.Context(), kubeClientset, cfg, uid)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring namespace for user %s: %v", uid, err))
+			return
+		}
+
 		// Ensure Volume Quotas for the user
 		if _, err := utils.CreateMinIOQuotaConfigMapIfDontExist(c.Request.Context(), cfg, kubeClientset, namespace); err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating Kueue ClusterQueue for user %s: %v", uid, err))
