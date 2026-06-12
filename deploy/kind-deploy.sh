@@ -825,6 +825,9 @@ fi
 if [ $(echo $use_kserve | tr '[:upper:]' '[:lower:]') == "y" ]; then
     ENABLE_KSERVE="true"
 fi
+if [ $(echo $use_kueue | tr '[:upper:]' '[:lower:]') == "y" ]; then
+    ENABLE_KUEUE="true"
+fi
 if [ $(echo $use_minio_quotas | tr '[:upper:]' '[:lower:]') == "y" ]; then
     ENABLE_MINIO_QUOTAS="true"
 fi
