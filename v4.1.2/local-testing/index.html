@@ -2349,6 +2349,11 @@ bash oscar/deploy/kind-deploy.sh
 four PVC-backed drives, which is required by the MinIO bucket quota admin API.
 Without this option, the local deployment keeps the simpler standalone MinIO
 mode.</p>
+<p>To enable the KServe module in the deployed OSCAR, add:</p>
+<pre><code class="language-sh">bash oscar/deploy/kind-deploy.sh --kserve
+</code></pre>
+<p>This option deploys KServe InferenceService and LLMInferenceService controllers and is required in order to use <a href="../fdl/#kservesettings">KServe settings</a> in the FDL.</p>
+<p><em>Note that in order to enable KServe, you must use Traefik as the Gateway API provider (the script uses it by default).</em></p>
 <h2 id="steps-for-manual-local-deployment">Steps for manual local deployment</h2>
 <p>If you want to do it manually you can follow the listed steps.</p>
 <h3 id="create-the-cluster">Create the cluster</h3>
