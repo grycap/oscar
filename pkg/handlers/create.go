@@ -27,9 +27,9 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/grycap/oscar/v4/pkg/backends/resources"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/cdmi-client-go"
+	"github.com/grycap/oscar/v4/pkg/backends/resources"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
@@ -397,15 +397,15 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					}
 				}
 
+				oldTags, _ := minIOAdminClient.GetTaggedMetadata(b.BucketName)
 				// Bucket metadata for filtering
-				tags := map[string]string{
-					"owner":        uid,
-					"from_service": service.Name,
-					"owner_name":   ownerName,
-				}
-				if err := minIOAdminClient.SetTags(b.BucketName, tags); err != nil {
-					c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
-					return
+				// If bucket dont have already the tags, set them.
+				if oldTags == nil || len(oldTags) == 0 {
+					tags := getBucketTags(&service, uid, ownerName, b.BucketName)
+					if err := minIOAdminClient.SetTags(b.BucketName, tags); err != nil {
+						c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
+						return
+					}
 				}
 				if minIOQuota != nil && minIOQuota.StoragePerBucket != "" {
 					if err := minIOAdminClient.SetBucketStorageQuota(b.BucketName, minIOQuota.StoragePerBucket); err != nil {
@@ -1011,4 +1011,27 @@ func serviceWithSameNameExists(name string, back types.ServerlessBackend) (bool,
 		}
 	}
 	return len(services) > 0, nil
+}
+
+func getBucketTags(service *types.Service, uid, ownerName, bucketName string) map[string]string {
+	tags := map[string]string{
+		"owner":        uid,
+		"from_service": service.Name,
+		"owner_name":   ownerName,
+	}
+
+	if service.Mount.Provider != "" {
+		path := strings.Trim(service.Mount.Path, " /")
+		splitPath := strings.SplitN(path, "/", 2)
+		mountBucketName := splitPath[0]
+		// Don't add service tags to the mount bucket
+		if mountBucketName == bucketName {
+			tags = map[string]string{
+				"owner":      uid,
+				"owner_name": ownerName,
+			}
+		}
+	}
+
+	return tags
 }
