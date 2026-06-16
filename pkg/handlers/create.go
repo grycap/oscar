@@ -1020,18 +1020,5 @@ func getBucketTags(service *types.Service, uid, ownerName, bucketName string) ma
 		"owner_name":   ownerName,
 	}
 
-	if service.Mount.Provider != "" {
-		path := strings.Trim(service.Mount.Path, " /")
-		splitPath := strings.SplitN(path, "/", 2)
-		mountBucketName := splitPath[0]
-		// Don't add service tags to the mount bucket
-		if mountBucketName == bucketName {
-			tags = map[string]string{
-				"owner":      uid,
-				"owner_name": ownerName,
-			}
-		}
-	}
-
 	return tags
 }
