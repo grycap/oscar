@@ -27,9 +27,9 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/grycap/oscar/v4/pkg/backends/resources"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/cdmi-client-go"
+	"github.com/grycap/oscar/v4/pkg/backends/resources"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
@@ -269,7 +269,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			service.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 			// At the moment check only for KServe service
-			if utils.IsKserveService(&service) && utils.IsKserveSupported(cfg) && !utils.VerifyWorkloadByResources(service, cfg) {
+			if service.IsKserve() && utils.IsKserveSupported(cfg) && !utils.VerifyWorkloadByResources(service, cfg) {
 				if err := utils.DeleteKueueLocalQueue(context.TODO(), cfg, service.Namespace, service.Name); err != nil {
 					createLogger.Printf("Error deleting Kueue local queue: %v", err)
 				}

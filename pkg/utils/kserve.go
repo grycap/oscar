@@ -58,9 +58,11 @@ var (
 )
 
 type KserveServiceOwner struct {
-	Name      string
-	Namespace string
-	UID       k8sTypes.UID
+	APIVersion string
+	Name       string
+	Namespace  string
+	UID        k8sTypes.UID
+	Kind       string
 }
 
 type dynamicClientFactory func() (*dynamic.DynamicClient, error)
@@ -96,8 +98,8 @@ func ValidateKserveService(service *types.Service) error {
 		return fmt.Errorf("service does not have KServe configuration")
 	}
 
-	if service.Kserve.Type == "" {
-		return fmt.Errorf("missing KServe service type %s | %s", KserveTypeInferenceService, KserveTypeLLMInferenceService)
+	if service.Kserve.Type == "" || (service.Kserve.Type != KserveTypeInferenceService && service.Kserve.Type != KserveTypeLLMInferenceService) {
+		return fmt.Errorf("invalid KServe service type %s | %s", KserveTypeInferenceService, KserveTypeLLMInferenceService)
 	}
 
 	if service.Kserve.StorageUri == "" {
@@ -114,6 +116,9 @@ func ValidateKserveService(service *types.Service) error {
 		if service.Kserve.LLMInference != nil {
 			return fmt.Errorf("LLMInference configuration should be nil for Inference type")
 		}
+		if service.Kserve.Inference.APIVersion != "" && !(service.Kserve.Inference.APIVersion == "v1" || service.Kserve.Inference.APIVersion == "v2") {
+			return fmt.Errorf("invalid APIVersion: %s", service.Kserve.Inference.APIVersion)
+		}
 	}
 
 	if service.Kserve.Type == KserveTypeLLMInferenceService {
@@ -121,17 +126,16 @@ func ValidateKserveService(service *types.Service) error {
 			return fmt.Errorf("Inference configuration should be nil for LLMInference type")
 		}
 	}
-
-	if service.Kserve.APIVersion != "" && !(service.Kserve.APIVersion == "v1" || service.Kserve.APIVersion == "v2") {
-		return fmt.Errorf("invalid APIVersion: %s", service.Kserve.APIVersion)
-	}
 	return nil
 }
 
 // CreateKserveService creates a KServe service based on the provided service and Knative service.
 func CreateKserveService(service *types.Service, knativeService *knv1.Service, cfg *types.Config) error {
-	if err := ValidateKserveService(service); err != nil {
+	/*	if err := ValidateKserveService(service); err != nil {
 		return err
+	}*/
+	if knativeService != nil && service.Namespace != knativeService.Namespace {
+		return fmt.Errorf("service namespace does not match Knative service namespace")
 	}
 
 	dynClient, err := getDynamicClient()
@@ -141,50 +145,40 @@ func CreateKserveService(service *types.Service, knativeService *knv1.Service, c
 	//kserveLogger.Printf("Creating KServe service '%s' for user '%s' with model format %s", service.Name, service.Owner, service.Kserve.ModelFormat)
 
 	var kserveSvc *unstructured.Unstructured
-	if service.Kserve.Type == KserveTypeLLMInferenceService {
-		// For LLM services, we use a different InferenceService definition (LLMInferenceService)
-		llmIsvc, err := NewKserveLLMInferenceServiceSpec(service, nil, cfg)
-		if err != nil {
-			return err
+	var owner *KserveServiceOwner = nil
+	if knativeService != nil {
+		owner = &KserveServiceOwner{
+			APIVersion: "serving.knative.dev/v1",
+			Name:       knativeService.GetName(),
+			Namespace:  knativeService.GetNamespace(),
+			UID:        knativeService.GetUID(),
+			Kind:       "Service",
 		}
+	}
 
-		kserveSvc, err = dynClient.Resource(llmInferenceServiceGVR).Namespace(knativeService.Namespace).Create(context.Background(), llmIsvc, metav1.CreateOptions{})
+	switch service.Kserve.Type {
+	case KserveTypeInferenceService:
+		kserveSvc, err = createKserveInferenceService(dynClient, service, owner, cfg)
 		if err != nil {
 			return fmt.Errorf("failed to create InferenceService: %v", err)
 		}
-	} else if service.Kserve.Type != KserveTypeInferenceService && knativeService != nil {
-		var owner *KserveServiceOwner = &KserveServiceOwner{
-			Name:      knativeService.GetName(),
-			Namespace: knativeService.GetNamespace(),
-			UID:       knativeService.GetUID(),
-		}
-		rawIsvc, err := NewKserveInferenceServiceSpec(service, owner, cfg)
+	case KserveTypeLLMInferenceService:
+		kserveSvc, err = createKserveLLMInferenceService(dynClient, service, owner, cfg)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create LLMInferenceService: %v", err)
 		}
-
-		kserveSvc, err = dynClient.Resource(kserveIsvcGVR).Namespace(knativeService.Namespace).Create(context.Background(), rawIsvc, metav1.CreateOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to create InferenceService: %v", err)
-		}
-	} else {
+	default:
 		return fmt.Errorf("unsupported KServe service type: %s", service.Kserve.Type)
 	}
 
-	var kserveSvcOwner *KserveServiceOwner = &KserveServiceOwner{
-		Name:      kserveSvc.GetName(),
-		Namespace: kserveSvc.GetNamespace(),
-		UID:       kserveSvc.GetUID(),
-	}
-
-	err = exposeKserveInferenceService(service, kserveSvcOwner, cfg)
+	err = exposeKserveService(dynClient, service, buildUnstructuredServiceOwnerRef(kserveSvc), cfg)
 	if err != nil {
 		// If exposing the service fails, delete the created InferenceService to avoid orphaned resources
-		deleteErr := DeleteKserveInferenceService(service.Name, service.Namespace)
+		deleteErr := DeleteKserveService(service.Name, service.Namespace, service.Kserve.Type)
 		if deleteErr != nil {
-			return fmt.Errorf("failed to expose InferenceService: %v; additionally, failed to delete InferenceService: %v", err, deleteErr)
+			return fmt.Errorf("failed to expose KServe Service: %v; additionally, failed to delete KServe Service: %v", err, deleteErr)
 		}
-		return fmt.Errorf("failed to expose InferenceService: %v", err)
+		return fmt.Errorf("failed to expose KServe Service: %v", err)
 	}
 	return nil
 }
@@ -239,10 +233,38 @@ func UpdateKserveService(service *types.Service, oldService *types.Service, name
 	return nil
 }
 
-// NewKserveInferenceServiceSpec builds an unstructured InferenceService
+func createKserveInferenceService(dynClient *dynamic.DynamicClient, service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (*unstructured.Unstructured, error) {
+	rawIsvc, err := newKserveInferenceServiceSpec(service, owner, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	kserveSvc, err := dynClient.Resource(kserveIsvcGVR).Namespace(rawIsvc.GetNamespace()).Create(context.Background(), rawIsvc, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return kserveSvc, nil
+}
+
+func createKserveLLMInferenceService(dynClient *dynamic.DynamicClient, service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (*unstructured.Unstructured, error) {
+	llmIsvc, err := newKserveLLMInferenceServiceSpec(service, owner, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	kserveSvc, err := dynClient.Resource(llmInferenceServiceGVR).Namespace(llmIsvc.GetNamespace()).Create(context.Background(), llmIsvc, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return kserveSvc, nil
+}
+
+// newKserveInferenceServiceSpec builds an unstructured InferenceService
 // (serving.kserve.io/v1beta1) suitable for use with a dynamic Kubernetes client.
-// It is functionally equivalent to NewKserveInferenceServiceSpec.
-func NewKserveInferenceServiceSpec(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (*unstructured.Unstructured, error) {
+// It is functionally equivalent to newKserveInferenceServiceSpec.
+func newKserveInferenceServiceSpec(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (*unstructured.Unstructured, error) {
 	if err := ValidateKserveService(service); err != nil {
 		return nil, err
 	}
@@ -252,15 +274,10 @@ func NewKserveInferenceServiceSpec(service *types.Service, owner *KserveServiceO
 		return nil, err
 	}
 
-	apiVersion := "v1"
-	if service.Kserve.APIVersion != "" {
-		apiVersion = service.Kserve.APIVersion
-	}
-
 	modelSpec := map[string]any{
 		"modelFormat":     map[string]any{"name": service.Kserve.Inference.ModelFormat},
 		"storageUri":      service.Kserve.StorageUri,
-		"protocolVersion": apiVersion,
+		"protocolVersion": service.Kserve.Inference.APIVersion,
 	}
 
 	if service.Kserve.Inference.Runtime != "" {
@@ -293,13 +310,17 @@ func NewKserveInferenceServiceSpec(service *types.Service, owner *KserveServiceO
 			return nil, fmt.Errorf("missing required label 'kueue.x-k8s.io/queue-name' for KServe service with Kueue enabled")
 		}
 	}
+	namespace := service.Namespace
+	if owner != nil {
+		namespace = owner.Namespace
+	}
 
 	return &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": kserveIsvcGVR.Group + "/" + kserveIsvcGVR.Version,
 		"kind":       "InferenceService",
 		"metadata": map[string]any{
 			"name":            buildKserveName(service.Name),
-			"namespace":       owner.Namespace,
+			"namespace":       namespace,
 			"ownerReferences": getOwnerReference(owner),
 			"labels":          labels,
 		},
@@ -321,7 +342,7 @@ func UpdateKserveInferenceServiceSpec(service *types.Service, oldIsvc *unstructu
 		return nil, err
 	}
 
-	apiVersion := service.Kserve.APIVersion
+	apiVersion := service.Kserve.Inference.APIVersion
 	if apiVersion == "" {
 		oldApiVersion, ok := oldIsvc.Object["spec"].(map[string]any)["predictor"].(map[string]any)["model"].(map[string]any)["protocolVersion"]
 		if !ok {
@@ -375,19 +396,23 @@ func GetKserveInferenceService(serviceName, namespace string) (*unstructured.Uns
 	return isvc, nil
 }
 
-func DeleteKserveInferenceService(serviceName, namespace string) error {
+func DeleteKserveService(serviceName, namespace, kserveType string) error {
 	dynClient, err := getDynamicClient()
 	if err != nil {
 		return err
 	}
-	err = dynClient.Resource(kserveIsvcGVR).Namespace(namespace).Delete(context.Background(), buildKserveName(serviceName), metav1.DeleteOptions{})
+	resource := kserveIsvcGVR
+	if kserveType == KserveTypeLLMInferenceService {
+		resource = llmInferenceServiceGVR
+	}
+	err = dynClient.Resource(resource).Namespace(namespace).Delete(context.Background(), buildKserveName(serviceName), metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("failed to delete Kserve InferenceService: %v", err)
 	}
 	return nil
 }
 
-func NewKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (*unstructured.Unstructured, error) {
+func newKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (*unstructured.Unstructured, error) {
 	if err := ValidateKserveService(service); err != nil {
 		return nil, err
 	}
@@ -419,10 +444,10 @@ func NewKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServi
 
 	minScale, _ := normalizeScaleFromKserveService(service.Kserve)
 
-	/*	router, err := buildKserveLLMServiceRouter(service, owner, cfg)
-		if err != nil {
-			return nil, err
-		}*/
+	/*router, err := buildKserveLLMServiceRouter(service, owner, cfg)
+	if err != nil {
+		return nil, err
+	}*/
 
 	labels := map[string]any{
 		kserveKeyLabelApp:           prefixLabelApp + service.Name,
@@ -437,14 +462,18 @@ func NewKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServi
 			return nil, fmt.Errorf("missing required label 'kueue.x-k8s.io/queue-name' for KServe service with Kueue enabled")
 		}
 	}
+	namespace := service.Namespace
+	if owner != nil {
+		namespace = owner.Namespace
+	}
 
 	return &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": llmInferenceServiceGVR.Group + "/" + llmInferenceServiceGVR.Version,
 		"kind":       "LLMInferenceService",
 		"metadata": map[string]any{
-			"name":      buildKserveName(service.Name),
-			"namespace": owner.Namespace,
-			//"ownerReferences": getOwnerReference(owner),
+			"name":            buildKserveName(service.Name),
+			"namespace":       namespace,
+			"ownerReferences": getOwnerReference(owner),
 		},
 		"spec": map[string]any{
 			"model": map[string]any{
@@ -565,20 +594,20 @@ func CheckKserveUpdate(oldService *types.Service, newService *types.Service) err
 	if oldKserve.StorageUri != newKserve.StorageUri {
 		return fmt.Errorf("cannot update model storage configuration for KServe")
 	}
-	if oldKserve.Inference.Runtime != newKserve.Inference.Runtime {
-		return fmt.Errorf("cannot update runtime for KServe")
-	}
+	// TODO
 	if oldKserve.SetAuth != newKserve.SetAuth {
 		return fmt.Errorf("cannot update authentication configuration for KServe")
 	}
 	if oldKserve.Type != newKserve.Type {
 		return fmt.Errorf("cannot change KServe service type")
-
 	} else if newKserve.Type == KserveTypeInferenceService {
 		if oldKserve.Inference == nil || newKserve.Inference == nil {
 			return fmt.Errorf("inference configuration cannot be nil for KServe service")
-
-		} else if oldKserve.Inference.ModelFormat != newKserve.Inference.ModelFormat {
+		}
+		if oldKserve.Inference.Runtime != newKserve.Inference.Runtime {
+			return fmt.Errorf("cannot update runtime for KServe")
+		}
+		if oldKserve.Inference.ModelFormat != newKserve.Inference.ModelFormat {
 			return fmt.Errorf("cannot update model format for KServe")
 		}
 	}
@@ -625,24 +654,25 @@ func getTraefikCORSMiddlewareName(serviceName string) string {
 	return serviceName + "-cors-mdw"
 }
 
-func exposeKserveInferenceService(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) error {
-	gatewayClientset, err := getDynamicClient()
-	if err != nil {
-		return fmt.Errorf("failed to create dynamic client: %v", err)
+func exposeKserveService(dynClient *dynamic.DynamicClient, service *types.Service, owner *KserveServiceOwner, cfg *types.Config) error {
+	log.Printf("Owner: %v", owner)
+	gwName := strings.TrimSpace(cfg.HTTPRouteGatewayName)
+	gwNamespace := strings.TrimSpace(cfg.HTTPRouteGatewayNamespace)
+	if gwNamespace == "" || gwName == "" {
+		return fmt.Errorf("gateway namespace and name must be provided in config to create HTTPRoute for KServe service")
 	}
 
 	if service.Kserve.SetAuth {
 		// TO DO: Create OIDC forwardAuth Traefik Middleware
-		//err = createTraefikAuthMiddleware(gatewayClientset, service, knSvc)
-		err = createTraefikOIDCMiddleware(gatewayClientset, service, owner, cfg)
+		//err = createTraefikAuthMiddleware(dynClient, service, knSvc)
+		err := createTraefikOIDCMiddleware(dynClient, service, owner, cfg)
 		if err != nil {
 			return fmt.Errorf("failed to create Auth middleware: %v", err)
 		}
-
 	}
 
 	// Create HTTPRoute
-	if err = createHTTPRoute(gatewayClientset, service, owner, cfg); err != nil {
+	if err := createHTTPRoute(dynClient, service, owner, cfg); err != nil {
 		return fmt.Errorf("failed to create HTTPRoute: %v", err)
 	}
 
@@ -652,10 +682,10 @@ func exposeKserveInferenceService(service *types.Service, owner *KserveServiceOw
 // createTraefikOIDCMiddleware creates a Traefik Middleware of type ForwardAuth for OIDC authentication,
 // which will be used in the HTTPRoute to protect the KServe service.
 // TO DO: change implementation when decided how to handle authentication for KServe services
-func createTraefikOIDCMiddleware(gatewayClientset dynamic.Interface, service *types.Service, owner *KserveServiceOwner, cfg *types.Config) error {
+func createTraefikOIDCMiddleware(dynClient dynamic.Interface, service *types.Service, owner *KserveServiceOwner, cfg *types.Config) error {
 	middleware := buildTraefikOIDCMiddlewareSpec(service, owner, cfg)
 
-	_, err := gatewayClientset.Resource(kserveTraefikMiddlewareGVR).Namespace(owner.Namespace).Create(context.Background(), middleware, metav1.CreateOptions{})
+	_, err := dynClient.Resource(kserveTraefikMiddlewareGVR).Namespace(middleware.GetNamespace()).Create(context.Background(), middleware, metav1.CreateOptions{})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("failed to create OIDC middleware: %v", err)
 	}
@@ -681,15 +711,15 @@ func buildTraefikOIDCMiddlewareSpec(service *types.Service, owner *KserveService
 	}}
 }
 
-func createTraefikAuthMiddleware(gatewayClientset dynamic.Interface, service *types.Service, owner *KserveServiceOwner) error {
-	err := createTraefikAuthSecret(gatewayClientset, service, owner)
+func createTraefikAuthMiddleware(dynClient dynamic.Interface, service *types.Service, owner *KserveServiceOwner) error {
+	err := createTraefikAuthSecret(dynClient, service, owner)
 	if err != nil {
 		return fmt.Errorf("failed to create auth secret: %v", err)
 	}
 
 	middleware := buildTraefikAuthMiddlewareSpec(service, owner)
 
-	_, err = gatewayClientset.Resource(kserveTraefikMiddlewareGVR).Namespace(owner.Namespace).Create(context.TODO(), middleware, metav1.CreateOptions{})
+	_, err = dynClient.Resource(kserveTraefikMiddlewareGVR).Namespace(owner.Namespace).Create(context.TODO(), middleware, metav1.CreateOptions{})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("failed to create basic auth middleware: %v", err)
 	}
@@ -713,7 +743,7 @@ func buildTraefikAuthMiddlewareSpec(service *types.Service, owner *KserveService
 	}}
 }
 
-func createTraefikAuthSecret(gatewayClientset dynamic.Interface, service *types.Service, owner *KserveServiceOwner) error {
+func createTraefikAuthSecret(dynClient dynamic.Interface, service *types.Service, owner *KserveServiceOwner) error {
 	hash := make(htpasswd.HashedPasswords)
 	err := hash.SetPassword(service.Name, service.Token, htpasswd.HashAPR1)
 	if err != nil {
@@ -723,7 +753,7 @@ func createTraefikAuthSecret(gatewayClientset dynamic.Interface, service *types.
 
 	secret := buildTraefikAuthSecretSpec(service, owner, hash)
 
-	_, err = gatewayClientset.Resource(kserveSecretGVR).Namespace(owner.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	_, err = dynClient.Resource(kserveSecretGVR).Namespace(owner.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	return err
 }
 
@@ -754,13 +784,6 @@ func getTraefikAuthSecretName(serviceName string) string {
 
 // createHTTPRoute creates a Gateway API HTTPRoute to expose the KServe InferenceService.
 func createHTTPRoute(gatewayClientset dynamic.Interface, service *types.Service, owner *KserveServiceOwner, cfg *types.Config) error {
-
-	gwName := strings.TrimSpace(cfg.HTTPRouteGatewayName)
-	gwNamespace := strings.TrimSpace(cfg.HTTPRouteGatewayNamespace)
-	if gwNamespace == "" || gwName == "" {
-		return fmt.Errorf("gateway namespace and name must be provided in config to create HTTPRoute for KServe service")
-	}
-
 	httpRoute := buildHTTPRouteSpec(service, owner, cfg)
 	_, err := gatewayClientset.Resource(kserveHTTPRouteGVR).Namespace(owner.Namespace).Create(context.Background(), httpRoute, metav1.CreateOptions{})
 	if err != nil {
@@ -773,8 +796,6 @@ func buildHTTPRouteSpec(service *types.Service, owner *KserveServiceOwner, cfg *
 	serviceName := service.Name
 	httpRouteName := serviceName + httpRouteSuffix
 	namespace := owner.Namespace
-	apiPath := getAPIPath(serviceName)
-	kserveSvcName := GetKserveSvcName(serviceName, service.Kserve.Type)
 
 	filters := []any{
 		map[string]any{
@@ -813,7 +834,7 @@ func buildHTTPRouteSpec(service *types.Service, owner *KserveServiceOwner, cfg *
 			map[string]any{
 				"path": map[string]any{
 					"type":  "PathPrefix",
-					"value": apiPath,
+					"value": getAPIPath(serviceName),
 				},
 			},
 		},
@@ -822,7 +843,7 @@ func buildHTTPRouteSpec(service *types.Service, owner *KserveServiceOwner, cfg *
 			map[string]any{
 				"group":     "",
 				"kind":      "Service",
-				"name":      kserveSvcName,
+				"name":      GetKserveSvcName(serviceName, service.Kserve.Type),
 				"namespace": namespace,
 				"port":      int64(80),
 			},
@@ -900,13 +921,16 @@ func createKserveResources(service *types.Kserve) (v1.ResourceRequirements, erro
 }
 
 func getOwnerReference(owner *KserveServiceOwner) []metav1.OwnerReference {
+	if owner == nil {
+		return nil
+	}
 	controller := false
 	blockOwnerDeletion := true
 
 	return []metav1.OwnerReference{
 		metav1.OwnerReference{
-			APIVersion:         "serving.knative.dev/v1",
-			Kind:               "Service",
+			APIVersion:         owner.APIVersion,
+			Kind:               owner.Kind,
 			Name:               owner.Name,
 			UID:                owner.UID,
 			Controller:         &controller,
@@ -937,7 +961,16 @@ func existsKserveHTTPRouteByServiceName(serviceName, namespace string) (bool, er
 	return (len(routeList.Items) > 0), nil
 }
 
-/*
+func buildUnstructuredServiceOwnerRef(kserveSvc *unstructured.Unstructured) *KserveServiceOwner {
+	return &KserveServiceOwner{
+		APIVersion: kserveSvc.GetAPIVersion(),
+		Name:       kserveSvc.GetName(),
+		Namespace:  kserveSvc.GetNamespace(),
+		UID:        kserveSvc.GetUID(),
+		Kind:       kserveSvc.GetKind(),
+	}
+}
+
 func buildKserveLLMServiceRouter(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (map[string]any, error) {
 	gwName := strings.TrimSpace(cfg.HTTPRouteGatewayName)
 	gwNamespace := strings.TrimSpace(cfg.HTTPRouteGatewayNamespace)
@@ -1043,4 +1076,3 @@ func getKserveLLMServiceRouterSpec(service *types.Service, namespace string, cfg
 		},
 	}
 }
-*/

@@ -570,9 +570,6 @@ func TestKserveUnmarshalJSON(t *testing.T) {
 		if k.Type != "inference" {
 			t.Errorf("expected Type = inference, got %s", k.Type)
 		}
-		if k.APIVersion != "v1" {
-			t.Errorf("expected default APIVersion = v1, got %s", k.APIVersion)
-		}
 		if k.CPU != "0.2" {
 			t.Errorf("expected default CPU = 0.2, got %s", k.CPU)
 		}
@@ -622,6 +619,9 @@ func TestKserveInferenceUnmarshalJSON(t *testing.T) {
 		}
 		if ki.ModelFormat != "onnx" {
 			t.Errorf("expected ModelFormat = onnx, got %s", ki.ModelFormat)
+		}
+		if ki.APIVersion != "v1" {
+			t.Errorf("expected default APIVersion = v1, got %s", ki.APIVersion)
 		}
 		if ki.Runtime != "kserve-runtime" {
 			t.Errorf("expected Runtime = kserve-runtime, got %s", ki.Runtime)

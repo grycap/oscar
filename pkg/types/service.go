@@ -231,7 +231,7 @@ type Service struct {
 	LogLevel string `json:"log_level"`
 
 	// Image Docker image for the service
-	Image string `json:"image" binding:"required"`
+	Image string `json:"image"`
 
 	// Alpine parameter to set if image is based on Alpine
 	// A custom release of faas-supervisor will be used
@@ -337,6 +337,31 @@ type Service struct {
 	Kserve *Kserve `json:"kserve,omitempty"`
 }
 
+func (s *Service) IsKserve() bool {
+	return s.Kserve != nil
+}
+
+func (s *Service) UnmarshalJSON(data []byte) error {
+	type Alias Service
+
+	aux := &struct {
+		*Alias
+	}{}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	if strings.TrimSpace(aux.Image) == "" && aux.Kserve == nil {
+		return fmt.Errorf("service Image is required")
+	}
+	if strings.TrimSpace(aux.Visibility) != "private" &&
+		strings.TrimSpace(aux.Visibility) != "public" &&
+		strings.TrimSpace(aux.Visibility) != "restricted" {
+		return fmt.Errorf("service Visibility must be one of: private, public, restricted")
+	}
+	*s = Service(*aux.Alias)
+	return nil
+}
+
 type Kserve struct {
 	// Type the type of KServe service to deploy
 	// Required. Set the type of KServe service, either "inference" for a standard InferenceService
@@ -354,10 +379,6 @@ type Kserve struct {
 	// StorageUri the URI of the model storage for KServe
 	// Required. It should follow the format expected by KServe, for example:
 	StorageUri string `json:"storage_uri"`
-
-	// Can be used to specify the protocol version for KServe (e.g., "v1", "v2").
-	// Optional. (default: "v1")
-	APIVersion string `json:"api_version,omitempty" default:"v1"`
 
 	// MinScale minimum number of active replicas (pods) for the service
 	// Optional. (default: 0)
@@ -400,13 +421,12 @@ func (k *Kserve) UnmarshalJSON(data []byte) error {
 
 	// Set default values for optional fields
 	aux := Alias{
-		APIVersion: "v1",
-		CPU:        "0.2",
-		Memory:     "256Mi",
-		SetAuth:    true,
-		MinScale:   0,
-		MaxScale:   1,
-		EnableGPU:  false,
+		CPU:       "0.2",
+		Memory:    "256Mi",
+		SetAuth:   true,
+		MinScale:  0,
+		MaxScale:  1,
+		EnableGPU: false,
 	}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -432,12 +452,17 @@ type KserveInference struct {
 	// Ref: https://kserve.github.io/website/docs/concepts/resources/servingruntime
 	// Optional.
 	Runtime string `json:"runtime,omitempty"`
+	// Can be used to specify the protocol version for KServe (e.g., "v1", "v2").
+	// Optional. (default: "v1")
+	APIVersion string `json:"api_version,omitempty" default:"v1"`
 }
 
 func (k *KserveInference) UnmarshalJSON(data []byte) error {
 	type Alias KserveInference
 
-	aux := Alias{}
+	aux := Alias{
+		APIVersion: "v1",
+	}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
