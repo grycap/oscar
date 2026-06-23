@@ -494,7 +494,7 @@ func getServiceResourceRequests(service *types.Service, cfg *types.Config) (v1.R
 	if len(service.EphemeralStorageRequest) > 0 {
 		parsedEphemeral, err := resource.ParseQuantity(service.EphemeralStorageRequest)
 		if err != nil {
-			return nil, fmt.Errorf("invalid service ephemeral storage %q: %w", service.EphemeralStorageRequest, err)
+			return nil, 0, fmt.Errorf("invalid service ephemeral storage %q: %w", service.EphemeralStorageRequest, err)
 		}
 		requests[v1.ResourceEphemeralStorage] = parsedEphemeral
 	}
