@@ -31,20 +31,18 @@ const (
 
 const (
 	//	defaultAuthMiddlewareName = "oidc-auth"
-	httpRouteSuffix               = "-route"
-	authMiddlewareSuffix          = "-auth-mdw"
-	authSecretSuffix              = "-auth-traefik" // #nosec G101
-	corsMiddlewareSuffix          = "-cors-mdw"
-	defaultLLMCPUimage            = "vllm/vllm-openai-cpu:latest"
-	defaultLLMGPUimage            = "vllm/vllm-openai:latest"
-	kserveKeyLabelApp             = "oscar-app"
-	prefixLabelApp                = "oscar-svc-ksv-"
-	kserveIsvcSuffix              = "-predictor"
-	kserveIsvcPodDplSuffix        = "-predictor"
-	kserveLLMIsvcSuffix           = "-kserve-workload-svc"
-	kserveLLMIsvcPodDplSuffix     = "-kserve"
-	KserveTypeInferenceService    = "inference"
-	KserveTypeLLMInferenceService = "llm_inference"
+	httpRouteSuffix           = "-route"
+	authMiddlewareSuffix      = "-auth-mdw"
+	authSecretSuffix          = "-auth-traefik" // #nosec G101
+	corsMiddlewareSuffix      = "-cors-mdw"
+	defaultLLMCPUimage        = "vllm/vllm-openai-cpu:latest"
+	defaultLLMGPUimage        = "vllm/vllm-openai:latest"
+	kserveKeyLabelApp         = "oscar-app"
+	prefixLabelApp            = "oscar-svc-ksv-"
+	kserveIsvcSuffix          = "-predictor"
+	kserveIsvcPodDplSuffix    = "-predictor"
+	kserveLLMIsvcSuffix       = "-kserve-workload-svc"
+	kserveLLMIsvcPodDplSuffix = "-kserve"
 )
 
 var (
@@ -82,7 +80,7 @@ func IsKserveService(service *types.Service) bool {
 	if service.Kserve == nil /* || service.Kserve.StorageUri == "" || service.Kserve.Type == ""*/ {
 		return false
 	}
-	/*if service.Kserve.Type == KserveTypeInferenceService && (service.Kserve.Inference == nil || service.Kserve.Inference.ModelFormat == "") {
+	/*if service.Kserve.Type == types.KserveTypeInferenceService && (service.Kserve.Inference == nil || service.Kserve.Inference.ModelFormat == "") {
 		return false
 	}*/
 	return true
@@ -92,46 +90,9 @@ func IsKserveSupported(cfg *types.Config) bool {
 	return cfg.KserveEnable && cfg.ExposedServicesRouteKind == types.HTTPROUTE
 }
 
-// ValidateKserveService checks if the provided service has valid KServe configuration.
-func ValidateKserveService(service *types.Service) error {
-	if !IsKserveService(service) {
-		return fmt.Errorf("service does not have KServe configuration")
-	}
-
-	if service.Kserve.Type == "" || (service.Kserve.Type != KserveTypeInferenceService && service.Kserve.Type != KserveTypeLLMInferenceService) {
-		return fmt.Errorf("invalid KServe service type %s | %s", KserveTypeInferenceService, KserveTypeLLMInferenceService)
-	}
-
-	if service.Kserve.StorageUri == "" {
-		return fmt.Errorf("missing model storage URI in KServe configuration")
-	}
-
-	if service.Kserve.Type == KserveTypeInferenceService {
-		if service.Kserve.Inference == nil {
-			return fmt.Errorf("missing Inference configuration for KServe service")
-		}
-		if service.Kserve.Inference.ModelFormat == "" {
-			return fmt.Errorf("missing model format in KServe configuration")
-		}
-		if service.Kserve.LLMInference != nil {
-			return fmt.Errorf("LLMInference configuration should be nil for Inference type")
-		}
-		if service.Kserve.Inference.APIVersion != "" && !(service.Kserve.Inference.APIVersion == "v1" || service.Kserve.Inference.APIVersion == "v2") {
-			return fmt.Errorf("invalid APIVersion: %s", service.Kserve.Inference.APIVersion)
-		}
-	}
-
-	if service.Kserve.Type == KserveTypeLLMInferenceService {
-		if service.Kserve.Inference != nil {
-			return fmt.Errorf("Inference configuration should be nil for LLMInference type")
-		}
-	}
-	return nil
-}
-
 // CreateKserveService creates a KServe service based on the provided service and Knative service.
 func CreateKserveService(service *types.Service, knativeService *knv1.Service, cfg *types.Config) error {
-	/*	if err := ValidateKserveService(service); err != nil {
+	/*	if err := service.Kserve.Validate(); err != nil {
 		return err
 	}*/
 	if knativeService != nil && service.Namespace != knativeService.Namespace {
@@ -157,12 +118,12 @@ func CreateKserveService(service *types.Service, knativeService *knv1.Service, c
 	}
 
 	switch service.Kserve.Type {
-	case KserveTypeInferenceService:
+	case types.KserveTypeInferenceService:
 		kserveSvc, err = createKserveInferenceService(dynClient, service, owner, cfg)
 		if err != nil {
 			return fmt.Errorf("failed to create InferenceService: %v", err)
 		}
-	case KserveTypeLLMInferenceService:
+	case types.KserveTypeLLMInferenceService:
 		kserveSvc, err = createKserveLLMInferenceService(dynClient, service, owner, cfg)
 		if err != nil {
 			return fmt.Errorf("failed to create LLMInferenceService: %v", err)
@@ -184,7 +145,7 @@ func CreateKserveService(service *types.Service, knativeService *knv1.Service, c
 }
 
 func UpdateKserveService(service *types.Service, oldService *types.Service, namespace string) error {
-	if err := ValidateKserveService(service); err != nil {
+	if err := service.Kserve.Validate(); err != nil {
 		return err
 	}
 	if err := CheckKserveUpdate(oldService, service); err != nil {
@@ -196,39 +157,71 @@ func UpdateKserveService(service *types.Service, oldService *types.Service, name
 		return fmt.Errorf("failed to create dynamic client: %v", err)
 	}
 
-	if service.Kserve.Type == KserveTypeLLMInferenceService {
-		// For LLM services, we use a different InferenceService definition (LLMInferenceService)
-		// Get existing object to preserve resourceVersion
-		oldLLMIsvc, err := dynClient.Resource(llmInferenceServiceGVR).Namespace(namespace).Get(context.Background(), buildKserveName(service.Name), metav1.GetOptions{})
+	switch service.Kserve.Type {
+	case types.KserveTypeInferenceService:
+		oldKserveSvc, err := getKserveInferenceService(dynClient, service.Name, namespace)
 		if err != nil {
-			return fmt.Errorf("failed to get LLMInferenceService: %v", err)
+			return fmt.Errorf("failed to get existing InferenceService: %v", err)
 		}
-		updatedLLMIsvc, err := UpdateKserveLLMInferenceServiceSpec(service, oldLLMIsvc)
+		err = updateKserveInferenceService(dynClient, service, oldKserveSvc)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to update InferenceService: %v", err)
 		}
-
-		_, err = dynClient.Resource(llmInferenceServiceGVR).Namespace(namespace).Update(context.Background(), updatedLLMIsvc, metav1.UpdateOptions{})
+	case types.KserveTypeLLMInferenceService:
+		oldKserveSvc, err := getKserveLLMInferenceService(dynClient, service.Name, namespace)
+		if err != nil {
+			return fmt.Errorf("failed to get existing LLMInferenceService: %v", err)
+		}
+		err = updateKserveLLMInferenceService(dynClient, service, oldKserveSvc)
 		if err != nil {
 			return fmt.Errorf("failed to update LLMInferenceService: %v", err)
 		}
-		return nil
+	default:
+		return fmt.Errorf("unsupported KServe service type: %s", service.Kserve.Type)
 	}
 
+	return nil
+}
+
+func getKserveInferenceService(dynClient *dynamic.DynamicClient, serviceName, namespace string) (*unstructured.Unstructured, error) {
 	// Get existing object to preserve resourceVersion
-	oldIsvc, err := dynClient.Resource(kserveIsvcGVR).Namespace(namespace).Get(context.Background(), buildKserveName(service.Name), metav1.GetOptions{})
+	kserveSvc, err := dynClient.Resource(kserveIsvcGVR).Namespace(namespace).Get(context.Background(), buildKserveName(serviceName), metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get InferenceService: %v", err)
+		return nil, fmt.Errorf("failed to get InferenceService: %v", err)
 	}
+	return kserveSvc, nil
+}
 
-	updatedIsvc, err := UpdateKserveInferenceServiceSpec(service, oldIsvc)
+func getKserveLLMInferenceService(dynClient *dynamic.DynamicClient, serviceName, namespace string) (*unstructured.Unstructured, error) {
+	// Get existing object to preserve resourceVersion
+	kserveSvc, err := dynClient.Resource(llmInferenceServiceGVR).Namespace(namespace).Get(context.Background(), buildKserveName(serviceName), metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get LLMInferenceService: %v", err)
+	}
+	return kserveSvc, nil
+}
+
+func updateKserveInferenceService(dynClient *dynamic.DynamicClient, service *types.Service, oldKserveSvc *unstructured.Unstructured) error {
+	newKserveSvc, err := UpdateKserveInferenceServiceSpec(service, oldKserveSvc)
 	if err != nil {
 		return err
 	}
 
-	_, err = dynClient.Resource(kserveIsvcGVR).Namespace(namespace).Update(context.Background(), updatedIsvc, metav1.UpdateOptions{})
+	_, err = dynClient.Resource(kserveIsvcGVR).Namespace(newKserveSvc.GetNamespace()).Update(context.Background(), newKserveSvc, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update InferenceService: %v", err)
+	}
+	return nil
+}
+
+func updateKserveLLMInferenceService(dynClient *dynamic.DynamicClient, service *types.Service, oldKserveSvc *unstructured.Unstructured) error {
+	newKserveSvc, err := UpdateKserveLLMInferenceServiceSpec(service, oldKserveSvc)
+	if err != nil {
+		return err
+	}
+	_, err = dynClient.Resource(llmInferenceServiceGVR).Namespace(newKserveSvc.GetNamespace()).Update(context.Background(), newKserveSvc, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update LLMInferenceService: %v", err)
 	}
 	return nil
 }
@@ -265,7 +258,7 @@ func createKserveLLMInferenceService(dynClient *dynamic.DynamicClient, service *
 // (serving.kserve.io/v1beta1) suitable for use with a dynamic Kubernetes client.
 // It is functionally equivalent to newKserveInferenceServiceSpec.
 func newKserveInferenceServiceSpec(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (*unstructured.Unstructured, error) {
-	if err := ValidateKserveService(service); err != nil {
+	if err := service.Kserve.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -333,7 +326,7 @@ func newKserveInferenceServiceSpec(service *types.Service, owner *KserveServiceO
 // UpdateKserveInferenceServiceSpec updates the spec fields of an existing
 // unstructured InferenceService object in place, preserving metadata (including resourceVersion).
 func UpdateKserveInferenceServiceSpec(service *types.Service, oldIsvc *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	if err := ValidateKserveService(service); err != nil {
+	if err := service.Kserve.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -402,7 +395,7 @@ func DeleteKserveService(serviceName, namespace, kserveType string) error {
 		return err
 	}
 	resource := kserveIsvcGVR
-	if kserveType == KserveTypeLLMInferenceService {
+	if kserveType == types.KserveTypeLLMInferenceService {
 		resource = llmInferenceServiceGVR
 	}
 	err = dynClient.Resource(resource).Namespace(namespace).Delete(context.Background(), buildKserveName(serviceName), metav1.DeleteOptions{})
@@ -413,7 +406,7 @@ func DeleteKserveService(serviceName, namespace, kserveType string) error {
 }
 
 func newKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (*unstructured.Unstructured, error) {
-	if err := ValidateKserveService(service); err != nil {
+	if err := service.Kserve.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -443,11 +436,6 @@ func newKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServi
 	container["env"] = types.ConvertEnvVars(service.Kserve.Env)
 
 	minScale, _ := normalizeScaleFromKserveService(service.Kserve)
-
-	/*router, err := buildKserveLLMServiceRouter(service, owner, cfg)
-	if err != nil {
-		return nil, err
-	}*/
 
 	labels := map[string]any{
 		kserveKeyLabelApp:           prefixLabelApp + service.Name,
@@ -485,7 +473,6 @@ func newKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServi
 			"template": map[string]any{
 				"containers": []any{container},
 			},
-			//"router": router,
 		},
 	}}, nil
 }
@@ -493,7 +480,7 @@ func newKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServi
 // UpdateKserveLLMInferenceServiceSpec updates the spec fields of an existing
 // unstructured LLMInferenceService object in place, preserving metadata (including resourceVersion).
 func UpdateKserveLLMInferenceServiceSpec(service *types.Service, oldLLMIsvc *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	if err := ValidateKserveService(service); err != nil {
+	if err := service.Kserve.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -551,9 +538,9 @@ func GetKserveSvcName(serviceName, kserveType string) string {
 	}
 
 	switch kserveType {
-	case KserveTypeInferenceService:
+	case types.KserveTypeInferenceService:
 		return serviceName + kserveIsvcSuffix
-	case KserveTypeLLMInferenceService:
+	case types.KserveTypeLLMInferenceService:
 		return serviceName + kserveLLMIsvcSuffix
 	default:
 		return ""
@@ -566,9 +553,9 @@ func GetKservePodAndDplName(serviceName, kserveType string) string {
 	}
 
 	switch kserveType {
-	case KserveTypeInferenceService:
+	case types.KserveTypeInferenceService:
 		return serviceName + kserveIsvcPodDplSuffix
-	case KserveTypeLLMInferenceService:
+	case types.KserveTypeLLMInferenceService:
 		return serviceName + kserveLLMIsvcPodDplSuffix
 	default:
 		return ""
@@ -576,43 +563,18 @@ func GetKservePodAndDplName(serviceName, kserveType string) string {
 }
 
 func CheckKserveUpdate(oldService *types.Service, newService *types.Service) error {
-	if oldService.Token != newService.Token {
-		return fmt.Errorf("unexpected error")
-	}
-	oldKserve := oldService.Kserve
-	newKserve := newService.Kserve
-	// If both old and new KServe configurations are nil,
-	// we consider it valid (no change)
-	if oldKserve == nil && newKserve == nil {
-		return nil
-	}
-	// If one of them is nil and the other is not,
-	// it's a not allowed change in KServe configuration
-	if oldKserve == nil || newKserve == nil {
-		return fmt.Errorf("cannot add or remove KServe configuration")
-	}
-	if oldKserve.StorageUri != newKserve.StorageUri {
-		return fmt.Errorf("cannot update model storage configuration for KServe")
-	}
-	// TODO
-	if oldKserve.SetAuth != newKserve.SetAuth {
-		return fmt.Errorf("cannot update authentication configuration for KServe")
-	}
-	if oldKserve.Type != newKserve.Type {
-		return fmt.Errorf("cannot change KServe service type")
-	} else if newKserve.Type == KserveTypeInferenceService {
-		if oldKserve.Inference == nil || newKserve.Inference == nil {
-			return fmt.Errorf("inference configuration cannot be nil for KServe service")
-		}
-		if oldKserve.Inference.Runtime != newKserve.Inference.Runtime {
-			return fmt.Errorf("cannot update runtime for KServe")
-		}
-		if oldKserve.Inference.ModelFormat != newKserve.Inference.ModelFormat {
-			return fmt.Errorf("cannot update model format for KServe")
-		}
+	if oldService.Token != newService.Token || !oldService.IsKserve() || !newService.IsKserve() {
+		return fmt.Errorf("unexpected error in KServe service update validation")
 	}
 
-	return nil
+	newKserve := newService.Kserve
+	oldKserve := oldService.Kserve
+	// If one of them is nil and the other is not,
+	// it's a not allowed change in KServe configuration
+	if newKserve == nil || oldKserve == nil {
+		return fmt.Errorf("cannot add or remove KServe configuration")
+	}
+	return newService.Kserve.ValdateUpdate(*oldService.Kserve)
 }
 
 func getDynamicClient() (*dynamic.DynamicClient, error) {
@@ -635,7 +597,7 @@ func normalizeScaleFromKserveService(service *types.Kserve) (int32, int32) {
 	if minScale > maxScale {
 		maxScale = minScale
 	}
-	if service.Type == KserveTypeLLMInferenceService && minScale == 0 {
+	if service.Type == types.KserveTypeLLMInferenceService && minScale == 0 {
 		minScale = 1
 	}
 	return minScale, maxScale
@@ -1076,3 +1038,43 @@ func getKserveLLMServiceRouterSpec(service *types.Service, namespace string, cfg
 		},
 	}
 }
+
+/*
+ValidateKserveService checks if the provided service has valid KServe configuration.
+
+func ValidateKserveService(service *types.Service) error {
+	if !IsKserveService(service) {
+		return fmt.Errorf("service does not have KServe configuration")
+	}
+
+	if service.Kserve.Type == "" || (service.Kserve.Type != types.KserveTypeInferenceService && service.Kserve.Type != KserveTypeLLMInferenceService) {
+		return fmt.Errorf("invalid KServe service type %s | %s", types.KserveTypeInferenceService, KserveTypeLLMInferenceService)
+	}
+
+	if service.Kserve.StorageUri == "" {
+		return fmt.Errorf("missing model storage URI in KServe configuration")
+	}
+
+	if service.Kserve.Type == types.KserveTypeInferenceService {
+		if service.Kserve.Inference == nil {
+			return fmt.Errorf("missing Inference configuration for KServe service")
+		}
+		if service.Kserve.Inference.ModelFormat == "" {
+			return fmt.Errorf("missing model format in KServe configuration")
+		}
+		if service.Kserve.LLMInference != nil {
+			return fmt.Errorf("LLMInference configuration should be nil for Inference type")
+		}
+		if service.Kserve.Inference.APIVersion != "" && !(service.Kserve.Inference.APIVersion == "v1" || service.Kserve.Inference.APIVersion == "v2") {
+			return fmt.Errorf("invalid APIVersion: %s", service.Kserve.Inference.APIVersion)
+		}
+	}
+
+	if service.Kserve.Type == KserveTypeLLMInferenceService {
+		if service.Kserve.Inference != nil {
+			return fmt.Errorf("Inference configuration should be nil for LLMInference type")
+		}
+	}
+	return nil
+}
+*/

@@ -505,7 +505,7 @@ func TestGetResourceOnlyWorkloadSpecWithKServePodSet(t *testing.T) {
 	service := newTestService("test-service", "testuser")
 	service.Expose.MinScale = 2
 	service.Kserve = &types.Kserve{
-		Type: KserveTypeInferenceService,
+		Type: types.KserveTypeInferenceService,
 		Inference: &types.KserveInference{
 			ModelFormat: "sklearn",
 		},
@@ -934,7 +934,7 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 			name: "kserve service but unsupported route kind",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-ingress", "owner")
-				s.Kserve = &types.Kserve{Type: KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn"}
+				s.Kserve = &types.Kserve{Type: types.KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn"}
 				return &s
 			}(),
 			cfg: func() *types.Config {
@@ -948,7 +948,7 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 			name: "kserve Inference defaults and min scale fallback",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-default", "owner")
-				s.Kserve = &types.Kserve{Type: KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", MinScale: 0}
+				s.Kserve = &types.Kserve{Type: types.KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", MinScale: 0}
 				return &s
 			}(),
 			cfg: func() *types.Config {
@@ -965,7 +965,7 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 			name: "kserve LLMInference defaults and min scale fallback",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-default", "owner")
-				s.Kserve = &types.Kserve{Type: KserveTypeLLMInferenceService, StorageUri: "s3://models/llama", MinScale: 0}
+				s.Kserve = &types.Kserve{Type: types.KserveTypeLLMInferenceService, StorageUri: "s3://models/llama", MinScale: 0}
 				return &s
 			}(),
 			cfg: func() *types.Config {
@@ -982,7 +982,7 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 			name: "kserve custom resources and gpu",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-custom", "owner")
-				s.Kserve = &types.Kserve{Type: KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", MinScale: 3, CPU: "1", Memory: "2Gi", EnableGPU: true}
+				s.Kserve = &types.Kserve{Type: types.KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", MinScale: 3, CPU: "1", Memory: "2Gi", EnableGPU: true}
 				return &s
 			}(),
 			cfg: func() *types.Config {
@@ -1001,7 +1001,7 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 			name: "kserve invalid cpu",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-badcpu", "owner")
-				s.Kserve = &types.Kserve{Type: KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", CPU: "bad-cpu"}
+				s.Kserve = &types.Kserve{Type: types.KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", CPU: "bad-cpu"}
 				return &s
 			}(),
 			cfg: func() *types.Config {
@@ -1017,7 +1017,7 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 			name: "kserve invalid memory",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-badmem", "owner")
-				s.Kserve = &types.Kserve{Type: KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", Memory: "bad-memory"}
+				s.Kserve = &types.Kserve{Type: types.KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", Memory: "bad-memory"}
 				return &s
 			}(),
 			cfg: func() *types.Config {

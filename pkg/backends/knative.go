@@ -131,7 +131,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 	}
 
 	if isKserve {
-		if err := utils.ValidateKserveService(&service); err != nil {
+		if err := service.Kserve.Validate(); err != nil {
 			return err
 		}
 		if service.Environment.Vars == nil {
@@ -272,13 +272,12 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	if err != nil {
 		return err
 	}
-	var oldService *types.Service
-
 	if isKserve {
-		if err := utils.ValidateKserveService(&service); err != nil {
+		if err := service.Kserve.Validate(); err != nil {
 			return err
 		}
 	}
+	var oldService *types.Service
 
 	// Check if there is some user defined settings for OSCAR
 	if err := checkAdditionalConfig(ConfigMapNameOSCAR, kn.config.ServicesNamespace, service, kn.config, kn.kubeClientset); err != nil {
