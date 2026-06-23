@@ -1,0 +1,17 @@
+name: release-helm
+
+on:
+  release:
+    types: [created]
+
+jobs:
+
+  update-pkgdev:    
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'release'
+    steps:
+      - name: Trigger pkg.go.dev indexing
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          MAJOR="${TAG%%.*}"
+          curl -s "https://proxy.golang.org/github.com/grycap/oscar/${MAJOR}/@v/${TAG}.info"

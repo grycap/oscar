@@ -45,6 +45,7 @@ var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
 // @Tags services
 // @Produce json
 // @Param serviceName path string true "Service name"
+// @Param namespace query string false "Namespace (admin only - if omitted searches across all namespaces)"
 // @Success 204 {string} string "No Content"
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 403 {string} string "Forbidden"
@@ -58,6 +59,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		// First get the Service
 		var service *types.Service
 		var uid string
+		var namespace string
 		var err error
 		serviceName := c.Param("serviceName")
 		authHeader := c.GetHeader("Authorization")
@@ -70,8 +72,12 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				return
 			}
 		}
-
-		service, err = back.ReadService(utils.BuildUserNamespace(cfg, uid), serviceName)
+		if isOIDC {
+			namespace = utils.BuildUserNamespace(cfg, uid)
+		} else {
+			namespace = c.Query("namespace")
+		}
+		service, err = back.ReadService(namespace, serviceName)
 		if err != nil {
 			if errors.IsNotFound(err) || errors.IsGone(err) {
 				c.Status(http.StatusNotFound)
@@ -200,18 +206,15 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		// Get admin client for the provider
 		s3Client = cfg.MinIOProvider.GetS3Client()
 
-		path := strings.Trim(in.Path, " /")
-		// Split buckets and folders from path
-		splitPath := strings.SplitN(path, "/", 2)
-
+		bucketName := getBucketNameFromPath(in.Path)
 		// Disable input notifications for service bucket
-		if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), splitPath[0]); err != nil {
+		if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), bucketName); err != nil {
 			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 		}
 		// Check if the bucket is in the mount path
 		if !sameStorage(in, service.Mount) {
 			err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
-				BucketName:   splitPath[0],
+				BucketName:   bucketName,
 				Visibility:   service.Visibility,
 				AllowedUsers: service.AllowedUsers,
 				Owner:        service.Owner,
@@ -226,7 +229,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				"owner":   service.Owner,
 				"service": "false",
 			}
-			if err := minIOAdminClient.SetTags(splitPath[0], tags); err != nil {
+			if err := minIOAdminClient.SetTags(bucketName, tags); err != nil {
 				return fmt.Errorf("Error tagging bucket: %v", err)
 			}
 		}
@@ -251,14 +254,12 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		case types.MinIOName, types.S3Name:
 			//Check if this storage provider is defined in input
 			previousExist := false
-			outPath := strings.Trim(out.Path, " /")
-			outBucket := strings.SplitN(outPath, "/", 2)[0]
+			outBucket := getBucketNameFromPath(out.Path)
 			//Compare this output storage provider with all the input storage provider
 			for _, in := range service.Input {
 				//Don't compare in.Provider with out.Provider directly
 				inProvID, inProvName := getProviderInfo(in.Provider)
-				inPath := strings.Trim(in.Path, " /")
-				inBucket := strings.SplitN(inPath, "/", 2)[0]
+				inBucket := getBucketNameFromPath(in.Path)
 
 				if inProvID == provID && inProvName == provName && inBucket == outBucket {
 					previousExist = true
@@ -320,7 +321,23 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		}
 	}
 
-	// TODO check if some components of mount need to be deleted
+	// Only for Default MinIO provider
+	if service.Mount.Provider == "minio.default" {
+		bucketName := getBucketNameFromPath(service.Mount.Path)
+		oldTags, _ := minIOAdminClient.GetTaggedMetadata(bucketName)
+		// Bucket metadata for filtering
+		// If bucket dont have already the tags, set them.
+		if oldTags != nil && len(oldTags) > 0 && oldTags["from_service"] != "" {
+			taggedService := oldTags["from_service"]
+			if taggedService == service.Name {
+				oldTags["from_service"] = ""
+				if err := minIOAdminClient.SetTags(bucketName, oldTags); err != nil {
+					return fmt.Errorf("Error updating bucket tags: %v", err)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -402,4 +419,10 @@ func sameStorage(firstStorage types.StorageIOConfig, secondStorage types.Storage
 	splitPathMount := strings.SplitN(secondPath, "/", 2)
 
 	return firstProvID == secondProvID && firstProvName == secondProvName && splitPathBucket[0] == splitPathMount[0]
+}
+
+func getBucketNameFromPath(mountPath string) string {
+	mountPath = strings.Trim(mountPath, " /")
+	splitPath := strings.SplitN(mountPath, "/", 2)
+	return splitPath[0]
 }

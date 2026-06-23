@@ -140,6 +140,7 @@ func ensureClusterQueue(ctx context.Context, kueueClient *kueueclientset.Clients
 	if err != nil {
 		return fmt.Errorf("invalid Kueue default memory quota %q: %w", cfg.KueueDefaultMemory, err)
 	}
+	// Parse the default ephemeral storage quota from config for per-user limits.
 	ephemeralStorageQuota, err := resource.ParseQuantity(cfg.KueueDefaultEphemeralStorage)
 	if err != nil {
 		return fmt.Errorf("invalid Kueue default ephemeral storage quota %q: %w", cfg.KueueDefaultEphemeralStorage, err)
@@ -168,7 +169,7 @@ func ensureClusterQueue(ctx context.Context, kueueClient *kueueclientset.Clients
 			},
 			ResourceGroups: []kueuev1.ResourceGroup{
 				{
-					CoveredResources: []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourceName("nvidia.com/gpu"), v1.ResourceEphemeralStorage},
+					CoveredResources: []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage, v1.ResourceName("nvidia.com/gpu")},
 					Flavors: []kueuev1.FlavorQuotas{
 						{
 							Name: kueuev1.ResourceFlavorReference(flavorName),
@@ -488,6 +489,15 @@ func getServiceResourceRequests(service *types.Service, cfg *types.Config) (v1.R
 
 	requests[v1.ResourceCPU] = cpuQty
 	requests[v1.ResourceMemory] = memoryQty
+
+	// Include ephemeral storage request in workload resources for Kueue quota enforcement.
+	if len(service.EphemeralStorageRequest) > 0 {
+		parsedEphemeral, err := resource.ParseQuantity(service.EphemeralStorageRequest)
+		if err != nil {
+			return nil, fmt.Errorf("invalid service ephemeral storage %q: %w", service.EphemeralStorageRequest, err)
+		}
+		requests[v1.ResourceEphemeralStorage] = parsedEphemeral
+	}
 
 	if service.EnableGPU {
 		gpu, err := resource.ParseQuantity("1")

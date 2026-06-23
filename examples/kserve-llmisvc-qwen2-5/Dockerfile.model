@@ -1,0 +1,21 @@
+FROM --platform=$BUILDPLATFORM alpine:3.20 AS builder
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+RUN apk add --no-cache ca-certificates git git-lfs
+RUN git lfs install --system
+RUN git clone --depth 1 https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct /models
+RUN cd /models && git lfs pull && rm -rf .git
+
+FROM --platform=$BUILDPLATFORM busybox
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+# Create a non-root user and group, and set permissions for the /models directory
+# Necesary to avoid permission issues when KServe tries to access the model files
+# Default KServe modelcard uid is 1010
+RUN addgroup -g 1010 storage \
+	&& adduser -D -u 1010 -G storage storage \
+	&& mkdir -p /models \
+	&& chown -R 1010:1010 /models \
+	&& chmod 755 /models
+COPY --from=builder --chown=1010:1010 /models/ /models/
+USER 1010:1010

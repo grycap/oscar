@@ -1,0 +1,5 @@
+FROM --platform=$BUILDPLATFORM vllm/vllm-openai-cpu:v0.22.1
+ARG BUILDPLATFORM
+ARG TARGETPLATFORM
+USER root
+RUN useradd -u 1010 -m storage
