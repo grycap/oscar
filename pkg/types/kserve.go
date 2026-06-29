@@ -162,12 +162,13 @@ func (k Kserve) validateInferenceService() error {
 	if k.LLMInference != nil {
 		return fmt.Errorf("can't have LLMInference configuration for InferenceService")
 	}
-	return nil
+
+	return k.Inference.Validate()
 }
 
 func (k Kserve) validateLLMInferenceService() error {
 	if k.Inference != nil {
-		return fmt.Errorf("Inference configuration must be nil for LLMInferenceService")
+		return fmt.Errorf("can't have Inference configuration for LLMInferenceService")
 	}
 
 	return nil
