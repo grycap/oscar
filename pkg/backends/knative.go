@@ -171,7 +171,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		}
 	} else if !types.IsInterLinkService(&service, kn.config) {
 		var createdKnSvc *knv1.Service
-		if service.Image != "" {
+		if !(service.Image == "" && isKserve) {
 			// Create the Knative service definition
 			knSvc, err := kn.createKNServiceDefinition(&service, namespace)
 			if err != nil {
@@ -197,9 +197,8 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 				}
 				return err
 			}
-		} else if !isKserve {
-			return fmt.Errorf("service \"%s\" does not have an image defined and is not a KServe service", service.Name)
 		}
+
 		// If the service is a KServe service, create the associated InferenceService
 		if isKserve {
 			// The Kserve service set an OwnerReference to the Knative service, so if the Knative service is deleted the KServe InferenceService will be automatically deleted by Kubernetes garbage collection
@@ -326,7 +325,7 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		}
 	} else {
 		var originalKnSvc *knv1.Service
-		if service.Image != "" && oldService.Image != "" {
+		if !(service.Image == "" && isKserve) {
 			// Get the old knative service
 			oldSvc, err := kn.knClientset.ServingV1().Services(namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 			if err != nil {
@@ -364,8 +363,6 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 				}
 				return err
 			}
-		} else if !isKserve {
-			return fmt.Errorf("service \"%s\" does not have an image defined and is not a KServe service", service.Name)
 		}
 
 		// If the service is a KServe service, update the associated InferenceService
