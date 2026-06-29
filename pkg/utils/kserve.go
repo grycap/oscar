@@ -79,6 +79,64 @@ func IsKserveSupported(cfg *types.Config) bool {
 	return cfg.KserveEnable && cfg.ExposedServicesRouteKind == types.HTTPROUTE
 }
 
+func GetKserveLabelSelector(serviceName string) string {
+	return fmt.Sprintf("%s=%s", kserveKeyLabelApp, prefixLabelApp+serviceName)
+}
+
+func GetKserveSvcName(serviceName, kserveType string) string {
+	if serviceName == "" {
+		return ""
+	}
+
+	switch kserveType {
+	case types.KserveTypeInferenceService:
+		return serviceName + kserveIsvcSuffix
+	case types.KserveTypeLLMInferenceService:
+		return serviceName + kserveLLMIsvcSuffix
+	default:
+		return ""
+	}
+}
+
+func GetKservePodAndDplName(serviceName, kserveType string) string {
+	if serviceName == "" {
+		return ""
+	}
+
+	switch kserveType {
+	case types.KserveTypeInferenceService:
+		return serviceName + kserveIsvcPodDplSuffix
+	case types.KserveTypeLLMInferenceService:
+		return serviceName + kserveLLMIsvcPodDplSuffix
+	default:
+		return ""
+	}
+}
+
+func CheckKserveUpdate(oldService *types.Service, newService *types.Service) error {
+	if oldService.Token != newService.Token {
+		return fmt.Errorf("unexpected error in KServe service update validation")
+	}
+
+	if newService.Image == "" && oldService.Image != "" {
+		return fmt.Errorf("cannot remove the image from an existing OSCAR-KServe service")
+	}
+
+	if newService.Image != "" && oldService.Image == "" {
+		return fmt.Errorf("cannot add an image to an existing OSCAR-KServe service")
+	}
+
+	newKserve := newService.Kserve
+	oldKserve := oldService.Kserve
+	// If one of them is nil and the other is not,
+	// it's a not allowed change in KServe configuration
+	if newKserve == nil || oldKserve == nil {
+		return fmt.Errorf("cannot add or remove KServe configuration")
+	}
+
+	return newService.Kserve.ValidateUpdate(*oldService.Kserve)
+}
+
 // CreateKserveService creates a KServe service based on the provided service and Knative service.
 func CreateKserveService(service *types.Service, knativeService *knv1.Service, cfg *types.Config) error {
 	/*	if err := service.Kserve.Validate(); err != nil {
@@ -137,8 +195,14 @@ func UpdateKserveService(service *types.Service, oldService *types.Service, name
 	if err := service.Kserve.Validate(); err != nil {
 		return err
 	}
+	// Check if the KServe configuration can be updated based on the old configuration
 	if err := CheckKserveUpdate(oldService, service); err != nil {
 		return err
+	}
+
+	// If the KServe configuration hasn't changed, no update is needed
+	if service.Kserve.Equal(*oldService.Kserve) {
+		return nil
 	}
 
 	dynClient, err := getDynamicClient()
@@ -169,6 +233,22 @@ func UpdateKserveService(service *types.Service, oldService *types.Service, name
 		return fmt.Errorf("unsupported KServe service type: %s", service.Kserve.Type)
 	}
 
+	return nil
+}
+
+func DeleteKserveService(serviceName, namespace, kserveType string) error {
+	dynClient, err := getDynamicClient()
+	if err != nil {
+		return err
+	}
+	resource := kserveIsvcGVR
+	if kserveType == types.KserveTypeLLMInferenceService {
+		resource = llmInferenceServiceGVR
+	}
+	err = dynClient.Resource(resource).Namespace(namespace).Delete(context.Background(), buildKserveName(serviceName), metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("failed to delete Kserve InferenceService: %v", err)
+	}
 	return nil
 }
 
@@ -365,35 +445,6 @@ func updateKserveInferenceServiceSpec(service *types.Service, oldIsvc *unstructu
 	return oldIsvc, nil
 }
 
-func GetKserveInferenceService(serviceName, namespace string) (*unstructured.Unstructured, error) {
-	dynClient, err := getDynamicClient()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create dynamic client: %v", err)
-	}
-
-	isvc, err := dynClient.Resource(kserveIsvcGVR).Namespace(namespace).Get(context.Background(), buildKserveName(serviceName), metav1.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get InferenceService: %v", err)
-	}
-	return isvc, nil
-}
-
-func DeleteKserveService(serviceName, namespace, kserveType string) error {
-	dynClient, err := getDynamicClient()
-	if err != nil {
-		return err
-	}
-	resource := kserveIsvcGVR
-	if kserveType == types.KserveTypeLLMInferenceService {
-		resource = llmInferenceServiceGVR
-	}
-	err = dynClient.Resource(resource).Namespace(namespace).Delete(context.Background(), buildKserveName(serviceName), metav1.DeleteOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete Kserve InferenceService: %v", err)
-	}
-	return nil
-}
-
 func newKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (*unstructured.Unstructured, error) {
 	if err := service.Kserve.Validate(); err != nil {
 		return nil, err
@@ -517,64 +568,6 @@ func updateKserveLLMInferenceServiceSpec(service *types.Service, oldLLMIsvc *uns
 	return oldLLMIsvc, nil
 }
 
-func GetKserveLabelSelector(serviceName string) string {
-	return fmt.Sprintf("%s=%s", kserveKeyLabelApp, prefixLabelApp+serviceName)
-}
-
-func GetKserveSvcName(serviceName, kserveType string) string {
-	if serviceName == "" {
-		return ""
-	}
-
-	switch kserveType {
-	case types.KserveTypeInferenceService:
-		return serviceName + kserveIsvcSuffix
-	case types.KserveTypeLLMInferenceService:
-		return serviceName + kserveLLMIsvcSuffix
-	default:
-		return ""
-	}
-}
-
-func GetKservePodAndDplName(serviceName, kserveType string) string {
-	if serviceName == "" {
-		return ""
-	}
-
-	switch kserveType {
-	case types.KserveTypeInferenceService:
-		return serviceName + kserveIsvcPodDplSuffix
-	case types.KserveTypeLLMInferenceService:
-		return serviceName + kserveLLMIsvcPodDplSuffix
-	default:
-		return ""
-	}
-}
-
-func CheckKserveUpdate(oldService *types.Service, newService *types.Service) error {
-	if oldService.Token != newService.Token {
-		return fmt.Errorf("unexpected error in KServe service update validation")
-	}
-
-	if newService.Image == "" && oldService.Image != "" {
-		return fmt.Errorf("cannot remove the image from an existing OSCAR-KServe service")
-	}
-
-	if newService.Image != "" && oldService.Image == "" {
-		return fmt.Errorf("cannot add an image to an existing OSCAR-KServe service")
-	}
-
-	newKserve := newService.Kserve
-	oldKserve := oldService.Kserve
-	// If one of them is nil and the other is not,
-	// it's a not allowed change in KServe configuration
-	if newKserve == nil || oldKserve == nil {
-		return fmt.Errorf("cannot add or remove KServe configuration")
-	}
-
-	return newService.Kserve.ValidateUpdate(*oldService.Kserve)
-}
-
 func getDynamicClient() (*dynamic.DynamicClient, error) {
 	dynClient, err := newDynamicClient()
 	if err != nil {
@@ -615,7 +608,6 @@ func getTraefikCORSMiddlewareName(serviceName string) string {
 }
 
 func exposeKserveService(dynClient *dynamic.DynamicClient, service *types.Service, owner *KserveServiceOwner, cfg *types.Config) error {
-	log.Printf("Owner: %v", owner)
 	gwName := strings.TrimSpace(cfg.HTTPRouteGatewayName)
 	gwNamespace := strings.TrimSpace(cfg.HTTPRouteGatewayNamespace)
 	if gwNamespace == "" || gwName == "" {
