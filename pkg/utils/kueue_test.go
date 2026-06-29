@@ -928,7 +928,8 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 				s.Kserve = nil
 				return &s
 			}(),
-			cfg: newTestConfig(),
+			cfg:     newTestConfig(),
+			wantErr: true,
 		},
 		{
 			name: "kserve service but unsupported route kind",
@@ -943,6 +944,7 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 				c.ExposedServicesRouteKind = "ingress"
 				return c
 			}(),
+			wantErr: true,
 		},
 		{
 			name: "kserve Inference defaults and min scale fallback",

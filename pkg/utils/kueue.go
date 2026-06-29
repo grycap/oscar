@@ -534,7 +534,7 @@ func getServiceResourceRequests(service *types.Service, cfg *types.Config) (v1.R
 
 func getKserveResourceRequests(service *types.Service, cfg *types.Config) (v1.ResourceList, int32, error) {
 
-	if service.IsKserve() && !IsKserveSupported(cfg) {
+	if !service.IsKserve() || !IsKserveSupported(cfg) {
 		return nil, 0, fmt.Errorf("KServe is not supported in the current configuration")
 	}
 
