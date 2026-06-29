@@ -75,17 +75,6 @@ var newDynamicClient dynamicClientFactory = func() (*dynamic.DynamicClient, erro
 
 var kserveLogger = log.New(os.Stdout, "[KSERVE-SERVICE] ", log.Flags())
 
-func IsKserveService(service *types.Service) bool {
-	// If the service has KServe configuration
-	if service.Kserve == nil /* || service.Kserve.StorageUri == "" || service.Kserve.Type == ""*/ {
-		return false
-	}
-	/*if service.Kserve.Type == types.KserveTypeInferenceService && (service.Kserve.Inference == nil || service.Kserve.Inference.ModelFormat == "") {
-		return false
-	}*/
-	return true
-}
-
 func IsKserveSupported(cfg *types.Config) bool {
 	return cfg.KserveEnable && cfg.ExposedServicesRouteKind == types.HTTPROUTE
 }

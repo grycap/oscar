@@ -471,7 +471,7 @@ func checkValues(service *types.Service, cfg *types.Config) {
 		service.CPU = defaultCPU
 	}
 
-	if utils.IsKserveService(service) && utils.IsKserveSupported(cfg) {
+	if service.IsKserve() && utils.IsKserveSupported(cfg) {
 		if service.Kserve.CPU == "" {
 			service.Kserve.CPU = defaultCPU
 		}
