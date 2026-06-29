@@ -250,6 +250,7 @@ func TestKnativeCreateService(t *testing.T) {
 			testService := types.Service{
 				Name:   "test",
 				Labels: map[string]string{},
+				Image:  "image",
 			}
 
 			for _, r := range s.k8sReactors {

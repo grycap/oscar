@@ -19,13 +19,6 @@ func TestKserveUnmarshalJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unmarshal failed: %v", err)
 	}
-	/*
-		CPU:       "0.2",
-			Memory:    "256Mi",
-			SetAuth:   true,
-			MinScale:  0,
-			MaxScale:  1,
-			EnableGPU: false,*/
 	if kserve.MinScale != 0 {
 		t.Errorf("Expected default MinScale 0, got %d", kserve.MinScale)
 	}
@@ -46,11 +39,19 @@ func TestKserveUnmarshalJSON(t *testing.T) {
 	}
 
 	// Test invalid unmarshaling (missing required StorageUri)
-	invalidData := []byte(`{"type": "inference", "storage_uri": ""}`)
+	invalidData := []byte(`{"type": "inference", "inference": {"model_format": "onnx"}, "storage_uri": ""}`)
 	var kserveInvalid Kserve
 	err = json.Unmarshal(invalidData, &kserveInvalid)
-	if err == nil {
-		t.Fatal("Expected unmarshal to fail due to missing StorageUri, but it succeeded.")
+	if err != nil {
+		t.Fatal("Unmarshal should not fail for missing StorageUri, validation is done separately")
+	}
+	err = kserveInvalid.Validate()
+	if err != nil {
+		t.Fatalf("Expected validation error for missing StorageUri, got: %v", err)
+	}
+	expectedErr := "missing model storage URI in KServe configuration"
+	if err.Error() != expectedErr {
+		t.Errorf("Expected error message:\n%s\nGot:\n%s", expectedErr, err.Error())
 	}
 }
 
