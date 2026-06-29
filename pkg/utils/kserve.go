@@ -327,6 +327,13 @@ func createKserveLLMInferenceService(dynClient *dynamic.DynamicClient, service *
 // (serving.kserve.io/v1beta1) suitable for use with a dynamic Kubernetes client.
 // It is functionally equivalent to newKserveInferenceServiceSpec.
 func newKserveInferenceServiceSpec(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (*unstructured.Unstructured, error) {
+	if service == nil {
+		return nil, fmt.Errorf("service is nil")
+	}
+	if service.Kserve == nil {
+		return nil, fmt.Errorf("missing KServe configuration")
+	}
+
 	if err := service.Kserve.Validate(); err != nil {
 		return nil, err
 	}
@@ -395,6 +402,13 @@ func newKserveInferenceServiceSpec(service *types.Service, owner *KserveServiceO
 // updateKserveInferenceServiceSpec updates the spec fields of an existing
 // unstructured InferenceService object in place, preserving metadata (including resourceVersion).
 func updateKserveInferenceServiceSpec(service *types.Service, oldIsvc *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	if service == nil {
+		return nil, fmt.Errorf("service is nil")
+	}
+	if service.Kserve == nil {
+		return nil, fmt.Errorf("missing KServe configuration")
+	}
+
 	if err := service.Kserve.Validate(); err != nil {
 		return nil, err
 	}
@@ -446,6 +460,13 @@ func updateKserveInferenceServiceSpec(service *types.Service, oldIsvc *unstructu
 }
 
 func newKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (*unstructured.Unstructured, error) {
+	if service == nil {
+		return nil, fmt.Errorf("service is nil")
+	}
+	if service.Kserve == nil {
+		return nil, fmt.Errorf("missing KServe configuration")
+	}
+
 	if err := service.Kserve.Validate(); err != nil {
 		return nil, err
 	}
@@ -520,6 +541,13 @@ func newKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServi
 // updateKserveLLMInferenceServiceSpec updates the spec fields of an existing
 // unstructured LLMInferenceService object in place, preserving metadata (including resourceVersion).
 func updateKserveLLMInferenceServiceSpec(service *types.Service, oldLLMIsvc *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	if service == nil {
+		return nil, fmt.Errorf("service is nil")
+	}
+	if service.Kserve == nil {
+		return nil, fmt.Errorf("missing KServe configuration")
+	}
+
 	if err := service.Kserve.Validate(); err != nil {
 		return nil, err
 	}
