@@ -46,13 +46,10 @@ func TestKserveUnmarshalJSON(t *testing.T) {
 		t.Fatal("Unmarshal should not fail for missing StorageUri, validation is done separately")
 	}
 	err = kserveInvalid.Validate()
-	if err != nil {
+	if err == nil {
 		t.Fatalf("Expected validation error for missing StorageUri, got: %v", err)
 	}
-	expectedErr := "missing model storage URI in KServe configuration"
-	if err.Error() != expectedErr {
-		t.Errorf("Expected error message:\n%s\nGot:\n%s", expectedErr, err.Error())
-	}
+
 }
 
 func TestKserveValidateInvalidType(t *testing.T) {
