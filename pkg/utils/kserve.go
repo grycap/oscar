@@ -552,8 +552,16 @@ func GetKservePodAndDplName(serviceName, kserveType string) string {
 }
 
 func CheckKserveUpdate(oldService *types.Service, newService *types.Service) error {
-	if oldService.Token != newService.Token || !oldService.IsKserve() || !newService.IsKserve() {
+	if oldService.Token != newService.Token {
 		return fmt.Errorf("unexpected error in KServe service update validation")
+	}
+
+	if newService.Image == "" && oldService.Image != "" {
+		return fmt.Errorf("cannot remove the image from an existing OSCAR-KServe service")
+	}
+
+	if newService.Image != "" && oldService.Image == "" {
+		return fmt.Errorf("cannot add an image to an existing OSCAR-KServe service")
 	}
 
 	newKserve := newService.Kserve
@@ -563,6 +571,7 @@ func CheckKserveUpdate(oldService *types.Service, newService *types.Service) err
 	if newKserve == nil || oldKserve == nil {
 		return fmt.Errorf("cannot add or remove KServe configuration")
 	}
+
 	return newService.Kserve.ValidateUpdate(*oldService.Kserve)
 }
 
