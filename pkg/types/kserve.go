@@ -127,7 +127,7 @@ func (k Kserve) Validate() error {
 	return nil
 }
 
-func (k Kserve) ValdateUpdate(old Kserve) error {
+func (k Kserve) ValidateUpdate(old Kserve) error {
 	if old.StorageUri != k.StorageUri {
 		return fmt.Errorf("cannot update model storage configuration for KServe")
 	}
@@ -137,7 +137,7 @@ func (k Kserve) ValdateUpdate(old Kserve) error {
 	}
 	if old.Type != k.Type {
 		return fmt.Errorf("cannot change KServe service type")
-	} else if k.Type == KserveTypeInferenceService {
+	} else if k.IsInferenceService() {
 		if old.Inference == nil || k.Inference == nil {
 			return fmt.Errorf("inference configuration cannot be nil for KServe service")
 		}

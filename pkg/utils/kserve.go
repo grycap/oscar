@@ -202,7 +202,7 @@ func getKserveLLMInferenceService(dynClient *dynamic.DynamicClient, serviceName,
 }
 
 func updateKserveInferenceService(dynClient *dynamic.DynamicClient, service *types.Service, oldKserveSvc *unstructured.Unstructured) error {
-	newKserveSvc, err := UpdateKserveInferenceServiceSpec(service, oldKserveSvc)
+	newKserveSvc, err := updateKserveInferenceServiceSpec(service, oldKserveSvc)
 	if err != nil {
 		return err
 	}
@@ -215,7 +215,7 @@ func updateKserveInferenceService(dynClient *dynamic.DynamicClient, service *typ
 }
 
 func updateKserveLLMInferenceService(dynClient *dynamic.DynamicClient, service *types.Service, oldKserveSvc *unstructured.Unstructured) error {
-	newKserveSvc, err := UpdateKserveLLMInferenceServiceSpec(service, oldKserveSvc)
+	newKserveSvc, err := updateKserveLLMInferenceServiceSpec(service, oldKserveSvc)
 	if err != nil {
 		return err
 	}
@@ -323,9 +323,9 @@ func newKserveInferenceServiceSpec(service *types.Service, owner *KserveServiceO
 	}}, nil
 }
 
-// UpdateKserveInferenceServiceSpec updates the spec fields of an existing
+// updateKserveInferenceServiceSpec updates the spec fields of an existing
 // unstructured InferenceService object in place, preserving metadata (including resourceVersion).
-func UpdateKserveInferenceServiceSpec(service *types.Service, oldIsvc *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func updateKserveInferenceServiceSpec(service *types.Service, oldIsvc *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	if err := service.Kserve.Validate(); err != nil {
 		return nil, err
 	}
@@ -477,9 +477,9 @@ func newKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServi
 	}}, nil
 }
 
-// UpdateKserveLLMInferenceServiceSpec updates the spec fields of an existing
+// updateKserveLLMInferenceServiceSpec updates the spec fields of an existing
 // unstructured LLMInferenceService object in place, preserving metadata (including resourceVersion).
-func UpdateKserveLLMInferenceServiceSpec(service *types.Service, oldLLMIsvc *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func updateKserveLLMInferenceServiceSpec(service *types.Service, oldLLMIsvc *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	if err := service.Kserve.Validate(); err != nil {
 		return nil, err
 	}
@@ -574,7 +574,7 @@ func CheckKserveUpdate(oldService *types.Service, newService *types.Service) err
 	if newKserve == nil || oldKserve == nil {
 		return fmt.Errorf("cannot add or remove KServe configuration")
 	}
-	return newService.Kserve.ValdateUpdate(*oldService.Kserve)
+	return newService.Kserve.ValidateUpdate(*oldService.Kserve)
 }
 
 func getDynamicClient() (*dynamic.DynamicClient, error) {
