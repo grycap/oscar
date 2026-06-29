@@ -83,13 +83,7 @@ func (k *Kserve) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	ks := Kserve(aux)
-	if err := ks.Validate(); err != nil {
-		return err
-	}
-
-	*k = ks
-
+	*k = Kserve(aux)
 	return nil
 }
 

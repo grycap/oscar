@@ -76,6 +76,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
+		if err := service.Validate(); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+			return
+		}
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
 			service.Owner = types.DefaultOwner

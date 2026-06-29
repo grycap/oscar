@@ -345,16 +345,16 @@ func (s *Service) UnmarshalJSON(data []byte) error {
 	type Alias Service
 
 	aux := Alias{}
+
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 
-	service := Service(aux)
-	if err := service.Validate(); err != nil {
-		return err
+	if aux.Visibility == "" {
+		aux.Visibility = "private"
 	}
 
-	*s = service
+	*s = Service(aux)
 	return nil
 }
 
@@ -371,6 +371,10 @@ func (s Service) Validate() error {
 
 	if strings.TrimSpace(s.Image) == "" && s.Kserve == nil {
 		return fmt.Errorf("service Image is required")
+	}
+
+	if s.IsKserve() {
+		return s.Kserve.Validate()
 	}
 
 	return nil
