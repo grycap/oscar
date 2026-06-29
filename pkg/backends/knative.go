@@ -376,7 +376,7 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 			// The Kserve service set an OwnerReference to the Knative service, so if the Knative service is deleted the KServe InferenceService will be automatically deleted by Kubernetes garbage collection
 			updateErr := utils.UpdateKserveService(&service, oldService, namespace)
 			if updateErr != nil {
-				log.Printf("Error updating asociated KServe InferenceService: %v", updateErr)
+				log.Printf("Error updating KServe service: %v", updateErr)
 				// Restore the old Knative Service
 				if originalKnSvc != nil {
 					if _, resErr := kn.knClientset.ServingV1().Services(namespace).Update(context.TODO(), originalKnSvc, metav1.UpdateOptions{}); resErr != nil {
@@ -568,14 +568,4 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service, name
 // GetKubeClientset returns the Kubernetes Clientset
 func (kn *KnativeBackend) GetKubeClientset() kubernetes.Interface {
 	return kn.kubeClientset
-}
-
-func isKserveServiceAndSupported(service *types.Service, kn *KnativeBackend) (bool, error) {
-	if service.IsKserve() {
-		if !utils.IsKserveSupported(kn.config) {
-			return false, fmt.Errorf("KServe is not supported in the current configuration")
-		}
-		return true, nil
-	}
-	return false, nil
 }
