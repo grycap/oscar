@@ -3,6 +3,8 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 )
 
@@ -171,6 +173,23 @@ func (k Kserve) validateLLMInferenceService() error {
 	return nil
 }
 
+func (k Kserve) Equal(other Kserve) bool {
+	return k.Type == other.Type &&
+		k.StorageUri == other.StorageUri &&
+		k.MinScale == other.MinScale &&
+		k.MaxScale == other.MaxScale &&
+		k.CPU == other.CPU &&
+		k.Memory == other.Memory &&
+		k.EnableGPU == other.EnableGPU &&
+		k.SetAuth == other.SetAuth &&
+		((k.Inference == nil) == (other.Inference == nil)) &&
+		((k.LLMInference == nil) == (other.LLMInference == nil)) &&
+		(k.Inference == nil || k.Inference.Equal(*other.Inference)) &&
+		(k.LLMInference == nil || k.LLMInference.Equal(*other.LLMInference)) &&
+		maps.Equal(k.Env, other.Env) &&
+		slices.Equal(k.Args, other.Args)
+}
+
 type KserveInference struct {
 	// ModelFormat the model format to use for KServe InferenceService
 	// ("onnx", "sklearn", "xgboost", "pytorch", "tensorflow", "triton", "huggingface").
@@ -218,9 +237,19 @@ func (k KserveInference) Validate() error {
 	}
 }
 
+func (k KserveInference) Equal(other KserveInference) bool {
+	return k.ModelFormat == other.ModelFormat &&
+		k.Runtime == other.Runtime &&
+		k.APIVersion == other.APIVersion
+}
+
 type KserveLLMInference struct {
 	// At the moment only supported for LLMInferenceService,
 	// the runtime image to use for KServe when IsLLM is true
 	// Optional. (default: a custom image based on vLLM for CPU and another one with GPU support)
 	RuntimeImage string `json:"runtime_image,omitempty"`
+}
+
+func (k KserveLLMInference) Equal(other KserveLLMInference) bool {
+	return k.RuntimeImage == other.RuntimeImage
 }
