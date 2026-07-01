@@ -35,8 +35,8 @@ const (
 	authMiddlewareSuffix      = "-auth-mdw"
 	authSecretSuffix          = "-auth-traefik" // #nosec G101
 	corsMiddlewareSuffix      = "-cors-mdw"
-	defaultLLMCPUimage        = "vllm/vllm-openai-cpu:latest"
-	defaultLLMGPUimage        = "vllm/vllm-openai:latest"
+	defaultLLMCPUimage        = "ghcr.io/grycap/kserve-llm-d-cpu:latest"
+	defaultLLMGPUimage        = "ghcr.io/grycap/kserve-llm-d-cuda:latest"
 	kserveKeyLabelApp         = "oscar-app"
 	prefixLabelApp            = "oscar-svc-ksv-"
 	kserveIsvcSuffix          = "-predictor"
