@@ -32,8 +32,8 @@ type Kserve struct {
 	StorageUri string `json:"storage_uri"`
 
 	// MinScale minimum number of active replicas (pods) for the service
-	// Optional. (default: 0)
-	MinScale int32 `json:"min_scale,omitempty" default:"0"`
+	// Optional. (default: 1)
+	MinScale int32 `json:"min_scale,omitempty" default:"1"`
 
 	// MaxScale maximum number of active replicas (pods) for the service
 	// Optional. (default: 1)
@@ -74,7 +74,7 @@ func (k *Kserve) UnmarshalJSON(data []byte) error {
 		CPU:       "0.2",
 		Memory:    "256Mi",
 		SetAuth:   true,
-		MinScale:  0,
+		MinScale:  1,
 		MaxScale:  1,
 		EnableGPU: false,
 	}
