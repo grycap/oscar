@@ -60,6 +60,14 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
+		if err := newService.Validate(); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+			return
+		}
+		if newService.IsKserve() && !utils.IsKserveSupported(cfg) {
+			c.String(http.StatusBadRequest, "KServe is not supported in this deployment")
+			return
+		}
 		rawInput := cloneStorageIOConfigs(newService.Input)
 		rawOutput := cloneStorageIOConfigs(newService.Output)
 		if err := normalizeStoragePaths(&newService); err != nil {
@@ -109,6 +117,14 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			serviceNamespace = cfg.ServicesNamespace
 		}
 		newService.Namespace = serviceNamespace
+
+		// Check if the service is a KServe service and validate the update
+		if oldService.IsKserve() || newService.IsKserve() {
+			if err := utils.CheckKserveUpdate(oldService, &newService); err != nil {
+				c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+				return
+			}
+		}
 
 		if !isAdminUser {
 			uid, err = auth.GetUIDFromContext(c)
