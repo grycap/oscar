@@ -483,6 +483,10 @@ func checkValues(service *types.Service, cfg *types.Config) {
 		if service.Kserve.Memory == "" {
 			service.Kserve.Memory = defaultMemory
 		}
+		if service.Labels == nil {
+			service.Labels = make(map[string]string)
+		}
+		service.Labels["kserve"] = "true"
 	}
 	// Check if visibility has been set. If not set default private.
 	if service.Visibility == "" {
