@@ -125,25 +125,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 	if namespace == "" {
 		namespace = kn.config.ServicesNamespace
 	}
-	isKserveSupported := utils.IsKserveSupported(kn.config)
 	isKserve := service.IsKserve()
-	if isKserve && !isKserveSupported {
-		return fmt.Errorf("KServe is not supported in the current configuration")
-	}
-	if isKserve {
-		if err := service.Kserve.Validate(); err != nil {
-			return err
-		}
-		if service.Environment.Vars == nil {
-			service.Environment.Vars = make(map[string]string)
-		}
-		service.Environment.Vars["KSERVE_HOST"] = fmt.Sprintf("%s.%s.svc.cluster.local", utils.GetKserveSvcName(service.Name, service.Kserve.Type), namespace)
-		if service.Labels == nil {
-			service.Labels = make(map[string]string)
-		}
-		service.Labels["kserve"] = "true"
-	}
-
 	// Check if there is some user defined settings for OSCAR
 	err := checkAdditionalConfig(ConfigMapNameOSCAR, kn.config.ServicesNamespace, service, kn.config, kn.kubeClientset)
 	if err != nil {
@@ -171,6 +153,7 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 		}
 	} else if !types.IsInterLinkService(&service, kn.config) {
 		var createdKnSvc *knv1.Service
+		// Skip Knative service creation only if the service is a KServe service without an image
 		if !(service.Image == "" && isKserve) {
 			// Create the Knative service definition
 			knSvc, err := kn.createKNServiceDefinition(&service, namespace)
@@ -271,18 +254,7 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	if namespace == "" {
 		namespace = kn.config.ServicesNamespace
 	}
-	isKserveSupported := utils.IsKserveSupported(kn.config)
 	isKserve := service.IsKserve()
-	if isKserve && !isKserveSupported {
-		return fmt.Errorf("KServe is not supported in the current configuration")
-	}
-
-	if isKserve {
-		if err := service.Kserve.Validate(); err != nil {
-			return err
-		}
-	}
-	var oldService *types.Service
 
 	// Check if there is some user defined settings for OSCAR
 	if err := checkAdditionalConfig(ConfigMapNameOSCAR, kn.config.ServicesNamespace, service, kn.config, kn.kubeClientset); err != nil {
@@ -293,18 +265,6 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 	oldCm, err := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("the service \"%s\" does not have a registered ConfigMap", service.Name)
-	}
-
-	if isKserveSupported {
-		oldService, err = getServiceFromConfigMap(oldCm)
-		if err != nil {
-			return err
-		}
-		if isKserve || oldService.IsKserve() {
-			if err := utils.CheckKserveUpdate(oldService, &service); err != nil {
-				return err
-			}
-		}
 	}
 
 	// Update the configMap with FDL and user-script
@@ -325,6 +285,7 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		}
 	} else {
 		var originalKnSvc *knv1.Service
+		// Skip Knative service update only if the service is a KServe service without an image
 		if !(service.Image == "" && isKserve) {
 			// Get the old knative service
 			oldSvc, err := kn.knClientset.ServingV1().Services(namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
@@ -367,8 +328,9 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 
 		// If the service is a KServe service, update the associated InferenceService
 		if isKserve {
-			if oldService == nil {
-				return fmt.Errorf("the service \"%s\" is a KServe service but the old service definition could not be retrieved", service.Name)
+			oldService, err := getServiceFromConfigMap(oldCm)
+			if err != nil {
+				return err
 			}
 			// The Kserve service set an OwnerReference to the Knative service, so if the Knative service is deleted the KServe InferenceService will be automatically deleted by Kubernetes garbage collection
 			updateErr := utils.UpdateKserveService(&service, oldService, namespace)
