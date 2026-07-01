@@ -19,8 +19,8 @@ func TestKserveUnmarshalJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unmarshal failed: %v", err)
 	}
-	if kserve.MinScale != 0 {
-		t.Errorf("Expected default MinScale 0, got %d", kserve.MinScale)
+	if kserve.MinScale != 1 {
+		t.Errorf("Expected default MinScale 1, got %d", kserve.MinScale)
 	}
 	if kserve.MaxScale != 1 {
 		t.Errorf("Expected default MaxScale 1, got %d", kserve.MaxScale)
