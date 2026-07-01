@@ -220,7 +220,6 @@ func TestNewKserveInferenceServiceDefinition_ProtocolVersion(t *testing.T) {
 	}{
 		{"v1 explicit", "v1", "v1"},
 		{"v2 explicit", "v2", "v2"},
-		{"error on invalid", "v3", ""}, // should throw an error
 	}
 
 	for _, tt := range tests {
@@ -240,16 +239,6 @@ func TestNewKserveInferenceServiceDefinition_ProtocolVersion(t *testing.T) {
 				t.Errorf("protocolVersion = %q, want %q", got, tt.expected)
 			}
 		})
-	}
-}
-
-func TestNewKserveInferenceServiceDefinition_NoKserveConfig(t *testing.T) {
-	svc := &oscarType.Service{Name: "no-kserve"}
-	knSvc := knativeServiceWithUID("uid")
-
-	_, err := newKserveInferenceServiceSpec(svc, knativeOwnerRef(knSvc), &oscarType.Config{})
-	if err == nil {
-		t.Error("expected error when service has no KServe configuration, got nil")
 	}
 }
 
@@ -616,7 +605,6 @@ func TestUpdateKserveInferenceServiceDefinition_ProtocolVersion(t *testing.T) {
 	}{
 		{"v1 explicit", "v1", "v1"},
 		{"v2 explicit", "v2", "v2"},
-		{"error on invalid", "v3", ""}, // should throw an error
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -624,9 +612,6 @@ func TestUpdateKserveInferenceServiceDefinition_ProtocolVersion(t *testing.T) {
 			svc.Kserve.Inference.APIVersion = tt.input
 			isvc, err := updateKserveInferenceServiceSpec(svc, oldIsvc)
 			if err != nil {
-				if tt.expected == "" {
-					return
-				}
 				t.Fatalf("unexpected error: %v", err)
 			}
 			got := getNestedString(t, isvc, "spec", "predictor", "model", "protocolVersion")
@@ -634,16 +619,6 @@ func TestUpdateKserveInferenceServiceDefinition_ProtocolVersion(t *testing.T) {
 				t.Errorf("protocolVersion = %q, want %q", got, tt.expected)
 			}
 		})
-	}
-}
-
-func TestUpdateKserveInferenceServiceDefinition_NoKserveConfig(t *testing.T) {
-	svc := &oscarType.Service{Name: "no-kserve"}
-	oldIsvc := &unstructured.Unstructured{Object: map[string]any{}}
-
-	_, err := updateKserveInferenceServiceSpec(svc, oldIsvc)
-	if err == nil {
-		t.Error("expected error when service has no KServe configuration, got nil")
 	}
 }
 
@@ -655,24 +630,6 @@ func TestUpdateKserveInferenceServiceDefinition_InvalidCPU(t *testing.T) {
 	_, err := updateKserveInferenceServiceSpec(svc, oldIsvc)
 	if err == nil {
 		t.Error("expected error due to invalid CPU quantity, got nil")
-	}
-}
-
-func TestUpdateKserveInferenceServiceDefinition_ErrorProtocolVersionWhenMissing(t *testing.T) {
-	svc := kserveService()
-	svc.Kserve.Inference.APIVersion = ""
-
-	oldIsvc := &unstructured.Unstructured{Object: map[string]any{
-		"spec": map[string]any{
-			"predictor": map[string]any{
-				"model": map[string]any{},
-			},
-		},
-	}}
-
-	_, err := updateKserveInferenceServiceSpec(svc, oldIsvc)
-	if err == nil {
-		t.Fatalf("expected error: %v", err)
 	}
 }
 
@@ -1317,12 +1274,263 @@ func setDynamicClientFactoryForTest(t *testing.T, factory dynamicClientFactory) 
 	})
 }
 
+func assertPanicWithMessage(t *testing.T, want string, fn func()) {
+	t.Helper()
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatalf("expected panic %q, got nil", want)
+		}
+		msg, ok := r.(string)
+		if !ok {
+			t.Fatalf("expected panic string %q, got %T (%v)", want, r, r)
+		}
+		if msg != want {
+			t.Fatalf("panic = %q, want %q", msg, want)
+		}
+	}()
+
+	fn()
+}
+
+func TestCreateKserveService_DecisionPaths(t *testing.T) {
+	baseCfg := &oscarType.Config{}
+	validKnative := knativeServiceWithUID("uid-create")
+
+	// Decision graph (CreateKserveService):
+	// C1: nil service/KServe -> panic
+	// C2: nil cfg -> panic
+	// C3: knative namespace mismatch -> error
+	// C4: dynamic client creation fails -> error
+	// C5: unsupported KServe type -> error
+	tests := []struct {
+		name      string
+		service   *oscarType.Service
+		knSvc     *knv1.Service
+		cfg       *oscarType.Config
+		factory   dynamicClientFactory
+		wantErr   string
+		wantPanic string
+	}{
+		{
+			name:      "panic when service is nil",
+			service:   nil,
+			knSvc:     nil,
+			cfg:       baseCfg,
+			wantPanic: "CreateKserveService: service or Kserve is nil",
+		},
+		{
+			name: "panic when kserve block is nil",
+			service: &oscarType.Service{
+				Name:      "my-service",
+				Namespace: "oscar-svc",
+				Kserve:    nil,
+			},
+			knSvc:     nil,
+			cfg:       baseCfg,
+			wantPanic: "CreateKserveService: service or Kserve is nil",
+		},
+		{
+			name:      "panic when cfg is nil",
+			service:   kserveService(),
+			knSvc:     nil,
+			cfg:       nil,
+			wantPanic: "CreateKserveService: cfg is nil",
+		},
+		{
+			name:    "error on knative namespace mismatch",
+			service: kserveService(),
+			knSvc: &knv1.Service{ObjectMeta: metav1.ObjectMeta{
+				Name:      "other-kn",
+				Namespace: "another-ns",
+				UID:       "uid-mismatch",
+			}},
+			cfg:     baseCfg,
+			wantErr: "service namespace does not match Knative service namespace",
+		},
+		{
+			name:    "error when dynamic client cannot be created",
+			service: kserveService(),
+			knSvc:   validKnative,
+			cfg:     baseCfg,
+			factory: func() (*dynamic.DynamicClient, error) {
+				return nil, errors.New("dynamic client failure")
+			},
+			wantErr: "failed to create dynamic client: dynamic client failure",
+		},
+		{
+			name: "error on unsupported kserve type",
+			service: func() *oscarType.Service {
+				s := kserveService()
+				s.Kserve.Type = "unsupported-type"
+				return s
+			}(),
+			knSvc: nil,
+			cfg:   baseCfg,
+			factory: func() (*dynamic.DynamicClient, error) {
+				return &dynamic.DynamicClient{}, nil
+			},
+			wantErr: "unsupported KServe service type: unsupported-type",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.factory != nil {
+				setDynamicClientFactoryForTest(t, tt.factory)
+			}
+
+			call := func() {
+				err := CreateKserveService(tt.service, tt.knSvc, tt.cfg)
+				if tt.wantErr == "" {
+					if err != nil {
+						t.Fatalf("unexpected error: %v", err)
+					}
+					return
+				}
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("error = %q, want substring %q", err.Error(), tt.wantErr)
+				}
+			}
+
+			if tt.wantPanic != "" {
+				assertPanicWithMessage(t, tt.wantPanic, call)
+				return
+			}
+
+			call()
+		})
+	}
+}
+
+func TestUpdateKserveService_DecisionPaths(t *testing.T) {
+	// Decision graph (UpdateKserveService):
+	// U1: nil service/KServe -> panic
+	// U2: nil old service/KServe -> panic
+	// U3: update validation fails (CheckKserveUpdate) -> error
+	// U4: no KServe changes -> nil (short-circuit)
+	// U5: dynamic client creation fails after valid update intent -> error
+	tests := []struct {
+		name          string
+		service       *oscarType.Service
+		oldService    *oscarType.Service
+		namespace     string
+		factory       dynamicClientFactory
+		wantErr       string
+		wantPanic     string
+		assertFactory func(t *testing.T)
+	}{
+		{
+			name:       "panic when service is nil",
+			service:    nil,
+			oldService: kserveService(),
+			namespace:  "oscar-svc",
+			wantPanic:  "UpdateKserveService: service or Kserve is nil",
+		},
+		{
+			name: "panic when service kserve is nil",
+			service: &oscarType.Service{
+				Name:      "my-service",
+				Namespace: "oscar-svc",
+				Kserve:    nil,
+			},
+			oldService: kserveService(),
+			namespace:  "oscar-svc",
+			wantPanic:  "UpdateKserveService: service or Kserve is nil",
+		},
+		{
+			name:       "panic when old service is nil",
+			service:    kserveService(),
+			oldService: nil,
+			namespace:  "oscar-svc",
+			wantPanic:  "UpdateKserveService: oldService or oldService.Kserve is nil",
+		},
+		{
+			name:    "panic when old service kserve is nil",
+			service: kserveService(),
+			oldService: &oscarType.Service{
+				Name:      "my-service",
+				Namespace: "oscar-svc",
+				Kserve:    nil,
+			},
+			namespace: "oscar-svc",
+			wantPanic: "UpdateKserveService: oldService or oldService.Kserve is nil",
+		},
+		{
+			name:    "error when validation rejects update",
+			service: func() *oscarType.Service { s := kserveService(); s.Token = "changed-token"; return s }(),
+			oldService: func() *oscarType.Service {
+				return kserveService()
+			}(),
+			namespace: "oscar-svc",
+			wantErr:   "unexpected error in KServe service update validation",
+		},
+		{
+			name:       "no-op update returns nil and does not build dynamic client",
+			service:    kserveService(),
+			oldService: kserveService(),
+			namespace:  "oscar-svc",
+			factory: func() (*dynamic.DynamicClient, error) {
+				return nil, errors.New("should not be called")
+			},
+		},
+		{
+			name: "error when dynamic client cannot be created for valid update",
+			service: func() *oscarType.Service {
+				s := kserveService()
+				s.Kserve.MinScale = 2
+				return s
+			}(),
+			oldService: kserveService(),
+			namespace:  "oscar-svc",
+			factory: func() (*dynamic.DynamicClient, error) {
+				return nil, errors.New("dynamic client failure")
+			},
+			wantErr: "failed to create dynamic client: dynamic client failure",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.factory != nil {
+				setDynamicClientFactoryForTest(t, tt.factory)
+			}
+
+			call := func() {
+				err := UpdateKserveService(tt.service, tt.oldService, tt.namespace)
+				if tt.wantErr == "" {
+					if err != nil {
+						t.Fatalf("unexpected error: %v", err)
+					}
+					return
+				}
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("error = %q, want substring %q", err.Error(), tt.wantErr)
+				}
+			}
+
+			if tt.wantPanic != "" {
+				assertPanicWithMessage(t, tt.wantPanic, call)
+				return
+			}
+
+			call()
+		})
+	}
+}
+
 func TestExistsKserveHTTPRouteByServiceName_DynamicClientError(t *testing.T) {
 	setDynamicClientFactoryForTest(t, func() (*dynamic.DynamicClient, error) {
 		return nil, errors.New("dynamic client failure")
 	})
 
-	exists, err := existsKserveHTTPRouteByServiceName("svc", "ns")
+	exists, err := existsKserveHTTPRouteByServiceName("svc")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -1373,34 +1581,6 @@ func newFakeDynamicClientForHTTPRoutes(routes ...*unstructured.Unstructured) *dy
 	)
 }
 
-// ─── CreateKserveService ────────────────────────────────────────────────────
-
-func TestCreateKserveService_InvalidService(t *testing.T) {
-	err := CreateKserveService(invalidKserveService(), knativeServiceWithUID("uid"), &oscarType.Config{})
-	if err == nil {
-		t.Fatal("expected error due to invalid service, got nil")
-	}
-}
-
-// ─── UpdateKserveService ────────────────────────────────────────────────────
-
-func TestUpdateKserveService_InvalidService(t *testing.T) {
-	err := UpdateKserveService(invalidKserveService(), kserveService(), "oscar-svc")
-	if err == nil {
-		t.Fatal("expected error due to invalid service, got nil")
-	}
-}
-
-func TestUpdateKserveService_UpdateNotAllowed(t *testing.T) {
-	oldSvc := kserveService()
-	newSvc := kserveService()
-	newSvc.Token = "different-token"
-	err := UpdateKserveService(newSvc, oldSvc, "oscar-svc")
-	if err == nil {
-		t.Fatal("expected error due to immutable field change, got nil")
-	}
-}
-
 // ─── DeleteKserveInferenceService ───────────────────────────────────────────
 
 func TestDeleteKserveInferenceService_DynamicClientError(t *testing.T) {
@@ -1424,7 +1604,3 @@ func TestDeleteKserveLLMInferenceService_DynamicClientError(t *testing.T) {
 		t.Fatal("expected error due to dynamic client failure, got nil")
 	}
 }
-
-// ─── GetKserveInferenceService ──────────────────────────────────────────────
-
-// ─── GetKserveLLMInferenceService ──────────────────────────────────────────

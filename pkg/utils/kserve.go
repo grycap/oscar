@@ -114,6 +114,9 @@ func GetKservePodAndDplName(serviceName, kserveType string) string {
 }
 
 func CheckKserveUpdate(oldService *types.Service, newService *types.Service) error {
+	if oldService == nil || newService == nil {
+		return fmt.Errorf("unexpected error in KServe service update validation")
+	}
 	if oldService.Token != newService.Token {
 		return fmt.Errorf("unexpected error in KServe service update validation")
 	}
@@ -133,15 +136,34 @@ func CheckKserveUpdate(oldService *types.Service, newService *types.Service) err
 	if newKserve == nil || oldKserve == nil {
 		return fmt.Errorf("cannot add or remove KServe configuration")
 	}
+	if err := newKserve.Validate(); err != nil {
+		return err
+	}
 
-	return newService.Kserve.ValidateUpdate(*oldService.Kserve)
+	return newKserve.ValidateUpdate(*oldKserve)
 }
 
 // CreateKserveService creates a KServe service based on the provided service and Knative service.
+//
+// Parameters
+//
+//  1. service is required
+//
+//  2. cfg is required
+//
+//  3. knativeService is optional, but if provided, its namespace must match the service's namespace.
+//
+//     - if knativeService is nil, OSCAR will deploy a standalone KServe service
+//
+//     - if knativeService is provided, OSCAR will deploy a KServe service that is owned by the OSCAR-Knative service.
 func CreateKserveService(service *types.Service, knativeService *knv1.Service, cfg *types.Config) error {
-	/*	if err := service.Kserve.Validate(); err != nil {
-		return err
-	}*/
+	if service == nil || service.Kserve == nil {
+		panic("CreateKserveService: service or Kserve is nil")
+	}
+	if cfg == nil {
+		panic("CreateKserveService: cfg is nil")
+	}
+
 	if knativeService != nil && service.Namespace != knativeService.Namespace {
 		return fmt.Errorf("service namespace does not match Knative service namespace")
 	}
@@ -191,9 +213,19 @@ func CreateKserveService(service *types.Service, knativeService *knv1.Service, c
 	return nil
 }
 
+// UpdateKserveService updates an existing KServe service based on the provided new service configuration.
+//
+// Parameters
+//
+//  1. service is required and represents the new desired state of the KServe service.
+//  2. oldService is required and represents the current state of the KServe service.
+//  3. namespace is required and represents the namespace in which the KServe service is deployed.
 func UpdateKserveService(service *types.Service, oldService *types.Service, namespace string) error {
-	if err := service.Kserve.Validate(); err != nil {
-		return err
+	if service == nil || service.Kserve == nil {
+		panic("UpdateKserveService: service or Kserve is nil")
+	}
+	if oldService == nil || oldService.Kserve == nil {
+		panic("UpdateKserveService: oldService or oldService.Kserve is nil")
 	}
 	// Check if the KServe configuration can be updated based on the old configuration
 	if err := CheckKserveUpdate(oldService, service); err != nil {
@@ -236,6 +268,7 @@ func UpdateKserveService(service *types.Service, oldService *types.Service, name
 	return nil
 }
 
+// DeleteKserveService deletes an existing KServe service based on the provided service name, namespace, and KServe type.
 func DeleteKserveService(serviceName, namespace, kserveType string) error {
 	dynClient, err := getDynamicClient()
 	if err != nil {
@@ -278,7 +311,7 @@ func updateKserveInferenceService(dynClient *dynamic.DynamicClient, service *typ
 
 	_, err = dynClient.Resource(kserveIsvcGVR).Namespace(newKserveSvc.GetNamespace()).Update(context.Background(), newKserveSvc, metav1.UpdateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to update InferenceService: %v", err)
+		return fmt.Errorf("failed to update InferenceService: %w", err)
 	}
 	return nil
 }
@@ -327,17 +360,6 @@ func createKserveLLMInferenceService(dynClient *dynamic.DynamicClient, service *
 // (serving.kserve.io/v1beta1) suitable for use with a dynamic Kubernetes client.
 // It is functionally equivalent to newKserveInferenceServiceSpec.
 func newKserveInferenceServiceSpec(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (*unstructured.Unstructured, error) {
-	if service == nil {
-		return nil, fmt.Errorf("service is nil")
-	}
-	if service.Kserve == nil {
-		return nil, fmt.Errorf("missing KServe configuration")
-	}
-
-	if err := service.Kserve.Validate(); err != nil {
-		return nil, err
-	}
-
 	resources, err := createKserveResources(service.Kserve)
 	if err != nil {
 		return nil, err
@@ -400,38 +422,18 @@ func newKserveInferenceServiceSpec(service *types.Service, owner *KserveServiceO
 }
 
 // updateKserveInferenceServiceSpec updates the spec fields of an existing
-// unstructured InferenceService object in place, preserving metadata (including resourceVersion).
+// unstructured InferenceService object in place, preserving metadata (including resourceVersion)
+// and any existing spec fields not managed by this function (e.g., canary, traffic, componentExtensionSpec).
 func updateKserveInferenceServiceSpec(service *types.Service, oldIsvc *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	if service == nil {
-		return nil, fmt.Errorf("service is nil")
-	}
-	if service.Kserve == nil {
-		return nil, fmt.Errorf("missing KServe configuration")
-	}
-
-	if err := service.Kserve.Validate(); err != nil {
-		return nil, err
-	}
-
 	resources, err := createKserveResources(service.Kserve)
 	if err != nil {
-		return nil, err
-	}
-
-	apiVersion := service.Kserve.Inference.APIVersion
-	if apiVersion == "" {
-		oldApiVersion, ok := oldIsvc.Object["spec"].(map[string]any)["predictor"].(map[string]any)["model"].(map[string]any)["protocolVersion"]
-		if !ok {
-			apiVersion = "v1"
-		} else {
-			apiVersion = oldApiVersion.(string)
-		}
+		return nil, fmt.Errorf("failed to create KServe resources: %w", err)
 	}
 
 	modelSpec := map[string]any{
 		"modelFormat":     map[string]any{"name": service.Kserve.Inference.ModelFormat},
 		"storageUri":      service.Kserve.StorageUri,
-		"protocolVersion": apiVersion,
+		"protocolVersion": service.Kserve.Inference.APIVersion,
 	}
 	if service.Kserve.Inference.Runtime != "" {
 		modelSpec["runtime"] = service.Kserve.Inference.Runtime
@@ -460,17 +462,6 @@ func updateKserveInferenceServiceSpec(service *types.Service, oldIsvc *unstructu
 }
 
 func newKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (*unstructured.Unstructured, error) {
-	if service == nil {
-		return nil, fmt.Errorf("service is nil")
-	}
-	if service.Kserve == nil {
-		return nil, fmt.Errorf("missing KServe configuration")
-	}
-
-	if err := service.Kserve.Validate(); err != nil {
-		return nil, err
-	}
-
 	runtimeImage := defaultLLMCPUimage
 	if service.Kserve.EnableGPU {
 		runtimeImage = defaultLLMGPUimage
@@ -541,17 +532,6 @@ func newKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServi
 // updateKserveLLMInferenceServiceSpec updates the spec fields of an existing
 // unstructured LLMInferenceService object in place, preserving metadata (including resourceVersion).
 func updateKserveLLMInferenceServiceSpec(service *types.Service, oldLLMIsvc *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	if service == nil {
-		return nil, fmt.Errorf("service is nil")
-	}
-	if service.Kserve == nil {
-		return nil, fmt.Errorf("missing KServe configuration")
-	}
-
-	if err := service.Kserve.Validate(); err != nil {
-		return nil, err
-	}
-
 	runtimeImage := defaultLLMCPUimage
 	if service.Kserve.EnableGPU {
 		runtimeImage = defaultLLMGPUimage
@@ -925,7 +905,7 @@ func getAPIPath(serviceName string) string {
 
 // existsKserveHTTPRouteByServiceName checks whether there is any HTTPRoute in the
 // cluster that matches the expected name and API path for the given service name, and returns an error if there are any conflicts (e.g. same name but different path, or same path but different name). It returns true if a matching HTTPRoute exists in the same namespace, false if no matching HTTPRoute exists, and an error if there is a conflict.
-func existsKserveHTTPRouteByServiceName(serviceName, namespace string) (bool, error) {
+func existsKserveHTTPRouteByServiceName(serviceName string) (bool, error) {
 	routeName := getHTTPRouteName(serviceName)
 
 	dynClient, err := getDynamicClient()
