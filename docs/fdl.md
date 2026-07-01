@@ -196,8 +196,7 @@ storage_providers:
 | `storage_uri` </br> *string* | Model storage URI consumed by KServe (for example `hf://...`, `oci://...`, or other KServe-compatible URIs). Required. |
 | `inference` </br> *[KServeInferenceSettings](#kserveinferencesettings)* | Inference-specific configuration. Required when `type` is `inference`. It must be omitted when `type` is `llm_inference`. |
 | `llm_inference` </br> *[KServeLLMInferenceSettings](#kservellminferencesettings)* | LLM inference configuration used with `llm_inference` services. Optional. |
-| `api_version` </br> *string* | Protocol version used by KServe predictors. Allowed values: `v1`, `v2`. Optional. (default: `v1`) |
-| `min_scale` </br> *integer* | Minimum number of predictor replicas. Optional. (default: `0`; for `llm_inference`, OSCAR enforces at least `1`) |
+| `min_scale` </br> *integer* | Minimum number of predictor replicas. Set to `0` to allow scale-to-zero (only available for `inference` type and dependent on cluster configuration). Optional. (default: `1`; for `llm_inference`, OSCAR enforces at least `1`) |
 | `max_scale` </br> *integer* | Maximum number of predictor replicas. Optional. (default: `1`). If `min_scale` is greater than `max_scale`, OSCAR sets `max_scale` equal to `min_scale`. |
 | `cpu` </br> *string* | CPU resources for the KServe workload in Kubernetes quantity format. Optional. (default: `0.2`) |
 | `memory` </br> *string* | Memory resources for the KServe workload in Kubernetes quantity format. Optional. (default: `256Mi`) |
@@ -212,6 +211,7 @@ storage_providers:
 |------------------------------| --------------------------------------------|
 | `model_format` </br> *string* | Model format expected by KServe for `inference` services. Required when `type` is `inference`. Typical values include: `onnx`, `sklearn`, `xgboost`, `pytorch`, `tensorflow`, `triton`, `huggingface`. |
 | `runtime` </br> *string* | Explicit KServe ServingRuntime name to use for `inference` services. Optional. |
+| `api_version` </br> *string* | Protocol version used by KServe predictors. Allowed values: `v1`, `v2`. Optional. (default: `v1`) |
 
 ## KServeLLMInferenceSettings
 

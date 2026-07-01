@@ -505,7 +505,7 @@ func TestGetResourceOnlyWorkloadSpecWithKServePodSet(t *testing.T) {
 	service := newTestService("test-service", "testuser")
 	service.Expose.MinScale = 2
 	service.Kserve = &types.Kserve{
-		Type: KserveTypeInferenceService,
+		Type: types.KserveTypeInferenceService,
 		Inference: &types.KserveInference{
 			ModelFormat: "sklearn",
 		},
@@ -751,6 +751,7 @@ func TestGetServiceResourceRequestsDecisionGraph(t *testing.T) {
 		service     *types.Service
 		wantErr     bool
 		wantErrText string
+		wantScale   int32
 		wantCPU     string
 		wantMemory  string
 		wantGPU     bool
@@ -813,11 +814,38 @@ func TestGetServiceResourceRequestsDecisionGraph(t *testing.T) {
 			wantGPUQty: "1",
 			wantSGX:    true,
 		},
+		{
+			name: "synchronous default and min scale 1",
+			service: func() *types.Service {
+				s := newTestService("svc-synchronous-scale", "owner")
+				s.CPU = ""
+				s.Memory = ""
+				s.Synchronous.MinScale = 1
+				return &s
+			}(),
+			wantCPU:    defaultCpuRequest.String(),
+			wantMemory: defaultMemoryRequest.String(),
+			wantScale:  1,
+		},
+		{
+			name: "exposed default and min scale 1",
+			service: func() *types.Service {
+				s := newTestService("svc-exposed-scale", "owner")
+				s.CPU = ""
+				s.Memory = ""
+				s.Expose.APIPort = []int{8080}
+				s.Expose.MinScale = 1
+				return &s
+			}(),
+			wantCPU:    defaultCpuRequest.String(),
+			wantMemory: defaultMemoryRequest.String(),
+			wantScale:  1,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			requests, err := getServiceResourceRequests(tt.service, cfg)
+			requests, _, err := getServiceResourceRequests(tt.service, cfg)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error containing %q, got nil", tt.wantErrText)
@@ -867,6 +895,15 @@ func TestGetServiceResourceRequestsDecisionGraph(t *testing.T) {
 			if hasSGX != tt.wantSGX {
 				t.Fatalf("sgx request present = %v, want %v", hasSGX, tt.wantSGX)
 			}
+
+			if tt.wantScale > 0 {
+				if len(tt.service.Expose.APIPort) > 0 && tt.service.Expose.MinScale != tt.wantScale {
+					t.Fatalf("service MinScale = %d, want %d", tt.service.Expose.MinScale, tt.wantScale)
+				}
+				if len(tt.service.Expose.APIPort) == 0 && int32(tt.service.Synchronous.MinScale) != tt.wantScale {
+					t.Fatalf("service Synchronous MinScale = %d, want %d", tt.service.Synchronous.MinScale, tt.wantScale)
+				}
+			}
 		})
 	}
 }
@@ -878,7 +915,6 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 		cfg         *types.Config
 		wantErr     bool
 		wantErrText string
-		wantHasSet  bool
 		wantScale   int32
 		wantCPU     string
 		wantMemory  string
@@ -892,14 +928,14 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 				s.Kserve = nil
 				return &s
 			}(),
-			cfg:        newTestConfig(),
-			wantHasSet: false,
+			cfg:     newTestConfig(),
+			wantErr: true,
 		},
 		{
 			name: "kserve service but unsupported route kind",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-ingress", "owner")
-				s.Kserve = &types.Kserve{Type: KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn"}
+				s.Kserve = &types.Kserve{Type: types.KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn"}
 				return &s
 			}(),
 			cfg: func() *types.Config {
@@ -908,13 +944,13 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 				c.ExposedServicesRouteKind = "ingress"
 				return c
 			}(),
-			wantHasSet: false,
+			wantErr: true,
 		},
 		{
 			name: "kserve Inference defaults and min scale fallback",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-default", "owner")
-				s.Kserve = &types.Kserve{Type: KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", MinScale: 0}
+				s.Kserve = &types.Kserve{Type: types.KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", MinScale: 0}
 				return &s
 			}(),
 			cfg: func() *types.Config {
@@ -923,7 +959,6 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 				c.ExposedServicesRouteKind = "httproute"
 				return c
 			}(),
-			wantHasSet: true,
 			wantScale:  1,
 			wantCPU:    defaultKserveCpuRequest.String(),
 			wantMemory: defaultKserveMemoryRequest.String(),
@@ -932,7 +967,7 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 			name: "kserve LLMInference defaults and min scale fallback",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-default", "owner")
-				s.Kserve = &types.Kserve{Type: KserveTypeLLMInferenceService, StorageUri: "s3://models/llama", MinScale: 0}
+				s.Kserve = &types.Kserve{Type: types.KserveTypeLLMInferenceService, StorageUri: "s3://models/llama", MinScale: 0}
 				return &s
 			}(),
 			cfg: func() *types.Config {
@@ -941,7 +976,6 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 				c.ExposedServicesRouteKind = "httproute"
 				return c
 			}(),
-			wantHasSet: true,
 			wantScale:  1,
 			wantCPU:    defaultKserveCpuRequest.String(),
 			wantMemory: defaultKserveMemoryRequest.String(),
@@ -950,7 +984,7 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 			name: "kserve custom resources and gpu",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-custom", "owner")
-				s.Kserve = &types.Kserve{Type: KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", MinScale: 3, CPU: "1", Memory: "2Gi", EnableGPU: true}
+				s.Kserve = &types.Kserve{Type: types.KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", MinScale: 3, CPU: "1", Memory: "2Gi", EnableGPU: true}
 				return &s
 			}(),
 			cfg: func() *types.Config {
@@ -959,7 +993,6 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 				c.ExposedServicesRouteKind = "httproute"
 				return c
 			}(),
-			wantHasSet: true,
 			wantScale:  3,
 			wantCPU:    "1",
 			wantMemory: "2Gi",
@@ -970,7 +1003,7 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 			name: "kserve invalid cpu",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-badcpu", "owner")
-				s.Kserve = &types.Kserve{Type: KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", CPU: "bad-cpu"}
+				s.Kserve = &types.Kserve{Type: types.KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", CPU: "bad-cpu"}
 				return &s
 			}(),
 			cfg: func() *types.Config {
@@ -986,7 +1019,7 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 			name: "kserve invalid memory",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-badmem", "owner")
-				s.Kserve = &types.Kserve{Type: KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", Memory: "bad-memory"}
+				s.Kserve = &types.Kserve{Type: types.KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", Memory: "bad-memory"}
 				return &s
 			}(),
 			cfg: func() *types.Config {
@@ -1002,7 +1035,7 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			requests, scale, hasSet, err := getKserveResourceRequests(tt.service, tt.cfg)
+			requests, scale, err := getKserveResourceRequests(tt.service, tt.cfg)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error containing %q, got nil", tt.wantErrText)
@@ -1015,12 +1048,6 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
-			}
-			if hasSet != tt.wantHasSet {
-				t.Fatalf("hasKservePodSet = %v, want %v", hasSet, tt.wantHasSet)
-			}
-			if !tt.wantHasSet {
-				return
 			}
 			if scale != tt.wantScale {
 				t.Fatalf("kserve min scale = %d, want %d", scale, tt.wantScale)

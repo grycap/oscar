@@ -76,6 +76,11 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
+		// Validate the service specification (including KServe configuration if present)
+		if err := service.Validate(); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+			return
+		}
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
 			service.Owner = types.DefaultOwner
@@ -269,7 +274,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			service.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 			// At the moment check only for KServe service
-			if utils.IsKserveService(&service) && utils.IsKserveSupported(cfg) && !utils.VerifyWorkloadByResources(service, cfg) {
+			if service.IsKserve() && utils.IsKserveSupported(cfg) && !utils.VerifyWorkloadByResources(service, cfg) {
 				if err := utils.DeleteKueueLocalQueue(context.TODO(), cfg, service.Namespace, service.Name); err != nil {
 					createLogger.Printf("Error deleting Kueue local queue: %v", err)
 				}
@@ -471,13 +476,17 @@ func checkValues(service *types.Service, cfg *types.Config) {
 		service.CPU = defaultCPU
 	}
 
-	if utils.IsKserveService(service) && utils.IsKserveSupported(cfg) {
+	if service.IsKserve() && utils.IsKserveSupported(cfg) {
 		if service.Kserve.CPU == "" {
 			service.Kserve.CPU = defaultCPU
 		}
 		if service.Kserve.Memory == "" {
 			service.Kserve.Memory = defaultMemory
 		}
+		if service.Labels == nil {
+			service.Labels = make(map[string]string)
+		}
+		service.Labels["kserve"] = "true"
 	}
 	// Check if visibility has been set. If not set default private.
 	if service.Visibility == "" {

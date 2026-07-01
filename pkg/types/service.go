@@ -231,7 +231,7 @@ type Service struct {
 	LogLevel string `json:"log_level"`
 
 	// Image Docker image for the service
-	Image string `json:"image" binding:"required"`
+	Image string `json:"image"`
 
 	// Alpine parameter to set if image is based on Alpine
 	// A custom release of faas-supervisor will be used
@@ -333,108 +333,16 @@ type Service struct {
 	// Internal/API use only, not part of FDL.
 	Deployment *ServiceDeploymentSummary `json:"deployment,omitempty" yaml:"-"`
 
-	// Kserve configuration to deploy the service using KServe InferenceService CRD
+	// Kserve configuration to deploy the service using KServe CRD
 	Kserve *Kserve `json:"kserve,omitempty"`
 }
 
-type Kserve struct {
-	// Type the type of KServe service to deploy
-	// Required. Set the type of KServe service, either "inference" for a standard InferenceService
-	// or "llm_inference" for an LLMInferenceService
-	Type string `json:"type,omitempty" default:"inference"`
-
-	// Inference configuration for KServe InferenceService.
-	// It is required when Type is set to "inference"
-	Inference *KserveInference `json:"inference,omitempty"`
-
-	// LLMInference configuration for KServe LLMInferenceService.
-	// It is required when Type is set to "llm_inference"
-	LLMInference *KserveLLMInference `json:"llm_inference,omitempty"`
-
-	// StorageUri the URI of the model storage for KServe
-	// Required. It should follow the format expected by KServe, for example:
-	StorageUri string `json:"storage_uri"`
-
-	// Can be used to specify the protocol version for KServe (e.g., "v1", "v2").
-	// Optional. (default: "v1")
-	APIVersion string `json:"api_version,omitempty" default:"v1"`
-
-	// MinScale minimum number of active replicas (pods) for the service
-	// Optional. (default: 0)
-	MinScale int32 `json:"min_scale,omitempty" default:"0"`
-
-	// MaxScale maximum number of active replicas (pods) for the service
-	// Optional. (default: 1)
-	MaxScale int32 `json:"max_scale,omitempty" default:"1"`
-
-	// CPU cpu limit for the service following the kubernetes format
-	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
-	// Optional. (default: 0.2)
-	CPU string `json:"cpu" default:"0.2"`
-
-	// Memory memory limit for the service following the kubernetes format
-	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
-	// Optional. (default: 256Mi)
-	Memory string `json:"memory" default:"256Mi"`
-
-	// Args command-line arguments to be passed to the container
-	// Optional
-	Args []string `json:"args,omitempty"`
-
-	// Environment variables to be passed to the container
-	// Optional
-	Env map[string]string `json:"env,omitempty"`
-
-	// EnableGPU parameter to request gpu usage in KServe InferenceService
-	// Optional. (default: false)
-	EnableGPU bool `json:"enable_gpu,omitempty" default:"false"`
-
-	// SetAuth parameter to set the authentication for the KServe InferenceService
-	// Optional. (default: true)
-	SetAuth bool `json:"set_auth,omitempty" default:"true"`
+func (s *Service) IsKserve() bool {
+	return s.Kserve != nil
 }
 
-// UnmarshalJSON sets KServe defaults for fields that may be omitted in API requests.
-func (k *Kserve) UnmarshalJSON(data []byte) error {
-	type Alias Kserve
-
-	// Set default values for optional fields
-	aux := Alias{
-		APIVersion: "v1",
-		CPU:        "0.2",
-		Memory:     "256Mi",
-		SetAuth:    true,
-		MinScale:   0,
-		MaxScale:   1,
-		EnableGPU:  false,
-	}
-
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-	// Validate required fields
-	if strings.TrimSpace(aux.StorageUri) == "" {
-		return fmt.Errorf("Kserve StorageUri is required")
-	}
-	if strings.TrimSpace(aux.Type) == "" {
-		return fmt.Errorf("Kserve Type is required")
-	}
-
-	*k = Kserve(aux)
-	return nil
-}
-
-type KserveInference struct {
-	// ModelFormat the model format to use for KServe InferenceService
-	// ("onnx", "sklearn", "xgboost", "pytorch", "tensorflow", "triton", "huggingface").
-	ModelFormat string `json:"model_format,omitempty"`
-	// Runtime the KServe runtime to use
-	// Optional.
-	Runtime string `json:"runtime,omitempty"`
-}
-
-func (k *KserveInference) UnmarshalJSON(data []byte) error {
-	type Alias KserveInference
+func (s *Service) UnmarshalJSON(data []byte) error {
+	type Alias Service
 
 	aux := Alias{}
 
@@ -442,20 +350,34 @@ func (k *KserveInference) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	// ModelFormat is required for KServe InferenceService
-	if strings.TrimSpace(aux.ModelFormat) == "" {
-		return fmt.Errorf("Kserve Inference ModelFormat is required")
+	if aux.Visibility == "" {
+		aux.Visibility = "private"
 	}
 
-	*k = KserveInference(aux)
+	*s = Service(aux)
 	return nil
 }
 
-type KserveLLMInference struct {
-	// At the moment only supported for LLMInferenceService,
-	// the runtime image to use for KServe when IsLLM is true
-	// Optional. (default: a custom image based on vLLM for CPU and another one with GPU support)
-	RuntimeImage string `json:"runtime_image,omitempty"`
+func (s Service) Validate() error {
+
+	visibility := strings.TrimSpace(s.Visibility)
+	switch visibility {
+	case "private", "public", "restricted":
+	default:
+		return fmt.Errorf(
+			"service visibility must be private, public or restricted",
+		)
+	}
+
+	if strings.TrimSpace(s.Image) == "" && s.Kserve == nil {
+		return fmt.Errorf("service Image is required")
+	}
+
+	if s.IsKserve() {
+		return s.Kserve.Validate()
+	}
+
+	return nil
 }
 
 // ServiceVolumeConfig stores the requested size and mount path for a managed volume.

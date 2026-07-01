@@ -946,24 +946,24 @@ func TestListServicePodsHelpers(t *testing.T) {
 func TestGetKserveServiceDeployment(t *testing.T) {
 	client := fake.NewSimpleClientset(&appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      utils.GetKservePodAndDplName("test-svc", utils.KserveTypeInferenceService),
+			Name:      utils.GetKservePodAndDplName("test-svc", types.KserveTypeInferenceService),
 			Namespace: "ns",
 		},
 	})
 
-	deployment, err := GetKserveServiceDeployment(client, "ns", "test-svc", utils.KserveTypeInferenceService)
+	deployment, err := GetKserveServiceDeployment(client, "ns", "test-svc", types.KserveTypeInferenceService)
 	if err != nil {
 		t.Fatalf("get kserve deployment: %v", err)
 	}
-	if deployment.Name != utils.GetKservePodAndDplName("test-svc", utils.KserveTypeInferenceService) {
-		t.Fatalf("expected deployment name %s, got %s", utils.GetKservePodAndDplName("test-svc", utils.KserveTypeInferenceService), deployment.Name)
+	if deployment.Name != utils.GetKservePodAndDplName("test-svc", types.KserveTypeInferenceService) {
+		t.Fatalf("expected deployment name %s, got %s", utils.GetKservePodAndDplName("test-svc", types.KserveTypeInferenceService), deployment.Name)
 	}
 }
 
 func TestGetKserveServiceDeploymentNotFound(t *testing.T) {
 	client := fake.NewSimpleClientset()
 
-	_, err := GetKserveServiceDeployment(client, "ns", "non-existent", utils.KserveTypeInferenceService)
+	_, err := GetKserveServiceDeployment(client, "ns", "non-existent", types.KserveTypeInferenceService)
 	if err == nil {
 		t.Fatal("expected error for non-existent deployment, got nil")
 	}
