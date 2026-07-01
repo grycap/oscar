@@ -333,7 +333,7 @@ type Service struct {
 	// Internal/API use only, not part of FDL.
 	Deployment *ServiceDeploymentSummary `json:"deployment,omitempty" yaml:"-"`
 
-	// Kserve configuration to deploy the service using KServe InferenceService CRD
+	// Kserve configuration to deploy the service using KServe CRD
 	Kserve *Kserve `json:"kserve,omitempty"`
 }
 

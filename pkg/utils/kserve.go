@@ -113,6 +113,7 @@ func GetKservePodAndDplName(serviceName, kserveType string) string {
 	}
 }
 
+// CheckKserveUpdate checks if the KServe configuration can be updated based on the old configuration.
 func CheckKserveUpdate(oldService *types.Service, newService *types.Service) error {
 	if oldService == nil || newService == nil {
 		return fmt.Errorf("unexpected error in KServe service update validation")
