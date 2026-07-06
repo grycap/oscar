@@ -86,7 +86,7 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 			return
 		}
 		var minIOQuota *types.MinIOQuotaUpdate
-		if kubeClientset != nil && !isAdminUser {
+		if kubeClientset != nil && !isAdminUser && cfg.MinIOQuotaEnabled {
 			quota, _, err := handlers.GetMinIOQuotaConfig(c.Request.Context(), cfg, kubeClientset, uid)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error reading MinIO quota: %v", err))

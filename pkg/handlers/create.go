@@ -27,9 +27,9 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/grycap/oscar/v4/pkg/backends/resources"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/cdmi-client-go"
+	"github.com/grycap/oscar/v4/pkg/backends/resources"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
@@ -284,7 +284,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			ownerName = utils.RemoveAccents(ownerName)
 		}
 		service.Labels["owner_name"] = strings.ReplaceAll(ownerName, " ", "_")
-		if !isAdminUser {
+		if !isAdminUser && cfg.MinIOQuotaEnabled {
 			minIOQuota, _, err = GetMinIOQuotaConfig(c.Request.Context(), cfg, back.GetKubeClientset(), uid)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error reading MinIO quota: %v", err))
