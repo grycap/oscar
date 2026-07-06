@@ -333,6 +333,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					}
 					c.String(http.StatusBadRequest, "Referenced volume size is not defined: Please add the volume size in service definition")
 				} else {
+					errDelete := back.DeleteService(service)
+					if errDelete != nil {
+						log.Printf("Error deleting service: %v\n", errDelete)
+					}
 					c.String(http.StatusBadRequest, "Referenced volume does not exist in the caller namespace")
 				}
 			} else {
