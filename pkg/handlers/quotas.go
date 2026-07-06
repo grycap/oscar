@@ -283,7 +283,7 @@ func fetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, u
 		resp.Volumes = volumes
 	}
 
-	if qb.KubeClientset != nil {
+	if qb.KubeClientset != nil && cfg.MinIOQuotaEnabled {
 		minioQuota, err := getMinIOQuotaInfo(ctx, cfg, qb.KubeClientset, user)
 		if err != nil {
 			return nil, fmt.Errorf("getting MinIO quotas for user %s: %w", user, err)
@@ -316,7 +316,7 @@ func updateQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, 
 		}
 	}
 
-	if hasMinIOQuotaUpdate(req.MinIO) {
+	if hasMinIOQuotaUpdate(req.MinIO) && cfg.MinIOQuotaEnabled {
 		if qb.KubeClientset == nil {
 			return fmt.Errorf("Kubernetes client is not initialized")
 		}

@@ -289,7 +289,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			ownerName = utils.RemoveAccents(ownerName)
 		}
 		service.Labels["owner_name"] = strings.ReplaceAll(ownerName, " ", "_")
-		if !isAdminUser {
+		if !isAdminUser && cfg.MinIOQuotaEnabled {
 			minIOQuota, _, err = GetMinIOQuotaConfig(c.Request.Context(), cfg, back.GetKubeClientset(), uid)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error reading MinIO quota: %v", err))

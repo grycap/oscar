@@ -228,9 +228,10 @@ func TestMakeCreateBucketHandlerEnforcesMinIOQuota(t *testing.T) {
 	defer server.Close()
 
 	cfg := &types.Config{
-		Name:              "oscar",
-		Namespace:         "oscar",
-		ServicesNamespace: "oscar-svc",
+		Name:               "oscar",
+		Namespace:          "oscar",
+		ServicesNamespace:  "oscar-svc",
+		MinIOQuotaEnabled:  true,
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
 			Region:    "us-east-1",
@@ -299,9 +300,10 @@ func TestMakeCreateBucketHandlerAppliesStoragePerBucketQuota(t *testing.T) {
 	defer server.Close()
 
 	cfg := &types.Config{
-		Name:              "oscar",
-		Namespace:         "oscar",
-		ServicesNamespace: "oscar-svc",
+		Name:               "oscar",
+		Namespace:          "oscar",
+		ServicesNamespace:  "oscar-svc",
+		MinIOQuotaEnabled:  true,
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
 			Region:    "us-east-1",
@@ -363,9 +365,10 @@ func TestMakeCreateBucketHandlerFailsSafelyWhenMinIOBucketCountingFails(t *testi
 	defer server.Close()
 
 	cfg := &types.Config{
-		Name:              "oscar",
-		Namespace:         "oscar",
-		ServicesNamespace: "oscar-svc",
+		Name:               "oscar",
+		Namespace:          "oscar",
+		ServicesNamespace:  "oscar-svc",
+		MinIOQuotaEnabled:  true,
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
 			Region:    "us-east-1",
@@ -377,7 +380,7 @@ func TestMakeCreateBucketHandlerFailsSafelyWhenMinIOBucketCountingFails(t *testi
 	namespace := utils.BuildUserNamespace(cfg, user)
 	client := fake.NewSimpleClientset(&corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "oscar-minio-quota", Namespace: namespace},
-		Data:       map[string]string{"buckets": "1"},
+		Data:       map[string]string{"buckets": "2", "storage_per_bucket": "100Gi"},
 	})
 
 	router := gin.New()
@@ -435,9 +438,10 @@ func TestMakeCreateBucketHandlerReturnsErrorWhenStorageQuotaApplyFails(t *testin
 	defer server.Close()
 
 	cfg := &types.Config{
-		Name:              "oscar",
-		Namespace:         "oscar",
-		ServicesNamespace: "oscar-svc",
+		Name:               "oscar",
+		Namespace:          "oscar",
+		ServicesNamespace:  "oscar-svc",
+		MinIOQuotaEnabled:  true,
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
 			Region:    "us-east-1",

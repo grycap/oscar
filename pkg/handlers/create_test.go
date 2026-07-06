@@ -675,8 +675,9 @@ func TestCheckValuesLegacyStorageFlowsPreserveNilVolume(t *testing.T) {
 func newServiceQuotaTestContext(t *testing.T, user, minIOEndpoint string, quotaData map[string]string) (*types.Config, *backends.FakeBackend, *testclient.Clientset) {
 	t.Helper()
 	cfg := &types.Config{
-		Namespace:         "oscar",
-		ServicesNamespace: "oscar-svc",
+		Namespace:          "oscar",
+		ServicesNamespace:  "oscar-svc",
+		MinIOQuotaEnabled:  true,
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  minIOEndpoint,
 			Region:    "us-east-1",

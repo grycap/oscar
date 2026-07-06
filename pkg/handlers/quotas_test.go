@@ -364,7 +364,7 @@ func TestFetchQuotaIncludesVolumeQuotas(t *testing.T) {
 
 func TestFetchQuotaIncludesMinIOQuotas(t *testing.T) {
 	user := "user@example.org"
-	cfg := &types.Config{ServicesNamespace: "oscar-svc"}
+	cfg := &types.Config{ServicesNamespace: "oscar-svc", MinIOQuotaEnabled: true}
 	namespace := utils.BuildUserNamespace(cfg, user)
 	client := fake.NewSimpleClientset(
 		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}},
@@ -394,7 +394,7 @@ func TestFetchQuotaIncludesMinIOQuotas(t *testing.T) {
 
 func TestFetchQuotaIncludesUnsetMinIOQuotas(t *testing.T) {
 	user := "user@example.org"
-	cfg := &types.Config{ServicesNamespace: "oscar-svc"}
+	cfg := &types.Config{ServicesNamespace: "oscar-svc", MinIOQuotaEnabled: true}
 	namespace := utils.BuildUserNamespace(cfg, user)
 	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})
 
@@ -443,7 +443,8 @@ func TestFetchQuotaCountsMinIOBucketsWithoutConfiguredLimit(t *testing.T) {
 	defer server.Close()
 
 	cfg := &types.Config{
-		ServicesNamespace: "oscar-svc",
+		ServicesNamespace:  "oscar-svc",
+		MinIOQuotaEnabled:  true,
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
 			Region:    "us-east-1",
