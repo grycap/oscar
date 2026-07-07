@@ -174,6 +174,7 @@ func main() {
 	metricsGroup.GET("", handlers.MakeMetricsSummaryHandler(back, metricsAgg))
 	metricsGroup.GET("/breakdown", handlers.MakeMetricsBreakdownHandler(back, metricsAgg))
 	metricsGroup.GET("/:serviceName", handlers.MakeMetricValueHandler(back, metricsAgg))
+
 	// Quotas
 	if cfg.KueueEnable || cfg.VolumeEnable {
 		system.GET("/quotas/user", handlers.MakeGetOwnQuotaHandler(*qb, cfg))
