@@ -1097,7 +1097,7 @@ fi
 if [ "$ENABLE_METRICS" == "true" ]; then
     echo -e "\n[*] Configuring OSCAR to use Prometheus and Loki ..."
     if ! kubectl -n oscar set env deployment/oscar \
-        PROMETHEUS_URL="http://prometheus-server.monitoring.svc.cluster.local" \
+        PROMETHEUS_URL="http://prometheus-operator-kube-p-prometheus.monitoring.svc.cluster.local:9090" \
         LOKI_URL="http://loki-gateway.monitoring.svc.cluster.local" \
         LOKI_QUERY="{namespace=\"oscar\"}" \
         LOKI_EXPOSED_QUERY="{app=\"traefik\"}" \
