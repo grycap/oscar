@@ -83,6 +83,51 @@ type JobStatus struct {
 }
 type JobStatuses map[string]JobStatus
 
+type QuotaResponse struct {
+	UserID       string                 `json:"user_id"`
+	ClusterQueue string                 `json:"cluster_queue,omitempty"`
+	Resources    map[string]QuotaValues `json:"resources,omitempty"`
+	Volumes      *VolumeQuotaResponse   `json:"volumes,omitempty"`
+	MinIO        *MinIOQuotaResponse    `json:"minio,omitempty"`
+}
+
+type QuotaValues struct {
+	Max  int64 `json:"max"`
+	Used int64 `json:"used"`
+}
+
+type VolumeQuotaResponse struct {
+	// Disk contains the user-visible storage quota for OSCAR-managed volumes.
+	Disk VolumeQuotaValues `json:"disk"`
+	// Volumes contains the user-visible count quota for OSCAR-managed volumes.
+	Volumes          VolumeQuotaValues `json:"volumes"`
+	MaxDiskperVolume string            `json:"max_disk_per_volume"`
+	MinDiskperVolume string            `json:"min_disk_per_volume"`
+}
+
+type VolumeQuotaValues struct {
+	Max  string `json:"max"`
+	Used string `json:"used"`
+}
+type MinIOQuotaResponse struct {
+	Buckets          MinIOBucketCountQuota      `json:"buckets"`
+	StoragePerBucket MinIOStoragePerBucketQuota `json:"storage_per_bucket"`
+	StorageTotal     MinIOStorageTotalUsage     `json:"storage_total"`
+}
+
+type MinIOBucketCountQuota struct {
+	Max  int64 `json:"max"`
+	Used int64 `json:"used"`
+}
+
+type MinIOStoragePerBucketQuota struct {
+	Max string `json:"max"`
+}
+
+type MinIOStorageTotalUsage struct {
+	Used string `json:"used"`
+}
+
 // Function to execute TOPSIS method
 // Normalizes a column by dividing each value by the square root of the sum of squares.
 func normalizeMatrix(matrix [][]float64) [][]float64 {
@@ -911,8 +956,101 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 					dist_cpu_node := node_cpu_schedulable - (1000 * serviceCPU)
 					dist_mem_node := node_mem_schedulable - serviceRAM
 					if dist_cpu_node >= 0 && dist_mem_node >= 0 {
-						canExecute = true
-						break
+
+						// Create HTTP request to view user quotas in the cluster
+						getQuotasURL, err := url.Parse(cluster.Endpoint)
+						if err != nil {
+							if delegation != "static" {
+								replicas[id].Priority = noDelegateCode
+							}
+							fmt.Printf("Error parsing the cluster's endpoint URL to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", replica.ClusterID, cluster.Endpoint, err)
+							continue
+						}
+						getQuotasURL.Path = path.Join(getQuotasURL.Path, "system", "quotas", "user")
+						//fmt.Printf("URL quota: %s", getQuotasURL.Path)
+						req, err := http.NewRequest(http.MethodGet, getQuotasURL.String(), nil)
+						if err != nil {
+							if delegation != "static" {
+								replicas[id].Priority = noDelegateCode
+							}
+							fmt.Printf("Error making request to ClusterID \"%s\": unable to make request: %v\n", replica.ClusterID, err)
+							continue
+						}
+						addAuthHeader(req, authHeader, token, cluster)
+
+						// Make HTTP client
+						var transport http.RoundTripper = &http.Transport{
+							// Enable/disable SSL verification
+							TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify}, // #nosec G402
+						}
+
+						client := &http.Client{
+							Transport: transport,
+							Timeout:   time.Second * 20,
+						}
+
+						resp_quota, err := client.Do(req)
+						fmt.Println("QuotaCode : ", resp_quota.StatusCode)
+						if err != nil {
+							if delegation != "static" {
+								replicas[id].Priority = noDelegateCode
+							}
+							fmt.Printf("Error getting cluster status to ClusterID \"%s\": unable to send request: %v\n", replica.ClusterID, err)
+							continue
+						}
+						defer resp_quota.Body.Close()
+
+						// Handling the error responses mapped in the OSCAR Handler
+
+						if resp_quota.StatusCode != http.StatusOK {
+							bodyBytes, _ := io.ReadAll(resp_quota.Body)
+							switch resp_quota.StatusCode {
+							case http.StatusUnauthorized:
+								fmt.Printf("Error 401: Unauthorized. Verify your token. Details: %s\n", string(bodyBytes))
+							case http.StatusServiceUnavailable:
+								fmt.Printf("Error 503: The quota system is disabled on the server\n")
+								canExecute = true
+								break
+							default:
+								fmt.Printf("Server error (%d): %s\n", resp_quota.StatusCode, string(bodyBytes))
+							}
+							continue
+						}
+
+						//Deserialize the success JSON (200 OK)
+						var quotaResp QuotaResponse
+						err = json.NewDecoder(resp_quota.Body).Decode(&quotaResp)
+						if err != nil {
+							fmt.Printf("Error parsing the response JSON: %v\n", err)
+							continue
+						}
+						if quotaResp.Resources["cpu"].Max == 0 && quotaResp.Resources["memory"].Max == 0 {
+							//There are no defined quotas
+							fmt.Printf("The %s cluster has no defined quotas \n", replica.ClusterID)
+							canExecute = true
+							break
+						}
+						// Display the data obtained on the screen
+						fmt.Printf("CPU Quota - MAX: %v\t USED: %v\n", quotaResp.Resources["cpu"].Max, quotaResp.Resources["cpu"].Used)
+						//Calculate the distance with respect to what the service requests.
+						quota_cpu_schedulable := float64(quotaResp.Resources["cpu"].Max - quotaResp.Resources["cpu"].Used)
+						dist_cpu_quota := quota_cpu_schedulable - (1000 * serviceCPU)
+						fmt.Printf("Dist_CPU_quotas: %v\n", dist_cpu_quota)
+						fmt.Printf("Memory Quota:- MAX: %v\t USED: %v\n", quotaResp.Resources["memory"].Max, quotaResp.Resources["memory"].Used)
+						//Calculate the distance with respect to what the service requests.
+						quota_mem_schedulable := float64(quotaResp.Resources["memory"].Max - quotaResp.Resources["memory"].Used)
+						dist_mem_quota := quota_mem_schedulable - serviceRAM
+						fmt.Printf("Dist_Mem_quotas: %v\n", dist_mem_quota)
+
+						if dist_cpu_quota >= 0 && dist_mem_quota >= 0 {
+							fmt.Printf("Availability of resources and quotas in the %s cluster \n", replica.ClusterID)
+							canExecute = true
+							break
+						} else {
+							fmt.Printf("Quota not available in the %s cluster \n", replica.ClusterID)
+							continue
+						}
+
 					} else {
 						canExecute = false
 					}
