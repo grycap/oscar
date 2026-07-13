@@ -103,6 +103,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 		// Check if users in allowed_users have a MinIO associated user
 		minIOAdminClient, minIOAdminErr := utils.MakeMinIOAdminClient(cfg)
+		objectStorageIAM, objectStorageIAMErr := utils.MakeObjectStorageIAM(cfg)
 
 		// Service is created by an EGI user
 		var uid string
@@ -189,9 +190,13 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 							// and create it if not
 							if !mc.UserExists(u) {
 								sk, _ := auth.GenerateRandomKey(8)
-								cmuErr := minIOAdminClient.CreateMinIOUser(u, sk)
+								if objectStorageIAMErr != nil {
+									log.Printf("error creating object-storage IAM client: %v", objectStorageIAMErr)
+									continue
+								}
+								cmuErr := objectStorageIAM.CreateUser(c.Request.Context(), u, sk)
 								if cmuErr != nil {
-									log.Printf("error creating MinIO user for user %s: %v", u, cmuErr)
+									log.Printf("error creating object-storage user for user %s: %v", u, cmuErr)
 								}
 								csErr := mc.CreateSecretForOIDC(u, sk)
 								if csErr != nil {

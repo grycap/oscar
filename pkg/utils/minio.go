@@ -203,6 +203,21 @@ func (minIOAdminClient *MinIOAdminClient) CreateMinIOUser(ak string, sk string) 
 	return nil
 }
 
+// CreateUser implements ObjectStorageIAM while preserving the legacy helper.
+func (minIOAdminClient *MinIOAdminClient) CreateUser(ctx context.Context, accessKey, secretKey string) error {
+	return createIAMUser(ctx, minIOAdminClient.adminClient, accessKey, secretKey, "enable")
+}
+
+// CreateGroup implements ObjectStorageIAM.
+func (minIOAdminClient *MinIOAdminClient) CreateGroup(ctx context.Context, group string) error {
+	return createIAMGroup(ctx, minIOAdminClient.adminClient, group, "enable")
+}
+
+// UpdateGroupMembers implements ObjectStorageIAM.
+func (minIOAdminClient *MinIOAdminClient) UpdateGroupMembers(ctx context.Context, group string, users []string, remove bool) error {
+	return updateIAMGroupMembers(ctx, minIOAdminClient.adminClient, group, users, remove, "enable")
+}
+
 // CreateS3PathWithWebhook Creates a bucket and its paths and enables the associated webhook
 func (minIOAdminClient *MinIOAdminClient) CreateS3PathWithWebhook(s3Client *s3.S3, path []string, arn string, bucketExists bool) error {
 	bucketKey := path[0]
