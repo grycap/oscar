@@ -208,6 +208,9 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
+		if strings.EqualFold(strings.TrimSpace(cfg.ObjectStorageType), utils.ObjectStorageRustFS) {
+			eventBytes = rewriteRustFSEventSource(eventBytes)
+		}
 
 		c.Set("eventBytes", eventBytes)
 
@@ -425,6 +428,37 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		}
 		c.Status(http.StatusCreated)
 	}
+}
+
+func rewriteRustFSEventSource(eventBytes []byte) []byte {
+	var event map[string]interface{}
+	if err := json.Unmarshal(eventBytes, &event); err != nil {
+		return eventBytes
+	}
+	records, ok := event["Records"].([]interface{})
+	if !ok {
+		return eventBytes
+	}
+	changed := false
+	for _, rawRecord := range records {
+		record, ok := rawRecord.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		eventSource, _ := record["eventSource"].(string)
+		if strings.EqualFold(strings.TrimSpace(eventSource), "rustfs:s3") {
+			record["eventSource"] = "minio:s3"
+			changed = true
+		}
+	}
+	if !changed {
+		return eventBytes
+	}
+	rewritten, err := json.Marshal(event)
+	if err != nil {
+		return eventBytes
+	}
+	return rewritten
 }
 
 type configForUser struct {
