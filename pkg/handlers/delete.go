@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -129,7 +130,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Remove the service's webhook in MinIO config and restart the server
-		if err := removeMinIOWebhook(service.Name, minIOAdminClient); err != nil {
+		if err := removeMinIOWebhook(service.Name, cfg); err != nil {
 			log.Printf("Error removing MinIO webhook for service \"%s\": %v\n", service.Name, err)
 		}
 
@@ -164,13 +165,11 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 	}
 }
 
-func removeMinIOWebhook(name string, minIOAdminClient *utils.MinIOAdminClient) error {
-
-	if err := minIOAdminClient.RemoveWebhook(name); err != nil {
+func removeMinIOWebhook(name string, cfg *types.Config) error {
+	if err := utils.RemoveObjectStorageWebhook(context.TODO(), cfg, name); err != nil {
 		return fmt.Errorf("error removing the service's webhook: %v", err)
 	}
-
-	return minIOAdminClient.RestartServer()
+	return nil
 }
 
 func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient) error {
@@ -208,7 +207,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 
 		bucketName := getBucketNameFromPath(in.Path)
 		// Disable input notifications for service bucket
-		if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), bucketName); err != nil {
+		if err := disableInputNotifications(s3Client, service.GetObjectStorageWebhookARN(cfg.ObjectStorageType), bucketName); err != nil {
 			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 		}
 		// Check if the bucket is in the mount path
@@ -270,7 +269,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				s3Client = cfg.MinIOProvider.GetS3Client()
 
 				// Disable input notifications for service bucket
-				if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), outBucket); err != nil {
+				if err := disableInputNotifications(s3Client, service.GetObjectStorageWebhookARN(cfg.ObjectStorageType), outBucket); err != nil {
 					log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 				}
 				if !sameStorage(out, service.Mount) {
@@ -305,7 +304,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		for _, bucket := range service.BucketList {
 
 			// Disable input notifications for service bucket
-			if err := disableInputNotifications(s3Client, service.GetMinIOWebhookARN(), bucket); err != nil {
+			if err := disableInputNotifications(s3Client, service.GetObjectStorageWebhookARN(cfg.ObjectStorageType), bucket); err != nil {
 				log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 			}
 

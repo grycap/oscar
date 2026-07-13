@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/grycap/oscar/v4/pkg/types"
 )
 
@@ -91,5 +93,38 @@ func TestRustFSIAMIntegration(t *testing.T) {
 	}
 	if !foundDefaultGroup {
 		t.Fatalf("temporary RustFS user is not a member of %s", ALL_USERS_GROUP)
+	}
+
+	webhookName := "oscwh" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	if err := RegisterObjectStorageWebhook(ctx, cfg, webhookName, "integration-token"); err != nil {
+		t.Fatalf("registering temporary RustFS webhook: %v", err)
+	}
+	bucketName := "oscwh-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	s3Client := cfg.MinIOProvider.GetS3Client()
+	if _, err := s3Client.CreateBucket(&s3.CreateBucketInput{Bucket: aws.String(bucketName)}); err != nil {
+		t.Fatalf("creating temporary RustFS notification bucket: %v", err)
+	}
+	webhookARN := fmt.Sprintf("arn:rustfs:sqs:%s:%s:webhook", cfg.MinIOProvider.Region, webhookName)
+	if err := enableInputNotification(s3Client, webhookARN, bucketName, ""); err != nil {
+		t.Fatalf("enabling temporary RustFS bucket notification: %v", err)
+	}
+	notifications, err := s3Client.GetBucketNotificationConfiguration(&s3.GetBucketNotificationConfigurationRequest{Bucket: aws.String(bucketName)})
+	if err != nil {
+		t.Fatalf("reading temporary RustFS bucket notification: %v", err)
+	}
+	if len(notifications.QueueConfigurations) != 1 || aws.StringValue(notifications.QueueConfigurations[0].QueueArn) != webhookARN {
+		t.Fatalf("unexpected RustFS bucket notification configuration: %#v", notifications.QueueConfigurations)
+	}
+	if _, err := s3Client.PutBucketNotificationConfiguration(&s3.PutBucketNotificationConfigurationInput{
+		Bucket:                    aws.String(bucketName),
+		NotificationConfiguration: &s3.NotificationConfiguration{},
+	}); err != nil {
+		t.Fatalf("clearing temporary RustFS bucket notification: %v", err)
+	}
+	if _, err := s3Client.DeleteBucket(&s3.DeleteBucketInput{Bucket: aws.String(bucketName)}); err != nil {
+		t.Fatalf("deleting temporary RustFS notification bucket: %v", err)
+	}
+	if err := RemoveObjectStorageWebhook(ctx, cfg, webhookName); err != nil {
+		t.Fatalf("removing temporary RustFS webhook: %v", err)
 	}
 }

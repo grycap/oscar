@@ -673,7 +673,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			folderKey = fmt.Sprintf("%s/", splitPath[1])
 		}
 
-		err := minIOAdminClient.CreateS3PathWithWebhook(s3Client, splitPath, service.GetMinIOWebhookARN(), false)
+		err := minIOAdminClient.CreateS3PathWithWebhook(s3Client, splitPath, service.GetObjectStorageWebhookARN(cfg.ObjectStorageType), false)
 
 		if err != nil && !isUpdate {
 			return nil, err
@@ -690,9 +690,9 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			for i, b := range service.BucketList {
 				// Create a bucket for each allowed user if allowed_users is not empty
 				if folderKey == "" {
-					err = minIOAdminClient.CreateS3PathWithWebhook(s3Client, []string{b}, service.GetMinIOWebhookARN(), false)
+					err = minIOAdminClient.CreateS3PathWithWebhook(s3Client, []string{b}, service.GetObjectStorageWebhookARN(cfg.ObjectStorageType), false)
 				} else {
-					err = minIOAdminClient.CreateS3PathWithWebhook(s3Client, []string{b, folderKey}, service.GetMinIOWebhookARN(), false)
+					err = minIOAdminClient.CreateS3PathWithWebhook(s3Client, []string{b, folderKey}, service.GetObjectStorageWebhookARN(cfg.ObjectStorageType), false)
 				}
 				if err != nil && isUpdate {
 					continue
@@ -1002,16 +1002,10 @@ func checkIdentity(service *types.Service, authHeader string) error {
 }
 
 func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider, cfg *types.Config) error {
-	minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
-	if err != nil {
-		return fmt.Errorf("the provided MinIO configuration is not valid: %v", err)
-	}
-
-	if err := minIOAdminClient.RegisterWebhook(name, token); err != nil {
+	if err := utils.RegisterObjectStorageWebhook(context.TODO(), cfg, name, token); err != nil {
 		return fmt.Errorf("error registering the service's webhook: %v", err)
 	}
-
-	return minIOAdminClient.RestartServer()
+	return nil
 }
 
 func serviceWithSameNameExists(name string, back types.ServerlessBackend) (bool, error) {

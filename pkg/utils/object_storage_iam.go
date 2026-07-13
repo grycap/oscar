@@ -232,38 +232,51 @@ func (r *rustFSIAM) UpdateGroupMembers(ctx context.Context, group string, users 
 }
 
 func (r *rustFSIAM) request(ctx context.Context, method, path string, query url.Values, body any) error {
-	requestURL := *r.endpoint
-	requestURL.Path = strings.TrimRight(requestURL.Path, "/") + "/minio/admin/v3" + path
-	requestURL.RawQuery = query.Encode()
-
 	var payload []byte
-	var err error
 	if body != nil {
+		var err error
 		payload, err = json.Marshal(body)
 		if err != nil {
 			return fmt.Errorf("encoding RustFS admin request: %w", err)
 		}
 	}
+	return r.requestPayload(ctx, method, "/minio/admin/v3"+path, query, payload, "application/json")
+}
+
+func (r *rustFSIAM) requestPayload(ctx context.Context, method, path string, query url.Values, payload []byte, contentType string) error {
+	_, err := r.requestPayloadResponse(ctx, method, path, query, payload, contentType)
+	return err
+}
+
+func (r *rustFSIAM) requestPayloadResponse(ctx context.Context, method, path string, query url.Values, payload []byte, contentType string) ([]byte, error) {
+	requestURL := *r.endpoint
+	requestURL.Path = strings.TrimRight(requestURL.Path, "/") + path
+	requestURL.RawQuery = query.Encode()
+
 	reader := bytes.NewReader(payload)
 	req, err := http.NewRequestWithContext(ctx, method, requestURL.String(), reader)
 	if err != nil {
-		return fmt.Errorf("creating RustFS admin request: %w", err)
+		return nil, fmt.Errorf("creating RustFS admin request: %w", err)
 	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
 	if _, err := r.signer.Sign(req, reader, "s3", r.region, time.Now()); err != nil {
-		return fmt.Errorf("signing RustFS admin request: %w", err)
+		return nil, fmt.Errorf("signing RustFS admin request: %w", err)
 	}
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("sending RustFS admin request: %w", err)
+		return nil, fmt.Errorf("sending RustFS admin request: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		responseBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return fmt.Errorf("RustFS admin API returned %s: %s", resp.Status, strings.TrimSpace(string(responseBody)))
+		return nil, fmt.Errorf("RustFS admin API returned %s: %s", resp.Status, strings.TrimSpace(string(responseBody)))
 	}
-	return nil
+	responseBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return nil, fmt.Errorf("reading RustFS admin response: %w", err)
+	}
+	return responseBody, nil
 }

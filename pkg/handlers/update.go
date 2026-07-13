@@ -229,7 +229,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			for _, bucket := range oldService.BucketList {
 				if !slices.Contains(newService.BucketList, bucket) {
 					// Disable input notifications for service bucket
-					if err := disableInputNotifications(s3Client, oldService.GetMinIOWebhookARN(), bucket); err != nil {
+					if err := disableInputNotifications(s3Client, oldService.GetObjectStorageWebhookARN(cfg.ObjectStorageType), bucket); err != nil {
 						log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", oldService.Name, err)
 					}
 
