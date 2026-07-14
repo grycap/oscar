@@ -352,7 +352,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Register minio webhook and restart the server
-		if err := registerMinIOWebhook(service.Name, service.Token, service.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
+		if err := registerMinIOWebhook(service.Name, service.Token, cfg); err != nil {
 			createLogger.Printf("Error registering MinIO webhook for service '%s': %v", service.Name, err)
 			derr := back.DeleteService(service)
 			if derr != nil {
@@ -1016,7 +1016,7 @@ func checkIdentity(service *types.Service, authHeader string) error {
 	return nil
 }
 
-func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider, cfg *types.Config) error {
+func registerMinIOWebhook(name string, token string, cfg *types.Config) error {
 	if err := utils.RegisterObjectStorageWebhook(context.TODO(), cfg, name, token); err != nil {
 		return fmt.Errorf("error registering the service's webhook: %v", err)
 	}

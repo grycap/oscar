@@ -353,7 +353,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						}
 					}
 					// Register minio webhook and restart the server
-					if err = registerMinIOWebhook(newService.Name, newService.Token, newService.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
+					if err = registerMinIOWebhook(newService.Name, newService.Token, cfg); err != nil {
 						uerr := back.UpdateService(*oldService)
 						if uerr != nil {
 							log.Println(uerr.Error())
