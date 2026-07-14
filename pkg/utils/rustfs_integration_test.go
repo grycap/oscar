@@ -104,6 +104,23 @@ func TestRustFSIAMIntegration(t *testing.T) {
 	if _, err := s3Client.CreateBucket(&s3.CreateBucketInput{Bucket: aws.String(bucketName)}); err != nil {
 		t.Fatalf("creating temporary RustFS notification bucket: %v", err)
 	}
+	defer s3Client.DeleteBucket(&s3.DeleteBucketInput{Bucket: aws.String(bucketName)})
+
+	adminClient, err := MakeMinIOAdminClient(cfg)
+	if err != nil {
+		t.Fatalf("creating RustFS quota admin client: %v", err)
+	}
+	if err := adminClient.SetBucketStorageQuota(bucketName, "10Mi"); err != nil {
+		t.Fatalf("setting temporary RustFS bucket quota: %v", err)
+	}
+	quota, err := adminClient.GetBucketStorageQuota(bucketName)
+	if err != nil {
+		t.Fatalf("reading temporary RustFS bucket quota: %v", err)
+	}
+	if quota.Max != "10Mi" || quota.MaxBytes != 10485760 || quota.Source != "bucket" {
+		t.Fatalf("unexpected temporary RustFS bucket quota: %+v", quota)
+	}
+
 	webhookARN := fmt.Sprintf("arn:rustfs:sqs:%s:%s:webhook", cfg.MinIOProvider.Region, webhookName)
 	if err := enableInputNotification(s3Client, webhookARN, bucketName, ""); err != nil {
 		t.Fatalf("enabling temporary RustFS bucket notification: %v", err)
