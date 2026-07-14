@@ -157,7 +157,7 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			Objects:      allObjects,
 		}
 		if isRustFSConfig(cfg) {
-			bucketInfo.StorageQuota = &utils.MinIOQuota{Max: "0", Source: "unsupported"}
+			bucketInfo.StorageQuota = rustFSBucketStorageQuota(adminClient, bucketName, metadata)
 			bucketInfo.StorageUsage = &utils.MinIOUsage{Used: "0"}
 			bucketInfo.Attribution = "partial"
 		} else {

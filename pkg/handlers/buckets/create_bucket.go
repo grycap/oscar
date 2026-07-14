@@ -125,6 +125,9 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 		if strings.ToLower(bucket.Visibility) == "" {
 			bucket.Visibility = utils.PRIVATE
 		}
+		if minIOQuota != nil && minIOQuota.StoragePerBucket != "" {
+			bucket.StorageQuota = &utils.MinIOQuota{Max: minIOQuota.StoragePerBucket, Source: "configured"}
+		}
 
 		// Bucket metadata for filtering
 		tags := bucketTags(bucket, ownerName)

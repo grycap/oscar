@@ -10,6 +10,7 @@ import (
 const (
 	bucketVisibilityTag   = "visibility"
 	bucketAllowedUsersTag = "allowed_users"
+	bucketStorageQuotaTag = "storage_quota"
 )
 
 func isRustFSConfig(cfg *types.Config) bool {
@@ -28,12 +29,41 @@ func normalizeBucketVisibility(visibility string) string {
 }
 
 func bucketTags(bucket utils.MinIOBucket, ownerName string) map[string]string {
-	return map[string]string{
+	tags := map[string]string{
 		"owner":               bucket.Owner,
 		"owner_name":          ownerName,
 		bucketVisibilityTag:   normalizeBucketVisibility(bucket.Visibility),
 		bucketAllowedUsersTag: strings.Join(bucket.AllowedUsers, ","),
 	}
+	if bucket.StorageQuota != nil && bucket.StorageQuota.Max != "" {
+		tags[bucketStorageQuotaTag] = bucket.StorageQuota.Max
+	}
+	return tags
+}
+
+func storageQuotaFromTags(metadata map[string]string) *utils.MinIOQuota {
+	if metadata == nil {
+		return nil
+	}
+	max := strings.TrimSpace(metadata[bucketStorageQuotaTag])
+	if max == "" {
+		return nil
+	}
+	return &utils.MinIOQuota{Max: max, Source: "tag"}
+}
+
+func rustFSBucketStorageQuota(adminClient *utils.MinIOAdminClient, bucketName string, metadata map[string]string) *utils.MinIOQuota {
+	quota, err := adminClient.GetBucketStorageQuota(bucketName)
+	if err == nil && quota != nil && quota.Max != "" && quota.Source != "unsupported" && quota.Source != "unset" {
+		return quota
+	}
+	if taggedQuota := storageQuotaFromTags(metadata); taggedQuota != nil {
+		return taggedQuota
+	}
+	if err == nil && quota != nil {
+		return quota
+	}
+	return &utils.MinIOQuota{Max: "0", Source: "unsupported"}
 }
 
 func visibilityFromTags(metadata map[string]string) string {

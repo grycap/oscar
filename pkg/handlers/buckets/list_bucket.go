@@ -169,7 +169,7 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 				Metadata:     metadata,
 			}
 			if isRustFSConfig(cfg) {
-				bucketInfo.StorageQuota = &utils.MinIOQuota{Max: "0", Source: "unsupported"}
+				bucketInfo.StorageQuota = rustFSBucketStorageQuota(minIOAdminClient, path, metadata)
 				bucketInfo.StorageUsage = &utils.MinIOUsage{Used: "0"}
 				bucketInfo.Attribution = "partial"
 				bucketsInfo = append(bucketsInfo, bucketInfo)

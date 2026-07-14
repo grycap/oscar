@@ -414,7 +414,11 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				// Bucket metadata for filtering
 				// If bucket dont have already the tags, set them.
 				if oldTags == nil || len(oldTags) == 0 {
-					tags := getBucketTags(&service, uid, ownerName, b.BucketName)
+					storageQuota := ""
+					if minIOQuota != nil {
+						storageQuota = minIOQuota.StoragePerBucket
+					}
+					tags := getBucketTags(&service, uid, ownerName, b.BucketName, storageQuota)
 					if err := minIOAdminClient.SetTags(b.BucketName, tags); err != nil {
 						c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
 						return
@@ -1024,11 +1028,14 @@ func serviceWithSameNameExists(name string, back types.ServerlessBackend) (bool,
 	return len(services) > 0, nil
 }
 
-func getBucketTags(service *types.Service, uid, ownerName, bucketName string) map[string]string {
+func getBucketTags(service *types.Service, uid, ownerName, bucketName, storageQuota string) map[string]string {
 	tags := map[string]string{
 		"owner":        uid,
 		"from_service": service.Name,
 		"owner_name":   ownerName,
+	}
+	if storageQuota != "" {
+		tags["storage_quota"] = storageQuota
 	}
 
 	return tags
