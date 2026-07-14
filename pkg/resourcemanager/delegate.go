@@ -228,8 +228,8 @@ func reorganizeIfNearby(alternatives []Alternative, distances []float64, thresho
 		}
 	}
 
-	// Randomly shuffle nearby items
-	rand.Shuffle(len(nearby), func(i, j int) {
+	// Randomly shuffle nearby items. This is only load distribution, not security-sensitive randomness.
+	rand.Shuffle(len(nearby), func(i, j int) { // #nosec G404
 		nearby[i], nearby[j] = nearby[j], nearby[i]
 	})
 
