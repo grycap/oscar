@@ -552,12 +552,12 @@ func (minIOAdminClient *MinIOAdminClient) SetTags(bucket string, newtags map[str
 	// Create tags from a map.
 	btags, err := tags.NewTags(newtags, false)
 	if err != nil {
-		return fmt.Errorf("error creating tag owner %s", newtags["uid"])
+		return fmt.Errorf("error creating bucket tags: %w", err)
 	}
 
 	err = minIOAdminClient.simpleClient.SetBucketTagging(context.Background(), bucket, btags)
 	if err != nil {
-		return fmt.Errorf("error setting tag on bucket %s", bucket)
+		return fmt.Errorf("error setting tag on bucket %s: %w", bucket, err)
 	}
 	return nil
 }

@@ -11,6 +11,7 @@ const (
 	bucketVisibilityTag   = "visibility"
 	bucketAllowedUsersTag = "allowed_users"
 	bucketStorageQuotaTag = "storage_quota"
+	bucketAllowedUsersSep = " "
 )
 
 func isRustFSConfig(cfg *types.Config) bool {
@@ -30,10 +31,12 @@ func normalizeBucketVisibility(visibility string) string {
 
 func bucketTags(bucket utils.MinIOBucket, ownerName string) map[string]string {
 	tags := map[string]string{
-		"owner":               bucket.Owner,
-		"owner_name":          ownerName,
-		bucketVisibilityTag:   normalizeBucketVisibility(bucket.Visibility),
-		bucketAllowedUsersTag: strings.Join(bucket.AllowedUsers, ","),
+		"owner":             bucket.Owner,
+		"owner_name":        ownerName,
+		bucketVisibilityTag: normalizeBucketVisibility(bucket.Visibility),
+	}
+	if len(bucket.AllowedUsers) > 0 {
+		tags[bucketAllowedUsersTag] = strings.Join(bucket.AllowedUsers, bucketAllowedUsersSep)
 	}
 	if bucket.StorageQuota != nil && bucket.StorageQuota.Max != "" {
 		tags[bucketStorageQuotaTag] = bucket.StorageQuota.Max
@@ -81,7 +84,7 @@ func allowedUsersFromTags(metadata map[string]string) []string {
 	if raw == "" {
 		return nil
 	}
-	values := strings.Split(raw, ",")
+	values := strings.Fields(strings.ReplaceAll(raw, ",", bucketAllowedUsersSep))
 	users := make([]string, 0, len(values))
 	for _, value := range values {
 		value = strings.TrimSpace(value)

@@ -1040,11 +1040,13 @@ func serviceWithSameNameExists(name string, back types.ServerlessBackend) (bool,
 
 func getBucketTags(service *types.Service, uid, ownerName, bucketName, storageQuota string) map[string]string {
 	tags := map[string]string{
-		"owner":         uid,
-		"from_service":  service.Name,
-		"owner_name":    ownerName,
-		"visibility":    normalizeObjectStorageVisibility(service.Visibility),
-		"allowed_users": strings.Join(service.AllowedUsers, ","),
+		"owner":        uid,
+		"from_service": service.Name,
+		"owner_name":   ownerName,
+		"visibility":   normalizeObjectStorageVisibility(service.Visibility),
+	}
+	if len(service.AllowedUsers) > 0 {
+		tags["allowed_users"] = strings.Join(service.AllowedUsers, " ")
 	}
 	if storageQuota != "" {
 		tags["storage_quota"] = storageQuota
