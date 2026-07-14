@@ -901,7 +901,7 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 
 			// Send the request
 			res, err := client.Do(req) // #nosec
-			fmt.Println("StatusCode : ", res.StatusCode)
+			//fmt.Println("StatusCode : ", res.StatusCode)
 			if err != nil {
 				if delegation != "static" {
 					replicas[id].Priority = noDelegateCode
@@ -956,7 +956,6 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 					dist_cpu_node := node_cpu_schedulable - (1000 * serviceCPU)
 					dist_mem_node := node_mem_schedulable - serviceRAM
 					if dist_cpu_node >= 0 && dist_mem_node >= 0 {
-
 						// Create HTTP request to view user quotas in the cluster
 						getQuotasURL, err := url.Parse(cluster.Endpoint)
 						if err != nil {
@@ -967,7 +966,6 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 							continue
 						}
 						getQuotasURL.Path = path.Join(getQuotasURL.Path, "system", "quotas", "user")
-						//fmt.Printf("URL quota: %s", getQuotasURL.Path)
 						req, err := http.NewRequest(http.MethodGet, getQuotasURL.String(), nil)
 						if err != nil {
 							if delegation != "static" {
@@ -990,7 +988,6 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 						}
 
 						resp_quota, err := client.Do(req)
-						fmt.Println("QuotaCode : ", resp_quota.StatusCode)
 						if err != nil {
 							if delegation != "static" {
 								replicas[id].Priority = noDelegateCode
@@ -1001,14 +998,13 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 						defer resp_quota.Body.Close()
 
 						// Handling the error responses mapped in the OSCAR Handler
-
 						if resp_quota.StatusCode != http.StatusOK {
 							bodyBytes, _ := io.ReadAll(resp_quota.Body)
 							switch resp_quota.StatusCode {
 							case http.StatusUnauthorized:
 								fmt.Printf("Error 401: Unauthorized. Verify your token. Details: %s\n", string(bodyBytes))
 							case http.StatusServiceUnavailable:
-								fmt.Printf("Error 503: The quota system is disabled on the server\n")
+								fmt.Printf("Error 503: The quota system is disabled on the server and has available resources\n")
 								canExecute = true
 								break
 							default:
@@ -1026,22 +1022,17 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 						}
 						if quotaResp.Resources["cpu"].Max == 0 && quotaResp.Resources["memory"].Max == 0 {
 							//There are no defined quotas
-							fmt.Printf("The %s cluster has no defined quotas \n", replica.ClusterID)
+							fmt.Printf("The %s cluster has no defined quotas and has available resources. \n", replica.ClusterID)
 							canExecute = true
 							break
 						}
 						// Display the data obtained on the screen
-						fmt.Printf("CPU Quota - MAX: %v\t USED: %v\n", quotaResp.Resources["cpu"].Max, quotaResp.Resources["cpu"].Used)
 						//Calculate the distance with respect to what the service requests.
 						quota_cpu_schedulable := float64(quotaResp.Resources["cpu"].Max - quotaResp.Resources["cpu"].Used)
 						dist_cpu_quota := quota_cpu_schedulable - (1000 * serviceCPU)
-						fmt.Printf("Dist_CPU_quotas: %v\n", dist_cpu_quota)
-						fmt.Printf("Memory Quota:- MAX: %v\t USED: %v\n", quotaResp.Resources["memory"].Max, quotaResp.Resources["memory"].Used)
 						//Calculate the distance with respect to what the service requests.
 						quota_mem_schedulable := float64(quotaResp.Resources["memory"].Max - quotaResp.Resources["memory"].Used)
 						dist_mem_quota := quota_mem_schedulable - serviceRAM
-						fmt.Printf("Dist_Mem_quotas: %v\n", dist_mem_quota)
-
 						if dist_cpu_quota >= 0 && dist_mem_quota >= 0 {
 							fmt.Printf("Availability of resources and quotas in the %s cluster \n", replica.ClusterID)
 							canExecute = true
@@ -1056,7 +1047,7 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 					}
 				}
 
-				//The priority of delegating the service is set based on the free CPU of the cluster as long as it has free CPU on a node to delegate the service.
+				//Priority is assigned to the cluster with available resources and quota.
 				if canExecute {
 
 					if delegation == "random" {
