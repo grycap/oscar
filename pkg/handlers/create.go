@@ -869,16 +869,23 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 					Owner:      service.Owner,
 				}
 				visibility := minIOAdminClient.GetCurrentResourceVisibility(minio)
+				bucketTags, _ := minIOAdminClient.GetTaggedMetadata(splitPath[0])
+				if isRustFSConfig(cfg) {
+					visibility = visibilityFromObjectStorageTags(bucketTags)
+					bucketOwner := bucketTags["owner"]
+					if bucketOwner != "" && !isAdminUser && bucketOwner != service.Owner {
+						return nil, fmt.Errorf("the bucket \"%s\" must belong to the service owner to be used as mount", minio.BucketName)
+					}
+				}
 
 				// Add admin exception for mount buckets
 				// Only allowed private buckets
 				// Admin buckets have no MinIO policy so visibility returns "".
 				// Guard against mounting another user's bucket by verifying the owner tag is empty or matches the admin user
-				// (oscar in our case, as admin users don't have a UID and are identified by the "owner" tag in MinIO buckets).
+				// (cfg.Name in our case, as admin users don't have a UID and are identified by the "owner" tag in MinIO buckets).
 				// (user buckets always carry their UID in the "owner" tag).
 				if isAdminUser && visibility == "" {
-					bucketTags, _ := minIOAdminClient.GetTaggedMetadata(splitPath[0])
-					if bucketTags["owner"] == "oscar" || bucketTags["owner"] == "" {
+					if bucketTags["owner"] == cfg.Name || bucketTags["owner"] == "" {
 						visibility = utils.PRIVATE
 					}
 				}
