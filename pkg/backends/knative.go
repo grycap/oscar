@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 	knv1 "knative.dev/serving/pkg/apis/serving/v1"
 	knclientset "knative.dev/serving/pkg/client/clientset/versioned"
 )
@@ -287,14 +288,6 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 		var originalKnSvc *knv1.Service
 		// Skip Knative service update only if the service is a KServe service without an image
 		if !(service.Image == "" && isKserve) {
-			// Get the old knative service
-			oldSvc, err := kn.knClientset.ServingV1().Services(namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			// Preserve the original Knative Service state so it can be restored on KServe errors
-			originalKnSvc = oldSvc.DeepCopy()
-
 			// Create the Knative service definition
 			knSvc, err := kn.createKNServiceDefinition(&service, namespace)
 			if err != nil {
@@ -306,16 +299,28 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 				return err
 			}
 
-			// Set the new service's values on the old Knative service to avoid update issues
-			oldSvc.ObjectMeta.Labels = knSvc.ObjectMeta.Labels
-			oldSvc.Spec = knSvc.Spec
-			// Update the annotations
-			for k, v := range knSvc.ObjectMeta.Annotations {
-				oldSvc.ObjectMeta.Annotations[k] = v
-			}
-
 			// Update the Knative service
-			_, err = kn.knClientset.ServingV1().Services(namespace).Update(context.TODO(), oldSvc, metav1.UpdateOptions{})
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				// Get the old knative service
+				oldSvc, err := kn.knClientset.ServingV1().Services(namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if originalKnSvc == nil {
+					// Preserve the original Knative Service state so it can be restored on KServe errors
+					originalKnSvc = oldSvc.DeepCopy()
+				}
+				// Set the new service's values on the old Knative service to avoid update issues
+				oldSvc.ObjectMeta.Labels = knSvc.ObjectMeta.Labels
+				oldSvc.Spec = knSvc.Spec
+				// Update the annotations
+				for k, v := range knSvc.ObjectMeta.Annotations {
+					oldSvc.ObjectMeta.Annotations[k] = v
+				}
+
+				_, err = kn.knClientset.ServingV1().Services(namespace).Update(context.TODO(), oldSvc, metav1.UpdateOptions{})
+				return err
+			})
 			if err != nil {
 				// Restore the old configMap
 				_, resErr := kn.kubeClientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), oldCm, metav1.UpdateOptions{})

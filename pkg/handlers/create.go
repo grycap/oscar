@@ -219,6 +219,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 						if !ownerOnList {
 							service.AllowedUsers = append(service.AllowedUsers, uid)
+							service.BucketList = append(service.BucketList, splitPath[0]+"-"+uid[:10])
 						}
 					}
 				}
@@ -418,7 +419,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					if minIOQuota != nil {
 						storageQuota = minIOQuota.StoragePerBucket
 					}
-					tags := getBucketTags(&service, uid, ownerName, b.BucketName, storageQuota)
+					tags := getBucketTags(&service, b.Owner, ownerName, b.BucketName, storageQuota)
 					if err := minIOAdminClient.SetTags(b.BucketName, tags); err != nil {
 						c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
 						return
@@ -707,6 +708,13 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 					if err != nil {
 						return nil, err
 					}
+				}
+				if isRustFSConfig(cfg) {
+					minIOBuckets = append(minIOBuckets, utils.MinIOBucket{
+						BucketName: b,
+						Visibility: utils.PRIVATE,
+						Owner:      service.AllowedUsers[i],
+					})
 				}
 				// Create bucket policy
 				if !isAdminUser && !isRustFSConfig(cfg) {

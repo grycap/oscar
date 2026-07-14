@@ -219,6 +219,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 					if !ownerOnList {
 						newService.AllowedUsers = append(newService.AllowedUsers, uid)
+						newService.BucketList = append(newService.BucketList, splitPath[0]+"-"+uid[:10])
 					}
 					/// Create
 				}
@@ -233,12 +234,12 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", oldService.Name, err)
 					}
 
-					err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+					err := deleteObjectStorageBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
 						BucketName:   bucket,
 						Visibility:   utils.PRIVATE,
 						AllowedUsers: []string{},
 						Owner:        oldService.Owner,
-					})
+					}, isRustFSConfig(cfg))
 					if err != nil {
 						log.Printf("error while removing MinIO bucket %v", err)
 					}
@@ -293,7 +294,25 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 		if len(newServiceBuckets) > 0 {
+			ownerName := "oscar"
+			if !isAdminUser {
+				ownerName = auth.GetUserNameFromContext(c)
+				ownerName = utils.RemoveAccents(ownerName)
+			}
 			for _, b := range newServiceBuckets {
+				if strings.ToLower(newService.Visibility) == "" {
+					b.Visibility = utils.PRIVATE
+				}
+				if isRustFSConfig(cfg) {
+					oldTags, _ := minIOAdminClient.GetTaggedMetadata(b.BucketName)
+					if oldTags == nil || len(oldTags) == 0 {
+						tags := getBucketTags(&newService, b.Owner, ownerName, b.BucketName, "")
+						if err := minIOAdminClient.SetTags(b.BucketName, tags); err != nil {
+							c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
+							return
+						}
+					}
+				}
 				if oldServiceBuckets[b.BucketName] {
 					// If the visibility of the bucket has changed remove old policies and config new ones
 					if oldService.Visibility != newService.Visibility && !isRustFSConfig(cfg) {
