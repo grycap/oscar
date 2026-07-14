@@ -103,7 +103,7 @@ func main() {
 	} else if cfg.VolumeEnable {
 		qb = &types.QuotaBackend{KubeClientset: kubeClientset}
 	}
-	if qb == nil && (cfg.KueueEnable || cfg.VolumeEnable) {
+	if qb == nil && (cfg.KueueEnable || cfg.VolumeEnable || cfg.MinIOQuotaEnabled) {
 		qb = &types.QuotaBackend{KubeClientset: kubeClientset}
 	}
 
