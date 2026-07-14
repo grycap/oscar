@@ -31,12 +31,25 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/grycap/oscar/v4/pkg/testsupport"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
+
+type fakeObjectStorageIAM struct{}
+
+func (fakeObjectStorageIAM) CreateUser(ctx context.Context, accessKey, secretKey string) error {
+	return nil
+}
+
+func (fakeObjectStorageIAM) CreateGroup(ctx context.Context, group string) error {
+	return nil
+}
+
+func (fakeObjectStorageIAM) UpdateGroupMembers(ctx context.Context, group string, users []string, remove bool) error {
+	return nil
+}
 
 func TestNewOIDCManager(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
@@ -255,7 +268,7 @@ func TestGetOIDCMiddleware(t *testing.T) {
 			Namespace: "oscar-svc",
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
-			VolumeName: "test-pv",
+			VolumeName:  "test-pv",
 			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
 			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
@@ -301,14 +314,13 @@ func TestGetOIDCMiddleware(t *testing.T) {
 		VolumeMaxDisk:    "5Gi",
 		VolumeMinDisk:    "1Gi",
 	}
-	minIOAdminClient, _ := utils.MakeMinIOAdminClient(&cfg)
 	issuer := server.URL
 
 	oidcConfig := &oidc.Config{
 		InsecureSkipSignatureCheck: true,
 		SkipClientIDCheck:          true,
 	}
-	middleware := getOIDCMiddleware(kubeClientset, minIOAdminClient, &cfg, oidcConfig)
+	middleware := getOIDCMiddleware(kubeClientset, fakeObjectStorageIAM{}, &cfg, oidcConfig)
 	if middleware == nil {
 		t.Errorf("expected middleware to be non-nil")
 	}
