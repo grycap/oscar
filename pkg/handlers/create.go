@@ -951,11 +951,6 @@ func collectMinIOBucketCandidates(service *types.Service) []string {
 	if provName == types.MinIOName && provID == types.DefaultProvider {
 		addPathBucket(service.Mount.Path)
 	}
-	for _, bucket := range service.BucketList {
-		if strings.TrimSpace(bucket) != "" {
-			buckets[bucket] = struct{}{}
-		}
-	}
 	result := make([]string, 0, len(buckets))
 	for bucket := range buckets {
 		result = append(result, bucket)

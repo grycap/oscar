@@ -629,6 +629,23 @@ func TestMakeCreateHandlerPreservesServiceBucketsWithoutMinIOQuota(t *testing.T)
 	}
 }
 
+func TestCollectMinIOBucketCandidatesIgnoresIsolationBuckets(t *testing.T) {
+	service := &types.Service{
+		Input: []types.StorageIOConfig{
+			{Provider: "minio.default", Path: "service-bucket/input"},
+		},
+		BucketList: []string{
+			"service-bucket-user-a",
+			"service-bucket-user-b",
+		},
+	}
+
+	candidates := collectMinIOBucketCandidates(service)
+	if len(candidates) != 1 || candidates[0] != "service-bucket" {
+		t.Fatalf("expected only the declared service bucket, got %v", candidates)
+	}
+}
+
 func TestCheckValuesLegacyStorageFlowsPreserveNilVolume(t *testing.T) {
 	cfg := &types.Config{
 		MinIOProvider: &types.MinIOProvider{
@@ -675,9 +692,9 @@ func TestCheckValuesLegacyStorageFlowsPreserveNilVolume(t *testing.T) {
 func newServiceQuotaTestContext(t *testing.T, user, minIOEndpoint string, quotaData map[string]string) (*types.Config, *backends.FakeBackend, *testclient.Clientset) {
 	t.Helper()
 	cfg := &types.Config{
-		Namespace:          "oscar",
-		ServicesNamespace:  "oscar-svc",
-		MinIOQuotaEnabled:  true,
+		Namespace:         "oscar",
+		ServicesNamespace: "oscar-svc",
+		MinIOQuotaEnabled: true,
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  minIOEndpoint,
 			Region:    "us-east-1",
