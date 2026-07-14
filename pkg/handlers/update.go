@@ -305,12 +305,19 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 				if isRustFSConfig(cfg) {
 					oldTags, _ := minIOAdminClient.GetTaggedMetadata(b.BucketName)
-					if oldTags == nil || len(oldTags) == 0 {
-						tags := getBucketTags(&newService, b.Owner, ownerName, b.BucketName, "")
-						if err := minIOAdminClient.SetTags(b.BucketName, tags); err != nil {
-							c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
-							return
+					storageQuota := ""
+					if oldTags != nil {
+						storageQuota = oldTags["storage_quota"]
+					}
+					tags := getBucketTags(&newService, b.Owner, ownerName, b.BucketName, storageQuota)
+					for key, value := range oldTags {
+						if _, reserved := tags[key]; !reserved {
+							tags[key] = value
 						}
+					}
+					if err := minIOAdminClient.SetTags(b.BucketName, tags); err != nil {
+						c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
+						return
 					}
 				}
 				if oldServiceBuckets[b.BucketName] {
