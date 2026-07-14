@@ -26,6 +26,7 @@ import (
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
+	"github.com/minio/madmin-go"
 )
 
 // MakeGetHandler godoc
@@ -85,9 +86,14 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 		}
 
 		visibility := adminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: ownerCandidate})
+		if isRustFSConfig(cfg) {
+			visibility = visibilityFromTags(metadata)
+		}
 
 		var allowedUsers []string
-		if visibility == utils.RESTRICTED {
+		if isRustFSConfig(cfg) {
+			allowedUsers = allowedUsersFromTags(metadata)
+		} else if visibility == utils.RESTRICTED {
 			allowedUsers, err = adminClient.GetBucketMembers(bucketName)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error retrieving bucket members: %v", err))
@@ -95,6 +101,10 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 		}
 
+		if !isAdmin && isRustFSConfig(cfg) && !userAllowedByTags(requester, metadata) {
+			c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", requester))
+			return
+		}
 		if !isAdmin && visibility == "" {
 			c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", requester))
 			return
@@ -130,10 +140,13 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			allObjects = append(allObjects, singleObject)
 			returnedItemCount++
 		}
-		dataUsage, err := adminClient.GetDataUsageInfo()
-		if err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error getting MinIO data usage: %v", err))
-			return
+		var dataUsage madmin.DataUsageInfo
+		if !isRustFSConfig(cfg) {
+			dataUsage, err = adminClient.GetDataUsageInfo()
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error getting MinIO data usage: %v", err))
+				return
+			}
 		}
 		bucketInfo := utils.MinIOBucket{
 			BucketName:   bucketName,
@@ -143,9 +156,15 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			Metadata:     metadata,
 			Objects:      allObjects,
 		}
-		if err := adminClient.EnrichBucketQuotaAndUsage(&bucketInfo, dataUsage); err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error getting bucket quota or usage for bucket '%s': %v", bucketName, err))
-			return
+		if isRustFSConfig(cfg) {
+			bucketInfo.StorageQuota = &utils.MinIOQuota{Max: "0", Source: "unsupported"}
+			bucketInfo.StorageUsage = &utils.MinIOUsage{Used: "0"}
+			bucketInfo.Attribution = "partial"
+		} else {
+			if err := adminClient.EnrichBucketQuotaAndUsage(&bucketInfo, dataUsage); err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error getting bucket quota or usage for bucket '%s': %v", bucketName, err))
+				return
+			}
 		}
 
 		response := BucketListResponse{

@@ -106,6 +106,14 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 		}
 
 		if (uid == types.DefaultOwner) || (bucketOwner == uid) {
+			if isRustFSConfig(cfg) {
+				if err := minIOAdminClient.DeleteBucket(s3Client, bucketName); err != nil {
+					c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+					return
+				}
+				c.Status(http.StatusNoContent)
+				return
+			}
 			v := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: uid})
 			err := handlers.DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
 				BucketName: bucketName,

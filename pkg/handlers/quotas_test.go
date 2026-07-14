@@ -443,8 +443,8 @@ func TestFetchQuotaCountsMinIOBucketsWithoutConfiguredLimit(t *testing.T) {
 	defer server.Close()
 
 	cfg := &types.Config{
-		ServicesNamespace:  "oscar-svc",
-		MinIOQuotaEnabled:  true,
+		ServicesNamespace: "oscar-svc",
+		MinIOQuotaEnabled: true,
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
 			Region:    "us-east-1",
@@ -624,6 +624,12 @@ func TestEnsureKueueQuotasEnabled(t *testing.T) {
 			t.Fatalf("expected nil error, got %v", err)
 		}
 	})
+}
+
+func TestEnsureQuotasEnabledAllowsMinIOOnly(t *testing.T) {
+	if err := ensureQuotasEnabled(&types.Config{MinIOQuotaEnabled: true}); err != nil {
+		t.Fatalf("expected minio-only quotas to be enabled, got %v", err)
+	}
 }
 
 func TestIsMissingKueueAPI(t *testing.T) {

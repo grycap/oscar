@@ -296,7 +296,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			for _, b := range newServiceBuckets {
 				if oldServiceBuckets[b.BucketName] {
 					// If the visibility of the bucket has changed remove old policies and config new ones
-					if oldService.Visibility != newService.Visibility {
+					if oldService.Visibility != newService.Visibility && !isRustFSConfig(cfg) {
 						err := minIOAdminClient.UnsetPolicies(utils.MinIOBucket{
 							BucketName:   b.BucketName,
 							AllowedUsers: oldService.AllowedUsers,
@@ -314,7 +314,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						if err != nil {
 							c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 						}
-					} else {
+					} else if !isRustFSConfig(cfg) {
 						if newService.Visibility == utils.RESTRICTED {
 							err := minIOAdminClient.UpdateServiceGroup(b.BucketName, newService.AllowedUsers)
 							if err != nil {
@@ -326,9 +326,12 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					oldServiceBuckets[b.BucketName] = false
 				} else {
 					// If the bucket didn't exist on the old service assume its created an set policies & webhooks
-					err := minIOAdminClient.SetPolicies(b)
-					if err != nil {
-						c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+					if !isRustFSConfig(cfg) {
+						err := minIOAdminClient.SetPolicies(b)
+						if err != nil {
+							c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+							return
+						}
 					}
 					// Register minio webhook and restart the server
 					if err = registerMinIOWebhook(newService.Name, newService.Token, newService.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
@@ -345,7 +348,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		for key, value := range oldServiceBuckets {
 			// If the bucket was not used in the new service definition set it to private
-			if value {
+			if value && !isRustFSConfig(cfg) {
 				err := minIOAdminClient.SetPolicies(utils.MinIOBucket{BucketName: key, Visibility: utils.PRIVATE})
 				if err != nil {
 					c.String(http.StatusInternalServerError, "error setting new policies: %v", err)

@@ -175,8 +175,8 @@ func ensureKueueQuotasEnabled(cfg *types.Config) error {
 }
 
 func ensureQuotasEnabled(cfg *types.Config) error {
-	if cfg == nil || (!cfg.KueueEnable && !cfg.VolumeEnable) {
-		return fmt.Errorf("%w: /system/quotas requires KUEUE_ENABLE=true or VOLUME_ENABLE=true", errKueueDisabled)
+	if cfg == nil || (!cfg.KueueEnable && !cfg.VolumeEnable && !cfg.MinIOQuotaEnabled) {
+		return fmt.Errorf("%w: /system/quotas requires KUEUE_ENABLE=true, VOLUME_ENABLE=true, or MINIO_QUOTA_ENABLED=true", errKueueDisabled)
 	}
 	return nil
 }

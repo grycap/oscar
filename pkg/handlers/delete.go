@@ -140,7 +140,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusInternalServerError, "Error deleting service buckets: ", err)
 		}
 
-		if len(service.BucketList) > 0 && strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser {
+		if len(service.BucketList) > 0 && strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser && !isRustFSConfig(cfg) {
 			for i, b := range service.BucketList {
 				err = minIOAdminClient.RemoveResource(b, service.AllowedUsers[i], false)
 				if err != nil {
@@ -212,12 +212,12 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		}
 		// Check if the bucket is in the mount path
 		if !sameStorage(in, service.Mount) {
-			err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+			err := deleteObjectStorageBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
 				BucketName:   bucketName,
 				Visibility:   service.Visibility,
 				AllowedUsers: service.AllowedUsers,
 				Owner:        service.Owner,
-			})
+			}, isRustFSConfig(cfg))
 
 			if err != nil {
 				return fmt.Errorf("error while removing MinIO bucket %v", err)
@@ -273,12 +273,12 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 					log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 				}
 				if !sameStorage(out, service.Mount) {
-					err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+					err := deleteObjectStorageBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
 						BucketName:   outBucket,
 						Visibility:   service.Visibility,
 						AllowedUsers: service.AllowedUsers,
 						Owner:        service.Owner,
-					})
+					}, isRustFSConfig(cfg))
 					if err != nil {
 						return fmt.Errorf("error while removing MinIO bucket %v", err)
 					}
@@ -308,12 +308,12 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 			}
 
-			err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+			err := deleteObjectStorageBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
 				BucketName:   bucket,
 				Visibility:   utils.PRIVATE,
 				AllowedUsers: []string{},
 				Owner:        service.Owner,
-			})
+			}, isRustFSConfig(cfg))
 			if err != nil {
 				log.Printf("error while removing MinIO bucket %v", err)
 			}
@@ -341,6 +341,10 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 }
 
 func DeleteMinIOBuckets(s3Client *s3.S3, minIOAdminClient *utils.MinIOAdminClient, bucket utils.MinIOBucket) error {
+	return deleteObjectStorageBuckets(s3Client, minIOAdminClient, bucket, false)
+}
+
+func deleteObjectStorageBuckets(s3Client *s3.S3, minIOAdminClient *utils.MinIOAdminClient, bucket utils.MinIOBucket, skipPolicies bool) error {
 	var policyName string
 	var isGroup bool
 	if strings.ToLower(bucket.Visibility) == utils.PUBLIC {
@@ -349,7 +353,7 @@ func DeleteMinIOBuckets(s3Client *s3.S3, minIOAdminClient *utils.MinIOAdminClien
 	} else {
 		policyName = bucket.Owner
 	}
-	if bucket.Owner != types.DefaultOwner {
+	if bucket.Owner != types.DefaultOwner && !skipPolicies {
 		err := minIOAdminClient.RemoveResource(bucket.BucketName, policyName, isGroup)
 		if err != nil {
 			return fmt.Errorf("error removing resource")

@@ -121,11 +121,13 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 			ownerName = auth.GetUserNameFromContext(c)
 			ownerName = utils.RemoveAccents(ownerName)
 		}
-		// Bucket metadata for filtering
-		tags := map[string]string{
-			"owner":      uid,
-			"owner_name": ownerName,
+		// If not specified default visibility is PRIVATE
+		if strings.ToLower(bucket.Visibility) == "" {
+			bucket.Visibility = utils.PRIVATE
 		}
+
+		// Bucket metadata for filtering
+		tags := bucketTags(bucket, ownerName)
 
 		if err := minIOAdminClient.SetTags(splitPath[0], tags); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
@@ -137,15 +139,13 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 				return
 			}
 		}
-		// If not specified default visibility is PRIVATE
-		if strings.ToLower(bucket.Visibility) == "" {
-			bucket.Visibility = utils.PRIVATE
-		}
-
 		if uid != cfg.Name {
-			err := minIOAdminClient.SetPolicies(bucket)
-			if err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating policies for bucket: %v", err))
+			if !isRustFSConfig(cfg) {
+				err := minIOAdminClient.SetPolicies(bucket)
+				if err != nil {
+					c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating policies for bucket: %v", err))
+					return
+				}
 			}
 		}
 

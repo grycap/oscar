@@ -88,6 +88,29 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 		}
 
 		bucket.Owner = uid
+		if isRustFSConfig(cfg) {
+			if uid != cfg.Name && metadata["owner"] != uid {
+				c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", uid))
+				return
+			}
+			ownerName := metadata["owner_name"]
+			if ownerName == "" {
+				ownerName = uid
+			}
+			newTags := bucketTags(bucket, ownerName)
+			for key, value := range metadata {
+				if _, reserved := newTags[key]; !reserved {
+					newTags[key] = value
+				}
+			}
+			if err := minIOAdminClient.SetTags(bucket.BucketName, newTags); err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket tags:", err))
+				return
+			}
+			c.Status(http.StatusNoContent)
+			return
+		}
+
 		var oldVis string
 		if oldVis = minIOAdminClient.GetCurrentResourceVisibility(bucket); oldVis != "" {
 			if oldVis == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucket.BucketName) {

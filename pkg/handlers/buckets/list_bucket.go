@@ -27,6 +27,7 @@ import (
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
+	"github.com/minio/madmin-go"
 )
 
 // MakeListHandler godoc
@@ -56,6 +57,17 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 			//c.JSON(http.StatusOK, bucketsList)
 
+		} else if isRustFSConfig(cfg) {
+			uid, err = auth.GetUIDFromContext(c)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+				return
+			}
+			bucketsList, err = listUserBuckets(cfg.MinIOProvider.GetS3Client())
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error reading buckets from object storage: %v", err))
+				return
+			}
 		} else {
 			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {
@@ -101,19 +113,32 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", err))
 			return
 		}
-		dataUsage, err := minIOAdminClient.GetDataUsageInfo()
-		if err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Error getting MinIO data usage: %v", err))
-			return
+		var dataUsage madmin.DataUsageInfo
+		if !isRustFSConfig(cfg) {
+			dataUsage, err = minIOAdminClient.GetDataUsageInfo()
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error getting MinIO data usage: %v", err))
+				return
+			}
 		}
 
 		for _, b := range bucketsList.Buckets {
 			var allowedUsers []string
 			var bowner string
 			path := *b.Name
-			bucketVisibility := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: *b.Name, Owner: uid})
 			metadata, err := minIOAdminClient.GetTaggedMetadata(path)
-			if bucketVisibility == utils.PRIVATE {
+			if err != nil {
+				metadata = map[string]string{}
+			}
+			bucketVisibility := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: *b.Name, Owner: uid})
+			if isRustFSConfig(cfg) {
+				if !isAdminUser && !userAllowedByTags(uid, metadata) {
+					continue
+				}
+				bucketVisibility = visibilityFromTags(metadata)
+				allowedUsers = allowedUsersFromTags(metadata)
+				bowner = metadata["owner"]
+			} else if bucketVisibility == utils.PRIVATE {
 				bowner = uid
 			} else {
 				if err != nil {
@@ -123,11 +148,13 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 				}
 			}
 			if bucketVisibility == utils.RESTRICTED {
-				members, err := minIOAdminClient.GetBucketMembers(path)
-				if err != nil {
-					fmt.Printf("WARNING: Couldn't get bucket owner info: %v\n", err)
-				} else {
-					allowedUsers = append(allowedUsers, members...)
+				if !isRustFSConfig(cfg) {
+					members, err := minIOAdminClient.GetBucketMembers(path)
+					if err != nil {
+						fmt.Printf("WARNING: Couldn't get bucket owner info: %v\n", err)
+					} else {
+						allowedUsers = append(allowedUsers, members...)
+					}
 				}
 			}
 
@@ -140,6 +167,13 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 				Owner:        bowner,
 				AllowedUsers: allowedUsers,
 				Metadata:     metadata,
+			}
+			if isRustFSConfig(cfg) {
+				bucketInfo.StorageQuota = &utils.MinIOQuota{Max: "0", Source: "unsupported"}
+				bucketInfo.StorageUsage = &utils.MinIOUsage{Used: "0"}
+				bucketInfo.Attribution = "partial"
+				bucketsInfo = append(bucketsInfo, bucketInfo)
+				continue
 			}
 			if err := minIOAdminClient.EnrichBucketQuotaAndUsage(&bucketInfo, dataUsage); err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error getting bucket quota or usage for bucket '%s': %v", path, err))
