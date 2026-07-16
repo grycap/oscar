@@ -62,7 +62,10 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 		if err := c.ShouldBindJSON(&bucket); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
 			return
-
+		}
+		if err := bucket.Validate(); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
+			return
 		}
 		isAdminUser = false
 		uid = cfg.Name
