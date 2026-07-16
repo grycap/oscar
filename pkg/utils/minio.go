@@ -78,6 +78,37 @@ type MinIOBucket struct {
 	Attribution  string            `json:"attribution,omitempty"`
 }
 
+// UnmarshalJSON custom unmarshaller to set default values for MinIOBucket
+// Is called when the MinIOBucket
+func (m *MinIOBucket) UnmarshalJSON(data []byte) error {
+	type Alias MinIOBucket
+
+	aux := Alias{
+		Visibility: PRIVATE,
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	*m = MinIOBucket(aux)
+	return nil
+}
+
+// Validate checks if the MinIOBucket struct has valid values for its fields
+func (m MinIOBucket) Validate() error {
+	visibility := strings.TrimSpace(m.Visibility)
+	switch visibility {
+	case PRIVATE, PUBLIC, RESTRICTED:
+	default:
+		return fmt.Errorf(
+			"bucket visibility must be private, public or restricted",
+		)
+	}
+
+	return nil
+}
+
 // MinIOObject captures object level metadata inside a MinIO bucket
 type MinIOObject struct {
 	ObjectName   string `json:"object_name"`
