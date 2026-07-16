@@ -402,7 +402,6 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			resp1, err := client.Do(req1) // #nosec
 			duration := time.Since(start)
 			if err != nil {
-				//fmt.Printf("Error making request for %s: %v\n", cred.URL, err)
 				results = append(results, []float64{duration.Seconds(), 0, 0, 0, 1e6, 1e6})
 				continue
 			}
@@ -464,18 +463,18 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 
 		if strings.ToLower(replica.Type) == oscarReplicaType && replica.Priority < noDelegateCode {
 			timestamp := time.Now().Format("2006/01/02 15:04:05")
-			log.Printf("[RESOURCE-DELEGATION] %s | Delegation job ( \"%s\" ) in ClusterID: %s with Priority %d", timestamp, jobID, replica.ClusterID, replica.Priority)
+			log.Printf("[RESOURCE-DELEGATION] %s | Delegation job \"%s\" in ClusterID: %s with Priority %d", timestamp, jobID, replica.ClusterID, replica.Priority)
 			// Check ClusterID is defined in 'Clusters'
 			cluster, ok := service.Clusters[replica.ClusterID]
 			if !ok {
-				logger.Printf("Error delegating job ( \"%s\" ) from service \"%s\" to ClusterID \"%s\": Cluster not defined\n", jobID, service.Name, replica.ClusterID)
+				logger.Printf("Error delegating job \"%s\" from service \"%s\" to ClusterID \"%s\": Cluster not defined\n", jobID, service.Name, replica.ClusterID)
 				continue
 			}
 
 			// Parse the cluster's endpoint URL and add the service's path
 			postJobURL, err := url.Parse(cluster.Endpoint)
 			if err != nil {
-				logger.Printf("Error delegating job ( \"%s\" ) from service \"%s\" to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", jobID, service.Name, replica.ClusterID, cluster.Endpoint, err)
+				logger.Printf("Error delegating job \"%s\" from service \"%s\" to ClusterID \"%s\": unable to parse cluster endpoint \"%s\": %v\n", jobID, service.Name, replica.ClusterID, cluster.Endpoint, err)
 				continue
 			}
 			postJobURL.Path = path.Join(postJobURL.Path, "job", replica.ServiceName)
@@ -484,7 +483,7 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			req, err := http.NewRequest(http.MethodPost, postJobURL.String(), bytes.NewBuffer(eventJSON))
 
 			if err != nil {
-				logger.Printf("Error delegating job ( \"%s\" ) from service \"%s\" to ClusterID \"%s\": unable to make request: %v\n", jobID, service.Name, replica.ClusterID, err)
+				logger.Printf("Error delegating job \"%s\" from service \"%s\" to ClusterID \"%s\": unable to make request: %v\n", jobID, service.Name, replica.ClusterID, err)
 				continue
 			}
 
@@ -515,19 +514,19 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			// Send the request
 			res, err := client.Do(req) // #nosec
 			if err != nil {
-				logger.Printf("Error delegating job ( \"%s\" ) from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", jobID, service.Name, replica.ClusterID, err)
+				logger.Printf("Error delegating job \"%s\" from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", jobID, service.Name, replica.ClusterID, err)
 				continue
 			}
 
 			// Check status code
 			if res.StatusCode == http.StatusCreated {
-				logger.Printf("Job ( \"%s\" ) successfully delegated from service \"%s\" to cluster \"%s\"\n", jobID, service.Name, replica.ClusterID)
+				logger.Printf("Job \"%s\" successfully delegated from service \"%s\" to cluster \"%s\"\n", jobID, service.Name, replica.ClusterID)
 				return nil
 			} else if res.StatusCode == http.StatusUnauthorized {
 				// Retry updating the token
 				token, err := updateServiceToken(replica, cluster)
 				if err != nil {
-					logger.Printf("Error delegating job ( \"%s\" ) from service \"%s\" to ClusterID \"%s\": %v\n", jobID, service.Name, replica.ClusterID, err)
+					logger.Printf("Error delegating job \"%s\" from service \"%s\" to ClusterID \"%s\": %v\n", jobID, service.Name, replica.ClusterID, err)
 					continue
 				}
 				// Add service token to the request
@@ -536,7 +535,7 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 				// Send the request
 				res, err = client.Do(req) // #nosec
 				if err != nil {
-					logger.Printf("Error delegating job ( \"%s\" ) from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", jobID, service.Name, replica.ClusterID, err)
+					logger.Printf("Error delegating job \"%s\" from service \"%s\" to ClusterID \"%s\": unable to send request: %v\n", jobID, service.Name, replica.ClusterID, err)
 					continue
 				}
 			}
@@ -548,17 +547,17 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 		if strings.ToLower(replica.Type) == endpointReplicaType {
 			// Parse the replica URL to check if it's valid
 			timestamp := time.Now().Format("2006/01/02 15:04:05")
-			log.Printf("[RESOURCE-DELEGATION] %s | Delegation job ( \"%s\" ) in ClusterID: %s with Priority %d", timestamp, jobID, replica.ClusterID, replica.Priority)
+			log.Printf("[RESOURCE-DELEGATION] %s | Delegation job \"%s\" in ClusterID: \"%s\" with Priority %d", timestamp, jobID, replica.ClusterID, replica.Priority)
 			replicaURL, err := url.Parse(replica.URL)
 			if err != nil {
-				logger.Printf("Error delegating job ( \"%s\" ) from service \"%s\" to endpoint \"%s\": unable to parse URL: %v\n", jobID, service.Name, replica.URL, err) // #nosec
+				logger.Printf("Error delegating job \"%s\" from service \"%s\" to endpoint \"%s\": unable to parse URL: %v\n", jobID, service.Name, replica.URL, err) // #nosec
 				continue
 			}
 
 			// Make request to get service's definition (including token) from cluster
 			req, err := http.NewRequest(http.MethodPost, replicaURL.String(), bytes.NewBuffer(eventJSON))
 			if err != nil {
-				logger.Printf("Error delegating job ( \"%s\" ) from service \"%s\" to endpoint \"%s\": unable to make request: %v\n", jobID, service.Name, replica.URL, err)
+				logger.Printf("Error delegating job \"%s\" from service \"%s\" to endpoint \"%s\": unable to make request: %v\n", jobID, service.Name, replica.URL, err)
 				continue
 			}
 
@@ -580,20 +579,20 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			// Send the request
 			res, err := client.Do(req) // #nosec
 			if err != nil {
-				logger.Printf("Error delegating job ( \"%s\" ) from service \"%s\" to endpoint \"%s\": unable to send request: %v\n", jobID, service.Name, replica.URL, err)
+				logger.Printf("Error delegating job \"%s\" from service \"%s\" to endpoint \"%s\": unable to send request: %v\n", jobID, service.Name, replica.URL, err)
 				continue
 			}
 
 			// Check status code
 			if res.StatusCode == http.StatusOK {
-				logger.Printf("Job ( \"%s\" ) successfully delegated to endpoint \"%s\"\n", jobID, replica.ClusterID)
+				logger.Printf("Job \"%s\" successfully delegated to endpoint \"%s\"\n", jobID, replica.ClusterID)
 				//fmt.Println("Job successfully delegated to cluster ", replica.ClusterID)
 				return nil
 			}
-			logger.Printf("Error delegating job ( \"%s\" ) from service \"%s\" to endpoint \"%s\": Status code %d\n", jobID, service.Name, replica.URL, res.StatusCode)
+			logger.Printf("Error delegating job \"%s\" from service \"%s\" to endpoint \"%s\": Status code %d\n", jobID, service.Name, replica.URL, res.StatusCode)
 		}
 	}
-	return fmt.Errorf("unable to delegate job ( \"%s\" ) from service \"%s\" to any replica, scheduling in the current cluster", jobID, service.Name)
+	return fmt.Errorf("unable to delegate job \"%s\" from service \"%s\" to any replica, scheduling in the current cluster", jobID, service.Name)
 }
 
 func federationMembers(service *types.Service) types.ReplicaList {
@@ -1022,7 +1021,6 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 						}
 						if quotaResp.Resources["cpu"].Max == 0 && quotaResp.Resources["memory"].Max == 0 {
 							//There are no defined quotas
-							fmt.Printf("The %s cluster has no defined quotas and has available resources. \n", replica.ClusterID)
 							canExecute = true
 							break
 						}
@@ -1034,11 +1032,11 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 						quota_mem_schedulable := float64(quotaResp.Resources["memory"].Max - quotaResp.Resources["memory"].Used)
 						dist_mem_quota := quota_mem_schedulable - serviceRAM
 						if dist_cpu_quota >= 0 && dist_mem_quota >= 0 {
-							fmt.Printf("Availability of resources and quotas in the %s cluster \n", replica.ClusterID)
+							//Availability of resources and quotas in the remote cluster
 							canExecute = true
 							break
 						} else {
-							fmt.Printf("Quota not available in the %s cluster \n", replica.ClusterID)
+							//Quota not available in the remote cluster
 							continue
 						}
 

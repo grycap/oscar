@@ -381,12 +381,8 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			}
 			//Check local resource availability
 			localResource := rm.IsSchedulable(podSpec.Containers[0].Resources)
+
 			if !localResource || !localQuota {
-				if localResource == false {
-					fmt.Println("Delegating job in RM due to lack of resources")
-				} else if localQuota == false {
-					fmt.Println("Delegating job in RM due to lack of quota")
-				}
 				authHeader := c.GetHeader("Authorization")
 
 				err := resourcemanager.DelegateJob(service, event.Value, jobUUID, authHeader, resourcemanager.ResourceManagerLogger, cfg, back.GetKubeClientset())
@@ -794,7 +790,7 @@ func getPodSpecNamespace(service *types.Service, cfg *types.Config) (*v1.PodSpec
 
 func isQuota(quota *types.QuotaResponse, service *types.Service) bool {
 	if quota.Resources["cpu"].Max == 0 || quota.Resources["memory"].Max == 0 {
-		fmt.Println("Quota defined at zero")
+		//Quota defined at zero
 		return true
 	}
 	serviceCPU, _ := strconv.ParseFloat(service.CPU, 64)
@@ -807,10 +803,10 @@ func isQuota(quota *types.QuotaResponse, service *types.Service) bool {
 	dist_mem_quota := quota_mem_schedulable - float64(serviceRAM.Value())
 
 	if dist_cpu_quota >= 0 && dist_mem_quota >= 0 {
-		fmt.Printf("Availability quotas in local cluster \n")
+		//Availability quotas in local cluster
 		return true
 	} else {
-		fmt.Printf("No Availability quotas in local cluster \n")
+		//No Availability quotas in local cluster
 		return false
 	}
 }
