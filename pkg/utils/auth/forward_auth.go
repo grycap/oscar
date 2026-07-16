@@ -22,7 +22,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const forwardAuthTokenContextKey = "forwardAuthOIDCToken"
+const forwardAuthTokenContextKey = "forwardAuthOIDCToken" // #nosec G101 -- Gin context key, not a hardcoded credential
 const minOIDCAccessTokenLength = 65
 const maxOIDCAccessTokenLength = 16 * 1024
 
