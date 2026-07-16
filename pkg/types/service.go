@@ -433,11 +433,15 @@ func (svcVol *ServiceVolumeConfig) UnmarshalJSON(data []byte) error {
 	type Alias ServiceVolumeConfig
 
 	// Default values for the ServiceVolumeConfig struct
-	aux := Alias{
-		LifecyclePolicy: "delete",
-	}
+	aux := Alias{}
+
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
+	}
+
+	// Conditionally set the default lifecycle policy to "delete" if a size is specified but no policy is provided.
+	if strings.TrimSpace(aux.Size) != "" && strings.TrimSpace(aux.LifecyclePolicy) == "" {
+		aux.LifecyclePolicy = "delete"
 	}
 
 	*svcVol = ServiceVolumeConfig(aux)
@@ -445,11 +449,13 @@ func (svcVol *ServiceVolumeConfig) UnmarshalJSON(data []byte) error {
 }
 
 func (svcVol *ServiceVolumeConfig) Validate() error {
-	lifecyclePolicy := strings.TrimSpace(svcVol.LifecyclePolicy)
-	switch lifecyclePolicy {
-	case "delete", "retain":
-	default:
-		return fmt.Errorf("service lifecycle_policy must be delete or retain")
+	if strings.TrimSpace(svcVol.Size) != "" {
+		lifecyclePolicy := strings.TrimSpace(svcVol.LifecyclePolicy)
+		switch lifecyclePolicy {
+		case "delete", "retain":
+		default:
+			return fmt.Errorf("service volume lifecycle_policy must be delete or retain")
+		}
 	}
 	return nil
 }
