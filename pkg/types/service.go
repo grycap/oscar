@@ -368,6 +368,14 @@ func (s *Service) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	if strings.TrimSpace(aux.Visibility) == "" {
+		aux.Visibility = "private"
+	}
+
+	if strings.TrimSpace(aux.IsolationLevel) == "" {
+		aux.IsolationLevel = IsolationLevelService
+	}
+
 	*s = Service(aux)
 	return nil
 }
@@ -493,6 +501,13 @@ func (e *Expose) UnmarshalJSON(data []byte) error {
 
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
+	}
+
+	if strings.TrimSpace(aux.ProbeMode) == "" {
+		aux.ProbeMode = "legacy"
+	}
+	if strings.TrimSpace(aux.AuthType) == "" {
+		aux.AuthType = "basic"
 	}
 
 	*e = Expose(aux)

@@ -19,6 +19,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // Federation defines a group of services replicated across clusters.
@@ -46,6 +47,13 @@ func (f *Federation) UnmarshalJSON(data []byte) error {
 
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
+	}
+
+	if strings.TrimSpace(aux.Delegation) == "" {
+		aux.Delegation = "static"
+	}
+	if strings.TrimSpace(aux.Topology) == "" {
+		aux.Topology = "none"
 	}
 
 	*f = Federation(aux)
