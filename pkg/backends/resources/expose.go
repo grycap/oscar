@@ -1269,6 +1269,11 @@ func getTraefikAuthMiddlewareSpec(service types.Service, namespace string, cfg *
 				"address":                  getServiceAuthEndpoint(service, cfg),
 				"trustForwardHeader":       true,
 				"addAuthCookiesToResponse": []any{getServiceAuthCookieName(service.Name)},
+				"authResponseHeaders": []any{
+					auth.OscarUserSubHeader,
+					auth.OscarUserNameHeader,
+					auth.OscarUserGroupsHeader,
+				},
 			},
 		}
 	}

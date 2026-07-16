@@ -52,7 +52,12 @@ Additional options can be defined in the "expose" section of the FDL (some previ
 - `NodePort`: The access method from the domain name to the public ip `<cluster_ip>:<NodePort>`.
 - `default_command`: Selects between executing the container's default command and executing the script inside the container. (default: false, it executes the script)
 - `set_auth`: The credentials are composed of the service name as the user and the service token as the password. Turn off this field if the container provides its own authentication method. It does not work with `NodePort` (default: false, it has no authentication).
-- `auth_type`: Authentication middleware used when `set_auth` is enabled. `basic` keeps the existing Basic Auth behavior. `forward` uses Traefik ForwardAuth to delegate checks to OSCAR service authorization and can bootstrap browser sessions from `?token=<service-token>` on Gateway API/Traefik exposed services.
+- `auth_type`: Authentication middleware used when `set_auth` is enabled. `basic` keeps the existing Basic Auth behavior. `forward` uses Traefik ForwardAuth to delegate checks to OSCAR service authorization. It accepts the existing service token and OIDC bearer tokens, applies service-level permissions to OIDC users, and creates a service-scoped `HttpOnly` browser cookie. The Dashboard can bootstrap that cookie through `/system/services/{service_name}/auth` using either a bearer header on `GET` or a top-level form `POST` containing `token` and an optional service-scoped `redirect`; the POST flow avoids cross-origin credential restrictions and redirects to the clean exposed URL after authorization. A direct `?token=<service-token-or-OIDC-JWT>` bootstrap is also supported for compatibility, but bearer tokens SHOULD be sent in a header or form body to avoid exposing them in URLs and access logs.
+
+For an OIDC-authenticated ForwardAuth request, OSCAR passes the verified identity
+to the exposed application through `X-OSCAR-User-Sub`,
+`X-OSCAR-User-Name`, and `X-OSCAR-User-Groups`. Applications MUST only trust
+these headers when their route is protected by OSCAR ForwardAuth.
 - `health_path`: The path where the service readiness and liveness status are checked. Only if the root path `/` returns status 4XX or 5XX.
 
 

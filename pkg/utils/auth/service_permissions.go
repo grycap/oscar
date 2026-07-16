@@ -19,7 +19,6 @@ package auth
 import (
 	"net/http"
 	"slices"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/types"
@@ -96,15 +95,6 @@ func hasPermission(service *types.Service, uid string) bool {
 		return false
 	}
 	return false
-}
-
-func isAuthBearer(c *gin.Context) (string, bool) {
-	authHeader := c.GetHeader("Authorization")
-	splitToken := strings.Split(authHeader, "Bearer ")
-	if len(splitToken) == 2 {
-		return strings.TrimSpace(splitToken[1]), true
-	}
-	return "", false
 }
 
 func isBasicAuth(c *gin.Context) bool {

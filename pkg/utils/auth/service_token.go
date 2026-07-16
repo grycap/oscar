@@ -18,7 +18,6 @@ package auth
 
 import (
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -26,11 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
-const tokenLength = 64
+const serviceTokenLength = 64
 const isServiceTokenKey = "isServiceToken"
 
-// GetServiceTokenMiddleware returns a gin middleware that checks if the request is authenticated with a service token
-// APPLY ONLY before auth.GetAuthMiddleware, since it relies on the fact that if a service token is provided, the user authentication will not be performed
+// GetServiceTokenMiddleware checks credentials issued specifically for an OSCAR service.
+// Apply it only before GetAuthMiddleware, because a valid service token bypasses user authentication.
 func GetServiceTokenMiddleware(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if isBasicAuth(c) {
@@ -41,7 +40,6 @@ func GetServiceTokenMiddleware(back types.ServerlessBackend) gin.HandlerFunc {
 		if tokens := getServiceTokenCandidates(c); len(tokens) > 0 {
 			serviceList, err := back.ListServicesByName(c.Param("serviceName"))
 			if err != nil {
-				// Check if error is caused because the service is not found
 				if errors.IsNotFound(err) || errors.IsGone(err) {
 					c.AbortWithStatus(http.StatusNotFound)
 				} else {
@@ -50,13 +48,12 @@ func GetServiceTokenMiddleware(back types.ServerlessBackend) gin.HandlerFunc {
 				return
 			}
 
-			// only one service should be returned
-			// the restriction for unique service names is enforced in the service creation and update handlers
+			// Service names are unique, so the lookup returns the single target service.
 			service := serviceList[0]
 			for _, token := range tokens {
 				if token == service.Token {
 					c.Set(isServiceTokenKey, true)
-					setServiceTokenCookie(c, service.Name, token)
+					setServiceAuthCookie(c, service.Name, token)
 					c.Next()
 					return
 				}
@@ -67,63 +64,31 @@ func GetServiceTokenMiddleware(back types.ServerlessBackend) gin.HandlerFunc {
 		}
 
 		c.Next()
-		return
 	}
 }
 
 func getServiceTokenCandidates(c *gin.Context) []string {
 	tokens := []string{}
 
-	// Prioritise the token in the authorization header over other sources of service tokens
+	// An Authorization credential takes precedence over tokens from other sources.
 	if token, ok := isAuthBearer(c); ok {
-		if len(strings.TrimSpace(token)) == tokenLength {
+		if len(strings.TrimSpace(token)) == serviceTokenLength {
 			tokens = append(tokens, token)
 		}
 		return tokens
 	}
 
-	if token := strings.TrimSpace(c.Query("token")); len(token) == tokenLength {
+	if token := strings.TrimSpace(c.Query("token")); len(token) == serviceTokenLength {
 		tokens = append(tokens, token)
 	}
 
-	if token := serviceTokenFromForwardedURI(c.GetHeader("X-Forwarded-Uri")); len(token) == tokenLength {
+	if token := tokenFromForwardedURI(c.GetHeader("X-Forwarded-Uri")); len(token) == serviceTokenLength {
 		tokens = append(tokens, token)
 	}
 
-	if token, err := c.Cookie(getServiceTokenCookieName(c.Param("serviceName"))); err == nil && len(strings.TrimSpace(token)) == tokenLength {
-		tokens = append(tokens, strings.TrimSpace(token))
+	if token := serviceAuthCookie(c, c.Param("serviceName")); len(token) == serviceTokenLength {
+		tokens = append(tokens, token)
 	}
 
 	return tokens
-}
-
-func serviceTokenFromForwardedURI(rawURI string) string {
-	if strings.TrimSpace(rawURI) == "" {
-		return ""
-	}
-
-	uri, err := url.Parse(rawURI)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(uri.Query().Get("token"))
-}
-
-func setServiceTokenCookie(c *gin.Context, serviceName string, token string) {
-	path := "/system/services/" + serviceName + "/exposed"
-	secure := strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") || c.Request.TLS != nil
-
-	http.SetCookie(c.Writer, &http.Cookie{ // #nosec G124
-		Name:     getServiceTokenCookieName(serviceName),
-		Value:    token,
-		Path:     path,
-		MaxAge:   0,
-		Secure:   secure,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	})
-}
-
-func getServiceTokenCookieName(serviceName string) string {
-	return "oscar_service_" + strings.ReplaceAll(serviceName, "-", "_") + "_auth"
 }

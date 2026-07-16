@@ -255,7 +255,7 @@ func TestGetOIDCMiddleware(t *testing.T) {
 			Namespace: "oscar-svc",
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
-			VolumeName: "test-pv",
+			VolumeName:  "test-pv",
 			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
 			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
@@ -354,6 +354,64 @@ func TestGetOIDCMiddleware(t *testing.T) {
 				t.Errorf("expected status to be %v, got %v", s.code, c.Writer.Status())
 			}
 		})
+	}
+}
+
+func TestGetOIDCIdentityMiddlewareDoesNotProvision(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, request *http.Request) {
+		rw.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/.well-known/openid-configuration":
+			rw.Write([]byte(`{"issuer":"http://` + request.Host + `","userinfo_endpoint":"http://` + request.Host + `/userinfo"}`))
+		case "/userinfo":
+			rw.Write([]byte(`{"sub":"student-sub","name":"Student Zero","group_membership":["/oscar-students"]}`))
+		default:
+			t.Errorf("lightweight identity middleware made unexpected provisioning request to %s", request.URL.Path)
+			rw.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	cfg := &types.Config{
+		OIDCEnable:       true,
+		OIDCValidIssuers: []string{server.URL},
+		OIDCGroups:       []string{"/oscar-students"},
+	}
+	oidcConfig := &oidc.Config{InsecureSkipSignatureCheck: true, SkipClientIDCheck: true}
+
+	var subject, name string
+	var groups []string
+	router := gin.New()
+	router.Use(getOIDCIdentityMiddleware(cfg, oidcConfig))
+	router.GET("/", func(c *gin.Context) {
+		subject = c.GetString("uidOrigin")
+		name = c.GetString("userName")
+		value, _ := c.Get(UserGroupsContextKey)
+		groups, _ = value.([]string)
+		c.Status(http.StatusOK)
+	})
+
+	claims := jwt.MapClaims{
+		"iss": server.URL,
+		"sub": "student-sub",
+		"exp": time.Now().Add(time.Hour).Unix(),
+		"iat": time.Now().Unix(),
+	}
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.Header.Set("Authorization", "Bearer "+GetToken(claims))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+	if subject != "student-sub" || name != "Student Zero" {
+		t.Fatalf("unexpected identity: subject=%q name=%q", subject, name)
+	}
+	if !reflect.DeepEqual(groups, []string{"/oscar-students"}) {
+		t.Fatalf("groups = %v", groups)
 	}
 }
 

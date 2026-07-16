@@ -72,7 +72,7 @@ func (m *serviceTokenMockBackend) GetKubeClientset() kubernetes.Interface {
 func TestGetServiceTokenMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	validToken := strings.Repeat("a", tokenLength)
+	validToken := strings.Repeat("a", serviceTokenLength)
 
 	// Decision graph paths for GetServiceTokenMiddleware:
 	// 1) basic auth -> pass through
@@ -222,7 +222,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			name:       "returns unauthorized when token does not match",
 			authHeader: "Bearer " + validToken,
 			backendServices: []*types.Service{
-				{Name: "svc", Token: strings.Repeat("b", tokenLength)},
+				{Name: "svc", Token: strings.Repeat("b", serviceTokenLength)},
 			},
 			wantLookup:          true,
 			wantStatus:          http.StatusUnauthorized,
@@ -294,7 +294,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 				req.Header.Set("X-Forwarded-Uri", tt.forwardedURI)
 			}
 			if tt.cookieToken != "" {
-				req.AddCookie(&http.Cookie{Name: getServiceTokenCookieName("svc"), Value: tt.cookieToken})
+				req.AddCookie(&http.Cookie{Name: getServiceAuthCookieName("svc"), Value: tt.cookieToken})
 			}
 			if tt.basicAuth {
 				req.SetBasicAuth("user", "password")

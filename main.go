@@ -113,6 +113,9 @@ func main() {
 	r.GET("/system/services/:serviceName/auth",
 		append(auth.BuildServiceAuthMiddlewareChain(cfg, kubeClientset, back), handlers.MakeServiceAuthHandler())...,
 	)
+	r.POST("/system/services/:serviceName/auth",
+		append(auth.BuildServiceAuthMiddlewareChain(cfg, kubeClientset, back), handlers.MakeServiceAuthBootstrapHandler())...,
+	)
 
 	// Swagger UI endpoint (disabled in production)
 	// r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

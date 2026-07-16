@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 
 	"net/http"
 	"strings"
@@ -40,7 +41,8 @@ const (
 	EGIIssuer          = "/realms/egi"
 	AI4EOSCIssuer      = "/realms/ai4eosc"
 
-	SecretKeyLength = 10
+	SecretKeyLength      = 10
+	UserGroupsContextKey = "userGroups"
 )
 
 var oidcLogger = log.New(os.Stdout, "[OIDC-AUTH] ", log.Flags())
@@ -48,11 +50,12 @@ var ClusterOidcManagers = make(map[string]*oidcManager)
 
 // oidcManager struct to represent a OIDC manager, including a cache of tokens
 type oidcManager struct {
-	provider   *oidc.Provider
-	config     *oidc.Config
-	subject    string
-	groups     []string
-	tokenCache map[string]*userInfo
+	provider        *oidc.Provider
+	config          *oidc.Config
+	subject         string
+	groups          []string
+	tokenCache      map[string]*userInfo
+	tokenCacheMutex sync.RWMutex
 }
 
 // userInfo custom struct to store essential fields from UserInfo
@@ -108,54 +111,75 @@ func NewOIDCManager(issuer string, subject string, groups []string) (*oidcManage
 	}, nil
 }
 
-// getIODCMiddleware returns the Gin's handler middleware to validate OIDC-based auth
-func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *utils.MinIOAdminClient, cfg *types.Config, oidcConfig *oidc.Config) gin.HandlerFunc {
+type oidcIdentityHandler func(*gin.Context) (*userInfo, bool)
 
+func newOIDCIdentityHandler(cfg *types.Config, oidcConfig *oidc.Config) oidcIdentityHandler {
+	managers := make(map[string]*oidcManager, len(cfg.OIDCValidIssuers))
 	for _, iss := range cfg.OIDCValidIssuers {
-		issuerManager, err := NewOIDCManager(iss, cfg.OIDCSubject, cfg.OIDCGroups)
-		if oidcConfig != nil {
-			issuerManager.config = oidcConfig
-		}
+		manager, err := NewOIDCManager(iss, cfg.OIDCSubject, cfg.OIDCGroups)
 		if err != nil {
-			return func(c *gin.Context) {
+			return func(c *gin.Context) (*userInfo, bool) {
 				c.AbortWithStatus(http.StatusUnauthorized)
-				return
+				return nil, false
 			}
 		}
+		if oidcConfig != nil {
+			manager.config = oidcConfig
+		}
 
-		ClusterOidcManagers[iss] = issuerManager
-
+		managers[iss] = manager
+		ClusterOidcManagers[iss] = manager
 	}
 
-	mc := NewMultitenancyConfig(kubeClientset, cfg.OIDCSubject)
-
-	return func(c *gin.Context) {
-		// Get token from headers
-		authHeader := c.GetHeader("Authorization")
-		if !strings.HasPrefix(authHeader, "Bearer ") {
+	return func(c *gin.Context) (*userInfo, bool) {
+		rawToken, ok := isAuthBearer(c)
+		if !ok {
 			c.AbortWithStatus(http.StatusUnauthorized)
-			return
+			return nil, false
 		}
-		rawToken := strings.TrimPrefix(authHeader, "Bearer ")
 		iss, err := GetIssuerFromToken(rawToken)
 		if err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("%v", err))
-			return
+			return nil, false
 		}
-		oidcManager := ClusterOidcManagers[iss]
-		if oidcManager == nil {
+		manager := managers[iss]
+		if manager == nil {
 			c.String(http.StatusUnauthorized, fmt.Sprintf("'%s' is not listed as an authorized issuer", iss))
-			return
-		}
-		// Check the token
-		if !oidcManager.IsAuthorised(rawToken) {
-			c.AbortWithStatus(http.StatusUnauthorized)
-			return
+			return nil, false
 		}
 
-		ui, err := oidcManager.GetUserInfo(rawToken)
-		if err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("%v", err))
+		ui, ok := manager.authorizedUserInfo(rawToken)
+		if !ok {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return nil, false
+		}
+		return ui, true
+	}
+}
+
+// getOIDCIdentityMiddleware validates OIDC identity and groups without
+// provisioning any per-user infrastructure. It is used by ForwardAuth.
+func getOIDCIdentityMiddleware(cfg *types.Config, oidcConfig *oidc.Config) gin.HandlerFunc {
+	authenticate := newOIDCIdentityHandler(cfg, oidcConfig)
+	return func(c *gin.Context) {
+		ui, ok := authenticate(c)
+		if !ok {
+			return
+		}
+		setOIDCIdentityContext(c, ui)
+		c.Next()
+	}
+}
+
+// getOIDCMiddleware validates OIDC identity and provisions the infrastructure
+// needed by regular OSCAR API operations.
+func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *utils.MinIOAdminClient, cfg *types.Config, oidcConfig *oidc.Config) gin.HandlerFunc {
+	authenticate := newOIDCIdentityHandler(cfg, oidcConfig)
+	mc := NewMultitenancyConfig(kubeClientset, cfg.OIDCSubject)
+
+	return func(c *gin.Context) {
+		ui, ok := authenticate(c)
+		if !ok {
 			return
 		}
 		uid := ui.Subject
@@ -200,19 +224,33 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, minIOAdminClient *uti
 
 		utils.EnsureVolumeLimits(FormatUID(uid), namespace, kubeClientset, cfg)
 
-		c.Set("uidOrigin", uid)
-		c.Set("userName", ui.Name)
+		setOIDCIdentityContext(c, ui)
 		c.Set("multitenancyConfig", mc)
 		c.Next()
 	}
 }
 
+func setOIDCIdentityContext(c *gin.Context, ui *userInfo) {
+	c.Set("uidOrigin", ui.Subject)
+	c.Set("userName", ui.Name)
+	c.Set(UserGroupsContextKey, ui.Groups)
+}
+
 // clearExpired delete expired tokens from the cache
 func (om *oidcManager) clearExpired() {
+	om.tokenCacheMutex.RLock()
+	tokens := make([]string, 0, len(om.tokenCache))
 	for rawToken := range om.tokenCache {
+		tokens = append(tokens, rawToken)
+	}
+	om.tokenCacheMutex.RUnlock()
+
+	for _, rawToken := range tokens {
 		_, err := om.provider.Verifier(om.config).Verify(context.TODO(), rawToken)
 		if err != nil {
+			om.tokenCacheMutex.Lock()
 			delete(om.tokenCache, rawToken)
+			om.tokenCacheMutex.Unlock()
 		}
 	}
 }
@@ -324,22 +362,31 @@ func (om *oidcManager) GetUID(rawToken string) (string, error) {
 
 // IsAuthorised checks if a token is authorised to access the API
 func (om *oidcManager) IsAuthorised(rawToken string) bool {
+	_, ok := om.authorizedUserInfo(rawToken)
+	return ok
+}
+
+func (om *oidcManager) authorizedUserInfo(rawToken string) (*userInfo, bool) {
 	// Check if the token is valid
 	_, err := om.provider.Verifier(om.config).Verify(context.TODO(), rawToken)
 	if err != nil {
-		return false
+		return nil, false
 	}
 
 	// Check if token is in cache
+	om.tokenCacheMutex.RLock()
 	ui, found := om.tokenCache[rawToken]
+	om.tokenCacheMutex.RUnlock()
 	if !found {
 		// Get userInfo from the issuer
 		ui, err = om.GetUserInfo(rawToken)
 		if err != nil {
-			return false
+			return nil, false
 		}
 		// Store userInfo in cache
+		om.tokenCacheMutex.Lock()
 		om.tokenCache[rawToken] = ui
+		om.tokenCacheMutex.Unlock()
 
 		// Call clearExpired to delete expired tokens
 		om.clearExpired()
@@ -349,12 +396,12 @@ func (om *oidcManager) IsAuthorised(rawToken string) bool {
 	for _, tokenGroup := range ui.Groups {
 		for _, authGroup := range om.groups {
 			if tokenGroup == authGroup {
-				return true
+				return ui, true
 			}
 		}
 	}
 
-	return false
+	return nil, false
 }
 
 func (om *oidcManager) UserInOneGroup(ui *userInfo, cfg *types.Config) bool {

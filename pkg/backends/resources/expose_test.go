@@ -4,9 +4,11 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -918,6 +920,15 @@ func TestGetTraefikAuthMiddlewareSpecForward(t *testing.T) {
 
 	if cookies[0] != getServiceAuthCookieName(svc.Name) {
 		t.Fatalf("expected auth cookie %s, got %s", getServiceAuthCookieName(svc.Name), cookies[0])
+	}
+
+	headers, found, err := unstructured.NestedStringSlice(middleware.Object, "spec", "forwardAuth", "authResponseHeaders")
+	if err != nil || !found {
+		t.Fatalf("expected forwardAuth.authResponseHeaders in middleware")
+	}
+	expectedHeaders := []string{auth.OscarUserSubHeader, auth.OscarUserNameHeader, auth.OscarUserGroupsHeader}
+	if !slices.Equal(headers, expectedHeaders) {
+		t.Fatalf("expected auth response headers %v, got %v", expectedHeaders, headers)
 	}
 }
 
