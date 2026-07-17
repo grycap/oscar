@@ -316,6 +316,13 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
+		// Set the KSERVE_HOST environment variable for KServe servicescd
+		if service.IsKserve() {
+			if service.Environment.Vars == nil {
+				service.Environment.Vars = make(map[string]string)
+			}
+			service.Environment.Vars["KSERVE_HOST"] = fmt.Sprintf("%s.%s.svc.cluster.local", utils.GetKserveSvcName(service.Name, service.Kserve.Type), service.Namespace)
+		}
 		// Create service
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
