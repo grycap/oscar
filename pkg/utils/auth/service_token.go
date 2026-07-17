@@ -56,7 +56,7 @@ func GetServiceTokenMiddleware(back types.ServerlessBackend) gin.HandlerFunc {
 			for _, token := range tokens {
 				if token == service.Token {
 					c.Set(isServiceTokenKey, true)
-					setServiceTokenCookie(c, service.Name, token)
+					setServiceAuthCookie(c, service.Name, token)
 					c.Next()
 					return
 				}
@@ -90,8 +90,8 @@ func getServiceTokenCandidates(c *gin.Context) []string {
 		tokens = append(tokens, token)
 	}
 
-	if token, err := c.Cookie(getServiceTokenCookieName(c.Param("serviceName"))); err == nil && len(strings.TrimSpace(token)) == tokenLength {
-		tokens = append(tokens, strings.TrimSpace(token))
+	if token := serviceAuthCookie(c, c.Param("serviceName")); len(token) == tokenLength {
+		tokens = append(tokens, token)
 	}
 
 	return tokens
@@ -107,23 +107,4 @@ func serviceTokenFromForwardedURI(rawURI string) string {
 		return ""
 	}
 	return strings.TrimSpace(uri.Query().Get("token"))
-}
-
-func setServiceTokenCookie(c *gin.Context, serviceName string, token string) {
-	path := "/system/services/" + serviceName + "/exposed"
-	secure := strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") || c.Request.TLS != nil
-
-	http.SetCookie(c.Writer, &http.Cookie{ // #nosec G124
-		Name:     getServiceTokenCookieName(serviceName),
-		Value:    token,
-		Path:     path,
-		MaxAge:   0,
-		Secure:   secure,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	})
-}
-
-func getServiceTokenCookieName(serviceName string) string {
-	return "oscar_service_" + strings.ReplaceAll(serviceName, "-", "_") + "_auth"
 }
