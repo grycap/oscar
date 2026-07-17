@@ -210,6 +210,8 @@ func (kn *KnativeBackend) CreateService(service types.Service) error {
 			}
 		}
 	}
+	go kn.ensureConfigMapExecExists(namespace)
+
 	//Create deaamonset to cache the service image on all the nodes
 	if service.ImagePrefetch {
 		err = imagepuller.CreateDaemonset(kn.config, service, namespace, kn.kubeClientset)
@@ -467,6 +469,31 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service, name
 		return nil, err
 	}
 
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].Name == types.ContainerName {
+			podSpec.Containers[i].Command = []string{"/oscar/bin/fwatchdog"}
+			podSpec.Containers[i].Args = nil
+		}
+	}
+
+	podSpec.Volumes = append(podSpec.Volumes, v1.Volume{
+		Name: "oscar-exec-watchdog",
+		VolumeSource: v1.VolumeSource{
+			ConfigMap: &v1.ConfigMapVolumeSource{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: "oscar-exec-watchdog",
+				},
+				DefaultMode: &[]int32{493}[0],
+			},
+		},
+	})
+
+	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
+		Name:      "oscar-exec-watchdog",
+		MountPath: "/oscar/exec",
+		ReadOnly:  false,
+	})
+
 	// fix ContainerConcurrency to 1 to avoid parallel invocations in the same container
 	containerConcurrency := int64(1)
 
@@ -527,4 +554,49 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service, name
 // GetKubeClientset returns the Kubernetes Clientset
 func (kn *KnativeBackend) GetKubeClientset() kubernetes.Interface {
 	return kn.kubeClientset
+}
+
+func (kn *KnativeBackend) createConfigMapExec(namespace string) (v1.ConfigMap, error) {
+	cm := kn.getConfigMapExecDef(namespace)
+	err := CreateOSCARCMConfiguration(kn.kubeClientset, &cm, namespace)
+	return cm, err
+}
+
+func (kn *KnativeBackend) ensureConfigMapExecExists(namespace string) (v1.ConfigMap, error) {
+	cm, err := GetOSCARCMConfiguration(kn.kubeClientset, "oscar-exec-watchdog", namespace)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// ConfigMap does not exist, create it
+			cm, err := kn.createConfigMapExec(namespace)
+			return cm, err
+		}
+	}
+	return *cm, err
+}
+
+func (kn *KnativeBackend) getConfigMapExecDef(namespace string) v1.ConfigMap {
+	return v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "oscar-exec-watchdog",
+			Namespace: namespace,
+		},
+		Data: map[string]string{
+			"exec-watchdog.sh": `#!/bin/bash
+
+# 1. make sure that the directory for the event exists
+mkdir -p /oscar/shared/input
+
+# 2. Read the standard input (stdin) that is sent by the OSCAR watchdog
+# and save it securely in the file by decoding it from base64
+cat | base64 -d > /oscar/shared/input/event | cat > /oscar/shared/input/event
+
+# 3. Export the environment variable that your logic needs
+export INPUT_FILE_PATH="/oscar/shared/input/event"
+
+# ==========================================================
+# YOUR LOGIC HERE (Example with cowsay using the saved file)
+# ==========================================================
+/oscar/config/script.sh`,
+		},
+	}
 }

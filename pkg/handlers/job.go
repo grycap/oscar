@@ -262,6 +262,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 
 		c.Next()
 
+		podSpec.InitContainers = service.GetInitContainer()
 		// Mount user MinIO credentials
 		podSpec.Volumes = append(podSpec.Volumes, v1.Volume{
 			Name: MinIOSecretVolumeName,
@@ -271,13 +272,46 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				},
 			},
 		})
+		podSpec.Volumes = append(podSpec.Volumes, v1.Volume{
+			Name: "shared-data-init",
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
+			},
+		})
+		podSpec.Volumes = append(podSpec.Volumes, v1.Volume{
+			Name: "shared-data-end",
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
+			},
+		})
 
-		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
+		podSpec.InitContainers[0].VolumeMounts = append(podSpec.InitContainers[0].VolumeMounts, v1.VolumeMount{
 			Name:      MinIOSecretVolumeName,
 			ReadOnly:  true,
 			MountPath: MinIODefaultPath,
 		})
 
+		podSpec.InitContainers[1].VolumeMounts = append(podSpec.InitContainers[1].VolumeMounts, v1.VolumeMount{
+			Name:      MinIOSecretVolumeName,
+			ReadOnly:  true,
+			MountPath: MinIODefaultPath,
+		})
+
+		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
+			Name:      types.StageInVolumeName,
+			MountPath: types.StageInPath,
+			ReadOnly:  false,
+		})
+
+		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
+			Name:      types.StageOutVolumeName,
+			MountPath: types.StageOutPath,
+			ReadOnly:  false,
+		})
+		podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, v1.EnvVar{
+			Name: "INPUT_FILE_PATH", Value: types.StageInPath})
+		podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, v1.EnvVar{
+			Name: "TMP_OUTPUT_DIR", Value: types.StageOutPath})
 		if err := configureDelegatedMinIOProvider(c, serviceNamespace, service, podSpec, kubeClientset, authHeader); err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
@@ -292,10 +326,11 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		} else {
 
 			if service.Mount.Provider != "" {
-				args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath()) + ";echo \"I finish\" > /tmpfolder/finish-file;"}
+				args = []string{"-c", fmt.Sprintf("INPUT_FILE_PATH=`find \"$INPUT_FILE_PATH\" | tail -1` && /oscar/config/script.sh") + ";echo \"I finish\" > /tmpfolder/finish-file;"}
 				resources.SetMount(podSpec, *service, cfg)
 			} else {
-				args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath())}
+				args = []string{"-c", fmt.Sprintf("INPUT_FILE_PATH=`find \"$INPUT_FILE_PATH\" | tail -1` &&  /oscar/config/script.sh")}
+				//args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath())}
 			}
 
 			event = v1.EnvVar{
@@ -349,11 +384,12 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			if c.Name == types.ContainerName {
 				podSpec.Containers[i].Command = command
 				podSpec.Containers[i].Args = args
-				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, event)
+				//podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, event)
 				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, jobUUIDVar)
 				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, resourceIDVar)
 			}
 		}
+		podSpec.InitContainers[0].Env = append(podSpec.InitContainers[0].Env, event)
 
 		// Delegate job if can't be scheduled and has defined replicas
 		if rm != nil && service.HasFederationMembers() {
@@ -420,6 +456,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 
 		_, err = kubeClientset.BatchV1().Jobs(serviceNamespace).Create(context.TODO(), job, metav1.CreateOptions{})
 		if err != nil {
+			fmt.Printf("Error creating job: %v\n", err)
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}

@@ -157,6 +157,14 @@ const (
 	OriginClusterAnnotation    = "oscar.grycap/origin-cluster"
 	OriginServiceAnnotation    = "oscar.grycap/origin-service"
 	FederationWorkerAnnotation = "oscar.grycap/federation-worker"
+
+	StageInContainerName  = "stage-in-container"
+	StageOutContainerName = "stage-out-container"
+	StageInVolumeName     = "shared-data-init"
+	StageOutVolumeName    = "shared-data-end"
+	StageInPath           = "/oscar/shared/input"
+	StageOutPath          = "/oscar/shared/output"
+	StageImage            = "ghcr.io/sergiolangaritabenitez/faas-supervisor:1.0.0"
 )
 
 // YAMLMarshal package-level yaml marshal function
@@ -436,11 +444,12 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 				VolumeMounts: []v1.VolumeMount{
 					{
 						Name:      ConfigVolumeName,
-						ReadOnly:  true,
+						ReadOnly:  false,
 						MountPath: ConfigPath,
 					},
 				},
-				Command:   []string{fmt.Sprintf("%s/%s", VolumePath, WatchdogName)},
+				Command:   []string{"sh"}, ///oscar/config/script.sh
+				Args:      []string{"-c", "mkdir -p /oscar/shared/input && echo \"$EVENT\" > /oscar/shared/input/event &&  INPUT_FILE_PATH=\"/oscar/shared/input/event\"  /oscar/config/script.sh"},
 				Resources: resources,
 			},
 		},
@@ -452,6 +461,7 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 						LocalObjectReference: v1.LocalObjectReference{
 							Name: service.Name,
 						},
+						DefaultMode: &[]int32{493}[0],
 					},
 				},
 			},
@@ -620,8 +630,13 @@ func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) {
 		// Use FaaS Supervisor to handle requests
 		{
 			Name:  WatchdogProcess,
-			Value: service.GetSupervisorPath(),
+			Value: "/oscar/exec/exec-watchdog.sh",
+			//Value: "/oscar/config/script.sh",
 		},
+		//{
+		//	Name:  "SCRIPT_B64",
+		//	Value: "IyBTY3JpcHQgb3JpZ2luYWwgYW50ZXMgZGUgY29kaWZpY2FyIGVuIEJhc2U2NDoKbWtkaXIgLXAgL29zY2FyL3NoYXJlZC9pbnB1dCAmJiB0ZWUgL29zY2FyL3NoYXJlZC9pbnB1dC9ldmVudCA+IC9kZXYvbnVsbCAmJiBleHBvcnQgSU5QVVRfRklMRV9QQVRIPS9vc2Nhci9zaGFyZWQvaW5wdXQvZXZlbnQgJiYgL29zY2FyL2NvbmZpZy9zY3JpcHQuc2gK",
+		//},
 		// Other OpenFaaS Watchdog options
 		// https://github.com/openfaas/classic-watchdog
 		{
@@ -730,4 +745,78 @@ func (service *Service) CreatesManagedVolume() bool {
 // UsesManagedVolume reports whether the service attaches a managed volume.
 func (service *Service) UsesManagedVolume() bool {
 	return service != nil && service.Volume != nil
+}
+
+func (service *Service) GetInitContainer() []v1.Container {
+	return []v1.Container{
+		v1.Container{
+			Name:  StageInContainerName,
+			Image: StageImage,
+			Command: []string{
+				"/bin/sh",
+				"-c",
+				"echo \"$EVENT\" | python -m faassupervisor.supervisor --just-download",
+			},
+			Env: []v1.EnvVar{
+				{
+					Name:  "INPUT_FILE_PATH",
+					Value: StageInPath,
+				},
+			},
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      StageInVolumeName,
+					MountPath: StageInPath,
+				},
+				{
+					Name:      ConfigVolumeName,
+					ReadOnly:  true,
+					MountPath: ConfigPath,
+				},
+			},
+			ImagePullPolicy: v1.PullIfNotPresent,
+			Resources:       v1.ResourceRequirements{},
+		},
+		v1.Container{
+			Name:  StageOutContainerName,
+			Image: StageImage,
+			Command: []string{
+				"/bin/sh",
+				"-c",
+				"while true; do sleep 3600; done",
+			},
+			Env: []v1.EnvVar{
+				{
+					Name:  "TMP_OUTPUT_DIR",
+					Value: StageOutPath,
+				},
+			},
+			Lifecycle: &v1.Lifecycle{
+				PreStop: &v1.LifecycleHandler{
+					Exec: &v1.ExecAction{
+						Command: []string{
+							"python",
+							"-m",
+							"faassupervisor.supervisor",
+							"--just-upload",
+						},
+					},
+				},
+			},
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      StageOutVolumeName,
+					MountPath: StageOutPath,
+				},
+				{
+					Name:      ConfigVolumeName,
+					ReadOnly:  true,
+					MountPath: ConfigPath,
+				},
+			},
+			ImagePullPolicy: v1.PullIfNotPresent,
+			Resources:       v1.ResourceRequirements{},
+			RestartPolicy:   &[]v1.ContainerRestartPolicy{v1.ContainerRestartPolicyAlways}[0],
+		},
+	}
 }
