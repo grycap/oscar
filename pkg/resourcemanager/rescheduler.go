@@ -123,12 +123,6 @@ func getReSchedulablePods(kubeClientset kubernetes.Interface, namespace string) 
 	}
 
 	for _, ns := range targetNamespaces {
-
-		listOpts := metav1.ListOptions{
-			LabelSelector: types.ReSchedulerLabelKey,
-			FieldSelector: fmt.Sprintf("status.phase=%s", v1.PodPending),
-		}
-
 		listOpts1 := metav1.ListOptions{
 			LabelSelector: types.ReSchedulerLabelKey,
 		}
@@ -140,20 +134,24 @@ func getReSchedulablePods(kubeClientset kubernetes.Interface, namespace string) 
 		}
 		for _, job := range jobs.Items {
 			if job.Spec.Suspend != nil && *job.Spec.Suspend == true {
-				now_job := time.Now()
-				suspendedTime := now_job.Sub(job.CreationTimestamp.Time).Seconds()
-				thresholdJob, err := strconv.Atoi(job.Labels[types.ReSchedulerLabelKey])
+
+				exceeded, err := isThresholdExceeded(job.CreationTimestamp.Time, job.Labels[types.ReSchedulerLabelKey])
 				if err != nil {
-					reSchedulerLogger.Printf("unable to parse rescheduler threshold from pod %s. Error: %v\n", job.Name, err)
+					reSchedulerLogger.Printf("Error parsing threshold for job %s: %v\n", job.Name, err)
 					continue
 				}
-				// Check if threshold is exceeded
-				if int(suspendedTime) > thresholdJob {
+
+				if exceeded {
 					reSchedulableJobs = append(reSchedulableJobs, job)
 				}
 			}
-
 		}
+
+		listOpts := metav1.ListOptions{
+			LabelSelector: types.ReSchedulerLabelKey,
+			FieldSelector: fmt.Sprintf("status.phase=%s", v1.PodPending),
+		}
+
 		// pending pods
 		pods, err := kubeClientset.CoreV1().Pods(ns).List(context.TODO(), listOpts)
 		if err != nil {
@@ -164,15 +162,14 @@ func getReSchedulablePods(kubeClientset kubernetes.Interface, namespace string) 
 		for _, pod := range pods.Items {
 			// Check that pod has the ServiceLabel
 			if _, ok := pod.Labels[types.ServiceLabel]; ok {
-				now := time.Now()
-				pendingTime := now.Sub(pod.CreationTimestamp.Time).Seconds()
-				threshold, err := strconv.Atoi(pod.Labels[types.ReSchedulerLabelKey])
+
+				exceeded, err := isThresholdExceeded(pod.CreationTimestamp.Time, pod.Labels[types.ReSchedulerLabelKey])
 				if err != nil {
-					reSchedulerLogger.Printf("unable to parse rescheduler threshold from pod %s. Error: %v\n", pod.Name, err)
+					reSchedulerLogger.Printf("Error parsing threshold for pod %s: %v\n", pod.Name, err)
 					continue
 				}
-				// Check if threshold is exceeded
-				if int(pendingTime) > threshold {
+
+				if exceeded {
 					reSchedulablePods = append(reSchedulablePods, pod)
 				}
 			}
@@ -296,4 +293,16 @@ func getEvent(podSpec v1.PodSpec) string {
 	}
 
 	return ""
+}
+
+func isThresholdExceeded(startTime time.Time, thresholdStr string) (bool, error) {
+	// Convert string threshold to integer
+	threshold, err := strconv.Atoi(thresholdStr)
+	if err != nil {
+		return false, err
+	}
+	// Calculate the time elapsed since the start
+	elapsedTime := time.Since(startTime).Seconds()
+	// Compare and return result
+	return int(elapsedTime) > threshold, nil
 }

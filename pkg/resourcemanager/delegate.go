@@ -857,6 +857,7 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 	for id, replica := range replicas {
 		// Manage if replica.Type is "oscar"
 		if strings.ToLower(replica.Type) == oscarReplicaType {
+			var quotaResp QuotaResponse
 			// Check ClusterID is defined in 'Clusters'
 			cluster, ok := service.Clusters[replica.ClusterID]
 			if !ok {
@@ -955,6 +956,7 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 					dist_cpu_node := node_cpu_schedulable - (1000 * serviceCPU)
 					dist_mem_node := node_mem_schedulable - serviceRAM
 					if dist_cpu_node >= 0 && dist_mem_node >= 0 {
+
 						// Create HTTP request to view user quotas in the cluster
 						getQuotasURL, err := url.Parse(cluster.Endpoint)
 						if err != nil {
@@ -1013,7 +1015,7 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 						}
 
 						//Deserialize the success JSON (200 OK)
-						var quotaResp QuotaResponse
+
 						err = json.NewDecoder(resp_quota.Body).Decode(&quotaResp)
 						if err != nil {
 							fmt.Printf("Error parsing the response JSON: %v\n", err)
@@ -1054,7 +1056,6 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 						timestamp := time.Now().Format("2006/01/02 15:04:05")
 						log.Printf("[RESOURCE-STATUS] %s | Resources available in ClusterID: %s -- Priority: %d with %s delegation", timestamp, replica.ClusterID, replicas[id].Priority, delegation)
 					} else if delegation == "load-based" {
-						//Map the totalClusterCPU range to a smaller range (input range 0 to 32 cpu to output range 100 to 0 priority)
 
 						var totalClusterCPU float64 = 0
 						var totalClusterMemory float64 = 0
@@ -1082,6 +1083,35 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 						replicas[id].Priority = uint(mappedCPUPriority)
 						timestamp := time.Now().Format("2006/01/02 15:04:05")
 						log.Printf("[RESOURCE-STATUS] %s | Resources available in ClusterID: %s -- Priority: %d with %s delegation", timestamp, replica.ClusterID, replicas[id].Priority, delegation) //fmt.Println("Priority ", replicas[id].Priority, " with ", delegation, " delegation")
+
+					} else if delegation == "quota-based" {
+						cpuUsedQuota := float64(quotaResp.Resources["cpu"].Used)
+						cpuMaxQuota := float64(quotaResp.Resources["cpu"].Max)
+						memUsedQuota := float64(quotaResp.Resources["memory"].Used)
+						memMaxQuota := float64(quotaResp.Resources["memory"].Max)
+
+						cpuUsagePercent := 0.0
+						if cpuMaxQuota > 0 {
+							cpuUsagePercent = cpuUsedQuota / cpuMaxQuota
+						}
+
+						memUsagePercent := 0.0
+						if memMaxQuota > 0 {
+							memUsagePercent = memUsedQuota / memMaxQuota
+						}
+
+						cpuHealthQuota := 1.0 - cpuUsagePercent
+						memHealthQuota := 1.0 - memUsagePercent
+
+						geometricMean := math.Sqrt(cpuHealthQuota * memHealthQuota)
+
+						healthScoreQuota := math.Round(geometricMean * 100)
+
+						replicas[id].Priority = uint(healthScoreQuota)
+
+						timestamp := time.Now().Format("2006/01/02 15:04:05")
+						log.Printf("[RESOURCE-STATUS] %s | Resources available in ClusterID: %s -- Priority: %d with %s delegation", timestamp, replica.ClusterID, replicas[id].Priority, delegation) //fmt.Println("Priority ", replicas[id].Priority, " with ", delegation, " delegation")
+
 					} else if delegation != "static" {
 						replicas[id].Priority = noDelegateCode
 						fmt.Println("Error when declaring the type of delegation in ClusterID ", replica.ClusterID)

@@ -22,7 +22,7 @@ type Federation struct {
 	GroupID string `json:"group_id"`
 	// Topology defines the federation topology: none, star, mesh.
 	Topology string `json:"topology"`
-	// Delegation defines the delegation policy: static, random, load-based.
+	// Delegation defines the delegation policy: static, random, load-based,quota-based.
 	Delegation string `json:"delegation,omitempty"`
 	// ReschedulerThreshold time (in seconds) that a job (with replicas) can be queued before delegating it.
 	ReschedulerThreshold int `json:"rescheduler_threshold,omitempty"`
