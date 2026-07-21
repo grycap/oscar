@@ -77,7 +77,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 		// Validate the service specification (including KServe configuration if present)
-		if err := service.Validate(); err != nil {
+		if err := validateServiceCreation(&service, cfg); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
@@ -274,7 +274,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			service.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 			// At the moment check only for KServe service
-			if service.IsKserve() && utils.IsKserveSupported(cfg) && !utils.VerifyWorkloadByResources(service, cfg) {
+			if service.IsKserve() && !utils.VerifyWorkloadByResources(service, cfg) {
 				if err := utils.DeleteKueueLocalQueue(context.TODO(), cfg, service.Namespace, service.Name); err != nil {
 					createLogger.Printf("Error deleting Kueue local queue: %v", err)
 				}
@@ -1030,4 +1030,15 @@ func getBucketTags(service *types.Service, uid, ownerName, bucketName string) ma
 	}
 
 	return tags
+}
+
+func validateServiceCreation(service *types.Service, cfg *types.Config) error {
+	// Validate the service specification (including KServe configuration if present)
+	if err := service.Validate(); err != nil {
+		return err
+	}
+	if service.IsKserve() && !utils.IsKserveSupported(cfg) {
+		return fmt.Errorf("KServe is not supported in this OSCAR deployment")
+	}
+	return nil
 }
