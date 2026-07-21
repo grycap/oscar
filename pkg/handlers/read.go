@@ -26,7 +26,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/backends/resources"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
@@ -88,15 +87,15 @@ func MakeReadHandler(back types.ServerlessBackend, kubeClientset kubernetes.Inte
 			}*/
 
 			switch service.Visibility {
-			case utils.PUBLIC:
+			case types.PUBLIC:
 				c.JSON(http.StatusOK, service)
 				return
-			case utils.PRIVATE:
+			case types.PRIVATE:
 				if service.Owner == uid {
 					c.JSON(http.StatusOK, service)
 					return
 				}
-			case utils.RESTRICTED:
+			case types.RESTRICTED:
 				if service.Owner == uid || slices.Contains(service.AllowedUsers, uid) {
 					c.JSON(http.StatusOK, service)
 					return

@@ -51,6 +51,10 @@ func (fakeObjectStorageIAM) UpdateGroupMembers(ctx context.Context, group string
 	return nil
 }
 
+func (fakeObjectStorageIAM) GetClient(ctx context.Context) *types.MinIOAdminClient {
+	return nil
+}
+
 func TestNewOIDCManager(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
 

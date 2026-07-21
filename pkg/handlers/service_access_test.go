@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/backends"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 )
 
 func TestIsBearerRequest(t *testing.T) {
@@ -45,19 +44,19 @@ func TestIsBearerRequest(t *testing.T) {
 func TestIsServiceAccessibleByUser(t *testing.T) {
 	publicSvc := &types.Service{
 		Name:         "public",
-		Visibility:   utils.PUBLIC,
+		Visibility:   types.PUBLIC,
 		Owner:        "owner",
 		AllowedUsers: []string{},
 	}
 	restrictedSvc := &types.Service{
 		Name:         "restricted",
-		Visibility:   utils.RESTRICTED,
+		Visibility:   types.RESTRICTED,
 		Owner:        "owner",
 		AllowedUsers: []string{"user1", "user2"},
 	}
 	privateSvc := &types.Service{
 		Name:         "private",
-		Visibility:   utils.PRIVATE,
+		Visibility:   types.PRIVATE,
 		Owner:        "owner",
 		AllowedUsers: []string{},
 	}
@@ -94,8 +93,8 @@ func TestListAuthorizedServicesForMetrics(t *testing.T) {
 	t.Run("No error bearer request", func(t *testing.T) {
 		back := backends.MakeFakeBackend()
 		back.Services = []*types.Service{
-			{Name: "svc1", Visibility: utils.PUBLIC, Owner: "owner1"},
-			{Name: "svc2", Visibility: utils.PRIVATE, Owner: "owner2"},
+			{Name: "svc1", Visibility: types.PUBLIC, Owner: "owner1"},
+			{Name: "svc2", Visibility: types.PRIVATE, Owner: "owner2"},
 		}
 
 		w := httptest.NewRecorder()

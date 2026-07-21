@@ -28,6 +28,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	objectstorage "github.com/grycap/oscar/v4/pkg/backends/object_storage"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"golang.org/x/oauth2"
@@ -109,7 +110,7 @@ func NewOIDCManager(issuer string, subject string, groups []string) (*oidcManage
 }
 
 // getIODCMiddleware returns the Gin's handler middleware to validate OIDC-based auth
-func getOIDCMiddleware(kubeClientset kubernetes.Interface, objectStorageIAM utils.ObjectStorageIAM, cfg *types.Config, oidcConfig *oidc.Config) gin.HandlerFunc {
+func getOIDCMiddleware(kubeClientset kubernetes.Interface, objectStorageIAM objectstorage.ObjectStorageIAM, cfg *types.Config, oidcConfig *oidc.Config) gin.HandlerFunc {
 
 	for _, iss := range cfg.OIDCValidIssuers {
 		issuerManager, err := NewOIDCManager(iss, cfg.OIDCSubject, cfg.OIDCGroups)

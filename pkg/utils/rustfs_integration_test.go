@@ -26,6 +26,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
+	objectstorage "github.com/grycap/oscar/v4/pkg/backends/object_storage"
 	"github.com/grycap/oscar/v4/pkg/types"
 )
 
@@ -40,7 +41,7 @@ func TestRustFSIAMIntegration(t *testing.T) {
 	}
 
 	cfg := &types.Config{
-		ObjectStorageType: ObjectStorageRustFS,
+		ObjectStorageType: types.ObjectStorageRustFS,
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  endpoint,
 			AccessKey: adminAccessKey,
@@ -53,11 +54,11 @@ func TestRustFSIAMIntegration(t *testing.T) {
 		ServicePort: 8080,
 	}
 
-	iam, err := MakeObjectStorageIAM(cfg)
+	iam, err := objectstorage.MakeObjectStorageIAM(cfg)
 	if err != nil {
 		t.Fatalf("creating RustFS IAM adapter: %v", err)
 	}
-	rustFS, ok := iam.(*rustFSIAM)
+	rustFS, ok := iam.(*types.RustFSIAM)
 	if !ok {
 		t.Fatalf("expected RustFS IAM adapter, got %T", iam)
 	}
@@ -67,13 +68,13 @@ func TestRustFSIAMIntegration(t *testing.T) {
 	accessKey := "oscit" + strconv.FormatInt(time.Now().UnixNano(), 36)
 	secretKey := fmt.Sprintf("OscarIntegrationSecret%d", time.Now().UnixNano())
 
-	if err := iam.CreateGroup(ctx, ALL_USERS_GROUP); err != nil {
+	if err := iam.CreateGroup(ctx, types.ALL_USERS_GROUP); err != nil {
 		t.Fatalf("ensuring default group: %v", err)
 	}
 	if err := iam.CreateUser(ctx, accessKey, secretKey); err != nil {
 		t.Fatalf("creating temporary RustFS user: %v", err)
 	}
-	users, err := rustFS.client.ListUsers(ctx)
+	users, err := rustFS.GetClient(ctx).GetAdminClient().ListUsers(ctx)
 	if err != nil {
 		t.Fatalf("listing RustFS users: %v", err)
 	}
@@ -86,13 +87,13 @@ func TestRustFSIAMIntegration(t *testing.T) {
 	}
 	foundDefaultGroup := false
 	for _, group := range userInfo.MemberOf {
-		if group == ALL_USERS_GROUP {
+		if group == types.ALL_USERS_GROUP {
 			foundDefaultGroup = true
 			break
 		}
 	}
 	if !foundDefaultGroup {
-		t.Fatalf("temporary RustFS user is not a member of %s", ALL_USERS_GROUP)
+		t.Fatalf("temporary RustFS user is not a member of %s", types.ALL_USERS_GROUP)
 	}
 
 	webhookName := "oscwh" + strconv.FormatInt(time.Now().UnixNano(), 36)
@@ -106,7 +107,7 @@ func TestRustFSIAMIntegration(t *testing.T) {
 	}
 	defer s3Client.DeleteBucket(&s3.DeleteBucketInput{Bucket: aws.String(bucketName)})
 
-	adminClient, err := MakeMinIOAdminClient(cfg)
+	adminClient, err := types.MakeMinIOAdminClient(cfg)
 	if err != nil {
 		t.Fatalf("creating RustFS quota admin client: %v", err)
 	}
@@ -122,7 +123,20 @@ func TestRustFSIAMIntegration(t *testing.T) {
 	}
 
 	webhookARN := fmt.Sprintf("arn:rustfs:sqs:%s:%s:webhook", cfg.MinIOProvider.Region, webhookName)
-	if err := enableInputNotification(s3Client, webhookARN, bucketName, ""); err != nil {
+	s3Client = cfg.MinIOProvider.GetS3Client()
+	nCfg, err := s3Client.GetBucketNotificationConfiguration(&s3.GetBucketNotificationConfigurationRequest{Bucket: aws.String(bucketName)})
+	if err != nil {
+		t.Fatalf("getting bucket notification configuration: %v", err)
+	}
+	queueConfiguration := s3.QueueConfiguration{
+		QueueArn: aws.String(webhookARN),
+		Events:   []*string{aws.String(s3.EventS3ObjectCreated)},
+	}
+	nCfg.QueueConfigurations = append(nCfg.QueueConfigurations, &queueConfiguration)
+	if _, err := s3Client.PutBucketNotificationConfiguration(&s3.PutBucketNotificationConfigurationInput{
+		Bucket:                    aws.String(bucketName),
+		NotificationConfiguration: nCfg,
+	}); err != nil {
 		t.Fatalf("enabling temporary RustFS bucket notification: %v", err)
 	}
 	notifications, err := s3Client.GetBucketNotificationConfiguration(&s3.GetBucketNotificationConfigurationRequest{Bucket: aws.String(bucketName)})

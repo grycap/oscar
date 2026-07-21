@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package types
 
 import (
 	"encoding/json"
@@ -34,9 +34,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
-
 	"github.com/grycap/oscar/v4/pkg/testsupport"
-	"github.com/grycap/oscar/v4/pkg/types"
+
 	madmin "github.com/minio/madmin-go"
 	"github.com/minio/minio-go/v7"
 	miniocreds "github.com/minio/minio-go/v7/pkg/credentials"
@@ -54,37 +53,6 @@ func newMinioMock() *minioMock {
 		policies:     map[string][]string{},
 		groupMembers: map[string][]string{},
 		bucketTags:   map[string]map[string]string{},
-	}
-}
-
-func TestParseStorageBytes(t *testing.T) {
-	tests := []struct {
-		name    string
-		value   string
-		wantErr bool
-	}{
-		{name: "gibibytes", value: "100Gi"},
-		{name: "zero", value: "0"},
-		{name: "invalid", value: "not-a-size", wantErr: true},
-		{name: "negative", value: "-1Gi", wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseStorageBytes(tt.value)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatalf("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got < 0 {
-				t.Fatalf("expected non-negative bytes, got %d", got)
-			}
-		})
 	}
 }
 
@@ -238,9 +206,9 @@ func TestBucketStorageQuotaHelpers(t *testing.T) {
 			}))
 			defer server.Close()
 
-			cfg := types.Config{
+			cfg := Config{
 				ObjectStorageType: tt.storageType,
-				MinIOProvider: &types.MinIOProvider{
+				MinIOProvider: &MinIOProvider{
 					Endpoint:  server.URL,
 					Region:    "us-east-1",
 					AccessKey: "minioadmin",
@@ -308,7 +276,7 @@ func TestListBucketsByOwner(t *testing.T) {
 		t.Fatalf("unexpected client error: %v", err)
 	}
 	client := &MinIOAdminClient{simpleClient: simpleClient}
-	cfg := types.Config{MinIOProvider: &types.MinIOProvider{
+	cfg := Config{MinIOProvider: &MinIOProvider{
 		Endpoint:  server.URL,
 		Region:    "us-east-1",
 		AccessKey: "minioadmin",
@@ -506,7 +474,7 @@ func mergeMembers(current []string, additions []string) []string {
 	return result
 }
 
-func createMinIOConfig() (types.Config, *httptest.Server) {
+func createMinIOConfig() (Config, *httptest.Server) {
 	// Create a fake MinIO server
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
 		if !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
@@ -522,8 +490,8 @@ func createMinIOConfig() (types.Config, *httptest.Server) {
 		}
 	}))
 
-	cfg := types.Config{
-		MinIOProvider: &types.MinIOProvider{
+	cfg := Config{
+		MinIOProvider: &MinIOProvider{
 			Endpoint:  server.URL,
 			Region:    "us-east-1",
 			AccessKey: "minioadmin",
@@ -568,8 +536,8 @@ func TestResourceInPolicy(t *testing.T) {
 	server := httptest.NewServer(mock)
 	defer server.Close()
 
-	cfg := types.Config{
-		MinIOProvider: &types.MinIOProvider{
+	cfg := Config{
+		MinIOProvider: &MinIOProvider{
 			Endpoint:  server.URL,
 			Region:    "us-east-1",
 			AccessKey: "minioadmin",
@@ -598,8 +566,8 @@ func TestGetCurrentResourceVisibility(t *testing.T) {
 	server := httptest.NewServer(mock)
 	defer server.Close()
 
-	cfg := types.Config{
-		MinIOProvider: &types.MinIOProvider{
+	cfg := Config{
+		MinIOProvider: &MinIOProvider{
 			Endpoint:  server.URL,
 			Region:    "us-east-1",
 			AccessKey: "minioadmin",
@@ -686,8 +654,8 @@ func TestSetAndUnsetPolicies(t *testing.T) {
 	server := httptest.NewServer(mock)
 	defer server.Close()
 
-	cfg := types.Config{
-		MinIOProvider: &types.MinIOProvider{
+	cfg := Config{
+		MinIOProvider: &MinIOProvider{
 			Endpoint:  server.URL,
 			Region:    "us-east-1",
 			AccessKey: "minioadmin",
@@ -731,8 +699,8 @@ func TestUpdateServiceGroup(t *testing.T) {
 	server := httptest.NewServer(mock)
 	defer server.Close()
 
-	cfg := types.Config{
-		MinIOProvider: &types.MinIOProvider{
+	cfg := Config{
+		MinIOProvider: &MinIOProvider{
 			Endpoint:  server.URL,
 			Region:    "us-east-1",
 			AccessKey: "minioadmin",
@@ -788,8 +756,8 @@ func TestGetBucketMembers(t *testing.T) {
 	server := httptest.NewServer(mock)
 	defer server.Close()
 
-	cfg := types.Config{
-		MinIOProvider: &types.MinIOProvider{
+	cfg := Config{
+		MinIOProvider: &MinIOProvider{
 			Endpoint:  server.URL,
 			Region:    "us-east-1",
 			AccessKey: "minioadmin",
@@ -819,8 +787,8 @@ func TestRegisterAndRemoveWebhook(t *testing.T) {
 	server := httptest.NewServer(mock)
 	defer server.Close()
 
-	cfg := types.Config{
-		MinIOProvider: &types.MinIOProvider{
+	cfg := Config{
+		MinIOProvider: &MinIOProvider{
 			Endpoint:  server.URL,
 			Region:    "us-east-1",
 			AccessKey: "minioadmin",
@@ -857,8 +825,8 @@ func TestRemoveFromPolicy(t *testing.T) {
 	server := httptest.NewServer(mock)
 	defer server.Close()
 
-	cfg := types.Config{
-		MinIOProvider: &types.MinIOProvider{
+	cfg := Config{
+		MinIOProvider: &MinIOProvider{
 			Endpoint:  server.URL,
 			Region:    "us-east-1",
 			AccessKey: "minioadmin",
@@ -887,8 +855,8 @@ func TestCreateAllUsersGroup(t *testing.T) {
 	server := httptest.NewServer(mock)
 	defer server.Close()
 
-	cfg := types.Config{
-		MinIOProvider: &types.MinIOProvider{
+	cfg := Config{
+		MinIOProvider: &MinIOProvider{
 			Endpoint:  server.URL,
 			Region:    "us-east-1",
 			AccessKey: "minioadmin",

@@ -153,11 +153,14 @@ func TestSetWorkingNodes(t *testing.T) {
 }
 
 func TestHandleUpdatePodEvent(t *testing.T) {
-	defer func(prev int, prevPC PodCounter, prevStopper chan struct{}) {
-		workingNodes = prev
-		pc = prevPC
+	prevWorkingNodes := workingNodes
+	prevWnCount := pc.wnCount
+	prevStopper := stopper
+	defer func() {
+		workingNodes = prevWorkingNodes
+		pc.wnCount = prevWnCount
 		stopper = prevStopper
-	}(workingNodes, pc, stopper)
+	}()
 
 	t.Run("running pod stops informer", func(t *testing.T) {
 		workingNodes = 1

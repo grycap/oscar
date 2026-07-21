@@ -29,6 +29,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/cdmi-client-go"
+	objectstorage "github.com/grycap/oscar/v4/pkg/backends/object_storage"
 	"github.com/grycap/oscar/v4/pkg/backends/resources"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
@@ -102,8 +103,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 		// Check if users in allowed_users have a MinIO associated user
-		minIOAdminClient, minIOAdminErr := utils.MakeMinIOAdminClient(cfg)
-		objectStorageIAM, objectStorageIAMErr := utils.MakeObjectStorageIAM(cfg)
+		objectStorageIAM, objectStorageIAMErr := objectstorage.MakeObjectStorageIAM(cfg)
 
 		// Service is created by an EGI user
 		var uid string
@@ -302,11 +302,11 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				return
 			}
 			if minIOQuota != nil {
-				if minIOAdminErr != nil {
-					c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", minIOAdminErr))
+				if objectStorageIAMErr != nil {
+					c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", objectStorageIAMErr))
 					return
 				}
-				if err := ValidateMinIOBucketCountQuota(cfg, minIOAdminClient, minIOQuota, uid, collectMinIOBucketCandidates(&service)); err != nil {
+				if err := ValidateMinIOBucketCountQuota(cfg, objectStorageIAM.GetClient(c.Request.Context()), minIOQuota, uid, collectMinIOBucketCandidates(&service)); err != nil {
 					c.String(http.StatusForbidden, err.Error())
 					return
 				}
@@ -362,12 +362,12 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
-		buckets := []utils.MinIOBucket{}
+		buckets := []types.MinIOBucket{}
 		if !(service.Annotations != nil &&
 			strings.EqualFold(strings.TrimSpace(service.Annotations[types.FederationWorkerAnnotation]), "true") &&
 			service.Federation != nil &&
 			strings.EqualFold(strings.TrimSpace(service.Federation.Topology), "mesh")) {
-			if buckets, err = createBuckets(&service, cfg, minIOAdminClient, false); err != nil {
+			if buckets, err = createBuckets(&service, cfg, objectStorageIAM.GetClient(c.Request.Context()), false); err != nil {
 				createLogger.Printf("Error creating buckets for service '%s': %v", service.Name, err)
 				if err == errInput {
 					c.String(http.StatusBadRequest, err.Error())
@@ -380,7 +380,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 
 				if !strings.Contains(err.Error(), " already exists") {
-					bderr := deleteBuckets(&service, cfg, minIOAdminClient)
+					bderr := deleteBuckets(&service, cfg, objectStorageIAM.GetClient(c.Request.Context()))
 					if bderr != nil {
 						log.Printf("Error deleting buckets: %v\n", bderr)
 					}
@@ -399,11 +399,11 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			for _, b := range buckets {
 				// If not specified default visibility is PRIVATE
 				if strings.ToLower(service.Visibility) == "" {
-					b.Visibility = utils.PRIVATE
+					b.Visibility = types.PRIVATE
 				}
 				if service.Owner != types.DefaultOwner {
-					if !isRustFSConfig(cfg) {
-						err := minIOAdminClient.SetPolicies(b)
+					if !utils.IsRustFSConfig(cfg) {
+						err := objectStorageIAM.GetClient(c.Request.Context()).SetPolicies(b)
 						if err != nil {
 							c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 							return
@@ -411,22 +411,22 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					}
 				}
 
-				oldTags, _ := minIOAdminClient.GetTaggedMetadata(b.BucketName)
+				oldTags, _ := objectStorageIAM.GetClient(c.Request.Context()).GetTaggedMetadata(b.BucketName)
 				// Bucket metadata for filtering
 				// If bucket dont have already the tags, set them.
 				if oldTags == nil || len(oldTags) == 0 {
-					storageQuota := ""
+					/*storageQuota := ""
 					if minIOQuota != nil {
 						storageQuota = minIOQuota.StoragePerBucket
-					}
-					tags := getBucketTags(&service, b.Owner, ownerName, b.BucketName, storageQuota)
-					if err := minIOAdminClient.SetTags(b.BucketName, tags); err != nil {
+					}*/
+					tags := utils.BucketTags(b, ownerName)
+					if err := objectStorageIAM.GetClient(c.Request.Context()).SetTags(b.BucketName, tags); err != nil {
 						c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
 						return
 					}
 				}
 				if minIOQuota != nil && minIOQuota.StoragePerBucket != "" {
-					if err := minIOAdminClient.SetBucketStorageQuota(b.BucketName, minIOQuota.StoragePerBucket); err != nil {
+					if err := objectStorageIAM.GetClient(c.Request.Context()).SetBucketStorageQuota(b.BucketName, minIOQuota.StoragePerBucket); err != nil {
 						derr := back.DeleteService(service)
 						if derr != nil {
 							log.Printf("Error deleting service: %v\n", derr)
@@ -503,7 +503,7 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	}
 	// Check if visibility has been set. If not set default private.
 	if service.Visibility == "" {
-		service.Visibility = utils.PRIVATE
+		service.Visibility = types.PRIVATE
 	}
 
 	// Validate logLevel (Python logging levels for faas-supervisor)
@@ -638,11 +638,11 @@ func cloneStorageIOConfigs(items []types.StorageIOConfig) []types.StorageIOConfi
 	return append([]types.StorageIOConfig(nil), items...)
 }
 
-func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient, isUpdate bool) ([]utils.MinIOBucket, error) {
+func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *types.MinIOAdminClient, isUpdate bool) ([]types.MinIOBucket, error) {
 	var s3Client *s3.S3
 	var cdmiClient *cdmi.Client
 	var provName, provID string
-	var minIOBuckets []utils.MinIOBucket
+	var minIOBuckets []types.MinIOBucket
 
 	// ========== CREATE INPUT BUCKETS ==========
 	for _, in := range service.Input {
@@ -687,7 +687,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			return nil, err
 		}
 
-		minIOBuckets = append(minIOBuckets, utils.MinIOBucket{
+		minIOBuckets = append(minIOBuckets, types.MinIOBucket{
 			BucketName:   splitPath[0],
 			AllowedUsers: service.AllowedUsers,
 			Visibility:   service.Visibility,
@@ -709,16 +709,16 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 						return nil, err
 					}
 				}
-				if isRustFSConfig(cfg) {
-					minIOBuckets = append(minIOBuckets, utils.MinIOBucket{
+				if utils.IsRustFSConfig(cfg) {
+					minIOBuckets = append(minIOBuckets, types.MinIOBucket{
 						BucketName: b,
-						Visibility: utils.PRIVATE,
+						Visibility: types.PRIVATE,
 						Owner:      service.AllowedUsers[i],
 					})
 				}
 				// Create bucket policy
-				if !isAdminUser && !isRustFSConfig(cfg) {
-					err = minIOAdminClient.CreateAddPolicy(b, service.AllowedUsers[i], utils.ALL_ACTIONS, false)
+				if !isAdminUser && !utils.IsRustFSConfig(cfg) {
+					err = minIOAdminClient.CreateAddPolicy(b, service.AllowedUsers[i], types.ALL_ACTIONS, false)
 					if err != nil {
 						return nil, err
 					}
@@ -766,7 +766,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			}
 			if !found {
 				// If the bucket hasn't been created on de input loop create it
-				minIOBuckets = append(minIOBuckets, utils.MinIOBucket{
+				minIOBuckets = append(minIOBuckets, types.MinIOBucket{
 					BucketName:   splitPath[0],
 					AllowedUsers: service.AllowedUsers,
 					Visibility:   service.Visibility,
@@ -864,14 +864,14 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				}
 			}
 			if foundInMinIO {
-				minio := utils.MinIOBucket{
+				minio := types.MinIOBucket{
 					BucketName: splitPath[0],
 					Owner:      service.Owner,
 				}
 				visibility := minIOAdminClient.GetCurrentResourceVisibility(minio)
 				bucketTags, _ := minIOAdminClient.GetTaggedMetadata(splitPath[0])
-				if isRustFSConfig(cfg) {
-					visibility = visibilityFromObjectStorageTags(bucketTags)
+				if utils.IsRustFSConfig(cfg) {
+					visibility = utils.VisibilityFromObjectStorageTags(bucketTags)
 					bucketOwner := bucketTags["owner"]
 					if bucketOwner != "" && !isAdminUser && bucketOwner != service.Owner {
 						return nil, fmt.Errorf("the bucket \"%s\" must belong to the service owner to be used as mount", minio.BucketName)
@@ -882,19 +882,19 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				// Only allowed private buckets
 				// Admin buckets have no MinIO policy so visibility returns "".
 				// Guard against mounting another user's bucket by verifying the owner tag is empty or matches the admin user
-				// (cfg.Name in our case, as admin users don't have a UID and are identified by the "owner" tag in MinIO buckets).
+				// (cfg.Username in our case, as admin users don't have a UID and are identified by the "owner" tag in MinIO buckets).
 				// (user buckets always carry their UID in the "owner" tag).
 				if isAdminUser && visibility == "" {
-					if bucketTags["owner"] == cfg.Name || bucketTags["owner"] == "" {
-						visibility = utils.PRIVATE
+					if bucketTags["owner"] == cfg.Username || bucketTags["owner"] == "" {
+						visibility = types.PRIVATE
 					}
 				}
 
-				if visibility != utils.PRIVATE {
+				if visibility != types.PRIVATE {
 					return nil, fmt.Errorf("the bucket \"%s\" must be private to be used as mount", minio.BucketName)
 				} else {
 					err := minIOAdminClient.CreateS3Path(s3Client, splitPath, true)
-					minIOBuckets = append(minIOBuckets, utils.MinIOBucket{
+					minIOBuckets = append(minIOBuckets, types.MinIOBucket{
 						BucketName:   splitPath[0],
 						AllowedUsers: service.AllowedUsers,
 						Visibility:   service.Visibility,
@@ -908,7 +908,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 
 			// Create mount bucket
 			err = minIOAdminClient.CreateS3Path(s3Client, splitPath, false)
-			minIOBuckets = append(minIOBuckets, utils.MinIOBucket{
+			minIOBuckets = append(minIOBuckets, types.MinIOBucket{
 				BucketName:   splitPath[0],
 				AllowedUsers: service.AllowedUsers,
 				Visibility:   service.Visibility,
@@ -1036,32 +1036,4 @@ func serviceWithSameNameExists(name string, back types.ServerlessBackend) (bool,
 		}
 	}
 	return len(services) > 0, nil
-}
-
-func getBucketTags(service *types.Service, uid, ownerName, bucketName, storageQuota string) map[string]string {
-	tags := map[string]string{
-		"owner":        uid,
-		"from_service": service.Name,
-		"owner_name":   ownerName,
-		"visibility":   normalizeObjectStorageVisibility(service.Visibility),
-	}
-	if len(service.AllowedUsers) > 0 {
-		tags["allowed_users"] = strings.Join(service.AllowedUsers, " ")
-	}
-	if storageQuota != "" {
-		tags["storage_quota"] = storageQuota
-	}
-
-	return tags
-}
-
-func normalizeObjectStorageVisibility(visibility string) string {
-	switch strings.ToLower(strings.TrimSpace(visibility)) {
-	case utils.PUBLIC:
-		return utils.PUBLIC
-	case utils.RESTRICTED:
-		return utils.RESTRICTED
-	default:
-		return utils.PRIVATE
-	}
 }

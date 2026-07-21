@@ -28,52 +28,6 @@ import (
 	"github.com/grycap/oscar/v4/pkg/types"
 )
 
-func TestMakeObjectStorageIAM(t *testing.T) {
-	tests := []struct {
-		name        string
-		storageType string
-		assertType  func(ObjectStorageIAM) bool
-	}{
-		{
-			name:        "default is MinIO",
-			storageType: "",
-			assertType: func(iam ObjectStorageIAM) bool {
-				_, ok := iam.(*minIOIAM)
-				return ok
-			},
-		},
-		{
-			name:        "explicit MinIO",
-			storageType: "MINIO",
-			assertType: func(iam ObjectStorageIAM) bool {
-				_, ok := iam.(*minIOIAM)
-				return ok
-			},
-		},
-		{
-			name:        "RustFS",
-			storageType: "rustfs",
-			assertType: func(iam ObjectStorageIAM) bool {
-				_, ok := iam.(*rustFSIAM)
-				return ok
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := objectStorageIAMTestConfig(tt.storageType)
-			iam, err := MakeObjectStorageIAM(cfg)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if !tt.assertType(iam) {
-				t.Fatalf("unexpected IAM implementation %T", iam)
-			}
-		})
-	}
-}
-
 func TestRustFSWebhookConfiguration(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
 
@@ -103,7 +57,7 @@ func TestRustFSWebhookConfiguration(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := objectStorageIAMTestConfig(ObjectStorageRustFS)
+	cfg := webhookTestConfig(types.ObjectStorageRustFS)
 	cfg.MinIOProvider.Endpoint = server.URL
 
 	if err := RegisterObjectStorageWebhook(context.Background(), cfg, "service-one", "token-one"); err != nil {
@@ -144,14 +98,7 @@ func TestRustFSWebhookConfiguration(t *testing.T) {
 	}
 }
 
-func TestMakeObjectStorageIAMRejectsUnknownType(t *testing.T) {
-	cfg := objectStorageIAMTestConfig("unknown")
-	if _, err := MakeObjectStorageIAM(cfg); err == nil {
-		t.Fatal("expected unsupported object storage type error")
-	}
-}
-
-func objectStorageIAMTestConfig(storageType string) *types.Config {
+func webhookTestConfig(storageType string) *types.Config {
 	return &types.Config{
 		ObjectStorageType: storageType,
 		MinIOProvider: &types.MinIOProvider{

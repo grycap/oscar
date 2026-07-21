@@ -72,9 +72,11 @@ func TestMakeCreateBucketHandler(t *testing.T) {
 						_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
 					case r.Method == http.MethodPut && strings.Contains(r.URL.RawQuery, "tagging"):
 						w.WriteHeader(http.StatusOK)
+					case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/info-canned-policy"):
+						w.WriteHeader(http.StatusNotFound)
 					case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/"):
 						w.WriteHeader(http.StatusOK)
-						_, _ = w.Write([]byte(`{"status":"success"}`))
+						_, _ = w.Write([]byte(`{"Status":"success"}`))
 					default:
 						w.WriteHeader(http.StatusOK)
 					}
@@ -284,7 +286,7 @@ func TestMakeCreateBucketHandlerSkipsPoliciesForRustFS(t *testing.T) {
 		Name:              "oscar",
 		Namespace:         "oscar",
 		ServicePort:       8080,
-		ObjectStorageType: utils.ObjectStorageRustFS,
+		ObjectStorageType: types.ObjectStorageRustFS,
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
 			Region:    "us-east-1",

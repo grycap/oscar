@@ -208,7 +208,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
-		if strings.EqualFold(strings.TrimSpace(cfg.ObjectStorageType), utils.ObjectStorageRustFS) {
+		if strings.EqualFold(strings.TrimSpace(cfg.ObjectStorageType), types.ObjectStorageRustFS) {
 			eventBytes = rewriteRustFSEventSource(eventBytes)
 		}
 

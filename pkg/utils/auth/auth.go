@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	objectstorage "github.com/grycap/oscar/v4/pkg/backends/object_storage"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -73,7 +73,7 @@ func CustomAuth(cfg *types.Config, kubeClientset kubernetes.Interface) gin.Handl
 		cfg.Username: cfg.Password,
 	})
 
-	objectStorageIAM, err := utils.MakeObjectStorageIAM(cfg)
+	objectStorageIAM, err := objectstorage.MakeObjectStorageIAM(cfg)
 	if err != nil {
 		return func(c *gin.Context) {
 			c.AbortWithStatusJSON(500, gin.H{"error": fmt.Sprintf("error creating object-storage IAM client: %v", err)})
@@ -82,8 +82,8 @@ func CustomAuth(cfg *types.Config, kubeClientset kubernetes.Interface) gin.Handl
 	// Slice to add default user to all users group on MinIO
 	var oscarUser = []string{"console"}
 
-	objectStorageIAM.CreateGroup(context.Background(), utils.ALL_USERS_GROUP)                          // #nosec G104
-	objectStorageIAM.UpdateGroupMembers(context.Background(), utils.ALL_USERS_GROUP, oscarUser, false) // #nosec G104
+	objectStorageIAM.CreateGroup(context.Background(), types.ALL_USERS_GROUP)                          // #nosec G104
+	objectStorageIAM.UpdateGroupMembers(context.Background(), types.ALL_USERS_GROUP, oscarUser, false) // #nosec G104
 
 	oidcHandler := getOIDCMiddleware(kubeClientset, objectStorageIAM, cfg, nil)
 	return func(c *gin.Context) {

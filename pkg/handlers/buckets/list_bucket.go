@@ -24,6 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
+	objectstorage "github.com/grycap/oscar/v4/pkg/backends/object_storage"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
@@ -57,7 +58,7 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 			//c.JSON(http.StatusOK, bucketsList)
 
-		} else if isRustFSConfig(cfg) {
+		} else if utils.IsRustFSConfig(cfg) {
 			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
@@ -97,7 +98,7 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 				if aerr, ok := err.(awserr.Error); ok {
 					switch aerr.Code() {
 					case "AccessDenied":
-						noBuckets := []utils.MinIOBucket{}
+						noBuckets := []types.MinIOBucket{}
 						fmt.Println(noBuckets)
 						c.JSON(http.StatusOK, noBuckets)
 						return
@@ -107,15 +108,17 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 				return
 			}
 		}
-		bucketsInfo := []utils.MinIOBucket{}
-		minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
+		bucketsInfo := []types.MinIOBucket{}
+
+		objectStorageIAM, err := objectstorage.MakeObjectStorageIAM(cfg)
+
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", err))
 			return
 		}
 		var dataUsage madmin.DataUsageInfo
-		if !isRustFSConfig(cfg) {
-			dataUsage, err = minIOAdminClient.GetDataUsageInfo()
+		if !utils.IsRustFSConfig(cfg) {
+			dataUsage, err = objectStorageIAM.GetClient(c.Request.Context()).GetDataUsageInfo()
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error getting MinIO data usage: %v", err))
 				return
@@ -126,19 +129,19 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 			var allowedUsers []string
 			var bowner string
 			path := *b.Name
-			metadata, err := minIOAdminClient.GetTaggedMetadata(path)
+			metadata, err := objectStorageIAM.GetClient(c.Request.Context()).GetTaggedMetadata(path)
 			if err != nil {
 				metadata = map[string]string{}
 			}
-			bucketVisibility := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: *b.Name, Owner: uid})
-			if isRustFSConfig(cfg) {
-				if !isAdminUser && !userAllowedByTags(uid, metadata) {
+			bucketVisibility := objectStorageIAM.GetClient(c.Request.Context()).GetCurrentResourceVisibility(types.MinIOBucket{BucketName: *b.Name, Owner: uid})
+			if utils.IsRustFSConfig(cfg) {
+				if !isAdminUser && !utils.UserAllowedByTags(uid, metadata) {
 					continue
 				}
-				bucketVisibility = visibilityFromTags(metadata)
-				allowedUsers = allowedUsersFromTags(metadata)
+				bucketVisibility = utils.VisibilityFromObjectStorageTags(metadata)
+				allowedUsers = utils.AllowedUsersFromTags(metadata)
 				bowner = metadata["owner"]
-			} else if bucketVisibility == utils.PRIVATE {
+			} else if bucketVisibility == types.PRIVATE {
 				bowner = uid
 			} else {
 				if err != nil {
@@ -147,9 +150,9 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 					bowner = metadata["owner"]
 				}
 			}
-			if bucketVisibility == utils.RESTRICTED {
-				if !isRustFSConfig(cfg) {
-					members, err := minIOAdminClient.GetBucketMembers(path)
+			if bucketVisibility == types.RESTRICTED {
+				if !utils.IsRustFSConfig(cfg) {
+					members, err := objectStorageIAM.GetClient(c.Request.Context()).GetBucketMembers(path)
 					if err != nil {
 						fmt.Printf("WARNING: Couldn't get bucket owner info: %v\n", err)
 					} else {
@@ -161,21 +164,21 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 			// Remove owner from metadata as it is already included in the response
 			delete(metadata, "owner")
 
-			bucketInfo := utils.MinIOBucket{
+			bucketInfo := types.MinIOBucket{
 				BucketName:   path,
 				Visibility:   bucketVisibility,
 				Owner:        bowner,
 				AllowedUsers: allowedUsers,
 				Metadata:     metadata,
 			}
-			if isRustFSConfig(cfg) {
-				bucketInfo.StorageQuota = rustFSBucketStorageQuota(minIOAdminClient, path, metadata)
-				bucketInfo.StorageUsage = &utils.MinIOUsage{Used: "0"}
+			if utils.IsRustFSConfig(cfg) {
+				bucketInfo.StorageQuota = utils.RustFSBucketStorageQuota(objectStorageIAM.GetClient(c.Request.Context()), path, metadata)
+				bucketInfo.StorageUsage = &types.MinIOUsage{Used: "0"}
 				bucketInfo.Attribution = "partial"
 				bucketsInfo = append(bucketsInfo, bucketInfo)
 				continue
 			}
-			if err := minIOAdminClient.EnrichBucketQuotaAndUsage(&bucketInfo, dataUsage); err != nil {
+			if err := objectStorageIAM.GetClient(c.Request.Context()).EnrichBucketQuotaAndUsage(&bucketInfo, dataUsage); err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error getting bucket quota or usage for bucket '%s': %v", path, err))
 				return
 			}

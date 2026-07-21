@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	objectstorage "github.com/grycap/oscar/v4/pkg/backends/object_storage"
 	"github.com/grycap/oscar/v4/pkg/handlers"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
@@ -58,7 +59,7 @@ var isAdminUser = false
 func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var uid string
-		var bucket utils.MinIOBucket
+		var bucket types.MinIOBucket
 		if err := c.ShouldBindJSON(&bucket); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
 			return
@@ -98,7 +99,7 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 		bucket.Owner = uid
 		// Use admin MinIO client for the bucket creation
 		s3Client := cfg.MinIOProvider.GetS3Client()
-		minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
+		objectStorageIAM, err := objectstorage.MakeObjectStorageIAM(cfg)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", err))
 			return
@@ -107,11 +108,11 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 		path := strings.Trim(bucket.BucketName, " /")
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
-		if err := handlers.ValidateMinIOBucketCountQuota(cfg, minIOAdminClient, minIOQuota, uid, []string{splitPath[0]}); err != nil {
+		if err := handlers.ValidateMinIOBucketCountQuota(cfg, objectStorageIAM.GetClient(c.Request.Context()), minIOQuota, uid, []string{splitPath[0]}); err != nil {
 			c.String(http.StatusForbidden, err.Error())
 			return
 		}
-		if err := minIOAdminClient.CreateS3Path(s3Client, splitPath, false); err != nil {
+		if err := objectStorageIAM.GetClient(c.Request.Context()).CreateS3Path(s3Client, splitPath, false); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("Error creating bucket with name '%s': %v", splitPath[0], err))
 			return
 		}
@@ -123,28 +124,28 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 		}
 		// If not specified default visibility is PRIVATE
 		if strings.ToLower(bucket.Visibility) == "" {
-			bucket.Visibility = utils.PRIVATE
+			bucket.Visibility = types.PRIVATE
 		}
 		if minIOQuota != nil && minIOQuota.StoragePerBucket != "" {
-			bucket.StorageQuota = &utils.MinIOQuota{Max: minIOQuota.StoragePerBucket, Source: "configured"}
+			bucket.StorageQuota = &types.MinIOQuota{Max: minIOQuota.StoragePerBucket, Source: "configured"}
 		}
 
 		// Bucket metadata for filtering
-		tags := bucketTags(bucket, ownerName)
+		tags := utils.BucketTags(bucket, ownerName)
 
-		if err := minIOAdminClient.SetTags(splitPath[0], tags); err != nil {
+		if err := objectStorageIAM.GetClient(c.Request.Context()).SetTags(splitPath[0], tags); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
 			return
 		}
 		if minIOQuota != nil && minIOQuota.StoragePerBucket != "" {
-			if err := minIOAdminClient.SetBucketStorageQuota(splitPath[0], minIOQuota.StoragePerBucket); err != nil {
+			if err := objectStorageIAM.GetClient(c.Request.Context()).SetBucketStorageQuota(splitPath[0], minIOQuota.StoragePerBucket); err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error setting bucket quota: %v", err))
 				return
 			}
 		}
-		if uid != cfg.Name {
-			if !isRustFSConfig(cfg) {
-				err := minIOAdminClient.SetPolicies(bucket)
+		if uid != cfg.Username {
+			if !utils.IsRustFSConfig(cfg) {
+				err := objectStorageIAM.GetClient(c.Request.Context()).SetPolicies(bucket)
 				if err != nil {
 					c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating policies for bucket: %v", err))
 					return

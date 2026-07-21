@@ -7,7 +7,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
@@ -20,13 +19,13 @@ func isServiceAccessibleByUser(service *types.Service, uid string) bool {
 	if service == nil {
 		return false
 	}
-	if service.Visibility == utils.PUBLIC {
+	if service.Visibility == types.PUBLIC {
 		return true
 	}
 	if uid == service.Owner {
 		return true
 	}
-	return service.Visibility == utils.RESTRICTED && slices.Contains(service.AllowedUsers, uid)
+	return service.Visibility == types.RESTRICTED && slices.Contains(service.AllowedUsers, uid)
 }
 
 func listAuthorizedServicesForMetrics(c *gin.Context, back types.ServerlessBackend) ([]*types.Service, bool) {

@@ -21,8 +21,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
+	objectstorage "github.com/grycap/oscar/v4/pkg/backends/object_storage"
 	"github.com/grycap/oscar/v4/pkg/types"
 )
 
@@ -30,7 +30,7 @@ import (
 // the configured object storage. RustFS exposes a native, plain-text admin API
 // for dynamic configuration; MinIO uses the encrypted madmin API and restart.
 func RegisterObjectStorageWebhook(ctx context.Context, cfg *types.Config, name, token string) error {
-	if strings.EqualFold(strings.TrimSpace(cfg.ObjectStorageType), ObjectStorageRustFS) {
+	if IsRustFSConfig(cfg) {
 		rustFS, err := makeRustFSIAM(cfg)
 		if err != nil {
 			return err
@@ -56,10 +56,10 @@ func RegisterObjectStorageWebhook(ctx context.Context, cfg *types.Config, name, 
 			return fmt.Errorf("encoding RustFS webhook target: %w", err)
 		}
 		path := "/rustfs/admin/v3/target/notify_webhook/" + name
-		return rustFS.requestPayload(ctx, http.MethodPut, path, nil, payload, "application/json")
+		return rustFS.RequestPayload(ctx, http.MethodPut, path, nil, payload, "application/json")
 	}
 
-	client, err := MakeMinIOAdminClient(cfg)
+	client, err := types.MakeMinIOAdminClient(cfg)
 	if err != nil {
 		return err
 	}
@@ -69,8 +69,8 @@ func RegisterObjectStorageWebhook(ctx context.Context, cfg *types.Config, name, 
 	return client.RestartServer()
 }
 
-func ensureRustFSNotificationsEnabled(ctx context.Context, rustFS *rustFSIAM) error {
-	response, err := rustFS.requestPayloadResponse(ctx, http.MethodGet, "/rustfs/admin/v3/module-switches", nil, nil, "")
+func ensureRustFSNotificationsEnabled(ctx context.Context, rustFS *types.RustFSIAM) error {
+	response, err := rustFS.RequestPayloadResponse(ctx, http.MethodGet, "/rustfs/admin/v3/module-switches", nil, nil, "")
 	if err != nil {
 		return fmt.Errorf("reading RustFS notification module state: %w", err)
 	}
@@ -91,7 +91,7 @@ func ensureRustFSNotificationsEnabled(ctx context.Context, rustFS *rustFSIAM) er
 	if err != nil {
 		return fmt.Errorf("encoding RustFS notification module state: %w", err)
 	}
-	if err := rustFS.requestPayload(ctx, http.MethodPut, "/rustfs/admin/v3/module-switches", nil, payload, "application/json"); err != nil {
+	if err := rustFS.RequestPayload(ctx, http.MethodPut, "/rustfs/admin/v3/module-switches", nil, payload, "application/json"); err != nil {
 		return fmt.Errorf("enabling RustFS notification module: %w", err)
 	}
 	return nil
@@ -99,16 +99,16 @@ func ensureRustFSNotificationsEnabled(ctx context.Context, rustFS *rustFSIAM) er
 
 // RemoveObjectStorageWebhook removes a per-service notification target.
 func RemoveObjectStorageWebhook(ctx context.Context, cfg *types.Config, name string) error {
-	if strings.EqualFold(strings.TrimSpace(cfg.ObjectStorageType), ObjectStorageRustFS) {
+	if IsRustFSConfig(cfg) {
 		rustFS, err := makeRustFSIAM(cfg)
 		if err != nil {
 			return err
 		}
 		path := "/rustfs/admin/v3/target/notify_webhook/" + name + "/reset"
-		return rustFS.requestPayload(ctx, http.MethodDelete, path, nil, nil, "")
+		return rustFS.RequestPayload(ctx, http.MethodDelete, path, nil, nil, "")
 	}
 
-	client, err := MakeMinIOAdminClient(cfg)
+	client, err := types.MakeMinIOAdminClient(cfg)
 	if err != nil {
 		return err
 	}
@@ -118,12 +118,12 @@ func RemoveObjectStorageWebhook(ctx context.Context, cfg *types.Config, name str
 	return client.RestartServer()
 }
 
-func makeRustFSIAM(cfg *types.Config) (*rustFSIAM, error) {
-	iam, err := MakeObjectStorageIAM(cfg)
+func makeRustFSIAM(cfg *types.Config) (*types.RustFSIAM, error) {
+	iam, err := objectstorage.MakeObjectStorageIAM(cfg)
 	if err != nil {
 		return nil, err
 	}
-	rustFS, ok := iam.(*rustFSIAM)
+	rustFS, ok := iam.(*types.RustFSIAM)
 	if !ok {
 		return nil, fmt.Errorf("expected RustFS IAM adapter, got %T", iam)
 	}

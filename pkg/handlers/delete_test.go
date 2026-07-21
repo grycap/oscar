@@ -11,7 +11,6 @@ import (
 	"github.com/grycap/oscar/v4/pkg/backends"
 	"github.com/grycap/oscar/v4/pkg/testsupport"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -215,11 +214,11 @@ func TestMakeDeleteHandlerForbidsVisibleServicesForNonOwners(t *testing.T) {
 	}{
 		{
 			name:       "public service",
-			visibility: utils.PUBLIC,
+			visibility: types.PUBLIC,
 		},
 		{
 			name:         "restricted service with allowed user",
-			visibility:   utils.RESTRICTED,
+			visibility:   types.RESTRICTED,
 			allowedUsers: []string{"user-b@example.com"},
 		},
 	}
@@ -255,5 +254,3 @@ func TestMakeDeleteHandlerForbidsVisibleServicesForNonOwners(t *testing.T) {
 		})
 	}
 }
-
-

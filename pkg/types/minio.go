@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package types
 
 import (
 	"context"
@@ -35,7 +35,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/minio/madmin-go"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -134,8 +133,12 @@ func (c *MinIOAdminClient) GetSimpleClient() *minio.Client {
 	return c.simpleClient
 }
 
+func (c *MinIOAdminClient) GetAdminClient() *madmin.AdminClient {
+	return c.adminClient
+}
+
 // MakeMinIOAdminClient creates a new MinIO Admin client to configure webhook notifications
-func MakeMinIOAdminClient(cfg *types.Config) (*MinIOAdminClient, error) {
+func MakeMinIOAdminClient(cfg *Config) (*MinIOAdminClient, error) {
 	// Parse minIO endpoint
 	endpointURL, err := url.Parse(cfg.MinIOProvider.Endpoint)
 	if err != nil {
