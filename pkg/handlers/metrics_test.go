@@ -10,12 +10,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"github.com/grycap/oscar/v4/pkg/backends"
 	"github.com/grycap/oscar/v4/pkg/metrics"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type fakeServiceInventory struct {
@@ -97,7 +96,7 @@ func setupMetricsRouter(back types.ServerlessBackend, agg *metrics.Aggregator, m
 
 func TestMetricValueHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
-	back.Service = &types.Service{Name: "svc-a", Owner: "owner@example.org", Visibility: utils.PUBLIC}
+	back.Service = &types.Service{Name: "svc-a", Owner: "owner@example.org", Visibility: types.PUBLIC}
 	agg := &metrics.Aggregator{
 		Sources: metrics.Sources{
 			UsageMetrics: &fakeUsageMetrics{cpu: 2.5, gpu: 1.0},
@@ -123,7 +122,7 @@ func TestMetricValueHandler(t *testing.T) {
 
 func TestMetricValueHandlerAllMetrics(t *testing.T) {
 	back := backends.MakeFakeBackend()
-	back.Service = &types.Service{Name: "svc-a", Owner: "owner@example.org", Visibility: utils.PUBLIC}
+	back.Service = &types.Service{Name: "svc-a", Owner: "owner@example.org", Visibility: types.PUBLIC}
 	agg := &metrics.Aggregator{
 		Sources: metrics.Sources{
 			UsageMetrics: &fakeUsageMetrics{cpu: 2.5, gpu: 1.0},
@@ -220,7 +219,7 @@ func TestMetricValueHandlerOIDCDeletedServiceNotFound(t *testing.T) {
 
 func TestMetricsSummaryHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
-	back.Services = []*types.Service{{Name: "svc-a", Owner: "owner@example.org", Visibility: utils.PUBLIC}}
+	back.Services = []*types.Service{{Name: "svc-a", Owner: "owner@example.org", Visibility: types.PUBLIC}}
 	agg := &metrics.Aggregator{
 		Sources: metrics.Sources{
 			ServiceInventory: &fakeServiceInventory{services: []metrics.ServiceDescriptor{{ID: "svc-a"}}},
@@ -252,7 +251,7 @@ func TestMetricsSummaryHandler(t *testing.T) {
 
 func TestMetricsSummaryDefaultsToLastDay(t *testing.T) {
 	back := backends.MakeFakeBackend()
-	back.Services = []*types.Service{{Name: "svc-a", Owner: "owner@example.org", Visibility: utils.PUBLIC}}
+	back.Services = []*types.Service{{Name: "svc-a", Owner: "owner@example.org", Visibility: types.PUBLIC}}
 	agg := &metrics.Aggregator{
 		Sources: metrics.Sources{
 			ServiceInventory: &fakeServiceInventory{services: []metrics.ServiceDescriptor{{ID: "svc-a"}}},
@@ -288,7 +287,7 @@ func TestMetricsSummaryDefaultsToLastDay(t *testing.T) {
 
 func TestMetricsBreakdownCSVExport(t *testing.T) {
 	back := backends.MakeFakeBackend()
-	back.Services = []*types.Service{{Name: "svc-a", Owner: "owner@example.org", Visibility: utils.PUBLIC}}
+	back.Services = []*types.Service{{Name: "svc-a", Owner: "owner@example.org", Visibility: types.PUBLIC}}
 	agg := &metrics.Aggregator{
 		Sources: metrics.Sources{
 			RequestLogs: &fakeRequestLogs{records: []metrics.RequestRecord{
@@ -353,10 +352,10 @@ func TestMetricsSummaryTimeRangeOrder(t *testing.T) {
 func TestMetricsSummaryHandlerScopesOIDCToVisibleServices(t *testing.T) {
 	back := backends.MakeFakeBackend()
 	back.Services = []*types.Service{
-		{Name: "svc-public", Owner: "owner@example.org", Visibility: utils.PUBLIC},
-		{Name: "svc-owned", Owner: "user@example.org", Visibility: utils.PRIVATE},
-		{Name: "svc-restricted", Owner: "owner@example.org", Visibility: utils.RESTRICTED, AllowedUsers: []string{"user@example.org"}},
-		{Name: "svc-private", Owner: "owner@example.org", Visibility: utils.PRIVATE},
+		{Name: "svc-public", Owner: "owner@example.org", Visibility: types.PUBLIC},
+		{Name: "svc-owned", Owner: "user@example.org", Visibility: types.PRIVATE},
+		{Name: "svc-restricted", Owner: "owner@example.org", Visibility: types.RESTRICTED, AllowedUsers: []string{"user@example.org"}},
+		{Name: "svc-private", Owner: "owner@example.org", Visibility: types.PRIVATE},
 	}
 	agg := &metrics.Aggregator{
 		Sources: metrics.Sources{
@@ -427,8 +426,8 @@ func TestMetricsSummaryHandlerScopesOIDCToVisibleServices(t *testing.T) {
 func TestMetricsSummaryHandlerBasicAuthSeesAllServices(t *testing.T) {
 	back := backends.MakeFakeBackend()
 	back.Services = []*types.Service{
-		{Name: "svc-public", Owner: "owner@example.org", Visibility: utils.PUBLIC},
-		{Name: "svc-private", Owner: "owner@example.org", Visibility: utils.PRIVATE},
+		{Name: "svc-public", Owner: "owner@example.org", Visibility: types.PUBLIC},
+		{Name: "svc-private", Owner: "owner@example.org", Visibility: types.PRIVATE},
 	}
 	agg := &metrics.Aggregator{
 		Sources: metrics.Sources{
@@ -477,8 +476,8 @@ func TestMetricsSummaryHandlerBasicAuthSeesAllServices(t *testing.T) {
 func TestMetricsBreakdownHandlerScopesOIDCToVisibleServices(t *testing.T) {
 	back := backends.MakeFakeBackend()
 	back.Services = []*types.Service{
-		{Name: "svc-public", Owner: "owner@example.org", Visibility: utils.PUBLIC},
-		{Name: "svc-private", Owner: "owner@example.org", Visibility: utils.PRIVATE},
+		{Name: "svc-public", Owner: "owner@example.org", Visibility: types.PUBLIC},
+		{Name: "svc-private", Owner: "owner@example.org", Visibility: types.PRIVATE},
 	}
 	agg := &metrics.Aggregator{
 		Sources: metrics.Sources{
@@ -516,7 +515,7 @@ func TestMetricsBreakdownHandlerScopesOIDCToVisibleServices(t *testing.T) {
 
 func TestMetricValueHandlerRejectsUnauthorizedOIDCService(t *testing.T) {
 	back := backends.MakeFakeBackend()
-	back.Service = &types.Service{Name: "svc-private", Owner: "owner@example.org", Visibility: utils.PRIVATE}
+	back.Service = &types.Service{Name: "svc-private", Owner: "owner@example.org", Visibility: types.PRIVATE}
 	agg := &metrics.Aggregator{
 		Sources: metrics.Sources{
 			UsageMetrics: &fakeUsageMetrics{cpu: 2.5, gpu: 1.0},
