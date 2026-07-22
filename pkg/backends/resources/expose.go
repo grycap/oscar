@@ -236,7 +236,7 @@ func UpdateExpose(service types.Service, namespace string, kubeClientset kuberne
 	}
 
 	utils.UpdateWorkload(service, targetNamespace, cfg, getPodTemplateSpec)
-	if cfg.KueueEnable {
+	if cfg.KueueEnable && service.Owner != types.DefaultOwner {
 		err = utils.CheckWorkloadAdmited(service, namespace, cfg, kubeClientset, getDeploymentSpec)
 		if err != nil {
 			return fmt.Errorf("Invalid workload after update: Error checking workload admission: change the cpu/memory requests")
@@ -457,7 +457,7 @@ func createDeployment(service types.Service, namespace string, kubeClientset kub
 	if err != nil {
 		return err
 	}
-	if cfg.KueueEnable {
+	if cfg.KueueEnable && service.Owner != types.DefaultOwner {
 		err = utils.CheckWorkloadAdmited(service, namespace, cfg, kubeClientset, getDeploymentSpec)
 		if err != nil {
 			if err := utils.DeleteKueueLocalQueue(context.TODO(), cfg, service.Namespace, service.Name); err != nil {
