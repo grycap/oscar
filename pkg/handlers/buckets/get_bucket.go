@@ -87,7 +87,7 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 		visibility := adminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: ownerCandidate})
 
 		var allowedUsers []string
-		if visibility == utils.RESTRICTED {
+		if visibility == types.RESTRICTED {
 			allowedUsers, err = adminClient.GetBucketMembers(bucketName)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error retrieving bucket members: %v", err))

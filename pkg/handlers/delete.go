@@ -34,8 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
-var ALL_USERS_GROUP = "all_users_group"
-var allUserGroupNotExist = "unable to remove bucket from policy \"" + ALL_USERS_GROUP + "\", policy '" + ALL_USERS_GROUP + "' does not exist"
+var allUserGroupNotExist = "unable to remove bucket from policy \"" + types.ALL_USERS_GROUP + "\", policy '" + types.ALL_USERS_GROUP + "' does not exist"
 var bucketNotExist = "NoSuchBucket: The specified bucket does not exist"
 var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
 
@@ -311,7 +310,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 
 			err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
 				BucketName:   bucket,
-				Visibility:   utils.PRIVATE,
+				Visibility:   types.PRIVATE,
 				AllowedUsers: []string{},
 				Owner:        service.Owner,
 			})
@@ -344,8 +343,8 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 func DeleteMinIOBuckets(s3Client *s3.S3, minIOAdminClient *utils.MinIOAdminClient, bucket utils.MinIOBucket) error {
 	var policyName string
 	var isGroup bool
-	if strings.ToLower(bucket.Visibility) == utils.PUBLIC {
-		policyName = ALL_USERS_GROUP
+	if strings.ToLower(bucket.Visibility) == types.PUBLIC {
+		policyName = types.ALL_USERS_GROUP
 		isGroup = true
 	} else {
 		policyName = bucket.Owner
@@ -356,7 +355,7 @@ func DeleteMinIOBuckets(s3Client *s3.S3, minIOAdminClient *utils.MinIOAdminClien
 			return fmt.Errorf("error removing resource")
 		}
 
-		if strings.ToLower(bucket.Visibility) == utils.RESTRICTED {
+		if strings.ToLower(bucket.Visibility) == types.RESTRICTED {
 			err := minIOAdminClient.RemoveGroupPolicy(bucket.BucketName)
 			if err != nil {
 				return fmt.Errorf("error removing policy for group")
