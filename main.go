@@ -174,8 +174,9 @@ func main() {
 	metricsGroup.GET("", handlers.MakeMetricsSummaryHandler(back, metricsAgg))
 	metricsGroup.GET("/breakdown", handlers.MakeMetricsBreakdownHandler(back, metricsAgg))
 	metricsGroup.GET("/:serviceName", handlers.MakeMetricValueHandler(back, metricsAgg))
+
 	// Quotas
-	if cfg.KueueEnable || cfg.VolumeEnable {
+	if cfg.KueueEnable || cfg.VolumeEnable || cfg.MinIOQuotaEnabled {
 		system.GET("/quotas/user", handlers.MakeGetOwnQuotaHandler(*qb, cfg))
 		system.GET("/quotas/user/:userId", handlers.MakeGetUserQuotaHandler(*qb, cfg))
 		system.PUT("/quotas/user/:userId", handlers.MakeUpdateUserQuotaHandler(*qb, cfg))

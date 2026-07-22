@@ -610,7 +610,7 @@ func TestGetCurrentResourceVisibility(t *testing.T) {
 			policies: map[string][]string{
 				"owner": []string{"arn:aws:s3:::bucket/*"},
 			},
-			expected: PRIVATE,
+			expected: types.PRIVATE,
 		},
 		{
 			name: "restricted",
@@ -618,14 +618,14 @@ func TestGetCurrentResourceVisibility(t *testing.T) {
 				"owner":  []string{"arn:aws:s3:::bucket/*"},
 				"bucket": []string{"arn:aws:s3:::bucket/*"},
 			},
-			expected: RESTRICTED,
+			expected: types.RESTRICTED,
 		},
 		{
 			name: "public",
 			policies: map[string][]string{
-				ALL_USERS_GROUP: []string{"arn:aws:s3:::bucket/*"},
+				types.ALL_USERS_GROUP: []string{"arn:aws:s3:::bucket/*"},
 			},
-			expected: PUBLIC,
+			expected: types.PUBLIC,
 		},
 		{
 			name:     "none",
@@ -691,7 +691,7 @@ func TestSetAndUnsetPolicies(t *testing.T) {
 	bucket := MinIOBucket{
 		BucketName:   "bucket",
 		Owner:        "owner",
-		Visibility:   RESTRICTED,
+		Visibility:   types.RESTRICTED,
 		AllowedUsers: []string{"alice"},
 	}
 
@@ -893,7 +893,7 @@ func TestCreateAllUsersGroup(t *testing.T) {
 		t.Fatalf("unexpected error creating group: %v", err)
 	}
 
-	if _, ok := mock.groupMembers[ALL_USERS_GROUP]; !ok {
+	if _, ok := mock.groupMembers[types.ALL_USERS_GROUP]; !ok {
 		t.Fatalf("expected all users group to be created")
 	}
 }

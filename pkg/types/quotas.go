@@ -23,12 +23,6 @@ import (
 	kueueclientset "sigs.k8s.io/kueue/client-go/clientset/versioned"
 )
 
-const MinIOQuotaConfigMapName = "oscar-minio-quota"
-
-func GetDefaultMinIOQuotaConfigMapName() string {
-	return MinIOQuotaConfigMapName
-}
-
 type QuotaBackend struct {
 	Kueueclient   *kueueclientset.Clientset
 	KubeClientset kubernetes.Interface
@@ -69,9 +63,9 @@ type QuotaUpdateRequest struct {
 	// EphemeralStorage bytes quota for the user's ClusterQueue
 	EphemeralStorage string `json:"ephemeral_storage"`
 	// GPU units quota for the user's ClusterQueue
-	GPU string `json:"gpu,omitempty"`
-	Volumes          *VolumeQuotaUpdate `json:"volumes,omitempty"`
-	MinIO            *MinIOQuotaUpdate  `json:"minio,omitempty"`
+	GPU     string             `json:"gpu,omitempty"`
+	Volumes *VolumeQuotaUpdate `json:"volumes,omitempty"`
+	MinIO   *MinIOQuotaUpdate  `json:"minio,omitempty"`
 }
 
 type VolumeQuotaUpdate struct {

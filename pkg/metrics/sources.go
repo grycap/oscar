@@ -100,7 +100,7 @@ func DefaultSources(cfg *types.Config, back types.ServerlessBackend, kubeClients
 				QueryTemplate:         cfg.LokiQuery,
 				Namespace:             cfg.Namespace,
 				AppLabel:              "oscar",
-				Client:                &http.Client{Timeout: 10 * time.Second},
+				Client:                &http.Client{Timeout: 100 * time.Second},
 				ServiceFilterTemplate: "\\\\[GIN-EXECUTIONS-LOGGER\\\\]\" |~ \"/(job|run)/%s",
 				ServiceFilterAll:      "\\\\[GIN-EXECUTIONS-LOGGER\\\\]\" |~ \"/(job|run)",
 			}
@@ -116,7 +116,7 @@ func DefaultSources(cfg *types.Config, back types.ServerlessBackend, kubeClients
 					QueryTemplate:         cfg.LokiExposedQuery,
 					Namespace:             cfg.LokiExposedNamespace,
 					AppLabel:              cfg.LokiExposedAppLabel,
-					Client:                &http.Client{Timeout: 10 * time.Second},
+					Client:                &http.Client{Timeout: 100 * time.Second},
 					ParseFunc:             parse,
 					SourceName:            "exposed-request-logs",
 					ServiceFilterTemplate: "/system/services/%s/exposed",

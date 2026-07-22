@@ -539,7 +539,7 @@ deployMetrics(){
     echo -e "\n[*] Deploying Prometheus ..."
     helm repo add --force-update prometheus-community https://prometheus-community.github.io/helm-charts
     helm repo update
-    helm upgrade --install prometheus prometheus-community/prometheus \
+    helm upgrade --install prometheus-operator prometheus-community/kube-prometheus-stack \
         --namespace monitoring \
         --set server.service.type=ClusterIP \
         --set server.persistentVolume.storageClass=nfs \
@@ -803,7 +803,7 @@ else
         read -p "Do you want to enable OIDC authentication support with these defaults? [y/n] " use_oidc </dev/tty
     fi
     if [ "$ENABLE_KSERVE" != "true" ]; then
-        read -p "Do you want to install KServe with deploy/kind-oscar-kserve.sh? [y/n] " use_kserve </dev/tty
+        read -p "Do you want to install KServe with deploy/scripts/kind-oscar-kserve.sh? [y/n] " use_kserve </dev/tty
     fi
     if [ "$ENABLE_KUEUE" != "true" ]; then
         read -p "Do you want to enable CPU and memory quotas with Kueue? [y/n] " use_kueue </dev/tty
@@ -824,6 +824,9 @@ if [ $(echo $use_oidc | tr '[:upper:]' '[:lower:]') == "y" ]; then
 fi
 if [ $(echo $use_kserve | tr '[:upper:]' '[:lower:]') == "y" ]; then
     ENABLE_KSERVE="true"
+fi
+if [ $(echo $use_kueue | tr '[:upper:]' '[:lower:]') == "y" ]; then
+    ENABLE_KUEUE="true"
 fi
 if [ $(echo $use_minio_quotas | tr '[:upper:]' '[:lower:]') == "y" ]; then
     ENABLE_MINIO_QUOTAS="true"
@@ -1094,8 +1097,15 @@ fi
 if [ "$ENABLE_METRICS" == "true" ]; then
     echo -e "\n[*] Configuring OSCAR to use Prometheus and Loki ..."
     if ! kubectl -n oscar set env deployment/oscar \
-        PROMETHEUS_URL="http://prometheus-server.monitoring.svc.cluster.local" \
-        LOKI_URL="http://loki-gateway.monitoring.svc.cluster.local"; then
+        PROMETHEUS_URL="http://prometheus-operator-kube-p-prometheus.monitoring.svc.cluster.local:9090" \
+        LOKI_URL="http://loki-gateway.monitoring.svc.cluster.local" \
+        LOKI_QUERY="{namespace=\"oscar\"}" \
+        LOKI_EXPOSED_QUERY="{app=\"traefik\"}" \
+        LOKI_EXPOSED_NAMESPACE="traefik" \
+        LOKI_EXPOSED_APP_LABEL="traefik" \
+        EXPOSED_SERVICES_ROUTE_KIND="httproute" \
+        HTTPROUTE_GATEWAY_NAME="traefik-gateway" \
+        HTTPROUTE_GATEWAY_NAMESPACE="traefik"; then
         echo -e "$RED[!]$END_COLOR Failed to configure OSCAR metrics endpoints"
     fi
 fi
@@ -1116,12 +1126,12 @@ if [ $(echo $ENABLE_KSERVE | tr '[:upper:]' '[:lower:]') == "true" ]; then
         echo -e "\n$RED[!]$END_COLOR KServe installer script currently targets Traefik gateway. Please use --traefik to enable KServe installation."
         exit 1
     fi
-    echo -e "\n[*] Installing KServe using $SCRIPT_DIR/kind-oscar-kserve.sh ..."
-    if [ ! -f "$SCRIPT_DIR/kind-oscar-kserve.sh" ]; then
-        echo -e "$RED[!]$END_COLOR KServe script not found: $SCRIPT_DIR/kind-oscar-kserve.sh"
+    echo -e "\n[*] Installing KServe using $SCRIPT_DIR/scripts/kind-oscar-kserve.sh ..."
+    if [ ! -f "$SCRIPT_DIR/scripts/kind-oscar-kserve.sh" ]; then
+        echo -e "$RED[!]$END_COLOR KServe script not found: $SCRIPT_DIR/scripts/kind-oscar-kserve.sh"
         exit 1
     fi
-    if ! bash "$SCRIPT_DIR/kind-oscar-kserve.sh"; then
+    if ! bash "$SCRIPT_DIR/scripts/kind-oscar-kserve.sh"; then
         echo -e "$RED[!]$END_COLOR KServe installation failed"
         exit 1
     fi

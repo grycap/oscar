@@ -26,16 +26,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func TestGetDefaultMinIOQuotaConfigMapName(t *testing.T) {
-	name := GetDefaultMinIOQuotaConfigMapName()
-	if name != MinIOQuotaConfigMapName {
-		t.Fatalf("expected %q, got %q", MinIOQuotaConfigMapName, name)
-	}
-	if name != "oscar-minio-quota" {
-		t.Fatalf("expected oscar-minio-quota, got %q", name)
-	}
-}
-
 func TestParseSeconds(t *testing.T) {
 	scenarios := []struct {
 		name        string

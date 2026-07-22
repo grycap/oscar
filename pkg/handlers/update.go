@@ -60,6 +60,14 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
+		if err := newService.Validate(); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+			return
+		}
+		if newService.IsKserve() && !utils.IsKserveSupported(cfg) {
+			c.String(http.StatusBadRequest, "KServe is not supported in this deployment")
+			return
+		}
 		rawInput := cloneStorageIOConfigs(newService.Input)
 		rawOutput := cloneStorageIOConfigs(newService.Output)
 		if err := normalizeStoragePaths(&newService); err != nil {
@@ -109,6 +117,14 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			serviceNamespace = cfg.ServicesNamespace
 		}
 		newService.Namespace = serviceNamespace
+
+		// Check if the service is a KServe service and validate the update
+		if oldService.IsKserve() || newService.IsKserve() {
+			if err := utils.CheckKserveUpdate(oldService, &newService); err != nil {
+				c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+				return
+			}
+		}
 
 		if !isAdminUser {
 			uid, err = auth.GetUIDFromContext(c)
@@ -214,7 +230,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 					err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
 						BucketName:   bucket,
-						Visibility:   utils.PRIVATE,
+						Visibility:   types.PRIVATE,
 						AllowedUsers: []string{},
 						Owner:        oldService.Owner,
 					})
@@ -287,14 +303,14 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						}
 						// If not specified default visibility is PRIVATE
 						if strings.ToLower(newService.Visibility) == "" {
-							b.Visibility = utils.PRIVATE
+							b.Visibility = types.PRIVATE
 						}
 						err = minIOAdminClient.SetPolicies(b)
 						if err != nil {
 							c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 						}
 					} else {
-						if newService.Visibility == utils.RESTRICTED {
+						if newService.Visibility == types.RESTRICTED {
 							err := minIOAdminClient.UpdateServiceGroup(b.BucketName, newService.AllowedUsers)
 							if err != nil {
 								c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
@@ -325,7 +341,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		for key, value := range oldServiceBuckets {
 			// If the bucket was not used in the new service definition set it to private
 			if value {
-				err := minIOAdminClient.SetPolicies(utils.MinIOBucket{BucketName: key, Visibility: utils.PRIVATE})
+				err := minIOAdminClient.SetPolicies(utils.MinIOBucket{BucketName: key, Visibility: types.PRIVATE})
 				if err != nil {
 					c.String(http.StatusInternalServerError, "error setting new policies: %v", err)
 				}

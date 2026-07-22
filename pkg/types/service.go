@@ -231,7 +231,7 @@ type Service struct {
 	LogLevel string `json:"log_level"`
 
 	// Image Docker image for the service
-	Image string `json:"image" binding:"required"`
+	Image string `json:"image"`
 
 	// Alpine parameter to set if image is based on Alpine
 	// A custom release of faas-supervisor will be used
@@ -333,129 +333,96 @@ type Service struct {
 	// Internal/API use only, not part of FDL.
 	Deployment *ServiceDeploymentSummary `json:"deployment,omitempty" yaml:"-"`
 
-	// Kserve configuration to deploy the service using KServe InferenceService CRD
+	// Kserve configuration to deploy the service using KServe CRD
 	Kserve *Kserve `json:"kserve,omitempty"`
 }
 
-type Kserve struct {
-	// Type the type of KServe service to deploy
-	// Required. Set the type of KServe service, either "inference" for a standard InferenceService
-	// or "llm_inference" for an LLMInferenceService
-	Type string `json:"type,omitempty" default:"inference"`
-
-	// Inference configuration for KServe InferenceService.
-	// It is required when Type is set to "inference"
-	Inference *KserveInference `json:"inference,omitempty"`
-
-	// LLMInference configuration for KServe LLMInferenceService.
-	// It is required when Type is set to "llm_inference"
-	LLMInference *KserveLLMInference `json:"llm_inference,omitempty"`
-
-	// StorageUri the URI of the model storage for KServe
-	// Required. It should follow the format expected by KServe, for example:
-	StorageUri string `json:"storage_uri"`
-
-	// Can be used to specify the protocol version for KServe (e.g., "v1", "v2").
-	// Optional. (default: "v1")
-	APIVersion string `json:"api_version,omitempty" default:"v1"`
-
-	// MinScale minimum number of active replicas (pods) for the service
-	// Optional. (default: 0)
-	MinScale int32 `json:"min_scale,omitempty" default:"0"`
-
-	// MaxScale maximum number of active replicas (pods) for the service
-	// Optional. (default: 1)
-	MaxScale int32 `json:"max_scale,omitempty" default:"1"`
-
-	// CPU cpu limit for the service following the kubernetes format
-	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
-	// Optional. (default: 0.2)
-	CPU string `json:"cpu" default:"0.2"`
-
-	// Memory memory limit for the service following the kubernetes format
-	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
-	// Optional. (default: 256Mi)
-	Memory string `json:"memory" default:"256Mi"`
-
-	// Args command-line arguments to be passed to the container
-	// Optional
-	Args []string `json:"args,omitempty"`
-
-	// Environment variables to be passed to the container
-	// Optional
-	Env map[string]string `json:"env,omitempty"`
-
-	// EnableGPU parameter to request gpu usage in KServe InferenceService
-	// Optional. (default: false)
-	EnableGPU bool `json:"enable_gpu,omitempty" default:"false"`
-
-	// SetAuth parameter to set the authentication for the KServe InferenceService
-	// Optional. (default: true)
-	SetAuth bool `json:"set_auth,omitempty" default:"true"`
+func (s *Service) IsKserve() bool {
+	return s.Kserve != nil
 }
 
-// UnmarshalJSON sets KServe defaults for fields that may be omitted in API requests.
-func (k *Kserve) UnmarshalJSON(data []byte) error {
-	type Alias Kserve
+func (s *Service) IsExposed() bool {
+	return len(s.Expose.APIPort) > 0 && s.Expose.APIPort[0] != 0
+}
 
-	// Set default values for optional fields
+func (s *Service) HasManagedVolume() bool {
+	return s.Volume != nil
+}
+
+func (s *Service) HasFederation() bool {
+	return s.Federation != nil
+}
+
+// UnmarshalJSON custom unmarshal function to set default values for the service
+// Is called when Service is unmarshalled from JSON
+func (s *Service) UnmarshalJSON(data []byte) error {
+	type Alias Service
+
+	// Default values for the Service struct
 	aux := Alias{
-		APIVersion: "v1",
-		CPU:        "0.2",
-		Memory:     "256Mi",
-		SetAuth:    true,
-		MinScale:   0,
-		MaxScale:   1,
-		EnableGPU:  false,
+		IsolationLevel: IsolationLevelService,
+		Visibility:     PRIVATE,
 	}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
-	// Validate required fields
-	if strings.TrimSpace(aux.StorageUri) == "" {
-		return fmt.Errorf("Kserve StorageUri is required")
-	}
-	if strings.TrimSpace(aux.Type) == "" {
-		return fmt.Errorf("Kserve Type is required")
+
+	if strings.TrimSpace(aux.Visibility) == "" {
+		aux.Visibility = PRIVATE
 	}
 
-	*k = Kserve(aux)
+	if strings.TrimSpace(aux.IsolationLevel) == "" {
+		aux.IsolationLevel = IsolationLevelService
+	}
+
+	*s = Service(aux)
 	return nil
 }
 
-type KserveInference struct {
-	// ModelFormat the model format to use for KServe InferenceService
-	// ("onnx", "sklearn", "xgboost", "pytorch", "tensorflow", "triton", "huggingface").
-	ModelFormat string `json:"model_format,omitempty"`
-	// Runtime the KServe runtime to use
-	// Optional.
-	Runtime string `json:"runtime,omitempty"`
-}
+// Validate checks that the service definition is valid and returns an error if not.
+func (s Service) Validate() error {
 
-func (k *KserveInference) UnmarshalJSON(data []byte) error {
-	type Alias KserveInference
-
-	aux := Alias{}
-
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
+	visibility := strings.TrimSpace(s.Visibility)
+	switch visibility {
+	case PRIVATE, PUBLIC, RESTRICTED:
+	default:
+		return fmt.Errorf(
+			"service visibility must be private, public or restricted",
+		)
 	}
 
-	// ModelFormat is required for KServe InferenceService
-	if strings.TrimSpace(aux.ModelFormat) == "" {
-		return fmt.Errorf("Kserve Inference ModelFormat is required")
+	isolationLvl := strings.TrimSpace(s.IsolationLevel)
+	switch isolationLvl {
+	case IsolationLevelUser, IsolationLevelService:
+	default:
+		return fmt.Errorf(
+			"service isolation_level must be %s or %s",
+			IsolationLevelUser, IsolationLevelService,
+		)
 	}
 
-	*k = KserveInference(aux)
+	if strings.TrimSpace(s.Image) == "" && s.Kserve == nil {
+		return fmt.Errorf("service Image is required")
+	}
+
+	if s.IsKserve() {
+		return s.Kserve.Validate()
+	}
+
+	if s.IsExposed() {
+		return s.Expose.Validate()
+	}
+
+	if s.HasManagedVolume() {
+		return s.Volume.Validate()
+	}
+
+	if s.HasFederation() {
+		return s.Federation.Validate()
+	}
+
 	return nil
-}
-
-type KserveLLMInference struct {
-	// At the moment only supported for LLMInferenceService,
-	// the runtime image to use for KServe when IsLLM is true
-	// Optional. (default: a custom image based on vLLM for CPU and another one with GPU support)
-	RuntimeImage string `json:"runtime_image,omitempty"`
 }
 
 // ServiceVolumeConfig stores the requested size and mount path for a managed volume.
@@ -468,6 +435,37 @@ type ServiceVolumeConfig struct {
 	MountPath string `json:"mount_path"`
 	// LifecyclePolicy controls whether a service-created volume is deleted with the creator service.
 	LifecyclePolicy string `json:"lifecycle_policy,omitempty"`
+}
+
+func (svcVol *ServiceVolumeConfig) UnmarshalJSON(data []byte) error {
+	type Alias ServiceVolumeConfig
+
+	// Default values for the ServiceVolumeConfig struct
+	aux := Alias{}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Conditionally set the default lifecycle policy to "delete" if a size is specified but no policy is provided.
+	if strings.TrimSpace(aux.Size) != "" && strings.TrimSpace(aux.LifecyclePolicy) == "" {
+		aux.LifecyclePolicy = "delete"
+	}
+
+	*svcVol = ServiceVolumeConfig(aux)
+	return nil
+}
+
+func (svcVol *ServiceVolumeConfig) Validate() error {
+	if strings.TrimSpace(svcVol.Size) != "" {
+		lifecyclePolicy := strings.TrimSpace(svcVol.LifecyclePolicy)
+		switch lifecyclePolicy {
+		case "delete", "retain":
+		default:
+			return fmt.Errorf("service volume lifecycle_policy must be delete or retain")
+		}
+	}
+	return nil
 }
 
 // ServiceVolumeStatus contains a minimal service-side view of an attached volume.
@@ -490,6 +488,48 @@ type Expose struct {
 	AuthType       string  `json:"auth_type,omitempty" default:"basic" `
 	HealthPath     string  `json:"health_path" default:"/" `
 	ProbeMode      string  `json:"probe_mode,omitempty" default:"legacy" `
+}
+
+func (e *Expose) UnmarshalJSON(data []byte) error {
+	type Alias Expose
+
+	// Default values for the Expose struct
+	aux := Alias{
+		ProbeMode: "legacy",
+		AuthType:  "basic",
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if strings.TrimSpace(aux.ProbeMode) == "" {
+		aux.ProbeMode = "legacy"
+	}
+	if strings.TrimSpace(aux.AuthType) == "" {
+		aux.AuthType = "basic"
+	}
+
+	*e = Expose(aux)
+	return nil
+}
+
+func (e Expose) Validate() error {
+	probeMode := strings.TrimSpace(e.ProbeMode)
+	switch probeMode {
+	case "direct", "legacy":
+	default:
+		return fmt.Errorf("service probe_mode must be legacy or direct")
+	}
+
+	authType := strings.TrimSpace(e.AuthType)
+	switch authType {
+	case "basic", "forward":
+	default:
+		return fmt.Errorf("service auth_type must be basic or forward")
+	}
+
+	return nil
 }
 
 // ToPodSpec returns a k8s podSpec from the Service
