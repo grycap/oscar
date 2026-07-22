@@ -2,7 +2,6 @@ functions:
   oscar:
   - oscar-kserve-y2m:
       name: qwen2-5-05b-instruct
-      image: ubuntu
       kserve:
         type: llm_inference
         llm_inference:

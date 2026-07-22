@@ -349,31 +349,64 @@ func (s *Service) IsKserve() bool {
 	return s.Kserve != nil
 }
 
+func (s *Service) IsExposed() bool {
+	return len(s.Expose.APIPort) > 0 && s.Expose.APIPort[0] != 0
+}
+
+func (s *Service) HasManagedVolume() bool {
+	return s.Volume != nil
+}
+
+func (s *Service) HasFederation() bool {
+	return s.Federation != nil
+}
+
+// UnmarshalJSON custom unmarshal function to set default values for the service
+// Is called when Service is unmarshalled from JSON
 func (s *Service) UnmarshalJSON(data []byte) error {
 	type Alias Service
 
-	aux := Alias{}
+	// Default values for the Service struct
+	aux := Alias{
+		IsolationLevel: IsolationLevelService,
+		Visibility:     PRIVATE,
+	}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 
-	if aux.Visibility == "" {
-		aux.Visibility = "private"
+	if strings.TrimSpace(aux.Visibility) == "" {
+		aux.Visibility = PRIVATE
+	}
+
+	if strings.TrimSpace(aux.IsolationLevel) == "" {
+		aux.IsolationLevel = IsolationLevelService
 	}
 
 	*s = Service(aux)
 	return nil
 }
 
+// Validate checks that the service definition is valid and returns an error if not.
 func (s Service) Validate() error {
 
 	visibility := strings.TrimSpace(s.Visibility)
 	switch visibility {
-	case "private", "public", "restricted":
+	case PRIVATE, PUBLIC, RESTRICTED:
 	default:
 		return fmt.Errorf(
 			"service visibility must be private, public or restricted",
+		)
+	}
+
+	isolationLvl := strings.TrimSpace(s.IsolationLevel)
+	switch isolationLvl {
+	case IsolationLevelUser, IsolationLevelService:
+	default:
+		return fmt.Errorf(
+			"service isolation_level must be %s or %s",
+			IsolationLevelUser, IsolationLevelService,
 		)
 	}
 
@@ -383,6 +416,18 @@ func (s Service) Validate() error {
 
 	if s.IsKserve() {
 		return s.Kserve.Validate()
+	}
+
+	if s.IsExposed() {
+		return s.Expose.Validate()
+	}
+
+	if s.HasManagedVolume() {
+		return s.Volume.Validate()
+	}
+
+	if s.HasFederation() {
+		return s.Federation.Validate()
 	}
 
 	return nil
@@ -398,6 +443,37 @@ type ServiceVolumeConfig struct {
 	MountPath string `json:"mount_path"`
 	// LifecyclePolicy controls whether a service-created volume is deleted with the creator service.
 	LifecyclePolicy string `json:"lifecycle_policy,omitempty"`
+}
+
+func (svcVol *ServiceVolumeConfig) UnmarshalJSON(data []byte) error {
+	type Alias ServiceVolumeConfig
+
+	// Default values for the ServiceVolumeConfig struct
+	aux := Alias{}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Conditionally set the default lifecycle policy to "delete" if a size is specified but no policy is provided.
+	if strings.TrimSpace(aux.Size) != "" && strings.TrimSpace(aux.LifecyclePolicy) == "" {
+		aux.LifecyclePolicy = "delete"
+	}
+
+	*svcVol = ServiceVolumeConfig(aux)
+	return nil
+}
+
+func (svcVol *ServiceVolumeConfig) Validate() error {
+	if strings.TrimSpace(svcVol.Size) != "" {
+		lifecyclePolicy := strings.TrimSpace(svcVol.LifecyclePolicy)
+		switch lifecyclePolicy {
+		case "delete", "retain":
+		default:
+			return fmt.Errorf("service volume lifecycle_policy must be delete or retain")
+		}
+	}
+	return nil
 }
 
 // ServiceVolumeStatus contains a minimal service-side view of an attached volume.
@@ -420,6 +496,48 @@ type Expose struct {
 	AuthType       string  `json:"auth_type,omitempty" default:"basic" `
 	HealthPath     string  `json:"health_path" default:"/" `
 	ProbeMode      string  `json:"probe_mode,omitempty" default:"legacy" `
+}
+
+func (e *Expose) UnmarshalJSON(data []byte) error {
+	type Alias Expose
+
+	// Default values for the Expose struct
+	aux := Alias{
+		ProbeMode: "legacy",
+		AuthType:  "basic",
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if strings.TrimSpace(aux.ProbeMode) == "" {
+		aux.ProbeMode = "legacy"
+	}
+	if strings.TrimSpace(aux.AuthType) == "" {
+		aux.AuthType = "basic"
+	}
+
+	*e = Expose(aux)
+	return nil
+}
+
+func (e Expose) Validate() error {
+	probeMode := strings.TrimSpace(e.ProbeMode)
+	switch probeMode {
+	case "direct", "legacy":
+	default:
+		return fmt.Errorf("service probe_mode must be legacy or direct")
+	}
+
+	authType := strings.TrimSpace(e.AuthType)
+	switch authType {
+	case "basic", "forward":
+	default:
+		return fmt.Errorf("service auth_type must be basic or forward")
+	}
+
+	return nil
 }
 
 // ToPodSpec returns a k8s podSpec from the Service
