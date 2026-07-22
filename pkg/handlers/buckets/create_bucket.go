@@ -33,9 +33,6 @@ import (
 
 const (
 	createPath = "/system/buckets"
-	PRIVATE    = "private"
-	PUBLIC     = "public"
-	RESTRICTED = "restricted"
 )
 
 // Custom logger
@@ -142,7 +139,7 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 		}
 		// If not specified default visibility is PRIVATE
 		if strings.ToLower(bucket.Visibility) == "" {
-			bucket.Visibility = utils.PRIVATE
+			bucket.Visibility = types.PRIVATE
 		}
 
 		if uid != cfg.Name {

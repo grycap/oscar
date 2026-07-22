@@ -94,7 +94,7 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 		bucket.Owner = uid
 		var oldVis string
 		if oldVis = minIOAdminClient.GetCurrentResourceVisibility(bucket); oldVis != "" {
-			if oldVis == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucket.BucketName) {
+			if oldVis == types.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucket.BucketName) {
 				if oldVis != bucket.Visibility {
 					// Remove old policies
 					err := minIOAdminClient.UnsetPolicies(utils.MinIOBucket{
@@ -115,7 +115,7 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 					}
 
 				} else {
-					if oldVis == RESTRICTED {
+					if oldVis == types.RESTRICTED {
 						err = minIOAdminClient.UpdateServiceGroup(bucket.BucketName, bucket.AllowedUsers)
 						if err != nil {
 							c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket:", err))

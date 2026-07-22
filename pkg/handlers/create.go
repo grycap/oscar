@@ -400,7 +400,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			for _, b := range buckets {
 				// If not specified default visibility is PRIVATE
 				if strings.ToLower(service.Visibility) == "" {
-					b.Visibility = utils.PRIVATE
+					b.Visibility = types.PRIVATE
 				}
 				if service.Owner != types.DefaultOwner {
 					err := minIOAdminClient.SetPolicies(b)
@@ -497,7 +497,7 @@ func checkValues(service *types.Service, cfg *types.Config) {
 	}
 	// Check if visibility has been set. If not set default private.
 	if service.Visibility == "" {
-		service.Visibility = utils.PRIVATE
+		service.Visibility = types.PRIVATE
 	}
 
 	// Validate logLevel (Python logging levels for faas-supervisor)
@@ -866,11 +866,11 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				if isAdminUser && visibility == "" {
 					bucketTags, _ := minIOAdminClient.GetTaggedMetadata(splitPath[0])
 					if bucketTags["owner"] == "oscar" || bucketTags["owner"] == "" {
-						visibility = utils.PRIVATE
+						visibility = types.PRIVATE
 					}
 				}
 
-				if visibility != utils.PRIVATE {
+				if visibility != types.PRIVATE {
 					return nil, fmt.Errorf("the bucket \"%s\" must be private to be used as mount", minio.BucketName)
 				} else {
 					err := minIOAdminClient.CreateS3Path(s3Client, splitPath, true)

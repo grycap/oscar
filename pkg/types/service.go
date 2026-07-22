@@ -361,7 +361,7 @@ func (s *Service) UnmarshalJSON(data []byte) error {
 	// Default values for the Service struct
 	aux := Alias{
 		IsolationLevel: IsolationLevelService,
-		Visibility:     "private",
+		Visibility:     PRIVATE,
 	}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -369,7 +369,7 @@ func (s *Service) UnmarshalJSON(data []byte) error {
 	}
 
 	if strings.TrimSpace(aux.Visibility) == "" {
-		aux.Visibility = "private"
+		aux.Visibility = PRIVATE
 	}
 
 	if strings.TrimSpace(aux.IsolationLevel) == "" {
@@ -385,7 +385,7 @@ func (s Service) Validate() error {
 
 	visibility := strings.TrimSpace(s.Visibility)
 	switch visibility {
-	case "private", "public", "restricted":
+	case PRIVATE, PUBLIC, RESTRICTED:
 	default:
 		return fmt.Errorf(
 			"service visibility must be private, public or restricted",

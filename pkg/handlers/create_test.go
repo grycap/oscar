@@ -781,8 +781,8 @@ func TestCheckValuesDefaults(t *testing.T) {
 	if service.CPU != defaultCPU {
 		t.Fatalf("expected default cpu %s, got %s", defaultCPU, service.CPU)
 	}
-	if service.Visibility != utils.PRIVATE {
-		t.Fatalf("expected visibility %s, got %s", utils.PRIVATE, service.Visibility)
+	if service.Visibility != types.PRIVATE {
+		t.Fatalf("expected visibility %s, got %s", types.PRIVATE, service.Visibility)
 	}
 	if service.LogLevel != defaultLogLevel {
 		t.Fatalf("expected log level %s, got %s", defaultLogLevel, service.LogLevel)
