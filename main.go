@@ -182,7 +182,7 @@ func main() {
 		system.PUT("/quotas/user/:userId", handlers.MakeUpdateUserQuotaHandler(*qb, cfg))
 	}
 	// Job path for async invocations
-	r.POST("/job/:serviceName", auth.GetLoggerMiddleware(), handlers.MakeJobHandler(cfg, kubeClientset, back, resMan))
+	r.POST("/job/:serviceName", auth.GetLoggerMiddleware(), handlers.MakeJobHandler(cfg, *qb, back, resMan))
 
 	// Service path for sync invocations (only if ServerlessBackend is enabled)
 	syncBack, ok := back.(types.SyncBackend)

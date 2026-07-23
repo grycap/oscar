@@ -42,6 +42,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -88,7 +89,7 @@ const (
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BearerAuth
 // @Router /job/{serviceName} [post]
-func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back types.ServerlessBackend, rm resourcemanager.ResourceManager) gin.HandlerFunc {
+func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back types.ServerlessBackend, rm resourcemanager.ResourceManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var service *types.Service
 		var podSpec *v1.PodSpec
@@ -184,7 +185,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
 				return
 			}
-			mc := auth.NewMultitenancyConfig(kubeClientset, cfg.OIDCSubject)
+			mc := auth.NewMultitenancyConfig(back.GetKubeClientset(), cfg.OIDCSubject)
 			if !mc.UserExists(uidFromToken) {
 				c.String(http.StatusForbidden, fmt.Sprintf("MinIO user not provisioned for %s; submit a direct request first", uidFromToken))
 				return
@@ -249,7 +250,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		}
 
 		secretName := auth.FormatUID(minIOSecretKey)
-		originSecretName, err := ensureOriginMinIODefaultSecretIfNeeded(c, cfg, service, serviceNamespace, kubeClientset, authHeader)
+		originSecretName, err := ensureOriginMinIODefaultSecretIfNeeded(c, cfg, service, serviceNamespace, back.GetKubeClientset(), authHeader)
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
@@ -257,7 +258,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 		if originSecretName != "" {
 			secretName = originSecretName
 		} else {
-			if err := ensureMinIOSecret(kubeClientset, minIOSecretKey, serviceNamespace); err != nil {
+			if err := ensureMinIOSecret(back.GetKubeClientset(), minIOSecretKey, serviceNamespace); err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", minIOSecretKey, err))
 				return
 			}
@@ -281,7 +282,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			MountPath: MinIODefaultPath,
 		})
 
-		if err := configureDelegatedMinIOProvider(c, serviceNamespace, service, podSpec, kubeClientset, authHeader); err != nil {
+		if err := configureDelegatedMinIOProvider(c, serviceNamespace, service, podSpec, back.GetKubeClientset(), authHeader); err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -360,8 +361,24 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 
 		// Delegate job if can't be scheduled and has defined replicas
 		if rm != nil && service.HasFederationMembers() {
-			if !rm.IsSchedulable(podSpec.Containers[0].Resources) {
+			uid, _ := auth.GetUIDFromContext(c)
+			//Get local quota
+			quota, e := FetchQuota(c.Request.Context(), cfg, backendQuota, uid)
+			localQuota := true
+			if e != nil {
+				fmt.Println(e)
+				localQuota = true
+			} else {
+				//Check for quota availability at the local cluster
+				localQuota = isQuota(quota, service)
+
+			}
+			//Check local resource availability
+			localResource := rm.IsSchedulable(podSpec.Containers[0].Resources)
+
+			if !localResource || !localQuota {
 				authHeader := c.GetHeader("Authorization")
+
 				err := resourcemanager.DelegateJob(service, event.Value, jobUUID, authHeader, resourcemanager.ResourceManagerLogger, cfg, back.GetKubeClientset())
 				if err == nil {
 					// TODO: check if another status code suits better
@@ -421,7 +438,7 @@ func MakeJobHandler(cfg *types.Config, kubeClientset kubernetes.Interface, back 
 			job.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 		}
 
-		_, err = kubeClientset.BatchV1().Jobs(serviceNamespace).Create(context.TODO(), job, metav1.CreateOptions{})
+		_, err = back.GetKubeClientset().BatchV1().Jobs(serviceNamespace).Create(context.TODO(), job, metav1.CreateOptions{})
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
@@ -800,4 +817,27 @@ func getPodSpecNamespace(service *types.Service, cfg *types.Config) (*v1.PodSpec
 		serviceNamespace = cfg.ServicesNamespace
 	}
 	return podSpec, serviceNamespace, nil
+}
+
+func isQuota(quota *types.QuotaResponse, service *types.Service) bool {
+	if quota.Resources["cpu"].Max == 0 || quota.Resources["memory"].Max == 0 {
+		//Quota defined at zero
+		return true
+	}
+	serviceCPU, _ := strconv.ParseFloat(service.CPU, 64)
+	serviceRAM, _ := resource.ParseQuantity(service.Memory)
+
+	quota_cpu_schedulable := float64(quota.Resources["cpu"].Max - quota.Resources["cpu"].Used)
+	dist_cpu_quota := quota_cpu_schedulable - (1000 * serviceCPU)
+
+	quota_mem_schedulable := float64(quota.Resources["memory"].Max - quota.Resources["memory"].Used)
+	dist_mem_quota := quota_mem_schedulable - float64(serviceRAM.Value())
+
+	if dist_cpu_quota >= 0 && dist_mem_quota >= 0 {
+		//Availability quotas in local cluster
+		return true
+	} else {
+		//No Availability quotas in local cluster
+		return false
+	}
 }

@@ -830,6 +830,85 @@ func TestGetProviderInfo(t *testing.T) {
 	}
 }
 
+func TestValidateServiceCreation(t *testing.T) {
+	cfg := &types.Config{
+		KserveEnable:             false,
+		ExposedServicesRouteKind: types.HTTPROUTE,
+	}
+
+	tests := []struct {
+		name    string
+		service types.Service
+		cfg     *types.Config
+		wantErr bool
+	}{
+		{
+			name: "valid non-kserve service",
+			service: types.Service{
+				Name:           "svc",
+				Image:          "img",
+				Visibility:     "public",
+				IsolationLevel: types.IsolationLevelService,
+			},
+			cfg:     cfg,
+			wantErr: false,
+		},
+		{
+			name: "invalid service visibility",
+			service: types.Service{
+				Name:           "svc",
+				Image:          "img",
+				Visibility:     "invalid",
+				IsolationLevel: types.IsolationLevelService,
+			},
+			cfg:     cfg,
+			wantErr: true,
+		},
+		{
+			name: "valid service isolation level",
+			service: types.Service{
+				Name:           "svc",
+				Image:          "img",
+				Visibility:     "public",
+				IsolationLevel: types.IsolationLevelUser,
+			},
+			cfg:     cfg,
+			wantErr: false,
+		},
+		{
+			name: "kserve service when unsupported",
+			service: types.Service{
+				Name:           "svc",
+				IsolationLevel: types.IsolationLevelService,
+				Kserve: &types.Kserve{
+					Type:       types.KserveTypeInferenceService,
+					StorageUri: "s3://model",
+					Inference: &types.KserveInference{
+						ModelFormat: "onnx",
+					},
+				},
+			},
+			cfg: &types.Config{
+				KserveEnable:             false,
+				ExposedServicesRouteKind: types.HTTPROUTE,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateServiceCreation(&tt.service, tt.cfg)
+			if tt.wantErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
 func TestServiceWithSameNameExists(t *testing.T) {
 	tests := []struct {
 		name          string

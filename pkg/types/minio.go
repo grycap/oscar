@@ -42,13 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-const (
-	ALL_USERS_GROUP = "all_users_group"
-	PRIVATE         = "private"
-	RESTRICTED      = "restricted"
-	PUBLIC          = "public"
-)
-
 var (
 	ALL_ACTIONS        = []string{"s3:*"}
 	RESTRICTED_ACTIONS = []string{"s3:ListBucket", "s3:GetObject", "s3:PutObject", "s3:DeleteObject"}
@@ -56,6 +49,13 @@ var (
 
 var minioLogger = log.New(os.Stdout, "[MINIO] ", log.Flags())
 var overlappingError = "An object key name filtering rule defined with overlapping prefixes"
+
+const (
+	ALL_USERS_GROUP = "all_users_group"
+	PRIVATE         = "private"
+	RESTRICTED      = "restricted"
+	PUBLIC          = "public"
+)
 
 // MinIOAdminClient struct to represent a MinIO Admin client to configure webhook notifications
 type MinIOAdminClient struct {
@@ -75,6 +75,37 @@ type MinIOBucket struct {
 	StorageQuota *MinIOQuota       `json:"storage_quota,omitempty"`
 	StorageUsage *MinIOUsage       `json:"storage_usage,omitempty"`
 	Attribution  string            `json:"attribution,omitempty"`
+}
+
+// UnmarshalJSON custom unmarshaller to set default values for MinIOBucket
+// Is called when the MinIOBucket
+func (m *MinIOBucket) UnmarshalJSON(data []byte) error {
+	type Alias MinIOBucket
+
+	aux := Alias{
+		Visibility: PRIVATE,
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	*m = MinIOBucket(aux)
+	return nil
+}
+
+// Validate checks if the MinIOBucket struct has valid values for its fields
+func (m MinIOBucket) Validate() error {
+	visibility := strings.TrimSpace(m.Visibility)
+	switch visibility {
+	case PRIVATE, PUBLIC, RESTRICTED:
+	default:
+		return fmt.Errorf(
+			"bucket visibility must be private, public or restricted",
+		)
+	}
+
+	return nil
 }
 
 // MinIOObject captures object level metadata inside a MinIO bucket

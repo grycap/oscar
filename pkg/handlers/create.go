@@ -78,7 +78,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 		// Validate the service specification (including KServe configuration if present)
-		if err := service.Validate(); err != nil {
+		if err := validateServiceCreation(&service, cfg); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
@@ -280,7 +280,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			service.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 			// At the moment check only for KServe service
-			if service.IsKserve() && utils.IsKserveSupported(cfg) && !utils.VerifyWorkloadByResources(service, cfg) {
+			if service.IsKserve() && !utils.VerifyWorkloadByResources(service, cfg) {
 				if err := utils.DeleteKueueLocalQueue(context.TODO(), cfg, service.Namespace, service.Name); err != nil {
 					createLogger.Printf("Error deleting Kueue local queue: %v", err)
 				}
@@ -322,6 +322,13 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
+		// Set the KSERVE_HOST environment variable for KServe servicescd
+		if service.IsKserve() {
+			if service.Environment.Vars == nil {
+				service.Environment.Vars = make(map[string]string)
+			}
+			service.Environment.Vars["KSERVE_HOST"] = fmt.Sprintf("%s.%s.svc.cluster.local", utils.GetKserveSvcName(service.Name, service.Kserve.Type), service.Namespace)
+		}
 		// Create service
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
@@ -885,6 +892,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				// (cfg.Username in our case, as admin users don't have a UID and are identified by the "owner" tag in MinIO buckets).
 				// (user buckets always carry their UID in the "owner" tag).
 				if isAdminUser && visibility == "" {
+					bucketTags, _ := minIOAdminClient.GetTaggedMetadata(splitPath[0])
 					if bucketTags["owner"] == cfg.Username || bucketTags["owner"] == "" {
 						visibility = types.PRIVATE
 					}
@@ -1036,4 +1044,25 @@ func serviceWithSameNameExists(name string, back types.ServerlessBackend) (bool,
 		}
 	}
 	return len(services) > 0, nil
+}
+
+func getBucketTags(service *types.Service, uid, ownerName, bucketName string) map[string]string {
+	tags := map[string]string{
+		"owner":        uid,
+		"from_service": service.Name,
+		"owner_name":   ownerName,
+	}
+
+	return tags
+}
+
+func validateServiceCreation(service *types.Service, cfg *types.Config) error {
+	// Validate the service specification (including KServe configuration if present)
+	if err := service.Validate(); err != nil {
+		return err
+	}
+	if service.IsKserve() && !utils.IsKserveSupported(cfg) {
+		return fmt.Errorf("KServe is not supported in this OSCAR deployment")
+	}
+	return nil
 }

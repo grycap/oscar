@@ -55,6 +55,10 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
 			return
 		}
+		if err := bucket.Validate(); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
+			return
+		}
 
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
@@ -136,7 +140,7 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 					}
 
 				} else {
-					if oldVis == RESTRICTED {
+					if oldVis == types.RESTRICTED {
 						err = objectStorageIAM.GetClient(c.Request.Context()).UpdateServiceGroup(bucket.BucketName, bucket.AllowedUsers)
 						if err != nil {
 							c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket:", err))

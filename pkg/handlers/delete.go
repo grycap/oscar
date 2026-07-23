@@ -36,8 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
-var ALL_USERS_GROUP = "all_users_group"
-var allUserGroupNotExist = "unable to remove bucket from policy \"" + ALL_USERS_GROUP + "\", policy '" + ALL_USERS_GROUP + "' does not exist"
+var allUserGroupNotExist = "unable to remove bucket from policy \"" + types.ALL_USERS_GROUP + "\", policy '" + types.ALL_USERS_GROUP + "' does not exist"
 var bucketNotExist = "NoSuchBucket: The specified bucket does not exist"
 var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
 
@@ -349,7 +348,7 @@ func deleteObjectStorageBuckets(s3Client *s3.S3, minIOAdminClient *types.MinIOAd
 	var policyName string
 	var isGroup bool
 	if strings.ToLower(bucket.Visibility) == types.PUBLIC {
-		policyName = ALL_USERS_GROUP
+		policyName = types.ALL_USERS_GROUP
 		isGroup = true
 	} else {
 		policyName = bucket.Owner

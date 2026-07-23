@@ -71,7 +71,7 @@ func MakeGetOwnQuotaHandler(qb types.QuotaBackend, cfg *types.Config) gin.Handle
 			writeQuotaError(c, err)
 			return
 		}
-		resp, err := fetchQuota(c.Request.Context(), cfg, qb, uid)
+		resp, err := FetchQuota(c.Request.Context(), cfg, qb, uid)
 		if err != nil {
 			writeQuotaError(c, err)
 			return
@@ -106,7 +106,7 @@ func MakeGetUserQuotaHandler(qb types.QuotaBackend, cfg *types.Config) gin.Handl
 			return
 		}
 
-		resp, err := fetchQuota(c.Request.Context(), cfg, qb, user)
+		resp, err := FetchQuota(c.Request.Context(), cfg, qb, user)
 		if err != nil {
 			writeQuotaError(c, err)
 			return
@@ -158,7 +158,7 @@ func MakeUpdateUserQuotaHandler(qb types.QuotaBackend, cfg *types.Config) gin.Ha
 			writeQuotaError(c, err)
 			return
 		}
-		resp, err := fetchQuota(c.Request.Context(), cfg, qb, user)
+		resp, err := FetchQuota(c.Request.Context(), cfg, qb, user)
 		if err != nil {
 			writeQuotaError(c, err)
 			return
@@ -189,7 +189,7 @@ func writeQuotaError(c *gin.Context, err error) {
 	c.String(http.StatusInternalServerError, err.Error())
 }
 
-func fetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, user string) (*types.QuotaResponse, error) {
+func FetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, user string) (*types.QuotaResponse, error) {
 	resp := &types.QuotaResponse{
 		UserID: user,
 	}

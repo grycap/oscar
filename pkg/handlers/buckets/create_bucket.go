@@ -34,9 +34,6 @@ import (
 
 const (
 	createPath = "/system/buckets"
-	PRIVATE    = "private"
-	PUBLIC     = "public"
-	RESTRICTED = "restricted"
 )
 
 // Custom logger
@@ -63,7 +60,10 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 		if err := c.ShouldBindJSON(&bucket); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
 			return
-
+		}
+		if err := bucket.Validate(); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
+			return
 		}
 		isAdminUser = false
 		uid = cfg.Name
@@ -142,6 +142,10 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error setting bucket quota: %v", err))
 				return
 			}
+		}
+		// If not specified default visibility is PRIVATE
+		if strings.ToLower(bucket.Visibility) == "" {
+			bucket.Visibility = types.PRIVATE
 		}
 		if uid != cfg.Username {
 			if !utils.IsRustFSConfig(cfg) {
