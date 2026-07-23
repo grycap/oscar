@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +15,39 @@ import (
 	"github.com/grycap/oscar/v4/pkg/types"
 	batchv1 "k8s.io/api/batch/v1"
 )
+
+func TestRewriteRustFSEventSource(t *testing.T) {
+	original := []byte(`{"Records":[{"eventSource":"rustfs:s3","s3":{"object":{"key":"input%2Fimage.jpg"}}}],"extra":"preserved"}`)
+	rewritten := rewriteRustFSEventSource(original)
+
+	var event map[string]interface{}
+	if err := json.Unmarshal(rewritten, &event); err != nil {
+		t.Fatalf("decoding rewritten event: %v", err)
+	}
+	record := event["Records"].([]interface{})[0].(map[string]interface{})
+	if record["eventSource"] != "minio:s3" {
+		t.Fatalf("expected minio:s3 event source, got %v", record["eventSource"])
+	}
+	if event["extra"] != "preserved" {
+		t.Fatalf("unrelated event data was not preserved")
+	}
+	object := record["s3"].(map[string]interface{})["object"].(map[string]interface{})
+	if object["key"] != "input%2Fimage.jpg" {
+		t.Fatalf("object key was unexpectedly changed: %v", object["key"])
+	}
+}
+
+func TestRewriteRustFSEventSourceLeavesOtherInputsUnchanged(t *testing.T) {
+	tests := [][]byte{
+		[]byte(`{"Records":[{"eventSource":"minio:s3"}]}`),
+		[]byte(`plain synchronous input`),
+	}
+	for _, input := range tests {
+		if got := rewriteRustFSEventSource(input); string(got) != string(input) {
+			t.Fatalf("expected input to remain unchanged, got %q", got)
+		}
+	}
+}
 
 func TestMakeJobHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()

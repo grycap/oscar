@@ -162,6 +162,20 @@ func TestGetMinIOWebhookARN(t *testing.T) {
 	}
 }
 
+func TestGetObjectStorageWebhookARN(t *testing.T) {
+	tests := map[string]string{
+		"":       "arn:minio:sqs:testregion:testname:webhook",
+		"minio":  "arn:minio:sqs:testregion:testname:webhook",
+		"rustfs": "arn:rustfs:sqs:testregion:testname:webhook",
+		"RUSTFS": "arn:rustfs:sqs:testregion:testname:webhook",
+	}
+	for storageType, expected := range tests {
+		if got := testService.GetObjectStorageWebhookARN(storageType); got != expected {
+			t.Errorf("storage type %q: expected %q, got %q", storageType, expected, got)
+		}
+	}
+}
+
 func TestGetSupervisorPath(t *testing.T) {
 	// Deep copy the testService
 	copy, err := deepcopy.Anything(testService)

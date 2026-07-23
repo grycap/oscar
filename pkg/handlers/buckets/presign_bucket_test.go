@@ -14,7 +14,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/testsupport"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 )
 
 func TestMakePresignHandler_AdminUpload(t *testing.T) {
@@ -192,7 +191,7 @@ func (f *fakeAdminClient) GetTaggedMetadata(bucket string) (map[string]string, e
 	return f.metadata, nil
 }
 
-func (f *fakeAdminClient) GetCurrentResourceVisibility(bucket utils.MinIOBucket) string {
+func (f *fakeAdminClient) GetCurrentResourceVisibility(bucket types.MinIOBucket) string {
 	return f.visibility
 }
 
@@ -212,7 +211,7 @@ func (s *stubPresignAdmin) GetTaggedMetadata(bucket string) (map[string]string, 
 	s.metaCalled = true
 	return map[string]string{"owner": "oscar"}, nil
 }
-func (s *stubPresignAdmin) GetCurrentResourceVisibility(bucket utils.MinIOBucket) string {
+func (s *stubPresignAdmin) GetCurrentResourceVisibility(bucket types.MinIOBucket) string {
 	s.visibilityCalled = true
 	return types.PRIVATE
 }

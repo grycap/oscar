@@ -640,6 +640,16 @@ func (service *Service) GetMinIOWebhookARN() string {
 	return fmt.Sprintf("arn:minio:sqs:%s:%s:webhook", service.StorageProviders.MinIO[DefaultProvider].Region, service.Name)
 }
 
+// GetObjectStorageWebhookARN returns the notification target ARN expected by
+// the selected S3-compatible object storage.
+func (service *Service) GetObjectStorageWebhookARN(objectStorageType string) string {
+	partition := "minio"
+	if strings.EqualFold(strings.TrimSpace(objectStorageType), "rustfs") {
+		partition = "rustfs"
+	}
+	return fmt.Sprintf("arn:%s:sqs:%s:%s:webhook", partition, service.StorageProviders.MinIO[DefaultProvider].Region, service.Name)
+}
+
 func ConvertEnvVars(vars map[string]string) []v1.EnvVar {
 	envVars := []v1.EnvVar{}
 	for k, v := range vars {

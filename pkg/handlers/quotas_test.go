@@ -626,6 +626,12 @@ func TestEnsureKueueQuotasEnabled(t *testing.T) {
 	})
 }
 
+func TestEnsureQuotasEnabledAllowsMinIOOnly(t *testing.T) {
+	if err := ensureQuotasEnabled(&types.Config{MinIOQuotaEnabled: true}); err != nil {
+		t.Fatalf("expected minio-only quotas to be enabled, got %v", err)
+	}
+}
+
 func TestIsMissingKueueAPI(t *testing.T) {
 	tests := []struct {
 		name string

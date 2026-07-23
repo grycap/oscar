@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	objectstorage "github.com/grycap/oscar/v4/pkg/backends/object_storage"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
@@ -166,7 +167,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 
-		minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+		objectStorageIAM, objectStorageIAMErr := objectstorage.MakeObjectStorageIAM(cfg)
 		s3Client := cfg.MinIOProvider.GetS3Client()
 		if newService.IsolationLevel == types.IsolationLevelUser && len(newService.AllowedUsers) > 0 {
 			// new bucket list
@@ -187,9 +188,13 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						// and create it if not
 						if mc != nil && !mc.UserExists(u) {
 							sk, _ := auth.GenerateRandomKey(8)
-							cmuErr := minIOAdminClient.CreateMinIOUser(u, sk)
+							if objectStorageIAMErr != nil {
+								log.Printf("error creating object-storage IAM client: %v", objectStorageIAMErr)
+								continue
+							}
+							cmuErr := objectStorageIAM.CreateUser(c.Request.Context(), u, sk)
 							if cmuErr != nil {
-								log.Printf("error creating MinIO user for user %s: %v", u, cmuErr)
+								log.Printf("error creating object-storage user for user %s: %v", u, cmuErr)
 							}
 							csErr := mc.CreateSecretForOIDC(u, sk)
 							if csErr != nil {
@@ -214,6 +219,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 					if !ownerOnList {
 						newService.AllowedUsers = append(newService.AllowedUsers, uid)
+						newService.BucketList = append(newService.BucketList, splitPath[0]+"-"+uid[:10])
 					}
 					/// Create
 				}
@@ -224,16 +230,16 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			for _, bucket := range oldService.BucketList {
 				if !slices.Contains(newService.BucketList, bucket) {
 					// Disable input notifications for service bucket
-					if err := disableInputNotifications(s3Client, oldService.GetMinIOWebhookARN(), bucket); err != nil {
+					if err := disableInputNotifications(s3Client, oldService.GetObjectStorageWebhookARN(cfg.ObjectStorageType), bucket); err != nil {
 						log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", oldService.Name, err)
 					}
 
-					err := DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+					err := deleteObjectStorageBuckets(s3Client, objectStorageIAM.GetClient(c.Request.Context()), types.MinIOBucket{
 						BucketName:   bucket,
 						Visibility:   types.PRIVATE,
 						AllowedUsers: []string{},
 						Owner:        oldService.Owner,
-					})
+					}, utils.IsRustFSConfig(cfg))
 					if err != nil {
 						log.Printf("error while removing MinIO bucket %v", err)
 					}
@@ -247,8 +253,8 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// Use create buckets function to create new inputs/outputs if needed
-		var newServiceBuckets []utils.MinIOBucket
-		if newServiceBuckets, err = createBuckets(&newService, cfg, minIOAdminClient, true); err != nil {
+		var newServiceBuckets []types.MinIOBucket
+		if newServiceBuckets, err = createBuckets(&newService, cfg, objectStorageIAM.GetClient(c.Request.Context()), true); err != nil {
 			if err == errInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {
@@ -288,11 +294,36 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 		if len(newServiceBuckets) > 0 {
+			ownerName := "oscar"
+			if !isAdminUser {
+				ownerName = auth.GetUserNameFromContext(c)
+				ownerName = utils.RemoveAccents(ownerName)
+			}
 			for _, b := range newServiceBuckets {
+				if strings.ToLower(newService.Visibility) == "" {
+					b.Visibility = types.PRIVATE
+				}
+				if utils.IsRustFSConfig(cfg) {
+					oldTags, _ := objectStorageIAM.GetClient(c.Request.Context()).GetTaggedMetadata(b.BucketName)
+					/*storageQuota := ""
+					if oldTags != nil {
+						storageQuota = oldTags["storage_quota"]
+					}*/
+					tags := utils.BucketTags(b, ownerName)
+					for key, value := range oldTags {
+						if _, reserved := tags[key]; !reserved {
+							tags[key] = value
+						}
+					}
+					if err := objectStorageIAM.GetClient(c.Request.Context()).SetTags(b.BucketName, tags); err != nil {
+						c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
+						return
+					}
+				}
 				if oldServiceBuckets[b.BucketName] {
 					// If the visibility of the bucket has changed remove old policies and config new ones
-					if oldService.Visibility != newService.Visibility {
-						err := minIOAdminClient.UnsetPolicies(utils.MinIOBucket{
+					if oldService.Visibility != newService.Visibility && !utils.IsRustFSConfig(cfg) {
+						err := objectStorageIAM.GetClient(c.Request.Context()).UnsetPolicies(types.MinIOBucket{
 							BucketName:   b.BucketName,
 							AllowedUsers: oldService.AllowedUsers,
 							Visibility:   oldService.Visibility,
@@ -305,13 +336,13 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						if strings.ToLower(newService.Visibility) == "" {
 							b.Visibility = types.PRIVATE
 						}
-						err = minIOAdminClient.SetPolicies(b)
+						err = objectStorageIAM.GetClient(c.Request.Context()).SetPolicies(b)
 						if err != nil {
 							c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 						}
-					} else {
+					} else if !utils.IsRustFSConfig(cfg) {
 						if newService.Visibility == types.RESTRICTED {
-							err := minIOAdminClient.UpdateServiceGroup(b.BucketName, newService.AllowedUsers)
+							err := objectStorageIAM.GetClient(c.Request.Context()).UpdateServiceGroup(b.BucketName, newService.AllowedUsers)
 							if err != nil {
 								c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 							}
@@ -321,12 +352,15 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					oldServiceBuckets[b.BucketName] = false
 				} else {
 					// If the bucket didn't exist on the old service assume its created an set policies & webhooks
-					err := minIOAdminClient.SetPolicies(b)
-					if err != nil {
-						c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+					if !utils.IsRustFSConfig(cfg) {
+						err := objectStorageIAM.GetClient(c.Request.Context()).SetPolicies(b)
+						if err != nil {
+							c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+							return
+						}
 					}
 					// Register minio webhook and restart the server
-					if err = registerMinIOWebhook(newService.Name, newService.Token, newService.StorageProviders.MinIO[types.DefaultProvider], cfg); err != nil {
+					if err = registerMinIOWebhook(newService.Name, newService.Token, cfg); err != nil {
 						uerr := back.UpdateService(*oldService)
 						if uerr != nil {
 							log.Println(uerr.Error())
@@ -340,8 +374,8 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		for key, value := range oldServiceBuckets {
 			// If the bucket was not used in the new service definition set it to private
-			if value {
-				err := minIOAdminClient.SetPolicies(utils.MinIOBucket{BucketName: key, Visibility: types.PRIVATE})
+			if value && !utils.IsRustFSConfig(cfg) {
+				err := objectStorageIAM.GetClient(c.Request.Context()).SetPolicies(types.MinIOBucket{BucketName: key, Visibility: types.PRIVATE})
 				if err != nil {
 					c.String(http.StatusInternalServerError, "error setting new policies: %v", err)
 				}
