@@ -296,6 +296,11 @@ func upsertRoute(service types.Service, namespace string, kubeClientset kubernet
 			return err
 		}
 	}
+	if existsHTTPRouteByName(getDNSHTTPRouteName(service.Name), namespace) {
+		if err := deleteHTTPRoute(getDNSHTTPRouteName(service.Name), namespace); err != nil {
+			return err
+		}
+	}
 
 	if existsTraefikCORSMiddleware(service.Name, namespace) {
 		if err := deleteTraefikCORSMiddleware(getTraefikCORSMiddlewareName(service.Name), namespace); err != nil {
@@ -338,6 +343,11 @@ func deleteRouteResources(serviceName string, namespace string, kubeClientset ku
 
 	if existsHTTPRoute(serviceName, namespace) {
 		if err := deleteHTTPRoute(getHTTPRouteName(serviceName), namespace); err != nil {
+			return err
+		}
+	}
+	if existsHTTPRouteByName(getDNSHTTPRouteName(serviceName), namespace) {
+		if err := deleteHTTPRoute(getDNSHTTPRouteName(serviceName), namespace); err != nil {
 			return err
 		}
 	}
@@ -386,6 +396,9 @@ func validateHTTPRouteConfig(service types.Service, cfg *types.Config) error {
 
 	if strings.TrimSpace(cfg.HTTPRouteGatewayName) == "" {
 		return fmt.Errorf("HTTPROUTE_GATEWAY_NAME must be defined when EXPOSED_SERVICES_ROUTE_KIND=httproute")
+	}
+	if strings.TrimSpace(cfg.IngressHost) == "" {
+		return fmt.Errorf("INGRESS_HOST must be defined when EXPOSED_SERVICES_ROUTE_KIND=httproute")
 	}
 
 	return validateExposeAuthConfig(service, cfg)
@@ -898,9 +911,12 @@ func createHTTPRoute(service types.Service, namespace string, kubeClientset kube
 		return err
 	}
 
-	httpRoute := getHTTPRouteSpec(service, namespace, cfg)
-	_, err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Create(context.TODO(), httpRoute, metav1.CreateOptions{})
-	return err
+	for _, httpRoute := range getHTTPRouteSpecs(service, namespace, cfg) {
+		if _, err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Create(context.TODO(), httpRoute, metav1.CreateOptions{}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func updateHTTPRoute(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
@@ -939,74 +955,88 @@ func updateHTTPRoute(service types.Service, namespace string, kubeClientset kube
 		return err
 	}
 
-	httpRoute := getHTTPRouteSpec(service, namespace, cfg)
-	currentHTTPRoute, err := gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Get(context.TODO(), httpRoute.GetName(), metav1.GetOptions{})
-	if err != nil {
-		return err
+	for _, httpRoute := range getHTTPRouteSpecs(service, namespace, cfg) {
+		currentHTTPRoute, getErr := gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Get(context.TODO(), httpRoute.GetName(), metav1.GetOptions{})
+		if apierrors.IsNotFound(getErr) {
+			if _, err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Create(context.TODO(), httpRoute, metav1.CreateOptions{}); err != nil {
+				return err
+			}
+			continue
+		}
+		if getErr != nil {
+			return getErr
+		}
+		httpRoute.SetResourceVersion(currentHTTPRoute.GetResourceVersion())
+		if _, err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Update(context.TODO(), httpRoute, metav1.UpdateOptions{}); err != nil {
+			return err
+		}
 	}
-	httpRoute.SetResourceVersion(currentHTTPRoute.GetResourceVersion())
-
-	_, err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Update(context.TODO(), httpRoute, metav1.UpdateOptions{})
-	return err
+	return nil
 }
 
 func getHTTPRouteSpec(service types.Service, namespace string, cfg *types.Config) *unstructured.Unstructured {
-	nameHTTPRoute := getHTTPRouteName(service.Name)
-	nameService := getServiceName(service.Name)
-	pathAPI := getAPIPath(service.Name)
+	return getHTTPRoute(service, namespace, cfg, getHTTPRouteName(service.Name), strings.TrimSpace(cfg.IngressHost), getAPIPath(service.Name), false)
+}
 
+func getDNSHTTPRouteSpec(service types.Service, namespace string, cfg *types.Config) *unstructured.Unstructured {
+	host := strings.TrimPrefix(strings.TrimSpace(cfg.IngressHost), "*.")
+	return getHTTPRoute(service, namespace, cfg, getDNSHTTPRouteName(service.Name), service.Name+"."+host, "/", true)
+}
+
+func getHTTPRouteSpecs(service types.Service, namespace string, cfg *types.Config) []*unstructured.Unstructured {
+	return []*unstructured.Unstructured{
+		getHTTPRouteSpec(service, namespace, cfg),
+		getDNSHTTPRouteSpec(service, namespace, cfg),
+	}
+}
+
+func getHTTPRoute(service types.Service, namespace string, cfg *types.Config, name, hostname, path string, dnsRoute bool) *unstructured.Unstructured {
 	rule := map[string]any{
 		"matches": []any{
 			map[string]any{
 				"path": map[string]any{
 					"type":  "PathPrefix",
-					"value": pathAPI,
+					"value": path,
 				},
 			},
 		},
 		"backendRefs": []any{
 			map[string]any{
-				"name": nameService,
+				"name": getServiceName(service.Name),
 				"port": int64(servicePortNumber),
 			},
 		},
 	}
 
-	if !service.Expose.RewriteTarget {
-		rule["filters"] = []any{
-			map[string]any{
-				"type": "URLRewrite",
-				"urlRewrite": map[string]any{
-					"path": map[string]any{
-						"type":               "ReplacePrefixMatch",
-						"replacePrefixMatch": "/",
-					},
-				},
-			},
-			map[string]any{
-				"type": "ExtensionRef",
-				"extensionRef": map[string]any{
-					"group": "traefik.io",
-					"kind":  "Middleware",
-					"name":  getTraefikCORSMiddlewareName(service.Name),
-				},
-			},
+	filters := []any{}
+	if (!dnsRoute && !service.Expose.RewriteTarget) || (dnsRoute && service.Expose.RewriteTarget) {
+		replacement := "/"
+		if dnsRoute {
+			replacement = getAPIPath(service.Name)
 		}
-	} else {
-		rule["filters"] = []any{
-			map[string]any{
-				"type": "ExtensionRef",
-				"extensionRef": map[string]any{
-					"group": "traefik.io",
-					"kind":  "Middleware",
-					"name":  getTraefikCORSMiddlewareName(service.Name),
+		filters = append(filters, map[string]any{
+			"type": "URLRewrite",
+			"urlRewrite": map[string]any{
+				"path": map[string]any{
+					"type":               "ReplacePrefixMatch",
+					"replacePrefixMatch": replacement,
 				},
 			},
-		}
+		})
 	}
+	filters = append(filters,
+		map[string]any{
+			"type": "ExtensionRef",
+			"extensionRef": map[string]any{
+				"group": "traefik.io",
+				"kind":  "Middleware",
+				"name":  getTraefikCORSMiddlewareName(service.Name),
+			},
+		},
+	)
+	rule["filters"] = filters
 
 	if service.Expose.SetAuth {
-		filters, _ := rule["filters"].([]any)
 		filters = append(filters, map[string]any{
 			"type": "ExtensionRef",
 			"extensionRef": map[string]any{
@@ -1022,10 +1052,7 @@ func getHTTPRouteSpec(service types.Service, namespace string, cfg *types.Config
 		"rules": []any{rule},
 	}
 
-	host := strings.TrimSpace(cfg.IngressHost)
-	if host != "" {
-		spec["hostnames"] = []any{host}
-	}
+	spec["hostnames"] = []any{hostname}
 
 	parentRef := map[string]any{
 		"group": "gateway.networking.k8s.io",
@@ -1043,7 +1070,7 @@ func getHTTPRouteSpec(service types.Service, namespace string, cfg *types.Config
 		"apiVersion": "gateway.networking.k8s.io/v1",
 		"kind":       "HTTPRoute",
 		"metadata": map[string]any{
-			"name":      nameHTTPRoute,
+			"name":      name,
 			"namespace": namespace,
 		},
 		"spec": spec,
@@ -1470,12 +1497,16 @@ func existsIngress(serviceName string, namespace string, kubeClientset kubernete
 }
 
 func existsHTTPRoute(serviceName string, namespace string) bool {
+	return existsHTTPRouteByName(getHTTPRouteName(serviceName), namespace)
+}
+
+func existsHTTPRouteByName(name string, namespace string) bool {
 	gatewayClientset, err := gatewayClientsetProvider()
 	if err != nil {
 		return false
 	}
 
-	_, err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Get(context.TODO(), getHTTPRouteName(serviceName), metav1.GetOptions{})
+	_, err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	return err == nil
 }
 
@@ -1491,6 +1522,10 @@ func getIngressName(name_container string) string {
 
 func getHTTPRouteName(name_container string) string {
 	return name_container + "-route"
+}
+
+func getDNSHTTPRouteName(name_container string) string {
+	return name_container + "-dns-route"
 }
 
 func getTraefikCORSMiddlewareName(name_container string) string {

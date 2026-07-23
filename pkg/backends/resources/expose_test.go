@@ -257,6 +257,9 @@ func TestCreateExposeHTTPRouteWithAuth(t *testing.T) {
 	if !existsHTTPRoute(svc.Name, svc.Namespace) {
 		t.Fatalf("expected httproute to exist")
 	}
+	if !existsHTTPRouteByName(getDNSHTTPRouteName(svc.Name), svc.Namespace) {
+		t.Fatalf("expected DNS httproute to exist")
+	}
 
 	if existsIngress(svc.Name, svc.Namespace, client) {
 		t.Fatalf("expected no ingress to be created when route kind is httproute")
@@ -285,6 +288,7 @@ func TestCreateExposeHTTPRouteWithoutAuth(t *testing.T) {
 	cfg := newTestConfig()
 	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 	cfg.HTTPRouteGatewayName = "public-gateway"
+	cfg.IngressHost = "example.org"
 
 	svc := newExposeService("httproute-no-auth", 0, false)
 	svc.Namespace = cfg.ServicesNamespace
@@ -296,6 +300,9 @@ func TestCreateExposeHTTPRouteWithoutAuth(t *testing.T) {
 
 	if !existsHTTPRoute(svc.Name, svc.Namespace) {
 		t.Fatalf("expected httproute to exist")
+	}
+	if !existsHTTPRouteByName(getDNSHTTPRouteName(svc.Name), svc.Namespace) {
+		t.Fatalf("expected DNS httproute to exist")
 	}
 
 	if !existsTraefikCORSMiddleware(svc.Name, svc.Namespace) {
@@ -596,8 +603,9 @@ func TestGetHTTPRouteSpec(t *testing.T) {
 		t.Fatalf("expected hostnames in httproute spec")
 	}
 
-	if len(hostnames) != 1 || hostnames[0] != cfg.IngressHost {
-		t.Fatalf("expected host %s", cfg.IngressHost)
+	expectedHostname := cfg.IngressHost
+	if len(hostnames) != 1 || hostnames[0] != expectedHostname {
+		t.Fatalf("expected host %s", expectedHostname)
 	}
 
 	rules, found, err := unstructured.NestedSlice(httpRoute.Object, "spec", "rules")
@@ -612,6 +620,15 @@ func TestGetHTTPRouteSpec(t *testing.T) {
 	rule, ok := rules[0].(map[string]any)
 	if !ok {
 		t.Fatalf("expected rule to be a map")
+	}
+	matches, ok := rule["matches"].([]any)
+	if !ok || len(matches) != 1 {
+		t.Fatalf("expected one path match")
+	}
+	match := matches[0].(map[string]any)
+	path := match["path"].(map[string]any)
+	if path["value"] != getAPIPath(svc.Name) {
+		t.Fatalf("expected service API path match, got %v", path["value"])
 	}
 
 	backendRefs, ok := rule["backendRefs"].([]any)
@@ -630,16 +647,12 @@ func TestGetHTTPRouteSpec(t *testing.T) {
 
 	filters, ok := rule["filters"].([]any)
 	if !ok || len(filters) != 2 {
-		t.Fatalf("expected rewrite and extensionRef filters for non rewrite_target mode")
+		t.Fatalf("expected rewrite and CORS extensionRef filters")
 	}
 
 	filter, ok := filters[0].(map[string]any)
-	if !ok {
-		t.Fatalf("expected filter to be a map")
-	}
-
-	if filter["type"] != "URLRewrite" {
-		t.Fatalf("expected URLRewrite filter, got %v", filter["type"])
+	if !ok || filter["type"] != "URLRewrite" {
+		t.Fatalf("expected URLRewrite filter, got %v", filters[0])
 	}
 
 	filter, ok = filters[1].(map[string]any)
@@ -661,6 +674,51 @@ func TestGetHTTPRouteSpec(t *testing.T) {
 	}
 }
 
+func TestGetDNSHTTPRouteSpec(t *testing.T) {
+	cfg := newTestConfig()
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
+	cfg.IngressHost = "*.example.org"
+	cfg.HTTPRouteGatewayName = "public-gateway"
+
+	svc := newExposeService("dns-service", 0, false)
+	httpRoute := getDNSHTTPRouteSpec(svc, cfg.ServicesNamespace, cfg)
+
+	if httpRoute.GetName() != getDNSHTTPRouteName(svc.Name) {
+		t.Fatalf("expected DNS httproute name %s, got %s", getDNSHTTPRouteName(svc.Name), httpRoute.GetName())
+	}
+
+	hostnames, found, err := unstructured.NestedSlice(httpRoute.Object, "spec", "hostnames")
+	if err != nil || !found || len(hostnames) != 1 || hostnames[0] != svc.Name+".example.org" {
+		t.Fatalf("unexpected DNS httproute hostnames: %v", hostnames)
+	}
+
+	rules, found, err := unstructured.NestedSlice(httpRoute.Object, "spec", "rules")
+	if err != nil || !found || len(rules) != 1 {
+		t.Fatalf("expected one DNS httproute rule")
+	}
+	rule := rules[0].(map[string]any)
+	match := rule["matches"].([]any)[0].(map[string]any)
+	path := match["path"].(map[string]any)
+	if path["value"] != "/" {
+		t.Fatalf("expected DNS root path match, got %v", path["value"])
+	}
+
+	filters := rule["filters"].([]any)
+	if len(filters) != 1 || filters[0].(map[string]any)["type"] != "ExtensionRef" {
+		t.Fatalf("expected only CORS filter for default DNS route, got %v", filters)
+	}
+
+	svc.Expose.RewriteTarget = true
+	httpRoute = getDNSHTTPRouteSpec(svc, cfg.ServicesNamespace, cfg)
+	rules, _, _ = unstructured.NestedSlice(httpRoute.Object, "spec", "rules")
+	filters = rules[0].(map[string]any)["filters"].([]any)
+	rewrite := filters[0].(map[string]any)
+	rewritePath := rewrite["urlRewrite"].(map[string]any)["path"].(map[string]any)
+	if rewrite["type"] != "URLRewrite" || rewritePath["replacePrefixMatch"] != getAPIPath(svc.Name) {
+		t.Fatalf("expected DNS route to restore the service API path when rewrite_target is enabled, got %v", rewrite)
+	}
+}
+
 func TestValidateHTTPRouteConfig(t *testing.T) {
 	svc := newExposeService("validation", 0, false)
 	cfg := newTestConfig()
@@ -671,6 +729,10 @@ func TestValidateHTTPRouteConfig(t *testing.T) {
 	}
 
 	cfg.HTTPRouteGatewayName = "public-gateway"
+	if err := validateHTTPRouteConfig(svc, cfg); err == nil {
+		t.Fatalf("expected error when INGRESS_HOST is empty")
+	}
+	cfg.IngressHost = "example.org"
 	svc.Expose.SetAuth = true
 	if err := validateHTTPRouteConfig(svc, cfg); err != nil {
 		t.Fatalf("expected set_auth to be valid with httproute, got: %v", err)
@@ -697,6 +759,7 @@ func TestGetHTTPRouteSpecWithAuth(t *testing.T) {
 	cfg := newTestConfig()
 	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 	cfg.HTTPRouteGatewayName = "public-gateway"
+	cfg.IngressHost = "example.org"
 
 	svc := newExposeService("http-route-auth", 0, true)
 	httpRoute := getHTTPRouteSpec(svc, cfg.ServicesNamespace, cfg)
@@ -842,6 +905,7 @@ func TestUpdateHTTPRouteSetsResourceVersion(t *testing.T) {
 	cfg := newTestConfig()
 	cfg.ExposedServicesRouteKind = routeKindHTTPRoute
 	cfg.HTTPRouteGatewayName = "public-gateway"
+	cfg.IngressHost = "example.org"
 
 	svc := newExposeService("httproute-update-rv", 0, false)
 	namespace := cfg.ServicesNamespace
