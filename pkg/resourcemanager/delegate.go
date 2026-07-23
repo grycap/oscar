@@ -83,51 +83,6 @@ type JobStatus struct {
 }
 type JobStatuses map[string]JobStatus
 
-type QuotaResponse struct {
-	UserID       string                 `json:"user_id"`
-	ClusterQueue string                 `json:"cluster_queue,omitempty"`
-	Resources    map[string]QuotaValues `json:"resources,omitempty"`
-	Volumes      *VolumeQuotaResponse   `json:"volumes,omitempty"`
-	MinIO        *MinIOQuotaResponse    `json:"minio,omitempty"`
-}
-
-type QuotaValues struct {
-	Max  int64 `json:"max"`
-	Used int64 `json:"used"`
-}
-
-type VolumeQuotaResponse struct {
-	// Disk contains the user-visible storage quota for OSCAR-managed volumes.
-	Disk VolumeQuotaValues `json:"disk"`
-	// Volumes contains the user-visible count quota for OSCAR-managed volumes.
-	Volumes          VolumeQuotaValues `json:"volumes"`
-	MaxDiskperVolume string            `json:"max_disk_per_volume"`
-	MinDiskperVolume string            `json:"min_disk_per_volume"`
-}
-
-type VolumeQuotaValues struct {
-	Max  string `json:"max"`
-	Used string `json:"used"`
-}
-type MinIOQuotaResponse struct {
-	Buckets          MinIOBucketCountQuota      `json:"buckets"`
-	StoragePerBucket MinIOStoragePerBucketQuota `json:"storage_per_bucket"`
-	StorageTotal     MinIOStorageTotalUsage     `json:"storage_total"`
-}
-
-type MinIOBucketCountQuota struct {
-	Max  int64 `json:"max"`
-	Used int64 `json:"used"`
-}
-
-type MinIOStoragePerBucketQuota struct {
-	Max string `json:"max"`
-}
-
-type MinIOStorageTotalUsage struct {
-	Used string `json:"used"`
-}
-
 // Function to execute TOPSIS method
 // Normalizes a column by dividing each value by the square root of the sum of squares.
 func normalizeMatrix(matrix [][]float64) [][]float64 {
@@ -857,7 +812,7 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 	for id, replica := range replicas {
 		// Manage if replica.Type is "oscar"
 		if strings.ToLower(replica.Type) == oscarReplicaType {
-			var quotaResp QuotaResponse
+			var quotaResp types.QuotaResponse
 			// Check ClusterID is defined in 'Clusters'
 			cluster, ok := service.Clusters[replica.ClusterID]
 			if !ok {
