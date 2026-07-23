@@ -344,7 +344,7 @@ func TestFetchQuotaIncludesVolumeQuotas(t *testing.T) {
 		},
 	)
 
-	resp, err := fetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
+	resp, err := FetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
 	if err != nil {
 		t.Fatalf("unexpected fetchQuota error: %v", err)
 	}
@@ -377,7 +377,7 @@ func TestFetchQuotaIncludesMinIOQuotas(t *testing.T) {
 		},
 	)
 
-	resp, err := fetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
+	resp, err := FetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
 	if err != nil {
 		t.Fatalf("unexpected fetchQuota error: %v", err)
 	}
@@ -398,7 +398,7 @@ func TestFetchQuotaIncludesUnsetMinIOQuotas(t *testing.T) {
 	namespace := utils.BuildUserNamespace(cfg, user)
 	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})
 
-	resp, err := fetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
+	resp, err := FetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
 	if err != nil {
 		t.Fatalf("unexpected fetchQuota error: %v", err)
 	}
@@ -443,8 +443,8 @@ func TestFetchQuotaCountsMinIOBucketsWithoutConfiguredLimit(t *testing.T) {
 	defer server.Close()
 
 	cfg := &types.Config{
-		ServicesNamespace:  "oscar-svc",
-		MinIOQuotaEnabled:  true,
+		ServicesNamespace: "oscar-svc",
+		MinIOQuotaEnabled: true,
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
 			Region:    "us-east-1",
@@ -456,7 +456,7 @@ func TestFetchQuotaCountsMinIOBucketsWithoutConfiguredLimit(t *testing.T) {
 	namespace := utils.BuildUserNamespace(cfg, user)
 	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})
 
-	resp, err := fetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
+	resp, err := FetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
 	if err != nil {
 		t.Fatalf("unexpected fetchQuota error: %v", err)
 	}
@@ -599,7 +599,7 @@ func TestUpdateVolumeQuotaStoresUserVisibleDiskQuota(t *testing.T) {
 		t.Fatalf("expected raw volume quota to include non-managed PVC count, got %s", rawVolumes.String())
 	}
 
-	resp, err := fetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
+	resp, err := FetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
 	if err != nil {
 		t.Fatalf("unexpected fetchQuota error: %v", err)
 	}
