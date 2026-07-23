@@ -113,7 +113,7 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 			path := *b.Name
 			bucketVisibility := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: *b.Name, Owner: uid})
 			metadata, err := minIOAdminClient.GetTaggedMetadata(path)
-			if bucketVisibility == utils.PRIVATE {
+			if bucketVisibility == types.PRIVATE {
 				bowner = uid
 			} else {
 				if err != nil {
@@ -122,7 +122,7 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 					bowner = metadata["owner"]
 				}
 			}
-			if bucketVisibility == utils.RESTRICTED {
+			if bucketVisibility == types.RESTRICTED {
 				members, err := minIOAdminClient.GetBucketMembers(path)
 				if err != nil {
 					fmt.Printf("WARNING: Couldn't get bucket owner info: %v\n", err)

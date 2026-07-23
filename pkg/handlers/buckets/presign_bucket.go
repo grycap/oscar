@@ -185,11 +185,11 @@ func MakePresignHandler(cfg *types.Config) gin.HandlerFunc {
 			allowed := requester == owner
 			if !allowed {
 				switch visibility {
-				case utils.PUBLIC:
+				case types.PUBLIC:
 					allowed = true
-				case utils.PRIVATE:
+				case types.PRIVATE:
 					allowed = adminClient.ResourceInPolicy(requester, bucketName)
-				case utils.RESTRICTED:
+				case types.RESTRICTED:
 					if adminClient.ResourceInPolicy(requester, bucketName) {
 						allowed = true
 					} else {

@@ -31,7 +31,6 @@ import (
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
 )
 
-var ALL_USERS_GROUP = "all_users_group"
 var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
 
 // MakeDeleteHandler godoc

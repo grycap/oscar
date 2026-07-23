@@ -54,6 +54,10 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
 			return
 		}
+		if err := bucket.Validate(); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
+			return
+		}
 
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
@@ -90,7 +94,7 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 		bucket.Owner = uid
 		var oldVis string
 		if oldVis = minIOAdminClient.GetCurrentResourceVisibility(bucket); oldVis != "" {
-			if oldVis == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucket.BucketName) {
+			if oldVis == types.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucket.BucketName) {
 				if oldVis != bucket.Visibility {
 					// Remove old policies
 					err := minIOAdminClient.UnsetPolicies(utils.MinIOBucket{
@@ -111,7 +115,7 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 					}
 
 				} else {
-					if oldVis == RESTRICTED {
+					if oldVis == types.RESTRICTED {
 						err = minIOAdminClient.UpdateServiceGroup(bucket.BucketName, bucket.AllowedUsers)
 						if err != nil {
 							c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket:", err))

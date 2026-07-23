@@ -539,7 +539,7 @@ deployMetrics(){
     echo -e "\n[*] Deploying Prometheus ..."
     helm repo add --force-update prometheus-community https://prometheus-community.github.io/helm-charts
     helm repo update
-    helm upgrade --install prometheus prometheus-community/prometheus \
+    helm upgrade --install prometheus-operator prometheus-community/kube-prometheus-stack \
         --namespace monitoring \
         --set server.service.type=ClusterIP \
         --set server.persistentVolume.storageClass=nfs \
@@ -1097,8 +1097,15 @@ fi
 if [ "$ENABLE_METRICS" == "true" ]; then
     echo -e "\n[*] Configuring OSCAR to use Prometheus and Loki ..."
     if ! kubectl -n oscar set env deployment/oscar \
-        PROMETHEUS_URL="http://prometheus-server.monitoring.svc.cluster.local" \
-        LOKI_URL="http://loki-gateway.monitoring.svc.cluster.local"; then
+        PROMETHEUS_URL="http://prometheus-operator-kube-p-prometheus.monitoring.svc.cluster.local:9090" \
+        LOKI_URL="http://loki-gateway.monitoring.svc.cluster.local" \
+        LOKI_QUERY="{namespace=\"oscar\"}" \
+        LOKI_EXPOSED_QUERY="{app=\"traefik\"}" \
+        LOKI_EXPOSED_NAMESPACE="traefik" \
+        LOKI_EXPOSED_APP_LABEL="traefik" \
+        EXPOSED_SERVICES_ROUTE_KIND="httproute" \
+        HTTPROUTE_GATEWAY_NAME="traefik-gateway" \
+        HTTPROUTE_GATEWAY_NAMESPACE="traefik"; then
         echo -e "$RED[!]$END_COLOR Failed to configure OSCAR metrics endpoints"
     fi
 fi
