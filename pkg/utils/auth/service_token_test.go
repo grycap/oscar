@@ -315,6 +315,15 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			if back.listServicesByNameCalled != tt.wantLookup {
 				t.Errorf("expected ListServicesByName called = %v, got %v", tt.wantLookup, back.listServicesByNameCalled)
 			}
+			if tt.wantServiceTokenCtx {
+				cookies := resp.Result().Cookies()
+				if len(cookies) != 1 {
+					t.Fatalf("expected one service token cookie, got %d", len(cookies))
+				}
+				if cookies[0].Path != "/" {
+					t.Fatalf("expected service token cookie path /, got %q", cookies[0].Path)
+				}
+			}
 		})
 	}
 }

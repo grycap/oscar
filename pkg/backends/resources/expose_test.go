@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/grycap/oscar/v4/pkg/types"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -257,8 +258,8 @@ func TestCreateExposeHTTPRouteWithAuth(t *testing.T) {
 	if !existsHTTPRoute(svc.Name, svc.Namespace) {
 		t.Fatalf("expected httproute to exist")
 	}
-	if !existsHTTPRouteByName(getDNSHTTPRouteName(svc.Name), svc.Namespace) {
-		t.Fatalf("expected DNS httproute to exist")
+	if existsHTTPRouteByName(getDNSHTTPRouteName(svc.Name), svc.Namespace) {
+		t.Fatalf("expected no additional legacy DNS httproute")
 	}
 
 	if existsIngress(svc.Name, svc.Namespace, client) {
@@ -301,8 +302,8 @@ func TestCreateExposeHTTPRouteWithoutAuth(t *testing.T) {
 	if !existsHTTPRoute(svc.Name, svc.Namespace) {
 		t.Fatalf("expected httproute to exist")
 	}
-	if !existsHTTPRouteByName(getDNSHTTPRouteName(svc.Name), svc.Namespace) {
-		t.Fatalf("expected DNS httproute to exist")
+	if existsHTTPRouteByName(getDNSHTTPRouteName(svc.Name), svc.Namespace) {
+		t.Fatalf("expected no additional legacy DNS httproute")
 	}
 
 	if !existsTraefikCORSMiddleware(svc.Name, svc.Namespace) {
@@ -638,7 +639,7 @@ func TestGetHTTPRouteSpec(t *testing.T) {
 		t.Fatalf("expected hostnames in httproute spec")
 	}
 
-	expectedHostname := cfg.IngressHost
+	expectedHostname := svc.Name + "." + cfg.IngressHost
 	if len(hostnames) != 1 || hostnames[0] != expectedHostname {
 		t.Fatalf("expected host %s", expectedHostname)
 	}
@@ -662,8 +663,8 @@ func TestGetHTTPRouteSpec(t *testing.T) {
 	}
 	match := matches[0].(map[string]any)
 	path := match["path"].(map[string]any)
-	if path["value"] != getAPIPath(svc.Name) {
-		t.Fatalf("expected service API path match, got %v", path["value"])
+	if path["value"] != "/" {
+		t.Fatalf("expected root path match, got %v", path["value"])
 	}
 
 	backendRefs, ok := rule["backendRefs"].([]any)
@@ -681,16 +682,11 @@ func TestGetHTTPRouteSpec(t *testing.T) {
 	}
 
 	filters, ok := rule["filters"].([]any)
-	if !ok || len(filters) != 2 {
-		t.Fatalf("expected rewrite and CORS extensionRef filters")
+	if !ok || len(filters) != 1 {
+		t.Fatalf("expected only the CORS extensionRef filter")
 	}
 
 	filter, ok := filters[0].(map[string]any)
-	if !ok || filter["type"] != "URLRewrite" {
-		t.Fatalf("expected URLRewrite filter, got %v", filters[0])
-	}
-
-	filter, ok = filters[1].(map[string]any)
 	if !ok {
 		t.Fatalf("expected extensionRef filter to be a map")
 	}
@@ -709,17 +705,17 @@ func TestGetHTTPRouteSpec(t *testing.T) {
 	}
 }
 
-func TestGetDNSHTTPRouteSpec(t *testing.T) {
+func TestGetHTTPRouteSpecNormalizesWildcardHost(t *testing.T) {
 	cfg := newTestConfig()
 	cfg.ExposedServicesRouteKind = types.HTTPROUTE
 	cfg.IngressHost = "*.example.org"
 	cfg.HTTPRouteGatewayName = "public-gateway"
 
 	svc := newExposeService("dns-service", 0, false)
-	httpRoute := getDNSHTTPRouteSpec(svc, cfg.ServicesNamespace, cfg)
+	httpRoute := getHTTPRouteSpec(svc, cfg.ServicesNamespace, cfg)
 
-	if httpRoute.GetName() != getDNSHTTPRouteName(svc.Name) {
-		t.Fatalf("expected DNS httproute name %s, got %s", getDNSHTTPRouteName(svc.Name), httpRoute.GetName())
+	if httpRoute.GetName() != getHTTPRouteName(svc.Name) {
+		t.Fatalf("expected httproute name %s, got %s", getHTTPRouteName(svc.Name), httpRoute.GetName())
 	}
 
 	hostnames, found, err := unstructured.NestedSlice(httpRoute.Object, "spec", "hostnames")
@@ -744,11 +740,11 @@ func TestGetDNSHTTPRouteSpec(t *testing.T) {
 	}
 
 	svc.Expose.RewriteTarget = true
-	httpRoute = getDNSHTTPRouteSpec(svc, cfg.ServicesNamespace, cfg)
+	httpRoute = getHTTPRouteSpec(svc, cfg.ServicesNamespace, cfg)
 	rules, _, _ = unstructured.NestedSlice(httpRoute.Object, "spec", "rules")
 	filters = rules[0].(map[string]any)["filters"].([]any)
 	if len(filters) != 1 || filters[0].(map[string]any)["type"] != "ExtensionRef" {
-		t.Fatalf("expected DNS route to preserve the root path when rewrite_target is enabled, got %v", filters)
+		t.Fatalf("expected HTTPRoute to preserve the root path when rewrite_target is enabled, got %v", filters)
 	}
 }
 
@@ -808,11 +804,11 @@ func TestGetHTTPRouteSpecWithAuth(t *testing.T) {
 	}
 
 	filters, ok := rule["filters"].([]any)
-	if !ok || len(filters) != 3 {
-		t.Fatalf("expected URLRewrite + CORS + Auth filters, got %v", rule["filters"])
+	if !ok || len(filters) != 2 {
+		t.Fatalf("expected CORS + Auth filters, got %v", rule["filters"])
 	}
 
-	authFilter, ok := filters[2].(map[string]any)
+	authFilter, ok := filters[1].(map[string]any)
 	if !ok {
 		t.Fatalf("expected auth filter map")
 	}
@@ -972,6 +968,36 @@ func TestUpdateHTTPRouteSetsResourceVersion(t *testing.T) {
 	}
 }
 
+func TestUpdateHTTPRouteMigratesAdditionalDNSRoute(t *testing.T) {
+	cfg := newTestConfig()
+	cfg.ExposedServicesRouteKind = routeKindHTTPRoute
+	cfg.HTTPRouteGatewayName = "public-gateway"
+	cfg.IngressHost = "example.org"
+
+	svc := newExposeService("httproute-migration", 0, false)
+	namespace := cfg.ServicesNamespace
+
+	oldDNSRoute := getHTTPRouteSpec(svc, namespace, cfg)
+	oldDNSRoute.SetName(getDNSHTTPRouteName(svc.Name))
+	gatewayClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), oldDNSRoute)
+	useGatewayClient(t, gatewayClient)
+
+	if err := updateHTTPRoute(svc, namespace, fake.NewSimpleClientset(), cfg); err != nil {
+		t.Fatalf("updateHTTPRoute returned error: %v", err)
+	}
+
+	if _, err := gatewayClient.Resource(httpRouteGVR).Namespace(namespace).Get(
+		context.TODO(), getHTTPRouteName(svc.Name), metav1.GetOptions{},
+	); err != nil {
+		t.Fatalf("expected canonical DNS httproute to be created: %v", err)
+	}
+	if _, err := gatewayClient.Resource(httpRouteGVR).Namespace(namespace).Get(
+		context.TODO(), getDNSHTTPRouteName(svc.Name), metav1.GetOptions{},
+	); !apierrors.IsNotFound(err) {
+		t.Fatalf("expected additional DNS httproute to be removed, got: %v", err)
+	}
+}
+
 func TestGetTraefikAuthMiddlewareSpec(t *testing.T) {
 	cfg := newTestConfig()
 	svc := newExposeService("auth-svc", 0, true)
@@ -1015,6 +1041,49 @@ func TestGetTraefikAuthMiddlewareSpecForward(t *testing.T) {
 
 	if cookies[0] != getServiceAuthCookieName(svc.Name) {
 		t.Fatalf("expected auth cookie %s, got %s", getServiceAuthCookieName(svc.Name), cookies[0])
+	}
+}
+
+func TestReconcileTraefikExposeResourcesAuthTransitions(t *testing.T) {
+	cfg := newTestConfig()
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
+	svc := newExposeService("auth-transition", 0, true)
+	namespace := cfg.ServicesNamespace
+	kubeClient := fake.NewSimpleClientset()
+	gatewayClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+	useGatewayClient(t, gatewayClient)
+
+	if err := reconcileTraefikExposeResources(svc, namespace, kubeClient, cfg); err != nil {
+		t.Fatalf("failed to reconcile basic auth resources: %v", err)
+	}
+	if !existsTraefikAuthSecret(svc.Name, namespace, kubeClient) {
+		t.Fatal("expected basic auth secret")
+	}
+
+	svc.Expose.AuthType = authTypeForward
+	if err := reconcileTraefikExposeResources(svc, namespace, kubeClient, cfg); err != nil {
+		t.Fatalf("failed to reconcile forward auth resources: %v", err)
+	}
+	if existsTraefikAuthSecret(svc.Name, namespace, kubeClient) {
+		t.Fatal("expected basic auth secret to be removed after switching to forward auth")
+	}
+
+	middleware, err := gatewayClient.Resource(traefikMiddlewareGVR).Namespace(namespace).Get(
+		context.TODO(), getTraefikAuthMiddlewareName(svc.Name), metav1.GetOptions{},
+	)
+	if err != nil {
+		t.Fatalf("expected forward auth middleware: %v", err)
+	}
+	if _, found, err := unstructured.NestedMap(middleware.Object, "spec", "forwardAuth"); err != nil || !found {
+		t.Fatalf("expected forwardAuth middleware spec, found=%t err=%v", found, err)
+	}
+
+	svc.Expose.SetAuth = false
+	if err := reconcileTraefikExposeResources(svc, namespace, kubeClient, cfg); err != nil {
+		t.Fatalf("failed to disable auth resources: %v", err)
+	}
+	if existsTraefikAuthMiddleware(svc.Name, namespace) {
+		t.Fatal("expected auth middleware to be removed when auth is disabled")
 	}
 }
 

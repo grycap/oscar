@@ -480,6 +480,33 @@ func TestGetExposedBasePath(t *testing.T) {
 	}
 }
 
+func TestUsesDNSRoute(t *testing.T) {
+	httpRouteConfig := &Config{ExposedServicesRouteKind: HTTPROUTE}
+	ingressConfig := &Config{ExposedServicesRouteKind: Ingress}
+
+	tests := []struct {
+		name    string
+		service *Service
+		cfg     *Config
+		want    bool
+	}{
+		{name: "nil service", cfg: httpRouteConfig},
+		{name: "nil config", service: &Service{}},
+		{name: "ingress", service: &Service{}, cfg: ingressConfig},
+		{name: "HTTPRoute without NodePort", service: &Service{}, cfg: httpRouteConfig, want: true},
+		{name: "HTTPRoute with dynamic NodePort", service: &Service{Expose: Expose{NodePort: []int32{0}}}, cfg: httpRouteConfig, want: true},
+		{name: "HTTPRoute with static NodePort", service: &Service{Expose: Expose{NodePort: []int32{30080}}}, cfg: httpRouteConfig},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.service.UsesDNSRoute(tt.cfg); got != tt.want {
+				t.Fatalf("expected UsesDNSRoute to be %t, got %t", tt.want, got)
+			}
+		})
+	}
+}
+
 func TestGetVolumePVCName(t *testing.T) {
 	svc := Service{Name: "demo"}
 	expected := "demo"

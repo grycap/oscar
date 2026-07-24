@@ -777,10 +777,7 @@ func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) {
 
 func addServiceMetadataEnvVars(p *v1.PodSpec, service *Service, cfg *Config) {
 	exposedBasePath := service.GetExposedBasePath()
-	usesDNSRoute := cfg != nil &&
-		strings.EqualFold(strings.TrimSpace(cfg.ExposedServicesRouteKind), HTTPROUTE) &&
-		(len(service.Expose.NodePort) == 0 || service.Expose.NodePort[0] == 0)
-	if exposedBasePath != "" && usesDNSRoute {
+	if exposedBasePath != "" && service.UsesDNSRoute(cfg) {
 		exposedBasePath = "/"
 	}
 	requiredEnvVars := []v1.EnvVar{
@@ -826,6 +823,15 @@ func (service *Service) GetExposedBasePath() string {
 		return ""
 	}
 	return fmt.Sprintf("/system/services/%s/exposed", service.Name)
+}
+
+// UsesDNSRoute reports whether the service is exposed through a Gateway API
+// HTTPRoute instead of a static NodePort.
+func (service *Service) UsesDNSRoute(cfg *Config) bool {
+	return service != nil &&
+		cfg != nil &&
+		strings.EqualFold(strings.TrimSpace(cfg.ExposedServicesRouteKind), HTTPROUTE) &&
+		(len(service.Expose.NodePort) == 0 || service.Expose.NodePort[0] == 0)
 }
 
 // GetVolumeName returns the logical managed volume name used by the service.

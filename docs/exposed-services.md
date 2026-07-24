@@ -40,10 +40,9 @@ Once the service is deployed, you can check if it was created correctly by makin
 https://{oscar_endpoint}/system/services/{service_name}/exposed/{path_resource} 
 ```
 
-When `EXPOSED_SERVICES_ROUTE_KIND=httproute`, the path-based endpoint remains available and each service is also exposed at the root of its own subdomain:
+When `EXPOSED_SERVICES_ROUTE_KIND=httproute`, each service is exposed at the root of its own subdomain:
 
 ``` bash
-https://{INGRESS_HOST}/system/services/{service_name}/exposed/{path_resource}
 https://{service_name}.{INGRESS_HOST}/{path_resource}
 ```
 
@@ -57,7 +56,7 @@ Additional options can be defined in the "expose" section of the FDL (some previ
 
 - `min_scale`: The minimum number of active pods (default: 1).
 - `max_scale`: The maximum number of active pods (default: 10) or the CPU threshold, which, once exceeded, will trigger the creation of additional pods (default: 80%).
-- `rewrite_target`: Target the URI where the traffic is redirected (default: false).
+- `rewrite_target`: Controls the historical path rewrite in Ingress mode (default: false). It is ignored by DNS-based HTTPRoutes, which expose services from `/`.
 - `NodePort`: The access method from the domain name to the public ip `<cluster_ip>:<NodePort>`.
 - `default_command`: Selects between executing the container's default command and executing the script inside the container. (default: false, it executes the script)
 - `set_auth`: The credentials are composed of the service name as the user and the service token as the password. Turn off this field if the container provides its own authentication method. It does not work with `NodePort` (default: false, it has no authentication).
