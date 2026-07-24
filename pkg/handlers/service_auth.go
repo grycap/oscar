@@ -56,6 +56,7 @@ func MakeServiceAuthHandler() gin.HandlerFunc {
 			return
 		}
 		auth.SetOIDCServiceAuthCookie(c)
+		auth.SetForwardOIDCAuthorizationHeader(c)
 		c.Status(http.StatusOK)
 	}
 }

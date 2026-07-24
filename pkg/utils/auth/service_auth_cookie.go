@@ -23,16 +23,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func getServiceAuthCookiePath(serviceName string) string {
+	return "/system/services/" + serviceName + "/exposed"
+}
+
 // The service-scoped authentication cookie can carry either a service token or
 // an OIDC access token. The corresponding middleware validates its contents.
 func setServiceAuthCookie(c *gin.Context, serviceName, credential string) {
-	path := "/system/services/" + serviceName + "/exposed"
 	secure := strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") || c.Request.TLS != nil
 
 	http.SetCookie(c.Writer, &http.Cookie{ // #nosec G124
 		Name:     getServiceAuthCookieName(serviceName),
 		Value:    credential,
-		Path:     path,
+		Path:     getServiceAuthCookiePath(serviceName),
 		MaxAge:   0,
 		Secure:   secure,
 		HttpOnly: true,
@@ -40,7 +43,24 @@ func setServiceAuthCookie(c *gin.Context, serviceName, credential string) {
 	})
 }
 
-func serviceAuthCookie(c *gin.Context, serviceName string) string {
+// The service-scoped authentication cookie can carry either a service token or
+// an OIDC access token. The corresponding middleware validates its contents.
+// This function sets the cookie with an expired value, so it will be deleted by the browser.
+func setExpiredServiceCookie(c *gin.Context, serviceName string) {
+	secure := strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") || c.Request.TLS != nil
+
+	http.SetCookie(c.Writer, &http.Cookie{ // #nosec G124
+		Name:     getServiceAuthCookieName(serviceName),
+		Value:    "",
+		Path:     getServiceAuthCookiePath(serviceName),
+		MaxAge:   -1,
+		Secure:   secure,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func getServiceAuthCookie(c *gin.Context, serviceName string) string {
 	credential, err := c.Cookie(getServiceAuthCookieName(serviceName))
 	if err != nil {
 		return ""

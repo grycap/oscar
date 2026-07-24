@@ -68,14 +68,39 @@ func GetOIDCServiceAuthFormMiddleware() gin.HandlerFunc {
 // credential as a Bearer header so the regular OIDC middleware validates it.
 func GetOIDCServiceAuthCookieMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if _, ok := isAuthBearer(c); !ok {
-			token := serviceAuthCookie(c, c.Param("serviceName"))
-			if looksLikeJWT(token) {
-				c.Request.Header.Set("Authorization", "Bearer "+token)
-			}
+		if c.Request.Method != http.MethodGet {
+			c.Next()
+			return
 		}
+		// If the request already has a Bearer token or Basic auth, we don't override it.
+		if _, isBearerAuth := isAuthBearer(c); isBearerAuth || isBasicAuth(c) {
+			c.Next()
+			return
+		}
+
+		token := getServiceAuthCookie(c, c.Param("serviceName"))
+		if looksLikeJWT(token) {
+			// Promote the cookie's JWT to the Authorization header for the rest of the middleware chain.
+			c.Request.Header.Set("Authorization", "Bearer "+token)
+		}
+		// Set the cookie as expired and if validation succeeds,
+		// the OIDC middleware will set it again with a renewed expiration time.
+		// This prevents users from being blocked when the cookie is used after the OIDC token has expired.
+		setExpiredServiceCookie(c, c.Param("serviceName"))
+
 		c.Next()
 	}
+}
+
+// SetForwardOIDCAuthorizationHeader promotes the OIDC token from the request's
+// Authorization header to the response's Authorization header. This is used for
+// service-to-service calls where the caller needs to forward the OIDC token.
+func SetForwardOIDCAuthorizationHeader(c *gin.Context) {
+	token, ok := isAuthBearer(c)
+	if !ok || !looksLikeJWT(token) {
+		return
+	}
+	c.Writer.Header().Set("Authorization", "Bearer "+token)
 }
 
 // SetOIDCServiceAuthCookie stores an OIDC Bearer token after authentication and

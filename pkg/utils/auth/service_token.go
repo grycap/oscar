@@ -90,7 +90,7 @@ func getServiceTokenCandidates(c *gin.Context) []string {
 		tokens = append(tokens, token)
 	}
 
-	if token := serviceAuthCookie(c, c.Param("serviceName")); len(token) == tokenLength {
+	if token := getServiceAuthCookie(c, c.Param("serviceName")); len(token) == tokenLength {
 		tokens = append(tokens, token)
 	}
 
