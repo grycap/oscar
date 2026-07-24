@@ -777,7 +777,10 @@ func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) {
 
 func addServiceMetadataEnvVars(p *v1.PodSpec, service *Service, cfg *Config) {
 	exposedBasePath := service.GetExposedBasePath()
-	if exposedBasePath != "" && cfg != nil && strings.EqualFold(strings.TrimSpace(cfg.ExposedServicesRouteKind), HTTPROUTE) {
+	usesDNSRoute := cfg != nil &&
+		strings.EqualFold(strings.TrimSpace(cfg.ExposedServicesRouteKind), HTTPROUTE) &&
+		(len(service.Expose.NodePort) == 0 || service.Expose.NodePort[0] == 0)
+	if exposedBasePath != "" && usesDNSRoute {
 		exposedBasePath = "/"
 	}
 	requiredEnvVars := []v1.EnvVar{

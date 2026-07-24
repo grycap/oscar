@@ -477,6 +477,7 @@ func TestGetProbePath(t *testing.T) {
 	tests := []struct {
 		name    string
 		service types.Service
+		cfg     *types.Config
 		want    string
 	}{
 		{
@@ -488,6 +489,7 @@ func TestGetProbePath(t *testing.T) {
 					HealthPath:    "/",
 				},
 			},
+			cfg:  newTestConfig(),
 			want: "/system/services/svc/exposed/",
 		},
 		{
@@ -500,6 +502,7 @@ func TestGetProbePath(t *testing.T) {
 					ProbeMode:     "legacy",
 				},
 			},
+			cfg:  newTestConfig(),
 			want: "/system/services/svc/exposed/healthz",
 		},
 		{
@@ -512,6 +515,7 @@ func TestGetProbePath(t *testing.T) {
 					ProbeMode:     "direct",
 				},
 			},
+			cfg:  newTestConfig(),
 			want: "/healthz",
 		},
 		{
@@ -523,6 +527,7 @@ func TestGetProbePath(t *testing.T) {
 					ProbeMode:  "direct",
 				},
 			},
+			cfg:  newTestConfig(),
 			want: "/healthz",
 		},
 		{
@@ -534,13 +539,43 @@ func TestGetProbePath(t *testing.T) {
 					HealthPath:    "/ready",
 				},
 			},
+			cfg:  newTestConfig(),
 			want: "/ready",
+		},
+		{
+			name: "HTTPRoute mode probes the DNS root directly",
+			service: types.Service{
+				Name: "svc",
+				Expose: types.Expose{
+					RewriteTarget: true,
+					HealthPath:    "/",
+				},
+			},
+			cfg: &types.Config{
+				ExposedServicesRouteKind: types.HTTPROUTE,
+			},
+			want: "/",
+		},
+		{
+			name: "HTTPRoute mode preserves legacy probe for static NodePort",
+			service: types.Service{
+				Name: "svc",
+				Expose: types.Expose{
+					RewriteTarget: true,
+					HealthPath:    "/",
+					NodePort:      []int32{30080},
+				},
+			},
+			cfg: &types.Config{
+				ExposedServicesRouteKind: types.HTTPROUTE,
+			},
+			want: "/system/services/svc/exposed/",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getProbePath(tt.service)
+			got := getProbePath(tt.service, tt.cfg)
 			if got != tt.want {
 				t.Fatalf("expected probe path %q, got %q", tt.want, got)
 			}

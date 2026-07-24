@@ -581,8 +581,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 			podSpec.Containers[i].Args = []string{"-c", fmt.Sprintf("%s/%s", types.ConfigPath, types.ScriptFileName)}
 		}
 
-		probePath := service.Expose.HealthPath
-		probePath = getProbePath(service)
+		probePath := getProbePath(service, cfg)
 
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
@@ -1577,9 +1576,11 @@ func isDirectProbeMode(service types.Service) bool {
 	return strings.EqualFold(strings.TrimSpace(service.Expose.ProbeMode), "direct")
 }
 
-func getProbePath(service types.Service) string {
+func getProbePath(service types.Service, cfg *types.Config) string {
 	healthPath := normalizeHealthPath(service.Expose.HealthPath)
-	if isDirectProbeMode(service) {
+	usesDNSRoute := getRouteKind(cfg) == routeKindHTTPRoute &&
+		(len(service.Expose.NodePort) == 0 || service.Expose.NodePort[0] == 0)
+	if usesDNSRoute || isDirectProbeMode(service) {
 		return healthPath
 	}
 	// Legacy default behavior: when rewrite_target is enabled, probe through
