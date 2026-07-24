@@ -25,13 +25,13 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
+	objectstorage "github.com/grycap/oscar/v4/pkg/backends/object_storage"
 	"github.com/grycap/oscar/v4/pkg/handlers"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
 )
 
-var ALL_USERS_GROUP = "all_users_group"
 var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
 
 // MakeDeleteHandler godoc
@@ -91,14 +91,15 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 			return
 		}
 		// If bucket exit
-		minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
+		objectStorageIAM, err := objectstorage.MakeObjectStorageIAM(cfg)
+
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", err))
 			return
 		}
 
 		var bucketOwner string = ""
-		metadata, metaErr := minIOAdminClient.GetTaggedMetadata(bucketName)
+		metadata, metaErr := objectStorageIAM.GetClient(c.Request.Context()).GetTaggedMetadata(bucketName)
 		if metaErr == nil {
 			if owner := strings.TrimSpace(metadata["owner"]); owner != "" {
 				bucketOwner = owner
@@ -106,8 +107,16 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 		}
 
 		if (uid == types.DefaultOwner) || (bucketOwner == uid) {
-			v := minIOAdminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: uid})
-			err := handlers.DeleteMinIOBuckets(s3Client, minIOAdminClient, utils.MinIOBucket{
+			if utils.IsRustFSConfig(cfg) {
+				if err := objectStorageIAM.GetClient(c.Request.Context()).DeleteBucket(s3Client, bucketName); err != nil {
+					c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+					return
+				}
+				c.Status(http.StatusNoContent)
+				return
+			}
+			v := objectStorageIAM.GetClient(c.Request.Context()).GetCurrentResourceVisibility(types.MinIOBucket{BucketName: bucketName, Owner: uid})
+			err := handlers.DeleteMinIOBuckets(s3Client, objectStorageIAM.GetClient(c.Request.Context()), types.MinIOBucket{
 				BucketName: bucketName,
 				Visibility: v,
 				Owner:      uid,

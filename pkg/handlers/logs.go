@@ -379,7 +379,7 @@ func MakeGetSystemLogsHandler(kubeClientset kubernetes.Interface, cfg *types.Con
 		if len(targetPod.Spec.Containers) > 0 {
 			containerName = targetPod.Spec.Containers[0].Name
 			for _, container := range targetPod.Spec.Containers {
-				if container.Name == cfg.Name {
+				if container.Name == cfg.Username {
 					containerName = container.Name
 					break
 				}
@@ -588,7 +588,7 @@ func authorizeRequest(c *gin.Context, service *types.Service) bool {
 			//c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 			return false
 		}
-		if service.Visibility == utils.PUBLIC {
+		if service.Visibility == types.PUBLIC {
 			return true
 		}
 
@@ -596,7 +596,7 @@ func authorizeRequest(c *gin.Context, service *types.Service) bool {
 			return true
 		}
 
-		if service.Visibility == utils.RESTRICTED && len(service.AllowedUsers) > 0 {
+		if service.Visibility == types.RESTRICTED && len(service.AllowedUsers) > 0 {
 			for _, id := range service.AllowedUsers {
 				if uid == id {
 					return true

@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	objectstorage "github.com/grycap/oscar/v4/pkg/backends/object_storage"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
@@ -49,8 +50,12 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var uid string
 		var err error
-		var bucket utils.MinIOBucket
+		var bucket types.MinIOBucket
 		if err := c.ShouldBindJSON(&bucket); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
+			return
+		}
+		if err := bucket.Validate(); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("The Bucket specification is not valid: %v", err))
 			return
 		}
@@ -70,13 +75,14 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 		}
 
-		minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
+		//minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
+		objectStorageIAM, err := objectstorage.MakeObjectStorageIAM(cfg)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintln("error creating MinIO admin client:", err))
 			return
 		}
 
-		metadata, err := minIOAdminClient.GetTaggedMetadata(bucket.BucketName)
+		metadata, err := objectStorageIAM.GetClient(c.Request.Context()).GetTaggedMetadata(bucket.BucketName)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintln("Missing bucket metadata: "))
 			return
@@ -88,12 +94,35 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 		}
 
 		bucket.Owner = uid
+		if utils.IsRustFSConfig(cfg) {
+			if uid != cfg.Username && metadata["owner"] != uid {
+				c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", uid))
+				return
+			}
+			ownerName := metadata["owner_name"]
+			if ownerName == "" {
+				ownerName = uid
+			}
+			newTags := utils.BucketTags(bucket, ownerName)
+			for key, value := range metadata {
+				if _, reserved := newTags[key]; !reserved {
+					newTags[key] = value
+				}
+			}
+			if err := objectStorageIAM.GetClient(c.Request.Context()).SetTags(bucket.BucketName, newTags); err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket tags:", err))
+				return
+			}
+			c.Status(http.StatusNoContent)
+			return
+		}
+
 		var oldVis string
-		if oldVis = minIOAdminClient.GetCurrentResourceVisibility(bucket); oldVis != "" {
-			if oldVis == utils.PUBLIC || minIOAdminClient.ResourceInPolicy(uid, bucket.BucketName) {
+		if oldVis = objectStorageIAM.GetClient(c.Request.Context()).GetCurrentResourceVisibility(bucket); oldVis != "" {
+			if oldVis == types.PUBLIC || objectStorageIAM.GetClient(c.Request.Context()).ResourceInPolicy(uid, bucket.BucketName) {
 				if oldVis != bucket.Visibility {
 					// Remove old policies
-					err := minIOAdminClient.UnsetPolicies(utils.MinIOBucket{
+					err := objectStorageIAM.GetClient(c.Request.Context()).UnsetPolicies(types.MinIOBucket{
 						BucketName: bucket.BucketName,
 						Visibility: oldVis,
 						Owner:      uid,
@@ -104,15 +133,15 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 					}
 
 					// Set new policies
-					err = minIOAdminClient.SetPolicies(bucket)
+					err = objectStorageIAM.GetClient(c.Request.Context()).SetPolicies(bucket)
 					if err != nil {
 						c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket:", err))
 						return
 					}
 
 				} else {
-					if oldVis == RESTRICTED {
-						err = minIOAdminClient.UpdateServiceGroup(bucket.BucketName, bucket.AllowedUsers)
+					if oldVis == types.RESTRICTED {
+						err = objectStorageIAM.GetClient(c.Request.Context()).UpdateServiceGroup(bucket.BucketName, bucket.AllowedUsers)
 						if err != nil {
 							c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket:", err))
 							return

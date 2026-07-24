@@ -16,8 +16,6 @@ limitations under the License.
 package types
 
 import (
-	"fmt"
-
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	kueueclientset "sigs.k8s.io/kueue/client-go/clientset/versioned"
@@ -104,8 +102,6 @@ type MinIOQuotaUpdate struct {
 func CreateQuotaBackend(kubeConfig *rest.Config, kubeClientset *kubernetes.Clientset) *QuotaBackend {
 	client, err := kueueclientset.NewForConfig(kubeConfig)
 	if err != nil {
-		// #nosec
-		fmt.Errorf("creating kueue client: %w", err)
 		return nil
 	}
 	qb := QuotaBackend{

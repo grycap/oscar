@@ -294,6 +294,10 @@ type Config struct {
 	// MinIOQuotaEnabled option to enable the creation of ConfigMaps with MinIO quotas for each user
 	MinIOQuotaEnabled bool `json:"minio_quota_enabled"`
 
+	// ObjectStorageType selects the implementation used for object-storage IAM operations.
+	// Supported values are "minio" and "rustfs".
+	ObjectStorageType string `json:"-"`
+
 	// MinIOQuotaBuckets default number of buckets allowed per user
 	MinIOQuotaBuckets string `json:"-"`
 
@@ -315,6 +319,7 @@ var configVars = []configVar{
 	{"MinIOProvider.Region", "MINIO_REGION", false, stringType, "us-east-1"},
 	{"MinIOProvider.Verify", "MINIO_TLS_VERIFY", false, boolType, "true"},
 	{"MinIOProvider.Endpoint", "MINIO_ENDPOINT", false, urlType, "https://minio-service.minio:9000"},
+	{"ObjectStorageType", "OBJECT_STORAGE_TYPE", false, stringType, "minio"},
 	{"Name", "OSCAR_NAME", false, stringType, "oscar"},
 	{"Namespace", "OSCAR_NAMESPACE", false, stringType, "oscar"},
 	{"ServicesNamespace", "OSCAR_SERVICES_NAMESPACE", false, stringType, "oscar-svc"},

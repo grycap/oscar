@@ -14,7 +14,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/testsupport"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 )
 
 func TestMakePresignHandler_AdminUpload(t *testing.T) {
@@ -23,7 +22,7 @@ func TestMakePresignHandler_AdminUpload(t *testing.T) {
 
 	fakeClient := &fakeAdminClient{
 		metadata:   map[string]string{"owner": "oscar"},
-		visibility: utils.PRIVATE,
+		visibility: types.PRIVATE,
 		simple: &fakeSimpleClient{
 			bucketExists: true,
 			presignURL:   "https://example.com/upload",
@@ -75,7 +74,7 @@ func TestMakePresignHandler_UserUnauthorized(t *testing.T) {
 
 	fakeClient := &fakeAdminClient{
 		metadata:   map[string]string{"owner": "admin"},
-		visibility: utils.PRIVATE,
+		visibility: types.PRIVATE,
 		simple: &fakeSimpleClient{
 			bucketExists: true,
 			presignURL:   "https://example.com/should-not-be-used",
@@ -114,7 +113,7 @@ func TestMakePresignHandler_RestrictedMemberDownload(t *testing.T) {
 
 	fakeClient := &fakeAdminClient{
 		metadata:   map[string]string{"owner": "bob"},
-		visibility: utils.RESTRICTED,
+		visibility: types.RESTRICTED,
 		members:    []string{"alice"},
 		simple: &fakeSimpleClient{
 			bucketExists: true,
@@ -192,7 +191,7 @@ func (f *fakeAdminClient) GetTaggedMetadata(bucket string) (map[string]string, e
 	return f.metadata, nil
 }
 
-func (f *fakeAdminClient) GetCurrentResourceVisibility(bucket utils.MinIOBucket) string {
+func (f *fakeAdminClient) GetCurrentResourceVisibility(bucket types.MinIOBucket) string {
 	return f.visibility
 }
 
@@ -212,9 +211,9 @@ func (s *stubPresignAdmin) GetTaggedMetadata(bucket string) (map[string]string, 
 	s.metaCalled = true
 	return map[string]string{"owner": "oscar"}, nil
 }
-func (s *stubPresignAdmin) GetCurrentResourceVisibility(bucket utils.MinIOBucket) string {
+func (s *stubPresignAdmin) GetCurrentResourceVisibility(bucket types.MinIOBucket) string {
 	s.visibilityCalled = true
-	return utils.PRIVATE
+	return types.PRIVATE
 }
 func (s *stubPresignAdmin) ResourceInPolicy(policyName string, resource string) bool {
 	s.policyCalled = true

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package types
 
 import (
 	"context"
@@ -35,19 +35,11 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/minio/madmin-go"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/minio/minio-go/v7/pkg/tags"
 	"k8s.io/apimachinery/pkg/api/resource"
-)
-
-const (
-	ALL_USERS_GROUP = "all_users_group"
-	PRIVATE         = "private"
-	RESTRICTED      = "restricted"
-	PUBLIC          = "public"
 )
 
 var (
@@ -57,6 +49,13 @@ var (
 
 var minioLogger = log.New(os.Stdout, "[MINIO] ", log.Flags())
 var overlappingError = "An object key name filtering rule defined with overlapping prefixes"
+
+const (
+	ALL_USERS_GROUP = "all_users_group"
+	PRIVATE         = "private"
+	RESTRICTED      = "restricted"
+	PUBLIC          = "public"
+)
 
 // MinIOAdminClient struct to represent a MinIO Admin client to configure webhook notifications
 type MinIOAdminClient struct {
@@ -76,6 +75,37 @@ type MinIOBucket struct {
 	StorageQuota *MinIOQuota       `json:"storage_quota,omitempty"`
 	StorageUsage *MinIOUsage       `json:"storage_usage,omitempty"`
 	Attribution  string            `json:"attribution,omitempty"`
+}
+
+// UnmarshalJSON custom unmarshaller to set default values for MinIOBucket
+// Is called when the MinIOBucket
+func (m *MinIOBucket) UnmarshalJSON(data []byte) error {
+	type Alias MinIOBucket
+
+	aux := Alias{
+		Visibility: PRIVATE,
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	*m = MinIOBucket(aux)
+	return nil
+}
+
+// Validate checks if the MinIOBucket struct has valid values for its fields
+func (m MinIOBucket) Validate() error {
+	visibility := strings.TrimSpace(m.Visibility)
+	switch visibility {
+	case PRIVATE, PUBLIC, RESTRICTED:
+	default:
+		return fmt.Errorf(
+			"bucket visibility must be private, public or restricted",
+		)
+	}
+
+	return nil
 }
 
 // MinIOObject captures object level metadata inside a MinIO bucket
@@ -134,8 +164,12 @@ func (c *MinIOAdminClient) GetSimpleClient() *minio.Client {
 	return c.simpleClient
 }
 
+func (c *MinIOAdminClient) GetAdminClient() *madmin.AdminClient {
+	return c.adminClient
+}
+
 // MakeMinIOAdminClient creates a new MinIO Admin client to configure webhook notifications
-func MakeMinIOAdminClient(cfg *types.Config) (*MinIOAdminClient, error) {
+func MakeMinIOAdminClient(cfg *Config) (*MinIOAdminClient, error) {
 	// Parse minIO endpoint
 	endpointURL, err := url.Parse(cfg.MinIOProvider.Endpoint)
 	if err != nil {
@@ -552,12 +586,12 @@ func (minIOAdminClient *MinIOAdminClient) SetTags(bucket string, newtags map[str
 	// Create tags from a map.
 	btags, err := tags.NewTags(newtags, false)
 	if err != nil {
-		return fmt.Errorf("error creating tag owner %s", newtags["uid"])
+		return fmt.Errorf("error creating bucket tags: %w", err)
 	}
 
 	err = minIOAdminClient.simpleClient.SetBucketTagging(context.Background(), bucket, btags)
 	if err != nil {
-		return fmt.Errorf("error setting tag on bucket %s", bucket)
+		return fmt.Errorf("error setting tag on bucket %s: %w", bucket, err)
 	}
 	return nil
 }

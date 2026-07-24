@@ -17,14 +17,15 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	objectstorage "github.com/grycap/oscar/v4/pkg/backends/object_storage"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -78,14 +79,19 @@ func CustomAuth(cfg *types.Config, kubeClientset kubernetes.Interface) gin.Handl
 		cfg.Username: cfg.Password,
 	})
 
-	minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+	objectStorageIAM, err := objectstorage.MakeObjectStorageIAM(cfg)
+	if err != nil {
+		return func(c *gin.Context) {
+			c.AbortWithStatusJSON(500, gin.H{"error": fmt.Sprintf("error creating object-storage IAM client: %v", err)})
+		}
+	}
 	// Slice to add default user to all users group on MinIO
 	var oscarUser = []string{"console"}
 
-	minIOAdminClient.CreateAllUsersGroup()                               // #nosec G104
-	minIOAdminClient.CreateAddGroup("all_users_group", oscarUser, false) // #nosec G104
+	objectStorageIAM.CreateGroup(context.Background(), types.ALL_USERS_GROUP)                          // #nosec G104
+	objectStorageIAM.UpdateGroupMembers(context.Background(), types.ALL_USERS_GROUP, oscarUser, false) // #nosec G104
 
-	oidcHandler := getOIDCMiddleware(kubeClientset, minIOAdminClient, cfg, nil)
+	oidcHandler := getOIDCMiddleware(kubeClientset, objectStorageIAM, cfg, nil)
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
