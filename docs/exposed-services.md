@@ -49,7 +49,7 @@ https://{service_name}.{INGRESS_HOST}/{path_resource}
 
 This requires `INGRESS_HOST` to be configured and wildcard DNS and TLS for `*.{INGRESS_HOST}` to point to and be accepted by the cluster Gateway.
 
-For exposed services, OSCAR sets `OSCAR_SERVICE_BASE_PATH` in the container environment to `/system/services/{service_name}/exposed`, independently of the configured route kind. The full list of OSCAR-managed environment variables is documented in [FDL](fdl.md#envvarsmap).
+For exposed services, OSCAR sets `OSCAR_SERVICE_BASE_PATH` in the container environment. Its value is `/system/services/{service_name}/exposed` in Ingress mode and `/` when services are exposed through DNS in HTTPRoute mode. The full list of OSCAR-managed environment variables is documented in [FDL](fdl.md#envvarsmap).
 
 Notice that if you get a `502 Bad Gateway` error, it is most likely because the specified port on the service does not match the API port.
 

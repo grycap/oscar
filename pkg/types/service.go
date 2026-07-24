@@ -614,7 +614,7 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 	}
 
 	// Add OSCAR-managed environment variables
-	addServiceMetadataEnvVars(podSpec, service)
+	addServiceMetadataEnvVars(podSpec, service, cfg)
 
 	// Add the required environment variables for the watchdog
 	addWatchdogEnvVars(podSpec, cfg, service)
@@ -775,7 +775,11 @@ func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) {
 	}
 }
 
-func addServiceMetadataEnvVars(p *v1.PodSpec, service *Service) {
+func addServiceMetadataEnvVars(p *v1.PodSpec, service *Service, cfg *Config) {
+	exposedBasePath := service.GetExposedBasePath()
+	if exposedBasePath != "" && cfg != nil && strings.EqualFold(strings.TrimSpace(cfg.ExposedServicesRouteKind), HTTPROUTE) {
+		exposedBasePath = "/"
+	}
 	requiredEnvVars := []v1.EnvVar{
 		{
 			Name:  OscarServiceNameEnvVar,
@@ -787,7 +791,7 @@ func addServiceMetadataEnvVars(p *v1.PodSpec, service *Service) {
 		},
 		{
 			Name:  OscarServiceBasePathEnvVar,
-			Value: service.GetExposedBasePath(),
+			Value: exposedBasePath,
 		},
 	}
 

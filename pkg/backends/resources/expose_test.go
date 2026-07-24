@@ -712,10 +712,8 @@ func TestGetDNSHTTPRouteSpec(t *testing.T) {
 	httpRoute = getDNSHTTPRouteSpec(svc, cfg.ServicesNamespace, cfg)
 	rules, _, _ = unstructured.NestedSlice(httpRoute.Object, "spec", "rules")
 	filters = rules[0].(map[string]any)["filters"].([]any)
-	rewrite := filters[0].(map[string]any)
-	rewritePath := rewrite["urlRewrite"].(map[string]any)["path"].(map[string]any)
-	if rewrite["type"] != "URLRewrite" || rewritePath["replacePrefixMatch"] != getAPIPath(svc.Name) {
-		t.Fatalf("expected DNS route to restore the service API path when rewrite_target is enabled, got %v", rewrite)
+	if len(filters) != 1 || filters[0].(map[string]any)["type"] != "ExtensionRef" {
+		t.Fatalf("expected DNS route to preserve the root path when rewrite_target is enabled, got %v", filters)
 	}
 }
 

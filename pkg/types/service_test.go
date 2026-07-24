@@ -554,6 +554,17 @@ func TestToPodSpecWithExposeMetadataEnvVars(t *testing.T) {
 	if envVars[OscarServiceBasePathEnvVar] != "/system/services/testname/exposed" {
 		t.Fatalf("expected %s to be %q, got %q", OscarServiceBasePathEnvVar, "/system/services/testname/exposed", envVars[OscarServiceBasePathEnvVar])
 	}
+
+	httpRouteConfig := testConfig
+	httpRouteConfig.ExposedServicesRouteKind = HTTPROUTE
+	podSpec, err = svc.ToPodSpec(&httpRouteConfig)
+	if err != nil {
+		t.Fatalf("unexpected error for HTTPRoute config: %v", err)
+	}
+	envVars = envVarsToMap(podSpec.Containers[0].Env)
+	if envVars[OscarServiceBasePathEnvVar] != "/" {
+		t.Fatalf("expected HTTPRoute %s to be %q, got %q", OscarServiceBasePathEnvVar, "/", envVars[OscarServiceBasePathEnvVar])
+	}
 }
 
 func TestServiceGetVolumeName(t *testing.T) {

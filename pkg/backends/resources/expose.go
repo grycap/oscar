@@ -1009,17 +1009,13 @@ func getHTTPRoute(service types.Service, namespace string, cfg *types.Config, na
 	}
 
 	filters := []any{}
-	if (!dnsRoute && !service.Expose.RewriteTarget) || (dnsRoute && service.Expose.RewriteTarget) {
-		replacement := "/"
-		if dnsRoute {
-			replacement = getAPIPath(service.Name)
-		}
+	if !dnsRoute && !service.Expose.RewriteTarget {
 		filters = append(filters, map[string]any{
 			"type": "URLRewrite",
 			"urlRewrite": map[string]any{
 				"path": map[string]any{
 					"type":               "ReplacePrefixMatch",
-					"replacePrefixMatch": replacement,
+					"replacePrefixMatch": "/",
 				},
 			},
 		})
