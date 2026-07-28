@@ -380,6 +380,22 @@ func (s *Service) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// HideSensitiveInfoIfNotOwner hides sensitive information in the service if the user is not the owner.
+func (s *Service) HideSensitiveInfoIfNotOwner(uid string) {
+	if s.Owner == uid {
+		return
+	}
+	s.Token = "hidden"
+	s.Environment.Secrets = nil
+	s.Environment.Vars = nil
+	s.AllowedUsers = nil
+	if s.Labels != nil {
+		s.Labels = map[string]string{
+			"owner_name": s.Labels["owner_name"],
+		}
+	}
+}
+
 // Validate checks that the service definition is valid and returns an error if not.
 func (s Service) Validate() error {
 
