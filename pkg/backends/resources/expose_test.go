@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/grycap/oscar/v4/pkg/types"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -258,9 +257,6 @@ func TestCreateExposeHTTPRouteWithAuth(t *testing.T) {
 	if !existsHTTPRoute(svc.Name, svc.Namespace) {
 		t.Fatalf("expected httproute to exist")
 	}
-	if existsHTTPRouteByName(getDNSHTTPRouteName(svc.Name), svc.Namespace) {
-		t.Fatalf("expected no additional legacy DNS httproute")
-	}
 
 	if existsIngress(svc.Name, svc.Namespace, client) {
 		t.Fatalf("expected no ingress to be created when route kind is httproute")
@@ -301,9 +297,6 @@ func TestCreateExposeHTTPRouteWithoutAuth(t *testing.T) {
 
 	if !existsHTTPRoute(svc.Name, svc.Namespace) {
 		t.Fatalf("expected httproute to exist")
-	}
-	if existsHTTPRouteByName(getDNSHTTPRouteName(svc.Name), svc.Namespace) {
-		t.Fatalf("expected no additional legacy DNS httproute")
 	}
 
 	if !existsTraefikCORSMiddleware(svc.Name, svc.Namespace) {
@@ -965,36 +958,6 @@ func TestUpdateHTTPRouteSetsResourceVersion(t *testing.T) {
 
 	if err := updateHTTPRoute(svc, namespace, fake.NewSimpleClientset(), cfg); err != nil {
 		t.Fatalf("updateHTTPRoute returned error: %v", err)
-	}
-}
-
-func TestUpdateHTTPRouteMigratesAdditionalDNSRoute(t *testing.T) {
-	cfg := newTestConfig()
-	cfg.ExposedServicesRouteKind = routeKindHTTPRoute
-	cfg.HTTPRouteGatewayName = "public-gateway"
-	cfg.IngressHost = "example.org"
-
-	svc := newExposeService("httproute-migration", 0, false)
-	namespace := cfg.ServicesNamespace
-
-	oldDNSRoute := getHTTPRouteSpec(svc, namespace, cfg)
-	oldDNSRoute.SetName(getDNSHTTPRouteName(svc.Name))
-	gatewayClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), oldDNSRoute)
-	useGatewayClient(t, gatewayClient)
-
-	if err := updateHTTPRoute(svc, namespace, fake.NewSimpleClientset(), cfg); err != nil {
-		t.Fatalf("updateHTTPRoute returned error: %v", err)
-	}
-
-	if _, err := gatewayClient.Resource(httpRouteGVR).Namespace(namespace).Get(
-		context.TODO(), getHTTPRouteName(svc.Name), metav1.GetOptions{},
-	); err != nil {
-		t.Fatalf("expected canonical DNS httproute to be created: %v", err)
-	}
-	if _, err := gatewayClient.Resource(httpRouteGVR).Namespace(namespace).Get(
-		context.TODO(), getDNSHTTPRouteName(svc.Name), metav1.GetOptions{},
-	); !apierrors.IsNotFound(err) {
-		t.Fatalf("expected additional DNS httproute to be removed, got: %v", err)
 	}
 }
 

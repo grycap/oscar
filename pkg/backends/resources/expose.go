@@ -271,8 +271,7 @@ func createRoute(service types.Service, namespace string, kubeClientset kubernet
 
 func upsertRoute(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
 	ingressExists := existsIngress(service.Name, namespace, kubeClientset)
-	httpRouteExists := existsHTTPRoute(service.Name, namespace) ||
-		existsHTTPRouteByName(getDNSHTTPRouteName(service.Name), namespace)
+	httpRouteExists := existsHTTPRoute(service.Name, namespace)
 
 	if getRouteKind(cfg) == routeKindHTTPRoute {
 		if ingressExists {
@@ -294,11 +293,6 @@ func upsertRoute(service types.Service, namespace string, kubeClientset kubernet
 
 	if httpRouteExists {
 		if err := deleteHTTPRoute(getHTTPRouteName(service.Name), namespace); err != nil {
-			return err
-		}
-	}
-	if existsHTTPRouteByName(getDNSHTTPRouteName(service.Name), namespace) {
-		if err := deleteHTTPRoute(getDNSHTTPRouteName(service.Name), namespace); err != nil {
 			return err
 		}
 	}
@@ -344,11 +338,6 @@ func deleteRouteResources(serviceName string, namespace string, kubeClientset ku
 
 	if existsHTTPRoute(serviceName, namespace) {
 		if err := deleteHTTPRoute(getHTTPRouteName(serviceName), namespace); err != nil {
-			return err
-		}
-	}
-	if existsHTTPRouteByName(getDNSHTTPRouteName(serviceName), namespace) {
-		if err := deleteHTTPRoute(getDNSHTTPRouteName(serviceName), namespace); err != nil {
 			return err
 		}
 	}
@@ -398,8 +387,8 @@ func validateHTTPRouteConfig(service types.Service, cfg *types.Config) error {
 	if strings.TrimSpace(cfg.HTTPRouteGatewayName) == "" {
 		return fmt.Errorf("HTTPROUTE_GATEWAY_NAME must be defined when EXPOSED_SERVICES_ROUTE_KIND=httproute")
 	}
-	if strings.TrimSpace(cfg.IngressHost) == "" {
-		return fmt.Errorf("INGRESS_HOST must be defined when EXPOSED_SERVICES_ROUTE_KIND=httproute")
+	if strings.TrimSpace(cfg.IngressHost) == "" && cfg.ExposedServicesUseDNSRoute {
+		return fmt.Errorf("INGRESS_HOST must be defined when EXPOSED_SERVICES_ROUTE_KIND=httproute and EXPOSED_SERVICES_USE_DNS_ROUTE=true")
 	}
 
 	return validateExposeAuthConfig(service, cfg)
@@ -913,14 +902,6 @@ func reconcileHTTPRoute(service types.Service, namespace string, kubeClientset k
 		return err
 	}
 
-	// Remove the additional DNS route created by older versions. The canonical
-	// HTTPRoute above now serves the DNS hostname directly.
-	err = gatewayClientset.Resource(httpRouteGVR).Namespace(namespace).Delete(
-		context.TODO(), getDNSHTTPRouteName(service.Name), metav1.DeleteOptions{},
-	)
-	if err = ignoreNotFound(err); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -964,12 +945,18 @@ func upsertHTTPRoute(gatewayClientset dynamic.Interface, httpRoute *unstructured
 
 func getHTTPRouteSpec(service types.Service, namespace string, cfg *types.Config) *unstructured.Unstructured {
 	host := strings.TrimPrefix(strings.TrimSpace(cfg.IngressHost), "*.")
+	apiPath := "/"
+	useDNSRoute := service.UsesDNSRoute(cfg)
+
+	if !useDNSRoute {
+		apiPath = getAPIPath(service.Name)
+	}
 	rule := map[string]any{
 		"matches": []any{
 			map[string]any{
 				"path": map[string]any{
 					"type":  "PathPrefix",
-					"value": "/",
+					"value": apiPath,
 				},
 			},
 		},
@@ -991,6 +978,20 @@ func getHTTPRouteSpec(service types.Service, namespace string, cfg *types.Config
 			},
 		},
 	}
+
+	if !useDNSRoute && !service.Expose.RewriteTarget {
+		filters = append(filters, map[string]any{
+			"type": "URLRewrite",
+			"urlRewrite": map[string]any{
+				"path": map[string]any{
+					"type":               "ReplacePrefixMatch",
+					"replacePrefixMatch": "/",
+				},
+			},
+		},
+		)
+	}
+
 	rule["filters"] = filters
 
 	if service.Expose.SetAuth {
@@ -1009,7 +1010,11 @@ func getHTTPRouteSpec(service types.Service, namespace string, cfg *types.Config
 		"rules": []any{rule},
 	}
 
-	spec["hostnames"] = []any{service.Name + "." + host}
+	if useDNSRoute {
+		spec["hostnames"] = []any{service.Name + "." + host}
+	} else if host != "" {
+		spec["hostnames"] = []any{host}
+	}
 
 	parentRef := map[string]any{
 		"group": "gateway.networking.k8s.io",
@@ -1479,11 +1484,6 @@ func getIngressName(name_container string) string {
 
 func getHTTPRouteName(name_container string) string {
 	return name_container + "-route"
-}
-
-func getDNSHTTPRouteName(name_container string) string {
-	// Kept only to remove the additional route created by early DNS-route versions.
-	return name_container + "-dns-route"
 }
 
 func getTraefikCORSMiddlewareName(name_container string) string {
