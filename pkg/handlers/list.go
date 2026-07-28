@@ -64,6 +64,7 @@ func MakeListHandler(back types.ServerlessBackend, kubeClientset kubernetes.Inte
 				switch service.Visibility {
 				case types.PUBLIC:
 					isAllowedServiceForUser = true
+					service.HideSensitiveInfoIfNotOwner(uid)
 				case types.PRIVATE:
 					if service.Owner == uid {
 						isAllowedServiceForUser = true
@@ -71,6 +72,7 @@ func MakeListHandler(back types.ServerlessBackend, kubeClientset kubernetes.Inte
 				case types.RESTRICTED:
 					if service.Owner == uid || slices.Contains(service.AllowedUsers, uid) {
 						isAllowedServiceForUser = true
+						service.HideSensitiveInfoIfNotOwner(uid)
 					}
 				}
 				// If the service is allowed for the user,
