@@ -88,6 +88,7 @@ func MakeReadHandler(back types.ServerlessBackend, kubeClientset kubernetes.Inte
 
 			switch service.Visibility {
 			case types.PUBLIC:
+				service.HideSensitiveInfoIfNotOwner(uid)
 				c.JSON(http.StatusOK, service)
 				return
 			case types.PRIVATE:
@@ -97,6 +98,7 @@ func MakeReadHandler(back types.ServerlessBackend, kubeClientset kubernetes.Inte
 				}
 			case types.RESTRICTED:
 				if service.Owner == uid || slices.Contains(service.AllowedUsers, uid) {
+					service.HideSensitiveInfoIfNotOwner(uid)
 					c.JSON(http.StatusOK, service)
 					return
 				}
