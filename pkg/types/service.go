@@ -831,6 +831,7 @@ func (service *Service) UsesDNSRoute(cfg *Config) bool {
 	return service != nil &&
 		cfg != nil &&
 		strings.EqualFold(strings.TrimSpace(cfg.ExposedServicesRouteKind), HTTPROUTE) &&
+		cfg.ExposedServicesUseDNSRoute &&
 		(len(service.Expose.NodePort) == 0 || service.Expose.NodePort[0] == 0)
 }
 
