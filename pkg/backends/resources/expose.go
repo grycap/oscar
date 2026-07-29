@@ -387,8 +387,8 @@ func validateHTTPRouteConfig(service types.Service, cfg *types.Config) error {
 	if strings.TrimSpace(cfg.HTTPRouteGatewayName) == "" {
 		return fmt.Errorf("HTTPROUTE_GATEWAY_NAME must be defined when EXPOSED_SERVICES_ROUTE_KIND=httproute")
 	}
-	if strings.TrimSpace(cfg.IngressHost) == "" && cfg.ExposedServicesUseDNSRoute {
-		return fmt.Errorf("INGRESS_HOST must be defined when EXPOSED_SERVICES_ROUTE_KIND=httproute and EXPOSED_SERVICES_USE_DNS_ROUTE=true")
+	if strings.TrimSpace(cfg.IngressHost) == "" && cfg.ExposedServicesUseSubdomainRoute {
+		return fmt.Errorf("INGRESS_HOST must be defined when EXPOSED_SERVICES_ROUTE_KIND=httproute and EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE=true")
 	}
 
 	return validateExposeAuthConfig(service, cfg)

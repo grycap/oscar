@@ -481,8 +481,8 @@ func TestGetExposedBasePath(t *testing.T) {
 }
 
 func TestUsesDNSRoute(t *testing.T) {
-	httpRouteConfig := &Config{ExposedServicesRouteKind: HTTPROUTE, ExposedServicesUseDNSRoute: true}
-	httpRouteConfigNoDNS := &Config{ExposedServicesRouteKind: HTTPROUTE, ExposedServicesUseDNSRoute: false}
+	httpRouteConfig := &Config{ExposedServicesRouteKind: HTTPROUTE, ExposedServicesUseSubdomainRoute: true}
+	httpRouteConfigNoDNS := &Config{ExposedServicesRouteKind: HTTPROUTE, ExposedServicesUseSubdomainRoute: false}
 	ingressConfig := &Config{ExposedServicesRouteKind: Ingress}
 
 	tests := []struct {
@@ -494,10 +494,10 @@ func TestUsesDNSRoute(t *testing.T) {
 		{name: "nil service", cfg: httpRouteConfig},
 		{name: "nil config", service: &Service{}},
 		{name: "ingress", service: &Service{}, cfg: ingressConfig},
-		{name: "HTTPRoute without NodePort with DNS use enabled", service: &Service{}, cfg: httpRouteConfig, want: true},
-		{name: "HTTPRoute with DNS use disabled", service: &Service{}, cfg: httpRouteConfigNoDNS, want: false},
-		{name: "HTTPRoute with dynamic NodePort with DNS", service: &Service{Expose: Expose{NodePort: []int32{0}}}, cfg: httpRouteConfig, want: true},
-		{name: "HTTPRoute with static NodePort with DNS", service: &Service{Expose: Expose{NodePort: []int32{30080}}}, cfg: httpRouteConfig, want: false},
+		{name: "HTTPRoute without NodePort with DNS subdomain use enabled", service: &Service{}, cfg: httpRouteConfig, want: true},
+		{name: "HTTPRoute with DNS subdomain use disabled", service: &Service{}, cfg: httpRouteConfigNoDNS, want: false},
+		{name: "HTTPRoute with dynamic NodePort with DNS subdomain", service: &Service{Expose: Expose{NodePort: []int32{0}}}, cfg: httpRouteConfig, want: true},
+		{name: "HTTPRoute with static NodePort with DNS subdomain", service: &Service{Expose: Expose{NodePort: []int32{30080}}}, cfg: httpRouteConfig, want: false},
 	}
 
 	for _, tt := range tests {
