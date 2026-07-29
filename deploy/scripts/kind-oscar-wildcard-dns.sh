@@ -77,3 +77,4 @@ EOF
 fi
 
 kubectl set env deployment/oscar -n oscar INGRESS_HOST="$INGRESS_HOST"
+kubectl set env deployment/oscar -n oscar EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE="true"
