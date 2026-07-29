@@ -269,7 +269,7 @@ OSCAR also injects a small set of reserved environment variables in every servic
 |----------|-------------|
 | `OSCAR_SERVICE_NAME` | Service name. |
 | `OSCAR_SERVICE_TOKEN` | Generated OSCAR service token. |
-| `OSCAR_SERVICE_BASE_PATH` | Base exposed path: `/system/services/{service_name}/exposed` in Ingress mode or `/` when using DNS in HTTPRoute mode. It is an empty string for non-exposed services. |
+| `OSCAR_SERVICE_BASE_PATH` | Base exposed path: `/system/services/{service_name}/exposed` in default mode or `/` when using DNS in HTTPRoute mode (Ingress don't support DNS subdomains). It is an empty string for non-exposed services. |
 
 These variables are managed by OSCAR and are available in addition to the user-defined entries declared in `environment.variables`.
 
