@@ -1157,11 +1157,9 @@ if [ $(echo $ENABLE_KSERVE | tr '[:upper:]' '[:lower:]') == "true" ]; then
 fi
 
 if $USE_DNS_WILDCARDS ; then
-    echo -e "\n[*] Patching CoreDNS to resolve 'localhost' to the host machine ..."
-    if ! bash "$SCRIPT_DIR/scripts/kind-oscar-wildcard-dns.sh"; then
-        echo -e "$RED[!]$END_COLOR CoreDNS patching failed"
-        exit 1
-    fi
+    echo -e "\n[*] Patching OSCAR to use subdomain routing for 'localhost' ..."
+    kubectl set env deployment/oscar -n oscar INGRESS_HOST="localhost"
+    kubectl set env deployment/oscar -n oscar EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE="true"
 fi
 
 #Wait for OSCAR deployment
