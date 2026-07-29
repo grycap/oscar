@@ -34,13 +34,13 @@ expose:
   api_port: 5000
 ```
 
-Once the service is deployed, you can check if it was created correctly by making an HTTP request to the exposed endpoint. With the default Ingress mode, the endpoint is:
+Once the service is deployed, you can check if it was created correctly by making an HTTP request to the exposed endpoint. By default, the endpoint is:
 
 ``` bash
 https://{oscar_endpoint}/system/services/{service_name}/exposed/{path_resource} 
 ```
 
-When `EXPOSED_SERVICES_ROUTE_KIND=httproute`, each service is exposed at the root of its own subdomain:
+When `EXPOSED_SERVICES_ROUTE_KIND=httproute` and `EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE=true`, each service is exposed at the root of its own subdomain:
 
 ``` bash
 https://{service_name}.{INGRESS_HOST}/{path_resource}
@@ -48,9 +48,9 @@ https://{service_name}.{INGRESS_HOST}/{path_resource}
 
 This requires `INGRESS_HOST` to be configured and wildcard DNS and TLS for `*.{INGRESS_HOST}` to point to and be accepted by the cluster Gateway.
 
-For exposed services, OSCAR sets `OSCAR_SERVICE_BASE_PATH` in the container environment. Its value is `/system/services/{service_name}/exposed` in Ingress mode and `/` when services are exposed through DNS in HTTPRoute mode. The full list of OSCAR-managed environment variables is documented in [FDL](fdl.md#envvarsmap).
+For exposed services, OSCAR sets `OSCAR_SERVICE_BASE_PATH` in the container environment. Its value is `/system/services/{service_name}/exposed` in default mode and `/` when services are exposed through DNS in HTTPRoute mode. The full list of OSCAR-managed environment variables is documented in [FDL](fdl.md#envvarsmap).
 
-Notice that if you get a `502 Bad Gateway` error, it is most likely because the specified port on the service does not match the API port.
+Notice that the use of DNS subdomains is only available with HTTPRoute; Ingress is not supported. Also, if you get a `502 Bad Gateway` error, it is most likely because the specified port on the service does not match the API port.
 
 Additional options can be defined in the "expose" section of the FDL (some previously mentioned), such as:
 

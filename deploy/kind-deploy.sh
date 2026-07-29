@@ -50,6 +50,7 @@ OIDC_ISSUERS_DEFAULT="https://keycloak.grycap.net/realms/grycap"
 OIDC_GROUPS_DEFAULT="/oscar-staff, /oscar-test"
 GATEWAY_CONTROLLER="traefik"
 GATEWAY_CONTROLLER_SET="false"
+USE_DNS_WILDCARDS="true"
 
 usage(){
     cat <<EOF
@@ -62,6 +63,7 @@ Options:
   --kueue        Enable Kueue support for CPU and memory quotas (default: disabled).
   --kserve       Install KServe using deploy/kind-oscar-kserve.sh (default: disabled).
   --minio-quotas Deploy MinIO with 1 replica and 4 PVCs to support bucket quotas.
+  --wildcards    Enable DNS wildcard support for Traefik (default for Traefik).
   --ingress      Use NGINX Ingress as gateway controller.
   --traefik      Use Traefik as gateway controller (default).
   -h, --help     Show this help message and exit.
@@ -402,6 +404,7 @@ spec:
     commonName: localhost
     dnsNames:
         - localhost
+        - "*.localhost"
     ipAddresses:
         - 127.0.0.1
     issuerRef:
@@ -738,6 +741,10 @@ while [ "$#" -gt 0 ]; do
             ENABLE_MINIO_QUOTAS="true"
             shift
             ;;
+        --wildcards)
+            USE_DNS_WILDCARDS="true"
+            shift
+            ;;
         --ingress)
             GATEWAY_CONTROLLER="ingress"
             GATEWAY_CONTROLLER_SET="true"
@@ -794,6 +801,16 @@ else
             fi
             GATEWAY_CONTROLLER="$gateway_controller_choice"
         fi
+        if [ "$GATEWAY_CONTROLLER" == "traefik" ]; then
+            echo -e "\n[*] Traefik also supports DNS wildcard subdomains"
+            read -p "Do you want to enable wildcard DNS? [y/n] (default: y) " use_dns_wildcards </dev/tty
+            use_dns_wildcards=$(echo "$use_dns_wildcards" | tr '[:upper:]' '[:lower:]')
+            if [ "$use_dns_wildcards" == "n" ]; then
+                USE_DNS_WILDCARDS="false"
+            else
+                USE_DNS_WILDCARDS="true"
+            fi
+        fi
     fi
     if [ "$ENABLE_OIDC" != "true" ]; then
         echo -e "\n[*] OIDC defaults to be applied if enabled:"
@@ -844,6 +861,7 @@ else
     OSCAR_EXPOSURE_HELM_ARGS="--set httproute.create=false --set ingress.create=true "
     KIND_HTTP_CONTAINER_PORT=80
     KIND_HTTPS_CONTAINER_PORT=443
+    USE_DNS_WILDCARDS="false"
 fi
 
 HTTP_PORT_FALLBACKS=(8080 8081 8082 8880 9080 10080)
@@ -1104,6 +1122,7 @@ if [ "$ENABLE_METRICS" == "true" ]; then
         LOKI_EXPOSED_NAMESPACE="traefik" \
         LOKI_EXPOSED_APP_LABEL="traefik" \
         EXPOSED_SERVICES_ROUTE_KIND="httproute" \
+        INGRESS_HOST="localhost" \
         HTTPROUTE_GATEWAY_NAME="traefik-gateway" \
         HTTPROUTE_GATEWAY_NAMESPACE="traefik"; then
         echo -e "$RED[!]$END_COLOR Failed to configure OSCAR metrics endpoints"
@@ -1133,6 +1152,14 @@ if [ $(echo $ENABLE_KSERVE | tr '[:upper:]' '[:lower:]') == "true" ]; then
     fi
     if ! bash "$SCRIPT_DIR/scripts/kind-oscar-kserve.sh"; then
         echo -e "$RED[!]$END_COLOR KServe installation failed"
+        exit 1
+    fi
+fi
+
+if $USE_DNS_WILDCARDS ; then
+    echo -e "\n[*] Patching CoreDNS to resolve 'localhost' to the host machine ..."
+    if ! bash "$SCRIPT_DIR/scripts/kind-oscar-wildcard-dns.sh"; then
+        echo -e "$RED[!]$END_COLOR CoreDNS patching failed"
         exit 1
     fi
 fi
