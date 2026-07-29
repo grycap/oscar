@@ -546,7 +546,8 @@ func TestGetProbePath(t *testing.T) {
 				},
 			},
 			cfg: &types.Config{
-				ExposedServicesRouteKind: types.HTTPROUTE,
+				ExposedServicesRouteKind:         types.HTTPROUTE,
+				ExposedServicesUseSubdomainRoute: true,
 			},
 			want: "/",
 		},
@@ -561,7 +562,8 @@ func TestGetProbePath(t *testing.T) {
 				},
 			},
 			cfg: &types.Config{
-				ExposedServicesRouteKind: types.HTTPROUTE,
+				ExposedServicesRouteKind:         types.HTTPROUTE,
+				ExposedServicesUseSubdomainRoute: false,
 			},
 			want: "/system/services/svc/exposed/",
 		},
@@ -591,9 +593,10 @@ func TestRouteKindSelection(t *testing.T) {
 	}
 }
 
-func TestGetHTTPRouteSpec(t *testing.T) {
+func TestGetHTTPRouteSpecUseSubdomainRoutes(t *testing.T) {
 	cfg := newTestConfig()
 	cfg.ExposedServicesRouteKind = types.HTTPROUTE
+	cfg.ExposedServicesUseSubdomainRoute = true
 	cfg.IngressHost = "example.org"
 	cfg.HTTPRouteGatewayName = "public-gateway"
 	cfg.HTTPRouteGatewayNamespace = "gateway-system"
@@ -698,9 +701,85 @@ func TestGetHTTPRouteSpec(t *testing.T) {
 	}
 }
 
+func TestGetHTTPRouteSpecUseSubpathRoutes(t *testing.T) {
+	cfg := newTestConfig()
+	cfg.ExposedServicesRouteKind = types.HTTPROUTE
+	cfg.ExposedServicesUseSubdomainRoute = false
+	cfg.IngressHost = "example.org"
+	cfg.HTTPRouteGatewayName = "public-gateway"
+	cfg.HTTPRouteGatewayNamespace = "gateway-system"
+
+	svc := newExposeService("http-route-service", 0, false)
+	httpRoute := getHTTPRouteSpec(svc, cfg.ServicesNamespace, cfg)
+
+	if httpRoute.GetName() != getHTTPRouteName(svc.Name) {
+		t.Fatalf("expected httproute name %s, got %s", getHTTPRouteName(svc.Name), httpRoute.GetName())
+	}
+
+	hostnames, found, err := unstructured.NestedSlice(httpRoute.Object, "spec", "hostnames")
+	if err != nil || !found || len(hostnames) != 1 || hostnames[0] != cfg.IngressHost {
+		t.Fatalf("expected hostnames [%s], got %v", cfg.IngressHost, hostnames)
+	}
+
+	rules, found, err := unstructured.NestedSlice(httpRoute.Object, "spec", "rules")
+	if err != nil || !found {
+		t.Fatalf("expected rules in httproute spec")
+	}
+	if len(rules) != 1 {
+		t.Fatalf("expected one rule, got %d", len(rules))
+	}
+
+	rule, ok := rules[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected rule to be a map")
+	}
+
+	matches, ok := rule["matches"].([]any)
+	if !ok || len(matches) != 1 {
+		t.Fatalf("expected one path match")
+	}
+	match := matches[0].(map[string]any)
+	path := match["path"].(map[string]any)
+	if path["value"] != getAPIPath(svc.Name) {
+		t.Fatalf("expected path %s, got %v", getAPIPath(svc.Name), path["value"])
+	}
+
+	backendRefs, ok := rule["backendRefs"].([]any)
+	if !ok || len(backendRefs) != 1 {
+		t.Fatalf("expected one backendRef")
+	}
+	backendRef, ok := backendRefs[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected backendRef to be a map")
+	}
+	if backendRef["name"] != getServiceName(svc.Name) {
+		t.Fatalf("expected backend service %s, got %v", getServiceName(svc.Name), backendRef["name"])
+	}
+
+	filters, ok := rule["filters"].([]any)
+	if !ok || len(filters) != 2 {
+		t.Fatalf("expected CORS and URLRewrite filters, got %v", rule["filters"])
+	}
+
+	corsFilter, ok := filters[0].(map[string]any)
+	if !ok || corsFilter["type"] != "ExtensionRef" {
+		t.Fatalf("expected first filter type ExtensionRef, got %v", corsFilter["type"])
+	}
+	corsExtensionRef, ok := corsFilter["extensionRef"].(map[string]any)
+	if !ok || corsExtensionRef["group"] != "traefik.io" || corsExtensionRef["kind"] != "Middleware" || corsExtensionRef["name"] != getTraefikCORSMiddlewareName(svc.Name) {
+		t.Fatalf("expected traefik CORS middleware reference, got %v", corsExtensionRef)
+	}
+
+	rewriteFilter, ok := filters[1].(map[string]any)
+	if !ok || rewriteFilter["type"] != "URLRewrite" {
+		t.Fatalf("expected second filter type URLRewrite, got %v", rewriteFilter["type"])
+	}
+}
+
 func TestGetHTTPRouteSpecNormalizesWildcardHost(t *testing.T) {
 	cfg := newTestConfig()
 	cfg.ExposedServicesRouteKind = types.HTTPROUTE
+	cfg.ExposedServicesUseSubdomainRoute = true
 	cfg.IngressHost = "*.example.org"
 	cfg.HTTPRouteGatewayName = "public-gateway"
 
@@ -745,6 +824,7 @@ func TestValidateHTTPRouteConfig(t *testing.T) {
 	svc := newExposeService("validation", 0, false)
 	cfg := newTestConfig()
 	cfg.ExposedServicesRouteKind = types.HTTPROUTE
+	cfg.ExposedServicesUseSubdomainRoute = true
 
 	if err := validateHTTPRouteConfig(svc, cfg); err == nil {
 		t.Fatalf("expected error when HTTPROUTE_GATEWAY_NAME is empty")
@@ -752,7 +832,7 @@ func TestValidateHTTPRouteConfig(t *testing.T) {
 
 	cfg.HTTPRouteGatewayName = "public-gateway"
 	if err := validateHTTPRouteConfig(svc, cfg); err == nil {
-		t.Fatalf("expected error when INGRESS_HOST is empty")
+		t.Fatalf("expected error when INGRESS_HOST is empty and subdomain route is enabled")
 	}
 	cfg.IngressHost = "example.org"
 	svc.Expose.SetAuth = true
@@ -780,6 +860,7 @@ func TestValidateHTTPRouteConfig(t *testing.T) {
 func TestGetHTTPRouteSpecWithAuth(t *testing.T) {
 	cfg := newTestConfig()
 	cfg.ExposedServicesRouteKind = types.HTTPROUTE
+	cfg.ExposedServicesUseSubdomainRoute = true
 	cfg.HTTPRouteGatewayName = "public-gateway"
 	cfg.IngressHost = "example.org"
 
