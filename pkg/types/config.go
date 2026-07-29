@@ -235,7 +235,7 @@ type Config struct {
 	//
 	IngressHost string `json:"-"`
 
-	ExposedServicesUseSubdomainRoute bool `json:"-"`
+	ExposedServicesUseSubdomainRoute bool `json:"exposed_services_use_subdomain_route"`
 
 	// ExposedServicesRouteKind determines which Kubernetes resource is used to expose services (ingress|httproute)
 	ExposedServicesRouteKind string `json:"-"`
