@@ -584,9 +584,10 @@ func TestToPodSpecWithExposeMetadataEnvVars(t *testing.T) {
 		t.Fatalf("expected %s to be %q, got %q", OscarServiceBasePathEnvVar, "/system/services/testname/exposed", envVars[OscarServiceBasePathEnvVar])
 	}
 
-	httpRouteConfig := testConfig
-	httpRouteConfig.ExposedServicesRouteKind = HTTPROUTE
-	podSpec, err = svc.ToPodSpec(&httpRouteConfig)
+	httpRouteSubdomainConfig := testConfig
+	httpRouteSubdomainConfig.ExposedServicesRouteKind = HTTPROUTE
+	httpRouteSubdomainConfig.ExposedServicesUseSubdomainRoute = true
+	podSpec, err = svc.ToPodSpec(&httpRouteSubdomainConfig)
 	if err != nil {
 		t.Fatalf("unexpected error for HTTPRoute config: %v", err)
 	}
@@ -596,13 +597,25 @@ func TestToPodSpecWithExposeMetadataEnvVars(t *testing.T) {
 	}
 
 	svc.Expose.NodePort = []int32{30080}
-	podSpec, err = svc.ToPodSpec(&httpRouteConfig)
+	podSpec, err = svc.ToPodSpec(&httpRouteSubdomainConfig)
 	if err != nil {
 		t.Fatalf("unexpected error for NodePort config: %v", err)
 	}
 	envVars = envVarsToMap(podSpec.Containers[0].Env)
 	if envVars[OscarServiceBasePathEnvVar] != "/system/services/testname/exposed" {
 		t.Fatalf("expected NodePort %s to keep the legacy path, got %q", OscarServiceBasePathEnvVar, envVars[OscarServiceBasePathEnvVar])
+	}
+
+	httpRouteNoSubdomainConfig := testConfig
+	httpRouteNoSubdomainConfig.ExposedServicesRouteKind = HTTPROUTE
+	httpRouteNoSubdomainConfig.ExposedServicesUseSubdomainRoute = false
+	podSpec, err = svc.ToPodSpec(&httpRouteNoSubdomainConfig)
+	if err != nil {
+		t.Fatalf("unexpected error for HTTPRoute config: %v", err)
+	}
+	envVars = envVarsToMap(podSpec.Containers[0].Env)
+	if envVars[OscarServiceBasePathEnvVar] != "/system/services/testname/exposed" {
+		t.Fatalf("expected HTTPRoute %s to be %q, got %q", OscarServiceBasePathEnvVar, "/system/services/testname/exposed", envVars[OscarServiceBasePathEnvVar])
 	}
 }
 
