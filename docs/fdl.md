@@ -183,7 +183,7 @@ storage_providers:
 | `nodePort` </br> *integer* | Change the access method from the domain name to the public ip. Optional.   |
 | `set_auth` </br> *bool* | Create credentials for the service, composed of the service name as the user and the service token as the password. (default: false). Optional.  |
 | `auth_type` </br> *string* | Authentication middleware used when `set_auth` is enabled. Supported values are `basic` (default) and `forward`. `forward` is only supported for Gateway API/Traefik exposed services and delegates checks to OSCAR service authorization. Optional. |
-| `rewrite_target` </br> *bool* | It is an expose boolean in the FDL that controls how OSCAR configures the NGINX Ingress/HTTProute rewrite for exposed services. If rewrite_target: false, ingress rewrites to /$1. If rewrite_target: true, ingress rewrites to /system/services/<service>/exposed/$1 (default: false). Optional.  |
+| `rewrite_target` </br> *bool* | Controls the historical NGINX Ingress rewrite. If false, Ingress removes the OSCAR exposed-service prefix; if true, it preserves it (default: false). DNS-based HTTPRoutes always expose the container from `/` and ignore this option. Optional. |
 | `default_command` </br> *bool* | Select between executing the container's default command and executing the script inside the container. (default: false). Optional.  |
 | `health_path` </br> *string* | Change the service readiness and liveness check path/endpoint. (default: "/"). Optional.  |
 | `probe_mode` </br> *string* | Probe path mode for exposed-service pod health checks. `legacy` (default) keeps current behavior; `direct` probes only `health_path` on the container without the OSCAR ingress prefix. Optional. |
@@ -269,7 +269,7 @@ OSCAR also injects a small set of reserved environment variables in every servic
 |----------|-------------|
 | `OSCAR_SERVICE_NAME` | Service name. |
 | `OSCAR_SERVICE_TOKEN` | Generated OSCAR service token. |
-| `OSCAR_SERVICE_BASE_PATH` | Base exposed path, for example `/system/services/{service_name}/exposed`. It is an empty string for non-exposed services. |
+| `OSCAR_SERVICE_BASE_PATH` | Base exposed path: `/system/services/{service_name}/exposed` in default mode or `/` when using DNS in HTTPRoute mode (Ingress don't support DNS subdomains). It is an empty string for non-exposed services. |
 
 These variables are managed by OSCAR and are available in addition to the user-defined entries declared in `environment.variables`.
 

@@ -110,13 +110,12 @@ func serviceTokenFromForwardedURI(rawURI string) string {
 }
 
 func setServiceTokenCookie(c *gin.Context, serviceName string, token string) {
-	path := "/system/services/" + serviceName + "/exposed"
 	secure := strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") || c.Request.TLS != nil
 
 	http.SetCookie(c.Writer, &http.Cookie{ // #nosec G124
 		Name:     getServiceTokenCookieName(serviceName),
 		Value:    token,
-		Path:     path,
+		Path:     "/",
 		MaxAge:   0,
 		Secure:   secure,
 		HttpOnly: true,
