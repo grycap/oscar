@@ -58,17 +58,17 @@ usage(){
 Usage: $(basename "$0") [options]
 
 Options:
-  --devel        Deploy using the OSCAR devel branch without interactive prompts.
-  --metrics      Deploy metrics stack (Prometheus + Loki + Alloy) for reporting.
-  --oidc         Enable OIDC support for OSCAR (default: disabled).
-  --kueue        Enable Kueue support for CPU and memory quotas (default: disabled).
-  --kserve       Install KServe using deploy/kind-oscar-kserve.sh (default: disabled).
-  --minio-quotas Deploy MinIO with 1 replica and 4 PVCs to support bucket quotas.
-  --wildcards    Enable DNS wildcard support for Traefik (default for Traefik).
-  --host HOST    Use HOST as OSCAR host (default: localhost).
-  --ingress      Use NGINX Ingress as gateway controller.
-  --traefik      Use Traefik as gateway controller (default).
-  -h, --help     Show this help message and exit.
+    --devel                      Deploy using the OSCAR devel branch without interactive prompts.
+    --metrics                    Deploy metrics stack (Prometheus + Loki + Alloy) for reporting.
+    --oidc                       Enable OIDC support for OSCAR (default: disabled).
+    --kueue                      Enable Kueue support for CPU and memory quotas (default: disabled).
+    --kserve                     Install KServe using deploy/kind-oscar-kserve.sh (default: disabled).
+    --minio-quotas               Deploy MinIO with 1 replica and 4 PVCs to support bucket quotas.
+    --wildcards[=true|false]     Enable or disable DNS wildcard support for Traefik (default: true).
+    --host HOST                  Use HOST as OSCAR host (default: localhost).
+    --ingress                    Use NGINX Ingress as gateway controller.
+    --traefik                    Use Traefik as gateway controller (default).
+    -h, --help                   Show this help message and exit.
 EOF
 }
 
@@ -745,6 +745,15 @@ while [ "$#" -gt 0 ]; do
             ;;
         --wildcards)
             USE_DNS_WILDCARDS="true"
+            shift
+            ;;
+        --wildcards=*)
+            USE_DNS_WILDCARDS="${1#*=}"
+            if [ "$USE_DNS_WILDCARDS" != "true" ] && [ "$USE_DNS_WILDCARDS" != "false" ]; then
+                echo -e "$RED[!]$END_COLOR Invalid value for --wildcards: $USE_DNS_WILDCARDS (expected: true|false)"
+                usage
+                exit 1
+            fi
             shift
             ;;
         --ingress)
