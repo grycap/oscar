@@ -63,7 +63,13 @@ func BuildServiceAuthMiddlewareChain(cfg *types.Config, kubeClientset kubernetes
 		authHandler(c)
 	}
 
-	return []gin.HandlerFunc{GetServiceTokenMiddleware(back), wrapperHandler, GetServicePermissionsMiddleware(back)}
+	return []gin.HandlerFunc{
+		GetOIDCServiceAuthFormMiddleware(),
+		GetOIDCServiceAuthCookieMiddleware(),
+		GetServiceTokenMiddleware(back),
+		wrapperHandler,
+		GetServicePermissionsMiddleware(back),
+	}
 }
 
 // CustomAuth returns a custom auth handler (gin middleware)

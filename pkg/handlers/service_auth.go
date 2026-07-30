@@ -17,14 +17,21 @@ limitations under the License.
 package handlers
 
 import (
+	"errors"
 	"net/http"
+	"net/url"
+	"path"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 )
+
+var errInvalidServiceAuthReturnPath = errors.New("invalid service authentication return path")
 
 // MakeServiceAuthHandler godoc
 // @Summary Authenticate service
-// @Description Validate access to a specific service using Basic auth or Bearer token (service token or OIDC token), plus service-level permissions.
+// @Description Validate access to a specific service using Basic auth or Bearer token (service token or OIDC token), plus service-level permissions. A successful OIDC authentication sets a service-scoped browser cookie. Dashboard form POST requests redirect to the validated exposed-service path.
 // @Tags services
 // @Param serviceName path string true "Service name"
 // @Success 200 "OK"
@@ -35,9 +42,38 @@ import (
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/services/{serviceName}/auth [get]
+// @Router /system/services/{serviceName}/auth [post]
 func MakeServiceAuthHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if c.Request.Method == http.MethodPost {
+			returnTo, err := validatedServiceAuthReturnPath(c.Param("serviceName"), c.Request.PostFormValue("return_to"))
+			if err != nil {
+				c.AbortWithStatus(http.StatusBadRequest)
+				return
+			}
+			auth.SetOIDCServiceAuthCookie(c)
+			c.Redirect(http.StatusSeeOther, returnTo)
+			return
+		}
+		auth.SetOIDCServiceAuthCookie(c)
+		auth.SetForwardOIDCAuthorizationHeader(c)
 		c.Status(http.StatusOK)
-		return
 	}
+}
+
+func validatedServiceAuthReturnPath(serviceName, rawReturnTo string) (string, error) {
+	basePath := "/system/services/" + serviceName + "/exposed"
+	if strings.TrimSpace(rawReturnTo) == "" {
+		return basePath + "/", nil
+	}
+
+	returnTo, err := url.Parse(strings.TrimSpace(rawReturnTo))
+	if err != nil || returnTo.IsAbs() || returnTo.Host != "" || returnTo.User != nil || !strings.HasPrefix(returnTo.Path, "/") {
+		return "", errInvalidServiceAuthReturnPath
+	}
+	cleanedPath := path.Clean(returnTo.Path)
+	if cleanedPath != basePath && !strings.HasPrefix(cleanedPath, basePath+"/") {
+		return "", errInvalidServiceAuthReturnPath
+	}
+	return returnTo.String(), nil
 }

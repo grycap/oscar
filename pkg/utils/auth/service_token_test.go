@@ -294,7 +294,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 				req.Header.Set("X-Forwarded-Uri", tt.forwardedURI)
 			}
 			if tt.cookieToken != "" {
-				req.AddCookie(&http.Cookie{Name: getServiceTokenCookieName("svc"), Value: tt.cookieToken})
+				req.AddCookie(&http.Cookie{Name: getServiceAuthCookieName("svc"), Value: tt.cookieToken})
 			}
 			if tt.basicAuth {
 				req.SetBasicAuth("user", "password")
