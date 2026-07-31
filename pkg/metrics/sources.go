@@ -119,8 +119,8 @@ func DefaultSources(cfg *types.Config, back types.ServerlessBackend, kubeClients
 					Client:                &http.Client{Timeout: 100 * time.Second},
 					ParseFunc:             parse,
 					SourceName:            "exposed-request-logs",
-					ServiceFilterTemplate: "/system/services/%s/exposed",
-					ServiceFilterAll:      "/system/services/.+/exposed",
+					ServiceFilterTemplate: "\"RequestHost\":\"%s." + cfg.IngressHost + "\"",
+					ServiceFilterAll:      "[a-zA-Z0-9-]+." + cfg.IngressHost + "\" != \"minio." + cfg.IngressHost,
 				}
 			}
 		} else if kubeClientset != nil {
@@ -750,7 +750,7 @@ func parseHTTPAccessLog(line string) (RequestRecord, bool) {
 		timestamp = parsed
 	}
 
-	serviceID, good := extractServiceFromExposedPath(jsonformat["RequestPath"].(string))
+	serviceID, good := extractServiceFromExposedPath(jsonformat)
 	if !good {
 		return RequestRecord{}, false
 	}
@@ -811,21 +811,30 @@ func parseIngressAccessLog(line string) (RequestRecord, bool) {
 	}, true
 }
 
-func extractServiceFromExposedPath(path string) (string, bool) {
-	path = strings.SplitN(path, "?", 2)[0]
-	const prefix = "/system/services/"
-	if !strings.HasPrefix(path, prefix) {
+func extractServiceFromExposedPath(path map[string]interface{}) (string, bool) {
+	reqAddrRaw, ok := path["RequestAddr"]
+	if !ok {
 		return "", false
 	}
-	rest := strings.TrimPrefix(path, prefix)
-	parts := strings.SplitN(rest, "/", 3)
-	if len(parts) < 2 {
+	dns, ok := reqAddrRaw.(string)
+	if !ok || dns == "" {
 		return "", false
 	}
-	if parts[0] == "" || parts[1] != "exposed" {
+	routerNameRaw, ok := path["RouterName"]
+	if !ok {
 		return "", false
 	}
-	return parts[0], true
+	routerName, ok := routerNameRaw.(string)
+	if !ok {
+		return "", false
+	}
+	serviceName := strings.SplitN(dns, ".", 2)[0]
+	if strings.Contains(routerName, serviceName) {
+		return serviceName, true
+
+	} else {
+		return "", false
+	}
 }
 
 type NoopUserRosterSource struct{}
