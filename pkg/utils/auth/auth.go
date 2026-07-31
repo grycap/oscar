@@ -65,8 +65,8 @@ func BuildServiceAuthMiddlewareChain(cfg *types.Config, kubeClientset kubernetes
 
 	return []gin.HandlerFunc{
 		GetOIDCServiceAuthFormMiddleware(),
-		GetOIDCServiceAuthCookieMiddleware(),
-		GetServiceTokenMiddleware(back),
+		GetOIDCServiceAuthCookieMiddleware(cfg),
+		GetServiceTokenMiddleware(back, cfg),
 		wrapperHandler,
 		GetServicePermissionsMiddleware(back),
 	}

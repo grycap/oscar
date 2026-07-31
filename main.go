@@ -110,7 +110,7 @@ func main() {
 	// Create the router
 	r := gin.Default()
 
-	serviceAuthMiddleware := append(auth.BuildServiceAuthMiddlewareChain(cfg, kubeClientset, back), handlers.MakeServiceAuthHandler())
+	serviceAuthMiddleware := append(auth.BuildServiceAuthMiddlewareChain(cfg, kubeClientset, back), handlers.MakeServiceAuthHandler(cfg))
 	r.GET("/system/services/:serviceName/auth", serviceAuthMiddleware...)
 	r.POST("/system/services/:serviceName/auth", serviceAuthMiddleware...)
 

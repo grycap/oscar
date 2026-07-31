@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/v4/pkg/types"
 )
 
 const serviceAuthFormMaxBytes = 16 * 1024
@@ -66,7 +67,7 @@ func GetOIDCServiceAuthFormMiddleware() gin.HandlerFunc {
 
 // GetOIDCServiceAuthCookieMiddleware restores a browser's service-scoped OIDC
 // credential as a Bearer header so the regular OIDC middleware validates it.
-func GetOIDCServiceAuthCookieMiddleware() gin.HandlerFunc {
+func GetOIDCServiceAuthCookieMiddleware(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Method != http.MethodGet {
 			c.Next()
@@ -77,16 +78,17 @@ func GetOIDCServiceAuthCookieMiddleware() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-
-		token := getServiceAuthCookie(c, c.Param("serviceName"))
+		serviceScopedCookieName := cfg.IngressHost == "" || !cfg.ExposedServicesUseSubdomainRoute
+		token := getServiceAuthCookie(c, c.Param("serviceName"), serviceScopedCookieName)
 		if looksLikeJWT(token) {
 			// Promote the cookie's JWT to the Authorization header for the rest of the middleware chain.
 			c.Request.Header.Set("Authorization", "Bearer "+token)
 		}
+
 		// Set the cookie as expired and if validation succeeds,
 		// the OIDC middleware will set it again with a renewed expiration time.
 		// This prevents users from being blocked when the cookie is used after the OIDC token has expired.
-		setExpiredServiceCookie(c, c.Param("serviceName"))
+		setExpiredServiceCookie(c, c.Param("serviceName"), serviceScopedCookieName)
 
 		c.Next()
 	}
@@ -105,12 +107,13 @@ func SetForwardOIDCAuthorizationHeader(c *gin.Context) {
 
 // SetOIDCServiceAuthCookie stores an OIDC Bearer token after authentication and
 // service authorization have succeeded.
-func SetOIDCServiceAuthCookie(c *gin.Context) {
+func SetOIDCServiceAuthCookie(c *gin.Context, cfg *types.Config) {
 	token, ok := isAuthBearer(c)
 	if !ok || !looksLikeJWT(token) {
 		return
 	}
-	setServiceAuthCookie(c, c.Param("serviceName"), token)
+	isPathBased := cfg.IngressHost == "" || !cfg.ExposedServicesUseSubdomainRoute
+	setServiceAuthCookie(c, c.Param("serviceName"), token, isPathBased, isPathBased, cfg)
 }
 
 // looksLikeJWT only classifies the credential. The regular OIDC middleware is

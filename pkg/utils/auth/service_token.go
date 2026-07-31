@@ -31,7 +31,7 @@ const isServiceTokenKey = "isServiceToken"
 
 // GetServiceTokenMiddleware returns a gin middleware that checks if the request is authenticated with a service token
 // APPLY ONLY before auth.GetAuthMiddleware, since it relies on the fact that if a service token is provided, the user authentication will not be performed
-func GetServiceTokenMiddleware(back types.ServerlessBackend) gin.HandlerFunc {
+func GetServiceTokenMiddleware(back types.ServerlessBackend, cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if isBasicAuth(c) {
 			c.Next()
@@ -56,7 +56,7 @@ func GetServiceTokenMiddleware(back types.ServerlessBackend) gin.HandlerFunc {
 			for _, token := range tokens {
 				if token == service.Token {
 					c.Set(isServiceTokenKey, true)
-					setServiceAuthCookie(c, service.Name, token)
+					setServiceTokenAuthCookie(c, c.Param("serviceName"), token, cfg)
 					c.Next()
 					return
 				}
@@ -69,6 +69,11 @@ func GetServiceTokenMiddleware(back types.ServerlessBackend) gin.HandlerFunc {
 		c.Next()
 		return
 	}
+}
+
+func setServiceTokenAuthCookie(c *gin.Context, serviceName, token string, cfg *types.Config) {
+	isPathbased := cfg.IngressHost == "" || !cfg.ExposedServicesUseSubdomainRoute
+	setServiceAuthCookie(c, serviceName, token, true, isPathbased, cfg)
 }
 
 func getServiceTokenCandidates(c *gin.Context) []string {
@@ -90,7 +95,7 @@ func getServiceTokenCandidates(c *gin.Context) []string {
 		tokens = append(tokens, token)
 	}
 
-	if token := getServiceAuthCookie(c, c.Param("serviceName")); len(token) == tokenLength {
+	if token := getServiceAuthCookie(c, c.Param("serviceName"), true); len(token) == tokenLength {
 		tokens = append(tokens, token)
 	}
 

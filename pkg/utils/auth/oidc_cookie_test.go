@@ -24,7 +24,13 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/v4/pkg/types"
 )
+
+var cfg = &types.Config{
+	ExposedServicesUseSubdomainRoute: false,
+	OIDCEnable:                       true,
+}
 
 func TestGetOIDCServiceAuthFormMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -32,7 +38,7 @@ func TestGetOIDCServiceAuthFormMiddleware(t *testing.T) {
 	router := gin.New()
 	router.POST("/system/services/:serviceName/auth",
 		GetOIDCServiceAuthFormMiddleware(),
-		GetOIDCServiceAuthCookieMiddleware(),
+		GetOIDCServiceAuthCookieMiddleware(cfg),
 		func(c *gin.Context) {
 			gotHeader = c.GetHeader("Authorization")
 			c.Status(http.StatusOK)
@@ -119,7 +125,7 @@ func TestGetOIDCServiceAuthCookieMiddleware(t *testing.T) {
 			var gotHeader string
 			router := gin.New()
 			router.GET("/system/services/:serviceName/auth",
-				GetOIDCServiceAuthCookieMiddleware(),
+				GetOIDCServiceAuthCookieMiddleware(cfg),
 				func(c *gin.Context) {
 					gotHeader = c.GetHeader("Authorization")
 					c.Status(http.StatusOK)
@@ -150,8 +156,8 @@ func TestOIDCCookieTakesPrecedenceOverApplicationQueryToken(t *testing.T) {
 
 	router := gin.New()
 	router.GET("/system/services/:serviceName/auth",
-		GetOIDCServiceAuthCookieMiddleware(),
-		GetServiceTokenMiddleware(backend),
+		GetOIDCServiceAuthCookieMiddleware(cfg),
+		GetServiceTokenMiddleware(backend, &types.Config{ExposedServicesUseSubdomainRoute: false}),
 		func(c *gin.Context) {
 			if got := c.GetHeader("Authorization"); got != "Bearer "+jwt {
 				t.Fatalf("Authorization header = %q, want Bearer JWT", got)
@@ -194,7 +200,7 @@ func TestSetOIDCServiceAuthCookie(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()
 			router.GET("/system/services/:serviceName/auth", func(c *gin.Context) {
-				SetOIDCServiceAuthCookie(c)
+				SetOIDCServiceAuthCookie(c, &types.Config{ExposedServicesUseSubdomainRoute: false})
 				c.Status(http.StatusOK)
 			})
 

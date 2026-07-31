@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
 )
 
@@ -43,28 +44,36 @@ var errInvalidServiceAuthReturnPath = errors.New("invalid service authentication
 // @Security BearerAuth
 // @Router /system/services/{serviceName}/auth [get]
 // @Router /system/services/{serviceName}/auth [post]
-func MakeServiceAuthHandler() gin.HandlerFunc {
+func MakeServiceAuthHandler(cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Method == http.MethodPost {
-			returnTo, err := validatedServiceAuthReturnPath(c.Param("serviceName"), c.Request.PostFormValue("return_to"))
+			returnTo, err := validatedServiceAuthReturnPath(c, c.Param("serviceName"), c.Request.PostFormValue("return_to"), cfg)
 			if err != nil {
 				c.AbortWithStatus(http.StatusBadRequest)
 				return
 			}
-			auth.SetOIDCServiceAuthCookie(c)
+			auth.SetOIDCServiceAuthCookie(c, cfg)
 			c.Redirect(http.StatusSeeOther, returnTo)
 			return
 		}
-		auth.SetOIDCServiceAuthCookie(c)
+		auth.SetOIDCServiceAuthCookie(c, cfg)
 		auth.SetForwardOIDCAuthorizationHeader(c)
 		c.Status(http.StatusOK)
 	}
 }
 
-func validatedServiceAuthReturnPath(serviceName, rawReturnTo string) (string, error) {
-	basePath := "/system/services/" + serviceName + "/exposed"
+func validatedServiceAuthReturnPath(c *gin.Context, serviceName, rawReturnTo string, cfg *types.Config) (string, error) {
+	returnToPath := "/system/services/" + serviceName + "/exposed"
+	if cfg.IngressHost != "" && cfg.ExposedServicesUseSubdomainRoute {
+		protocol := "http"
+		if strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") || c.Request.TLS != nil {
+			protocol = "https"
+		}
+		returnToPath = protocol + "://" + serviceName + "." + cfg.IngressHost
+	}
+
 	if strings.TrimSpace(rawReturnTo) == "" {
-		return basePath + "/", nil
+		return returnToPath + "/", nil
 	}
 
 	returnTo, err := url.Parse(strings.TrimSpace(rawReturnTo))
@@ -72,7 +81,7 @@ func validatedServiceAuthReturnPath(serviceName, rawReturnTo string) (string, er
 		return "", errInvalidServiceAuthReturnPath
 	}
 	cleanedPath := path.Clean(returnTo.Path)
-	if cleanedPath != basePath && !strings.HasPrefix(cleanedPath, basePath+"/") {
+	if cleanedPath != returnToPath && !strings.HasPrefix(cleanedPath, returnToPath+"/") {
 		return "", errInvalidServiceAuthReturnPath
 	}
 	return returnTo.String(), nil

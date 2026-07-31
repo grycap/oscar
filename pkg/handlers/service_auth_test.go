@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/grycap/oscar/v4/pkg/types"
 )
 
 func TestMakeServiceAuthHandler(t *testing.T) {
@@ -46,7 +47,7 @@ func TestMakeServiceAuthHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()
-			router.GET("/system/services/:serviceName/auth", MakeServiceAuthHandler())
+			router.GET("/system/services/:serviceName/auth", MakeServiceAuthHandler(&types.Config{ExposedServicesUseSubdomainRoute: false}))
 
 			req, err := http.NewRequest(http.MethodGet, tt.targetPath, nil)
 			if err != nil {
@@ -66,7 +67,7 @@ func TestMakeServiceAuthHandler(t *testing.T) {
 func TestMakeServiceAuthHandlerRedirectsFormBootstrap(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.POST("/system/services/:serviceName/auth", MakeServiceAuthHandler())
+	router.POST("/system/services/:serviceName/auth", MakeServiceAuthHandler(&types.Config{ExposedServicesUseSubdomainRoute: false}))
 
 	form := url.Values{
 		"token":     {"header.payload.signature"},
@@ -92,7 +93,7 @@ func TestMakeServiceAuthHandlerRedirectsFormBootstrap(t *testing.T) {
 func TestMakeServiceAuthHandlerRejectsExternalReturnPath(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.POST("/system/services/:serviceName/auth", MakeServiceAuthHandler())
+	router.POST("/system/services/:serviceName/auth", MakeServiceAuthHandler(&types.Config{ExposedServicesUseSubdomainRoute: false}))
 
 	form := url.Values{"return_to": {"https://attacker.example/"}}
 	request := httptest.NewRequest(http.MethodPost, "/system/services/oscar-viva/auth", strings.NewReader(form.Encode()))
@@ -112,7 +113,7 @@ func TestMakeServiceAuthHandlerRejectsExternalReturnPath(t *testing.T) {
 func TestMakeServiceAuthHandlerSetsOIDCCookie(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.GET("/system/services/:serviceName/auth", MakeServiceAuthHandler())
+	router.GET("/system/services/:serviceName/auth", MakeServiceAuthHandler(&types.Config{ExposedServicesUseSubdomainRoute: false}))
 
 	request := httptest.NewRequest(http.MethodGet, "/system/services/oscar-viva/auth", nil)
 	request.Header.Set("Authorization", "Bearer header.payload.signature")
