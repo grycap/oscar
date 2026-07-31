@@ -380,6 +380,22 @@ func (s *Service) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// HideSensitiveInfoIfNotOwner hides sensitive information in the service if the user is not the owner.
+func (s *Service) HideSensitiveInfoIfNotOwner(uid string) {
+	if s.Owner == uid {
+		return
+	}
+	s.Token = "hidden"
+	s.Environment.Secrets = nil
+	s.Environment.Vars = nil
+	s.AllowedUsers = nil
+	if s.Labels != nil {
+		s.Labels = map[string]string{
+			"owner_name": s.Labels["owner_name"],
+		}
+	}
+}
+
 // Validate checks that the service definition is valid and returns an error if not.
 func (s Service) Validate() error {
 
@@ -638,6 +654,16 @@ func (service Service) ToYAML() (string, error) {
 // GetMinIOWebhookARN returns the MinIO's notify_webhook ARN for the specified function
 func (service *Service) GetMinIOWebhookARN() string {
 	return fmt.Sprintf("arn:minio:sqs:%s:%s:webhook", service.StorageProviders.MinIO[DefaultProvider].Region, service.Name)
+}
+
+// GetObjectStorageWebhookARN returns the notification target ARN expected by
+// the selected S3-compatible object storage.
+func (service *Service) GetObjectStorageWebhookARN(objectStorageType string) string {
+	partition := "minio"
+	if strings.EqualFold(strings.TrimSpace(objectStorageType), "rustfs") {
+		partition = "rustfs"
+	}
+	return fmt.Sprintf("arn:%s:sqs:%s:%s:webhook", partition, service.StorageProviders.MinIO[DefaultProvider].Region, service.Name)
 }
 
 func ConvertEnvVars(vars map[string]string) []v1.EnvVar {

@@ -379,7 +379,7 @@ func MakeGetSystemLogsHandler(kubeClientset kubernetes.Interface, cfg *types.Con
 		if len(targetPod.Spec.Containers) > 0 {
 			containerName = targetPod.Spec.Containers[0].Name
 			for _, container := range targetPod.Spec.Containers {
-				if container.Name == cfg.Name {
+				if container.Name == cfg.Username {
 					containerName = container.Name
 					break
 				}

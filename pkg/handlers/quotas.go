@@ -71,7 +71,7 @@ func MakeGetOwnQuotaHandler(qb types.QuotaBackend, cfg *types.Config) gin.Handle
 			writeQuotaError(c, err)
 			return
 		}
-		resp, err := fetchQuota(c.Request.Context(), cfg, qb, uid)
+		resp, err := FetchQuota(c.Request.Context(), cfg, qb, uid)
 		if err != nil {
 			writeQuotaError(c, err)
 			return
@@ -106,7 +106,7 @@ func MakeGetUserQuotaHandler(qb types.QuotaBackend, cfg *types.Config) gin.Handl
 			return
 		}
 
-		resp, err := fetchQuota(c.Request.Context(), cfg, qb, user)
+		resp, err := FetchQuota(c.Request.Context(), cfg, qb, user)
 		if err != nil {
 			writeQuotaError(c, err)
 			return
@@ -158,7 +158,7 @@ func MakeUpdateUserQuotaHandler(qb types.QuotaBackend, cfg *types.Config) gin.Ha
 			writeQuotaError(c, err)
 			return
 		}
-		resp, err := fetchQuota(c.Request.Context(), cfg, qb, user)
+		resp, err := FetchQuota(c.Request.Context(), cfg, qb, user)
 		if err != nil {
 			writeQuotaError(c, err)
 			return
@@ -175,8 +175,8 @@ func ensureKueueQuotasEnabled(cfg *types.Config) error {
 }
 
 func ensureQuotasEnabled(cfg *types.Config) error {
-	if cfg == nil || (!cfg.KueueEnable && !cfg.VolumeEnable) {
-		return fmt.Errorf("%w: /system/quotas requires KUEUE_ENABLE=true or VOLUME_ENABLE=true", errKueueDisabled)
+	if cfg == nil || (!cfg.KueueEnable && !cfg.VolumeEnable && !cfg.MinIOQuotaEnabled) {
+		return fmt.Errorf("%w: /system/quotas requires KUEUE_ENABLE=true, VOLUME_ENABLE=true, or MINIO_QUOTA_ENABLED=true", errKueueDisabled)
 	}
 	return nil
 }
@@ -189,7 +189,7 @@ func writeQuotaError(c *gin.Context, err error) {
 	c.String(http.StatusInternalServerError, err.Error())
 }
 
-func fetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, user string) (*types.QuotaResponse, error) {
+func FetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, user string) (*types.QuotaResponse, error) {
 	resp := &types.QuotaResponse{
 		UserID: user,
 	}
@@ -481,7 +481,7 @@ func getMinIOQuotaInfo(ctx context.Context, cfg *types.Config, kubeClientset kub
 		},
 	}
 	if cfg.MinIOProvider != nil {
-		minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
+		minIOAdminClient, err := types.MakeMinIOAdminClient(cfg)
 		if err != nil {
 			return nil, fmt.Errorf("creating MinIO admin client: %w", err)
 		}
@@ -494,7 +494,7 @@ func getMinIOQuotaInfo(ctx context.Context, cfg *types.Config, kubeClientset kub
 		if err != nil {
 			return nil, err
 		}
-		storageUsage, _, err := utils.AggregateBucketStorageUsage(dataUsage, ownedBuckets)
+		storageUsage, _, err := types.AggregateBucketStorageUsage(dataUsage, ownedBuckets)
 		if err != nil {
 			return nil, err
 		}
@@ -513,7 +513,7 @@ func getMinIOQuotaInfo(ctx context.Context, cfg *types.Config, kubeClientset kub
 		resp.Buckets.Max = buckets
 	}
 	if quota.StoragePerBucket != "" {
-		if _, err := utils.ParseStorageBytes(quota.StoragePerBucket); err != nil {
+		if _, err := types.ParseStorageBytes(quota.StoragePerBucket); err != nil {
 			return nil, fmt.Errorf("invalid minio.storage_per_bucket: %w", err)
 		}
 		resp.StoragePerBucket = types.MinIOStoragePerBucketQuota{
@@ -530,7 +530,7 @@ func updateMinIOQuota(ctx context.Context, user string, update *types.MinIOQuota
 		}
 	}
 	if update.StoragePerBucket != "" {
-		if _, err := utils.ParseStorageBytes(update.StoragePerBucket); err != nil {
+		if _, err := types.ParseStorageBytes(update.StoragePerBucket); err != nil {
 			return fmt.Errorf("invalid minio.storage_per_bucket: %w", err)
 		}
 	}
@@ -559,7 +559,7 @@ func updateMinIOQuota(ctx context.Context, user string, update *types.MinIOQuota
 }
 
 func applyMinIOStoragePerBucketQuota(owner, storagePerBucket string, cfg *types.Config) error {
-	minIOAdminClient, err := utils.MakeMinIOAdminClient(cfg)
+	minIOAdminClient, err := types.MakeMinIOAdminClient(cfg)
 	if err != nil {
 		return fmt.Errorf("creating MinIO admin client: %w", err)
 	}
@@ -575,7 +575,7 @@ func applyMinIOStoragePerBucketQuota(owner, storagePerBucket string, cfg *types.
 	return nil
 }
 
-func ValidateMinIOBucketCountQuota(cfg *types.Config, minIOAdminClient *utils.MinIOAdminClient, quota *types.MinIOQuotaUpdate, owner string, bucketNames []string) error {
+func ValidateMinIOBucketCountQuota(cfg *types.Config, minIOAdminClient *types.MinIOAdminClient, quota *types.MinIOQuotaUpdate, owner string, bucketNames []string) error {
 	if quota == nil || quota.Buckets == "" {
 		return nil
 	}

@@ -162,6 +162,20 @@ func TestGetMinIOWebhookARN(t *testing.T) {
 	}
 }
 
+func TestGetObjectStorageWebhookARN(t *testing.T) {
+	tests := map[string]string{
+		"":       "arn:minio:sqs:testregion:testname:webhook",
+		"minio":  "arn:minio:sqs:testregion:testname:webhook",
+		"rustfs": "arn:rustfs:sqs:testregion:testname:webhook",
+		"RUSTFS": "arn:rustfs:sqs:testregion:testname:webhook",
+	}
+	for storageType, expected := range tests {
+		if got := testService.GetObjectStorageWebhookARN(storageType); got != expected {
+			t.Errorf("storage type %q: expected %q, got %q", storageType, expected, got)
+		}
+	}
+}
+
 func TestGetSupervisorPath(t *testing.T) {
 	// Deep copy the testService
 	copy, err := deepcopy.Anything(testService)
@@ -720,6 +734,107 @@ func TestServiceUsesManagedVolume(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.service.UsesManagedVolume(); got != tt.want {
 				t.Errorf("UsesManagedVolume() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestServiceHideSensitiveInfoIfNotOwner(t *testing.T) {
+	tests := []struct {
+		name                 string
+		owner                string
+		uid                  string
+		expectedToken        string
+		expectedVars         map[string]string
+		expectedSecrets      map[string]string
+		expectedAllowedUsers []string
+		expectedLabels       map[string]string
+	}{
+		{
+			name:          "same owner preserves all fields",
+			owner:         "user1",
+			uid:           "user1",
+			expectedToken: "testtoken",
+			expectedVars: map[string]string{
+				"TEST_VAR": "testvalue",
+			},
+			expectedSecrets: map[string]string{
+				"TEST_SECRET": "testsecret",
+			},
+			expectedAllowedUsers: []string{"userA", "userB"},
+			expectedLabels: map[string]string{
+				"testlabel":  "testlabelvalue",
+				"owner_name": "owner1",
+			},
+		},
+		{
+			name:                 "not owner hides sensitive fields and preserves owner_name label",
+			owner:                "user1",
+			uid:                  "user2",
+			expectedToken:        "hidden",
+			expectedVars:         nil,
+			expectedSecrets:      nil,
+			expectedAllowedUsers: nil,
+			expectedLabels: map[string]string{
+				"owner_name": "owner1",
+			},
+		},
+		{
+			name:                 "not owner with nil labels does not panic",
+			owner:                "user1",
+			uid:                  "user2",
+			expectedToken:        "hidden",
+			expectedVars:         nil,
+			expectedSecrets:      nil,
+			expectedAllowedUsers: nil,
+			expectedLabels:       nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := Service{
+				Name:  "svc",
+				Owner: tt.owner,
+				Token: "testtoken",
+				Environment: struct {
+					Vars    map[string]string `json:"variables"`
+					Secrets map[string]string `json:"secrets"`
+				}{
+					Vars:    map[string]string{"TEST_VAR": "testvalue"},
+					Secrets: map[string]string{"TEST_SECRET": "testsecret"},
+				},
+				AllowedUsers: []string{"userA", "userB"},
+				Labels: map[string]string{
+					"testlabel":  "testlabelvalue",
+					"owner_name": "owner1",
+				},
+			}
+			if tt.name == "not owner with nil labels does not panic" {
+				svc.Labels = nil
+			}
+
+			svc.HideSensitiveInfoIfNotOwner(tt.uid)
+
+			if svc.Token != tt.expectedToken {
+				t.Fatalf("expected token %q, got %q", tt.expectedToken, svc.Token)
+			}
+			if len(svc.Environment.Vars) != len(tt.expectedVars) {
+				t.Fatalf("expected vars %v, got %v", tt.expectedVars, svc.Environment.Vars)
+			}
+			if len(svc.Environment.Secrets) != len(tt.expectedSecrets) {
+				t.Fatalf("expected secrets %v, got %v", tt.expectedSecrets, svc.Environment.Secrets)
+			}
+			if len(svc.AllowedUsers) != len(tt.expectedAllowedUsers) {
+				t.Fatalf("expected allowed users %v, got %v", tt.expectedAllowedUsers, svc.AllowedUsers)
+			}
+			if len(svc.Labels) != len(tt.expectedLabels) {
+				t.Fatalf("expected labels %v, got %v", tt.expectedLabels, svc.Labels)
+			}
+			for key, want := range tt.expectedLabels {
+				if svc.Labels[key] != want {
+					t.Fatalf("expected label %q to be %q, got %q", key, want, svc.Labels[key])
+				}
 			}
 		})
 	}
