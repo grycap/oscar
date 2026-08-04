@@ -40,7 +40,7 @@ func (m *mockRequestLogSource) Name() string {
 	return "mock"
 }
 
-func (m *mockRequestLogSource) ListRequests(ctx context.Context, tr TimeRange, serviceID string) ([]RequestRecord, *types.SourceStatus, error) {
+func (m *mockRequestLogSource) ListRequests(ctx context.Context, cfg *types.Config, tr TimeRange, serviceID string) ([]RequestRecord, *types.SourceStatus, error) {
 	return m.records, &types.SourceStatus{}, m.err
 }
 
@@ -254,7 +254,7 @@ func TestScopedRequestLogSource(t *testing.T) {
 		allowed: allowed,
 	}
 
-	records, _, _ := src.ListRequests(ctx, tr, "svc1")
+	records, _, _ := src.ListRequests(ctx, &types.Config{}, tr, "svc1")
 	if len(records) != 1 {
 		t.Errorf("Expected 1 record, got %d", len(records))
 	}
