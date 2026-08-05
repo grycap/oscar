@@ -110,9 +110,9 @@ func main() {
 	// Create the router
 	r := gin.Default()
 
-	r.GET("/system/services/:serviceName/auth",
-		append(auth.BuildServiceAuthMiddlewareChain(cfg, kubeClientset, back), handlers.MakeServiceAuthHandler())...,
-	)
+	serviceAuthMiddleware := append(auth.BuildServiceAuthMiddlewareChain(cfg, kubeClientset, back), handlers.MakeServiceAuthHandler(cfg))
+	r.GET("/system/services/:serviceName/auth", serviceAuthMiddleware...)
+	r.POST("/system/services/:serviceName/auth", serviceAuthMiddleware...)
 
 	// Swagger UI endpoint (disabled in production)
 	// r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

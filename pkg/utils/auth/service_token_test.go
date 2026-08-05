@@ -73,6 +73,8 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	validToken := strings.Repeat("a", tokenLength)
+	dnsSubdomainCfg := &types.Config{IngressHost: "localtest", ExposedServicesUseSubdomainRoute: true}
+	subpathCfg := &types.Config{IngressHost: "localtest", ExposedServicesUseSubdomainRoute: false}
 
 	// Decision graph paths for GetServiceTokenMiddleware:
 	// 1) basic auth -> pass through
@@ -95,6 +97,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 		wantStatus          int
 		wantNextHandler     bool
 		wantServiceTokenCtx bool
+		wantCookiePath      string
 	}{
 		{
 			name:                "allows request with basic auth",
@@ -142,6 +145,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			wantStatus:          http.StatusOK,
 			wantNextHandler:     true,
 			wantServiceTokenCtx: true,
+			wantCookiePath:      "/",
 		},
 		{
 			name:         "sets service token context from forwarded uri token",
@@ -153,6 +157,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			wantStatus:          http.StatusOK,
 			wantNextHandler:     true,
 			wantServiceTokenCtx: true,
+			wantCookiePath:      "/",
 		},
 		{
 			name:        "sets service token context from service cookie",
@@ -164,6 +169,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			wantStatus:          http.StatusOK,
 			wantNextHandler:     true,
 			wantServiceTokenCtx: true,
+			wantCookiePath:      "/",
 		},
 		{
 			name:        "sets service token context from cookie when query token belongs to exposed app",
@@ -176,6 +182,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			wantStatus:          http.StatusOK,
 			wantNextHandler:     true,
 			wantServiceTokenCtx: true,
+			wantCookiePath:      "/",
 		},
 		{
 			name:         "sets service token context from cookie when forwarded uri token belongs to exposed app",
@@ -188,6 +195,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			wantStatus:          http.StatusOK,
 			wantNextHandler:     true,
 			wantServiceTokenCtx: true,
+			wantCookiePath:      "/",
 		},
 		{
 			name:                "returns not found when backend returns not found",
@@ -217,6 +225,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			wantStatus:          http.StatusOK,
 			wantNextHandler:     true,
 			wantServiceTokenCtx: true,
+			wantCookiePath:      "/",
 		},
 		{
 			name:       "returns unauthorized when token does not match",
@@ -240,6 +249,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			wantStatus:          http.StatusOK,
 			wantNextHandler:     true,
 			wantServiceTokenCtx: true,
+			wantCookiePath:      "/",
 		},
 		{
 			name:         "both bearer token and valid query token present, bearer token is prioritised",
@@ -252,6 +262,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			wantStatus:          http.StatusOK,
 			wantNextHandler:     true,
 			wantServiceTokenCtx: true,
+			wantCookiePath:      "/",
 		},
 	}
 
@@ -267,7 +278,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			serviceTokenInContext := false
 
 			router.GET("/system/services/:serviceName/auth",
-				GetServiceTokenMiddleware(back),
+				GetServiceTokenMiddleware(back, dnsSubdomainCfg),
 				func(c *gin.Context) {
 					nextHandlerCalled = true
 					if isServiceToken, exists := c.Get(isServiceTokenKey); exists {
@@ -294,7 +305,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 				req.Header.Set("X-Forwarded-Uri", tt.forwardedURI)
 			}
 			if tt.cookieToken != "" {
-				req.AddCookie(&http.Cookie{Name: getServiceTokenCookieName("svc"), Value: tt.cookieToken})
+				req.AddCookie(&http.Cookie{Name: getServiceAuthCookieName("svc"), Value: tt.cookieToken})
 			}
 			if tt.basicAuth {
 				req.SetBasicAuth("user", "password")
@@ -320,10 +331,47 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 				if len(cookies) != 1 {
 					t.Fatalf("expected one service token cookie, got %d", len(cookies))
 				}
-				if cookies[0].Path != "/" {
-					t.Fatalf("expected service token cookie path /, got %q", cookies[0].Path)
+				if cookies[0].Path != tt.wantCookiePath {
+					t.Fatalf("expected service token cookie path %q, got %q", tt.wantCookiePath, cookies[0].Path)
 				}
 			}
 		})
 	}
+
+	t.Run("sets service token cookie path for subpath routing", func(t *testing.T) {
+		back := &serviceTokenMockBackend{
+			listServicesByNameResult: []*types.Service{{Name: "svc", Token: validToken}},
+		}
+
+		router := gin.New()
+		router.GET("/system/services/:serviceName/auth",
+			GetServiceTokenMiddleware(back, subpathCfg),
+			func(c *gin.Context) {
+				c.Status(http.StatusOK)
+			},
+		)
+
+		req, err := http.NewRequest(http.MethodGet, "/system/services/svc/auth?token="+validToken, nil)
+		if err != nil {
+			t.Fatalf("unexpected error creating request: %v", err)
+		}
+
+		resp := httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, resp.Code)
+		}
+		if !back.listServicesByNameCalled {
+			t.Fatalf("expected ListServicesByName to be called")
+		}
+
+		cookies := resp.Result().Cookies()
+		if len(cookies) != 1 {
+			t.Fatalf("expected one service token cookie, got %d", len(cookies))
+		}
+		if cookies[0].Path != getServiceAuthCookiePath("svc") {
+			t.Fatalf("expected service token cookie path %q, got %q", getServiceAuthCookiePath("svc"), cookies[0].Path)
+		}
+	})
 }
