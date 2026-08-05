@@ -57,7 +57,7 @@ func (f *fakeRequestLogs) Name() string {
 	return "request-logs"
 }
 
-func (f *fakeRequestLogs) ListRequests(ctx context.Context, tr TimeRange, serviceID string) ([]RequestRecord, *types.SourceStatus, error) {
+func (f *fakeRequestLogs) ListRequests(ctx context.Context, cfg *types.Config, tr TimeRange, serviceID string) ([]RequestRecord, *types.SourceStatus, error) {
 	if f.err != nil {
 		return nil, missingStatus(f.Name(), f.err), f.err
 	}
@@ -126,7 +126,7 @@ func TestSummaryAggregationTotals(t *testing.T) {
 		},
 	}
 
-	resp, err := agg.Summary(context.Background(), tr)
+	resp, err := agg.Summary(context.Background(), &types.Config{}, tr)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestSummaryIncludesExposedRequests(t *testing.T) {
 		},
 	}
 
-	resp, err := agg.Summary(context.Background(), tr)
+	resp, err := agg.Summary(context.Background(), &types.Config{}, tr)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestCountryAttributionUnknownExcluded(t *testing.T) {
 		},
 	}
 
-	resp, err := agg.Summary(context.Background(), tr)
+	resp, err := agg.Summary(context.Background(), &types.Config{}, tr)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -228,7 +228,7 @@ func TestBreakdownMembershipClassification(t *testing.T) {
 		},
 	}
 
-	resp, err := agg.Breakdown(context.Background(), tr, "user", false)
+	resp, err := agg.Breakdown(context.Background(), &types.Config{}, tr, "user", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -260,7 +260,7 @@ func TestMetricValueSyncCount(t *testing.T) {
 		},
 	}
 
-	resp, err := agg.MetricValue(context.Background(), tr, "svc-a", types.MetricRequestsSync)
+	resp, err := agg.MetricValue(context.Background(), &types.Config{}, tr, "svc-a", types.MetricRequestsSync)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -287,7 +287,7 @@ func TestBuildLokiQuery(t *testing.T) {
 
 func TestParseGinExecutionLogFromGinPrefix(t *testing.T) {
 	line := "[GIN] 2026-01-20T10:00:00Z | 200 |  12.345ms | 10.0.0.1 | POST    /job/test-service | user@example.com"
-	record, ok := parseGinExecutionLog(line)
+	record, ok := parseGinExecutionLog(line, &types.Config{})
 	if !ok {
 		t.Fatal("expected log line to parse")
 	}
@@ -308,7 +308,7 @@ func TestParseGinExecutionLogFromGinPrefix(t *testing.T) {
 
 func TestParseIngressAccessLog(t *testing.T) {
 	line := "172.18.0.1 - - [23/Jan/2026:18:13:07 +0000] \"GET /system/services/gmolto-nginx/exposed/ HTTP/1.1\" 200 17 \"-\" \"curl/8.7.1\" 109 0.003 [oscar-svc-gmolto-nginx-svc-80] [] 10.244.0.223:80 17 0.002 200 a72c147a794286b864361ecca7a31075"
-	record, ok := parseIngressAccessLog(line)
+	record, ok := parseIngressAccessLog(line, &types.Config{})
 	if !ok {
 		t.Fatal("expected ingress log line to parse")
 	}
@@ -332,7 +332,7 @@ func TestSummaryCompletenessMissingSource(t *testing.T) {
 		},
 	}
 
-	resp, err := agg.Summary(context.Background(), tr)
+	resp, err := agg.Summary(context.Background(), &types.Config{}, tr)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -364,11 +364,11 @@ func TestSummaryBreakdownReconciliation(t *testing.T) {
 		},
 	}
 
-	summary, err := agg.Summary(context.Background(), tr)
+	summary, err := agg.Summary(context.Background(), &types.Config{}, tr)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	breakdown, err := agg.Breakdown(context.Background(), tr, "service", false)
+	breakdown, err := agg.Breakdown(context.Background(), &types.Config{}, tr, "service", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -425,6 +425,6 @@ func BenchmarkSummaryAggregation(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = agg.Summary(context.Background(), tr)
+		_, _ = agg.Summary(context.Background(), &types.Config{}, tr)
 	}
 }

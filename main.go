@@ -171,9 +171,9 @@ func main() {
 	metricsSources := metrics.DefaultSources(cfg, back, kubeClientset)
 	metricsAgg := &metrics.Aggregator{Sources: metricsSources}
 	metricsGroup := r.Group("/system/metrics", auth.GetAuthMiddleware(cfg, kubeClientset))
-	metricsGroup.GET("", handlers.MakeMetricsSummaryHandler(back, metricsAgg))
-	metricsGroup.GET("/breakdown", handlers.MakeMetricsBreakdownHandler(back, metricsAgg))
-	metricsGroup.GET("/:serviceName", handlers.MakeMetricValueHandler(back, metricsAgg))
+	metricsGroup.GET("", handlers.MakeMetricsSummaryHandler(cfg, back, metricsAgg))
+	metricsGroup.GET("/breakdown", handlers.MakeMetricsBreakdownHandler(cfg, back, metricsAgg))
+	metricsGroup.GET("/:serviceName", handlers.MakeMetricValueHandler(cfg, back, metricsAgg))
 
 	// Quotas
 	if cfg.KueueEnable || cfg.VolumeEnable || cfg.MinIOQuotaEnabled {

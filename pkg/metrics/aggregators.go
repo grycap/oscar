@@ -15,7 +15,7 @@ type Aggregator struct {
 
 var errUnsupportedMetric = errors.New("unsupported metric for value query")
 
-func (a *Aggregator) MetricValue(ctx context.Context, tr TimeRange, serviceID string, metric types.MetricKey) (types.MetricValueResponse, error) {
+func (a *Aggregator) MetricValue(ctx context.Context, cfg *types.Config, tr TimeRange, serviceID string, metric types.MetricKey) (types.MetricValueResponse, error) {
 	if !types.IsMetricKeyValid(metric) {
 		return types.MetricValueResponse{}, errUnsupportedMetric
 	}
@@ -49,7 +49,7 @@ func (a *Aggregator) MetricValue(ctx context.Context, tr TimeRange, serviceID st
 		if a.Sources.RequestLogs == nil {
 			resp.Sources = append(resp.Sources, *missingStatus("request-logs", errors.New("request log source missing")))
 		} else {
-			records, status, _ := a.Sources.RequestLogs.ListRequests(ctx, tr, serviceID)
+			records, status, _ := a.Sources.RequestLogs.ListRequests(ctx, cfg, tr, serviceID)
 			if status != nil {
 				resp.Sources = append(resp.Sources, *status)
 			}
@@ -66,7 +66,7 @@ func (a *Aggregator) MetricValue(ctx context.Context, tr TimeRange, serviceID st
 		if a.Sources.ExposedRequestLogs == nil {
 			resp.Sources = append(resp.Sources, *missingStatus("exposed-request-logs", errors.New("exposed request log source missing")))
 		} else {
-			records, status, _ := a.Sources.ExposedRequestLogs.ListRequests(ctx, tr, serviceID)
+			records, status, _ := a.Sources.ExposedRequestLogs.ListRequests(ctx, cfg, tr, serviceID)
 			if status != nil {
 				resp.Sources = append(resp.Sources, *status)
 			}
@@ -79,7 +79,7 @@ func (a *Aggregator) MetricValue(ctx context.Context, tr TimeRange, serviceID st
 	return resp, nil
 }
 
-func (a *Aggregator) Summary(ctx context.Context, tr TimeRange) (types.MetricsSummaryResponse, error) {
+func (a *Aggregator) Summary(ctx context.Context, cfg *types.Config, tr TimeRange) (types.MetricsSummaryResponse, error) {
 	resp := types.MetricsSummaryResponse{
 		Start:   tr.Start,
 		End:     tr.End,
@@ -104,7 +104,7 @@ func (a *Aggregator) Summary(ctx context.Context, tr TimeRange) (types.MetricsSu
 	if a.Sources.RequestLogs == nil {
 		resp.Sources = append(resp.Sources, *missingStatus("request-logs", errors.New("request log source missing")))
 	} else {
-		records, requestStatus, _ := a.Sources.RequestLogs.ListRequests(ctx, tr, "")
+		records, requestStatus, _ := a.Sources.RequestLogs.ListRequests(ctx, cfg, tr, "")
 		if requestStatus != nil {
 			resp.Sources = append(resp.Sources, *requestStatus)
 		}
@@ -119,7 +119,7 @@ func (a *Aggregator) Summary(ctx context.Context, tr TimeRange) (types.MetricsSu
 	if a.Sources.ExposedRequestLogs == nil {
 		resp.Sources = append(resp.Sources, *missingStatus("exposed-request-logs", errors.New("exposed request log source missing")))
 	} else {
-		records, exposedStatus, _ := a.Sources.ExposedRequestLogs.ListRequests(ctx, tr, "")
+		records, exposedStatus, _ := a.Sources.ExposedRequestLogs.ListRequests(ctx, cfg, tr, "")
 		if exposedStatus != nil {
 			resp.Sources = append(resp.Sources, *exposedStatus)
 		}
@@ -132,7 +132,7 @@ func (a *Aggregator) Summary(ctx context.Context, tr TimeRange) (types.MetricsSu
 	return resp, nil
 }
 
-func (a *Aggregator) Breakdown(ctx context.Context, tr TimeRange, groupBy string, includeUsers bool) (types.MetricsBreakdownResponse, error) {
+func (a *Aggregator) Breakdown(ctx context.Context, cfg *types.Config, tr TimeRange, groupBy string, includeUsers bool) (types.MetricsBreakdownResponse, error) {
 	resp := types.MetricsBreakdownResponse{
 		Start:   tr.Start,
 		End:     tr.End,
@@ -142,7 +142,7 @@ func (a *Aggregator) Breakdown(ctx context.Context, tr TimeRange, groupBy string
 
 	var records []RequestRecord
 	if a.Sources.RequestLogs != nil {
-		records, _, _ = a.Sources.RequestLogs.ListRequests(ctx, tr, "")
+		records, _, _ = a.Sources.RequestLogs.ListRequests(ctx, cfg, tr, "")
 	}
 
 	groupBy = strings.ToLower(groupBy)
@@ -150,7 +150,7 @@ func (a *Aggregator) Breakdown(ctx context.Context, tr TimeRange, groupBy string
 	case "service":
 		var exposedRecords []RequestRecord
 		if a.Sources.ExposedRequestLogs != nil {
-			exposedRecords, _, _ = a.Sources.ExposedRequestLogs.ListRequests(ctx, tr, "")
+			exposedRecords, _, _ = a.Sources.ExposedRequestLogs.ListRequests(ctx, cfg, tr, "")
 		}
 		resp.Items = breakdownByService(records, exposedRecords, includeUsers)
 	case "user":

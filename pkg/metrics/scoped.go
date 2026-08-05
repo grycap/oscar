@@ -41,8 +41,8 @@ func (s *scopedRequestLogSource) Name() string {
 	return s.inner.Name()
 }
 
-func (s *scopedRequestLogSource) ListRequests(ctx context.Context, tr TimeRange, serviceID string) ([]RequestRecord, *types.SourceStatus, error) {
-	records, status, err := s.inner.ListRequests(ctx, tr, serviceID)
+func (s *scopedRequestLogSource) ListRequests(ctx context.Context, cfg *types.Config, tr TimeRange, serviceID string) ([]RequestRecord, *types.SourceStatus, error) {
+	records, status, err := s.inner.ListRequests(ctx, cfg, tr, serviceID)
 	if err != nil {
 		return records, status, err
 	}
