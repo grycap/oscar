@@ -239,7 +239,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						Visibility:   types.PRIVATE,
 						AllowedUsers: []string{},
 						Owner:        oldService.Owner,
-					}, utils.IsRustFSConfig(cfg))
+					}, utils.IsRustFSConfig(cfg), cfg)
 					if err != nil {
 						log.Printf("error while removing MinIO bucket %v", err)
 					}

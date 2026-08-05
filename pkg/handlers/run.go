@@ -125,7 +125,7 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 
 		}
 
-		if service.Owner != types.DefaultOwner && cfg.KueueEnable && !utils.VerifyWorkload(*service, service.Namespace, cfg) {
+		if service.Owner != cfg.Username && cfg.KueueEnable && !utils.VerifyWorkload(*service, service.Namespace, cfg) {
 			c.String(http.StatusBadRequest, "invalid workload: try to reduce the service resource (cpu, memory, etc.)")
 			return
 		}

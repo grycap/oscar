@@ -192,7 +192,7 @@ func setMinIOEnvVars(service types.Service, providerId string, cfg *types.Config
 			},
 		}
 		variables = append(variables, credentials...)
-	} else if uid == "cluster_admin" {
+	} else if uid == cfg.Username {
 		credentials := []v1.EnvVar{
 			{
 				Name: "AWS_ACCESS_KEY_ID",

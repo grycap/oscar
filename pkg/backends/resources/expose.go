@@ -236,7 +236,7 @@ func UpdateExpose(service types.Service, namespace string, kubeClientset kuberne
 	}
 
 	utils.UpdateWorkload(service, targetNamespace, cfg, getPodTemplateSpec)
-	if cfg.KueueEnable && service.Owner != types.DefaultOwner {
+	if cfg.KueueEnable && service.Owner != cfg.Username {
 		err = utils.CheckWorkloadAdmited(service, namespace, cfg, kubeClientset, getDeploymentSpec)
 		if err != nil {
 			return fmt.Errorf("Invalid workload after update: Error checking workload admission: change the cpu/memory requests")
@@ -457,7 +457,7 @@ func createDeployment(service types.Service, namespace string, kubeClientset kub
 	if err != nil {
 		return err
 	}
-	if cfg.KueueEnable && service.Owner != types.DefaultOwner {
+	if cfg.KueueEnable && service.Owner != cfg.Username {
 		err = utils.CheckWorkloadAdmited(service, namespace, cfg, kubeClientset, getDeploymentSpec)
 		if err != nil {
 			if err := utils.DeleteKueueLocalQueue(context.TODO(), cfg, service.Namespace, service.Name); err != nil {
@@ -475,7 +475,7 @@ func createDeployment(service types.Service, namespace string, kubeClientset kub
 func getDeploymentSpec(service types.Service, namespace string, cfg *types.Config) *apps.Deployment {
 	deployName := GetDeploymentName(service.Name)
 	minScale := int32(0)
-	if service.Owner == types.DefaultOwner || !cfg.KueueEnable {
+	if service.Owner == cfg.Username || !cfg.KueueEnable {
 		minScale = int32(service.Expose.MinScale)
 	}
 	uid := auth.FormatUID(service.Owner)
@@ -501,7 +501,7 @@ func getDeploymentSpec(service types.Service, namespace string, cfg *types.Confi
 		},
 		Status: apps.DeploymentStatus{},
 	}
-	if service.Owner != types.DefaultOwner && cfg.KueueEnable {
+	if service.Owner != cfg.Username && cfg.KueueEnable {
 		deployment.Spec.Template.ObjectMeta.Labels[types.KueueOwnerLabel] = uid
 
 		// TO DO: In KUEUE v0.16.0+ you can simply add quque name to use KUEUE

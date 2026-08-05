@@ -57,7 +57,7 @@ func BuildUserNamespace(cfg *types.Config, owner string) string {
 		return ""
 	}
 
-	if owner == "" || owner == types.DefaultOwner {
+	if owner == "" || owner == cfg.Username {
 		return cfg.ServicesNamespace
 	}
 
@@ -132,7 +132,7 @@ func EnsureUserNamespace(ctx context.Context, kubeClientset kubernetes.Interface
 				},
 			},
 		}
-		if owner == "" || owner == types.DefaultOwner {
+		if owner == "" || owner == cfg.Username {
 			// do not leak owner information for the shared namespace
 			delete(ns.Annotations, namespaceOwnerLabel)
 			delete(ns.Labels, namespaceOwnerHashLabel)
@@ -154,7 +154,7 @@ func EnsureUserNamespace(ctx context.Context, kubeClientset kubernetes.Interface
 			ns.Labels[namespaceManagedByLabel] = namespaceManagedByValue
 			updated = true
 		}
-		if owner != "" && owner != types.DefaultOwner {
+		if owner != "" && owner != cfg.Username {
 			if ns.Labels[namespaceOwnerHashLabel] != ownerHash(owner) {
 				ns.Labels[namespaceOwnerHashLabel] = ownerHash(owner)
 				updated = true
@@ -172,7 +172,7 @@ func EnsureUserNamespace(ctx context.Context, kubeClientset kubernetes.Interface
 	}
 
 	// Shared namespace does not require per-user RBAC bindings
-	if owner == "" || owner == types.DefaultOwner {
+	if owner == "" || owner == cfg.Username {
 		return nsName, nil
 	}
 

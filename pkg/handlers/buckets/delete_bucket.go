@@ -61,7 +61,7 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 		// Check owner
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
-			uid = types.DefaultOwner
+			uid = cfg.Username
 			deleteLogger.Printf("Deleting bucket '%s' for user '%s'", bucketName, uid)
 		} else {
 			var err error
@@ -106,7 +106,7 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 		}
 
-		if (uid == types.DefaultOwner) || (bucketOwner == uid) {
+		if (uid == cfg.Username) || (bucketOwner == uid) {
 			if utils.IsRustFSConfig(cfg) {
 				if err := objectStorageIAM.GetClient(c.Request.Context()).DeleteBucket(s3Client, bucketName); err != nil {
 					c.String(http.StatusInternalServerError, fmt.Sprintln(err))
@@ -120,7 +120,7 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 				BucketName: bucketName,
 				Visibility: v,
 				Owner:      uid,
-			})
+			}, cfg)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 				return

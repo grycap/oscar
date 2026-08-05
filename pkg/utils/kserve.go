@@ -398,7 +398,7 @@ func newKserveInferenceServiceSpec(service *types.Service, owner *KserveServiceO
 		localQueueName, ok := service.Labels["kueue.x-k8s.io/queue-name"]
 		if ok && localQueueName != "" {
 			labels["kueue.x-k8s.io/queue-name"] = localQueueName
-		} else if service.Owner != types.DefaultOwner {
+		} else if service.Owner != cfg.Username {
 			return nil, fmt.Errorf("missing required label 'kueue.x-k8s.io/queue-name' for KServe service with Kueue enabled")
 		}
 	}
@@ -499,7 +499,7 @@ func newKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServi
 		localQueueName, ok := service.Labels["kueue.x-k8s.io/queue-name"]
 		if ok && localQueueName != "" {
 			labels["kueue.x-k8s.io/queue-name"] = localQueueName
-		} else if service.Owner != types.DefaultOwner {
+		} else if service.Owner != cfg.Username {
 			return nil, fmt.Errorf("missing required label 'kueue.x-k8s.io/queue-name' for KServe service with Kueue enabled")
 		}
 	}

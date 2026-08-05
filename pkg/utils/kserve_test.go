@@ -299,9 +299,9 @@ func TestNewKserveInferenceServiceDefinition_KueueLabels(t *testing.T) {
 		},
 		{
 			name:    "kueue enabled missing queue for default owner",
-			owner:   oscarType.DefaultOwner,
+			owner:   "cluster_admin",
 			labels:  nil,
-			cfg:     &oscarType.Config{KueueEnable: true},
+			cfg:     &oscarType.Config{KueueEnable: true, Username: "cluster_admin"},
 			wantErr: "",
 		},
 	}
@@ -493,12 +493,13 @@ func TestNewKserveLLMInferenceServiceDefinition_KueueLabels(t *testing.T) {
 		},
 		{
 			name:   "kueue enabled missing queue for default owner",
-			owner:  oscarType.DefaultOwner,
+			owner:  "cluster_admin",
 			labels: nil,
 			cfg: &oscarType.Config{
 				KueueEnable:               true,
 				HTTPRouteGatewayName:      "name",
 				HTTPRouteGatewayNamespace: "namespace",
+				Username:                  "cluster_admin",
 			},
 			wantErr: "",
 		},

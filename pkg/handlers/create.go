@@ -84,7 +84,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			isAdminUser = true
-			service.Owner = types.DefaultOwner
+			service.Owner = cfg.Username
 			createLogger.Printf("Creating service '%s' for user '%s'", service.Name, service.Owner)
 		}
 		rawInput := cloneStorageIOConfigs(service.Input)
@@ -408,7 +408,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				if strings.ToLower(service.Visibility) == "" {
 					b.Visibility = types.PRIVATE
 				}
-				if service.Owner != types.DefaultOwner {
+				if service.Owner != cfg.Username {
 					if !utils.IsRustFSConfig(cfg) {
 						err := objectStorageIAM.GetClient(c.Request.Context()).SetPolicies(b)
 						if err != nil {

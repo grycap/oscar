@@ -37,6 +37,7 @@ func newTestConfig() *types.Config {
 		ServicesNamespace:                 "oscar-svc",
 		Namespace:                         "oscar",
 		Name:                              "oscar",
+		Username:                          "cluster_admin",
 		ServicePort:                       8080,
 		IngressServicesCORSAllowedOrigins: "*",
 		IngressServicesCORSAllowedMethods: "GET,POST",
@@ -51,7 +52,7 @@ func newExposeService(name string, nodePort int32, setAuth bool) types.Service {
 		Image:  "ghcr.io/grycap/test",
 		Script: "echo test",
 		Token:  "s3cr3t",
-		Owner:  types.DefaultOwner,
+		Owner:  "cluster_admin",
 		Expose: types.Expose{
 			MinScale:      1,
 			MaxScale:      3,

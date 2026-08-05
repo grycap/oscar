@@ -177,7 +177,8 @@ func TestMakeDeleteBucketHandlerDeletesWhenAuthorized(t *testing.T) {
 	defer server.Close()
 
 	cfg := &types.Config{
-		Name: "oscar",
+		Name:     "oscar",
+		Username: "cluster_admin",
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  server.URL,
 			Region:    "us-east-1",
@@ -194,7 +195,7 @@ func TestMakeDeleteBucketHandlerDeletesWhenAuthorized(t *testing.T) {
 	}{
 		{name: "owner can delete", uid: "alice", wantStatus: http.StatusNoContent},
 		{name: "non owner is forbidden", uid: "bob", wantStatus: http.StatusForbidden},
-		{name: "cluster admin can delete", uid: types.DefaultOwner, wantStatus: http.StatusNoContent},
+		{name: "cluster admin can delete", uid: "cluster_admin", wantStatus: http.StatusNoContent},
 	}
 
 	for _, tc := range testCases {

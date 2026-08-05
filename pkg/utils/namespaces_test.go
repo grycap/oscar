@@ -39,8 +39,8 @@ func TestBuildUserNamespace(t *testing.T) {
 	}{
 		{
 			name:     "default owner returns services namespace",
-			cfg:      &types.Config{ServicesNamespace: "oscar-svc"},
-			owner:    types.DefaultOwner,
+			cfg:      &types.Config{ServicesNamespace: "oscar-svc", Username: "cluster_admin"},
+			owner:    "cluster_admin",
 			expected: "oscar-svc",
 		},
 		{

@@ -245,7 +245,7 @@ func TestMakeGetBucketHandlerRestrictedMember(t *testing.T) {
 			return
 		} else if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/info-canned-policy" {
 			switch r.URL.Query().Get("name") {
-			case types.DefaultOwner:
+			case "cluster_admin":
 				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write([]byte(`{"PolicyName": "cluster_admin", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::demo/*"]}]}}`))
 				return
@@ -265,6 +265,7 @@ func TestMakeGetBucketHandlerRestrictedMember(t *testing.T) {
 	}))
 
 	cfg := &types.Config{
+		Username: "cluster_admin",
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  server.URL,
 			Region:    "us-east-1",

@@ -92,7 +92,7 @@ func MakeCreateVolumeHandler(cfg *types.Config, back types.ServerlessBackend) gi
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
-		if owner != types.DefaultOwner {
+		if owner != cfg.Username {
 			if err := utils.ValidateManagedVolumeQuota(auth.FormatUID(owner), namespace, req.Size, cfg, back.GetKubeClientset()); err != nil {
 				c.String(http.StatusBadRequest, err.Error())
 				return
@@ -204,7 +204,7 @@ func MakeDeleteVolumeHandler(cfg *types.Config, back types.ServerlessBackend) gi
 func resolveVolumeCaller(c *gin.Context, cfg *types.Config, back types.ServerlessBackend) (string, string, error) {
 	authHeader := c.GetHeader("Authorization")
 	if len(strings.Split(authHeader, "Bearer")) == 1 {
-		return cfg.ServicesNamespace, types.DefaultOwner, nil
+		return cfg.ServicesNamespace, cfg.Username, nil
 	}
 
 	uid, err := auth.GetUIDFromContext(c)

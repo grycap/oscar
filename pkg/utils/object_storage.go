@@ -110,8 +110,8 @@ func AllowedUsersFromTags(metadata map[string]string) []string {
 	return users
 }
 
-func UserAllowedByTags(uid string, metadata map[string]string) bool {
-	if uid == types.DefaultOwner {
+func UserAllowedByTags(cfg *types.Config, uid string, metadata map[string]string) bool {
+	if uid == cfg.Username {
 		return true
 	}
 	if metadata["owner"] == uid {

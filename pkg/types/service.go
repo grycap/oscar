@@ -150,6 +150,7 @@ const (
 
 	IsolationLevelService = "SERVICE"
 
+	// Deprecated
 	DefaultOwner = "cluster_admin"
 
 	JobOwnerExecutionAnnotation = "oscar.grycap/job-owner"
@@ -293,7 +294,7 @@ type Service struct {
 	Clusters map[string]Cluster `json:"clusters,omitempty"`
 
 	// EGI UID of the user that created the service
-	// If the service is created through basic auth the default owner is "cluster_admin"
+	// If the service is created through basic auth the default owner is the configured Config.Username
 	Owner string `json:"owner"`
 
 	// Namespace where the service resources are deployed. Internal use only, not part of FDL.

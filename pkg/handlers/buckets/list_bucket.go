@@ -135,7 +135,7 @@ func MakeListHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 			bucketVisibility := objectStorageIAM.GetClient(c.Request.Context()).GetCurrentResourceVisibility(types.MinIOBucket{BucketName: *b.Name, Owner: uid})
 			if utils.IsRustFSConfig(cfg) {
-				if !isAdminUser && !utils.UserAllowedByTags(uid, metadata) {
+				if !isAdminUser && !utils.UserAllowedByTags(cfg, uid, metadata) {
 					continue
 				}
 				bucketVisibility = utils.VisibilityFromObjectStorageTags(metadata)

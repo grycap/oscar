@@ -217,7 +217,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				Visibility:   service.Visibility,
 				AllowedUsers: service.AllowedUsers,
 				Owner:        service.Owner,
-			}, utils.IsRustFSConfig(cfg))
+			}, utils.IsRustFSConfig(cfg), cfg)
 
 			if err != nil {
 				return fmt.Errorf("error while removing MinIO bucket %v", err)
@@ -278,7 +278,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 						Visibility:   service.Visibility,
 						AllowedUsers: service.AllowedUsers,
 						Owner:        service.Owner,
-					}, utils.IsRustFSConfig(cfg))
+					}, utils.IsRustFSConfig(cfg), cfg)
 					if err != nil {
 						return fmt.Errorf("error while removing MinIO bucket %v", err)
 					}
@@ -313,7 +313,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				Visibility:   types.PRIVATE,
 				AllowedUsers: []string{},
 				Owner:        service.Owner,
-			}, utils.IsRustFSConfig(cfg))
+			}, utils.IsRustFSConfig(cfg), cfg)
 			if err != nil {
 				log.Printf("error while removing MinIO bucket %v", err)
 			}
@@ -340,11 +340,11 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	return nil
 }
 
-func DeleteMinIOBuckets(s3Client *s3.S3, minIOAdminClient *types.MinIOAdminClient, bucket types.MinIOBucket) error {
-	return deleteObjectStorageBuckets(s3Client, minIOAdminClient, bucket, false)
+func DeleteMinIOBuckets(s3Client *s3.S3, minIOAdminClient *types.MinIOAdminClient, bucket types.MinIOBucket, cfg *types.Config) error {
+	return deleteObjectStorageBuckets(s3Client, minIOAdminClient, bucket, false, cfg)
 }
 
-func deleteObjectStorageBuckets(s3Client *s3.S3, minIOAdminClient *types.MinIOAdminClient, bucket types.MinIOBucket, skipPolicies bool) error {
+func deleteObjectStorageBuckets(s3Client *s3.S3, minIOAdminClient *types.MinIOAdminClient, bucket types.MinIOBucket, skipPolicies bool, cfg *types.Config) error {
 	var policyName string
 	var isGroup bool
 	if strings.ToLower(bucket.Visibility) == types.PUBLIC {
@@ -353,7 +353,7 @@ func deleteObjectStorageBuckets(s3Client *s3.S3, minIOAdminClient *types.MinIOAd
 	} else {
 		policyName = bucket.Owner
 	}
-	if bucket.Owner != types.DefaultOwner && !skipPolicies {
+	if bucket.Owner != cfg.Username && !skipPolicies {
 		err := minIOAdminClient.RemoveResource(bucket.BucketName, policyName, isGroup)
 		if err != nil {
 			return fmt.Errorf("error removing resource")

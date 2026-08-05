@@ -152,7 +152,7 @@ func MakePresignHandler(cfg *types.Config) gin.HandlerFunc {
 		authHeader := c.GetHeader("Authorization")
 		isAdmin := len(strings.Split(authHeader, "Bearer")) == 1
 
-		requester := cfg.Name
+		requester := cfg.Username
 		if !isAdmin {
 			requester, err = auth.GetUIDFromContext(c)
 			if err != nil {
@@ -173,7 +173,7 @@ func MakePresignHandler(cfg *types.Config) gin.HandlerFunc {
 
 		owner := metadata["owner"]
 		if owner == "" {
-			owner = types.DefaultOwner
+			owner = cfg.Username
 		}
 
 		visibility := adminClient.GetCurrentResourceVisibility(types.MinIOBucket{BucketName: bucketName, Owner: owner})

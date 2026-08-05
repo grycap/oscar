@@ -63,7 +63,7 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			return
 		}
 
-		requester := types.DefaultOwner
+		requester := cfg.Username
 		if !isAdmin {
 			requester, err = auth.GetUIDFromContext(c)
 			if err != nil {
@@ -83,7 +83,7 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 
 		ownerCandidate := metadata["owner"]
 		if ownerCandidate == "" {
-			ownerCandidate = types.DefaultOwner
+			ownerCandidate = cfg.Username
 		}
 
 		visibility := objectStorageIAM.GetClient(c.Request.Context()).GetCurrentResourceVisibility(types.MinIOBucket{BucketName: bucketName, Owner: ownerCandidate})
@@ -102,7 +102,7 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 		}
 
-		if !isAdmin && utils.IsRustFSConfig(cfg) && !utils.UserAllowedByTags(requester, metadata) {
+		if !isAdmin && utils.IsRustFSConfig(cfg) && !utils.UserAllowedByTags(cfg, requester, metadata) {
 			c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", requester))
 			return
 		}

@@ -392,7 +392,7 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 		// Create job definition
 		ttl := int32(cfg.TTLJob) // #nosec
 		suspend := false
-		if service.Owner != types.DefaultOwner && cfg.KueueEnable {
+		if service.Owner != cfg.Username && cfg.KueueEnable {
 			suspend = true
 		}
 		job := &batchv1.Job{
@@ -428,7 +428,7 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 		}
 
 		// Point the job to the service's LocalQueue so Kueue can admit it.
-		if service.Owner != types.DefaultOwner && cfg.KueueEnable {
+		if service.Owner != cfg.Username && cfg.KueueEnable {
 			if job.Labels == nil {
 				job.Labels = make(map[string]string)
 			}
