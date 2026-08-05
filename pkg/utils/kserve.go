@@ -372,8 +372,8 @@ func newKserveInferenceServiceSpec(service *types.Service, owner *KserveServiceO
 		"protocolVersion": service.Kserve.Inference.APIVersion,
 	}
 
-	if service.Kserve.Inference.Runtime != "" {
-		modelSpec["runtime"] = service.Kserve.Inference.Runtime
+	if service.Kserve.Inference.RuntimeImage != "" {
+		modelSpec["runtime"] = service.Kserve.Inference.RuntimeImage
 	}
 	// TO DO: consider if we want to inject root path for LLM services as well, and if so, how to handle the case when the framework is vllm that expects the prefix to be preserved for routing
 	//injectRootPath(service)
@@ -436,8 +436,8 @@ func updateKserveInferenceServiceSpec(service *types.Service, oldIsvc *unstructu
 		"storageUri":      service.Kserve.StorageUri,
 		"protocolVersion": service.Kserve.Inference.APIVersion,
 	}
-	if service.Kserve.Inference.Runtime != "" {
-		modelSpec["runtime"] = service.Kserve.Inference.Runtime
+	if service.Kserve.Inference.RuntimeImage != "" {
+		modelSpec["runtime"] = service.Kserve.Inference.RuntimeImage
 	}
 
 	modelSpec["resources"] = resources

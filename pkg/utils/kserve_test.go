@@ -1018,8 +1018,8 @@ func TestCheckKserveUpdate(t *testing.T) {
 		{
 			name: "cannot change runtime",
 			mutate: func(oldSvc, newSvc *oscarType.Service) {
-				oldSvc.Kserve.Inference.Runtime = "kserve-runtime-a"
-				newSvc.Kserve.Inference.Runtime = "kserve-runtime-b"
+				oldSvc.Kserve.Inference.RuntimeImage = "kserve-runtime-a"
+				newSvc.Kserve.Inference.RuntimeImage = "kserve-runtime-b"
 			},
 			wantErr: true,
 		},

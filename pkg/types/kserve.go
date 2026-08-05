@@ -137,7 +137,7 @@ func (k Kserve) ValidateUpdate(old Kserve) error {
 		if old.Inference == nil || k.Inference == nil {
 			return fmt.Errorf("inference configuration cannot be nil for KServe service")
 		}
-		if old.Inference.Runtime != k.Inference.Runtime {
+		if old.Inference.RuntimeImage != k.Inference.RuntimeImage {
 			return fmt.Errorf("cannot update runtime for KServe")
 		}
 		if old.Inference.ModelFormat != k.Inference.ModelFormat {
@@ -186,13 +186,15 @@ func (k Kserve) Equal(other Kserve) bool {
 }
 
 type KserveInference struct {
-	// ModelFormat the model format to use for KServe InferenceService
+	// ModelFormat the model format to use for KServe InferenceService.
+	// Every model format has its own runtime and the available runtimes may vary depending on the cluster configuration.
 	// ("onnx", "sklearn", "xgboost", "pytorch", "tensorflow", "triton", "huggingface").
 	ModelFormat string `json:"model_format,omitempty"`
-	// Runtime the KServe runtime to use
+	// RuntimeImage the KServe runtime to use. Its a custom runtime if
+	// the available runtimes in the model format are not enough
 	// Ref: https://kserve.github.io/website/docs/concepts/resources/servingruntime
 	// Optional.
-	Runtime string `json:"runtime,omitempty"`
+	RuntimeImage string `json:"runtime_image,omitempty"`
 	// Can be used to specify the protocol version for KServe (e.g., "v1", "v2").
 	// Optional. (default: "v1")
 	APIVersion string `json:"api_version,omitempty" default:"v1"`
@@ -234,7 +236,7 @@ func (k KserveInference) Validate() error {
 
 func (k KserveInference) Equal(other KserveInference) bool {
 	return k.ModelFormat == other.ModelFormat &&
-		k.Runtime == other.Runtime &&
+		k.RuntimeImage == other.RuntimeImage &&
 		k.APIVersion == other.APIVersion
 }
 
