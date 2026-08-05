@@ -66,7 +66,7 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 			return
 		}
 		isAdminUser = false
-		uid = cfg.Name
+		uid = cfg.Username
 
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
@@ -117,7 +117,7 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 			return
 		}
 
-		ownerName := "oscar"
+		ownerName := cfg.Username
 		if !isAdminUser {
 			ownerName = auth.GetUserNameFromContext(c)
 			ownerName = utils.RemoveAccents(ownerName)

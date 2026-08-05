@@ -62,7 +62,7 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
-			uid = cfg.Name
+			uid = cfg.Username
 		} else {
 			uid, err = auth.GetUIDFromContext(c)
 			if err != nil {

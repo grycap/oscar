@@ -294,7 +294,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 		if len(newServiceBuckets) > 0 {
-			ownerName := "oscar"
+			ownerName := cfg.Username
 			if !isAdminUser {
 				ownerName = auth.GetUserNameFromContext(c)
 				ownerName = utils.RemoveAccents(ownerName)
