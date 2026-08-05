@@ -55,7 +55,7 @@ func (f *fakeRequestLogs) Name() string {
 	return "request-logs"
 }
 
-func (f *fakeRequestLogs) ListRequests(ctx context.Context, tr metrics.TimeRange, serviceID string) ([]metrics.RequestRecord, *types.SourceStatus, error) {
+func (f *fakeRequestLogs) ListRequests(ctx context.Context, cfg *types.Config, tr metrics.TimeRange, serviceID string) ([]metrics.RequestRecord, *types.SourceStatus, error) {
 	if serviceID == "" {
 		return f.records, &types.SourceStatus{Name: f.Name(), Status: "ok"}, nil
 	}
@@ -81,16 +81,16 @@ func (f *fakeCountrySource) CountryForRecord(ctx context.Context, record metrics
 	return record.Country, &types.SourceStatus{Name: f.Name(), Status: "ok"}, nil
 }
 
-func setupMetricsRouter(back types.ServerlessBackend, agg *metrics.Aggregator, middlewares ...gin.HandlerFunc) *gin.Engine {
+func setupMetricsRouter(cfg *types.Config, back types.ServerlessBackend, agg *metrics.Aggregator, middlewares ...gin.HandlerFunc) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	for _, middleware := range middlewares {
 		router.Use(middleware)
 	}
-	router.GET("/system/metrics", MakeMetricsSummaryHandler(back, agg))
-	router.GET("/system/metrics/", MakeMetricsSummaryHandler(back, agg))
-	router.GET("/system/metrics/breakdown", MakeMetricsBreakdownHandler(back, agg))
-	router.GET("/system/metrics/:serviceName", MakeMetricValueHandler(back, agg))
+	router.GET("/system/metrics", MakeMetricsSummaryHandler(cfg, back, agg))
+	router.GET("/system/metrics/", MakeMetricsSummaryHandler(cfg, back, agg))
+	router.GET("/system/metrics/breakdown", MakeMetricsBreakdownHandler(cfg, back, agg))
+	router.GET("/system/metrics/:serviceName", MakeMetricValueHandler(cfg, back, agg))
 	return router
 }
 
@@ -102,7 +102,7 @@ func TestMetricValueHandler(t *testing.T) {
 			UsageMetrics: &fakeUsageMetrics{cpu: 2.5, gpu: 1.0},
 		},
 	}
-	router := setupMetricsRouter(back, agg)
+	router := setupMetricsRouter(&types.Config{}, back, agg)
 
 	req := httptest.NewRequest(http.MethodGet, "/system/metrics/svc-a?metric=cpu-hours&start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z", nil)
 	rec := httptest.NewRecorder()
@@ -132,7 +132,7 @@ func TestMetricValueHandlerAllMetrics(t *testing.T) {
 			}},
 		},
 	}
-	router := setupMetricsRouter(back, agg)
+	router := setupMetricsRouter(&types.Config{}, back, agg)
 
 	req := httptest.NewRequest(http.MethodGet, "/system/metrics/svc-a?start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z", nil)
 	rec := httptest.NewRecorder()
@@ -173,7 +173,7 @@ func TestMetricValueHandlerBasicAuthAllowsDeletedServiceHistory(t *testing.T) {
 			}},
 		},
 	}
-	router := setupMetricsRouter(back, agg)
+	router := setupMetricsRouter(&types.Config{}, back, agg)
 
 	req := httptest.NewRequest(http.MethodGet, "/system/metrics/deleted-svc?metric=requests-sync-per-service&start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z", nil)
 	req.Header.Set("Authorization", "Basic b3NjYXI6cGFzcw==")
@@ -202,7 +202,7 @@ func TestMetricValueHandlerOIDCDeletedServiceNotFound(t *testing.T) {
 			}},
 		},
 	}
-	router := setupMetricsRouter(back, agg, func(c *gin.Context) {
+	router := setupMetricsRouter(&types.Config{}, back, agg, func(c *gin.Context) {
 		c.Set("uidOrigin", "u1")
 		c.Next()
 	})
@@ -230,7 +230,7 @@ func TestMetricsSummaryHandler(t *testing.T) {
 			CountrySource: &fakeCountrySource{},
 		},
 	}
-	router := setupMetricsRouter(back, agg)
+	router := setupMetricsRouter(&types.Config{}, back, agg)
 
 	req := httptest.NewRequest(http.MethodGet, "/system/metrics?start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z", nil)
 	rec := httptest.NewRecorder()
@@ -260,7 +260,7 @@ func TestMetricsSummaryDefaultsToLastDay(t *testing.T) {
 			CountrySource:    &fakeCountrySource{},
 		},
 	}
-	router := setupMetricsRouter(back, agg)
+	router := setupMetricsRouter(&types.Config{}, back, agg)
 
 	before := time.Now().UTC()
 	req := httptest.NewRequest(http.MethodGet, "/system/metrics", nil)
@@ -296,7 +296,7 @@ func TestMetricsBreakdownCSVExport(t *testing.T) {
 			CountrySource: &fakeCountrySource{},
 		},
 	}
-	router := setupMetricsRouter(back, agg)
+	router := setupMetricsRouter(&types.Config{}, back, agg)
 
 	req := httptest.NewRequest(http.MethodGet, "/system/metrics/breakdown?start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z&group_by=service&format=csv", nil)
 	rec := httptest.NewRecorder()
@@ -316,7 +316,7 @@ func TestMetricsBreakdownCSVExport(t *testing.T) {
 func TestMetricsBreakdownInvalidTimeRange(t *testing.T) {
 	back := backends.MakeFakeBackend()
 	agg := &metrics.Aggregator{}
-	router := setupMetricsRouter(back, agg)
+	router := setupMetricsRouter(&types.Config{}, back, agg)
 	req := httptest.NewRequest(http.MethodGet, "/system/metrics/breakdown?start=bad&end=2026-01-02T00:00:00Z&group_by=service", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -328,7 +328,7 @@ func TestMetricsBreakdownInvalidTimeRange(t *testing.T) {
 func TestMetricsValueMissingServiceID(t *testing.T) {
 	back := backends.MakeFakeBackend()
 	agg := &metrics.Aggregator{}
-	router := setupMetricsRouter(back, agg)
+	router := setupMetricsRouter(&types.Config{}, back, agg)
 	req := httptest.NewRequest(http.MethodGet, "/system/metrics/%20?metric=cpu-hours&start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -340,7 +340,7 @@ func TestMetricsValueMissingServiceID(t *testing.T) {
 func TestMetricsSummaryTimeRangeOrder(t *testing.T) {
 	back := backends.MakeFakeBackend()
 	agg := &metrics.Aggregator{}
-	router := setupMetricsRouter(back, agg)
+	router := setupMetricsRouter(&types.Config{}, back, agg)
 	req := httptest.NewRequest(http.MethodGet, "/system/metrics?start=2026-01-02T00:00:00Z&end=2026-01-01T00:00:00Z", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -388,7 +388,7 @@ func TestMetricsSummaryHandlerScopesOIDCToVisibleServices(t *testing.T) {
 			CountrySource: &fakeCountrySource{},
 		},
 	}
-	router := setupMetricsRouter(back, agg, func(c *gin.Context) {
+	router := setupMetricsRouter(&types.Config{}, back, agg, func(c *gin.Context) {
 		c.Set("uidOrigin", "user@example.org")
 		c.Next()
 	})
@@ -444,7 +444,7 @@ func TestMetricsSummaryHandlerBasicAuthSeesAllServices(t *testing.T) {
 			CountrySource: &fakeCountrySource{},
 		},
 	}
-	router := setupMetricsRouter(back, agg)
+	router := setupMetricsRouter(&types.Config{}, back, agg)
 
 	req := httptest.NewRequest(http.MethodGet, "/system/metrics?start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z", nil)
 	req.Header.Set("Authorization", "Basic b3NjYXI6cGFzcw==")
@@ -487,7 +487,7 @@ func TestMetricsBreakdownHandlerScopesOIDCToVisibleServices(t *testing.T) {
 			}},
 		},
 	}
-	router := setupMetricsRouter(back, agg, func(c *gin.Context) {
+	router := setupMetricsRouter(&types.Config{}, back, agg, func(c *gin.Context) {
 		c.Set("uidOrigin", "user@example.org")
 		c.Next()
 	})
@@ -521,7 +521,7 @@ func TestMetricValueHandlerRejectsUnauthorizedOIDCService(t *testing.T) {
 			UsageMetrics: &fakeUsageMetrics{cpu: 2.5, gpu: 1.0},
 		},
 	}
-	router := setupMetricsRouter(back, agg, func(c *gin.Context) {
+	router := setupMetricsRouter(&types.Config{}, back, agg, func(c *gin.Context) {
 		c.Set("uidOrigin", "user@example.org")
 		c.Next()
 	})

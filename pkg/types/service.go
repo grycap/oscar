@@ -630,7 +630,7 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 	}
 
 	// Add OSCAR-managed environment variables
-	addServiceMetadataEnvVars(podSpec, service)
+	addServiceMetadataEnvVars(podSpec, service, cfg)
 
 	// Add the required environment variables for the watchdog
 	addWatchdogEnvVars(podSpec, cfg, service)
@@ -801,7 +801,11 @@ func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) {
 	}
 }
 
-func addServiceMetadataEnvVars(p *v1.PodSpec, service *Service) {
+func addServiceMetadataEnvVars(p *v1.PodSpec, service *Service, cfg *Config) {
+	exposedBasePath := service.GetExposedBasePath()
+	if exposedBasePath != "" && service.UsesDNSRoute(cfg) {
+		exposedBasePath = "/"
+	}
 	requiredEnvVars := []v1.EnvVar{
 		{
 			Name:  OscarServiceNameEnvVar,
@@ -813,7 +817,7 @@ func addServiceMetadataEnvVars(p *v1.PodSpec, service *Service) {
 		},
 		{
 			Name:  OscarServiceBasePathEnvVar,
-			Value: service.GetExposedBasePath(),
+			Value: exposedBasePath,
 		},
 	}
 
@@ -845,6 +849,16 @@ func (service *Service) GetExposedBasePath() string {
 		return ""
 	}
 	return fmt.Sprintf("/system/services/%s/exposed", service.Name)
+}
+
+// UsesDNSRoute reports whether the service is exposed through a Gateway API
+// HTTPRoute instead of a static NodePort.
+func (service *Service) UsesDNSRoute(cfg *Config) bool {
+	return service != nil &&
+		cfg != nil &&
+		strings.EqualFold(strings.TrimSpace(cfg.ExposedServicesRouteKind), HTTPROUTE) &&
+		cfg.ExposedServicesUseSubdomainRoute &&
+		(len(service.Expose.NodePort) == 0 || service.Expose.NodePort[0] == 0)
 }
 
 // GetVolumeName returns the logical managed volume name used by the service.

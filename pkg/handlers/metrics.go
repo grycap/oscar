@@ -62,7 +62,7 @@ type serviceBreakdownResponse struct {
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/metrics/{serviceName} [get]
-func MakeMetricValueHandler(back types.ServerlessBackend, agg *metrics.Aggregator) gin.HandlerFunc {
+func MakeMetricValueHandler(cfg *types.Config, back types.ServerlessBackend, agg *metrics.Aggregator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		serviceName := strings.TrimSpace(c.Param("serviceName"))
 		if serviceName == "" {
@@ -87,7 +87,7 @@ func MakeMetricValueHandler(back types.ServerlessBackend, agg *metrics.Aggregato
 
 		metricRaw := strings.TrimSpace(c.Query("metric"))
 		if metricRaw == "" {
-			metricsList, err := loadAllServiceMetrics(c, scopedAgg, tr, serviceName)
+			metricsList, err := loadAllServiceMetrics(c, cfg, scopedAgg, tr, serviceName)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
@@ -107,7 +107,7 @@ func MakeMetricValueHandler(back types.ServerlessBackend, agg *metrics.Aggregato
 			return
 		}
 
-		resp, err := scopedAgg.MetricValue(c.Request.Context(), tr, serviceName, metricKey)
+		resp, err := scopedAgg.MetricValue(c.Request.Context(), cfg, tr, serviceName, metricKey)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -116,7 +116,7 @@ func MakeMetricValueHandler(back types.ServerlessBackend, agg *metrics.Aggregato
 	}
 }
 
-func loadAllServiceMetrics(c *gin.Context, agg *metrics.Aggregator, tr metrics.TimeRange, serviceName string) ([]types.ServiceMetricValue, error) {
+func loadAllServiceMetrics(c *gin.Context, cfg *types.Config, agg *metrics.Aggregator, tr metrics.TimeRange, serviceName string) ([]types.ServiceMetricValue, error) {
 	keys := []types.MetricKey{
 		types.MetricCPUHours,
 		types.MetricGPUHours,
@@ -127,7 +127,7 @@ func loadAllServiceMetrics(c *gin.Context, agg *metrics.Aggregator, tr metrics.T
 	}
 	items := make([]types.ServiceMetricValue, 0, len(keys))
 	for _, key := range keys {
-		resp, err := agg.MetricValue(c.Request.Context(), tr, serviceName, key)
+		resp, err := agg.MetricValue(c.Request.Context(), cfg, tr, serviceName, key)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +153,7 @@ func loadAllServiceMetrics(c *gin.Context, agg *metrics.Aggregator, tr metrics.T
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/metrics [get]
-func MakeMetricsSummaryHandler(back types.ServerlessBackend, agg *metrics.Aggregator) gin.HandlerFunc {
+func MakeMetricsSummaryHandler(cfg *types.Config, back types.ServerlessBackend, agg *metrics.Aggregator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tr, ok := parseTimeRange(c)
 		if !ok {
@@ -165,7 +165,7 @@ func MakeMetricsSummaryHandler(back types.ServerlessBackend, agg *metrics.Aggreg
 			return
 		}
 
-		resp, err := scopedAgg.Summary(c.Request.Context(), tr)
+		resp, err := scopedAgg.Summary(c.Request.Context(), cfg, tr)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -190,7 +190,7 @@ func MakeMetricsSummaryHandler(back types.ServerlessBackend, agg *metrics.Aggreg
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/metrics/breakdown [get]
-func MakeMetricsBreakdownHandler(back types.ServerlessBackend, agg *metrics.Aggregator) gin.HandlerFunc {
+func MakeMetricsBreakdownHandler(cfg *types.Config, back types.ServerlessBackend, agg *metrics.Aggregator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tr, ok := parseTimeRange(c)
 		if !ok {
@@ -215,7 +215,7 @@ func MakeMetricsBreakdownHandler(back types.ServerlessBackend, agg *metrics.Aggr
 			return
 		}
 
-		resp, err := scopedAgg.Breakdown(c.Request.Context(), tr, groupBy, includeUsers)
+		resp, err := scopedAgg.Breakdown(c.Request.Context(), cfg, tr, groupBy, includeUsers)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

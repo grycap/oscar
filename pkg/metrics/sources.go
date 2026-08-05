@@ -62,7 +62,7 @@ type UsageMetricsSource interface {
 
 type RequestLogSource interface {
 	Name() string
-	ListRequests(ctx context.Context, tr TimeRange, serviceID string) ([]RequestRecord, *types.SourceStatus, error)
+	ListRequests(ctx context.Context, cfg *types.Config, tr TimeRange, serviceID string) ([]RequestRecord, *types.SourceStatus, error)
 }
 
 type UserRosterSource interface {
@@ -101,15 +101,26 @@ func DefaultSources(cfg *types.Config, back types.ServerlessBackend, kubeClients
 				Namespace:             cfg.Namespace,
 				AppLabel:              "oscar",
 				Client:                &http.Client{Timeout: 100 * time.Second},
-				ServiceFilterTemplate: "\\\\[GIN-EXECUTIONS-LOGGER\\\\]\" |~ \"/(job|run)/%s",
-				ServiceFilterAll:      "\\\\[GIN-EXECUTIONS-LOGGER\\\\]\" |~ \"/(job|run)",
+				ServiceFilterTemplate: "\"\\\\[GIN-EXECUTIONS-LOGGER\\\\]\" |~ \"/(job|run)/%s\"",
+				ServiceFilterAll:      "\"\\\\[GIN-EXECUTIONS-LOGGER\\\\]\" |~ \"/(job|run)\"",
 			}
 			if cfg.LokiExposedQuery != "" {
-				var parse func(string) (RequestRecord, bool)
+				var parse func(string, *types.Config) (RequestRecord, bool)
 				if cfg.ExposedServicesRouteKind == types.Ingress {
 					parse = parseIngressAccessLog
 				} else {
 					parse = parseHTTPAccessLog
+				}
+
+				var serviceFilterTemplate string
+				var serviceFilterAll string
+
+				if cfg.ExposedServicesUseSubdomainRoute {
+					serviceFilterTemplate = "`RequestHost\":\"%s." + cfg.IngressHost + "`"
+					serviceFilterAll = "\"[a-zAZ0-9-]+." + cfg.IngressHost + "\" != \"minio." + cfg.IngressHost + "\""
+				} else {
+					serviceFilterTemplate = "\"/system/services/%s/exposed\""
+					serviceFilterAll = "\"/system/services/.+/exposed\""
 				}
 				sources.ExposedRequestLogs = &LokiRequestLogSource{
 					BaseURL:               cfg.LokiBaseURL,
@@ -119,8 +130,8 @@ func DefaultSources(cfg *types.Config, back types.ServerlessBackend, kubeClients
 					Client:                &http.Client{Timeout: 100 * time.Second},
 					ParseFunc:             parse,
 					SourceName:            "exposed-request-logs",
-					ServiceFilterTemplate: "/system/services/%s/exposed",
-					ServiceFilterAll:      "/system/services/.+/exposed",
+					ServiceFilterTemplate: serviceFilterTemplate,
+					ServiceFilterAll:      serviceFilterAll,
 				}
 			}
 		} else if kubeClientset != nil {
@@ -321,7 +332,7 @@ func (s *NoopRequestLogSource) Name() string {
 	return "request-logs"
 }
 
-func (s *NoopRequestLogSource) ListRequests(ctx context.Context, tr TimeRange, serviceID string) ([]RequestRecord, *types.SourceStatus, error) {
+func (s *NoopRequestLogSource) ListRequests(ctx context.Context, cfg *types.Config, tr TimeRange, serviceID string) ([]RequestRecord, *types.SourceStatus, error) {
 	err := errors.New("request log source not configured")
 	status := missingStatus(s.Name(), err)
 	return nil, status, err
@@ -333,7 +344,7 @@ type LokiRequestLogSource struct {
 	Namespace             string
 	AppLabel              string
 	Client                *http.Client
-	ParseFunc             func(string) (RequestRecord, bool)
+	ParseFunc             func(string, *types.Config) (RequestRecord, bool)
 	SourceName            string
 	ServiceFilterTemplate string
 	ServiceFilterAll      string
@@ -346,7 +357,7 @@ func (s *LokiRequestLogSource) Name() string {
 	return "loki"
 }
 
-func (s *LokiRequestLogSource) ListRequests(ctx context.Context, tr TimeRange, serviceID string) ([]RequestRecord, *types.SourceStatus, error) {
+func (s *LokiRequestLogSource) ListRequests(ctx context.Context, cfg *types.Config, tr TimeRange, serviceID string) ([]RequestRecord, *types.SourceStatus, error) {
 	if s.BaseURL == "" {
 		err := errors.New("loki base URL not configured")
 		return nil, missingStatus(s.Name(), err), err
@@ -399,7 +410,7 @@ func (s *LokiRequestLogSource) ListRequests(ctx context.Context, tr TimeRange, s
 	for _, stream := range result {
 		for _, entry := range stream.Values {
 			lokiTime := time.Unix(0, entry.Timestamp)
-			record, ok := parseFn(entry.Line)
+			record, ok := parseFn(entry.Line, cfg)
 			if !ok {
 				continue
 			}
@@ -476,9 +487,9 @@ func (s *LokiRequestLogSource) buildQuery(serviceID string) string {
 	}
 
 	if serviceID != "" && s.ServiceFilterTemplate != "" {
-		query += fmt.Sprintf(" |~ \"%s\"", fmt.Sprintf(s.ServiceFilterTemplate, regexp.QuoteMeta(serviceID)))
+		query += fmt.Sprintf(" |~ %s", fmt.Sprintf(s.ServiceFilterTemplate, regexp.QuoteMeta(serviceID)))
 	} else if serviceID == "" && s.ServiceFilterAll != "" {
-		query += fmt.Sprintf(" |~ \"%s\"", s.ServiceFilterAll)
+		query += fmt.Sprintf(" |~ %s", s.ServiceFilterAll)
 	}
 	return query
 }
@@ -556,7 +567,7 @@ type KubeRequestLogSource struct {
 	Namespace  string
 	LabelKey   string
 	LabelValue string
-	ParseFunc  func(string) (RequestRecord, bool)
+	ParseFunc  func(string, *types.Config) (RequestRecord, bool)
 	SourceName string
 }
 
@@ -567,7 +578,7 @@ func (s *KubeRequestLogSource) Name() string {
 	return "request-logs"
 }
 
-func (s *KubeRequestLogSource) ListRequests(ctx context.Context, tr TimeRange, serviceID string) ([]RequestRecord, *types.SourceStatus, error) {
+func (s *KubeRequestLogSource) ListRequests(ctx context.Context, cfg *types.Config, tr TimeRange, serviceID string) ([]RequestRecord, *types.SourceStatus, error) {
 	fmt.Println("kubernetes")
 	if s.Client == nil {
 		err := errors.New("kubernetes client not configured")
@@ -594,7 +605,7 @@ func (s *KubeRequestLogSource) ListRequests(ctx context.Context, tr TimeRange, s
 	var notes []string
 
 	for _, pod := range pods.Items {
-		podRecords, podErr := s.readPodLogs(ctx, pod, tr, serviceID)
+		podRecords, podErr := s.readPodLogs(ctx, cfg, pod, tr, serviceID)
 		if podErr != nil {
 			hadError = true
 			notes = append(notes, podErr.Error())
@@ -619,7 +630,7 @@ func (s *KubeRequestLogSource) ListRequests(ctx context.Context, tr TimeRange, s
 	return records, status, nil
 }
 
-func (s *KubeRequestLogSource) readPodLogs(ctx context.Context, pod corev1.Pod, tr TimeRange, serviceID string) ([]RequestRecord, error) {
+func (s *KubeRequestLogSource) readPodLogs(ctx context.Context, cfg *types.Config, pod corev1.Pod, tr TimeRange, serviceID string) ([]RequestRecord, error) {
 	opts := &corev1.PodLogOptions{
 		SinceTime: &metav1.Time{Time: tr.Start},
 	}
@@ -639,7 +650,7 @@ func (s *KubeRequestLogSource) readPodLogs(ctx context.Context, pod corev1.Pod, 
 	}
 	for scanner.Scan() {
 		line := scanner.Text()
-		record, ok := parseFn(line)
+		record, ok := parseFn(line, cfg)
 		if !ok {
 			continue
 		}
@@ -660,7 +671,7 @@ func (s *KubeRequestLogSource) readPodLogs(ctx context.Context, pod corev1.Pod, 
 const ginExecutionPrefix = "[GIN-EXECUTIONS-LOGGER]"
 const ginPrefix = "[GIN]"
 
-func parseGinExecutionLog(line string) (RequestRecord, bool) {
+func parseGinExecutionLog(line string, cfg *types.Config) (RequestRecord, bool) {
 	payload := ""
 	if idx := strings.Index(line, ginExecutionPrefix); idx != -1 {
 		payload = strings.TrimSpace(line[idx+len(ginExecutionPrefix):])
@@ -735,7 +746,7 @@ func parseExposedServiceFromPath(path string) (string, bool) {
 	return parts[0], true
 }
 
-func parseHTTPAccessLog(line string) (RequestRecord, bool) {
+func parseHTTPAccessLog(line string, cfg *types.Config) (RequestRecord, bool) {
 	var jsonformat map[string]interface{}
 	err := json.Unmarshal([]byte(line), &jsonformat)
 	if err != nil {
@@ -750,7 +761,7 @@ func parseHTTPAccessLog(line string) (RequestRecord, bool) {
 		timestamp = parsed
 	}
 
-	serviceID, good := extractServiceFromExposedPath(jsonformat["RequestPath"].(string))
+	serviceID, good := extractServiceFromExposedPath(jsonformat, cfg.ExposedServicesUseSubdomainRoute)
 	if !good {
 		return RequestRecord{}, false
 	}
@@ -764,7 +775,7 @@ func parseHTTPAccessLog(line string) (RequestRecord, bool) {
 	}, true
 }
 
-func parseIngressAccessLog(line string) (RequestRecord, bool) {
+func parseIngressAccessLog(line string, cfg *types.Config) (RequestRecord, bool) {
 	fields := strings.Fields(line)
 	if len(fields) == 0 {
 		return RequestRecord{}, false
@@ -811,21 +822,49 @@ func parseIngressAccessLog(line string) (RequestRecord, bool) {
 	}, true
 }
 
-func extractServiceFromExposedPath(path string) (string, bool) {
-	path = strings.SplitN(path, "?", 2)[0]
-	const prefix = "/system/services/"
-	if !strings.HasPrefix(path, prefix) {
-		return "", false
+func extractServiceFromExposedPath(path map[string]interface{}, expose_service_user_subdomine_route bool) (string, bool) {
+	if expose_service_user_subdomine_route {
+		reqAddrRaw, ok := path["RequestAddr"]
+		if !ok {
+			return "", false
+		}
+		dns, ok := reqAddrRaw.(string)
+		if !ok || dns == "" {
+			return "", false
+		}
+		routerNameRaw, ok := path["RouterName"]
+		if !ok {
+			return "", false
+		}
+		routerName, ok := routerNameRaw.(string)
+		if !ok {
+			return "", false
+		}
+		serviceName := strings.SplitN(dns, ".", 2)[0]
+		if strings.Contains(routerName, serviceName) {
+			return serviceName, true
+
+		} else {
+			return "", false
+		}
+	} else {
+		pathString := path["RequestPath"].(string)
+		pathString = strings.SplitN(pathString, "?", 2)[0]
+		const prefix = "/system/services/"
+		if !strings.HasPrefix(pathString, prefix) {
+			return "", false
+		}
+		rest := strings.TrimPrefix(pathString, prefix)
+		parts := strings.SplitN(rest, "/", 3)
+		if len(parts) < 2 {
+			return "", false
+		}
+		if parts[0] == "" || parts[1] != "exposed" {
+			return "", false
+		}
+		return parts[0], true
 	}
-	rest := strings.TrimPrefix(path, prefix)
-	parts := strings.SplitN(rest, "/", 3)
-	if len(parts) < 2 {
-		return "", false
-	}
-	if parts[0] == "" || parts[1] != "exposed" {
-		return "", false
-	}
-	return parts[0], true
+
 }
 
 type NoopUserRosterSource struct{}

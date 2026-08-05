@@ -46,25 +46,29 @@ ENABLE_OIDC="false"
 ENABLE_KUEUE="false"
 ENABLE_KSERVE="false"
 ENABLE_MINIO_QUOTAS="false"
+OSCAR_HOST="localhost"
 OIDC_ISSUERS_DEFAULT="https://keycloak.grycap.net/realms/grycap"
 OIDC_GROUPS_DEFAULT="/oscar-staff, /oscar-test"
 GATEWAY_CONTROLLER="traefik"
 GATEWAY_CONTROLLER_SET="false"
+USE_DNS_WILDCARDS="true"
 
 usage(){
     cat <<EOF
 Usage: $(basename "$0") [options]
 
 Options:
-  --devel        Deploy using the OSCAR devel branch without interactive prompts.
-  --metrics      Deploy metrics stack (Prometheus + Loki + Alloy) for reporting.
-  --oidc         Enable OIDC support for OSCAR (default: disabled).
-  --kueue        Enable Kueue support for CPU and memory quotas (default: disabled).
-  --kserve       Install KServe using deploy/kind-oscar-kserve.sh (default: disabled).
-  --minio-quotas Deploy MinIO with 1 replica and 4 PVCs to support bucket quotas.
-  --ingress      Use NGINX Ingress as gateway controller.
-  --traefik      Use Traefik as gateway controller (default).
-  -h, --help     Show this help message and exit.
+    --devel                      Deploy using the OSCAR devel branch without interactive prompts.
+    --metrics                    Deploy metrics stack (Prometheus + Loki + Alloy) for reporting.
+    --oidc                       Enable OIDC support for OSCAR (default: disabled).
+    --kueue                      Enable Kueue support for CPU and memory quotas (default: disabled).
+    --kserve                     Install KServe using deploy/kind-oscar-kserve.sh (default: disabled).
+    --minio-quotas               Deploy MinIO with 1 replica and 4 PVCs to support bucket quotas.
+    --wildcards[=true|false]     Enable or disable DNS wildcard support for Traefik (default: true).
+    --host HOST                  Use HOST as OSCAR host (default: localhost).
+    --ingress                    Use NGINX Ingress as gateway controller.
+    --traefik                    Use Traefik as gateway controller (default).
+    -h, --help                   Show this help message and exit.
 EOF
 }
 
@@ -399,9 +403,10 @@ metadata:
     namespace: traefik
 spec:
     secretName: traefik-gateway-tls
-    commonName: localhost
+    commonName: $OSCAR_HOST
     dnsNames:
-        - localhost
+        - $OSCAR_HOST
+        - "*.$OSCAR_HOST"
     ipAddresses:
         - 127.0.0.1
     issuerRef:
@@ -494,9 +499,9 @@ checkOSCARDeploy(){
     fi
     echo -e "\n[$GREEN$CHECK$END_COLOR] OSCAR platform deployed correctly"
     if [ "$HOST_HTTPS_PORT" == "$DEFAULT_HTTPS_PORT" ]; then
-        oscar_url="https://localhost"
+        oscar_url="https://$OSCAR_HOST"
     else
-        oscar_url="https://localhost:$HOST_HTTPS_PORT"
+        oscar_url="https://$OSCAR_HOST:$HOST_HTTPS_PORT"
     fi
 }
 
@@ -738,6 +743,19 @@ while [ "$#" -gt 0 ]; do
             ENABLE_MINIO_QUOTAS="true"
             shift
             ;;
+        --wildcards)
+            USE_DNS_WILDCARDS="true"
+            shift
+            ;;
+        --wildcards=*)
+            USE_DNS_WILDCARDS="${1#*=}"
+            if [ "$USE_DNS_WILDCARDS" != "true" ] && [ "$USE_DNS_WILDCARDS" != "false" ]; then
+                echo -e "$RED[!]$END_COLOR Invalid value for --wildcards: $USE_DNS_WILDCARDS (expected: true|false)"
+                usage
+                exit 1
+            fi
+            shift
+            ;;
         --ingress)
             GATEWAY_CONTROLLER="ingress"
             GATEWAY_CONTROLLER_SET="true"
@@ -746,6 +764,20 @@ while [ "$#" -gt 0 ]; do
         --traefik)
             GATEWAY_CONTROLLER="traefik"
             GATEWAY_CONTROLLER_SET="true"
+            shift
+            ;;
+        --host=*)
+            OSCAR_HOST="${1#*=}"
+            shift
+            ;;
+        --host)
+            shift
+            if [ "$#" -eq 0 ]; then
+                echo -e "$RED[!]$END_COLOR Missing value for --host"
+                usage
+                exit 1
+            fi
+            OSCAR_HOST="$1"
             shift
             ;;
         -h|--help)
@@ -793,6 +825,16 @@ else
                 exit 1
             fi
             GATEWAY_CONTROLLER="$gateway_controller_choice"
+        fi
+        if [ "$GATEWAY_CONTROLLER" == "traefik" ]; then
+            echo -e "\n[*] Traefik also supports DNS wildcard subdomains"
+            read -p "Do you want to enable wildcard DNS? [y/n] (default: y) " use_dns_wildcards </dev/tty
+            use_dns_wildcards=$(echo "$use_dns_wildcards" | tr '[:upper:]' '[:lower:]')
+            if [ "$use_dns_wildcards" == "n" ]; then
+                USE_DNS_WILDCARDS="false"
+            else
+                USE_DNS_WILDCARDS="true"
+            fi
         fi
     fi
     if [ "$ENABLE_OIDC" != "true" ]; then
@@ -844,6 +886,7 @@ else
     OSCAR_EXPOSURE_HELM_ARGS="--set httproute.create=false --set ingress.create=true "
     KIND_HTTP_CONTAINER_PORT=80
     KIND_HTTPS_CONTAINER_PORT=443
+    USE_DNS_WILDCARDS="false"
 fi
 
 HTTP_PORT_FALLBACKS=(8080 8081 8082 8880 9080 10080)
@@ -1076,9 +1119,9 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 echo -e "\n[*] Deploying OSCAR ..."
 helm repo add --force-update grycap https://grycap.github.io/helm-charts/
 if [ $(echo $use_knative | tr '[:upper:]' '[:lower:]') == "y" ]; then 
-    helm install --namespace=oscar oscar grycap/oscar $OSCAR_EXPOSURE_HELM_ARGS --set httproute.host=localhost --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative --set resourceManager.enable=true --set kueue.enable=$ENABLE_KUEUE $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar $OSCAR_EXPOSURE_HELM_ARGS --set httproute.host="$OSCAR_HOST" --set authPass="$OSCAR_PASSWORD" --set service.type=ClusterIP --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey="$MINIO_PASSWORD" --set serverlessBackend=knative --set resourceManager.enable=true --set kueue.enable="$ENABLE_KUEUE" $OSCAR_HELM_IMAGE_OVERRIDES
 else
-    helm install --namespace=oscar oscar grycap/oscar $OSCAR_EXPOSURE_HELM_ARGS --set httproute.host=localhost --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set resourceManager.enable=true --set kueue.enable=$ENABLE_KUEUE $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar $OSCAR_EXPOSURE_HELM_ARGS --set httproute.host="$OSCAR_HOST" --set authPass="$OSCAR_PASSWORD" --set service.type=ClusterIP --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey="$MINIO_PASSWORD" --set resourceManager.enable=true --set kueue.enable="$ENABLE_KUEUE" $OSCAR_HELM_IMAGE_OVERRIDES
 fi
 
 if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
@@ -1104,6 +1147,7 @@ if [ "$ENABLE_METRICS" == "true" ]; then
         LOKI_EXPOSED_NAMESPACE="traefik" \
         LOKI_EXPOSED_APP_LABEL="traefik" \
         EXPOSED_SERVICES_ROUTE_KIND="httproute" \
+        INGRESS_HOST="$OSCAR_HOST" \
         HTTPROUTE_GATEWAY_NAME="traefik-gateway" \
         HTTPROUTE_GATEWAY_NAMESPACE="traefik"; then
         echo -e "$RED[!]$END_COLOR Failed to configure OSCAR metrics endpoints"
@@ -1137,6 +1181,12 @@ if [ $(echo $ENABLE_KSERVE | tr '[:upper:]' '[:lower:]') == "true" ]; then
     fi
 fi
 
+if $USE_DNS_WILDCARDS ; then
+    echo -e "\n[*] Patching OSCAR to use subdomain routing for '$OSCAR_HOST' ..."
+    kubectl set env deployment/oscar -n oscar INGRESS_HOST="$OSCAR_HOST"
+    kubectl set env deployment/oscar -n oscar EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE="true"
+fi
+
 #Wait for OSCAR deployment
 checkOSCARDeploy
  
@@ -1144,14 +1194,14 @@ echo -e "\n[*] Deployment details:"
 echo "  - Kind cluster name: $CLUSTER_NAME"
 echo "  - Kind context: $KIND_CONTEXT"
 if [ "$HOST_HTTP_PORT" == "$DEFAULT_HTTP_PORT" ]; then
-    oscar_http_url="http://localhost"
+    oscar_http_url="http://$OSCAR_HOST"
 else
-    oscar_http_url="http://localhost:$HOST_HTTP_PORT"
+    oscar_http_url="http://$OSCAR_HOST:$HOST_HTTP_PORT"
 fi
 if [ "$HOST_HTTPS_PORT" == "$DEFAULT_HTTPS_PORT" ]; then
-    oscar_https_url="https://localhost"
+    oscar_https_url="https://$OSCAR_HOST"
 else
-    oscar_https_url="https://localhost:$HOST_HTTPS_PORT"
+    oscar_https_url="https://$OSCAR_HOST:$HOST_HTTPS_PORT"
 fi
 minio_api_url="http://localhost:$HOST_MINIO_API_PORT"
 minio_console_url="http://localhost:$HOST_MINIO_CONSOLE_PORT"

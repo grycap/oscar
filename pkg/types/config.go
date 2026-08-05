@@ -235,6 +235,8 @@ type Config struct {
 	//
 	IngressHost string `json:"-"`
 
+	ExposedServicesUseSubdomainRoute bool `json:"exposed_services_use_subdomain_route"`
+
 	// ExposedServicesRouteKind determines which Kubernetes resource is used to expose services (ingress|httproute)
 	ExposedServicesRouteKind string `json:"-"`
 
@@ -367,6 +369,7 @@ var configVars = []configVar{
 	{"OIDCClientSecret", "OIDC_CLIENT_SECRET", false, stringType, ""},
 	{"UsersAdmin", "USERS_ADMIN", false, stringSliceType, ""},
 	{"IngressHost", "INGRESS_HOST", false, stringType, ""},
+	{"ExposedServicesUseSubdomainRoute", "EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE", false, boolType, "false"},
 	{"ExposedServicesRouteKind", "EXPOSED_SERVICES_ROUTE_KIND", false, routeKindType, "ingress"},
 	{"HTTPRouteGatewayName", "HTTPROUTE_GATEWAY_NAME", false, stringType, "traefik-gateway"},
 	{"HTTPRouteGatewayNamespace", "HTTPROUTE_GATEWAY_NAMESPACE", false, stringType, "traefik"},
