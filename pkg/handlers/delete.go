@@ -82,6 +82,8 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		if err != nil {
 			if errors.IsNotFound(err) || errors.IsGone(err) {
 				c.Status(http.StatusNotFound)
+			} else if strings.Contains(err.Error(), "does not have a registered ConfigMap") {
+				c.String(http.StatusForbidden, "You do not have permission to delete this service")
 			} else {
 				c.String(http.StatusInternalServerError, err.Error())
 			}
