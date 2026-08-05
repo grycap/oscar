@@ -101,8 +101,8 @@ func DefaultSources(cfg *types.Config, back types.ServerlessBackend, kubeClients
 				Namespace:             cfg.Namespace,
 				AppLabel:              "oscar",
 				Client:                &http.Client{Timeout: 100 * time.Second},
-				ServiceFilterTemplate: "\\\\[GIN-EXECUTIONS-LOGGER\\\\]\" |~ \"/(job|run)/%s",
-				ServiceFilterAll:      "\\\\[GIN-EXECUTIONS-LOGGER\\\\]\" |~ \"/(job|run)",
+				ServiceFilterTemplate: "\"\\\\[GIN-EXECUTIONS-LOGGER\\\\]\" |~ \"/(job|run)/%s\"",
+				ServiceFilterAll:      "\"\\\\[GIN-EXECUTIONS-LOGGER\\\\]\" |~ \"/(job|run)\"",
 			}
 			if cfg.LokiExposedQuery != "" {
 				var parse func(string, *types.Config) (RequestRecord, bool)
@@ -116,11 +116,11 @@ func DefaultSources(cfg *types.Config, back types.ServerlessBackend, kubeClients
 				var serviceFilterAll string
 
 				if cfg.ExposedServicesUseSubdomainRoute {
-					serviceFilterTemplate = "\"RequestHost\":\"%s." + cfg.IngressHost + "\""
-					serviceFilterAll = "[a-zA-Z0-9-]+." + cfg.IngressHost + "\" != \"minio." + cfg.IngressHost
+					serviceFilterTemplate = "`RequestHost\":\"%s." + cfg.IngressHost + "`"
+					serviceFilterAll = "\"[a-zAZ0-9-]+." + cfg.IngressHost + "\" != \"minio." + cfg.IngressHost + "\""
 				} else {
-					serviceFilterTemplate = "/system/services/%s/exposed"
-					serviceFilterAll = "/system/services/.+/exposed"
+					serviceFilterTemplate = "\"/system/services/%s/exposed\""
+					serviceFilterAll = "\"/system/services/.+/exposed\""
 				}
 				sources.ExposedRequestLogs = &LokiRequestLogSource{
 					BaseURL:               cfg.LokiBaseURL,
@@ -487,9 +487,9 @@ func (s *LokiRequestLogSource) buildQuery(serviceID string) string {
 	}
 
 	if serviceID != "" && s.ServiceFilterTemplate != "" {
-		query += fmt.Sprintf(" |~ \"%s\"", fmt.Sprintf(s.ServiceFilterTemplate, regexp.QuoteMeta(serviceID)))
+		query += fmt.Sprintf(" |~ %s", fmt.Sprintf(s.ServiceFilterTemplate, regexp.QuoteMeta(serviceID)))
 	} else if serviceID == "" && s.ServiceFilterAll != "" {
-		query += fmt.Sprintf(" |~ \"%s\"", s.ServiceFilterAll)
+		query += fmt.Sprintf(" |~ %s", s.ServiceFilterAll)
 	}
 	return query
 }

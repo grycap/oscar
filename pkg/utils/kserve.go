@@ -616,6 +616,13 @@ func getTraefikCORSMiddlewareName(serviceName string) string {
 	return serviceName + "-cors-mdw"
 }
 
+func getHTTPRouteBackendPort(service *types.Service) int64 {
+	if service.Kserve.Type == types.KserveTypeLLMInferenceService {
+		return 8000
+	}
+	return 80
+}
+
 func exposeKserveService(dynClient *dynamic.DynamicClient, service *types.Service, owner *KserveServiceOwner, cfg *types.Config) error {
 	gwName := strings.TrimSpace(cfg.HTTPRouteGatewayName)
 	gwNamespace := strings.TrimSpace(cfg.HTTPRouteGatewayNamespace)
@@ -753,6 +760,8 @@ func createHTTPRoute(gatewayClientset dynamic.Interface, service *types.Service,
 	return nil
 }
 
+// buildHTTPRouteSpec builds an unstructured HTTPRoute object to expose the
+// KServe InferenceService or LLMInferenceService.
 func buildHTTPRouteSpec(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) *unstructured.Unstructured {
 	serviceName := service.Name
 	httpRouteName := serviceName + httpRouteSuffix
@@ -806,7 +815,7 @@ func buildHTTPRouteSpec(service *types.Service, owner *KserveServiceOwner, cfg *
 				"kind":      "Service",
 				"name":      GetKserveSvcName(serviceName, service.Kserve.Type),
 				"namespace": namespace,
-				"port":      int64(80),
+				"port":      getHTTPRouteBackendPort(service),
 			},
 		},
 	}
@@ -998,7 +1007,7 @@ func getKserveLLMServiceRouterSpec(service *types.Service, namespace string, cfg
 			"group": "",
 			"kind":  "Service",
 			"name":  GetKserveSvcName(service.Name, service.Kserve.Type),
-			"port":  8000,
+			"port":  int64(8000),
 		},
 	}
 
