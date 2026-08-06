@@ -38,7 +38,7 @@ var updateLogger = log.New(os.Stdout, "[UPDATE-HANDLER] ", log.Flags())
 // @Description Change bucket visibility or allowed users.
 // @Tags buckets
 // @Accept json
-// @Param bucket body utils.MinIOBucket true "Bucket definition"
+// @Param bucket body types.MinIOBucket true "Bucket definition"
 // @Success 204 {string} string "No Content"
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 403 {string} string "Forbidden"

@@ -58,6 +58,35 @@ func SecretExists(name string, namespace string, kubeClientset kubernetes.Interf
 	return !errors.IsNotFound(err)
 }
 
+// GetSecret returns the Kubernetes Secret with the given name and namespace.
+func GetSecret(secretName string, namespace string, kubeClientset kubernetes.Interface) (*v1.Secret, error) {
+	return kubeClientset.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+}
+
+// MergeSecretData merges the given key-value pairs into the secret with the
+// given name and namespace. The secret is created if it does not exist and
+// existing keys that are not present in secretData are preserved.
+func MergeSecretData(secretName string, namespace string, secretData map[string]string, kubeClientset kubernetes.Interface) error {
+	secret, err := kubeClientset.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return CreateSecret(secretName, namespace, secretData, kubeClientset)
+		}
+		return err
+	}
+
+	if secret.Data == nil {
+		secret.Data = map[string][]byte{}
+	}
+	for k, v := range secretData {
+		secret.Data[k] = []byte(v)
+	}
+	secret.StringData = nil
+
+	_, err = kubeClientset.CoreV1().Secrets(namespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
+	return err
+}
+
 func getPodSecretSpec(secretName string, secretData map[string]string, namespace string) v1.Secret {
 	inmutable := false
 	return v1.Secret{
