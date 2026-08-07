@@ -259,7 +259,7 @@ storage_providers:
 | Field                                | Description                          |
 | -------------------------------------| -------------------------------------|
 |`variables` </br> *map[string]string* | Map to define the environment variables that will be available in the service container |
-|`secrets` </br> *map[string]string* | Map to define the secret environment variables that will be available in the service container. They can also be managed at runtime through the [`/system/secrets` API](api.md#oscar-api) without redeploying the service |
+|`secrets` </br> *map[string]string* | Map to define the secret environment variables that will be available in the service container. They can also be managed at runtime through the [`/system/services/{serviceName}/secrets` API](api.md#oscar-api) without redeploying the service |
 
 > ℹ️ For federated services, `secrets.refresh_token` is required. OSCAR Manager
 > stores this value in the user namespace and does not mount it into service pods.

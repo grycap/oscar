@@ -16,28 +16,24 @@ the `minio.buckets` and `minio.storage_per_bucket` fields.
 The `/system/secrets` endpoints manage the service environment secrets without
 redeploying the service:
 
-- `GET /system/secrets` lists the secrets of the accessible services. Values
-  are only returned for services owned by the caller.
-- `GET /system/secrets/{serviceName}` returns the secrets of a specific service.
-- `PUT /system/secrets/{serviceName}` merges the given key-value pairs into the
-  service secrets. Keys that do not exist yet are created and keys not present
-  in the request are preserved. The reserved `refresh_token` key cannot be
-  modified.
+- `GET /system/services/{serviceName}/secrets?key=API_KEY` returns the value of
+  the requested secret key (404 if it does not exist).
+- `PUT /system/services/{serviceName}/secrets` merges the given key-value pairs
+  into the service secrets. Keys that do not exist yet are created and keys not
+  present in the request are preserved. The secrets are provided as a JSON
+  object. The reserved `refresh_token` key cannot be modified. It responds with
+  `204 No Content` on success.
 
 ```bash
-# List the secrets of the accessible services
+# Get a secret of a specific service
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-     "https://oscar-cluster-remote/system/secrets"
-
-# Get the secrets of a specific service
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-     "https://oscar-cluster-remote/system/secrets/cowsay"
+     "https://oscar-cluster-remote/system/services/cowsay/secrets?key=API_KEY"
 
 # Add or update secrets of a specific service
-curl -X PUT "https://oscar-cluster-remote/system/secrets/cowsay" \
+curl -X PUT "https://oscar-cluster-remote/system/services/cowsay/secrets" \
      -H "Authorization: Bearer YOUR_TOKEN" \
      -H "Content-Type: application/json" \
-     -d '{"secrets":{"API_KEY":"new-value","ANOTHER_KEY":"another-value"}}'
+     -d '{"API_KEY":"new-value","ANOTHER_KEY":"another-value"}'
 ```
 
 > ❗️

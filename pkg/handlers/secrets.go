@@ -30,79 +30,21 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// MakeListSecretsHandler godoc
-// @Summary List service secrets
-// @Description List the environment secrets of the accessible services. Secret values are only returned for services owned by the caller.
-// @Tags secrets
-// @Produce json
-// @Success 200 {array} types.ServiceSecrets
-// @Failure 401 {string} string "Unauthorized"
-// @Failure 500 {string} string "Internal Server Error"
-// @Security BasicAuth
-// @Security BearerAuth
-// @Router /system/secrets [get]
-func MakeListSecretsHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		uid := ""
-		var err error
-		isBearer := isBearerRequest(c)
-		if isBearer {
-			uid, err = auth.GetUIDFromContext(c)
-			if err != nil {
-				c.String(http.StatusUnauthorized, err.Error())
-				return
-			}
-		}
-		namespace := utils.BuildUserNamespace(cfg, uid)
-		services, err := back.ListServices(namespace)
-		if err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
-			return
-		}
-		response := []types.ServiceSecrets{}
-		for _, service := range services {
-			if isBearer && !isServiceAccessibleByUser(service, uid) {
-				continue
-			}
-
-			if namespace == "" || !utils.SecretExists(service.Name, namespace, kubeClientset) {
-				continue
-			}
-
-			secrets, err := readServiceSecretData(service.Name, namespace, kubeClientset)
-			if err != nil {
-				c.String(http.StatusInternalServerError, err.Error())
-				return
-			}
-			if isBearer && service.Owner != uid {
-				for key := range secrets {
-					secrets[key] = ""
-				}
-			}
-			response = append(response, types.ServiceSecrets{
-				Service: service.Name,
-				Secrets: secrets,
-			})
-		}
-
-		c.JSON(http.StatusOK, response)
-	}
-}
-
 // MakeGetServiceSecretHandler godoc
-// @Summary Get service secrets
-// @Description Get the environment secrets of a specific service.
+// @Summary Get service secret
+// @Description Get the value of a specific secret key of a service.
 // @Tags secrets
-// @Produce json
+// @Produce text/plain
 // @Param serviceName path string true "Service name"
-// @Success 200 {object} types.ServiceSecrets
+// @Param key query string true "Secret key to retrieve"
+// @Success 200 {string} string "Secret value"
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 403 {string} string "Forbidden"
 // @Failure 404 {string} string "Not Found"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
 // @Security BearerAuth
-// @Router /system/secrets/{serviceName} [get]
+// @Router /system/services/{serviceName}/secrets [get]
 func MakeGetServiceSecretHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		serviceName, ok := validateServiceName(c, c.Param("serviceName"))
@@ -133,7 +75,18 @@ func MakeGetServiceSecretHandler(back types.ServerlessBackend, kubeClientset kub
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
-		c.JSON(http.StatusOK, types.ServiceSecrets{Service: serviceName, Secrets: secrets})
+
+		if key := c.Query("key"); key != "" {
+			value, ok := secrets[key]
+			if !ok {
+				c.Status(http.StatusNotFound)
+				return
+			}
+			c.String(http.StatusOK, value)
+			return
+		}
+
+		c.Status(http.StatusNotFound)
 	}
 }
 
@@ -142,10 +95,9 @@ func MakeGetServiceSecretHandler(back types.ServerlessBackend, kubeClientset kub
 // @Description Merge the given key-value pairs into the service secret. Keys that do not exist yet are created and keys not present in the request are preserved.
 // @Tags secrets
 // @Accept json
-// @Produce json
 // @Param serviceName path string true "Service name"
-// @Param secrets body types.SecretUpdateRequest true "Secrets to merge"
-// @Success 200 {object} types.ServiceSecrets
+// @Param secrets body map[string]string true "Secrets to merge"
+// @Success 204
 // @Failure 400 {string} string "Bad Request"
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 403 {string} string "Forbidden"
@@ -153,7 +105,7 @@ func MakeGetServiceSecretHandler(back types.ServerlessBackend, kubeClientset kub
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
 // @Security BearerAuth
-// @Router /system/secrets/{serviceName} [put]
+// @Router /system/services/{serviceName}/secrets [put]
 func MakeUpdateServiceSecretHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		serviceName, ok := validateServiceName(c, c.Param("serviceName"))
@@ -162,16 +114,16 @@ func MakeUpdateServiceSecretHandler(back types.ServerlessBackend, kubeClientset 
 			return
 		}
 
-		var req types.SecretUpdateRequest
+		var req map[string]string
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.String(http.StatusBadRequest, "The secret specification is not valid: %v", err)
 			return
 		}
-		if len(req.Secrets) == 0 {
+		if len(req) == 0 {
 			c.String(http.StatusBadRequest, "The secret specification must include at least one key")
 			return
 		}
-		for key := range req.Secrets {
+		for key := range req {
 			if key == types.RefreshTokenSecretKey {
 				c.String(http.StatusBadRequest, "secret key %q is reserved and cannot be modified", key)
 				return
@@ -184,23 +136,17 @@ func MakeUpdateServiceSecretHandler(back types.ServerlessBackend, kubeClientset 
 		}
 
 		namespace := resolveServiceNamespace(service, cfg)
-		if err := utils.MergeSecretData(service.Name, namespace, req.Secrets, kubeClientset); err != nil {
+		if err := utils.MergeSecretData(service.Name, namespace, req, kubeClientset); err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
 
-		if err := updateServiceConfigMapSecrets(service.Name, namespace, req.Secrets, kubeClientset); err != nil {
+		if err := updateServiceConfigMapSecrets(service.Name, namespace, req, kubeClientset); err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
 
-		/*secrets, err := readServiceSecretData(service.Name, namespace, kubeClientset)
-		if err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
-			return
-		}*/
-
-		c.JSON(http.StatusOK, types.ServiceSecrets{Service: service.Name, Secrets: req.Secrets})
+		c.Status(http.StatusNoContent)
 	}
 }
 

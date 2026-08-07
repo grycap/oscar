@@ -49,54 +49,30 @@ func newSecretsRouter(back types.ServerlessBackend, cfg *types.Config, uid strin
 		c.Set("uidOrigin", uid)
 		c.Next()
 	})
-	r.GET("/system/secrets", MakeListSecretsHandler(back, back.GetKubeClientset(), cfg))
-	r.GET("/system/secrets/:serviceName", MakeGetServiceSecretHandler(back, back.GetKubeClientset(), cfg))
-	r.PUT("/system/secrets/:serviceName", MakeUpdateServiceSecretHandler(back, back.GetKubeClientset(), cfg))
+	r.GET("/system/services/:serviceName/secrets", MakeGetServiceSecretHandler(back, back.GetKubeClientset(), cfg))
+	r.PUT("/system/services/:serviceName/secrets", MakeUpdateServiceSecretHandler(back, back.GetKubeClientset(), cfg))
 	return r
 }
 
-func TestListSecretsHandler(t *testing.T) {
+func TestGetServiceSecretHandlerRequiresKey(t *testing.T) {
 	back, _, cfg := newSecretsTestBackend("user@example.org")
 	r := newSecretsRouter(back, cfg, "user@example.org")
 
-	req := httptest.NewRequest(http.MethodGet, "/system/secrets", nil)
+	req := httptest.NewRequest(http.MethodGet, "/system/services/cowsay/secrets", nil)
 	req.Header.Set("Authorization", "Bearer token")
 	resp := httptest.NewRecorder()
 	r.ServeHTTP(resp, req)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected list secrets status 200, got %d: %s", resp.Code, resp.Body.String())
-	}
-	if !strings.Contains(resp.Body.String(), testSecretServiceName) {
-		t.Fatalf("expected list response to include service, got %s", resp.Body.String())
-	}
-	if !strings.Contains(resp.Body.String(), "secret-value") {
-		t.Fatalf("expected list response to include secret value for owner, got %s", resp.Body.String())
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("expected get service secret status 404 without key, got %d: %s", resp.Code, resp.Body.String())
 	}
 }
 
-func TestListSecretsHandlerEmptyForNonOwnerNamespace(t *testing.T) {
-	back, _, cfg := newSecretsTestBackend("user@example.org")
-	r := newSecretsRouter(back, cfg, "other@example.org")
-
-	req := httptest.NewRequest(http.MethodGet, "/system/secrets", nil)
-	req.Header.Set("Authorization", "Bearer token")
-	resp := httptest.NewRecorder()
-	r.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected list secrets status 200, got %d: %s", resp.Code, resp.Body.String())
-	}
-	if resp.Body.String() != "[]" {
-		t.Fatalf("expected empty list for non-owner namespace, got %s", resp.Body.String())
-	}
-}
-
-func TestGetServiceSecretHandler(t *testing.T) {
+func TestGetServiceSecretHandlerByKey(t *testing.T) {
 	back, _, cfg := newSecretsTestBackend("user@example.org")
 	r := newSecretsRouter(back, cfg, "user@example.org")
 
-	req := httptest.NewRequest(http.MethodGet, "/system/secrets/cowsay", nil)
+	req := httptest.NewRequest(http.MethodGet, "/system/services/cowsay/secrets?key=API_KEY", nil)
 	req.Header.Set("Authorization", "Bearer token")
 	resp := httptest.NewRecorder()
 	r.ServeHTTP(resp, req)
@@ -104,8 +80,22 @@ func TestGetServiceSecretHandler(t *testing.T) {
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected get service secret status 200, got %d: %s", resp.Code, resp.Body.String())
 	}
-	if !strings.Contains(resp.Body.String(), "secret-value") {
-		t.Fatalf("expected get response to include secret value, got %s", resp.Body.String())
+	if resp.Body.String() != "secret-value" {
+		t.Fatalf("expected get response to be the secret value, got %q", resp.Body.String())
+	}
+}
+
+func TestGetServiceSecretHandlerByMissingKey(t *testing.T) {
+	back, _, cfg := newSecretsTestBackend("user@example.org")
+	r := newSecretsRouter(back, cfg, "user@example.org")
+
+	req := httptest.NewRequest(http.MethodGet, "/system/services/cowsay/secrets?key=NONEXISTENT", nil)
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("expected get service secret status 404, got %d: %s", resp.Code, resp.Body.String())
 	}
 }
 
@@ -113,7 +103,7 @@ func TestGetServiceSecretHandlerNotFoundForNonOwner(t *testing.T) {
 	back, _, cfg := newSecretsTestBackend("user@example.org")
 	r := newSecretsRouter(back, cfg, "other@example.org")
 
-	req := httptest.NewRequest(http.MethodGet, "/system/secrets/cowsay", nil)
+	req := httptest.NewRequest(http.MethodGet, "/system/services/cowsay/secrets", nil)
 	req.Header.Set("Authorization", "Bearer token")
 	resp := httptest.NewRecorder()
 	r.ServeHTTP(resp, req)
@@ -128,7 +118,7 @@ func TestGetServiceSecretHandlerNotFound(t *testing.T) {
 	back.AddError("ReadService", apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, "missing"))
 	r := newSecretsRouter(back, cfg, "user@example.org")
 
-	req := httptest.NewRequest(http.MethodGet, "/system/secrets/missing", nil)
+	req := httptest.NewRequest(http.MethodGet, "/system/services/missing/secrets", nil)
 	req.Header.Set("Authorization", "Bearer token")
 	resp := httptest.NewRecorder()
 	r.ServeHTTP(resp, req)
@@ -143,17 +133,17 @@ func TestUpdateServiceSecretHandler(t *testing.T) {
 	namespace := utils.BuildUserNamespace(cfg, "user@example.org")
 	r := newSecretsRouter(back, cfg, "user@example.org")
 
-	req := httptest.NewRequest(http.MethodPut, "/system/secrets/cowsay", strings.NewReader(`{"secrets":{"NEW_KEY":"new-value"}}`))
+	req := httptest.NewRequest(http.MethodPut, "/system/services/cowsay/secrets", strings.NewReader(`{"NEW_KEY":"new-value"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer token")
 	resp := httptest.NewRecorder()
 	r.ServeHTTP(resp, req)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected update service secret status 200, got %d: %s", resp.Code, resp.Body.String())
+	if resp.Code != http.StatusNoContent {
+		t.Fatalf("expected update service secret status 204, got %d: %s", resp.Code, resp.Body.String())
 	}
-	if !strings.Contains(resp.Body.String(), "NEW_KEY") || !strings.Contains(resp.Body.String(), "new-value") || strings.Contains(resp.Body.String(), "secret-value") {
-		t.Fatalf("expected only request keys in response, got %s", resp.Body.String())
+	if resp.Body.Len() != 0 {
+		t.Fatalf("expected empty response body, got %s", resp.Body.String())
 	}
 
 	secret, err := back.GetKubeClientset().CoreV1().Secrets(namespace).Get(t.Context(), testSecretServiceName, metav1.GetOptions{})
@@ -186,7 +176,7 @@ func TestUpdateServiceSecretHandlerRejectsReservedKey(t *testing.T) {
 	back, _, cfg := newSecretsTestBackend("user@example.org")
 	r := newSecretsRouter(back, cfg, "user@example.org")
 
-	req := httptest.NewRequest(http.MethodPut, "/system/secrets/cowsay", strings.NewReader(`{"secrets":{"refresh_token":"token"}}`))
+	req := httptest.NewRequest(http.MethodPut, "/system/services/cowsay/secrets", strings.NewReader(`{"refresh_token":"token"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer token")
 	resp := httptest.NewRecorder()
@@ -201,7 +191,7 @@ func TestUpdateServiceSecretHandlerRejectsEmptyBody(t *testing.T) {
 	back, _, cfg := newSecretsTestBackend("user@example.org")
 	r := newSecretsRouter(back, cfg, "user@example.org")
 
-	req := httptest.NewRequest(http.MethodPut, "/system/secrets/cowsay", strings.NewReader(`{"secrets":{}}`))
+	req := httptest.NewRequest(http.MethodPut, "/system/services/cowsay/secrets", strings.NewReader(`{}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer token")
 	resp := httptest.NewRecorder()
@@ -216,7 +206,7 @@ func TestUpdateServiceSecretHandlerForbiddenForNonOwner(t *testing.T) {
 	back, _, cfg := newSecretsTestBackend("user@example.org")
 	r := newSecretsRouter(back, cfg, "other@example.org")
 
-	req := httptest.NewRequest(http.MethodPut, "/system/secrets/cowsay", strings.NewReader(`{"secrets":{"NEW_KEY":"value"}}`))
+	req := httptest.NewRequest(http.MethodPut, "/system/services/cowsay/secrets", strings.NewReader(`{"NEW_KEY":"value"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer token")
 	resp := httptest.NewRecorder()
@@ -232,7 +222,7 @@ func TestUpdateServiceSecretHandlerNotFound(t *testing.T) {
 	back.AddError("ReadService", apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, "missing"))
 	r := newSecretsRouter(back, cfg, "user@example.org")
 
-	req := httptest.NewRequest(http.MethodPut, "/system/secrets/missing", strings.NewReader(`{"secrets":{"K":"V"}}`))
+	req := httptest.NewRequest(http.MethodPut, "/system/services/missing/secrets", strings.NewReader(`{"K":"V"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer token")
 	resp := httptest.NewRecorder()
