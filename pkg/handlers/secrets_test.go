@@ -11,6 +11,7 @@ import (
 	"github.com/grycap/oscar/v4/pkg/backends"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,9 +50,83 @@ func newSecretsRouter(back types.ServerlessBackend, cfg *types.Config, uid strin
 		c.Set("uidOrigin", uid)
 		c.Next()
 	})
+	r.GET("/system/secrets", MakeGetSecretsHandler(back, back.GetKubeClientset(), cfg))
+	r.PUT("/system/secrets", MakeUpdateSecretsHandler(back, back.GetKubeClientset(), cfg))
 	r.GET("/system/services/:serviceName/secrets", MakeGetServiceSecretHandler(back, back.GetKubeClientset(), cfg))
 	r.PUT("/system/services/:serviceName/secrets", MakeUpdateServiceSecretHandler(back, back.GetKubeClientset(), cfg))
 	return r
+}
+
+func TestGetSecretsHandlerByKey(t *testing.T) {
+	back, client, cfg := newSecretsTestBackend("user@example.org")
+	namespace := utils.BuildUserNamespace(cfg, "user@example.org")
+	_, _ = client.CoreV1().Secrets(namespace).Create(context.TODO(), &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: auth.FormatUID("user@example.org"), Namespace: namespace},
+		Data:       map[string][]byte{"API_KEY": []byte("user-secret-value")},
+	}, metav1.CreateOptions{})
+	r := newSecretsRouter(back, cfg, "user@example.org")
+
+	req := httptest.NewRequest(http.MethodGet, "/system/secrets?key=API_KEY", nil)
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected get secrets status 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if resp.Body.String() != "user-secret-value" {
+		t.Fatalf("expected get secrets response to be the secret value, got %q", resp.Body.String())
+	}
+}
+
+func TestGetSecretsHandlerRequiresKey(t *testing.T) {
+	back, client, cfg := newSecretsTestBackend("user@example.org")
+	namespace := utils.BuildUserNamespace(cfg, "user@example.org")
+	_, _ = client.CoreV1().Secrets(namespace).Create(context.TODO(), &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: auth.FormatUID("user@example.org"), Namespace: namespace},
+		Data:       map[string][]byte{"API_KEY": []byte("user-secret-value")},
+	}, metav1.CreateOptions{})
+	r := newSecretsRouter(back, cfg, "user@example.org")
+
+	req := httptest.NewRequest(http.MethodGet, "/system/secrets", nil)
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("expected get secrets status 404 without key, got %d: %s", resp.Code, resp.Body.String())
+	}
+}
+
+func TestUpdateSecretsHandler(t *testing.T) {
+	back, client, cfg := newSecretsTestBackend("user@example.org")
+	namespace := utils.BuildUserNamespace(cfg, "user@example.org")
+	_, _ = client.CoreV1().Secrets(namespace).Create(context.TODO(), &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: auth.FormatUID("user@example.org"), Namespace: namespace},
+		Data:       map[string][]byte{"API_KEY": []byte("user-secret-value")},
+	}, metav1.CreateOptions{})
+	r := newSecretsRouter(back, cfg, "user@example.org")
+
+	req := httptest.NewRequest(http.MethodPut, "/system/secrets", strings.NewReader(`{"NEW_KEY":"new-value"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusNoContent {
+		t.Fatalf("expected update secrets status 204, got %d: %s", resp.Code, resp.Body.String())
+	}
+
+	secret, err := client.CoreV1().Secrets(namespace).Get(t.Context(), auth.FormatUID("user@example.org"), metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed retrieving secret after update: %v", err)
+	}
+	if string(secret.Data["API_KEY"]) != "user-secret-value" {
+		t.Fatalf("expected existing key to be preserved, got %q", string(secret.Data["API_KEY"]))
+	}
+	if string(secret.Data["NEW_KEY"]) != "new-value" {
+		t.Fatalf("expected new key to be stored, got %q", string(secret.Data["NEW_KEY"]))
+	}
 }
 
 func TestGetServiceSecretHandlerRequiresKey(t *testing.T) {

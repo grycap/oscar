@@ -30,6 +30,114 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// MakeGetSecretsHandler godoc
+// @Summary Get user secret
+// @Description Get the value of a specific secret key of the current user. The secret is read from the user namespace using the user UID.
+// @Tags secrets
+// @Produce text/plain
+// @Param key query string true "Secret key to retrieve"
+// @Success 200 {string} string "Secret value"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/secrets [get]
+func MakeGetSecretsHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uid, ok := getUIDFromRequest(c)
+		if !ok {
+			return
+		}
+
+		namespace := utils.BuildUserNamespace(cfg, uid)
+		secret, err := utils.GetSecret(auth.FormatUID(uid), namespace, kubeClientset)
+
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				c.Status(http.StatusNotFound)
+				return
+			}
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		if key := c.Query("key"); key != "" {
+			value, ok := secret.Data[key]
+			if !ok {
+				c.Status(http.StatusNotFound)
+				return
+			}
+			c.String(http.StatusOK, string(value))
+			return
+		}
+
+		c.Status(http.StatusNotFound)
+	}
+}
+
+// MakeUpdateSecretsHandler godoc
+// @Summary Update user secrets
+// @Description Merge the given key-value pairs into the current user secret. Keys that do not exist yet are created and keys not present in the request are preserved.
+// @Tags secrets
+// @Accept json
+// @Param secrets body map[string]string true "Secrets to merge"
+// @Success 204
+// @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 404 {string} string "Not Found"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Security BearerAuth
+// @Router /system/secrets [put]
+func MakeUpdateSecretsHandler(back types.ServerlessBackend, kubeClientset kubernetes.Interface, cfg *types.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uid, ok := getUIDFromRequest(c)
+		if !ok {
+			return
+		}
+
+		var req map[string]string
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.String(http.StatusBadRequest, "The secret specification is not valid: %v", err)
+			return
+		}
+		if len(req) == 0 {
+			c.String(http.StatusBadRequest, "The secret specification must include at least one key")
+			return
+		}
+		for key := range req {
+			if key == types.RefreshTokenSecretKey || key == auth.AccessKey || key == auth.SecretKey || key == auth.OIDCUID {
+				c.String(http.StatusBadRequest, "secret key %q is reserved and cannot be modified", key)
+				return
+			}
+		}
+		namespace := utils.BuildUserNamespace(cfg, uid)
+		if err := utils.MergeSecretData(auth.FormatUID(uid), namespace, req, kubeClientset); err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		c.Status(http.StatusNoContent)
+	}
+}
+
+// getUIDFromRequest returns the UID of the requesting user, handling both
+// bearer and basic authentication. For basic auth requests the UID is empty.
+func getUIDFromRequest(c *gin.Context) (string, bool) {
+	uid := ""
+	var err error
+	isBearer := isBearerRequest(c)
+	if isBearer {
+		uid, err = auth.GetUIDFromContext(c)
+		if err != nil {
+			c.String(http.StatusUnauthorized, err.Error())
+			return "", false
+		}
+	}
+	return uid, true
+}
+
 // MakeGetServiceSecretHandler godoc
 // @Summary Get service secret
 // @Description Get the value of a specific secret key of a service.
@@ -54,16 +162,11 @@ func MakeGetServiceSecretHandler(back types.ServerlessBackend, kubeClientset kub
 			return
 		}
 
-		uid := ""
-		var err error
-		isBearer := isBearerRequest(c)
-		if isBearer {
-			uid, err = auth.GetUIDFromContext(c)
-			if err != nil {
-				c.String(http.StatusUnauthorized, err.Error())
-				return
-			}
+		uid, ok := getUIDFromRequest(c)
+		if !ok {
+			return
 		}
+
 		namespace := utils.BuildUserNamespace(cfg, uid)
 
 		secrets, err := readServiceSecretData(serviceName, namespace, kubeClientset)
@@ -114,6 +217,12 @@ func MakeUpdateServiceSecretHandler(back types.ServerlessBackend, kubeClientset 
 			return
 		}
 
+		uid, ok := getUIDFromRequest(c)
+		if !ok {
+			return
+		}
+		namespace := utils.BuildUserNamespace(cfg, uid)
+
 		var req map[string]string
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.String(http.StatusBadRequest, "The secret specification is not valid: %v", err)
@@ -124,7 +233,7 @@ func MakeUpdateServiceSecretHandler(back types.ServerlessBackend, kubeClientset 
 			return
 		}
 		for key := range req {
-			if key == types.RefreshTokenSecretKey {
+			if key == types.RefreshTokenSecretKey || key == auth.OIDCUID || key == auth.AccessKey || key == auth.SecretKey {
 				c.String(http.StatusBadRequest, "secret key %q is reserved and cannot be modified", key)
 				return
 			}
@@ -135,7 +244,6 @@ func MakeUpdateServiceSecretHandler(back types.ServerlessBackend, kubeClientset 
 			return
 		}
 
-		namespace := resolveServiceNamespace(service, cfg)
 		if err := utils.MergeSecretData(service.Name, namespace, req, kubeClientset); err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return

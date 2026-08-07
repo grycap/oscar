@@ -150,6 +150,8 @@ func main() {
 		system.DELETE("/volumes/:volumeName", handlers.MakeDeleteVolumeHandler(cfg, back))
 	}
 	// Service secrets
+	system.GET("/secrets", handlers.MakeGetSecretsHandler(back, kubeClientset, cfg))
+	system.PUT("/secrets", handlers.MakeUpdateSecretsHandler(back, kubeClientset, cfg))
 	system.GET("/services/:serviceName/secrets", handlers.MakeGetServiceSecretHandler(back, kubeClientset, cfg))
 	system.PUT("/services/:serviceName/secrets", handlers.MakeUpdateServiceSecretHandler(back, kubeClientset, cfg))
 	// CRUD Buckets
