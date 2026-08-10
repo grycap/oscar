@@ -608,6 +608,10 @@ func buildKserveName(serviceName string) string {
 	return serviceName
 }
 
+func getServiceAuthCookieName(serviceName string) string {
+	return "oscar_service_" + strings.ReplaceAll(serviceName, "-", "_") + "_auth"
+}
+
 func getHTTPRouteName(serviceName string) string {
 	return serviceName + "-route"
 }
@@ -672,8 +676,10 @@ func buildTraefikOIDCMiddlewareSpec(service *types.Service, owner *KserveService
 		},
 		"spec": map[string]any{
 			"forwardAuth": map[string]any{
-				"address":            authEndpointAddress,
-				"trustForwardHeader": true,
+				"address":                  authEndpointAddress,
+				"trustForwardHeader":       true,
+				"addAuthCookiesToResponse": []any{getServiceAuthCookieName(service.Name)},
+				"authResponseHeaders":      []any{"Authorization"},
 			},
 		},
 	}}
@@ -766,6 +772,8 @@ func buildHTTPRouteSpec(service *types.Service, owner *KserveServiceOwner, cfg *
 	serviceName := service.Name
 	httpRouteName := serviceName + httpRouteSuffix
 	namespace := owner.Namespace
+	apiPath := "/"
+	host := fmt.Sprintf("%s.%s", serviceName, strings.TrimSpace(cfg.IngressHost))
 
 	filters := []any{
 		map[string]any{
@@ -788,23 +796,29 @@ func buildHTTPRouteSpec(service *types.Service, owner *KserveServiceOwner, cfg *
 			},
 		})
 	}
-	// TO DO: vLLM framework support root path change
-	filters = append(filters, map[string]any{
-		"type": "URLRewrite",
-		"urlRewrite": map[string]any{
-			"path": map[string]any{
-				"type":               "ReplacePrefixMatch",
-				"replacePrefixMatch": "/",
+
+	// If ExposedServicesUseSubdomainRoute is false (custom domain routing is disabled),
+	// we need to rewrite the path to remove the prefix and use the IngressHost as the hostname.
+	if !cfg.ExposedServicesUseSubdomainRoute {
+		apiPath = getAPIPath(serviceName)
+		host = strings.TrimSpace(cfg.IngressHost)
+		filters = append(filters, map[string]any{
+			"type": "URLRewrite",
+			"urlRewrite": map[string]any{
+				"path": map[string]any{
+					"type":               "ReplacePrefixMatch",
+					"replacePrefixMatch": "/",
+				},
 			},
-		},
-	})
+		})
+	}
 
 	rule := map[string]any{
 		"matches": []any{
 			map[string]any{
 				"path": map[string]any{
 					"type":  "PathPrefix",
-					"value": getAPIPath(serviceName),
+					"value": apiPath,
 				},
 			},
 		},
@@ -824,7 +838,7 @@ func buildHTTPRouteSpec(service *types.Service, owner *KserveServiceOwner, cfg *
 		"rules": []any{rule},
 	}
 
-	if host := strings.TrimSpace(cfg.IngressHost); host != "" {
+	if host != "" {
 		spec["hostnames"] = []any{host}
 	}
 
