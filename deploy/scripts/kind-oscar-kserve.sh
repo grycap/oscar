@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+KSERVE_VERSION="v0.20.0"
+
 if kubectl get namespace cert-manager >/dev/null 2>&1 && \
   kubectl get deployment -n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook >/dev/null 2>&1; then
   echo "cert-manager already installed, skipping install"
@@ -14,13 +16,13 @@ kubectl wait --namespace cert-manager \
   --timeout=300s
 
 helm upgrade --install kserve-crd oci://ghcr.io/kserve/charts/kserve-crd \
-  --version v0.19.0 \
+  --version ${KSERVE_VERSION} \
   --namespace kserve \
   --create-namespace \
   --wait
 
 helm upgrade --install kserve-resources oci://ghcr.io/kserve/charts/kserve-resources \
-  --version v0.19.0 \
+  --version ${KSERVE_VERSION} \
   --namespace kserve \
   --set kserve.controller.deploymentMode=Standard \
   --set kserve.controller.gateway.disableIngressCreation=true \
@@ -32,20 +34,20 @@ helm upgrade --install kserve-resources oci://ghcr.io/kserve/charts/kserve-resou
   --wait
 
 helm upgrade --install kserve-llmisvc-crd oci://ghcr.io/kserve/charts/kserve-llmisvc-crd \
-  --version v0.19.0 \
+  --version ${KSERVE_VERSION} \
   --namespace kserve \
   --create-namespace \
   --wait
 
 helm upgrade --install kserve-llmisvc-resources oci://ghcr.io/kserve/charts/kserve-llmisvc-resources \
-  --version v0.19.0 \
+  --version ${KSERVE_VERSION} \
   --create-namespace \
   --namespace kserve \
   --set kserve.createSharedResources=false \
   --wait
 
 helm upgrade --install kserve-runtime-configs oci://ghcr.io/kserve/charts/kserve-runtime-configs \
-  --version v0.19.0 \
+  --version ${KSERVE_VERSION} \
   --namespace kserve \
   --set kserve.llmisvcConfigs.enabled=true \
   --set kserve.servingruntime.enabled=true \
