@@ -18,7 +18,7 @@ functions:
       expose:
         min_scale: 1
         max_scale: 1
-        api_port: 18789
+        api_port: [18789]
         cpu_threshold: 90
         rewrite_target: true
         set_auth: true
