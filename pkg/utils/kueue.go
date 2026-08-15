@@ -620,61 +620,9 @@ func buildVerificationWorkloadName(serviceName string) string {
 }
 
 func CheckWorkloadAdmited(service types.Service, namespace string, cfg *types.Config, kubeClientset kubernetes.Interface, templateFunction func(types.Service, string, *types.Config) *apps.Deployment) error {
-	restCfg, err := rest.InClusterConfig()
-	if err != nil {
-		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
-		return err
-	}
-
-	kueueClient, err := kueueclientset.NewForConfig(restCfg)
-	if err != nil {
-		KueueLogger.Printf("error building kueue clientset: %v", err)
-		return err
-	}
-	factory := kueueinformers.NewSharedInformerFactory(kueueClient, 0)
-	workloadsInformer := factory.Kueue().V1beta2().Workloads().Informer()
-
-	resource, err := workloadsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			_, ok := newObj.(*kueuev1.Workload)
-			if !ok {
-				KueueLogger.Printf("error: unexpected type in workload informer")
-				return
-			}
-		},
-	})
-	if err != nil {
-		KueueLogger.Printf("error adding event handler to workload informer: %v, %v", err, resource)
-	}
-
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
-	factory.Start(stopCh)
-
-	if !cache.WaitForCacheSync(stopCh, workloadsInformer.HasSynced) {
-		return fmt.Errorf("failed to sync workload informer")
-	}
-	obj, exists, err := workloadsInformer.GetIndexer().GetByKey(namespace + "/" + service.Name)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return fmt.Errorf("workload not found")
-	}
-
-	wl := obj.(*kueuev1.Workload)
-	admitted := false
-	for _, c := range wl.Status.Conditions {
-		if c.Type == kueuev1.WorkloadAdmitted &&
-			c.Status == metav1.ConditionTrue {
-			admitted = true
-			break
-		}
-	}
-	if !admitted {
+	if !onlyCheckWorkloadAdmited(namespace, service.Name, defaultKueueAdmissionTimeout) {
 		DeleteWorkload(service.Name, namespace, cfg)
-		return fmt.Errorf("workload for exposed service '%s' is NOT admitted", service.Name)
+		return fmt.Errorf("workload for exposed service '%s' was not admitted within %s", service.Name, defaultKueueAdmissionTimeout)
 	} else {
 		KueueLogger.Printf("workload for exposed service '%s' is admitted", service.Name)
 		deployment := templateFunction(service, namespace, cfg) //getDeploymentSpec
@@ -708,7 +656,7 @@ func VerifyWorkload(service types.Service, namespace string, cfg *types.Config) 
 	if !CreateWorkload(service, namespace, cfg, getPodTemplateSpec) {
 		return false
 	}
-	check := onlyCheckWorkloadAdmited(service.Name, defaultKueueAdmissionTimeout)
+	check := onlyCheckWorkloadAdmited(namespace, service.Name, defaultKueueAdmissionTimeout)
 	delete := DeleteWorkload(service.Name, namespace, cfg)
 	return check && delete
 }
@@ -761,7 +709,7 @@ func VerifyWorkloadByResources(service types.Service, cfg *types.Config) bool {
 		return false
 	}
 
-	check := onlyCheckWorkloadAdmited(workloadName, 1*time.Second)
+	check := onlyCheckWorkloadAdmited(namespace, workloadName, 1*time.Second)
 	delete := DeleteWorkload(workloadName, namespace, cfg)
 	return check && delete
 }
@@ -789,7 +737,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 	}
 }
 
-func onlyCheckWorkloadAdmited(serviceName string, timeout time.Duration) bool {
+func onlyCheckWorkloadAdmited(namespace, serviceName string, timeout time.Duration) bool {
 	restCfg, err := rest.InClusterConfig()
 	if err != nil {
 		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
@@ -809,7 +757,7 @@ func onlyCheckWorkloadAdmited(serviceName string, timeout time.Duration) bool {
 	resource, err := workloadsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newWL := newObj.(*kueuev1.Workload)
-			if newWL.Name != serviceName {
+			if newWL.Namespace != namespace || newWL.Name != serviceName {
 				return
 			}
 			if workloadIsAdmitted(newWL) {
@@ -833,7 +781,7 @@ func onlyCheckWorkloadAdmited(serviceName string, timeout time.Duration) bool {
 	}
 
 	for _, obj := range workloadsInformer.GetStore().List() {
-		if wl, ok := obj.(*kueuev1.Workload); ok && wl.Name == serviceName && workloadIsAdmitted(wl) {
+		if wl, ok := obj.(*kueuev1.Workload); ok && wl.Namespace == namespace && wl.Name == serviceName && workloadIsAdmitted(wl) {
 			KueueLogger.Printf("Workload %s admitted", serviceName)
 			return true
 		}
