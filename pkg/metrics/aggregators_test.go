@@ -33,6 +33,23 @@ type fakeUsageMetrics struct {
 	err          error
 }
 
+type fakeAggregateUsageMetrics struct {
+	cpu    float64
+	gpu    float64
+	status *types.SourceStatus
+	err    error
+}
+
+func (f *fakeAggregateUsageMetrics) Name() string { return "aggregate-usage" }
+
+func (f *fakeAggregateUsageMetrics) UsageHours(context.Context, TimeRange, string) (float64, float64, *types.SourceStatus, error) {
+	return 0, 0, nil, errors.New("per-service usage should not be called")
+}
+
+func (f *fakeAggregateUsageMetrics) UsageHoursAll(context.Context, TimeRange) (float64, float64, *types.SourceStatus, error) {
+	return f.cpu, f.gpu, f.status, f.err
+}
+
 func (f *fakeUsageMetrics) Name() string {
 	return "usage-metrics"
 }
@@ -42,6 +59,31 @@ func (f *fakeUsageMetrics) UsageHours(ctx context.Context, tr TimeRange, service
 		return 0, 0, missingStatus(f.Name(), f.err), f.err
 	}
 	return f.cpuByService[serviceID], f.gpuByService[serviceID], okStatus(f.Name(), ""), nil
+}
+
+func TestSumUsageUsesScopedAggregateSource(t *testing.T) {
+	wantStatus := &types.SourceStatus{Name: "aggregate-usage", Status: "partial"}
+	agg := Aggregator{Sources: Sources{UsageMetrics: &fakeAggregateUsageMetrics{
+		cpu: 3, gpu: 4, status: wantStatus, err: errors.New("partial query"),
+	}}}
+
+	cpu, gpu, status := agg.sumUsage(t.Context(), TimeRange{}, []ServiceDescriptor{{ID: "svc"}})
+	if cpu != 3 || gpu != 4 || status != wantStatus {
+		t.Fatalf("sumUsage() = (%v, %v, %#v), want (3, 4, %#v)", cpu, gpu, status, wantStatus)
+	}
+}
+
+func TestSumUsageFallsBackWhenScopedAggregateUnsupported(t *testing.T) {
+	source := &scopedUsageMetricsSource{inner: &fakeUsageMetrics{
+		cpuByService: map[string]float64{"svc": 2},
+		gpuByService: map[string]float64{"svc": 1},
+	}}
+	agg := Aggregator{Sources: Sources{UsageMetrics: source}}
+
+	cpu, gpu, status := agg.sumUsage(t.Context(), TimeRange{}, []ServiceDescriptor{{ID: "svc"}})
+	if cpu != 2 || gpu != 1 || status == nil || status.Status != "ok" {
+		t.Fatalf("sumUsage() = (%v, %v, %#v), want (2, 1, ok)", cpu, gpu, status)
+	}
 }
 
 type fakeRequestLogs struct {

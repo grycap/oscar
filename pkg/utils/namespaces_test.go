@@ -513,6 +513,25 @@ func TestListManagedUserNamespaces(t *testing.T) {
 	}
 }
 
+func TestListManagedUserNamespacesInputHandling(t *testing.T) {
+	if _, err := ListManagedUserNamespaces(t.Context(), nil); err == nil {
+		t.Fatal("ListManagedUserNamespaces() with nil clientset should return an error")
+	}
+
+	clientset := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+		Name:        "oscar-svc-user",
+		Labels:      map[string]string{namespaceManagedByLabel: namespaceManagedByValue},
+		Annotations: map[string]string{namespaceOwnerLabel: " user "},
+	}})
+	namespaces, err := ListManagedUserNamespaces(nil, clientset)
+	if err != nil {
+		t.Fatalf("ListManagedUserNamespaces() error: %v", err)
+	}
+	if len(namespaces) != 1 || namespaces[0].Owner != "user" {
+		t.Fatalf("ListManagedUserNamespaces() = %+v, want trimmed owner", namespaces)
+	}
+}
+
 func TestNamespaceConstants(t *testing.T) {
 	// Test that constants have expected values
 	if maxNamespaceLength != 18 {

@@ -2,11 +2,43 @@ package metrics
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/grycap/oscar/v4/pkg/types"
 )
+
+func newScopedPrometheusSource(t *testing.T, queries *[]string) *PrometheusUsageMetricsSource {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Errorf("ParseForm() error: %v", err)
+		}
+		query := r.Form.Get("query")
+		*queries = append(*queries, query)
+		value := "1"
+		if strings.Contains(query, "gpu:") {
+			value = "2"
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"status":"success","data":{"resultType":"vector","result":[{"metric":{},"value":[1,%q]}]}}`, value)
+	}))
+	t.Cleanup(server.Close)
+	source, err := NewPrometheusUsageMetricsSource(
+		server.URL,
+		"cpu:{{namespace}}:{{service}}:{{range}}",
+		"gpu:{{namespace}}:{{service}}:{{range}}",
+		"unused",
+	)
+	if err != nil {
+		t.Fatalf("NewPrometheusUsageMetricsSource() error: %v", err)
+	}
+	return source
+}
 
 type mockServiceInventorySource struct {
 	services []ServiceDescriptor
@@ -200,6 +232,113 @@ func TestScopedUsageMetricsSource(t *testing.T) {
 	}
 	if mem != 2.0 {
 		t.Errorf("Expected mem=2.0, got %f", mem)
+	}
+}
+
+func TestScopedPrometheusUsageMetricsSource(t *testing.T) {
+	queries := []string{}
+	source := newScopedPrometheusSource(t, &queries)
+	scoped := &scopedUsageMetricsSource{
+		inner: source,
+		scope: QueryScope{
+			OwnerNamespace: "owner.ns",
+			ActiveServices: []ServiceScope{
+				{Name: "svc+one", Namespace: "owner.ns"},
+				{Name: "svc+one", Namespace: "legacy.ns"},
+				{Name: "svc+one", Namespace: "legacy.ns"},
+				{Name: "other", Namespace: "ignored.ns"},
+			},
+		},
+	}
+	tr := TimeRange{Start: time.Unix(0, 0), End: time.Unix(3600, 0)}
+
+	cpu, gpu, status, err := scoped.UsageHours(t.Context(), tr, "svc+one")
+	if err != nil {
+		t.Fatalf("UsageHours() error: %v", err)
+	}
+	if cpu != 2 || gpu != 4 {
+		t.Fatalf("UsageHours() = (%v, %v), want (2, 4); queries: %v", cpu, gpu, queries)
+	}
+	if status == nil || status.Status != "ok" {
+		t.Fatalf("UsageHours() status = %#v, want ok", status)
+	}
+	if len(queries) != 4 {
+		t.Fatalf("query count = %d, want 4", len(queries))
+	}
+	joined := strings.Join(queries, "\n")
+	for _, want := range []string{`owner\.ns`, `legacy\.ns`, `svc\+one`} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("queries do not contain %q: %s", want, joined)
+		}
+	}
+}
+
+func TestScopedPrometheusUsageHoursAll(t *testing.T) {
+	queries := []string{}
+	source := newScopedPrometheusSource(t, &queries)
+	scoped := &scopedUsageMetricsSource{
+		inner: source,
+		scope: QueryScope{
+			OwnerNamespace: "owner-ns",
+			ActiveServices: []ServiceScope{
+				{Name: "same", Namespace: "owner-ns"},
+				{Name: "legacy", Namespace: "legacy-ns"},
+				{Name: "empty"},
+			},
+		},
+	}
+
+	cpu, gpu, status, err := scoped.UsageHoursAll(t.Context(), TimeRange{Start: time.Unix(0, 0), End: time.Unix(60, 0)})
+	if err != nil {
+		t.Fatalf("UsageHoursAll() error: %v", err)
+	}
+	if cpu != 2 || gpu != 4 || status == nil || status.Status != "ok" {
+		t.Fatalf("UsageHoursAll() = (%v, %v, %#v), want (2, 4, ok)", cpu, gpu, status)
+	}
+	if len(queries) != 4 {
+		t.Fatalf("query count = %d, want 4", len(queries))
+	}
+	joined := strings.Join(queries, "\n")
+	if !strings.Contains(joined, "owner-ns:.*") || !strings.Contains(joined, "legacy-ns:legacy") {
+		t.Fatalf("unexpected queries: %s", joined)
+	}
+}
+
+func TestScopedUsageHoursAllUnsupported(t *testing.T) {
+	scoped := &scopedUsageMetricsSource{inner: &mockUsageMetricsSource{}}
+	if _, _, _, err := scoped.UsageHoursAll(t.Context(), TimeRange{}); err != errScopedUsageUnsupported {
+		t.Fatalf("UsageHoursAll() error = %v, want %v", err, errScopedUsageUnsupported)
+	}
+}
+
+func TestScopedUsageHelpers(t *testing.T) {
+	scoped := &scopedUsageMetricsSource{scope: QueryScope{
+		OwnerNamespace: "owner",
+		ActiveServices: []ServiceScope{
+			{Name: "svc", Namespace: ""},
+			{Name: "other", Namespace: "other"},
+			{Name: "svc", Namespace: "owner"},
+			{Name: "svc", Namespace: "legacy"},
+			{Name: "svc", Namespace: "legacy"},
+		},
+	}}
+	namespaces := scoped.namespacesForService("svc")
+	if got := strings.Join(namespaces, ","); got != "owner,legacy" {
+		t.Fatalf("namespacesForService() = %q, want %q", got, "owner,legacy")
+	}
+
+	left := &types.SourceStatus{Status: "ok", Notes: "first"}
+	right := &types.SourceStatus{Status: "partial", Notes: "second"}
+	merged := mergeSourceStatus(left, right)
+	if merged.Status != "partial" || merged.Notes != "first; second" {
+		t.Fatalf("mergeSourceStatus() = %#v", merged)
+	}
+	if mergeSourceStatus(nil, right) != right || mergeSourceStatus(left, nil) != left {
+		t.Fatal("mergeSourceStatus() should preserve non-nil status")
+	}
+	missing := mergeSourceStatus(&types.SourceStatus{Status: "ok"}, &types.SourceStatus{Status: "missing"})
+	if missing.Status != "missing" {
+		t.Fatalf("mergeSourceStatus() status = %q, want missing", missing.Status)
 	}
 }
 
