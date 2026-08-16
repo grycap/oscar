@@ -29,9 +29,10 @@ type TimeRange struct {
 }
 
 type ServiceDescriptor struct {
-	ID    string
-	Name  string
-	Image string
+	ID        string
+	Name      string
+	Image     string
+	Namespace string
 }
 
 type RequestType string
@@ -42,12 +43,13 @@ const (
 )
 
 type RequestRecord struct {
-	ServiceID  string
-	UserID     string
-	Country    string
-	AuthMethod string
-	Type       RequestType
-	Timestamp  time.Time
+	ServiceID        string
+	ServiceNamespace string
+	UserID           string
+	Country          string
+	AuthMethod       string
+	Type             RequestType
+	Timestamp        time.Time
 }
 
 type ServiceInventorySource interface {
@@ -117,7 +119,7 @@ func DefaultSources(cfg *types.Config, back types.ServerlessBackend, kubeClients
 
 				if cfg.ExposedServicesUseSubdomainRoute {
 					serviceFilterTemplate = "`RequestHost\":\"%s." + cfg.IngressHost + "`"
-					serviceFilterAll = "\"[a-zAZ0-9-]+." + cfg.IngressHost + "\" != \"minio." + cfg.IngressHost + "\""
+					serviceFilterAll = "\"[A-Za-z0-9-]+." + cfg.IngressHost + "\" != \"minio." + cfg.IngressHost + "\""
 				} else {
 					serviceFilterTemplate = "\"/system/services/%s/exposed\""
 					serviceFilterAll = "\"/system/services/.+/exposed\""
@@ -185,9 +187,10 @@ func (s *BackendServiceInventorySource) ListServices(ctx context.Context, tr Tim
 			continue
 		}
 		result = append(result, ServiceDescriptor{
-			ID:    service.Name,
-			Name:  service.Name,
-			Image: service.Image,
+			ID:        service.Name,
+			Name:      service.Name,
+			Image:     service.Image,
+			Namespace: service.Namespace,
 		})
 	}
 	status := okStatus(s.Name(), "")
@@ -231,6 +234,17 @@ func (s *PrometheusUsageMetricsSource) Name() string {
 }
 
 func (s *PrometheusUsageMetricsSource) UsageHours(ctx context.Context, tr TimeRange, serviceID string) (float64, float64, *types.SourceStatus, error) {
+	serviceMatcher := serviceID
+	if serviceMatcher != ".*" {
+		serviceMatcher = regexp.QuoteMeta(serviceMatcher)
+	}
+	return s.UsageHoursInNamespace(ctx, tr, regexp.QuoteMeta(s.ServicesNamespace)+".*", serviceMatcher)
+}
+
+// UsageHoursInNamespace returns usage for a service constrained to a namespace
+// matcher. serviceID and namespaceMatcher are regular expressions used by the
+// configured Prometheus query templates.
+func (s *PrometheusUsageMetricsSource) UsageHoursInNamespace(ctx context.Context, tr TimeRange, namespaceMatcher, serviceID string) (float64, float64, *types.SourceStatus, error) {
 	if s.API == nil {
 		err := errors.New("prometheus client not configured")
 		return 0, 0, missingStatus(s.Name(), err), err
@@ -243,8 +257,8 @@ func (s *PrometheusUsageMetricsSource) UsageHours(ctx context.Context, tr TimeRa
 	}
 	rangeLiteral := fmt.Sprintf("%ds", rangeSeconds)
 
-	cpuValue, cpuErr := s.queryValue(ctx, s.CPUQuery, serviceID, rangeLiteral, tr.End)
-	gpuValue, gpuErr := s.queryValue(ctx, s.GPUQuery, serviceID, rangeLiteral, tr.End)
+	cpuValue, cpuErr := s.queryValue(ctx, s.CPUQuery, namespaceMatcher, serviceID, rangeLiteral, tr.End)
+	gpuValue, gpuErr := s.queryValue(ctx, s.GPUQuery, namespaceMatcher, serviceID, rangeLiteral, tr.End)
 
 	status := okStatus(s.Name(), "")
 	if cpuErr != nil || gpuErr != nil {
@@ -262,17 +276,18 @@ func (s *PrometheusUsageMetricsSource) UsageHours(ctx context.Context, tr TimeRa
 	return cpuValue, gpuValue, status, nil
 }
 
-func (s *PrometheusUsageMetricsSource) queryValue(ctx context.Context, template, serviceID, rangeLiteral string, ts time.Time) (float64, error) {
+func (s *PrometheusUsageMetricsSource) queryValue(ctx context.Context, template, namespaceMatcher, serviceID, rangeLiteral string, ts time.Time) (float64, error) {
 	if template == "" {
 		return 0, errors.New("prometheus query template not configured")
 	}
 	query := strings.ReplaceAll(template, "{{service}}", serviceID)
 	query = strings.ReplaceAll(query, "{{range}}", rangeLiteral)
+	query = strings.ReplaceAll(query, "{{namespace}}", namespaceMatcher)
 	if strings.Contains(query, "{{services_namespace}}") {
-		if s.ServicesNamespace == "" {
+		if namespaceMatcher == "" {
 			return 0, errors.New("prometheus services namespace not configured")
 		}
-		query = strings.ReplaceAll(query, "{{services_namespace}}", s.ServicesNamespace)
+		query = strings.ReplaceAll(query, "{{services_namespace}}", namespaceMatcher)
 	}
 
 	result, warnings, err := s.API.Query(ctx, query, ts)
@@ -348,6 +363,7 @@ type LokiRequestLogSource struct {
 	SourceName            string
 	ServiceFilterTemplate string
 	ServiceFilterAll      string
+	scope                 *QueryScope
 }
 
 func (s *LokiRequestLogSource) Name() string {
@@ -368,37 +384,9 @@ func (s *LokiRequestLogSource) ListRequests(ctx context.Context, cfg *types.Conf
 		return nil, missingStatus(s.Name(), err), err
 	}
 
-	values := url.Values{}
-	values.Set("query", query)
-	values.Set("start", strconv.FormatInt(tr.Start.UTC().UnixNano(), 10))
-	values.Set("end", strconv.FormatInt(tr.End.UTC().UnixNano(), 10))
-	values.Set("limit", "5000")
-	values.Set("direction", "forward")
-
-	endpoint := strings.TrimRight(s.BaseURL, "/") + "/loki/api/v1/query_range?" + values.Encode()
 	client := s.Client
 	if client == nil {
 		client = http.DefaultClient
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, missingStatus(s.Name(), err), err
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, missingStatus(s.Name(), err), err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		err := fmt.Errorf("loki query failed: %s", resp.Status)
-		return nil, missingStatus(s.Name(), err), err
-	}
-
-	result, err := decodeLokiResponse(resp.Body)
-	if err != nil {
-		return nil, missingStatus(s.Name(), err), err
 	}
 
 	parseFn := s.ParseFunc
@@ -407,33 +395,84 @@ func (s *LokiRequestLogSource) ListRequests(ctx context.Context, cfg *types.Conf
 	}
 
 	records := make([]RequestRecord, 0)
-	for _, stream := range result {
-		for _, entry := range stream.Values {
-			lokiTime := time.Unix(0, entry.Timestamp)
-			record, ok := parseFn(entry.Line, cfg)
-			if !ok {
-				continue
-			}
-			if record.Country == "" || strings.EqualFold(record.Country, "unknown") {
-				if country := countryFromLokiLabels(stream.Labels); country != "" {
-					record.Country = country
-				}
-			}
-			if record.Timestamp.IsZero() {
-				record.Timestamp = lokiTime
-			}
-			if record.Timestamp.Before(tr.Start) && record.Timestamp.After(tr.End) {
-				continue
-			}
-			if serviceID != "" && record.ServiceID != serviceID {
-				continue
-			}
-			records = append(records, record)
+	pageStart := tr.Start.UTC().UnixNano()
+	end := tr.End.UTC().UnixNano()
+	for pageStart <= end {
+		result, entryCount, lastTimestamp, err := s.fetchLokiPage(ctx, client, query, pageStart, end)
+		if err != nil {
+			return nil, missingStatus(s.Name(), err), err
 		}
+		for _, stream := range result {
+			for _, entry := range stream.Values {
+				lokiTime := time.Unix(0, entry.Timestamp)
+				record, ok := parseFn(entry.Line, cfg)
+				if !ok {
+					continue
+				}
+				if record.Country == "" || strings.EqualFold(record.Country, "unknown") {
+					if country := countryFromLokiLabels(stream.Labels); country != "" {
+						record.Country = country
+					}
+				}
+				if record.Timestamp.IsZero() {
+					record.Timestamp = lokiTime
+				}
+				if record.Timestamp.Before(tr.Start) || record.Timestamp.After(tr.End) {
+					continue
+				}
+				if serviceID != "" && record.ServiceID != serviceID {
+					continue
+				}
+				records = append(records, record)
+			}
+		}
+		if entryCount < 5000 || lastTimestamp < pageStart {
+			break
+		}
+		pageStart = lastTimestamp + 1
 	}
 
 	status := okStatus(s.Name(), "")
 	return records, status, nil
+}
+
+func (s *LokiRequestLogSource) fetchLokiPage(ctx context.Context, client *http.Client, query string, start, end int64) ([]lokiStream, int, int64, error) {
+	values := url.Values{}
+	values.Set("query", query)
+	values.Set("start", strconv.FormatInt(start, 10))
+	values.Set("end", strconv.FormatInt(end, 10))
+	values.Set("limit", "5000")
+	values.Set("direction", "forward")
+
+	endpoint := strings.TrimRight(s.BaseURL, "/") + "/loki/api/v1/query_range?" + values.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, 0, 0, fmt.Errorf("loki query failed: %s", resp.Status)
+	}
+
+	result, err := decodeLokiResponse(resp.Body)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	entryCount := 0
+	lastTimestamp := int64(0)
+	for _, stream := range result {
+		entryCount += len(stream.Values)
+		for _, entry := range stream.Values {
+			if entry.Timestamp > lastTimestamp {
+				lastTimestamp = entry.Timestamp
+			}
+		}
+	}
+	return result, entryCount, lastTimestamp, nil
 }
 
 func parseTraefik(serviceID string, tr TimeRange, result []lokiStream, s *LokiRequestLogSource, parseFn func(string) (RequestRecord, bool)) ([]RequestRecord, *types.SourceStatus, error) {
@@ -483,7 +522,7 @@ func (s *LokiRequestLogSource) buildQuery(serviceID string) string {
 			serviceReplacement = ".*"
 		}
 		query = strings.ReplaceAll(query, "{{service}}", serviceReplacement)
-		return query
+		return s.appendScopeFilter(query)
 	}
 
 	if serviceID != "" && s.ServiceFilterTemplate != "" {
@@ -491,7 +530,40 @@ func (s *LokiRequestLogSource) buildQuery(serviceID string) string {
 	} else if serviceID == "" && s.ServiceFilterAll != "" {
 		query += fmt.Sprintf(" |~ %s", s.ServiceFilterAll)
 	}
-	return query
+	return s.appendScopeFilter(query)
+}
+
+func (s *LokiRequestLogSource) appendScopeFilter(query string) string {
+	if s.scope == nil || s.scope.OwnerNamespace == "" {
+		return query
+	}
+
+	ownerNamespace := regexp.QuoteMeta(s.scope.OwnerNamespace)
+	patterns := []string{
+		`\|\s*` + ownerNamespace + `\s*$`,
+		`"ServiceName"\s*:\s*"` + ownerNamespace + `-`,
+	}
+	activeNames := make([]string, 0, len(s.scope.ActiveServices))
+	seen := make(map[string]struct{}, len(s.scope.ActiveServices))
+	for _, service := range s.scope.ActiveServices {
+		if service.Name == "" {
+			continue
+		}
+		if _, ok := seen[service.Name]; ok {
+			continue
+		}
+		seen[service.Name] = struct{}{}
+		activeNames = append(activeNames, regexp.QuoteMeta(service.Name))
+	}
+	if len(activeNames) > 0 {
+		services := strings.Join(activeNames, "|")
+		patterns = append(patterns,
+			`/(?:job|run)/(?:`+services+`)(?:[/?\s]|$)`,
+			`/system/services/(?:`+services+`)/exposed(?:[/?\s]|$)`,
+			`"(?:RequestAddr|RequestHost)"\s*:\s*"(?:`+services+`)\.`,
+		)
+	}
+	return query + " |~ " + strconv.Quote(strings.Join(patterns, "|"))
 }
 
 type lokiStreamEntry struct {
@@ -704,14 +776,22 @@ func parseGinExecutionLog(line string, cfg *types.Config) (RequestRecord, bool) 
 	path = strings.Trim(path, "\"")
 	path = strings.SplitN(path, "?", 2)[0]
 	serviceID, reqType := parseServiceFromPath(path)
+	serviceNamespace := ""
+	if len(parts) >= 8 {
+		if loggedServiceID := strings.TrimSpace(parts[6]); loggedServiceID != "" {
+			serviceID = loggedServiceID
+		}
+		serviceNamespace = strings.TrimSpace(parts[7])
+	}
 
 	return RequestRecord{
-		ServiceID:  serviceID,
-		UserID:     strings.TrimSpace(parts[5]),
-		Country:    "",
-		AuthMethod: "",
-		Type:       reqType,
-		Timestamp:  timestamp.UTC(),
+		ServiceID:        serviceID,
+		ServiceNamespace: serviceNamespace,
+		UserID:           strings.TrimSpace(parts[5]),
+		Country:          "",
+		AuthMethod:       "",
+		Type:             reqType,
+		Timestamp:        timestamp.UTC(),
 	}, ip != ""
 }
 
@@ -748,17 +828,15 @@ func parseExposedServiceFromPath(path string) (string, bool) {
 
 func parseHTTPAccessLog(line string, cfg *types.Config) (RequestRecord, bool) {
 	var jsonformat map[string]interface{}
-	err := json.Unmarshal([]byte(line), &jsonformat)
-	if err != nil {
-		fields := strings.Fields(line)
-		if len(fields) == 0 {
-			return RequestRecord{}, false
-		}
+	if err := json.Unmarshal([]byte(line), &jsonformat); err != nil {
+		return RequestRecord{}, false
 	}
 	var timestamp time.Time
-	parsed, err := time.Parse("02/Jan/2006:15:04:05 -0700", jsonformat["StartUTC"].(string))
-	if err == nil {
-		timestamp = parsed
+	if timestampRaw, ok := jsonformat["StartUTC"].(string); ok {
+		parsed, err := time.Parse("02/Jan/2006:15:04:05 -0700", timestampRaw)
+		if err == nil {
+			timestamp = parsed
+		}
 	}
 
 	serviceID, good := extractServiceFromExposedPath(jsonformat, cfg.ExposedServicesUseSubdomainRoute)
@@ -766,13 +844,43 @@ func parseHTTPAccessLog(line string, cfg *types.Config) (RequestRecord, bool) {
 		return RequestRecord{}, false
 	}
 	return RequestRecord{
-		ServiceID:  serviceID,
-		UserID:     "",
-		Country:    "",
-		AuthMethod: "",
-		Type:       "",
-		Timestamp:  timestamp,
+		ServiceID:        serviceID,
+		ServiceNamespace: traefikServiceNamespace(jsonformat, serviceID),
+		UserID:           "",
+		Country:          "",
+		AuthMethod:       "",
+		Type:             "",
+		Timestamp:        timestamp,
 	}, true
+}
+
+func traefikServiceNamespace(fields map[string]interface{}, serviceID string) string {
+	serviceName, _ := fields["ServiceName"].(string)
+	serviceName = strings.TrimSpace(serviceName)
+	if serviceName == "" || serviceID == "" {
+		return ""
+	}
+	pattern := `^(.+)-` + regexp.QuoteMeta(serviceID) + `-svc(?:-|@)`
+	match := regexp.MustCompile(pattern).FindStringSubmatch(serviceName)
+	if len(match) != 2 {
+		return ""
+	}
+	return match[1]
+}
+
+func ingressServiceNamespace(line, serviceID string) string {
+	if serviceID == "" {
+		return ""
+	}
+	// The default ingress-nginx upstream field is
+	// [<namespace>-<service>-<port>]. Use the service parsed from the request
+	// path to isolate the namespace without depending on a fixed log layout.
+	pattern := `\[([^]]+)-` + regexp.QuoteMeta(serviceID) + `-[^]]+\]`
+	match := regexp.MustCompile(pattern).FindStringSubmatch(line)
+	if len(match) != 2 {
+		return ""
+	}
+	return match[1]
 }
 
 func parseIngressAccessLog(line string, cfg *types.Config) (RequestRecord, bool) {
@@ -813,25 +921,30 @@ func parseIngressAccessLog(line string, cfg *types.Config) (RequestRecord, bool)
 	}
 
 	return RequestRecord{
-		ServiceID:  serviceID,
-		UserID:     "",
-		Country:    "",
-		AuthMethod: "",
-		Type:       "",
-		Timestamp:  timestamp,
+		ServiceID:        serviceID,
+		ServiceNamespace: ingressServiceNamespace(line, serviceID),
+		UserID:           "",
+		Country:          "",
+		AuthMethod:       "",
+		Type:             "",
+		Timestamp:        timestamp,
 	}, true
 }
 
 func extractServiceFromExposedPath(path map[string]interface{}, expose_service_user_subdomine_route bool) (string, bool) {
 	if expose_service_user_subdomine_route {
-		reqAddrRaw, ok := path["RequestAddr"]
-		if !ok {
+		var dns string
+		for _, key := range []string{"RequestHost", "RequestAddr"} {
+			value, ok := path[key].(string)
+			if ok && strings.TrimSpace(value) != "" {
+				dns = strings.TrimSpace(value)
+				break
+			}
+		}
+		if dns == "" {
 			return "", false
 		}
-		dns, ok := reqAddrRaw.(string)
-		if !ok || dns == "" {
-			return "", false
-		}
+		dns = strings.SplitN(dns, ":", 2)[0]
 		routerNameRaw, ok := path["RouterName"]
 		if !ok {
 			return "", false
@@ -848,7 +961,10 @@ func extractServiceFromExposedPath(path map[string]interface{}, expose_service_u
 			return "", false
 		}
 	} else {
-		pathString := path["RequestPath"].(string)
+		pathString, ok := path["RequestPath"].(string)
+		if !ok || pathString == "" {
+			return "", false
+		}
 		pathString = strings.SplitN(pathString, "?", 2)[0]
 		const prefix = "/system/services/"
 		if !strings.HasPrefix(pathString, prefix) {

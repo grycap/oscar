@@ -112,3 +112,13 @@ type MetricsBreakdownResponse struct {
 	GroupBy string          `json:"group_by"`
 	Items   []BreakdownItem `json:"items"`
 }
+
+type MetricsOwner struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+}
+
+type MetricsOwnersResponse struct {
+	Owners []MetricsOwner `json:"owners"`
+}

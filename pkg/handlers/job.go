@@ -244,6 +244,7 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 		if minIOSecretKey == "" {
 			minIOSecretKey = service.Owner
 		}
+		auth.SetMetricsServiceContext(c, service.Name, serviceNamespace)
 
 		if minIOSecretKey == service.Owner {
 			minIOSecretKey = "minio"

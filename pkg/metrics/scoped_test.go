@@ -49,7 +49,7 @@ func TestScopeSourcesNilAllowed(t *testing.T) {
 		ServiceInventory: &mockServiceInventorySource{},
 	}
 
-	result := ScopeSources(src, nil)
+	result := ScopeSources(src, QueryScope{})
 	if result.ServiceInventory == nil {
 		t.Error("Expected ServiceInventory to be unchanged")
 	}
@@ -68,11 +68,12 @@ func TestScopeSourcesWithAllowed(t *testing.T) {
 		ExposedRequestLogs: &mockRequestLogSource{},
 	}
 
-	allowed := map[string]struct{}{
-		"svc1": {},
+	scope := QueryScope{
+		OwnerNamespace: "oscar-svc-user",
+		ActiveServices: []ServiceScope{{Name: "svc1"}},
 	}
 
-	result := ScopeSources(src, allowed)
+	result := ScopeSources(src, scope)
 	if result.ServiceInventory == nil {
 		t.Error("Expected ServiceInventory to be set")
 	}
@@ -87,43 +88,18 @@ func TestScopeSourcesWithAllowed(t *testing.T) {
 	}
 }
 
-func TestCloneAllowedServices(t *testing.T) {
-	allowed := map[string]struct{}{
-		"svc1": {},
-		"svc2": {},
-	}
-
-	cloned := cloneAllowedServices(allowed)
-	if cloned == nil {
-		t.Fatal("Expected non-nil")
-	}
-	if _, ok := cloned["svc1"]; !ok {
-		t.Error("Expected svc1 in cloned")
-	}
-	if _, ok := cloned["svc2"]; !ok {
-		t.Error("Expected svc2 in cloned")
-	}
-}
-
-func TestCloneAllowedServicesNil(t *testing.T) {
-	cloned := cloneAllowedServices(nil)
-	if cloned != nil {
-		t.Error("Expected nil for nil input")
-	}
-}
-
 func TestFilterServiceDescriptors(t *testing.T) {
 	services := []ServiceDescriptor{
-		{ID: "svc1"},
-		{ID: "svc2"},
-		{ID: "svc3"},
+		{ID: "svc1", Namespace: "oscar-svc-user"},
+		{ID: "svc2", Namespace: "oscar-svc-other"},
+		{ID: "svc3", Namespace: "oscar-svc-shared"},
 	}
-	allowed := map[string]struct{}{
-		"svc1": {},
-		"svc3": {},
+	scope := QueryScope{
+		OwnerNamespace: "oscar-svc-user",
+		ActiveServices: []ServiceScope{{Name: "svc3", Namespace: "oscar-svc-shared"}},
 	}
 
-	filtered := filterServiceDescriptors(services, allowed)
+	filtered := filterServiceDescriptors(services, scope)
 	if len(filtered) != 2 {
 		t.Errorf("Expected 2 services, got %d", len(filtered))
 	}
@@ -140,7 +116,7 @@ func TestFilterServiceDescriptorsNilAllowed(t *testing.T) {
 		{ID: "svc1"},
 	}
 
-	filtered := filterServiceDescriptors(services, nil)
+	filtered := filterServiceDescriptors(services, QueryScope{})
 	if len(filtered) != 1 {
 		t.Errorf("Expected 1 service, got %d", len(filtered))
 	}
@@ -148,21 +124,21 @@ func TestFilterServiceDescriptorsNilAllowed(t *testing.T) {
 
 func TestFilterRequestRecords(t *testing.T) {
 	records := []RequestRecord{
-		{ServiceID: "svc1"},
-		{ServiceID: "svc2"},
-		{ServiceID: "svc3"},
+		{ServiceID: "deleted", ServiceNamespace: "oscar-svc-user"},
+		{ServiceID: "svc2", ServiceNamespace: "oscar-svc-other"},
+		{ServiceID: "svc3", ServiceNamespace: "oscar-svc-shared"},
 	}
-	allowed := map[string]struct{}{
-		"svc1": {},
-		"svc3": {},
+	scope := QueryScope{
+		OwnerNamespace: "oscar-svc-user",
+		ActiveServices: []ServiceScope{{Name: "svc3", Namespace: "oscar-svc-shared"}},
 	}
 
-	filtered := filterRequestRecords(records, allowed)
+	filtered := filterRequestRecords(records, scope)
 	if len(filtered) != 2 {
 		t.Errorf("Expected 2 records, got %d", len(filtered))
 	}
-	if filtered[0].ServiceID != "svc1" {
-		t.Errorf("Expected svc1, got %s", filtered[0].ServiceID)
+	if filtered[0].ServiceID != "deleted" {
+		t.Errorf("Expected deleted, got %s", filtered[0].ServiceID)
 	}
 	if filtered[1].ServiceID != "svc3" {
 		t.Errorf("Expected svc3, got %s", filtered[1].ServiceID)
@@ -174,7 +150,7 @@ func TestFilterRequestRecordsNilAllowed(t *testing.T) {
 		{ServiceID: "svc1"},
 	}
 
-	filtered := filterRequestRecords(records, nil)
+	filtered := filterRequestRecords(records, QueryScope{})
 	if len(filtered) != 1 {
 		t.Errorf("Expected 1 record, got %d", len(filtered))
 	}
@@ -189,18 +165,14 @@ func TestScopedServiceInventorySource(t *testing.T) {
 
 	inner := &mockServiceInventorySource{
 		services: []ServiceDescriptor{
-			{ID: "svc1"},
-			{ID: "svc2"},
+			{ID: "svc1", Namespace: "oscar-svc-user"},
+			{ID: "svc2", Namespace: "oscar-svc-other"},
 		},
 	}
 
-	allowed := map[string]struct{}{
-		"svc1": {},
-	}
-
 	src := &scopedServiceInventorySource{
-		inner:   inner,
-		allowed: allowed,
+		inner: inner,
+		scope: QueryScope{OwnerNamespace: "oscar-svc-user"},
 	}
 
 	services, _, _ := src.ListServices(ctx, tr)
@@ -220,7 +192,7 @@ func TestScopedUsageMetricsSource(t *testing.T) {
 	}
 
 	inner := &mockUsageMetricsSource{}
-	src := &scopedUsageMetricsSource{inner: inner}
+	src := &scopedUsageMetricsSource{inner: inner, scope: QueryScope{OwnerNamespace: "oscar-svc-user"}}
 
 	cpu, mem, _, _ := src.UsageHours(ctx, tr, "svc1")
 	if cpu != 1.0 {
@@ -245,13 +217,12 @@ func TestScopedRequestLogSource(t *testing.T) {
 		},
 	}
 
-	allowed := map[string]struct{}{
-		"svc1": {},
-	}
-
 	src := &scopedRequestLogSource{
-		inner:   inner,
-		allowed: allowed,
+		inner: inner,
+		scope: QueryScope{
+			OwnerNamespace: "oscar-svc-user",
+			ActiveServices: []ServiceScope{{Name: "svc1"}},
+		},
 	}
 
 	records, _, _ := src.ListRequests(ctx, &types.Config{}, tr, "svc1")

@@ -285,6 +285,26 @@ func TestBuildLokiQuery(t *testing.T) {
 	}
 }
 
+func TestBuildLokiQueryWithUserScope(t *testing.T) {
+	source := LokiRequestLogSource{
+		QueryTemplate:    `{namespace="{{namespace}}", app="{{app}}"}`,
+		Namespace:        "oscar",
+		AppLabel:         "oscar",
+		ServiceFilterAll: `"\\[GIN-EXECUTIONS-LOGGER\\]" |~ "/(job|run)"`,
+		scope: &QueryScope{
+			OwnerNamespace: "oscar-svc-user",
+			ActiveServices: []ServiceScope{{Name: "shared-service"}},
+		},
+	}
+	query := source.buildQuery("")
+	if !strings.Contains(query, "oscar-svc-user") {
+		t.Fatalf("expected owner namespace filter, got %s", query)
+	}
+	if !strings.Contains(query, "shared-service") {
+		t.Fatalf("expected active service fallback, got %s", query)
+	}
+}
+
 func TestParseGinExecutionLogFromGinPrefix(t *testing.T) {
 	line := "[GIN] 2026-01-20T10:00:00Z | 200 |  12.345ms | 10.0.0.1 | POST    /job/test-service | user@example.com"
 	record, ok := parseGinExecutionLog(line, &types.Config{})
@@ -306,6 +326,20 @@ func TestParseGinExecutionLogFromGinPrefix(t *testing.T) {
 	}
 }
 
+func TestParseGinExecutionLogWithServiceNamespace(t *testing.T) {
+	line := "[GIN-EXECUTIONS-LOGGER] 2026-01-20T10:00:00Z | 200 | 12ms | 10.0.0.1 | POST /job/path-service | caller | logged-service | oscar-svc-user"
+	record, ok := parseGinExecutionLog(line, &types.Config{})
+	if !ok {
+		t.Fatal("expected log line to parse")
+	}
+	if record.ServiceID != "logged-service" {
+		t.Fatalf("expected logged service identity, got %s", record.ServiceID)
+	}
+	if record.ServiceNamespace != "oscar-svc-user" {
+		t.Fatalf("expected service namespace, got %s", record.ServiceNamespace)
+	}
+}
+
 func TestParseIngressAccessLog(t *testing.T) {
 	line := "172.18.0.1 - - [23/Jan/2026:18:13:07 +0000] \"GET /system/services/gmolto-nginx/exposed/ HTTP/1.1\" 200 17 \"-\" \"curl/8.7.1\" 109 0.003 [oscar-svc-gmolto-nginx-svc-80] [] 10.244.0.223:80 17 0.002 200 a72c147a794286b864361ecca7a31075"
 	record, ok := parseIngressAccessLog(line, &types.Config{})
@@ -315,8 +349,25 @@ func TestParseIngressAccessLog(t *testing.T) {
 	if record.ServiceID != "gmolto-nginx" {
 		t.Fatalf("expected serviceID gmolto-nginx, got %s", record.ServiceID)
 	}
+	if record.ServiceNamespace != "oscar-svc" {
+		t.Fatalf("expected ingress namespace oscar-svc, got %s", record.ServiceNamespace)
+	}
 	if record.Timestamp.IsZero() {
 		t.Fatal("expected timestamp to be parsed")
+	}
+}
+
+func TestParseTraefikDNSAccessLog(t *testing.T) {
+	line := `{"StartUTC":"15/Aug/2026:12:30:00 +0000","RequestHost":"demo.example.org","RouterName":"oscar-svc-user-demo-route@kubernetesgateway","ServiceName":"oscar-svc-user-demo-svc-80@kubernetesgateway"}`
+	record, ok := parseHTTPAccessLog(line, &types.Config{ExposedServicesUseSubdomainRoute: true})
+	if !ok {
+		t.Fatal("expected Traefik access log to parse")
+	}
+	if record.ServiceID != "demo" {
+		t.Fatalf("expected serviceID demo, got %s", record.ServiceID)
+	}
+	if record.ServiceNamespace != "oscar-svc-user" {
+		t.Fatalf("expected Traefik service namespace, got %s", record.ServiceNamespace)
 	}
 }
 

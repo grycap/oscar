@@ -41,7 +41,7 @@ func TestIsBearerRequest(t *testing.T) {
 	}
 }
 
-func TestIsServiceAccessibleByUser(t *testing.T) {
+func TestIsServiceOwnedByUser(t *testing.T) {
 	publicSvc := &types.Service{
 		Name:         "public",
 		Visibility:   types.PUBLIC,
@@ -68,10 +68,10 @@ func TestIsServiceAccessibleByUser(t *testing.T) {
 		expected bool
 	}{
 		{"Nil service", nil, "user", false},
-		{"Public service any user", publicSvc, "anyone", true},
-		{"Public service anonymous", publicSvc, "", true},
+		{"Public service owner", publicSvc, "owner", true},
+		{"Public service other user", publicSvc, "anyone", false},
 		{"Restricted service owner", restrictedSvc, "owner", true},
-		{"Restricted service allowed user", restrictedSvc, "user1", true},
+		{"Restricted service allowed user", restrictedSvc, "user1", false},
 		{"Restricted service not allowed", restrictedSvc, "user3", false},
 		{"Private service owner", privateSvc, "owner", true},
 		{"Private service other", privateSvc, "other", false},
@@ -79,9 +79,9 @@ func TestIsServiceAccessibleByUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isServiceAccessibleByUser(tt.service, tt.uid)
+			result := isServiceOwnedByUser(tt.service, tt.uid)
 			if result != tt.expected {
-				t.Errorf("isServiceAccessibleByUser(%v, %q) = %v, want %v", tt.service, tt.uid, result, tt.expected)
+				t.Errorf("isServiceOwnedByUser(%v, %q) = %v, want %v", tt.service, tt.uid, result, tt.expected)
 			}
 		})
 	}
@@ -127,6 +127,29 @@ func TestListAuthorizedServicesForMetrics(t *testing.T) {
 		}
 		if w.Code != http.StatusInternalServerError {
 			t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
+		}
+	})
+
+	t.Run("Bearer request only returns owned services", func(t *testing.T) {
+		back := backends.MakeFakeBackend()
+		back.Services = []*types.Service{
+			{Name: "owned", Visibility: types.PRIVATE, Owner: "user1"},
+			{Name: "public-other", Visibility: types.PUBLIC, Owner: "owner1"},
+			{Name: "restricted-other", Visibility: types.RESTRICTED, Owner: "owner2", AllowedUsers: []string{"user1"}},
+		}
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("GET", "/", nil)
+		c.Request.Header.Set("Authorization", "Bearer token")
+		c.Set("uidOrigin", "user1")
+
+		services, ok := listAuthorizedServicesForMetrics(c, back)
+		if !ok {
+			t.Fatal("expected ok = true")
+		}
+		if len(services) != 1 || services[0].Name != "owned" {
+			t.Fatalf("expected only the owned service, got %v", services)
 		}
 	})
 }

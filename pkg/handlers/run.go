@@ -129,9 +129,14 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 			c.String(http.StatusBadRequest, "invalid workload: try to reduce the service resource (cpu, memory, etc.)")
 			return
 		}
+		serviceNamespace := service.Namespace
+		if serviceNamespace == "" {
+			serviceNamespace = utils.BuildUserNamespace(cfg, service.Owner)
+		}
+		auth.SetMetricsServiceContext(c, service.Name, serviceNamespace)
 
 		proxy := &httputil.ReverseProxy{
-			Director: back.GetProxyDirector(service.Name, service.Namespace),
+			Director: back.GetProxyDirector(service.Name, serviceNamespace),
 		}
 		proxy.ServeHTTP(c.Writer, c.Request) // #nosec
 	}

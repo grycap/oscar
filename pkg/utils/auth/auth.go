@@ -29,6 +29,18 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const (
+	metricsServiceNameContextKey      = "metricsServiceName"
+	metricsServiceNamespaceContextKey = "metricsServiceNamespace"
+)
+
+// SetMetricsServiceContext adds the resolved service identity to the execution
+// log without changing the public request path.
+func SetMetricsServiceContext(c *gin.Context, serviceName, serviceNamespace string) {
+	c.Set(metricsServiceNameContextKey, serviceName)
+	c.Set(metricsServiceNamespaceContextKey, serviceNamespace)
+}
+
 // GetAuthMiddleware returns the appropriate gin auth middleware
 func GetAuthMiddleware(cfg *types.Config, kubeClientset kubernetes.Interface) gin.HandlerFunc {
 	if !cfg.OIDCEnable {
@@ -140,8 +152,10 @@ func GetLoggerMiddleware() gin.HandlerFunc {
 			clientIP, _ = IPAddress.(string)
 		}
 
-		log.Printf("[GIN-EXECUTIONS-LOGGER] %s | %3d | %13v | %s | %-7s %s | %s", // #nosec
-			logTime, status, latency, clientIP, method, path, user) // #nosec
+		serviceName := c.GetString(metricsServiceNameContextKey)
+		serviceNamespace := c.GetString(metricsServiceNamespaceContextKey)
+		log.Printf("[GIN-EXECUTIONS-LOGGER] %s | %3d | %13v | %s | %-7s %s | %s | %s | %s", // #nosec
+			logTime, status, latency, clientIP, method, path, user, serviceName, serviceNamespace) // #nosec
 	}
 }
 

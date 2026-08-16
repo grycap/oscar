@@ -272,10 +272,10 @@ type Config struct {
 	// PrometheusBaseURL base URL for Prometheus HTTP API
 	PrometheusBaseURL string `json:"-"`
 
-	// PrometheusCPUQuery query template for CPU hours (use {{service}}, {{range}}, and {{services_namespace}})
+	// PrometheusCPUQuery query template for CPU hours (use {{service}}, {{range}}, and {{namespace}})
 	PrometheusCPUQuery string `json:"-"`
 
-	// PrometheusGPUQuery query template for GPU hours (use {{service}}, {{range}}, and {{services_namespace}})
+	// PrometheusGPUQuery query template for GPU hours (use {{service}}, {{range}}, and {{namespace}})
 	PrometheusGPUQuery string `json:"-"`
 
 	// LokiBaseURL base URL for Loki HTTP API
@@ -382,11 +382,11 @@ var configVars = []configVar{
 	{"JobListingLimit", "JOB_LISTING_LIMIT", false, intType, "70"},
 	{"KserveEnable", "KSERVE_ENABLE", false, boolType, "false"},
 	{"PrometheusBaseURL", "PROMETHEUS_URL", false, urlType, ""},
-	{"PrometheusCPUQuery", "PROMETHEUS_CPU_QUERY", false, stringType, "sum(increase(container_cpu_usage_seconds_total{namespace=~\"{{services_namespace}}.*\",service=~\"{{service}}\"}[{{range}}])) / 3600"},
-	{"PrometheusGPUQuery", "PROMETHEUS_GPU_QUERY", false, stringType, "sum(increase(container_gpu_usage_seconds_total{namespace=~\"{{services_namespace}}.*\",service=~\"{{service}}\"}[{{range}}])) / 3600"},
+	{"PrometheusCPUQuery", "PROMETHEUS_CPU_QUERY", false, stringType, "sum(increase(container_cpu_usage_seconds_total{namespace=~\"{{namespace}}\",service=~\"{{service}}\"}[{{range}}])) / 3600"},
+	{"PrometheusGPUQuery", "PROMETHEUS_GPU_QUERY", false, stringType, "sum(increase(container_gpu_usage_seconds_total{namespace=~\"{{namespace}}\",service=~\"{{service}}\"}[{{range}}])) / 3600"},
 	{"LokiBaseURL", "LOKI_URL", false, urlType, ""},
 	{"LokiQuery", "LOKI_QUERY", false, stringType, "{namespace=\"{{namespace}}\", app=\"{{app}}\"} |~ \"/(job|run)/\""},
-	{"LokiExposedQuery", "LOKI_EXPOSED_QUERY", false, stringType, "{namespace=\"{{namespace}}\", app=\"{{app}}\"} |~ \"/system/services/.+/exposed\""},
+	{"LokiExposedQuery", "LOKI_EXPOSED_QUERY", false, stringType, "{namespace=\"{{namespace}}\", app=\"{{app}}\"}"},
 	{"LokiExposedNamespace", "LOKI_EXPOSED_NAMESPACE", false, stringType, "ingress-nginx"},
 	{"LokiExposedAppLabel", "LOKI_EXPOSED_APP", false, stringType, "ingress-nginx"},
 	{"MinIOQuotaEnabled", "MINIO_QUOTA_ENABLED", false, boolType, "false"},
