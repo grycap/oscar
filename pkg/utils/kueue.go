@@ -34,6 +34,13 @@ const (
 var (
 	defaultCpuRequest    = resource.MustParse("0.2")
 	defaultMemoryRequest = resource.MustParse("256Mi")
+	newKueueClient       = func() (kueueclientset.Interface, error) {
+		restCfg, err := rest.InClusterConfig()
+		if err != nil {
+			return nil, err
+		}
+		return kueueclientset.NewForConfig(restCfg)
+	}
 )
 
 var KueueLogger = log.New(os.Stdout, "[KUEUE-SERVICE] ", log.Flags())
@@ -738,12 +745,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 }
 
 func onlyCheckWorkloadAdmited(namespace, serviceName string, timeout time.Duration) bool {
-	restCfg, err := rest.InClusterConfig()
-	if err != nil {
-		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
-		return false
-	}
-	kueueClient, err := kueueclientset.NewForConfig(restCfg)
+	kueueClient, err := newKueueClient()
 	if err != nil {
 		KueueLogger.Printf("error building kueue clientset: %v", err)
 		return false
