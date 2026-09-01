@@ -209,8 +209,8 @@ storage_providers:
 
 | Field                        | Description                                 |
 |------------------------------| --------------------------------------------|
-| `model_format` </br> *string* | Model format expected by KServe for `inference` services. Required when `type` is `inference`. Typical values include: `onnx`, `sklearn`, `xgboost`, `pytorch`, `tensorflow`, `triton`, `huggingface`. |
-| `runtime` </br> *string* | Explicit KServe ServingRuntime name to use for `inference` services. Optional. |
+| `model_format` </br> *string* | Model format expected by KServe for `inference` services. Required when `type` is `inference`. Typical values include: `onnx`, `sklearn`, `xgboost`, `pytorch`, `tensorflow`, `triton`, `huggingface`. Every model format has its own runtime and the available runtimes may vary depending on the cluster configuration |
+| `runtime_image` </br> *string* | Explicit KServe ServingRuntime name to use for `inference` services. Use if the model format are not enough. Optional. |
 | `api_version` </br> *string* | Protocol version used by KServe predictors. Allowed values: `v1`, `v2`. Optional. (default: `v1`) |
 
 ## KServeLLMInferenceSettings
