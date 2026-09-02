@@ -62,6 +62,15 @@ func MakeGetSecretsHandler(back types.ServerlessBackend, kubeClientset kubernete
 			return
 		}
 
+		if list := c.Query("list"); list == "true" {
+			keys := make([]string, 0, len(secret.Data))
+			for key := range secret.Data {
+				keys = append(keys, key)
+			}
+			c.JSON(http.StatusOK, keys)
+			return
+		}
+
 		if key := c.Query("key"); key != "" {
 			value, ok := secret.Data[key]
 			if !ok {
@@ -176,6 +185,15 @@ func MakeGetServiceSecretHandler(back types.ServerlessBackend, kubeClientset kub
 				return
 			}
 			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		if list := c.Query("list"); list == "true" {
+			keys := make([]string, 0, len(secrets))
+			for key := range secrets {
+				keys = append(keys, key)
+			}
+			c.JSON(http.StatusOK, keys)
 			return
 		}
 
