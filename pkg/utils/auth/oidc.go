@@ -117,15 +117,9 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, objectStorageIAM obje
 		if oidcConfig != nil {
 			issuerManager.config = oidcConfig
 		}
-		if err != nil {
-			return func(c *gin.Context) {
-				c.AbortWithStatus(http.StatusUnauthorized)
-				return
-			}
+		if err == nil {
+			ClusterOidcManagers[iss] = issuerManager
 		}
-
-		ClusterOidcManagers[iss] = issuerManager
-
 	}
 
 	mc := NewMultitenancyConfig(kubeClientset, cfg.OIDCSubject)
