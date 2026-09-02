@@ -33,6 +33,23 @@ type fakeUsageMetrics struct {
 	err          error
 }
 
+type fakeAggregateUsageMetrics struct {
+	cpu    float64
+	gpu    float64
+	status *types.SourceStatus
+	err    error
+}
+
+func (f *fakeAggregateUsageMetrics) Name() string { return "aggregate-usage" }
+
+func (f *fakeAggregateUsageMetrics) UsageHours(context.Context, TimeRange, string) (float64, float64, *types.SourceStatus, error) {
+	return 0, 0, nil, errors.New("per-service usage should not be called")
+}
+
+func (f *fakeAggregateUsageMetrics) UsageHoursAll(context.Context, TimeRange) (float64, float64, *types.SourceStatus, error) {
+	return f.cpu, f.gpu, f.status, f.err
+}
+
 func (f *fakeUsageMetrics) Name() string {
 	return "usage-metrics"
 }
@@ -42,6 +59,31 @@ func (f *fakeUsageMetrics) UsageHours(ctx context.Context, tr TimeRange, service
 		return 0, 0, missingStatus(f.Name(), f.err), f.err
 	}
 	return f.cpuByService[serviceID], f.gpuByService[serviceID], okStatus(f.Name(), ""), nil
+}
+
+func TestSumUsageUsesScopedAggregateSource(t *testing.T) {
+	wantStatus := &types.SourceStatus{Name: "aggregate-usage", Status: "partial"}
+	agg := Aggregator{Sources: Sources{UsageMetrics: &fakeAggregateUsageMetrics{
+		cpu: 3, gpu: 4, status: wantStatus, err: errors.New("partial query"),
+	}}}
+
+	cpu, gpu, status := agg.sumUsage(t.Context(), TimeRange{}, []ServiceDescriptor{{ID: "svc"}})
+	if cpu != 3 || gpu != 4 || status != wantStatus {
+		t.Fatalf("sumUsage() = (%v, %v, %#v), want (3, 4, %#v)", cpu, gpu, status, wantStatus)
+	}
+}
+
+func TestSumUsageFallsBackWhenScopedAggregateUnsupported(t *testing.T) {
+	source := &scopedUsageMetricsSource{inner: &fakeUsageMetrics{
+		cpuByService: map[string]float64{"svc": 2},
+		gpuByService: map[string]float64{"svc": 1},
+	}}
+	agg := Aggregator{Sources: Sources{UsageMetrics: source}}
+
+	cpu, gpu, status := agg.sumUsage(t.Context(), TimeRange{}, []ServiceDescriptor{{ID: "svc"}})
+	if cpu != 2 || gpu != 1 || status == nil || status.Status != "ok" {
+		t.Fatalf("sumUsage() = (%v, %v, %#v), want (2, 1, ok)", cpu, gpu, status)
+	}
 }
 
 type fakeRequestLogs struct {
@@ -285,6 +327,26 @@ func TestBuildLokiQuery(t *testing.T) {
 	}
 }
 
+func TestBuildLokiQueryWithUserScope(t *testing.T) {
+	source := LokiRequestLogSource{
+		QueryTemplate:    `{namespace="{{namespace}}", app="{{app}}"}`,
+		Namespace:        "oscar",
+		AppLabel:         "oscar",
+		ServiceFilterAll: `"\\[GIN-EXECUTIONS-LOGGER\\]" |~ "/(job|run)"`,
+		scope: &QueryScope{
+			OwnerNamespace: "oscar-svc-user",
+			ActiveServices: []ServiceScope{{Name: "shared-service"}},
+		},
+	}
+	query := source.buildQuery("")
+	if !strings.Contains(query, "oscar-svc-user") {
+		t.Fatalf("expected owner namespace filter, got %s", query)
+	}
+	if !strings.Contains(query, "shared-service") {
+		t.Fatalf("expected active service fallback, got %s", query)
+	}
+}
+
 func TestParseGinExecutionLogFromGinPrefix(t *testing.T) {
 	line := "[GIN] 2026-01-20T10:00:00Z | 200 |  12.345ms | 10.0.0.1 | POST    /job/test-service | user@example.com"
 	record, ok := parseGinExecutionLog(line, &types.Config{})
@@ -306,6 +368,20 @@ func TestParseGinExecutionLogFromGinPrefix(t *testing.T) {
 	}
 }
 
+func TestParseGinExecutionLogWithServiceNamespace(t *testing.T) {
+	line := "[GIN-EXECUTIONS-LOGGER] 2026-01-20T10:00:00Z | 200 | 12ms | 10.0.0.1 | POST /job/path-service | caller | logged-service | oscar-svc-user"
+	record, ok := parseGinExecutionLog(line, &types.Config{})
+	if !ok {
+		t.Fatal("expected log line to parse")
+	}
+	if record.ServiceID != "logged-service" {
+		t.Fatalf("expected logged service identity, got %s", record.ServiceID)
+	}
+	if record.ServiceNamespace != "oscar-svc-user" {
+		t.Fatalf("expected service namespace, got %s", record.ServiceNamespace)
+	}
+}
+
 func TestParseIngressAccessLog(t *testing.T) {
 	line := "172.18.0.1 - - [23/Jan/2026:18:13:07 +0000] \"GET /system/services/gmolto-nginx/exposed/ HTTP/1.1\" 200 17 \"-\" \"curl/8.7.1\" 109 0.003 [oscar-svc-gmolto-nginx-svc-80] [] 10.244.0.223:80 17 0.002 200 a72c147a794286b864361ecca7a31075"
 	record, ok := parseIngressAccessLog(line, &types.Config{})
@@ -315,8 +391,25 @@ func TestParseIngressAccessLog(t *testing.T) {
 	if record.ServiceID != "gmolto-nginx" {
 		t.Fatalf("expected serviceID gmolto-nginx, got %s", record.ServiceID)
 	}
+	if record.ServiceNamespace != "oscar-svc" {
+		t.Fatalf("expected ingress namespace oscar-svc, got %s", record.ServiceNamespace)
+	}
 	if record.Timestamp.IsZero() {
 		t.Fatal("expected timestamp to be parsed")
+	}
+}
+
+func TestParseTraefikDNSAccessLog(t *testing.T) {
+	line := `{"StartUTC":"15/Aug/2026:12:30:00 +0000","RequestHost":"demo.example.org","RouterName":"oscar-svc-user-demo-route@kubernetesgateway","ServiceName":"oscar-svc-user-demo-svc-80@kubernetesgateway"}`
+	record, ok := parseHTTPAccessLog(line, &types.Config{ExposedServicesUseSubdomainRoute: true})
+	if !ok {
+		t.Fatal("expected Traefik access log to parse")
+	}
+	if record.ServiceID != "demo" {
+		t.Fatalf("expected serviceID demo, got %s", record.ServiceID)
+	}
+	if record.ServiceNamespace != "oscar-svc-user" {
+		t.Fatalf("expected Traefik service namespace, got %s", record.ServiceNamespace)
 	}
 }
 

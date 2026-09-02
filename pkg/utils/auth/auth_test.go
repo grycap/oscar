@@ -27,6 +27,17 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
+func TestSetMetricsServiceContext(t *testing.T) {
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	SetMetricsServiceContext(c, "service", "namespace")
+
+	service, serviceExists := c.Get(metricsServiceNameContextKey)
+	namespace, namespaceExists := c.Get(metricsServiceNamespaceContextKey)
+	if !serviceExists || service != "service" || !namespaceExists || namespace != "namespace" {
+		t.Fatalf("unexpected metrics service context: service=%v namespace=%v", service, namespace)
+	}
+}
+
 func TestGetAuthMiddleware(t *testing.T) {
 	cfg := &types.Config{
 		OIDCEnable: false,

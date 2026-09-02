@@ -182,6 +182,14 @@ func (a *Aggregator) sumUsage(ctx context.Context, tr TimeRange, services []Serv
 		}
 		return cpuTotal, gpuTotal, status
 	}
+	if scopedSource, ok := a.Sources.UsageMetrics.(interface {
+		UsageHoursAll(context.Context, TimeRange) (float64, float64, *types.SourceStatus, error)
+	}); ok {
+		cpuTotal, gpuTotal, status, err := scopedSource.UsageHoursAll(ctx, tr)
+		if err == nil || !errors.Is(err, errScopedUsageUnsupported) {
+			return cpuTotal, gpuTotal, status
+		}
+	}
 
 	var cpuTotal float64
 	var gpuTotal float64

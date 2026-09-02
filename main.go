@@ -173,6 +173,7 @@ func main() {
 	metricsGroup := r.Group("/system/metrics", auth.GetAuthMiddleware(cfg, kubeClientset))
 	metricsGroup.GET("", handlers.MakeMetricsSummaryHandler(cfg, back, metricsAgg))
 	metricsGroup.GET("/breakdown", handlers.MakeMetricsBreakdownHandler(cfg, back, metricsAgg))
+	metricsGroup.GET("/owners", handlers.MakeMetricsOwnersHandler(cfg, back))
 	metricsGroup.GET("/:serviceName", handlers.MakeMetricValueHandler(cfg, back, metricsAgg))
 
 	// Quotas

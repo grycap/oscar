@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"slices"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -15,17 +14,8 @@ func isBearerRequest(c *gin.Context) bool {
 	return strings.HasPrefix(c.GetHeader("Authorization"), "Bearer ")
 }
 
-func isServiceAccessibleByUser(service *types.Service, uid string) bool {
-	if service == nil {
-		return false
-	}
-	if service.Visibility == types.PUBLIC {
-		return true
-	}
-	if uid == service.Owner {
-		return true
-	}
-	return service.Visibility == types.RESTRICTED && slices.Contains(service.AllowedUsers, uid)
+func isServiceOwnedByUser(service *types.Service, uid string) bool {
+	return service != nil && service.Owner == uid
 }
 
 func listAuthorizedServicesForMetrics(c *gin.Context, back types.ServerlessBackend) ([]*types.Service, bool) {
@@ -46,35 +36,34 @@ func listAuthorizedServicesForMetrics(c *gin.Context, back types.ServerlessBacke
 
 	filtered := make([]*types.Service, 0, len(services))
 	for _, service := range services {
-		if isServiceAccessibleByUser(service, uid) {
+		if isServiceOwnedByUser(service, uid) {
 			filtered = append(filtered, service)
 		}
 	}
 	return filtered, true
 }
 
-func getAuthorizedServiceForMetrics(c *gin.Context, back types.ServerlessBackend, serviceName string) (*types.Service, bool) {
+// authorizeServiceMetricsQuery permits an OIDC user to query a service that no
+// longer exists. The metrics sources still constrain that query to the user's
+// namespace, so a missing live service cannot expose another user's data.
+func authorizeServiceMetricsQuery(c *gin.Context, back types.ServerlessBackend, serviceName string) bool {
 	service, err := back.ReadService("", serviceName)
 	if err != nil {
 		if errors.IsNotFound(err) || errors.IsGone(err) {
-			c.Status(http.StatusNotFound)
-		} else {
-			c.String(http.StatusInternalServerError, err.Error())
+			return true
 		}
-		return nil, false
-	}
-	if !isBearerRequest(c) {
-		return service, true
+		c.String(http.StatusInternalServerError, err.Error())
+		return false
 	}
 
 	uid, err := auth.GetUIDFromContext(c)
 	if err != nil {
 		c.String(http.StatusUnauthorized, err.Error())
-		return nil, false
+		return false
 	}
-	if !isServiceAccessibleByUser(service, uid) {
+	if !isServiceOwnedByUser(service, uid) {
 		c.Status(http.StatusForbidden)
-		return nil, false
+		return false
 	}
-	return service, true
+	return true
 }
