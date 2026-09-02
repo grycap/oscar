@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/grycap/oscar/v4/pkg/types"
 	apps "k8s.io/api/apps/v1"
@@ -15,6 +16,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	kueuev1 "sigs.k8s.io/kueue/apis/kueue/v1beta2"
+	kueueclientset "sigs.k8s.io/kueue/client-go/clientset/versioned"
+	kueuefake "sigs.k8s.io/kueue/client-go/clientset/versioned/fake"
 )
 
 func newTestConfig() *types.Config {
@@ -628,6 +631,80 @@ func TestWorkloadIsAdmitted(t *testing.T) {
 				t.Fatalf("workloadIsAdmitted() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestOnlyCheckWorkloadAdmitedFromInitialState(t *testing.T) {
+	originalNewKueueClient := newKueueClient
+	t.Cleanup(func() { newKueueClient = originalNewKueueClient })
+
+	admittedWorkload := func(namespace string) *kueuev1.Workload {
+		return &kueuev1.Workload{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-service", Namespace: namespace},
+			Status: kueuev1.WorkloadStatus{Conditions: []metav1.Condition{{
+				Type:   string(kueuev1.WorkloadAdmitted),
+				Status: metav1.ConditionTrue,
+			}}},
+		}
+	}
+
+	tests := []struct {
+		name              string
+		workloadNamespace string
+		want              bool
+	}{
+		{name: "matching namespace", workloadNamespace: "test-ns", want: true},
+		{name: "different namespace", workloadNamespace: "other-ns", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := kueuefake.NewSimpleClientset(admittedWorkload(tt.workloadNamespace))
+			newKueueClient = func() (kueueclientset.Interface, error) { return client, nil }
+
+			if got := onlyCheckWorkloadAdmited("test-ns", "test-service", 10*time.Millisecond); got != tt.want {
+				t.Fatalf("onlyCheckWorkloadAdmited() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestOnlyCheckWorkloadAdmitedFromUpdate(t *testing.T) {
+	originalNewKueueClient := newKueueClient
+	t.Cleanup(func() { newKueueClient = originalNewKueueClient })
+
+	client := kueuefake.NewSimpleClientset(&kueuev1.Workload{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-service", Namespace: "test-ns"},
+	})
+	newKueueClient = func() (kueueclientset.Interface, error) { return client, nil }
+
+	result := make(chan bool, 1)
+	go func() {
+		result <- onlyCheckWorkloadAdmited("test-ns", "test-service", time.Second)
+	}()
+
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case got := <-result:
+			if !got {
+				t.Fatal("onlyCheckWorkloadAdmited() = false, want true")
+			}
+			return
+		case <-ticker.C:
+			workload, err := client.KueueV1beta2().Workloads("test-ns").Get(context.Background(), "test-service", metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("getting workload: %v", err)
+			}
+			workload.Status.Conditions = []metav1.Condition{{
+				Type:   string(kueuev1.WorkloadAdmitted),
+				Status: metav1.ConditionTrue,
+			}}
+			if _, err := client.KueueV1beta2().Workloads("test-ns").UpdateStatus(context.Background(), workload, metav1.UpdateOptions{}); err != nil {
+				t.Fatalf("updating workload status: %v", err)
+			}
+		}
 	}
 }
 
