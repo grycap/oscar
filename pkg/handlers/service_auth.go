@@ -72,7 +72,7 @@ func validatedServiceAuthReturnPath(c *gin.Context, serviceName, rawReturnTo str
 		returnToPath = protocol + "://" + serviceName + "." + cfg.IngressHost
 	}
 
-	if strings.TrimSpace(rawReturnTo) == "" {
+	if strings.TrimSpace(rawReturnTo) == "" || strings.TrimSpace(rawReturnTo) == "/" {
 		return returnToPath + "/", nil
 	}
 
