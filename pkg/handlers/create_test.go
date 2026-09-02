@@ -125,9 +125,9 @@ func TestMakeCreateHandler(t *testing.T) {
 			Namespace: "oscar-svc",
 		},
 		Data: map[string][]byte{
-			"oidc_uid":  []byte("somelonguid@egi.eu"),
-			"accessKey": []byte("somelonguid@egi.eu"),
-			"secretKey": []byte("secret"),
+			auth.OIDCUID:   []byte("somelonguid@egi.eu"),
+			auth.AccessKey: []byte("somelonguid@egi.eu"),
+			auth.SecretKey: []byte("secret"),
 		},
 		Type: corev1.SecretTypeOpaque,
 	}
@@ -400,9 +400,9 @@ func TestMakeCreateHandlerVolumeFlows(t *testing.T) {
 		baseSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{Name: auth.FormatUID("owner@example.com"), Namespace: "oscar-svc"},
 			Data: map[string][]byte{
-				"oidc_uid":  []byte("owner@example.com"),
-				"accessKey": []byte("owner@example.com"),
-				"secretKey": []byte("secret"),
+				auth.OIDCUID:   []byte("owner@example.com"),
+				auth.AccessKey: []byte("owner@example.com"),
+				auth.SecretKey: []byte("secret"),
 			},
 		}
 		kubeClientset := testclient.NewSimpleClientset(baseNamespace, basePV, basePVC, baseSecret)
@@ -447,9 +447,9 @@ func TestMakeCreateHandlerVolumeFlows(t *testing.T) {
 		baseSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{Name: auth.FormatUID("owner@example.com"), Namespace: "oscar-svc"},
 			Data: map[string][]byte{
-				"oidc_uid":  []byte("owner@example.com"),
-				"accessKey": []byte("owner@example.com"),
-				"secretKey": []byte("secret"),
+				auth.OIDCUID:   []byte("owner@example.com"),
+				auth.AccessKey: []byte("owner@example.com"),
+				auth.SecretKey: []byte("secret"),
 			},
 		}
 		kubeClientset := testclient.NewSimpleClientset(baseNamespace, basePV, basePVC, baseSecret)
@@ -744,9 +744,9 @@ func newServiceQuotaTestContext(t *testing.T, user, minIOEndpoint string, quotaD
 		&corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{Name: auth.FormatUID(user), Namespace: cfg.ServicesNamespace},
 			Data: map[string][]byte{
-				"oidc_uid":  []byte(user),
-				"accessKey": []byte(user),
-				"secretKey": []byte("secret"),
+				auth.OIDCUID:   []byte(user),
+				auth.AccessKey: []byte(user),
+				auth.SecretKey: []byte("secret"),
 			},
 		},
 	}
