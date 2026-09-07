@@ -829,7 +829,7 @@ func (minIOAdminClient *MinIOAdminClient) EnrichBucketQuotaAndUsage(bucket *MinI
 	return nil
 }
 
-// CreateAddPolicy creates a policy asociated to a bucket to set its visibility
+// CreateAddPolicy creates a policy associated to a bucket to set its visibility
 func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucket string, policyName string, policyActions []string, isGroup bool) error {
 	var jsonErr error
 	var policy []byte
@@ -865,7 +865,7 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucket string, policyN
 		}
 	}
 
-	err := minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), policyName, []byte(policy))
+	err := minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), policyName, policy)
 	if err != nil {
 		return fmt.Errorf("error creating/adding MinIO policy for user/group %s: %v", policyName, err)
 	}
@@ -906,7 +906,7 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 		return jsonErr
 	}
 
-	err := minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), policyName, []byte(policy))
+	err := minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), policyName, policy)
 	if err != nil {
 		return fmt.Errorf("error creating MinIO policy for user %s: %v", policyName, err)
 	}
@@ -970,7 +970,7 @@ func (minIOAdminClient *MinIOAdminClient) RemoveResource(bucketName string, poli
 		return jsonErr
 	}
 
-	err := minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), policyName, []byte(policy))
+	err := minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), policyName, policy)
 	if err != nil {
 		return fmt.Errorf("error creating MinIO policy %s: %v", policyName, err)
 	}

@@ -152,7 +152,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			// Set the owner on the new service definition
 			newService.Owner = oldService.Owner
 
-			// If the service has changed VO check permisions again
+			// If the service has changed VO check permissions again
 			if newService.VO != "" && newService.VO != oldService.VO {
 				for _, vo := range cfg.OIDCGroups {
 					if vo == newService.VO {
@@ -184,7 +184,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					newService.Labels["uid"] = full_uid[:10]
 					var userBucket string
 					for _, u := range newService.AllowedUsers {
-						// Check if the uid's from allowed_users have and asociated MinIO user
+						// Check if the uid's from allowed_users have and associated MinIO user
 						// and create it if not
 						if mc != nil && !mc.UserExists(u) {
 							sk, _ := auth.GenerateRandomKey(8)
@@ -412,13 +412,13 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			if utils.SecretExists(newService.Name, serviceNamespace, back.GetKubeClientset()) {
 				secretsErr := utils.UpdateSecretData(newService.Name, serviceNamespace, newService.Environment.Secrets, back.GetKubeClientset())
 				if secretsErr != nil {
-					c.String(http.StatusInternalServerError, "error updating asociated secret: %v", secretsErr)
+					c.String(http.StatusInternalServerError, "error updating associated secret: %v", secretsErr)
 					return
 				}
 			} else {
 				secretsErr := utils.CreateSecret(newService.Name, serviceNamespace, newService.Environment.Secrets, back.GetKubeClientset())
 				if secretsErr != nil {
-					c.String(http.StatusInternalServerError, "error adding asociated secret: %v", secretsErr)
+					c.String(http.StatusInternalServerError, "error adding associated secret: %v", secretsErr)
 					return
 				}
 			}

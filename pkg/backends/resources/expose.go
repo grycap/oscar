@@ -479,7 +479,7 @@ func getDeploymentSpec(service types.Service, namespace string, cfg *types.Confi
 	deployName := GetDeploymentName(service.Name)
 	minScale := int32(0)
 	if service.Owner == types.DefaultOwner || !cfg.KueueEnable {
-		minScale = int32(service.Expose.MinScale)
+		minScale = service.Expose.MinScale
 	}
 	uid := auth.FormatUID(service.Owner)
 	if len(uid) > 62 {

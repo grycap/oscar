@@ -696,7 +696,7 @@ func exchangeRefreshToken(cfg *types.Config, refreshToken string) (string, error
 	}
 	respBytes := buf.String()
 
-	respString := string(respBytes)
+	respString := respBytes
 
 	var rrt ResponseRefreshToken
 	err = json.Unmarshal([]byte(respString), &rrt)

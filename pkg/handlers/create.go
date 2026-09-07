@@ -186,7 +186,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						service.Labels["uid"] = full_uid[:10]
 						var userBucket string
 						for _, u := range service.AllowedUsers {
-							// Check if the uid's from allowed_users have and asociated MinIO user
+							// Check if the uid's from allowed_users have and associated MinIO user
 							// and create it if not
 							if !mc.UserExists(u) {
 								sk, _ := auth.GenerateRandomKey(8)

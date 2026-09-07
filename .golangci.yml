@@ -1,14 +1,7 @@
 version: "2"
-linters-settings:
-  gocyclo:
-    min-complexity: 15
-  misspell:
-    locale: US
-  prealloc:
-    skip-var-check: true
 
 linters:
-  disable-all: true
+  default: none
   enable:
     - errcheck
     - gocyclo
@@ -18,7 +11,12 @@ linters:
     - unconvert
     - unused
     - misspell
+  settings:
+    gocyclo:
+      min-complexity: 15
+    misspell:
+      locale: US
 
-run:
-  timeout: 5m
-  modules-download-mode: readonly
+formatters:
+  enable:
+    - gofmt
