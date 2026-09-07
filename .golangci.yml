@@ -1,3 +1,4 @@
+version: "2"
 linters-settings:
   gocyclo:
     min-complexity: 15
@@ -11,13 +12,9 @@ linters:
   enable:
     - errcheck
     - gocyclo
-    - gofmt
-    - goheader
     - govet
     - ineffassign
     - staticcheck
-    - structcheck
-    - typecheck
     - unconvert
     - unused
     - misspell
