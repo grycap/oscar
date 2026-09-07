@@ -14,6 +14,7 @@ import (
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 )
 
+//nolint:gocyclo
 func TestMakeDeleteHandler(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
 
@@ -23,12 +24,13 @@ func TestMakeDeleteHandler(t *testing.T) {
 		if hreq.URL.Path != "/input" && hreq.URL.Path != "/output" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
 			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
 		}
-		if hreq.URL.Path == "/minio/admin/v3/info" {
+		switch hreq.URL.Path {
+		case "/minio/admin/v3/info":
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
-		} else if hreq.URL.Path == "/minio/admin/v3/info-canned-policy" {
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+		case "/minio/admin/v3/info-canned-policy":
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{
+			_, _ = rw.Write([]byte(`{
 				"PolicyName": "input",
 				"Policy": {
 					"Version": "2012-10-17",
@@ -41,9 +43,9 @@ func TestMakeDeleteHandler(t *testing.T) {
 					]
 				}
 				}`))
-		} else {
+		default:
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"status": "success"}`))
+			_, _ = rw.Write([]byte(`{"status": "success"}`))
 		}
 	}))
 
@@ -97,7 +99,7 @@ func TestMakeDeleteHandler(t *testing.T) {
 			if s.returnError {
 				switch s.errType {
 				case "404":
-					back.AddError("DeleteService", k8serr.NewGone("Not Found"))
+					back.AddError("DeleteService", k8serr.NewResourceExpired("Not Found"))
 				case "500":
 					err := errors.New("Not found")
 					back.AddError("DeleteService", k8serr.NewInternalError(err))
@@ -137,11 +139,11 @@ func TestMakeDeleteHandlerPassesVolumeLifecycleService(t *testing.T) {
 		}
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 			return
 		}
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{"status": "success"}`))
+		_, _ = rw.Write([]byte(`{"status": "success"}`))
 	}))
 	defer server.Close()
 

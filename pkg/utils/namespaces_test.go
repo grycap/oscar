@@ -523,7 +523,7 @@ func TestListManagedUserNamespacesInputHandling(t *testing.T) {
 		Labels:      map[string]string{namespaceManagedByLabel: namespaceManagedByValue},
 		Annotations: map[string]string{namespaceOwnerLabel: " user "},
 	}})
-	namespaces, err := ListManagedUserNamespaces(nil, clientset)
+	namespaces, err := ListManagedUserNamespaces(context.TODO(), clientset)
 	if err != nil {
 		t.Fatalf("ListManagedUserNamespaces() error: %v", err)
 	}
@@ -571,6 +571,7 @@ func TestNamespaceConstants(t *testing.T) {
 	}
 }
 
+//nolint:gocyclo
 func TestEnsureControllerRoleIncludesVolumeQuotaPermissionsOnCreate(t *testing.T) {
 	ctx := context.Background()
 	namespace := "test-ns"

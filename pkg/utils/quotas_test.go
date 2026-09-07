@@ -55,7 +55,7 @@ func TestCreateMinIOQuotaConfigMapIfDontExist_AlreadyExists(t *testing.T) {
 			"existing": "data",
 		},
 	}
-	kubeClientset.CoreV1().ConfigMaps("oscar").Create(context.Background(), existingCM, metav1.CreateOptions{})
+	_, _ = kubeClientset.CoreV1().ConfigMaps("oscar").Create(context.Background(), existingCM, metav1.CreateOptions{})
 
 	cm, err := CreateMinIOQuotaConfigMapIfDontExist(context.Background(), cfg, kubeClientset, "oscar")
 	if err != nil {

@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -33,6 +32,7 @@ import (
 	"github.com/grycap/oscar/v4/pkg/types"
 )
 
+//nolint:gocyclo
 func TestDelegateJob(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
 
@@ -55,12 +55,12 @@ func TestDelegateJob(t *testing.T) {
 		}
 		if r.Method == http.MethodGet && r.URL.Path == "/system/services/test-svc" {
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(&types.Service{Token: "test-token"})
+			_ = json.NewEncoder(w).Encode(&types.Service{Token: "test-token"})
 			return
 		}
 		if r.Method == http.MethodGet && r.URL.Path == "/system/status" {
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(&types.StatusInfo{
+			_ = json.NewEncoder(w).Encode(&types.StatusInfo{
 				Cluster: types.ClusterInfo{
 					NodesCount: 1,
 					Metrics: types.ClusterMetrics{
@@ -81,12 +81,12 @@ func TestDelegateJob(t *testing.T) {
 			type JobList struct {
 				Jobs []JobStatus `json:"jobs"`
 			}
-			json.NewEncoder(w).Encode(JobList{Jobs: []JobStatus{}})
+			_ = json.NewEncoder(w).Encode(JobList{Jobs: []JobStatus{}})
 			return
 		}
 		if r.Method == http.MethodGet && r.URL.Path == "/system/status/" {
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(&types.StatusInfo{
+			_ = json.NewEncoder(w).Encode(&types.StatusInfo{
 				Cluster: types.ClusterInfo{
 					NodesCount: 1,
 					Metrics: types.ClusterMetrics{
@@ -208,7 +208,7 @@ func TestGetServiceToken(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/system/services/test-service" {
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(&types.Service{Token: "test-token"})
+			_ = json.NewEncoder(w).Encode(&types.Service{Token: "test-token"})
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -246,7 +246,7 @@ func TestUpdateServiceToken(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/system/services/test-service" {
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(&types.Service{Token: "test-token"})
+			_ = json.NewEncoder(w).Encode(&types.Service{Token: "test-token"})
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -310,7 +310,6 @@ func TestTopsisMethod(t *testing.T) {
 }
 
 func TestSortByThreshold(t *testing.T) {
-	rand.Seed(0)
 	preferences := []float64{0.9, 0.86, 0.2}
 	sorted := sortbyThreshold(preferences, 5)
 	if len(sorted) != len(preferences) {
@@ -402,7 +401,6 @@ func TestCalculatePreferences(t *testing.T) {
 }
 
 func TestReorganizeIfNearby(t *testing.T) {
-	rand.Seed(1)
 	alternatives := []Alternative{{Index: 1, Preference: 0.9}, {Index: 2, Preference: 0.88}, {Index: 3, Preference: 0.5}}
 	dists := []float64{0.02, 0.4}
 	threshold := 0.05

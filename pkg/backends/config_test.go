@@ -49,7 +49,7 @@ func TestGetOSCARCMConfiguration(t *testing.T) {
 			"key1": "value1",
 		},
 	}
-	client.CoreV1().ConfigMaps("default").Create(context.TODO(), cm, metav1.CreateOptions{})
+	_, _ = client.CoreV1().ConfigMaps("default").Create(context.TODO(), cm, metav1.CreateOptions{})
 
 	result, err := GetOSCARCMConfiguration(client, "test-config", "default")
 	if err != nil {
@@ -75,7 +75,7 @@ func TestUpdateOSCARCMConfiguration(t *testing.T) {
 			"key1": "value1",
 		},
 	}
-	client.CoreV1().ConfigMaps("default").Create(context.TODO(), cm, metav1.CreateOptions{})
+	_, _ = client.CoreV1().ConfigMaps("default").Create(context.TODO(), cm, metav1.CreateOptions{})
 
 	cm.Data["key1"] = "updated"
 	err := UpdateOSCARCMConfiguration(client, cm, "default")

@@ -26,10 +26,10 @@ func TestMakeUpdateHandler(t *testing.T) {
 		}
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 		} else {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"status": "success"}`))
+			_, _ = rw.Write([]byte(`{"status": "success"}`))
 		}
 	}))
 
@@ -253,11 +253,11 @@ func TestMakeUpdateHandlerLegacyServiceWithoutVolume(t *testing.T) {
 		}
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 			return
 		}
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{"status": "success"}`))
+		_, _ = rw.Write([]byte(`{"status": "success"}`))
 	}))
 	defer server.Close()
 

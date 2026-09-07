@@ -266,10 +266,10 @@ func (h *presignMinioMock) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/info-canned-policy"):
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"PolicyName":"default","Policy":{"Version":"version","Statement":[{"Resource":["arn:aws:s3:::test-bucket/*"],"Effect":"Allow"}]}}`))
+		_, _ = w.Write([]byte(`{"PolicyName":"default","Policy":{"Version":"version","Statement":[{"Resource":["arn:aws:s3:::test-bucket/*"],"Effect":"Allow"}]}}`))
 	case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/group"):
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"name":"test-bucket","status":"enable","members":["oscar"],"policy":""}`))
+		_, _ = w.Write([]byte(`{"name":"test-bucket","status":"enable","members":["oscar"],"policy":""}`))
 	default:
 		if r.Method == http.MethodHead {
 			w.Header().Set("Content-Length", "0")
@@ -279,16 +279,16 @@ func (h *presignMinioMock) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		if r.Method == http.MethodGet && r.URL.RawQuery == "location=" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
+			_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
 			return
 		}
 		if r.URL.Query().Has("tagging") {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`<Tagging><TagSet><Tag><Key>owner</Key><Value>oscar</Value></Tag></TagSet></Tagging>`))
+			_, _ = w.Write([]byte(`<Tagging><TagSet><Tag><Key>owner</Key><Value>oscar</Value></Tag></TagSet></Tagging>`))
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"Status":"success"}`))
+		_, _ = w.Write([]byte(`{"Status":"success"}`))
 	}
 }
 

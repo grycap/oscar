@@ -29,8 +29,7 @@ func newKueueMock() *kueueMock {
 }
 func (k *kueueMock) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"Status":"success"}`))
-	return
+	_, _ = w.Write([]byte(`{"Status":"success"}`))
 }
 func newTestConfig() *types.Config {
 	return &types.Config{
@@ -593,6 +592,7 @@ func TestRouteKindSelection(t *testing.T) {
 	}
 }
 
+//nolint:gocyclo
 func TestGetHTTPRouteSpecUseSubdomainRoutes(t *testing.T) {
 	cfg := newTestConfig()
 	cfg.ExposedServicesRouteKind = types.HTTPROUTE
@@ -701,6 +701,7 @@ func TestGetHTTPRouteSpecUseSubdomainRoutes(t *testing.T) {
 	}
 }
 
+//nolint:gocyclo
 func TestGetHTTPRouteSpecUseSubpathRoutes(t *testing.T) {
 	cfg := newTestConfig()
 	cfg.ExposedServicesRouteKind = types.HTTPROUTE
@@ -899,6 +900,7 @@ func TestGetHTTPRouteSpecWithAuth(t *testing.T) {
 	}
 }
 
+//nolint:gocyclo
 func TestGetTraefikCORSMiddlewareSpec(t *testing.T) {
 	cfg := newTestConfig()
 	cfg.IngressServicesCORSAllowedOrigins = "https://one.example, https://two.example"

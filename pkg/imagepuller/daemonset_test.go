@@ -85,7 +85,7 @@ func TestCreateDaemonsetFailsOnNodeListError(t *testing.T) {
 	service := types.Service{Name: "svc"}
 	client := fake.NewSimpleClientset()
 
-	client.Fake.PrependReactor("list", "nodes", func(action k8stesting.Action) (bool, runtime.Object, error) {
+	client.PrependReactor("list", "nodes", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		return true, nil, errors.New("boom")
 	})
 
@@ -120,7 +120,7 @@ func TestSetWorkingNodes(t *testing.T) {
 			name: "returns error on list failure",
 			client: func() kubernetes.Interface {
 				c := fake.NewSimpleClientset()
-				c.Fake.PrependReactor("list", "nodes", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				c.PrependReactor("list", "nodes", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					return true, nil, errors.New("boom")
 				})
 				return c

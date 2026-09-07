@@ -332,6 +332,7 @@ func checkNodeDetail(detail map[string]interface{}, expected types.NodeDetail, t
 }
 
 // Renamed function to avoid conflict with existing status_test.go file
+//nolint:gocyclo
 func checkStatusModResult(jsonResponse map[string]interface{}, t *testing.T, isAdmin bool) {
 	// Root elements
 	cluster := jsonResponse["cluster"].(map[string]interface{})
@@ -428,7 +429,7 @@ func TestMakeStatusHandler(t *testing.T) {
 		// 1. Mock Admin info (used by the admin client)
 		if strings.HasPrefix(hreq.URL.Path, "/minio/admin/") {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 			return
 		}
 		// 2. Mock ListBuckets (used by getMinioInfo - called via AWS S3 client)
@@ -438,7 +439,7 @@ func TestMakeStatusHandler(t *testing.T) {
 			if hreq.URL.RawQuery == "" {
 				rw.WriteHeader(http.StatusOK)
 				// Mock of 2 buckets: "bucket-a" and "bucket-b"
-				rw.Write([]byte(`
+				_, _ = rw.Write([]byte(`
 				<ListAllMyBucketsResult>
 					<Buckets>
 						<Bucket><Name>bucket-a</Name><CreationDate>2023-01-01T00:00:00Z</CreationDate></Bucket>
@@ -455,7 +456,7 @@ func TestMakeStatusHandler(t *testing.T) {
 		}
 		/*if hreq.URL.Path != "/" && hreq.URL.RawQuery == "" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 			return
 		}*/
 		// 3. Mock ListObjects (used by getMinioInfo to calculate count - called via MinIO client)
@@ -469,7 +470,7 @@ func TestMakeStatusHandler(t *testing.T) {
 			// Mock of 3 total objects (2 in bucket-a, 1 in bucket-b, including a directory)
 			if strings.HasPrefix(bucketPath, "bucket-a") {
 				// 2 files, 1 directory (Size 0)
-				rw.Write([]byte(` <?xml version="1.0" encoding="UTF-8"?>
+				_, _ = rw.Write([]byte(` <?xml version="1.0" encoding="UTF-8"?>
 				<ListBucketResult>
 					<Contents><Key>file1.txt</Key><Size>100</Size></Contents>
 					<Contents><Key>file2.txt</Key><Size>200</Size></Contents>
@@ -478,7 +479,7 @@ func TestMakeStatusHandler(t *testing.T) {
 				return
 			} else if strings.HasPrefix(bucketPath, "bucket-b") {
 				// 1 object
-				rw.Write([]byte(`
+				_, _ = rw.Write([]byte(`
 				<ListBucketResult>
 					<Contents><Key>file3.dat</Key><Size>300</Size></Contents>
 				</ListBucketResult>`))
@@ -495,7 +496,7 @@ func TestMakeStatusHandler(t *testing.T) {
 	// Create a fake Metrics clientset
 	metricsClientset := metricsfake.NewSimpleClientset()
 	// Add NodeMetrics objects to the fake clientset store
-	metricsClientset.Fake.PrependReactor("list", "nodes", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+	metricsClientset.PrependReactor("list", "nodes", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 		// Usage values must be 50% of the Allocatable defined above
 		return true, &metricsv1beta1api.NodeMetricsList{
 			Items: []metricsv1beta1api.NodeMetrics{
@@ -730,7 +731,7 @@ func makeFakeClients() (*fake.Clientset, *metricsfake.Clientset) {
 	_, _ = fakeClient.CoreV1().Pods("oscar-svc").Create(context.TODO(), podSuccess, metav1.CreateOptions{})
 	_, _ = fakeClient.CoreV1().Pods("oscar-svc").Create(context.TODO(), podRunning, metav1.CreateOptions{})
 
-	fakeClient.Fake.PrependReactor("list", "nodes", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.PrependReactor("list", "nodes", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 		return true, nodeList, nil
 	})
 
@@ -932,7 +933,7 @@ func TestGetJobsInfoSummarisesStatus(t *testing.T) {
 
 func TestMakeStatusHandlerHandlesNodeListErrors(t *testing.T) {
 	fakeClient, metricsClient := makeFakeClients()
-	fakeClient.Fake.PrependReactor("list", "nodes", func(action k8stesting.Action) (bool, runtime.Object, error) {
+	fakeClient.PrependReactor("list", "nodes", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		return true, nil, errors.New("cannot list nodes")
 	})
 

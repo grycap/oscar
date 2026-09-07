@@ -52,7 +52,7 @@ func TestMakeUpdateBucketHandler_ServiceBucketForbidden(t *testing.T) {
 			return
 		} else if hreq.URL.Path == "/alice-bucket/" && hreq.Method == http.MethodGet {
 			rw.WriteHeader(http.StatusForbidden)
-			rw.Write([]byte(`{"Code":"AccessDenied","Message":"Access Denied"}`))
+			_, _ = rw.Write([]byte(`{"Code":"AccessDenied","Message":"Access Denied"}`))
 			return
 		} else {
 			rw.WriteHeader(http.StatusOK)
@@ -108,7 +108,7 @@ func TestMakeUpdateBucketHandler_VisibilityChange(t *testing.T) {
 			return
 		} else if hreq.URL.Path == "/alice-bucket/" && hreq.Method == http.MethodGet {
 			rw.WriteHeader(http.StatusForbidden)
-			rw.Write([]byte(`{"Code":"AccessDenied","Message":"Access Denied"}`))
+			_, _ = rw.Write([]byte(`{"Code":"AccessDenied","Message":"Access Denied"}`))
 			return
 		} else {
 			rw.WriteHeader(http.StatusOK)
@@ -175,7 +175,7 @@ func TestMakeUpdateBucketHandler_RestrictedUpdateMembers(t *testing.T) {
 			return
 		} else if hreq.URL.Path == "/alice-bucket/" && hreq.Method == http.MethodGet {
 			rw.WriteHeader(http.StatusForbidden)
-			rw.Write([]byte(`{"Code":"AccessDenied","Message":"Access Denied"}`))
+			_, _ = rw.Write([]byte(`{"Code":"AccessDenied","Message":"Access Denied"}`))
 			return
 		} else if hreq.URL.Path == "/" && hreq.Method == http.MethodGet {
 			rw.WriteHeader(http.StatusOK)
@@ -183,11 +183,11 @@ func TestMakeUpdateBucketHandler_RestrictedUpdateMembers(t *testing.T) {
 			return
 		} else if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/info-canned-policy") && hreq.Method == http.MethodGet {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"PolicyName": "testpolicy", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::alice-bucket/*"]}]}}`))
+			_, _ = rw.Write([]byte(`{"PolicyName": "testpolicy", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::alice-bucket/*"]}]}}`))
 			return
 		} else if hreq.URL.Path == "/minio/admin/v3/update-group-members" && hreq.Method == http.MethodPut {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Members": {"a"}, "Status":"a","Policy":"a"}`))
+			_, _ = rw.Write([]byte(`{"Members": {"a"}, "Status":"a","Policy":"a"}`))
 			return
 		} else {
 			rw.WriteHeader(http.StatusOK)

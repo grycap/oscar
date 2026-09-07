@@ -11,6 +11,7 @@ import (
 	"github.com/grycap/oscar/v4/pkg/types"
 )
 
+//nolint:gocyclo
 func TestMakeListBucketHandlerAdmin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

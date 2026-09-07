@@ -28,6 +28,7 @@ import (
 	"github.com/grycap/oscar/v4/pkg/types"
 )
 
+//nolint:gocyclo
 func TestRustFSWebhookConfiguration(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
 

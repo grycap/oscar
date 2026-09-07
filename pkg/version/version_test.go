@@ -59,7 +59,7 @@ func TestGetKubeVersion(t *testing.T) {
 	// reactor := func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 	// 	return true, nil, errors.New("test error")
 	// }
-	// fakeClientset.Fake.AddReactor("get", "version", reactor)
+	// fakeClientset.AddReactor("get", "version", reactor)
 	// version = getKubeVersion(fakeClientset)
 	// if version != "" {
 	// 	t.Errorf("expected empty string version, got: %s", version)

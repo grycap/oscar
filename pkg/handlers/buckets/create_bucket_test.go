@@ -33,6 +33,7 @@ func (r *bucketRequestRecorder) snapshot() []string {
 	return append([]string(nil), r.calls...)
 }
 
+//nolint:gocyclo
 func TestMakeCreateBucketHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

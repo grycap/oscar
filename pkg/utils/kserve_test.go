@@ -346,6 +346,7 @@ func TestNewKserveInferenceServiceDefinition_KueueLabels(t *testing.T) {
 	}
 }
 
+//nolint:gocyclo
 func TestNewKserveLLMInferenceServiceDefinition(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -1165,6 +1166,7 @@ func TestUpdateKserveLLMInferenceServiceDefinition_InvalidCPU(t *testing.T) {
 	}
 }
 
+//nolint:gocyclo
 func TestGetKserveLLMServiceRouterSpec(t *testing.T) {
 	tests := []struct {
 		name          string
