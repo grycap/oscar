@@ -126,7 +126,7 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 				return
 			}
 		} else {
-			c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", uid))
+			c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorized", uid))
 			return
 		}
 

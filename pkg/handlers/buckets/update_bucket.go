@@ -96,7 +96,7 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 		bucket.Owner = uid
 		if utils.IsRustFSConfig(cfg) {
 			if uid != cfg.Username && metadata["owner"] != uid {
-				c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", uid))
+				c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorized", uid))
 				return
 			}
 			ownerName := metadata["owner_name"]

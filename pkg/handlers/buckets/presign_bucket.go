@@ -211,7 +211,7 @@ func MakePresignHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 
 			if !allowed {
-				c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised to generate presigned URLs for bucket '%s'", requester, bucketName))
+				c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorized to generate presigned URLs for bucket '%s'", requester, bucketName))
 				return
 			}
 		}

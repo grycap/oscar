@@ -912,7 +912,7 @@ func getOwnerReference(owner *KserveServiceOwner) []metav1.OwnerReference {
 	blockOwnerDeletion := true
 
 	return []metav1.OwnerReference{
-		metav1.OwnerReference{
+		{
 			APIVersion:         owner.APIVersion,
 			Kind:               owner.Kind,
 			Name:               owner.Name,

@@ -1227,7 +1227,7 @@ func eventBuild(event string, storage_provider string) ([]byte, string) {
 		k, err1 := json.Marshal(delegatedEvent1)
 
 		if err1 != nil {
-			fmt.Printf("error marshalling delegated event: %v ", err1)
+			fmt.Printf("error marshaling delegated event: %v ", err1)
 			return nil, ""
 		}
 
@@ -1240,7 +1240,7 @@ func eventBuild(event string, storage_provider string) ([]byte, string) {
 
 		z, err2 := json.Marshal(delegatedEvent)
 		if err2 != nil {
-			fmt.Printf("error marshalling delegated event: %v", err2)
+			fmt.Printf("error marshaling delegated event: %v", err2)
 			return nil, ""
 		}
 		eventJSON = z
