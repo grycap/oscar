@@ -362,6 +362,8 @@ func (s *Service) UnmarshalJSON(data []byte) error {
 	aux := Alias{
 		IsolationLevel: IsolationLevelService,
 		Visibility:     PRIVATE,
+		CPU:            "0.2",
+		Memory:         "256Mi",
 	}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
