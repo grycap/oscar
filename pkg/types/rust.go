@@ -188,7 +188,11 @@ func (r *RustFSIAM) RequestPayloadResponse(ctx context.Context, method, path str
 	if err != nil {
 		return nil, fmt.Errorf("sending RustFS admin request: %w", err)
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		responseBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return nil, fmt.Errorf("RustFS admin API returned %s: %s", resp.Status, strings.TrimSpace(string(responseBody)))

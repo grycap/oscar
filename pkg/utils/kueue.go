@@ -343,11 +343,11 @@ func CreateWorkload(service types.Service, namespace string, cfg *types.Config, 
 		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
 		return false
 	}
-	kueueClient, err := kueueclientset.NewForConfig(restCfg)
+	kueueClient, _ := kueueclientset.NewForConfig(restCfg)
 
-	_, err2 := kueueClient.KueueV1beta2().Workloads(namespace).Create(context.TODO(), workloadSpec, metav1.CreateOptions{})
-	if err2 != nil {
-		KueueLogger.Printf("error creating workload for exposed service '%s': %v", service.Name, err2)
+	_, err = kueueClient.KueueV1beta2().Workloads(namespace).Create(context.TODO(), workloadSpec, metav1.CreateOptions{})
+	if err != nil {
+		KueueLogger.Printf("error creating workload for exposed service '%s': %v", service.Name, err)
 		return false
 	}
 	return true
@@ -364,11 +364,11 @@ func DeleteWorkload(name string, namespace string, cfg *types.Config) bool {
 		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
 		return false
 	}
-	kueueClient, err := kueueclientset.NewForConfig(restCfg)
+	kueueClient, _ := kueueclientset.NewForConfig(restCfg)
 
-	err2 := kueueClient.KueueV1beta2().Workloads(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
-	if err2 != nil {
-		KueueLogger.Printf("error deleting workload for exposed service '%s': %v", name, err2)
+	err = kueueClient.KueueV1beta2().Workloads(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err != nil {
+		KueueLogger.Printf("error deleting workload for exposed service '%s': %v", name, err)
 		return false
 	}
 
@@ -476,8 +476,8 @@ func buildResourceCheckPodSet(name string, replicas int32, requests v1.ResourceL
 
 func getServiceResourceRequests(service *types.Service, cfg *types.Config) (v1.ResourceList, int32, error) {
 	requests := v1.ResourceList{}
-	var cpuQty resource.Quantity = defaultCpuRequest
-	var memoryQty resource.Quantity = defaultMemoryRequest
+	cpuQty := defaultCpuRequest
+	memoryQty := defaultMemoryRequest
 
 	if len(service.CPU) > 0 {
 		parsedCPU, err := resource.ParseQuantity(service.CPU)

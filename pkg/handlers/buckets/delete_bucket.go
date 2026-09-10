@@ -54,7 +54,7 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 		var uid string
 		bucketName := c.Param("bucket")
 		if bucketName == "" {
-			c.String(http.StatusBadRequest, fmt.Sprintf("Received empty bucket name"))
+			c.String(http.StatusBadRequest, "Received empty bucket name")
 			return
 
 		}

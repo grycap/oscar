@@ -38,8 +38,6 @@ import (
 
 const ConfigMapNameOSCAR = "additional-oscar-config"
 
-const exposedServiceAppLabelPrefix = "oscar-svc-exp-"
-
 // KubeBackend struct to represent a Kubernetes client to store services as podTemplates
 type KubeBackend struct {
 	kubeClientset kubernetes.Interface

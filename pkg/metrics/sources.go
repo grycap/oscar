@@ -453,7 +453,11 @@ func (s *LokiRequestLogSource) fetchLokiPage(ctx context.Context, client *http.C
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, 0, 0, fmt.Errorf("loki query failed: %s", resp.Status)
 	}
@@ -475,7 +479,7 @@ func (s *LokiRequestLogSource) fetchLokiPage(ctx context.Context, client *http.C
 	return result, entryCount, lastTimestamp, nil
 }
 
-func parseTraefik(serviceID string, tr TimeRange, result []lokiStream, s *LokiRequestLogSource, parseFn func(string) (RequestRecord, bool)) ([]RequestRecord, *types.SourceStatus, error) {
+/*func parseTraefik(serviceID string, tr TimeRange, result []lokiStream, s *LokiRequestLogSource, parseFn func(string) (RequestRecord, bool)) ([]RequestRecord, *types.SourceStatus, error) {
 	if len(result) == 0 {
 		status := okStatus(s.Name(), "")
 		return []RequestRecord{}, status, nil
@@ -489,11 +493,11 @@ func parseTraefik(serviceID string, tr TimeRange, result []lokiStream, s *LokiRe
 			continue
 		}
 
-		/*if record.Country == "" || strings.EqualFold(record.Country, "unknown") {
+		if record.Country == "" || strings.EqualFold(record.Country, "unknown") {
 			if country := countryFromLokiLabels(stream.Labels); country != "" {
 				record.Country = country
 			}
-		}*/
+		}
 		if record.Timestamp.IsZero() {
 			record.Timestamp = lokiTime
 		}
@@ -508,7 +512,7 @@ func parseTraefik(serviceID string, tr TimeRange, result []lokiStream, s *LokiRe
 
 	status := okStatus(s.Name(), "")
 	return records, status, nil
-}
+}*/
 
 func (s *LokiRequestLogSource) buildQuery(serviceID string) string {
 	if s.QueryTemplate == "" {
@@ -711,7 +715,9 @@ func (s *KubeRequestLogSource) readPodLogs(ctx context.Context, cfg *types.Confi
 	if err != nil {
 		return nil, err
 	}
-	defer stream.Close()
+	defer func() {
+		_ = stream.Close()
+	}()
 
 	records := make([]RequestRecord, 0)
 	scanner := bufio.NewScanner(stream)

@@ -41,7 +41,7 @@ func extractRefreshTokenSecret(service *types.Service) string {
 	return strings.TrimSpace(refreshToken)
 }
 
-func createRefreshTokenSecret(service *types.Service, namespace string, refreshToken string, kubeClientset kubernetes.Interface) error {
+/*func createRefreshTokenSecret(service *types.Service, namespace string, refreshToken string, kubeClientset kubernetes.Interface) error {
 	if refreshToken == "" {
 		return nil
 	}
@@ -54,7 +54,7 @@ func createRefreshTokenSecret(service *types.Service, namespace string, refreshT
 	return utils.CreateSecret(secretName, namespace, map[string]string{
 		types.RefreshTokenSecretKey: refreshToken,
 	}, kubeClientset)
-}
+}*/
 
 func upsertRefreshTokenSecret(service *types.Service, namespace string, refreshToken string, kubeClientset kubernetes.Interface) error {
 	if refreshToken == "" {

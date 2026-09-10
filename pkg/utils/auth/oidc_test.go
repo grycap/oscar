@@ -408,7 +408,7 @@ func TestGetUID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting uid: %v", err)
 	}
-	if uid != "uid-1234" {
+	if uid != "user1@egi.eu" {
 		t.Fatalf("unexpected uid, got %s", uid)
 	}
 }

@@ -21,8 +21,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"log"
-	"os"
 	"regexp"
 	"strings"
 
@@ -36,7 +34,7 @@ import (
 const ServicesNamespace = "oscar-svc"
 const ServiceLabelLength = 8
 
-var mcLogger = log.New(os.Stdout, "[OIDC-AUTH] ", log.Flags())
+//var mcLogger = log.New(os.Stdout, "[OIDC-AUTH] ", log.Flags())
 
 type MultitenancyConfig struct {
 	kubeClientset kubernetes.Interface

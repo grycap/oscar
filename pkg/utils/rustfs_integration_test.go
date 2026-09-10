@@ -32,6 +32,7 @@ import (
 
 // TestRustFSIAMIntegration exercises the RustFS admin API against a live
 // instance. It is skipped unless all RUSTFS_TEST_* variables are provided.
+//
 //nolint:gocyclo
 func TestRustFSIAMIntegration(t *testing.T) {
 	endpoint := os.Getenv("RUSTFS_TEST_ENDPOINT")

@@ -21,11 +21,9 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math"
 	"net/http"
 	"net/url"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -47,7 +45,7 @@ var (
 	RESTRICTED_ACTIONS = []string{"s3:ListBucket", "s3:GetObject", "s3:PutObject", "s3:DeleteObject"}
 )
 
-var minioLogger = log.New(os.Stdout, "[MINIO] ", log.Flags())
+// var minioLogger = log.New(os.Stdout, "[MINIO] ", log.Flags())
 var overlappingError = "An object key name filtering rule defined with overlapping prefixes"
 
 const (

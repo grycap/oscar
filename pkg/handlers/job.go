@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"log"
@@ -116,80 +117,26 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 		// Check if reqToken is the service token
 		var uidFromToken string
 		var minIOSecretKey string
+		var isValid bool
 		rawToken := strings.TrimSpace(splitToken[1])
 		if len(rawToken) == tokenLength {
-			for _, serviceIter := range serviceList {
-				if rawToken == serviceIter.Token {
-					service = serviceIter
-				}
-			}
-			if service == nil {
+			service, err = selectServiceByToken(c, serviceList, rawToken)
+			if err != nil {
 				c.Status(http.StatusUnauthorized)
 				return
 			}
-			// Get podSpec from the service
-			podSpec, serviceNamespace, err = getPodSpecNamespace(service, cfg)
-			if err != nil {
-				c.String(http.StatusInternalServerError, err.Error())
-				return
-			}
-			// Use
-			minIOSecretKey = service.Owner
+			minIOSecretKey = "minio"
 		} else {
-			//  If isn't service token check if it is an oidc token
-			issuer, err := auth.GetIssuerFromToken(rawToken)
-			if err != nil {
-				c.String(http.StatusBadGateway, fmt.Sprintf("%v", err))
-			}
-			oidcManager := auth.ClusterOidcManagers[issuer]
-			if oidcManager == nil {
-				c.String(http.StatusBadRequest, fmt.Sprintf("Error getting oidc manager for issuer '%s'", issuer))
+			service, isValid = validateOIDCToken(rawToken, serviceList, c, &uidFromToken, cfg, back)
+			if !isValid {
 				return
 			}
-
-			ui, err := oidcManager.GetUserInfo(rawToken)
-			uidFromToken = ui.Subject
-			if err != nil {
-				c.String(http.StatusInternalServerError, err.Error())
-				return
-			}
-			uid := auth.FormatUID(uidFromToken)
-			c.Set("uidOrigin", uid)
-			c.Next()
-
-			service, err = selectService(c, serviceList)
-			if err != nil {
-				if err.Error() == errServiceNotFound {
-					c.Status(http.StatusNotFound)
-				} else {
-					c.String(http.StatusBadRequest, err.Error())
-				}
-				return
-			}
-			// Get podSpec from the service
-			podSpec, serviceNamespace, err = getPodSpecNamespace(service, cfg)
-			if err != nil {
-				c.String(http.StatusInternalServerError, err.Error())
-				return
-			}
-			if len(uid) > 62 {
-				uid = uid[:62]
-			}
-			service.Labels[types.JobOwnerExecutionAnnotation] = uid
-			if !oidcManager.IsAuthorised(rawToken) {
-				c.Status(http.StatusUnauthorized)
-				return
-			}
-
-			if !oidcManager.UserInOneGroup(ui, cfg) {
-				c.String(http.StatusUnauthorized, "this user isn't enrrolled on the vo: %v", service.VO)
-				return
-			}
-			mc := auth.NewMultitenancyConfig(back.GetKubeClientset(), cfg.OIDCSubject)
-			if !mc.UserExists(uidFromToken) {
-				c.String(http.StatusForbidden, fmt.Sprintf("MinIO user not provisioned for %s; submit a direct request first", uidFromToken))
-				return
-			}
+		}
+		// Get podSpec from the service
+		podSpec, serviceNamespace, err = getPodSpecNamespace(service, cfg)
+		if err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return
 		}
 		// Add secrets as environment variables if defined
 		if utils.SecretExists(service.Name, serviceNamespace, back.GetKubeClientset()) {
@@ -241,47 +188,12 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 			minIOSecretKey = requestUserUID
 		}
 
-		if minIOSecretKey == "" {
-			minIOSecretKey = service.Owner
+		if minIOSecretKey == "" || minIOSecretKey == service.Owner {
+			minIOSecretKey = "minio"
 		}
 		auth.SetMetricsServiceContext(c, service.Name, serviceNamespace)
 
-		if minIOSecretKey == service.Owner {
-			minIOSecretKey = "minio"
-		}
-
-		secretName := auth.FormatUID(minIOSecretKey)
-		originSecretName, err := ensureOriginMinIODefaultSecretIfNeeded(c, cfg, service, serviceNamespace, back.GetKubeClientset(), authHeader)
-		if err != nil {
-			c.String(http.StatusInternalServerError, err.Error())
-			return
-		}
-		if originSecretName != "" {
-			secretName = originSecretName
-		} else {
-			if err := ensureMinIOSecret(back.GetKubeClientset(), minIOSecretKey, serviceNamespace); err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", minIOSecretKey, err))
-				return
-			}
-		}
-
-		c.Next()
-
-		// Mount user MinIO credentials
-		podSpec.Volumes = append(podSpec.Volumes, v1.Volume{
-			Name: MinIOSecretVolumeName,
-			VolumeSource: v1.VolumeSource{
-				Secret: &v1.SecretVolumeSource{
-					SecretName: secretName,
-				},
-			},
-		})
-
-		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
-			Name:      MinIOSecretVolumeName,
-			ReadOnly:  true,
-			MountPath: MinIODefaultPath,
-		})
+		addMinioSecretAsVolume(minIOSecretKey, c, cfg, service, serviceNamespace, podSpec, back, authHeader)
 
 		if err := configureDelegatedMinIOProvider(c, serviceNamespace, service, podSpec, back.GetKubeClientset(), authHeader); err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
@@ -295,58 +207,10 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 		if types.IsInterLinkService(service, cfg) {
 			command, event, args = types.SetInterlinkJob(podSpec, service, cfg, eventBytes)
 		} else {
-
-			if service.Mount.Provider != "" {
-				args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath()) + ";echo \"I finish\" > /tmpfolder/finish-file;"}
-				resources.SetMount(podSpec, *service, cfg)
-			} else {
-				args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath())}
-			}
-
-			event = v1.EnvVar{
-				Name:  types.EventVariable,
-				Value: string(eventBytes),
-			}
+			command, event, args = setNormalJob(podSpec, service, cfg, eventBytes)
 		}
 
-		//extract delegation header
-		delegateUID := c.GetHeader(DelegationHeader)
-		var jobUUID string
-
-		if delegateUID != "" {
-			jobUUID = delegateUID
-			delegateFrom := c.GetHeader("X-Delegated-From")
-			jobLogger.Printf("Creating job \"%s\" delegated from cluster \"%s\" ", jobUUID, delegateFrom)
-
-		} else {
-
-			serviceNameLenght := len(service.Name)
-			serviceName := service.Name
-			jobUUID = uuid.New().String()
-
-			if serviceNameLenght >= 25 {
-				serviceName = serviceName[:16]
-			}
-			jobUUID = serviceName + "-" + jobUUID
-			jobLogger.Printf("Creating job \"%s\". ", jobUUID)
-
-		}
-
-		// Make JOB_UUID envVar
-		jobUUIDVar := v1.EnvVar{
-			Name:  types.JobUUIDVariable,
-			Value: jobUUID,
-		}
-
-		// Make RESOURCE_ID envVar
-		resourceIDVar := v1.EnvVar{
-			Name: "RESOURCE_ID",
-			ValueFrom: &v1.EnvVarSource{
-				FieldRef: &v1.ObjectFieldSelector{
-					FieldPath: "spec.nodeName",
-				},
-			},
-		}
+		jobUUIDVar, resourceIDVar := extractDelegationHeader(c, service.Name)
 
 		// Add podSpec variables
 		podSpec.RestartPolicy = restartPolicy
@@ -360,35 +224,7 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 			}
 		}
 
-		// Delegate job if can't be scheduled and has defined replicas
-		if rm != nil && service.HasFederationMembers() {
-			uid, _ := auth.GetUIDFromContext(c)
-			//Get local quota
-			quota, e := FetchQuota(c.Request.Context(), cfg, backendQuota, uid)
-			localQuota := true
-			if e != nil {
-				fmt.Println(e)
-				localQuota = true
-			} else {
-				//Check for quota availability at the local cluster
-				localQuota = isQuota(quota, service)
-
-			}
-			//Check local resource availability
-			localResource := rm.IsSchedulable(podSpec.Containers[0].Resources)
-
-			if !localResource || !localQuota {
-				authHeader := c.GetHeader("Authorization")
-
-				err := resourcemanager.DelegateJob(service, event.Value, jobUUID, authHeader, resourcemanager.ResourceManagerLogger, cfg, back.GetKubeClientset())
-				if err == nil {
-					// TODO: check if another status code suits better
-					c.Status(http.StatusCreated)
-					return
-				}
-				jobLogger.Printf("unable to delegate job. Error: %v\n", err)
-			}
-		}
+		checkQuotaAndDelegateJob(c, cfg, backendQuota, back, rm, service, podSpec, jobUUIDVar, serviceNamespace, event.Value)
 
 		// Create job definition
 		ttl := int32(cfg.TTLJob) // #nosec
@@ -400,7 +236,7 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 			ObjectMeta: metav1.ObjectMeta{
 				// UUID used as a name for jobs
 				// To filter jobs by service name use the label "oscar_service"
-				Name:        jobUUID,
+				Name:        jobUUIDVar.Value,
 				Namespace:   serviceNamespace,
 				Labels:      service.Labels,
 				Annotations: service.Annotations,
@@ -419,25 +255,8 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 			},
 		}
 
-		// Add ReScheduler label if there are replicas defined and the cfg.ReSchedulerEnable is true
-		if service.HasFederationMembers() && cfg.ReSchedulerEnable {
-			if service.Federation != nil && service.Federation.ReschedulerThreshold != 0 {
-				job.Labels[types.ReSchedulerLabelKey] = strconv.Itoa(service.Federation.ReschedulerThreshold)
-			} else {
-				job.Labels[types.ReSchedulerLabelKey] = strconv.Itoa(cfg.ReSchedulerThreshold)
-			}
-		}
-
-		// Point the job to the service's LocalQueue so Kueue can admit it.
-		if service.Owner != types.DefaultOwner && cfg.KueueEnable {
-			if job.Labels == nil {
-				job.Labels = make(map[string]string)
-			}
-			if job.Annotations == nil {
-				job.Annotations = make(map[string]string)
-			}
-			job.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
-		}
+		setJobFederationLabels(job, service, cfg)
+		setJobKueueLabels(job, service, cfg)
 
 		_, err = back.GetKubeClientset().BatchV1().Jobs(serviceNamespace).Create(context.TODO(), job, metav1.CreateOptions{})
 		if err != nil {
@@ -446,6 +265,239 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 		}
 		c.Status(http.StatusCreated)
 	}
+}
+
+func validateOIDCToken(rawToken string, serviceList []*types.Service, c *gin.Context,
+	uidFromToken *string, cfg *types.Config, back types.ServerlessBackend) (*types.Service, bool) {
+	// 1. Obtener issuer
+	issuer, err := auth.GetIssuerFromToken(rawToken)
+	if err != nil {
+		c.String(http.StatusBadGateway, fmt.Sprintf("%v", err))
+		return nil, false
+	}
+
+	// 2. Obtener manager OIDC
+	oidcManager := auth.ClusterOidcManagers[issuer]
+	if oidcManager == nil {
+		c.String(http.StatusBadRequest, fmt.Sprintf("Error getting oidc manager for issuer '%s'", issuer))
+		return nil, false
+	}
+
+	// 3. Obtener info de usuario
+	ui, err := oidcManager.GetUserInfo(rawToken)
+	if err != nil {
+		c.String(http.StatusInternalServerError, err.Error())
+		return nil, false
+	}
+	*uidFromToken = ui.Subject
+
+	// 4. Formatear y configurar UID
+	uid := auth.FormatUID(*uidFromToken)
+	if len(uid) > 62 {
+		uid = uid[:62]
+	}
+	c.Set("uidOrigin", uid)
+
+	// 5. Seleccionar servicio
+	var errService error
+	service, errService := selectService(c, serviceList)
+	if errService != nil {
+		if errService.Error() == errServiceNotFound {
+			c.Status(http.StatusNotFound)
+		} else {
+			c.String(http.StatusBadRequest, errService.Error())
+		}
+		return nil, false
+	}
+
+	// 6. Aplicar etiqueta
+	service.Labels[types.JobOwnerExecutionAnnotation] = uid
+
+	// 7. Validaciones de autorización
+	if !oidcManager.IsAuthorised(rawToken) {
+		c.Status(http.StatusUnauthorized)
+		return nil, false
+	}
+
+	if !oidcManager.UserInOneGroup(ui, cfg) {
+		c.String(http.StatusUnauthorized, "this user isn't enrolled on the vo: %v", service.VO)
+		return nil, false
+	}
+
+	// 8. Verificar usuario MinIO
+	mc := auth.NewMultitenancyConfig(back.GetKubeClientset(), cfg.OIDCSubject)
+	if !mc.UserExists(*uidFromToken) {
+		c.String(http.StatusForbidden, fmt.Sprintf("MinIO user not provisioned for %s; submit a direct request first", *uidFromToken))
+		return nil, false
+	}
+
+	return service, true
+}
+
+func setJobFederationLabels(job *batchv1.Job, service *types.Service, cfg *types.Config) {
+	// Add ReScheduler label if there are replicas defined and the cfg.ReSchedulerEnable is true
+	if service.HasFederationMembers() && cfg.ReSchedulerEnable {
+		if service.Federation != nil && service.Federation.ReschedulerThreshold != 0 {
+			job.Labels[types.ReSchedulerLabelKey] = strconv.Itoa(service.Federation.ReschedulerThreshold)
+		} else {
+			job.Labels[types.ReSchedulerLabelKey] = strconv.Itoa(cfg.ReSchedulerThreshold)
+		}
+	}
+
+}
+func setJobKueueLabels(job *batchv1.Job, service *types.Service, cfg *types.Config) {
+	// Point the job to the service's LocalQueue so Kueue can admit it.
+	if service.Owner != types.DefaultOwner && cfg.KueueEnable {
+		if job.Labels == nil {
+			job.Labels = make(map[string]string)
+		}
+		if job.Annotations == nil {
+			job.Annotations = make(map[string]string)
+		}
+		job.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
+	}
+
+}
+
+func checkQuotaAndDelegateJob(c *gin.Context, cfg *types.Config, backendQuota types.QuotaBackend, back types.ServerlessBackend, rm resourcemanager.ResourceManager, service *types.Service, podSpec *v1.PodSpec, jobUUIDVar v1.EnvVar, serviceNamespace string, event string) {
+	// Delegate job if can't be scheduled and has defined replicas
+	if rm != nil && service.HasFederationMembers() {
+		uid, _ := auth.GetUIDFromContext(c)
+		//Get local quota
+		quota, e := FetchQuota(c.Request.Context(), cfg, backendQuota, uid)
+		var localQuota bool
+		if e != nil {
+			fmt.Println(e)
+			localQuota = true
+		} else {
+			//Check for quota availability at the local cluster
+			localQuota = isQuota(quota, service)
+
+		}
+		//Check local resource availability
+		localResource := rm.IsSchedulable(podSpec.Containers[0].Resources)
+
+		if !localResource || !localQuota {
+			authHeader := c.GetHeader("Authorization")
+
+			err := resourcemanager.DelegateJob(service, event, jobUUIDVar.Value, authHeader, resourcemanager.ResourceManagerLogger, cfg, back.GetKubeClientset())
+			if err == nil {
+				// TODO: check if another status code suits better
+				c.Status(http.StatusCreated)
+				return
+			}
+			jobLogger.Printf("unable to delegate job. Error: %v\n", err)
+		}
+	}
+}
+
+func setNormalJob(podSpec *v1.PodSpec, service *types.Service, cfg *types.Config, eventBytes []byte) ([]string, v1.EnvVar, []string) {
+	var args []string
+	var event v1.EnvVar
+	if service.Mount.Provider != "" {
+		args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath()) + ";echo \"I finish\" > /tmpfolder/finish-file;"}
+		resources.SetMount(podSpec, *service, cfg)
+	} else {
+		args = []string{"-c", fmt.Sprintf("echo $%s | %s", types.EventVariable, service.GetSupervisorPath())}
+	}
+
+	event = v1.EnvVar{
+		Name:  types.EventVariable,
+		Value: string(eventBytes),
+	}
+	return command, event, args
+}
+
+func extractDelegationHeader(c *gin.Context, serviceName string) (v1.EnvVar, v1.EnvVar) {
+	//extract delegation header
+	delegateUID := c.GetHeader(DelegationHeader)
+	var jobUUID string
+
+	if delegateUID != "" {
+		jobUUID = delegateUID
+		delegateFrom := c.GetHeader("X-Delegated-From")
+		jobLogger.Printf("Creating job \"%s\" delegated from cluster \"%s\" ", jobUUID, delegateFrom)
+
+	} else {
+
+		serviceNameLenght := len(serviceName)
+		serviceName := serviceName
+		jobUUID = uuid.New().String()
+
+		if serviceNameLenght >= 25 {
+			serviceName = serviceName[:16]
+		}
+		jobUUID = serviceName + "-" + jobUUID
+		jobLogger.Printf("Creating job \"%s\". ", jobUUID)
+
+	}
+
+	// Make JOB_UUID envVar
+	jobUUIDVar := v1.EnvVar{
+		Name:  types.JobUUIDVariable,
+		Value: jobUUID,
+	}
+
+	// Make RESOURCE_ID envVar
+	resourceIDVar := v1.EnvVar{
+		Name: "RESOURCE_ID",
+		ValueFrom: &v1.EnvVarSource{
+			FieldRef: &v1.ObjectFieldSelector{
+				FieldPath: "spec.nodeName",
+			},
+		},
+	}
+	return jobUUIDVar, resourceIDVar
+}
+
+func selectServiceByToken(c *gin.Context, serviceList []*types.Service, rawToken string) (*types.Service, error) {
+	var service *types.Service
+	for _, serviceIter := range serviceList {
+		if rawToken == serviceIter.Token {
+			service = serviceIter
+		}
+	}
+	if service == nil {
+
+		return nil, stderrors.New(errServiceNotFound)
+	}
+	return service, nil
+}
+
+func addMinioSecretAsVolume(minIOSecretKey string, c *gin.Context, cfg *types.Config, service *types.Service, serviceNamespace string, podSpec *v1.PodSpec, back types.ServerlessBackend, authHeader string) {
+	secretName := auth.FormatUID(minIOSecretKey)
+	originSecretName, err := ensureOriginMinIODefaultSecretIfNeeded(c, cfg, service, serviceNamespace, back.GetKubeClientset(), authHeader)
+	if err != nil {
+		c.String(http.StatusInternalServerError, err.Error())
+		return
+	}
+	if originSecretName != "" {
+		secretName = originSecretName
+	} else {
+		if err := ensureMinIOSecret(back.GetKubeClientset(), minIOSecretKey, serviceNamespace); err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", minIOSecretKey, err))
+			return
+		}
+	}
+
+	c.Next()
+
+	// Mount user MinIO credentials
+	podSpec.Volumes = append(podSpec.Volumes, v1.Volume{
+		Name: MinIOSecretVolumeName,
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName: secretName,
+			},
+		},
+	})
+
+	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
+		Name:      MinIOSecretVolumeName,
+		ReadOnly:  true,
+		MountPath: MinIODefaultPath,
+	})
+
 }
 
 // Function to rewrite the eventSource field in MinIO events generated by RustFS
@@ -692,7 +744,10 @@ func fetchMinIOProvider(originEndpoint string, authHeader string, sslVerify bool
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
+
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("origin /system/config returned status %d", res.StatusCode)
 	}

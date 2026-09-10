@@ -67,7 +67,6 @@ func GetServiceTokenMiddleware(back types.ServerlessBackend, cfg *types.Config) 
 		}
 
 		c.Next()
-		return
 	}
 }
 

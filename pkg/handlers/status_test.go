@@ -332,6 +332,7 @@ func checkNodeDetail(detail map[string]interface{}, expected types.NodeDetail, t
 }
 
 // Renamed function to avoid conflict with existing status_test.go file
+//
 //nolint:gocyclo
 func checkStatusModResult(jsonResponse map[string]interface{}, t *testing.T, isAdmin bool) {
 	// Root elements

@@ -195,35 +195,40 @@ func (f *fakeAdminClient) GetCurrentResourceVisibility(bucket types.MinIOBucket)
 	return f.visibility
 }
 
-type stubPresignAdmin struct {
+/*type stubPresignAdmin struct {
 	simpleCalled     bool
 	metaCalled       bool
 	visibilityCalled bool
 	policyCalled     bool
 	membersCalled    bool
-}
+}*/
 
-func (s *stubPresignAdmin) SimpleClient() presignSimpleClient {
-	s.simpleCalled = true
-	return &fakeSimpleClient{bucketExists: true, presignURL: "http://stub"}
-}
-func (s *stubPresignAdmin) GetTaggedMetadata(bucket string) (map[string]string, error) {
-	s.metaCalled = true
-	return map[string]string{"owner": "oscar"}, nil
-}
-func (s *stubPresignAdmin) GetCurrentResourceVisibility(bucket types.MinIOBucket) string {
-	s.visibilityCalled = true
-	return types.PRIVATE
-}
-func (s *stubPresignAdmin) ResourceInPolicy(policyName string, resource string) bool {
-	s.policyCalled = true
-	return false
-}
-func (s *stubPresignAdmin) GetBucketMembers(bucket string) ([]string, error) {
-	s.membersCalled = true
-	return []string{"user"}, nil
-}
+/*
+	func (s *stubPresignAdmin) SimpleClient() presignSimpleClient {
+		s.simpleCalled = true
+		return &fakeSimpleClient{bucketExists: true, presignURL: "http://stub"}
+	}
 
+	func (s *stubPresignAdmin) GetTaggedMetadata(bucket string) (map[string]string, error) {
+		s.metaCalled = true
+		return map[string]string{"owner": "oscar"}, nil
+	}
+
+	func (s *stubPresignAdmin) GetCurrentResourceVisibility(bucket types.MinIOBucket) string {
+		s.visibilityCalled = true
+		return types.PRIVATE
+	}
+
+	func (s *stubPresignAdmin) ResourceInPolicy(policyName string, resource string) bool {
+		s.policyCalled = true
+		return false
+	}
+
+	func (s *stubPresignAdmin) GetBucketMembers(bucket string) ([]string, error) {
+		s.membersCalled = true
+		return []string{"user"}, nil
+	}
+*/
 func (f *fakeAdminClient) ResourceInPolicy(policyName string, resource string) bool {
 	if f.policies == nil {
 		return false

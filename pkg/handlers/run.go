@@ -22,10 +22,13 @@ import (
 	"net/http/httputil"
 	"strings"
 
+	stderrors "errors"
+
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -95,7 +98,7 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 				return
 			}
 
-			ui, err := oidcManager.GetUserInfo(rawToken)
+			ui, _ := oidcManager.GetUserInfo(rawToken)
 
 			if !oidcManager.IsAuthorised(rawToken) {
 				c.Status(http.StatusNotFound)
@@ -145,12 +148,12 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 func selectService(c *gin.Context, serviceList []*types.Service) (*types.Service, error) {
 	// If no services found, return not found
 	if len(serviceList) == 0 {
-		return nil, fmt.Errorf(errServiceNotFound)
+		return nil, stderrors.New(errServiceNotFound)
 	} else if len(serviceList) == 1 { // Found 1 service
 		if authorizeRequest(c, serviceList[0]) { // Found 1 service and is authorize
 			return serviceList[0], nil
 		} else {
-			return nil, fmt.Errorf(errServiceNotFound)
+			return nil, stderrors.New(errServiceNotFound)
 		}
 	} else { // Found more than one service with same name
 		authTime := 0
@@ -164,11 +167,11 @@ func selectService(c *gin.Context, serviceList []*types.Service) (*types.Service
 		if authTime == 1 { // More than 1 service found, but 1 service authorize
 			return service, nil
 		} else if authTime == 0 { // More than 1 service found, but no service authorize
-			return nil, fmt.Errorf(errServiceNotFound)
+			return nil, stderrors.New(errServiceNotFound)
 		} else if authTime > 1 { // More than 1 service found, and more than one service authorize -> user query owner
 			owner := strings.TrimSpace(c.Query("owner"))
 			if owner == "" {
-				return nil, fmt.Errorf(errMultipleServiceAuth)
+				return nil, stderrors.New(errMultipleServiceAuth)
 			}
 			for _, serviceIter := range serviceList {
 				if authorizeRequest(c, serviceIter) && serviceIter.Owner == owner {
@@ -176,8 +179,8 @@ func selectService(c *gin.Context, serviceList []*types.Service) (*types.Service
 					return service, nil
 				}
 			}
-			return nil, fmt.Errorf(errServiceNotFound)
+			return nil, stderrors.New(errServiceNotFound)
 		}
-		return nil, fmt.Errorf(errServiceNotFound)
+		return nil, stderrors.New(errServiceNotFound)
 	}
 }

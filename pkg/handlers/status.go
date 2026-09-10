@@ -68,7 +68,7 @@ func MakeStatusHandler(cfg *types.Config, kubeClientset kubernetes.Interface, me
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		clusterInfo := types.StatusInfo{}
-		var isAdmin bool = false
+		isAdmin := false
 		if len(strings.Split(authHeader, "Bearer")) > 1 {
 			uid, err := auth.GetUIDFromContext(c)
 			if err != nil {

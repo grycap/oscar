@@ -143,7 +143,7 @@ func MakeConfigUpdateHandler(cfg *types.Config, back kubernetes.Interface) gin.H
 
 		}
 		if apierrors.IsNotFound(err) {
-			if configInput.AllowedImageRepositories == nil || len(configInput.AllowedImageRepositories) == 0 {
+			if len(configInput.AllowedImageRepositories) == 0 {
 				cm := getOSCARCMConfigurationDefaultDefinition(cfg.AdditionalConfigPath)
 				err = backends.CreateOSCARCMConfiguration(back, cm, cfg.Namespace)
 				if err != nil {
@@ -183,7 +183,6 @@ func MakeConfigUpdateHandler(cfg *types.Config, back kubernetes.Interface) gin.H
 
 		}
 		c.JSON(http.StatusOK, configInput.AllowedImageRepositories)
-		return
 
 	}
 }

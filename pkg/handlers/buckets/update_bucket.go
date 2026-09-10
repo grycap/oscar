@@ -150,6 +150,7 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 				}
 			}
 		}
+		updateLogger.Printf("%s | %v | %s | %s | %s", "UPDATE", 204, createPath, bucket.BucketName, uid)
 
 		c.Status(http.StatusNoContent)
 	}

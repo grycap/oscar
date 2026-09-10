@@ -456,6 +456,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				return
 			}
 		}
+		updateLogger.Printf("%s | %v | %s | %s | %s", "UPDATE", 204, createPath, newService.Name, uid)
 
 		c.Status(http.StatusNoContent)
 	}
