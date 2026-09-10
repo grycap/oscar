@@ -29,6 +29,7 @@ import (
 	"github.com/grycap/oscar/v4/pkg/utils"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -470,6 +471,13 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service, name
 	podSpec, err := service.ToPodSpec(kn.config)
 	if err != nil {
 		return nil, err
+	}
+
+	// Subtract 25m CPU for the queue-proxy sidecar container, which is added by Knative automatically.
+	// This prevents the pod from being evicted due to CPU limit exceeded.
+	if cpuLimit, ok := podSpec.Containers[0].Resources.Limits[v1.ResourceCPU]; ok {
+		cpuLimit.Sub(resource.MustParse("25m"))
+		podSpec.Containers[0].Resources.Limits[v1.ResourceCPU] = cpuLimit
 	}
 
 	// fix ContainerConcurrency to 1 to avoid parallel invocations in the same container

@@ -362,6 +362,8 @@ func (s *Service) UnmarshalJSON(data []byte) error {
 	aux := Alias{
 		IsolationLevel: IsolationLevelService,
 		Visibility:     PRIVATE,
+		CPU:            "0.2",
+		Memory:         "256Mi",
 	}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -420,6 +422,10 @@ func (s Service) Validate() error {
 
 	if strings.TrimSpace(s.Image) == "" && s.Kserve == nil {
 		return fmt.Errorf("service Image is required")
+	}
+
+	if cpu, err := resource.ParseQuantity(s.CPU); err != nil || cpu.Cmp(resource.MustParse("0.2")) < 0 {
+		return fmt.Errorf("service CPU must be greater than or equal to 0.2")
 	}
 
 	if s.IsKserve() {

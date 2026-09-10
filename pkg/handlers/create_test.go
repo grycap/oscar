@@ -847,6 +847,7 @@ func TestValidateServiceCreation(t *testing.T) {
 			service: types.Service{
 				Name:           "svc",
 				Image:          "img",
+				CPU:            "0.2",
 				Visibility:     "public",
 				IsolationLevel: types.IsolationLevelService,
 			},
@@ -858,6 +859,7 @@ func TestValidateServiceCreation(t *testing.T) {
 			service: types.Service{
 				Name:           "svc",
 				Image:          "img",
+				CPU:            "0.2",
 				Visibility:     "invalid",
 				IsolationLevel: types.IsolationLevelService,
 			},
@@ -869,6 +871,7 @@ func TestValidateServiceCreation(t *testing.T) {
 			service: types.Service{
 				Name:           "svc",
 				Image:          "img",
+				CPU:            "0.2",
 				Visibility:     "public",
 				IsolationLevel: types.IsolationLevelUser,
 			},
