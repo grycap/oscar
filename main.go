@@ -199,6 +199,10 @@ func main() {
 		c.Request.URL.Path = "/ui"
 		r.HandleContext(c)
 	})
+	// RustFS uses HEAD / to validate webhook endpoints.
+	r.HEAD("/", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
 
 	// Health path for k8s health checks
 	r.GET("/health", handlers.HealthHandler)
