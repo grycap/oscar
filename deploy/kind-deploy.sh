@@ -1111,7 +1111,7 @@ else
     echo -e "\n[*] Deploying RustFS storage provider ..."
     STORAGE_ACCESS_KEY="rustfs"
     helm repo add rustfs https://charts.rustfs.com
-    helm install rustfs rustfs/rustfs --namespace rustfs --create-namespace --version 1.0.0-rc.5 \
+    helm install rustfs rustfs/rustfs --namespace rustfs --create-namespace --version 0.12.0 \
     --set secret.rustfs.access_key=$STORAGE_ACCESS_KEY \
     --set secret.rustfs.secret_key=$MINIO_PASSWORD \
     --set storageclass.name=standard \
