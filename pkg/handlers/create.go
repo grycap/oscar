@@ -900,18 +900,16 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 
 				if visibility != types.PRIVATE {
 					return nil, fmt.Errorf("the bucket \"%s\" must be private to be used as mount", minio.BucketName)
-				} else {
-					err := minIOAdminClient.CreateS3Path(s3Client, splitPath, true)
-					minIOBuckets = append(minIOBuckets, types.MinIOBucket{
-						BucketName:   splitPath[0],
-						AllowedUsers: service.AllowedUsers,
-						Visibility:   service.Visibility,
-						Owner:        service.Owner})
-					if err != nil && !isUpdate {
-						return nil, err
-					}
-					return minIOBuckets, nil
 				}
+
+				// The bucket already exists and is only being mounted. Creating the
+				// folder is part of the mount operation, but the bucket itself is
+				// owned by another resource and must not inherit this service's
+				// visibility or policies.
+				if err := minIOAdminClient.CreateS3Path(s3Client, splitPath, true); err != nil && !isUpdate {
+					return nil, err
+				}
+				return minIOBuckets, nil
 			}
 
 			// Create mount bucket
