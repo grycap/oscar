@@ -307,7 +307,7 @@ func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.D
 		affected = 0
 	}
 
-	state := types.DeploymentStatePending
+	var state string
 	switch {
 	case desired == 0:
 		state = types.DeploymentStateStopped

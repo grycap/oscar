@@ -24,7 +24,9 @@ import (
 // GenerateToken generates a random hexadecimal token
 func GenerateToken() string {
 	b := make([]byte, 32)
-	rand.Read(b) // #nosec G104
+	if _, err := rand.Read(b); err != nil {
+		return ""
+	}
 
 	return hex.EncodeToString(b)
 }

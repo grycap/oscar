@@ -67,7 +67,6 @@ func GetServiceTokenMiddleware(back types.ServerlessBackend, cfg *types.Config) 
 		}
 
 		c.Next()
-		return
 	}
 }
 
@@ -79,7 +78,7 @@ func setServiceTokenAuthCookie(c *gin.Context, serviceName, token string, cfg *t
 func getServiceTokenCandidates(c *gin.Context) []string {
 	tokens := []string{}
 
-	// Prioritise the token in the authorization header over other sources of service tokens
+	// Prioritize the token in the authorization header over other sources of service tokens
 	if token, ok := isAuthBearer(c); ok {
 		if len(strings.TrimSpace(token)) == tokenLength {
 			tokens = append(tokens, token)

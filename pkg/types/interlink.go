@@ -44,7 +44,7 @@ func SetInterlinkJob(podSpec *v1.PodSpec, service *Service, cfg *Config, eventBy
 	command := SupervisorCommand
 	event := v1.EnvVar{
 		Name:  EventVariable,
-		Value: base64.StdEncoding.EncodeToString([]byte(eventBytes)),
+		Value: base64.StdEncoding.EncodeToString(eventBytes),
 	}
 	args := OscarContainerCommand
 	podSpec.NodeSelector = map[string]string{

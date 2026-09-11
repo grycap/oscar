@@ -485,11 +485,11 @@ func sanitizeOwner(owner string) string {
 		if len(sanitized) > maxNamespaceLength {
 			sanitized = sanitized[:maxNamespaceLength]
 		}
-		if len(validation.IsDNS1123Label(sanitized)) == 0 {
-			break
+		if len(validation.IsDNS1123Label(sanitized)) > 0 {
+			// if still invalid, fall back to empty so hash is used
+			return ""
 		}
-		// if still invalid, fall back to empty so hash is used
-		return ""
+
 	}
 
 	return sanitized

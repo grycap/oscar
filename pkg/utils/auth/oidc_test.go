@@ -60,7 +60,7 @@ func TestNewOIDCManager(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
 		if hreq.URL.Path == "/.well-known/openid-configuration" {
-			rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `"}`))
+			_, _ = rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `"}`))
 		}
 	}))
 
@@ -104,13 +104,13 @@ func TestIsAuthorised(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")
-		if hreq.URL.Path == "/.well-known/openid-configuration" {
-			rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `", "userinfo_endpoint": "http://` + hreq.Host + `/userinfo"}`))
-		} else if hreq.URL.Path == "/userinfo" {
-			rw.Write([]byte(`{"sub": "123433g", "group_membership": ["/group/group1"]}`))
+		switch hreq.URL.Path {
+		case "/.well-known/openid-configuration":
+			_, _ = rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `", "userinfo_endpoint": "http://` + hreq.Host + `/userinfo"}`))
+		case "/userinfo":
+			_, _ = rw.Write([]byte(`{"sub": "uid-1234", "group_membership": ["/group/group1"]}`))
 		}
 	}))
-
 	issuer := server.URL
 	subject := "123433g"
 	groups := []string{"/group/group1"}
@@ -131,9 +131,9 @@ func TestIsAuthorised(t *testing.T) {
 
 	token1 := GetToken(claims1)
 	fmt.Println(token1)
-	// Test when the token is authorised
+	// Test when the token is authorized
 	if !oidcManager.IsAuthorised(token1) {
-		t.Errorf("expected token1 to be authorised")
+		t.Errorf("expected token1 to be authorized")
 	}
 	claims2 := jwt.MapClaims{
 		"iss":              "asdfas2123",
@@ -142,11 +142,11 @@ func TestIsAuthorised(t *testing.T) {
 		"iat":              time.Now().Unix(),
 		"group_membership": []string{"/group/group2"},
 	}
-	// Test when the token is not authorised
+	// Test when the token is not authorized
 	token2 := GetToken(claims2)
 	fmt.Println(token2)
 	if oidcManager.IsAuthorised(token2) {
-		t.Errorf("expected token2 to not be authorised")
+		t.Errorf("expected token2 to not be authorized")
 	}
 }
 
@@ -210,10 +210,11 @@ func TestGetUserInfo(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")
-		if hreq.URL.Path == "/.well-known/openid-configuration" {
-			rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `", "userinfo_endpoint": "http://` + hreq.Host + `/userinfo"}`))
-		} else if hreq.URL.Path == "/userinfo" {
-			rw.Write([]byte(`{"sub": "user1@egi.eu", "group_membership": ["/group/group1"]}`))
+		switch hreq.URL.Path {
+		case "/.well-known/openid-configuration":
+			_, _ = rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `", "userinfo_endpoint": "http://` + hreq.Host + `/userinfo"}`))
+		case "/userinfo":
+			_, _ = rw.Write([]byte(`{"sub": "user1@egi.eu", "group_membership": ["/group/group1"]}`))
 		}
 	}))
 
@@ -250,16 +251,17 @@ func TestGetOIDCMiddleware(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
-		if hreq.URL.Path == "/.well-known/openid-configuration" {
-			rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `", "userinfo_endpoint": "http://` + hreq.Host + `/userinfo"}`))
-		} else if hreq.URL.Path == "/userinfo" {
-			rw.Write([]byte(`{"sub": "123433g", "group_membership": ["/group/group1"]}`))
-		} else if hreq.URL.Path == "/minio/admin/v3/info" {
+		switch hreq.URL.Path {
+		case "/.well-known/openid-configuration":
+			_, _ = rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `", "userinfo_endpoint": "http://` + hreq.Host + `/userinfo"}`))
+		case "/userinfo":
+			_, _ = rw.Write([]byte(`{"sub": "123433g", "group_membership": ["/group/group1"]}`))
+		case "/minio/admin/v3/info":
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
-		} else {
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+		default:
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"status": "success"}`))
+			_, _ = rw.Write([]byte(`{"status": "success"}`))
 		}
 	}))
 
@@ -301,8 +303,8 @@ func TestGetOIDCMiddleware(t *testing.T) {
 			},
 		},
 	}
-	kubeClientset.CoreV1().PersistentVolumeClaims("oscar-svc").Create(context.TODO(), basePVC, metav1.CreateOptions{})
-	kubeClientset.CoreV1().PersistentVolumes().Create(context.TODO(), basePV, metav1.CreateOptions{})
+	_, _ = kubeClientset.CoreV1().PersistentVolumeClaims("oscar-svc").Create(context.TODO(), basePVC, metav1.CreateOptions{})
+	_, _ = kubeClientset.CoreV1().PersistentVolumes().Create(context.TODO(), basePV, metav1.CreateOptions{})
 
 	cfg := types.Config{
 		MinIOProvider: &types.MinIOProvider{
@@ -377,10 +379,11 @@ func TestGetUID(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")
-		if hreq.URL.Path == "/.well-known/openid-configuration" {
-			rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `", "userinfo_endpoint": "http://` + hreq.Host + `/userinfo"}`))
-		} else if hreq.URL.Path == "/userinfo" {
-			rw.Write([]byte(`{"sub": "uid-1234", "group_membership": ["/group/group1"]}`))
+		switch hreq.URL.Path {
+		case "/.well-known/openid-configuration":
+			_, _ = rw.Write([]byte(`{"issuer": "http://` + hreq.Host + `", "userinfo_endpoint": "http://` + hreq.Host + `/userinfo"}`))
+		case "/userinfo":
+			_, _ = rw.Write([]byte(`{"sub": "user1@egi.eu", "group_membership": ["/group/group1"]}`))
 		}
 	}))
 	defer server.Close()
@@ -405,7 +408,7 @@ func TestGetUID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting uid: %v", err)
 	}
-	if uid != "uid-1234" {
+	if uid != "user1@egi.eu" {
 		t.Fatalf("unexpected uid, got %s", uid)
 	}
 }

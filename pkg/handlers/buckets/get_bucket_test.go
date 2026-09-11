@@ -14,6 +14,7 @@ import (
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
 
+//nolint:gocyclo
 func TestMakeGetBucketHandlerAdmin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -62,7 +63,6 @@ func TestMakeGetBucketHandlerAdmin(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"success"}`))
-		return
 	}))
 
 	cfg := &types.Config{
@@ -210,6 +210,7 @@ func TestMakeGetBucketHandlerForbidden(t *testing.T) {
 	defer server.Close()
 }
 
+//nolint:gocyclo
 func TestMakeGetBucketHandlerRestrictedMember(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	lastModified := "2024-01-02T03:04:05Z"
@@ -261,7 +262,6 @@ func TestMakeGetBucketHandlerRestrictedMember(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"success"}`))
-		return
 	}))
 
 	cfg := &types.Config{
@@ -429,7 +429,6 @@ func TestMakeGetBucketHandlerPagination(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"success"}`))
-		return
 	}))
 
 	cfg := &types.Config{

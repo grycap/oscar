@@ -38,8 +38,6 @@ import (
 
 const ConfigMapNameOSCAR = "additional-oscar-config"
 
-const exposedServiceAppLabelPrefix = "oscar-svc-exp-"
-
 // KubeBackend struct to represent a Kubernetes client to store services as podTemplates
 type KubeBackend struct {
 	kubeClientset kubernetes.Interface
@@ -331,7 +329,7 @@ func (k *KubeBackend) DeleteService(service types.Service) error {
 	if utils.SecretExists(name, namespace, k.kubeClientset) {
 		secretsErr := utils.DeleteSecret(name, namespace, k.kubeClientset)
 		if secretsErr != nil {
-			log.Printf("Error deleting asociated secret: %v", secretsErr)
+			log.Printf("Error deleting associated secret: %v", secretsErr)
 		}
 	}
 

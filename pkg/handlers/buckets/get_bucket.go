@@ -103,11 +103,11 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 		}
 
 		if !isAdmin && utils.IsRustFSConfig(cfg) && !utils.UserAllowedByTags(requester, metadata) {
-			c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", requester))
+			c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorized", requester))
 			return
 		}
 		if !isAdmin && visibility == "" {
-			c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", requester))
+			c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorized", requester))
 			return
 		}
 
@@ -136,7 +136,7 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			singleObject := types.MinIOObject{
 				ObjectName:   *listResult.Contents[k].Key,
 				SizeBytes:    *listResult.Contents[k].Size,
-				LastModified: string(listResult.Contents[k].LastModified.String()),
+				LastModified: listResult.Contents[k].LastModified.String(),
 			}
 			allObjects = append(allObjects, singleObject)
 			returnedItemCount++

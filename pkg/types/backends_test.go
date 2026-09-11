@@ -112,6 +112,7 @@ func TestServerlessBackendInterface(t *testing.T) {
 	info := backend.GetInfo()
 	if info == nil {
 		t.Error("Expected GetInfo to return non-nil info")
+		return
 	}
 
 	if info.Name != "MockBackend" {

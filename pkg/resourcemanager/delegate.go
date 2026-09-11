@@ -272,66 +272,75 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
 				continue
 			}
+			jobStatuses, continueFlag, timeFloat := getJobStatusFromCluster(cluster, cred, authHeader, delegationToken)
+			if continueFlag {
+				results = append(results, []float64{timeFloat, 0, 0, 0, 1e6, 1e6})
+				continue
+			}
 
 			// Parse the cluster's endpoint URL and add the service's path
-			JobURL, err := url.Parse(cluster.Endpoint)
-			if err != nil {
-				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
-				continue
-			}
+			/*
+				JobURL, err := url.Parse(cluster.Endpoint)
+				if err != nil {
+					results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
+					continue
+				}
 
-			JobURL.Path = path.Join(JobURL.Path, "/system/logs/", cred.ServiceName)
+				JobURL.Path = path.Join(JobURL.Path, "/system/logs/", cred.ServiceName)
 
-			// Make request to get service's definition (including token) from cluster
-			req2, err := http.NewRequest("GET", JobURL.String(), nil)
-			if err != nil {
-				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
-				continue
-			}
+				// Make request to get service's definition (including token) from cluster
+				req2, err := http.NewRequest("GET", JobURL.String(), nil)
+				if err != nil {
+					results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
+					continue
+				}
 
-			// Add Headers
-			for k, v := range cred.Headers {
-				req2.Header.Add(k, v)
-			}
+				// Add Headers
+				for k, v := range cred.Headers {
+					req2.Header.Add(k, v)
+				}
 
-			addAuthHeader(req2, authHeader, delegationToken, cluster)
+				addAuthHeader(req2, authHeader, delegationToken, cluster)
 
-			// Make HTTP client
-			var transport http.RoundTripper = &http.Transport{
-				// Enable/disable SSL verification
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify}, // #nosec G402
-			}
+				// Make HTTP client
+				var transport http.RoundTripper = &http.Transport{
+					// Enable/disable SSL verification
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify}, // #nosec G402
+				}
 
-			client := &http.Client{
-				Transport: transport,
-				Timeout:   time.Second * 20,
-			}
+				client := &http.Client{
+					Transport: transport,
+					Timeout:   time.Second * 20,
+				}
 
-			// Send the request
-			resp2, err := client.Do(req2) // #nosec
-			if err != nil {
-				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
-				continue
-			}
-			defer resp2.Body.Close()
-			body, err := io.ReadAll(resp2.Body) //  io.ReadAll-> read body request
-			if err != nil {
-				fmt.Printf("Error to read body request to %s: %v\n", cred.URL, err)
-				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
-				continue
-			}
-			var jobStatuses JobStatuses
-			err = json.Unmarshal(body, &jobStatuses)
-			if err != nil {
-				fmt.Println("Error decoding the JSON of the response:", err)
-				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
-				continue
-			}
+				// Send the request
+				resp2, err := client.Do(req2) // #nosec
+				if err != nil {
+					results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
+					continue
+				}
+				defer func() {
+					_ = resp2.Body.Close()
+				}()
+
+				body, err := io.ReadAll(resp2.Body) //  io.ReadAll-> read body request
+				if err != nil {
+					fmt.Printf("Error to read body request to %s: %v\n", cred.URL, err)
+					results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
+					continue
+				}
+				var jobStatuses JobStatuses
+				err = json.Unmarshal(body, &jobStatuses)
+				if err != nil {
+					fmt.Println("Error decoding the JSON of the response:", err)
+					results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
+					continue
+				}*/
 
 			// Count job statuses
 			averageExecutionTime, pendingCount := countJobs(jobStatuses)
 
-			JobURL, err = url.Parse(cluster.Endpoint)
+			/*JobURL, err := url.Parse(cluster.Endpoint)
 			if err != nil {
 				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
 				continue
@@ -351,7 +360,15 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 			}
 
 			addAuthHeader(req1, authHeader, delegationToken, cluster)
+			var transport http.RoundTripper = &http.Transport{
+				// Enable/disable SSL verification
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify}, // #nosec G402
+			}
 
+			client := &http.Client{
+				Transport: transport,
+				Timeout:   time.Second * 20,
+			}
 			// Make the HTTP request
 			start := time.Now()
 			resp1, err := client.Do(req1) // #nosec
@@ -361,22 +378,29 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 				continue
 			}
 
-			defer resp1.Body.Close()
+			defer func() {
+				_ = resp1.Body.Close()
+			}()
 			var clusterStatus types.StatusInfo
 			err = json.NewDecoder(resp1.Body).Decode(&clusterStatus)
 			if err != nil {
 				fmt.Println("Error decoding the JSON of the response:", err)
 				results = append(results, []float64{duration.Seconds(), 0, 0, 0, 1e6, 1e6})
 				continue
+			}*/
+			clusterStatus, _, timeFloat := getClusterStatusFromCluster(cluster, cred, authHeader, delegationToken)
+			if continueFlag {
+				results = append(results, []float64{timeFloat, 0, 0, 0, 1e6, 1e6})
+				continue
 			}
-
 			serviceCPU, err := strconv.ParseFloat(service.CPU, 64)
 
 			if err != nil {
 				fmt.Println("Error converting service CPU to float: ", err)
-				results = append(results, []float64{duration.Seconds(), 0, 0, 0, 1e6, 1e6})
+				results = append(results, []float64{timeFloat, 0, 0, 0, 1e6, 1e6})
 				continue
 			}
+			duration := time.Duration(timeFloat * float64(time.Second))
 			results = createParameters(results, duration, clusterStatus, serviceCPU, averageExecutionTime, float64(pendingCount))
 
 		}
@@ -550,6 +574,111 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 	return fmt.Errorf("unable to delegate job \"%s\" from service \"%s\" to any replica, scheduling in the current cluster", jobID, service.Name)
 }
 
+func getClusterStatusFromCluster(cluster types.Cluster, replica types.Replica, authHeader string, delegationToken string) (types.StatusInfo, bool, float64) {
+	JobURL, err := url.Parse(cluster.Endpoint)
+	if err != nil {
+		return types.StatusInfo{}, true, 20
+	}
+	JobURL.Path = path.Join(JobURL.Path, "/system/status/")
+	req1, err := http.NewRequest("GET", JobURL.String(), nil)
+
+	if err != nil {
+		fmt.Printf("Error creating request for %s: %v\n", replica.URL, err)
+		return types.StatusInfo{}, true, 20
+
+	}
+
+	// Add Headers
+	for k, v := range replica.Headers {
+		req1.Header.Add(k, v)
+	}
+
+	addAuthHeader(req1, authHeader, delegationToken, cluster)
+	var transport http.RoundTripper = &http.Transport{
+		// Enable/disable SSL verification
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify}, // #nosec G402
+	}
+
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   time.Second * 20,
+	}
+	// Make the HTTP request
+	start := time.Now()
+	resp1, err := client.Do(req1) // #nosec
+	duration := time.Since(start)
+	if err != nil {
+		return types.StatusInfo{}, true, duration.Seconds()
+	}
+
+	defer func() {
+		_ = resp1.Body.Close()
+	}()
+	var clusterStatus types.StatusInfo
+	err = json.NewDecoder(resp1.Body).Decode(&clusterStatus)
+	if err != nil {
+		fmt.Println("Error decoding the JSON of the response:", err)
+		return types.StatusInfo{}, true, duration.Seconds()
+	}
+	return clusterStatus, false, 0
+}
+
+func getJobStatusFromCluster(cluster types.Cluster, replica types.Replica, authHeader string, delegationToken string) (JobStatuses, bool, float64) {
+
+	JobURL, err := url.Parse(cluster.Endpoint)
+	if err != nil {
+		return nil, true, 20
+	}
+
+	JobURL.Path = path.Join(JobURL.Path, "/system/logs/", replica.ServiceName)
+
+	// Make request to get service's definition (including token) from cluster
+	req2, err := http.NewRequest("GET", JobURL.String(), nil)
+	if err != nil {
+		return nil, true, 20
+	}
+
+	// Add Headers
+	for k, v := range replica.Headers {
+		req2.Header.Add(k, v)
+	}
+
+	addAuthHeader(req2, authHeader, delegationToken, cluster)
+
+	// Make HTTP client
+	var transport http.RoundTripper = &http.Transport{
+		// Enable/disable SSL verification
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: !cluster.SSLVerify}, // #nosec G402
+	}
+
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   time.Second * 20,
+	}
+
+	// Send the request
+	resp2, err := client.Do(req2) // #nosec
+	if err != nil {
+		return nil, true, 20
+	}
+	defer func() {
+		_ = resp2.Body.Close()
+	}()
+
+	body, err := io.ReadAll(resp2.Body) //  io.ReadAll-> read body request
+	if err != nil {
+		fmt.Printf("Error to read body request to %s: %v\n", replica.URL, err)
+		return nil, true, 20
+	}
+	var jobStatuses JobStatuses
+	err = json.Unmarshal(body, &jobStatuses)
+	if err != nil {
+		fmt.Println("Error decoding the JSON of the response:", err)
+		return nil, true, 20
+	}
+	return jobStatuses, false, 0
+}
+
 func federationMembers(service *types.Service) types.ReplicaList {
 	if service == nil || service.Federation == nil {
 		return nil
@@ -646,11 +775,11 @@ func getRefreshTokenForService(service *types.Service, kubeClientset kubernetes.
 	return strings.TrimSpace(string(tokenBytes))
 }
 
-type refreshTokenResponse struct {
+/*type refreshTokenResponse struct {
 	AccessToken string `json:"access_token"`
 	TokenType   string `json:"token_type"`
 	ExpiresIn   int    `json:"expires_in"`
-}
+}*/
 
 func exchangeRefreshToken(cfg *types.Config, refreshToken string) (string, error) {
 	token, _ := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
@@ -696,7 +825,7 @@ func exchangeRefreshToken(cfg *types.Config, refreshToken string) (string, error
 	}
 	respBytes := buf.String()
 
-	respString := string(respBytes)
+	respString := respBytes
 
 	var rrt ResponseRefreshToken
 	err = json.Unmarshal([]byte(respString), &rrt)
@@ -951,7 +1080,9 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 							fmt.Printf("Error getting cluster status to ClusterID \"%s\": unable to send request: %v\n", replica.ClusterID, err)
 							continue
 						}
-						defer resp_quota.Body.Close()
+						defer func() {
+							_ = resp_quota.Body.Close()
+						}()
 
 						// Handling the error responses mapped in the OSCAR Handler
 						if resp_quota.StatusCode != http.StatusOK {
@@ -962,7 +1093,6 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 							case http.StatusServiceUnavailable:
 								fmt.Printf("Error 503: The quota system is disabled on the server and has available resources\n")
 								canExecute = true
-								break
 							default:
 								fmt.Printf("Server error (%d): %s\n", resp_quota.StatusCode, string(bodyBytes))
 							}
@@ -1227,7 +1357,7 @@ func eventBuild(event string, storage_provider string) ([]byte, string) {
 		k, err1 := json.Marshal(delegatedEvent1)
 
 		if err1 != nil {
-			fmt.Printf("error marshalling delegated event: %v ", err1)
+			fmt.Printf("error marshaling delegated event: %v ", err1)
 			return nil, ""
 		}
 
@@ -1240,7 +1370,7 @@ func eventBuild(event string, storage_provider string) ([]byte, string) {
 
 		z, err2 := json.Marshal(delegatedEvent)
 		if err2 != nil {
-			fmt.Printf("error marshalling delegated event: %v", err2)
+			fmt.Printf("error marshaling delegated event: %v", err2)
 			return nil, ""
 		}
 		eventJSON = z

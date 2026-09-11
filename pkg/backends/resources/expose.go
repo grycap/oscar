@@ -479,7 +479,7 @@ func getDeploymentSpec(service types.Service, namespace string, cfg *types.Confi
 	deployName := GetDeploymentName(service.Name)
 	minScale := int32(0)
 	if service.Owner == types.DefaultOwner || !cfg.KueueEnable {
-		minScale = int32(service.Expose.MinScale)
+		minScale = service.Expose.MinScale
 	}
 	uid := auth.FormatUID(service.Owner)
 	if len(uid) > 62 {
@@ -620,7 +620,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 }
 
 // / List deployment and the horizontal auto scale
-func listDeployments(namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) (*apps.DeploymentList, *autos.HorizontalPodAutoscalerList, error) {
+/*func listDeployments(namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) (*apps.DeploymentList, *autos.HorizontalPodAutoscalerList, error) {
 	deployment, err := kubeClientset.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, nil, err
@@ -631,7 +631,7 @@ func listDeployments(namespace string, kubeClientset kubernetes.Interface, cfg *
 		return nil, nil, err2
 	}
 	return deployment, hpa, nil
-}
+}*/
 
 // Delete Deployment and HPA
 func deleteDeployment(name string, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
@@ -788,13 +788,13 @@ func getServiceSpec(service types.Service, namespace string, cfg *types.Config) 
 
 /// List services in a certain namespace
 
-func listServices(namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) (*v1.ServiceList, error) {
+/*func listServices(namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) (*v1.ServiceList, error) {
 	services, err := kubeClientset.CoreV1().Services(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 	return services, nil
-}
+}*/
 
 // / Update a kubernete service
 func updateService(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
@@ -1124,13 +1124,13 @@ func getIngressSpec(service types.Service, namespace string, cfg *types.Config) 
 
 /// List the kuberntes ingress
 
-func listIngress(namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) (*net.IngressList, error) {
+/*func listIngress(namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) (*net.IngressList, error) {
 	ingress, err := kubeClientset.NetworkingV1().Ingresses(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 	return ingress, nil
-}
+}*/
 
 // Delete a kubernetes ingress
 func deleteIngress(name string, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {

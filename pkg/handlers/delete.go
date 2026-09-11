@@ -72,15 +72,13 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 				return
 			}
-		}
-		if isOIDC {
 			namespace = utils.BuildUserNamespace(cfg, uid)
 		} else {
 			namespace = c.Query("namespace")
 		}
 		service, err = back.ReadService(namespace, serviceName)
 		if err != nil {
-			if errors.IsNotFound(err) || errors.IsGone(err) {
+			if errors.IsNotFound(err) || errors.IsGone(err) || errors.IsResourceExpired(err) {
 				c.Status(http.StatusNotFound)
 			} else if strings.Contains(err.Error(), "does not have a registered ConfigMap") {
 				c.String(http.StatusForbidden, "You do not have permission to delete this service")
@@ -94,13 +92,10 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusForbidden, "User %s doesn't have permision to delete this service", uid)
 			return
 		}
-		if service.Namespace == "" {
-			service.Namespace = cfg.ServicesNamespace
-		}
 
 		if err := back.DeleteService(*service); err != nil {
 			// Check if error is caused because the service is not found
-			if errors.IsNotFound(err) || errors.IsGone(err) {
+			if errors.IsNotFound(err) || errors.IsGone(err) || errors.IsResourceExpired(err) {
 				c.Status(http.StatusNotFound)
 			} else {
 				c.String(http.StatusInternalServerError, err.Error())
@@ -110,45 +105,14 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		refreshSecretName := utils.RefreshTokenSecretName(service.Name)
 		if refreshSecretName != "" {
-			if err := utils.DeleteSecret(refreshSecretName, service.Namespace, back.GetKubeClientset()); err != nil {
-				log.Printf("error deleting refresh-token secret %s/%s: %v", service.Namespace, refreshSecretName, err)
+			if err := utils.DeleteSecret(refreshSecretName, namespace, back.GetKubeClientset()); err != nil {
+				log.Printf("error deleting refresh-token secret %s/%s: %v", namespace, refreshSecretName, err)
 			}
 		}
 
-		objectStorageIAM, _ := objectstorage.MakeObjectStorageIAM(cfg)
+		err = deleteServiceBuckets(c, service, cfg)
 		if err != nil {
-			log.Printf("the provided MinIO configuration is not valid: %v", err)
-		}
-
-		if service.Mount.Path != "" {
-			path := strings.Trim(service.Mount.Path, " /")
-			// Split buckets and folders from path
-			bucket := strings.SplitN(path, "/", 2)
-			var users []string
-			err = objectStorageIAM.GetClient(c.Request.Context()).CreateAddGroup(bucket[0], users, true)
-			if err != nil {
-				log.Printf("error updating MinIO users in group: %v", err)
-			}
-		}
-
-		// Remove the service's webhook in MinIO config and restart the server
-		if err := removeMinIOWebhook(service.Name, cfg); err != nil {
-			log.Printf("Error removing MinIO webhook for service \"%s\": %v\n", service.Name, err)
-		}
-
-		// Delete service buckets
-		err = deleteBuckets(service, cfg, objectStorageIAM.GetClient(c.Request.Context()))
-		if err != nil && !strings.Contains(err.Error(), allUserGroupNotExist) && !strings.Contains(err.Error(), bucketNotExist) {
-			c.String(http.StatusInternalServerError, "Error deleting service buckets: ", err)
-		}
-
-		if len(service.BucketList) > 0 && strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser && !utils.IsRustFSConfig(cfg) {
-			for i, b := range service.BucketList {
-				err = objectStorageIAM.GetClient(c.Request.Context()).RemoveResource(b, service.AllowedUsers[i], false)
-				if err != nil {
-					c.String(http.StatusInternalServerError, "error while removing isolated bucket %v", err)
-				}
-			}
+			log.Printf("Error deleting service buckets for service \"%s\": %v\n", service.Name, err)
 		}
 
 		// Add Yunikorn queue if enabled
@@ -158,13 +122,51 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 		if cfg.KueueEnable {
-			if err := utils.DeleteKueueLocalQueue(c.Request.Context(), cfg, service.Namespace, service.Name); err != nil {
+			if err := utils.DeleteKueueLocalQueue(c.Request.Context(), cfg, namespace, service.Name); err != nil {
 				log.Println(err.Error()) // #nosec
 			}
 		}
-
+		deleteLogger.Printf("%s | %v | %s | %s | %s", "DELETE", 204, createPath, service.Name, uid)
 		c.Status(http.StatusNoContent)
 	}
+}
+
+func deleteServiceBuckets(c *gin.Context, service *types.Service, cfg *types.Config) error {
+	objectStorageIAM, err := objectstorage.MakeObjectStorageIAM(cfg)
+	if err != nil {
+		log.Printf("the provided MinIO configuration is not valid: %v", err)
+	}
+
+	if service.Mount.Path != "" {
+		path := strings.Trim(service.Mount.Path, " /")
+		// Split buckets and folders from path
+		bucket := strings.SplitN(path, "/", 2)
+		var users []string
+		err = objectStorageIAM.GetClient(c.Request.Context()).CreateAddGroup(bucket[0], users, true)
+		if err != nil {
+			log.Printf("error updating MinIO users in group: %v", err)
+		}
+	}
+	// Remove the service's webhook in MinIO config and restart the server
+	if err := removeMinIOWebhook(service.Name, cfg); err != nil {
+		log.Printf("Error removing MinIO webhook for service \"%s\": %v\n", service.Name, err)
+	}
+
+	// Delete service buckets
+	err = deleteBuckets(service, cfg, objectStorageIAM.GetClient(c.Request.Context()))
+	if err != nil && !strings.Contains(err.Error(), allUserGroupNotExist) && !strings.Contains(err.Error(), bucketNotExist) {
+		return fmt.Errorf("error deleting service buckets: %v", err)
+	}
+
+	if len(service.BucketList) > 0 && strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser && !utils.IsRustFSConfig(cfg) {
+		for i, b := range service.BucketList {
+			err = objectStorageIAM.GetClient(c.Request.Context()).RemoveResource(b, service.AllowedUsers[i], false)
+			if err != nil {
+				return fmt.Errorf("error while removing isolated bucket %v", err)
+			}
+		}
+	}
+	return nil
 }
 
 func removeMinIOWebhook(name string, cfg *types.Config) error {
@@ -181,27 +183,14 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	// Delete input buckets
 	for _, in := range service.Input {
 		provID, provName = getProviderInfo(in.Provider)
-
-		// Only allow input from MinIO and dCache
-		if provName != types.MinIOName && provName != types.WebDavName && provName != types.RucioName {
-			return errInput
-		}
-
 		// If the provider is WebDav (dCache) skip bucket creation
 		if provName == types.WebDavName || provName == types.RucioName {
 			continue
 		}
 
-		// Check if the provider identifier is defined in StorageProviders
-		if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
-			return fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
-		}
-
-		// Check if the input provider is the defined in the server config
-		if provID != types.DefaultProvider {
-			if !reflect.DeepEqual(*cfg.MinIOProvider, *service.StorageProviders.MinIO[provID]) {
-				return fmt.Errorf("the provided MinIO server \"%s\" is not the configured in OSCAR", service.StorageProviders.MinIO[provID].Endpoint)
-			}
+		err := previousCheckServiceBuckets(provID, provName, service, cfg, minIOAdminClient)
+		if err != nil {
+			return err
 		}
 
 		// Get admin client for the provider
@@ -213,7 +202,11 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 		}
 		// Check if the bucket is in the mount path
-		if !sameStorage(in, service.Mount) {
+		err = checkBucketInMountPath(service, s3Client, minIOAdminClient, bucketName, in, service.Mount.Path, cfg)
+		if err != nil {
+			return err
+		}
+		/*if !sameStorage(in, service.Mount) {
 			err := deleteObjectStorageBuckets(s3Client, minIOAdminClient, types.MinIOBucket{
 				BucketName:   bucketName,
 				Visibility:   service.Visibility,
@@ -233,7 +226,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			if err := minIOAdminClient.SetTags(bucketName, tags); err != nil {
 				return fmt.Errorf("Error tagging bucket: %v", err)
 			}
-		}
+		}*/
 
 	}
 
@@ -274,7 +267,11 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				if err := disableInputNotifications(s3Client, service.GetObjectStorageWebhookARN(cfg.ObjectStorageType), outBucket); err != nil {
 					log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 				}
-				if !sameStorage(out, service.Mount) {
+				err := checkBucketInMountPath(service, s3Client, minIOAdminClient, outBucket, out, service.Mount.Path, cfg)
+				if err != nil {
+					return err
+				}
+				/*if !sameStorage(out, service.Mount) {
 					err := deleteObjectStorageBuckets(s3Client, minIOAdminClient, types.MinIOBucket{
 						BucketName:   outBucket,
 						Visibility:   service.Visibility,
@@ -293,7 +290,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 					if err := minIOAdminClient.SetTags(outBucket, tags); err != nil {
 						return fmt.Errorf("Error tagging bucket: %v", err)
 					}
-				}
+				}*/
 
 			}
 
@@ -328,7 +325,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		oldTags, _ := minIOAdminClient.GetTaggedMetadata(bucketName)
 		// Bucket metadata for filtering
 		// If bucket dont have already the tags, set them.
-		if oldTags != nil && len(oldTags) > 0 && oldTags["from_service"] != "" {
+		if len(oldTags) > 0 && oldTags["from_service"] != "" {
 			taggedService := oldTags["from_service"]
 			if taggedService == service.Name {
 				oldTags["from_service"] = ""
@@ -339,6 +336,60 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		}
 	}
 
+	return nil
+}
+
+// Check if the bucket is in the mount path
+func checkBucketInMountPath(
+	service *types.Service,
+	s3Client *s3.S3,
+	minIOAdminClient *types.MinIOAdminClient,
+	bucketName string,
+	storageConfig types.StorageIOConfig,
+	mountPath string,
+	cfg *types.Config) error {
+	if !sameStorage(storageConfig, service.Mount) {
+		err := deleteObjectStorageBuckets(s3Client, minIOAdminClient, types.MinIOBucket{
+			BucketName:   bucketName,
+			Visibility:   service.Visibility,
+			AllowedUsers: service.AllowedUsers,
+			Owner:        service.Owner,
+		}, utils.IsRustFSConfig(cfg))
+
+		if err != nil {
+			return fmt.Errorf("error while removing MinIO bucket %v", err)
+		}
+	} else {
+		// Bucket metadata for filtering
+		tags := map[string]string{
+			"owner":   service.Owner,
+			"service": "false",
+		}
+		if err := minIOAdminClient.SetTags(bucketName, tags); err != nil {
+			return fmt.Errorf("Error tagging bucket: %v", err)
+		}
+	}
+	return nil
+}
+
+func previousCheckServiceBuckets(provID string, provName string, service *types.Service, cfg *types.Config, minIOAdminClient *types.MinIOAdminClient) error {
+
+	// Only allow input from MinIO and dCache
+	if provName != types.MinIOName && provName != types.WebDavName && provName != types.RucioName {
+		return errInput
+	}
+
+	// Check if the provider identifier is defined in StorageProviders
+	if !isStorageProviderDefined(provName, provID, service.StorageProviders) {
+		return fmt.Errorf("the StorageProvider \"%s.%s\" is not defined", provName, provID)
+	}
+
+	// Check if the input provider is the defined in the server config
+	if provID != types.DefaultProvider {
+		if !reflect.DeepEqual(*cfg.MinIOProvider, *service.StorageProviders.MinIO[provID]) {
+			return fmt.Errorf("the provided MinIO server \"%s\" is not the configured in OSCAR", service.StorageProviders.MinIO[provID].Endpoint)
+		}
+	}
 	return nil
 }
 

@@ -31,7 +31,6 @@ import (
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
-	batch "k8s.io/api/batch/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -125,7 +124,7 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.
 	}
 }
 
-func getJobs(kubeClientset kubernetes.Interface, serviceNamespace string, listOpts metav1.ListOptions, c *gin.Context) *batch.JobList {
+func getJobs(kubeClientset kubernetes.Interface, serviceNamespace string, listOpts metav1.ListOptions, c *gin.Context) *batchv1.JobList {
 	jobs, err := kubeClientset.BatchV1().Jobs(serviceNamespace).List(context.TODO(), listOpts)
 	if err != nil {
 		// Check if error is caused because the service is not found
@@ -412,7 +411,9 @@ func MakeGetSystemLogsHandler(kubeClientset kubernetes.Interface, cfg *types.Con
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
-		defer stream.Close()
+		defer func() {
+			_ = stream.Close()
+		}()
 
 		buf := new(bytes.Buffer)
 		if _, err = buf.ReadFrom(stream); err != nil {

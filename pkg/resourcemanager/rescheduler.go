@@ -133,7 +133,7 @@ func getReSchedulablePods(kubeClientset kubernetes.Interface, namespace string) 
 			continue
 		}
 		for _, job := range jobs.Items {
-			if job.Spec.Suspend != nil && *job.Spec.Suspend == true {
+			if job.Spec.Suspend != nil && *job.Spec.Suspend {
 
 				exceeded, err := isThresholdExceeded(job.CreationTimestamp.Time, job.Labels[types.ReSchedulerLabelKey])
 				if err != nil {

@@ -7,10 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/foomo/htpasswd"
 	"github.com/grycap/oscar/v4/pkg/types"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,7 +48,7 @@ var (
 	kserveIsvcGVR              = schema.GroupVersionResource{Group: "serving.kserve.io", Version: "v1beta1", Resource: "inferenceservices"}
 	kserveHTTPRouteGVR         = schema.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "httproutes"}
 	kserveTraefikMiddlewareGVR = schema.GroupVersionResource{Group: "traefik.io", Version: "v1alpha1", Resource: "middlewares"}
-	kserveSecretGVR            = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
+	//kserveSecretGVR            = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
 	defaultKserveCpuRequest    = resource.MustParse("0.2")
 	defaultKserveMemoryRequest = resource.MustParse("256Mi")
 )
@@ -173,7 +171,7 @@ func CreateKserveService(service *types.Service, knativeService *knv1.Service, c
 	if err != nil {
 		return fmt.Errorf("failed to create dynamic client: %v", err)
 	}
-	//kserveLogger.Printf("Creating KServe service '%s' for user '%s' with model format %s", service.Name, service.Owner, service.Kserve.ModelFormat)
+	kserveLogger.Printf("Creating KServe service '%s' for user '%s' with model format %s", service.Name, service.Owner, service.Kserve.Inference.ModelFormat)
 
 	var kserveSvc *unstructured.Unstructured
 	var owner *KserveServiceOwner = nil
@@ -685,7 +683,7 @@ func buildTraefikOIDCMiddlewareSpec(service *types.Service, owner *KserveService
 	}}
 }
 
-func createTraefikAuthMiddleware(dynClient dynamic.Interface, service *types.Service, owner *KserveServiceOwner) error {
+/*func createTraefikAuthMiddleware(dynClient dynamic.Interface, service *types.Service, owner *KserveServiceOwner) error {
 	err := createTraefikAuthSecret(dynClient, service, owner)
 	if err != nil {
 		return fmt.Errorf("failed to create auth secret: %v", err)
@@ -698,9 +696,9 @@ func createTraefikAuthMiddleware(dynClient dynamic.Interface, service *types.Ser
 		return fmt.Errorf("failed to create basic auth middleware: %v", err)
 	}
 	return nil
-}
+}*/
 
-func buildTraefikAuthMiddlewareSpec(service *types.Service, owner *KserveServiceOwner) *unstructured.Unstructured {
+/*func buildTraefikAuthMiddlewareSpec(service *types.Service, owner *KserveServiceOwner) *unstructured.Unstructured {
 	return &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "traefik.io/v1alpha1",
 		"kind":       "Middleware",
@@ -715,9 +713,9 @@ func buildTraefikAuthMiddlewareSpec(service *types.Service, owner *KserveService
 			},
 		},
 	}}
-}
+}*/
 
-func createTraefikAuthSecret(dynClient dynamic.Interface, service *types.Service, owner *KserveServiceOwner) error {
+/*func createTraefikAuthSecret(dynClient dynamic.Interface, service *types.Service, owner *KserveServiceOwner) error {
 	hash := make(htpasswd.HashedPasswords)
 	err := hash.SetPassword(service.Name, service.Token, htpasswd.HashAPR1)
 	if err != nil {
@@ -729,9 +727,9 @@ func createTraefikAuthSecret(dynClient dynamic.Interface, service *types.Service
 
 	_, err = dynClient.Resource(kserveSecretGVR).Namespace(owner.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	return err
-}
+}*/
 
-func buildTraefikAuthSecretSpec(service *types.Service, owner *KserveServiceOwner, hash htpasswd.HashedPasswords) *unstructured.Unstructured {
+/*func buildTraefikAuthSecretSpec(service *types.Service, owner *KserveServiceOwner, hash htpasswd.HashedPasswords) *unstructured.Unstructured {
 	return &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "Secret",
@@ -746,7 +744,7 @@ func buildTraefikAuthSecretSpec(service *types.Service, owner *KserveServiceOwne
 		},
 		"type": "Opaque",
 	}}
-}
+}*/
 
 func getTraefikAuthMiddlewareName(serviceName string) string {
 	return serviceName + "-auth-mdw"
@@ -862,7 +860,7 @@ func buildHTTPRouteSpec(service *types.Service, owner *KserveServiceOwner, cfg *
 	}}
 }
 
-func createKserveResources(service *types.Kserve) (v1.ResourceRequirements, error) {
+func createKserveResources(service *types.Kserve) (corev1.ResourceRequirements, error) {
 	resources := corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
 			corev1.ResourceCPU:    defaultKserveCpuRequest,
@@ -912,7 +910,7 @@ func getOwnerReference(owner *KserveServiceOwner) []metav1.OwnerReference {
 	blockOwnerDeletion := true
 
 	return []metav1.OwnerReference{
-		metav1.OwnerReference{
+		{
 			APIVersion:         owner.APIVersion,
 			Kind:               owner.Kind,
 			Name:               owner.Name,
@@ -955,7 +953,7 @@ func buildUnstructuredServiceOwnerRef(kserveSvc *unstructured.Unstructured) *Kse
 	}
 }
 
-func buildKserveLLMServiceRouter(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (map[string]any, error) {
+/*func buildKserveLLMServiceRouter(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (map[string]any, error) {
 	gwName := strings.TrimSpace(cfg.HTTPRouteGatewayName)
 	gwNamespace := strings.TrimSpace(cfg.HTTPRouteGatewayNamespace)
 	if gwNamespace == "" || gwName == "" {
@@ -975,7 +973,7 @@ func buildKserveLLMServiceRouter(service *types.Service, owner *KserveServiceOwn
 		}
 	}
 	return getKserveLLMServiceRouterSpec(service, owner.Namespace, cfg), nil
-}
+}*/
 
 // getKserveLLMServiceRouterSpec returns a router configuration for LLM InferenceServices
 // to route requests based on the service name.

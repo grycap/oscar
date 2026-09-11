@@ -165,11 +165,11 @@ func TestKnativeListServices(t *testing.T) {
 			back.knClientset = knFake.NewSimpleClientset()
 
 			for _, r := range s.k8sReactors {
-				back.kubeClientset.(*fake.Clientset).Fake.PrependReactor(r.Verb, r.Resource, r.Reaction)
+				back.kubeClientset.(*fake.Clientset).PrependReactor(r.Verb, r.Resource, r.Reaction)
 			}
 
 			for _, r := range s.knReactors {
-				back.knClientset.(*knFake.Clientset).Fake.PrependReactor(r.Verb, r.Resource, r.Reaction)
+				back.knClientset.(*knFake.Clientset).PrependReactor(r.Verb, r.Resource, r.Reaction)
 			}
 
 			svcList, err := back.ListServices()
@@ -253,11 +253,11 @@ func TestKnativeCreateService(t *testing.T) {
 			}
 
 			for _, r := range s.k8sReactors {
-				back.kubeClientset.(*fake.Clientset).Fake.PrependReactor(r.Verb, r.Resource, r.Reaction)
+				back.kubeClientset.(*fake.Clientset).PrependReactor(r.Verb, r.Resource, r.Reaction)
 			}
 
 			for _, r := range s.knReactors {
-				back.knClientset.(*knFake.Clientset).Fake.PrependReactor(r.Verb, r.Resource, r.Reaction)
+				back.knClientset.(*knFake.Clientset).PrependReactor(r.Verb, r.Resource, r.Reaction)
 			}
 
 			err := back.CreateService(testService)
@@ -289,7 +289,7 @@ func TestKnativeCreateService(t *testing.T) {
 		}
 
 		// Error deleting configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "configmaps", errorReaction)
 
 		if err := back.CreateService(invalidService); err == nil {
 			t.Error("expected error, got: nil")
@@ -303,7 +303,7 @@ func TestKnativeCreateService(t *testing.T) {
 		back.knClientset = knFake.NewSimpleClientset()
 
 		// Fail if Knative Service create is called.
-		back.knClientset.(*knFake.Clientset).Fake.PrependReactor("create", "services", errorReaction)
+		back.knClientset.(*knFake.Clientset).PrependReactor("create", "services", errorReaction)
 
 		exposedService := types.Service{
 			Name:   "test-exposed",
@@ -398,11 +398,11 @@ func TestKnativeReadService(t *testing.T) {
 			back.knClientset = knFake.NewSimpleClientset()
 
 			for _, r := range s.k8sReactors {
-				back.kubeClientset.(*fake.Clientset).Fake.PrependReactor(r.Verb, r.Resource, r.Reaction)
+				back.kubeClientset.(*fake.Clientset).PrependReactor(r.Verb, r.Resource, r.Reaction)
 			}
 
 			for _, r := range s.knReactors {
-				back.knClientset.(*knFake.Clientset).Fake.PrependReactor(r.Verb, r.Resource, r.Reaction)
+				back.knClientset.(*knFake.Clientset).PrependReactor(r.Verb, r.Resource, r.Reaction)
 			}
 
 			// Read service
@@ -424,9 +424,9 @@ func TestKnativeReadService(t *testing.T) {
 		back := MakeKnativeBackend(fakeClientset, fakeConfig, testConfig)
 		back.knClientset = knFake.NewSimpleClientset()
 
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReaction)
 
-		back.knClientset.(*knFake.Clientset).Fake.PrependReactor("get", "services", knGetSvcReactor.React)
+		back.knClientset.(*knFake.Clientset).PrependReactor("get", "services", knGetSvcReactor.React)
 
 		// Read service
 		_, err := back.ReadService(testConfig.ServicesNamespace, "test")
@@ -547,11 +547,11 @@ func TestKnativeUpdateService(t *testing.T) {
 			back.knClientset = knFake.NewSimpleClientset()
 
 			for _, r := range s.k8sReactors {
-				back.kubeClientset.(*fake.Clientset).Fake.PrependReactor(r.Verb, r.Resource, r.Reaction)
+				back.kubeClientset.(*fake.Clientset).PrependReactor(r.Verb, r.Resource, r.Reaction)
 			}
 
 			for _, r := range s.knReactors {
-				back.knClientset.(*knFake.Clientset).Fake.PrependReactor(r.Verb, r.Resource, r.Reaction)
+				back.knClientset.(*knFake.Clientset).PrependReactor(r.Verb, r.Resource, r.Reaction)
 			}
 
 			// Update with valid service
@@ -598,16 +598,16 @@ func TestKnativeUpdateService(t *testing.T) {
 		}
 
 		// Return valid configmap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReaction)
 
 		// Return valid knative service
-		back.knClientset.(*knFake.Clientset).Fake.PrependReactor("get", "services", knGetSvcReactor.Reaction)
+		back.knClientset.(*knFake.Clientset).PrependReactor("get", "services", knGetSvcReactor.Reaction)
 
 		// Return error updating knative service
-		back.knClientset.(*knFake.Clientset).Fake.PrependReactor("update", "services", errorReaction)
+		back.knClientset.(*knFake.Clientset).PrependReactor("update", "services", errorReaction)
 
 		// Custom reactor for configmap update
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "configmaps", customConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "configmaps", customConfigMapReactor)
 
 		// Call
 		err := back.UpdateService(newInvalidService)
@@ -646,16 +646,16 @@ func TestKnativeUpdateService(t *testing.T) {
 		}
 
 		// Return valid configmap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReaction)
 
 		// Return valid knative service
-		back.knClientset.(*knFake.Clientset).Fake.PrependReactor("get", "services", knGetSvcReactor.Reaction)
+		back.knClientset.(*knFake.Clientset).PrependReactor("get", "services", knGetSvcReactor.Reaction)
 
 		// Return error updating knative service
-		back.knClientset.(*knFake.Clientset).Fake.PrependReactor("update", "services", errorReaction)
+		back.knClientset.(*knFake.Clientset).PrependReactor("update", "services", errorReaction)
 
 		// Custom reactor for configmap update
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "configmaps", customConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "configmaps", customConfigMapReactor)
 
 		// Call
 		err := back.UpdateService(newService)
@@ -779,11 +779,11 @@ func TestKnativeDeleteService(t *testing.T) {
 			back.knClientset = knFake.NewSimpleClientset()
 
 			for _, r := range s.k8sReactors {
-				back.kubeClientset.(*fake.Clientset).Fake.PrependReactor(r.Verb, r.Resource, r.Reaction)
+				back.kubeClientset.(*fake.Clientset).PrependReactor(r.Verb, r.Resource, r.Reaction)
 			}
 
 			for _, r := range s.knReactors {
-				back.knClientset.(*knFake.Clientset).Fake.PrependReactor(r.Verb, r.Resource, r.Reaction)
+				back.knClientset.(*knFake.Clientset).PrependReactor(r.Verb, r.Resource, r.Reaction)
 			}
 
 			// Delete service

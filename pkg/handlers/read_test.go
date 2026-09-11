@@ -40,7 +40,7 @@ func TestMakeReadHandler(t *testing.T) {
 			if s.returnError {
 				switch s.errType {
 				case "404":
-					back.AddError("ReadService", k8serr.NewGone("Not Found"))
+					back.AddError("ReadService", k8serr.NewResourceExpired("Not Found"))
 				case "500":
 					err := errors.New("Not found")
 					back.AddError("ReadService", k8serr.NewInternalError(err))

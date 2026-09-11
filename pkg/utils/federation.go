@@ -234,7 +234,10 @@ func sendFederatedService(service *types.Service, cluster types.Cluster, authHea
 	if err != nil {
 		return fmt.Errorf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
@@ -278,7 +281,10 @@ func checkFederatedAuth(serviceName string, cluster types.Cluster, authHeader st
 	if err != nil {
 		return fmt.Errorf("auth check failed for cluster \"%s\": %v", cluster.Endpoint, err)
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		return fmt.Errorf("auth rejected by cluster \"%s\" (status %d)", cluster.Endpoint, resp.StatusCode)
@@ -320,7 +326,10 @@ func sendFederatedDeleteService(serviceName string, cluster types.Cluster, authH
 	if err != nil {
 		return fmt.Errorf("rollback delete failed for cluster \"%s\": %v", cluster.Endpoint, err)
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil

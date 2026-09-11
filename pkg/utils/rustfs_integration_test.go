@@ -32,6 +32,8 @@ import (
 
 // TestRustFSIAMIntegration exercises the RustFS admin API against a live
 // instance. It is skipped unless all RUSTFS_TEST_* variables are provided.
+//
+//nolint:gocyclo
 func TestRustFSIAMIntegration(t *testing.T) {
 	endpoint := os.Getenv("RUSTFS_TEST_ENDPOINT")
 	adminAccessKey := os.Getenv("RUSTFS_TEST_ACCESS_KEY")
@@ -105,7 +107,7 @@ func TestRustFSIAMIntegration(t *testing.T) {
 	if _, err := s3Client.CreateBucket(&s3.CreateBucketInput{Bucket: aws.String(bucketName)}); err != nil {
 		t.Fatalf("creating temporary RustFS notification bucket: %v", err)
 	}
-	defer s3Client.DeleteBucket(&s3.DeleteBucketInput{Bucket: aws.String(bucketName)})
+	defer func() { _, _ = s3Client.DeleteBucket(&s3.DeleteBucketInput{Bucket: aws.String(bucketName)}) }()
 
 	adminClient, err := types.MakeMinIOAdminClient(cfg)
 	if err != nil {

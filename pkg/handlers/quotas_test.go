@@ -724,6 +724,7 @@ func TestUtilityFunctions(t *testing.T) {
 	})
 }
 
+//nolint:gocyclo
 func TestQuotaJSONTags(t *testing.T) {
 	t.Run("types.QuotaResponse JSON tags", func(t *testing.T) {
 		resp := types.QuotaResponse{

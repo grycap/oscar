@@ -69,6 +69,7 @@ func (m *serviceTokenMockBackend) GetKubeClientset() kubernetes.Interface {
 	return nil
 }
 
+//nolint:gocyclo
 func TestGetServiceTokenMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -124,7 +125,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			wantServiceTokenCtx: false,
 		},
 		{
-			name:         "denies request with bearer token of invalid length and valid query token present, bearer token is prioritised",
+			name:         "denies request with bearer token of invalid length and valid query token present, bearer token is prioritized",
 			forwardedURI: "/system/services/svc/exposed/api/ws?token=" + validToken,
 			authHeader:   "Bearer user-token",
 			backendServices: []*types.Service{
@@ -239,7 +240,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			wantServiceTokenCtx: false,
 		},
 		{
-			name:         "both bearer token and query token present, bearer token is prioritised",
+			name:         "both bearer token and query token present, bearer token is prioritized",
 			forwardedURI: "/system/services/svc/exposed/api/ws?token=app-session-token",
 			authHeader:   "Bearer " + validToken,
 			backendServices: []*types.Service{
@@ -252,7 +253,7 @@ func TestGetServiceTokenMiddleware(t *testing.T) {
 			wantCookiePath:      "/",
 		},
 		{
-			name:         "both bearer token and valid query token present, bearer token is prioritised",
+			name:         "both bearer token and valid query token present, bearer token is prioritized",
 			forwardedURI: "/system/services/svc/exposed/api/ws?token=" + validToken,
 			authHeader:   "Bearer " + validToken,
 			backendServices: []*types.Service{

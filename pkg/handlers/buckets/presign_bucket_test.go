@@ -195,35 +195,40 @@ func (f *fakeAdminClient) GetCurrentResourceVisibility(bucket types.MinIOBucket)
 	return f.visibility
 }
 
-type stubPresignAdmin struct {
+/*type stubPresignAdmin struct {
 	simpleCalled     bool
 	metaCalled       bool
 	visibilityCalled bool
 	policyCalled     bool
 	membersCalled    bool
-}
+}*/
 
-func (s *stubPresignAdmin) SimpleClient() presignSimpleClient {
-	s.simpleCalled = true
-	return &fakeSimpleClient{bucketExists: true, presignURL: "http://stub"}
-}
-func (s *stubPresignAdmin) GetTaggedMetadata(bucket string) (map[string]string, error) {
-	s.metaCalled = true
-	return map[string]string{"owner": "oscar"}, nil
-}
-func (s *stubPresignAdmin) GetCurrentResourceVisibility(bucket types.MinIOBucket) string {
-	s.visibilityCalled = true
-	return types.PRIVATE
-}
-func (s *stubPresignAdmin) ResourceInPolicy(policyName string, resource string) bool {
-	s.policyCalled = true
-	return false
-}
-func (s *stubPresignAdmin) GetBucketMembers(bucket string) ([]string, error) {
-	s.membersCalled = true
-	return []string{"user"}, nil
-}
+/*
+	func (s *stubPresignAdmin) SimpleClient() presignSimpleClient {
+		s.simpleCalled = true
+		return &fakeSimpleClient{bucketExists: true, presignURL: "http://stub"}
+	}
 
+	func (s *stubPresignAdmin) GetTaggedMetadata(bucket string) (map[string]string, error) {
+		s.metaCalled = true
+		return map[string]string{"owner": "oscar"}, nil
+	}
+
+	func (s *stubPresignAdmin) GetCurrentResourceVisibility(bucket types.MinIOBucket) string {
+		s.visibilityCalled = true
+		return types.PRIVATE
+	}
+
+	func (s *stubPresignAdmin) ResourceInPolicy(policyName string, resource string) bool {
+		s.policyCalled = true
+		return false
+	}
+
+	func (s *stubPresignAdmin) GetBucketMembers(bucket string) ([]string, error) {
+		s.membersCalled = true
+		return []string{"user"}, nil
+	}
+*/
 func (f *fakeAdminClient) ResourceInPolicy(policyName string, resource string) bool {
 	if f.policies == nil {
 		return false
@@ -266,10 +271,10 @@ func (h *presignMinioMock) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/info-canned-policy"):
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"PolicyName":"default","Policy":{"Version":"version","Statement":[{"Resource":["arn:aws:s3:::test-bucket/*"],"Effect":"Allow"}]}}`))
+		_, _ = w.Write([]byte(`{"PolicyName":"default","Policy":{"Version":"version","Statement":[{"Resource":["arn:aws:s3:::test-bucket/*"],"Effect":"Allow"}]}}`))
 	case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/group"):
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"name":"test-bucket","status":"enable","members":["oscar"],"policy":""}`))
+		_, _ = w.Write([]byte(`{"name":"test-bucket","status":"enable","members":["oscar"],"policy":""}`))
 	default:
 		if r.Method == http.MethodHead {
 			w.Header().Set("Content-Length", "0")
@@ -279,16 +284,16 @@ func (h *presignMinioMock) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		if r.Method == http.MethodGet && r.URL.RawQuery == "location=" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
+			_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
 			return
 		}
 		if r.URL.Query().Has("tagging") {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`<Tagging><TagSet><Tag><Key>owner</Key><Value>oscar</Value></Tag></TagSet></Tagging>`))
+			_, _ = w.Write([]byte(`<Tagging><TagSet><Tag><Key>owner</Key><Value>oscar</Value></Tag></TagSet></Tagging>`))
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"Status":"success"}`))
+		_, _ = w.Write([]byte(`{"Status":"success"}`))
 	}
 }
 

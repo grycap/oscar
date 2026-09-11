@@ -103,34 +103,11 @@ func MakePresignHandler(cfg *types.Config) gin.HandlerFunc {
 			c.String(http.StatusBadRequest, fmt.Sprintf("Invalid presign request: %v", err))
 			return
 		}
-
-		bucketName := strings.TrimSpace(c.Param("bucket"))
-		if bucketName == "" {
-			c.String(http.StatusBadRequest, "Bucket parameter cannot be empty")
+		bucketName, objectKey, operation, expires, err := validatePresignRequest(c, &req)
+		if err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("Invalid presign request: %v", err))
 			return
 		}
-
-		objectKey := strings.Trim(strings.TrimSpace(req.ObjectKey), "/")
-		if objectKey == "" {
-			c.String(http.StatusBadRequest, "Object key cannot be empty")
-			return
-		}
-
-		operation := strings.ToLower(strings.TrimSpace(req.Operation))
-		if operation != operationUpload && operation != operationDownload {
-			c.String(http.StatusBadRequest, fmt.Sprintf("Unsupported operation '%s'. Allowed values are '%s' or '%s'", req.Operation, operationUpload, operationDownload))
-			return
-		}
-
-		expires := req.ExpiresIn
-		if expires == 0 {
-			expires = defaultPresignExpirySeconds
-		}
-		if expires < minPresignExpirySeconds || expires > maxPresignExpirySeconds {
-			c.String(http.StatusBadRequest, fmt.Sprintf("Invalid expiration requested: %d. Allowed range is %d-%d seconds", expires, minPresignExpirySeconds, maxPresignExpirySeconds))
-			return
-		}
-
 		adminClient, err := newPresignAdminClient(cfg)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", err))
@@ -211,7 +188,7 @@ func MakePresignHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 
 			if !allowed {
-				c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised to generate presigned URLs for bucket '%s'", requester, bucketName))
+				c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorized to generate presigned URLs for bucket '%s'", requester, bucketName))
 				return
 			}
 		}
@@ -248,6 +225,32 @@ func MakePresignHandler(cfg *types.Config) gin.HandlerFunc {
 			Headers:   respHeaders,
 		})
 	}
+}
+
+func validatePresignRequest(c *gin.Context, req *PresignRequest) (string, string, string, int64, error) {
+	bucketName := strings.TrimSpace(c.Param("bucket"))
+	if bucketName == "" {
+		return "", "", "", 0, fmt.Errorf("bucket parameter cannot be empty")
+	}
+
+	objectKey := strings.Trim(strings.TrimSpace(req.ObjectKey), "/")
+	if objectKey == "" {
+		return "", "", "", 0, fmt.Errorf("object key cannot be empty")
+	}
+
+	operation := strings.ToLower(strings.TrimSpace(req.Operation))
+	if operation != operationUpload && operation != operationDownload {
+		return "", "", "", 0, fmt.Errorf("unsupported operation '%s'. Allowed values are '%s' or '%s'", req.Operation, operationUpload, operationDownload)
+	}
+
+	expires := req.ExpiresIn
+	if expires == 0 {
+		expires = defaultPresignExpirySeconds
+	}
+	if expires < minPresignExpirySeconds || expires > maxPresignExpirySeconds {
+		return "", "", "", 0, fmt.Errorf("invalid expiration requested: %d. Allowed range is %d-%d seconds", expires, minPresignExpirySeconds, maxPresignExpirySeconds)
+	}
+	return bucketName, objectKey, operation, expires, nil
 }
 
 func buildSignedHeaders(operation string, contentType string, extra map[string]string) http.Header {

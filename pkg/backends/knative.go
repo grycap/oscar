@@ -402,7 +402,7 @@ func (kn *KnativeBackend) DeleteService(service types.Service) error {
 	if utils.SecretExists(name, namespace, kn.kubeClientset) {
 		secretsErr := utils.DeleteSecret(name, namespace, kn.kubeClientset)
 		if secretsErr != nil {
-			log.Printf("Error deleting asociated secret: %v", secretsErr)
+			log.Printf("Error deleting associated secret: %v", secretsErr)
 		}
 	}
 

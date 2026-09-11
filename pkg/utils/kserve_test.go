@@ -9,11 +9,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types" // for UID
 	"k8s.io/client-go/dynamic"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
 	knv1 "knative.dev/serving/pkg/apis/serving/v1"
 )
 
@@ -62,12 +59,6 @@ func kserveService() *oscarType.Service {
 			Memory:     "2Gi",
 		},
 	}
-}
-
-func invalidKserveService() *oscarType.Service {
-	svc := kserveService()
-	svc.Kserve.StorageUri = ""
-	return svc
 }
 
 func llmKserveService() *oscarType.Service {
@@ -346,6 +337,7 @@ func TestNewKserveInferenceServiceDefinition_KueueLabels(t *testing.T) {
 	}
 }
 
+//nolint:gocyclo
 func TestNewKserveLLMInferenceServiceDefinition(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -1165,6 +1157,7 @@ func TestUpdateKserveLLMInferenceServiceDefinition_InvalidCPU(t *testing.T) {
 	}
 }
 
+//nolint:gocyclo
 func TestGetKserveLLMServiceRouterSpec(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -1540,45 +1533,6 @@ func TestExistsKserveHTTPRouteByServiceName_DynamicClientError(t *testing.T) {
 	if !strings.Contains(err.Error(), "failed to create dynamic client") {
 		t.Fatalf("unexpected error: %v", err)
 	}
-}
-
-func newHTTPRouteForTest(name, namespace, path string) *unstructured.Unstructured {
-	return &unstructured.Unstructured{Object: map[string]any{
-		"apiVersion": "gateway.networking.k8s.io/v1",
-		"kind":       "HTTPRoute",
-		"metadata": map[string]any{
-			"name":      name,
-			"namespace": namespace,
-		},
-		"spec": map[string]any{
-			"rules": []any{
-				map[string]any{
-					"matches": []any{
-						map[string]any{
-							"path": map[string]any{
-								"type":  "PathPrefix",
-								"value": path,
-							},
-						},
-					},
-				},
-			},
-		},
-	}}
-}
-
-func newFakeDynamicClientForHTTPRoutes(routes ...*unstructured.Unstructured) *dynamicfake.FakeDynamicClient {
-	scheme := runtime.NewScheme()
-	objects := make([]runtime.Object, 0, len(routes))
-	for _, route := range routes {
-		objects = append(objects, route)
-	}
-
-	return dynamicfake.NewSimpleDynamicClientWithCustomListKinds(
-		scheme,
-		map[schema.GroupVersionResource]string{kserveHTTPRouteGVR: "HTTPRouteList"},
-		objects...,
-	)
 }
 
 // ─── DeleteKserveInferenceService ───────────────────────────────────────────
