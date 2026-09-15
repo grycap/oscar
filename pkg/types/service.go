@@ -424,8 +424,10 @@ func (s Service) Validate() error {
 		return fmt.Errorf("service Image is required")
 	}
 
-	if cpu, err := resource.ParseQuantity(s.CPU); err != nil || cpu.Cmp(resource.MustParse("0.2")) < 0 {
-		return fmt.Errorf("service CPU must be greater than or equal to 0.2")
+	if strings.TrimSpace(s.Image) != "" {
+		if cpu, err := resource.ParseQuantity(s.CPU); err != nil || cpu.Cmp(resource.MustParse("0.2")) < 0 {
+			return fmt.Errorf("service CPU must be greater than or equal to 0.2")
+		}
 	}
 
 	if s.IsKserve() {
