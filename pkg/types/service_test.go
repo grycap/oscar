@@ -33,6 +33,26 @@ func envVarsToMap(envVars []v1.EnvVar) map[string]string {
 	return values
 }
 
+func TestHasActiveFederationMembers(t *testing.T) {
+	service := &Service{Federation: &Federation{
+		Topology: "none",
+		Members:  ReplicaList{{Type: "oscar", ClusterID: "target", ServiceName: "replica"}},
+	}}
+	if service.HasActiveFederationMembers() {
+		t.Fatal("topology none must disable federation delegation")
+	}
+
+	service.Federation.Topology = "star"
+	if !service.HasActiveFederationMembers() {
+		t.Fatal("star topology with members must enable federation delegation")
+	}
+
+	service.Federation.Topology = "mesh"
+	if !service.HasActiveFederationMembers() {
+		t.Fatal("mesh topology with members must enable federation delegation")
+	}
+}
+
 var (
 	testService Service = Service{
 		Name:      "testname",
