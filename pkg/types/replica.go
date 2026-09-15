@@ -62,8 +62,9 @@ func (rl ReplicaList) Less(i, j int) bool {
 
 // FederationResponse response payload for federation API.
 type FederationResponse struct {
-	Topology string      `json:"topology"`
-	Members  ReplicaList `json:"members"`
+	Topology   string      `json:"topology"`
+	Delegation string      `json:"delegation"`
+	Members    ReplicaList `json:"members"`
 }
 
 // FederationRequest payload for federation API.
@@ -72,5 +73,9 @@ type FederationRequest struct {
 	Update           ReplicaList        `json:"update,omitempty"`
 	Clusters         map[string]Cluster `json:"clusters,omitempty"`
 	StorageProviders *StorageProviders  `json:"storage_providers,omitempty"`
+	RefreshToken     string             `json:"refresh_token,omitempty"` // #nosec G117 -- credential accepted for secure secret storage
+	Delegation       string             `json:"delegation,omitempty"`
+	Topology         string             `json:"topology,omitempty"`
+	ClusterID        string             `json:"cluster_id,omitempty"`
 	Delete           bool               `json:"delete,omitempty"`
 }
