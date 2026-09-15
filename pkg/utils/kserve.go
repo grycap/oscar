@@ -43,6 +43,8 @@ const (
 	kserveIsvcPodDplSuffix    = "-predictor"
 	kserveLLMIsvcSuffix       = "-kserve-workload-svc"
 	kserveLLMIsvcPodDplSuffix = "-kserve"
+	kserveCpuOverhead         = "10m"
+	kserveMemoryOverhead      = "15Mi"
 )
 
 var (
@@ -880,7 +882,7 @@ func createKserveResources(service *types.Kserve) (v1.ResourceRequirements, erro
 			return resources, err
 		}
 		// Substract 10m from the requested CPU due to KServe modelcar overhead
-		cpu.Sub(resource.MustParse("10m"))
+		cpu.Sub(resource.MustParse(kserveCpuOverhead))
 		resources.Limits[corev1.ResourceCPU] = cpu
 		resources.Requests[corev1.ResourceCPU] = cpu
 	}
@@ -891,7 +893,7 @@ func createKserveResources(service *types.Kserve) (v1.ResourceRequirements, erro
 			return resources, err
 		}
 		// Substract 15Mi from the requested memory due to KServe modelcar overhead
-		memory.Sub(resource.MustParse("15Mi"))
+		memory.Sub(resource.MustParse(kserveMemoryOverhead))
 		resources.Limits[corev1.ResourceMemory] = memory
 		resources.Requests[corev1.ResourceMemory] = memory
 	}
