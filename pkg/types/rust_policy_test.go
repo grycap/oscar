@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/grycap/oscar/v4/pkg/testsupport"
@@ -40,7 +41,7 @@ func TestRustFSPoliciesMatchMinIO(t *testing.T) {
 			groupRequests := 0
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
-				case "/minio/admin/v3/info-canned-policy":
+				case "/minio/admin/v3/info-canned-policy", "/rustfs/admin/v3/info-canned-policy":
 					if backend == ObjectStorageRustFS {
 						name := r.URL.Query().Get("name")
 						if _, exists := mock.policies[name]; !exists {
@@ -54,16 +55,25 @@ func TestRustFSPoliciesMatchMinIO(t *testing.T) {
 						json.NewEncoder(w).Encode(map[string]any{"policy_name": name, "policy": info.Policy})
 						return
 					}
-				case "/minio/admin/v3/add-canned-policy":
+				case "/minio/admin/v3/add-canned-policy", "/rustfs/admin/v3/add-canned-policy":
+					if backend == ObjectStorageRustFS && r.ContentLength < 0 {
+						t.Error("RustFS add-canned-policy request is missing Content-Length")
+					}
 					body, err := io.ReadAll(r.Body)
 					if err != nil {
 						t.Error(err)
 					}
 					policies = append(policies, r.URL.Query().Get("name")+":"+string(body))
 					r.Body = io.NopCloser(bytes.NewReader(body))
-				case "/minio/admin/v3/set-user-or-group-policy":
+				case "/minio/admin/v3/set-user-or-group-policy", "/rustfs/admin/v3/set-user-or-group-policy":
+					if backend == ObjectStorageRustFS && r.ContentLength != int64(len("{}")) {
+						t.Errorf("RustFS set-user-or-group-policy ContentLength = %d, want %d", r.ContentLength, len("{}"))
+					}
+					if backend == ObjectStorageRustFS && strings.Contains(strings.ToLower(r.Header.Get("Authorization")), "content-length") {
+						t.Error("RustFS set-user-or-group-policy must not sign Content-Length")
+					}
 					bindings = append(bindings, r.URL.RawQuery)
-				case "/minio/admin/v3/update-group-members":
+				case "/minio/admin/v3/update-group-members", "/rustfs/admin/v3/update-group-members":
 					groupRequests++
 					body, err := io.ReadAll(r.Body)
 					if err != nil {
@@ -83,6 +93,9 @@ func TestRustFSPoliciesMatchMinIO(t *testing.T) {
 						t.Errorf("group status = %q, want %q", group.Status, want)
 					}
 					r.Body = io.NopCloser(bytes.NewReader(body))
+				}
+				if backend == ObjectStorageRustFS {
+					r.URL.Path = strings.Replace(r.URL.Path, "/rustfs/admin/v3", "/minio/admin/v3", 1)
 				}
 				mock.ServeHTTP(w, r)
 			}))

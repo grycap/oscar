@@ -6,9 +6,9 @@ Additionally, OSCAR allows direct operations on the MinIO instance—such as cre
 
 ## RustFS permissions
 
-RustFS notification configuration uses its native `/rustfs/admin/v3` routes. Shared IAM operations use the MinIO client and `/minio/admin/v3`, which RustFS 1.0.0-rc.6 accepts as a compatibility prefix without additional configuration.
+RustFS notification configuration and IAM operations use its native `/rustfs/admin/v3` routes.
 
-With `OBJECT_STORAGE_TYPE=rustfs` (RustFS 1.0.0-rc.6), OSCAR uses the same policy creation, assignment, update and removal flow as MinIO. Group membership requests use the RustFS JSON format and group status.
+With `OBJECT_STORAGE_TYPE=rustfs`, OSCAR uses the same policy creation, assignment, update and removal flow as MinIO through the RustFS-native IAM API. Group membership requests use the RustFS JSON format and group status.
 
 ## Using graphical interfaces
 

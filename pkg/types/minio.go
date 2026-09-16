@@ -875,17 +875,35 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucket string, policyN
 		}
 	}
 
-	err := minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), policyName, []byte(policy))
+	err := minIOAdminClient.addCannedPolicy(context.TODO(), policyName, policy)
 	if err != nil {
 		return fmt.Errorf("error creating/adding MinIO policy for user/group %s: %v", policyName, err)
 	}
 
-	err = minIOAdminClient.adminClient.SetPolicy(context.TODO(), policyName, policyName, isGroup)
+	err = minIOAdminClient.setPolicy(context.TODO(), policyName, policyName, isGroup)
 	if err != nil {
 		return fmt.Errorf("error setting MinIO policy for user/group %s: %v", policyName, err)
 	}
 
 	return nil
+}
+
+func (minIOAdminClient *MinIOAdminClient) addCannedPolicy(ctx context.Context, policyName string, policy []byte) error {
+	if minIOAdminClient.rustFS != nil {
+		return minIOAdminClient.rustFS.RequestPayload(ctx, http.MethodPut, "/rustfs/admin/v3/add-canned-policy", url.Values{"name": []string{policyName}}, policy, "application/json")
+	}
+	return minIOAdminClient.adminClient.AddCannedPolicy(ctx, policyName, policy)
+}
+
+func (minIOAdminClient *MinIOAdminClient) setPolicy(ctx context.Context, policyName, entityName string, isGroup bool) error {
+	if minIOAdminClient.rustFS != nil {
+		return minIOAdminClient.rustFS.RequestPayload(ctx, http.MethodPut, "/rustfs/admin/v3/set-user-or-group-policy", url.Values{
+			"policyName":  []string{policyName},
+			"userOrGroup": []string{entityName},
+			"isGroup":     []string{fmt.Sprintf("%t", isGroup)},
+		}, []byte("{}"), "application/json")
+	}
+	return minIOAdminClient.adminClient.SetPolicy(ctx, policyName, entityName, isGroup)
 }
 
 func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, policyName string, isGroup bool) error {
@@ -916,12 +934,12 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 		return jsonErr
 	}
 
-	err := minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), policyName, []byte(policy))
+	err := minIOAdminClient.addCannedPolicy(context.TODO(), policyName, policy)
 	if err != nil {
 		return fmt.Errorf("error creating MinIO policy for user %s: %v", policyName, err)
 	}
 
-	err = minIOAdminClient.adminClient.SetPolicy(context.TODO(), policyName, policyName, isGroup)
+	err = minIOAdminClient.setPolicy(context.TODO(), policyName, policyName, isGroup)
 	if err != nil {
 		return fmt.Errorf("error setting MinIO policy for user %s: %v", policyName, err)
 	}
@@ -980,12 +998,12 @@ func (minIOAdminClient *MinIOAdminClient) RemoveResource(bucketName string, poli
 		return jsonErr
 	}
 
-	err := minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), policyName, []byte(policy))
+	err := minIOAdminClient.addCannedPolicy(context.TODO(), policyName, policy)
 	if err != nil {
 		return fmt.Errorf("error creating MinIO policy %s: %v", policyName, err)
 	}
 
-	err = minIOAdminClient.adminClient.SetPolicy(context.TODO(), policyName, policyName, isGroup)
+	err = minIOAdminClient.setPolicy(context.TODO(), policyName, policyName, isGroup)
 	if err != nil {
 		return fmt.Errorf("error setting MinIO policy for user %s: %v", policyName, err)
 	}
