@@ -7,6 +7,7 @@ import (
 
 	oscarType "github.com/grycap/oscar/v4/pkg/types"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -912,9 +913,17 @@ func TestCreateKserveResources(t *testing.T) {
 		{
 			name:      "custom cpu and memory",
 			kserveCfg: &oscarType.Kserve{CPU: "1", Memory: "2Gi"},
-			wantCPU:   "1",
-			wantMem:   "2Gi",
-			wantGPU:   false,
+			wantCPU: func() string {
+				q := resource.MustParse("1")
+				q.Sub(resource.MustParse(kserveCpuOverhead))
+				return q.String()
+			}(),
+			wantMem: func() string {
+				q := resource.MustParse("2Gi")
+				q.Sub(resource.MustParse(kserveMemoryOverhead))
+				return q.String()
+			}(),
+			wantGPU: false,
 		},
 		{
 			name:      "gpu enabled",
@@ -950,19 +959,23 @@ func TestCreateKserveResources(t *testing.T) {
 			}
 
 			cpuLimit := resources.Limits[corev1.ResourceCPU]
+			//cpuLimit.Add(resource.MustParse(kserveCpuOverhead))
 			if got := cpuLimit.String(); got != tt.wantCPU {
 				t.Errorf("limits.cpu = %q, want %q", got, tt.wantCPU)
 			}
 			cpuRequest := resources.Requests[corev1.ResourceCPU]
+			//cpuRequest.Add(resource.MustParse(kserveCpuOverhead))
 			if got := cpuRequest.String(); got != tt.wantCPU {
 				t.Errorf("requests.cpu = %q, want %q", got, tt.wantCPU)
 			}
 
 			memoryLimit := resources.Limits[corev1.ResourceMemory]
+			//memoryLimit.Add(resource.MustParse(kserveMemoryOverhead))
 			if got := memoryLimit.String(); got != tt.wantMem {
 				t.Errorf("limits.memory = %q, want %q", got, tt.wantMem)
 			}
 			memoryRequest := resources.Requests[corev1.ResourceMemory]
+			//memoryRequest.Add(resource.MustParse(kserveMemoryOverhead))
 			if got := memoryRequest.String(); got != tt.wantMem {
 				t.Errorf("requests.memory = %q, want %q", got, tt.wantMem)
 			}
