@@ -113,8 +113,6 @@ func MakeUpdateHandler(cfg *types.Config) gin.HandlerFunc {
 				c.String(http.StatusInternalServerError, fmt.Sprintln("error updating bucket tags:", err))
 				return
 			}
-			c.Status(http.StatusNoContent)
-			return
 		}
 
 		var oldVis string

@@ -409,12 +409,10 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					b.Visibility = types.PRIVATE
 				}
 				if service.Owner != types.DefaultOwner {
-					if !utils.IsRustFSConfig(cfg) {
-						err := objectStorageIAM.GetClient(c.Request.Context()).SetPolicies(b)
-						if err != nil {
-							c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
-							return
-						}
+					err := objectStorageIAM.GetClient(c.Request.Context()).SetPolicies(b)
+					if err != nil {
+						c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+						return
 					}
 				}
 
@@ -724,7 +722,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 					})
 				}
 				// Create bucket policy
-				if !isAdminUser && !utils.IsRustFSConfig(cfg) {
+				if !isAdminUser {
 					err = minIOAdminClient.CreateAddPolicy(b, service.AllowedUsers[i], types.ALL_ACTIONS, false)
 					if err != nil {
 						return nil, err

@@ -142,7 +142,7 @@ func MakeDeleteHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusInternalServerError, "Error deleting service buckets: ", err)
 		}
 
-		if len(service.BucketList) > 0 && strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser && !utils.IsRustFSConfig(cfg) {
+		if len(service.BucketList) > 0 && strings.ToUpper(service.IsolationLevel) == types.IsolationLevelUser {
 			for i, b := range service.BucketList {
 				err = objectStorageIAM.GetClient(c.Request.Context()).RemoveResource(b, service.AllowedUsers[i], false)
 				if err != nil {
@@ -219,7 +219,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				Visibility:   service.Visibility,
 				AllowedUsers: service.AllowedUsers,
 				Owner:        service.Owner,
-			}, utils.IsRustFSConfig(cfg))
+			}, false)
 
 			if err != nil {
 				return fmt.Errorf("error while removing MinIO bucket %v", err)
@@ -280,7 +280,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 						Visibility:   service.Visibility,
 						AllowedUsers: service.AllowedUsers,
 						Owner:        service.Owner,
-					}, utils.IsRustFSConfig(cfg))
+					}, false)
 					if err != nil {
 						return fmt.Errorf("error while removing MinIO bucket %v", err)
 					}
@@ -315,7 +315,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				Visibility:   types.PRIVATE,
 				AllowedUsers: []string{},
 				Owner:        service.Owner,
-			}, utils.IsRustFSConfig(cfg))
+			}, false)
 			if err != nil {
 				log.Printf("error while removing MinIO bucket %v", err)
 			}

@@ -62,6 +62,7 @@ type MinIOAdminClient struct {
 	adminClient   *madmin.AdminClient
 	simpleClient  *minio.Client
 	oscarEndpoint *url.URL
+	rustFS        *RustFSIAM
 }
 
 // MinIOBucket definition to create buckets independent of a service
@@ -218,6 +219,12 @@ func MakeMinIOAdminClient(cfg *Config) (*MinIOAdminClient, error) {
 		oscarEndpoint: oscarEndpoint,
 	}
 
+	if strings.EqualFold(strings.TrimSpace(cfg.ObjectStorageType), ObjectStorageRustFS) {
+		minIOAdminClient.rustFS, err = NewRustFSIAM(cfg, minIOAdminClient)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return minIOAdminClient, nil
 }
 
@@ -440,6 +447,9 @@ func (minIOAdminClient *MinIOAdminClient) UnsetPolicies(bucket MinIOBucket) erro
 }
 
 func (minIOAdminClient *MinIOAdminClient) CreateAddGroup(groupName string, users []string, remove bool) error {
+	if minIOAdminClient.rustFS != nil {
+		return minIOAdminClient.rustFS.UpdateGroupMembers(context.TODO(), groupName, users, remove)
+	}
 	group := madmin.GroupAddRemove{
 		Group:    groupName,
 		Members:  users,

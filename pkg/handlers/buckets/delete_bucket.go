@@ -28,7 +28,6 @@ import (
 	objectstorage "github.com/grycap/oscar/v4/pkg/backends/object_storage"
 	"github.com/grycap/oscar/v4/pkg/handlers"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
 )
 
@@ -107,14 +106,6 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 		}
 
 		if (uid == types.DefaultOwner) || (bucketOwner == uid) {
-			if utils.IsRustFSConfig(cfg) {
-				if err := objectStorageIAM.GetClient(c.Request.Context()).DeleteBucket(s3Client, bucketName); err != nil {
-					c.String(http.StatusInternalServerError, fmt.Sprintln(err))
-					return
-				}
-				c.Status(http.StatusNoContent)
-				return
-			}
 			v := objectStorageIAM.GetClient(c.Request.Context()).GetCurrentResourceVisibility(types.MinIOBucket{BucketName: bucketName, Owner: uid})
 			err := handlers.DeleteMinIOBuckets(s3Client, objectStorageIAM.GetClient(c.Request.Context()), types.MinIOBucket{
 				BucketName: bucketName,

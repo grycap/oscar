@@ -261,7 +261,7 @@ func TestMakeCreateBucketHandlerReturnsWhenPolicyCreationFails(t *testing.T) {
 	}
 }
 
-func TestMakeCreateBucketHandlerSkipsPoliciesForRustFS(t *testing.T) {
+func TestMakeCreateBucketHandlerReportsPolicyErrorsForRustFS(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	testsupport.SkipIfCannotListen(t)
 
@@ -309,8 +309,8 @@ func TestMakeCreateBucketHandlerSkipsPoliciesForRustFS(t *testing.T) {
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusCreated {
-		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, res.Code, res.Body.String())
+	if res.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusInternalServerError, res.Code, res.Body.String())
 	}
 }
 
