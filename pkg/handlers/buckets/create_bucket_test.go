@@ -273,7 +273,9 @@ func TestMakeCreateBucketHandlerReportsPolicyErrorsForRustFS(t *testing.T) {
 			_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
 		case r.Method == http.MethodPut && strings.Contains(r.URL.RawQuery, "tagging"):
 			w.WriteHeader(http.StatusOK)
-		case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/"):
+		case r.URL.Path == "/minio/admin/v3/info-canned-policy":
+			w.WriteHeader(http.StatusNotFound)
+		case strings.HasPrefix(r.URL.Path, "/rustfs/admin/v3/"):
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(`{"error":"policy API unavailable"}`))
 		default:
