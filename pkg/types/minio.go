@@ -422,7 +422,7 @@ func (minIOAdminClient *MinIOAdminClient) SetPolicies(bucket MinIOBucket) error 
 		}
 	} else {
 		// Config public visibility
-		if err := minIOAdminClient.CreateAddPolicy(bucket.BucketName, ALL_USERS_GROUP, ALL_ACTIONS, true); err != nil {
+		if err := minIOAdminClient.CreateAddPolicy(bucket.BucketName, ALL_USERS_GROUP, RESTRICTED_ACTIONS, true); err != nil {
 			return fmt.Errorf("error creating policy: %v", err)
 		}
 	}
