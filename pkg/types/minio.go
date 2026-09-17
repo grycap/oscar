@@ -147,12 +147,19 @@ type ServicePolicy struct {
 	UpdatePolicy bool     `json:"UpdatePolicy"`
 }
 
-func getPolicyDefinition(actions []string, resource string) *Policy {
+func bucketResourceARNs(bucket string) []string {
+	return []string{
+		"arn:aws:s3:::" + bucket + "/*",
+		"arn:aws:s3:::" + bucket,
+	}
+}
+
+func getPolicyDefinition(actions []string, resources []string) *Policy {
 	return &Policy{
 		Version: "2012-10-17",
 		Statement: []Statement{
 			{
-				Resource: []string{resource},
+				Resource: resources,
 				Action:   actions,
 				Effect:   "Allow",
 			},
@@ -415,7 +422,7 @@ func (minIOAdminClient *MinIOAdminClient) SetPolicies(bucket MinIOBucket) error 
 		}
 	} else {
 		// Config public visibility
-		if err := minIOAdminClient.CreateAddPolicy(bucket.BucketName, ALL_USERS_GROUP, ALL_ACTIONS, true); err != nil {
+		if err := minIOAdminClient.CreateAddPolicy(bucket.BucketName, ALL_USERS_GROUP, RESTRICTED_ACTIONS, true); err != nil {
 			return fmt.Errorf("error creating policy: %v", err)
 		}
 	}
@@ -844,12 +851,12 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucket string, policyN
 	var jsonErr error
 	var policy []byte
 
-	rs := "arn:aws:s3:::" + bucket + "/*"
+	resources := bucketResourceARNs(bucket)
 
 	getPolicy, errInfo := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), policyName)
 	if errInfo != nil {
 		// If the policy does not exist create it
-		newPolicy := getPolicyDefinition(policyActions, rs)
+		newPolicy := getPolicyDefinition(policyActions, resources)
 		policy, jsonErr = json.Marshal(newPolicy)
 		if jsonErr != nil {
 			return jsonErr
@@ -862,11 +869,11 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucket string, policyN
 			return jsonErr
 		}
 		if actualPolicy.Statement[0].Effect == "Deny" {
-			actualPolicy = getPolicyDefinition(policyActions, rs)
+			actualPolicy = getPolicyDefinition(policyActions, resources)
 
 		} else {
 			// Add new resource and apply policy
-			actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, rs)
+			actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, resources...)
 		}
 
 		policy, jsonErr = json.Marshal(actualPolicy)
