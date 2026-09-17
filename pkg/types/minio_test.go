@@ -559,6 +559,34 @@ func TestResourceInPolicy(t *testing.T) {
 	}
 }
 
+func TestCreateAddPolicyIncludesBucketAndObjectARNs(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	mock := newMinioMock()
+	server := httptest.NewServer(mock)
+	defer server.Close()
+
+	cfg := Config{MinIOProvider: &MinIOProvider{
+		Endpoint:  server.URL,
+		Region:    "us-east-1",
+		AccessKey: "minioadmin",
+		SecretKey: "minioadmin",
+		Verify:    false,
+	}}
+	client, err := MakeMinIOAdminClient(&cfg)
+	if err != nil {
+		t.Fatalf("unexpected error creating client: %v", err)
+	}
+
+	if err := client.CreateAddPolicy("bucket", "owner", RESTRICTED_ACTIONS, false); err != nil {
+		t.Fatalf("unexpected error creating policy: %v", err)
+	}
+	want := []string{"arn:aws:s3:::bucket/*", "arn:aws:s3:::bucket"}
+	if got := mock.policies["owner"]; !slices.Equal(got, want) {
+		t.Fatalf("policy resources = %v, want %v", got, want)
+	}
+}
+
 func TestGetCurrentResourceVisibility(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
 

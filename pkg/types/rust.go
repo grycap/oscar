@@ -159,7 +159,7 @@ func (r *RustFSIAM) request(ctx context.Context, method, path string, query url.
 			return fmt.Errorf("encoding RustFS admin request: %w", err)
 		}
 	}
-	return r.RequestPayload(ctx, method, "/minio/admin/v3"+path, query, payload, "application/json")
+	return r.RequestPayload(ctx, method, "/rustfs/admin/v3"+path, query, payload, "application/json")
 }
 
 func (r *RustFSIAM) RequestPayload(ctx context.Context, method, path string, query url.Values, payload []byte, contentType string) error {
@@ -177,6 +177,10 @@ func (r *RustFSIAM) RequestPayloadResponse(ctx context.Context, method, path str
 	if err != nil {
 		return nil, fmt.Errorf("creating RustFS admin request: %w", err)
 	}
+	if len(payload) == 0 {
+		req.Body = io.NopCloser(bytes.NewReader(nil))
+	}
+	req.ContentLength = int64(len(payload))
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}

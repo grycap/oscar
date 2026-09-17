@@ -95,6 +95,9 @@ func TestRustFSIAMIntegration(t *testing.T) {
 	if !foundDefaultGroup {
 		t.Fatalf("temporary RustFS user is not a member of %s", types.ALL_USERS_GROUP)
 	}
+	if err := rustFS.GetClient(ctx).CreateAddPolicy("oscit-policy-"+strconv.FormatInt(time.Now().UnixNano(), 36), accessKey, types.ALL_ACTIONS, false); err != nil {
+		t.Fatalf("assigning policy to temporary RustFS user: %v", err)
+	}
 
 	webhookName := "oscwh" + strconv.FormatInt(time.Now().UnixNano(), 36)
 	if err := RegisterObjectStorageWebhook(ctx, cfg, webhookName, "integration-token"); err != nil {

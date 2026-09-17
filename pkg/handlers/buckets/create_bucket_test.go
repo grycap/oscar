@@ -261,7 +261,7 @@ func TestMakeCreateBucketHandlerReturnsWhenPolicyCreationFails(t *testing.T) {
 	}
 }
 
-func TestMakeCreateBucketHandlerSkipsPoliciesForRustFS(t *testing.T) {
+func TestMakeCreateBucketHandlerReportsPolicyErrorsForRustFS(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	testsupport.SkipIfCannotListen(t)
 
@@ -273,7 +273,9 @@ func TestMakeCreateBucketHandlerSkipsPoliciesForRustFS(t *testing.T) {
 			_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
 		case r.Method == http.MethodPut && strings.Contains(r.URL.RawQuery, "tagging"):
 			w.WriteHeader(http.StatusOK)
-		case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/"):
+		case r.URL.Path == "/minio/admin/v3/info-canned-policy":
+			w.WriteHeader(http.StatusNotFound)
+		case strings.HasPrefix(r.URL.Path, "/rustfs/admin/v3/"):
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(`{"error":"policy API unavailable"}`))
 		default:
@@ -309,8 +311,8 @@ func TestMakeCreateBucketHandlerSkipsPoliciesForRustFS(t *testing.T) {
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusCreated {
-		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, res.Code, res.Body.String())
+	if res.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusInternalServerError, res.Code, res.Body.String())
 	}
 }
 

@@ -239,7 +239,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						Visibility:   types.PRIVATE,
 						AllowedUsers: []string{},
 						Owner:        oldService.Owner,
-					}, utils.IsRustFSConfig(cfg))
+					}, false)
 					if err != nil {
 						log.Printf("error while removing MinIO bucket %v", err)
 					}
@@ -322,7 +322,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 				if oldServiceBuckets[b.BucketName] {
 					// If the visibility of the bucket has changed remove old policies and config new ones
-					if oldService.Visibility != newService.Visibility && !utils.IsRustFSConfig(cfg) {
+					if oldService.Visibility != newService.Visibility {
 						err := objectStorageIAM.GetClient(c.Request.Context()).UnsetPolicies(types.MinIOBucket{
 							BucketName:   b.BucketName,
 							AllowedUsers: oldService.AllowedUsers,
@@ -340,7 +340,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						if err != nil {
 							c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 						}
-					} else if !utils.IsRustFSConfig(cfg) {
+					} else {
 						if newService.Visibility == types.RESTRICTED {
 							err := objectStorageIAM.GetClient(c.Request.Context()).UpdateServiceGroup(b.BucketName, newService.AllowedUsers)
 							if err != nil {
@@ -352,12 +352,10 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					oldServiceBuckets[b.BucketName] = false
 				} else {
 					// If the bucket didn't exist on the old service assume its created an set policies & webhooks
-					if !utils.IsRustFSConfig(cfg) {
-						err := objectStorageIAM.GetClient(c.Request.Context()).SetPolicies(b)
-						if err != nil {
-							c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
-							return
-						}
+					err := objectStorageIAM.GetClient(c.Request.Context()).SetPolicies(b)
+					if err != nil {
+						c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
+						return
 					}
 					// Register minio webhook and restart the server
 					if err = registerMinIOWebhook(newService.Name, newService.Token, cfg); err != nil {
@@ -374,7 +372,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		for key, value := range oldServiceBuckets {
 			// If the bucket was not used in the new service definition set it to private
-			if value && !utils.IsRustFSConfig(cfg) {
+			if value {
 				err := objectStorageIAM.GetClient(c.Request.Context()).SetPolicies(types.MinIOBucket{BucketName: key, Visibility: types.PRIVATE})
 				if err != nil {
 					c.String(http.StatusInternalServerError, "error setting new policies: %v", err)

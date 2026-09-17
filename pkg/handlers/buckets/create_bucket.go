@@ -148,12 +148,10 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 			bucket.Visibility = types.PRIVATE
 		}
 		if uid != cfg.Username {
-			if !utils.IsRustFSConfig(cfg) {
-				err := objectStorageIAM.GetClient(c.Request.Context()).SetPolicies(bucket)
-				if err != nil {
-					c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating policies for bucket: %v", err))
-					return
-				}
+			err := objectStorageIAM.GetClient(c.Request.Context()).SetPolicies(bucket)
+			if err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating policies for bucket: %v", err))
+				return
 			}
 		}
 

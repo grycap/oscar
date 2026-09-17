@@ -62,6 +62,7 @@ type MinIOAdminClient struct {
 	adminClient   *madmin.AdminClient
 	simpleClient  *minio.Client
 	oscarEndpoint *url.URL
+	rustFS        *RustFSIAM
 }
 
 // MinIOBucket definition to create buckets independent of a service
@@ -146,12 +147,19 @@ type ServicePolicy struct {
 	UpdatePolicy bool     `json:"UpdatePolicy"`
 }
 
-func getPolicyDefinition(actions []string, resource string) *Policy {
+func bucketResourceARNs(bucket string) []string {
+	return []string{
+		"arn:aws:s3:::" + bucket + "/*",
+		"arn:aws:s3:::" + bucket,
+	}
+}
+
+func getPolicyDefinition(actions []string, resources []string) *Policy {
 	return &Policy{
 		Version: "2012-10-17",
 		Statement: []Statement{
 			{
-				Resource: []string{resource},
+				Resource: resources,
 				Action:   actions,
 				Effect:   "Allow",
 			},
@@ -218,6 +226,12 @@ func MakeMinIOAdminClient(cfg *Config) (*MinIOAdminClient, error) {
 		oscarEndpoint: oscarEndpoint,
 	}
 
+	if strings.EqualFold(strings.TrimSpace(cfg.ObjectStorageType), ObjectStorageRustFS) {
+		minIOAdminClient.rustFS, err = NewRustFSIAM(cfg, minIOAdminClient)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return minIOAdminClient, nil
 }
 
@@ -408,7 +422,7 @@ func (minIOAdminClient *MinIOAdminClient) SetPolicies(bucket MinIOBucket) error 
 		}
 	} else {
 		// Config public visibility
-		if err := minIOAdminClient.CreateAddPolicy(bucket.BucketName, ALL_USERS_GROUP, ALL_ACTIONS, true); err != nil {
+		if err := minIOAdminClient.CreateAddPolicy(bucket.BucketName, ALL_USERS_GROUP, RESTRICTED_ACTIONS, true); err != nil {
 			return fmt.Errorf("error creating policy: %v", err)
 		}
 	}
@@ -440,6 +454,9 @@ func (minIOAdminClient *MinIOAdminClient) UnsetPolicies(bucket MinIOBucket) erro
 }
 
 func (minIOAdminClient *MinIOAdminClient) CreateAddGroup(groupName string, users []string, remove bool) error {
+	if minIOAdminClient.rustFS != nil {
+		return minIOAdminClient.rustFS.UpdateGroupMembers(context.TODO(), groupName, users, remove)
+	}
 	group := madmin.GroupAddRemove{
 		Group:    groupName,
 		Members:  users,
@@ -834,12 +851,12 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucket string, policyN
 	var jsonErr error
 	var policy []byte
 
-	rs := "arn:aws:s3:::" + bucket + "/*"
+	resources := bucketResourceARNs(bucket)
 
 	getPolicy, errInfo := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), policyName)
 	if errInfo != nil {
 		// If the policy does not exist create it
-		newPolicy := getPolicyDefinition(policyActions, rs)
+		newPolicy := getPolicyDefinition(policyActions, resources)
 		policy, jsonErr = json.Marshal(newPolicy)
 		if jsonErr != nil {
 			return jsonErr
@@ -852,11 +869,11 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucket string, policyN
 			return jsonErr
 		}
 		if actualPolicy.Statement[0].Effect == "Deny" {
-			actualPolicy = getPolicyDefinition(policyActions, rs)
+			actualPolicy = getPolicyDefinition(policyActions, resources)
 
 		} else {
 			// Add new resource and apply policy
-			actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, rs)
+			actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource, resources...)
 		}
 
 		policy, jsonErr = json.Marshal(actualPolicy)
@@ -865,12 +882,12 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucket string, policyN
 		}
 	}
 
-	err := minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), policyName, []byte(policy))
+	err := minIOAdminClient.addCannedPolicy(context.TODO(), policyName, policy)
 	if err != nil {
 		return fmt.Errorf("error creating/adding MinIO policy for user/group %s: %v", policyName, err)
 	}
 
-	err = minIOAdminClient.adminClient.SetPolicy(context.TODO(), policyName, policyName, isGroup)
+	err = minIOAdminClient.setPolicy(context.TODO(), policyName, policyName, isGroup)
 	if err != nil {
 		return fmt.Errorf("error setting MinIO policy for user/group %s: %v", policyName, err)
 	}
@@ -878,9 +895,26 @@ func (minIOAdminClient *MinIOAdminClient) CreateAddPolicy(bucket string, policyN
 	return nil
 }
 
-func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, policyName string, isGroup bool) error {
+func (minIOAdminClient *MinIOAdminClient) addCannedPolicy(ctx context.Context, policyName string, policy []byte) error {
+	if minIOAdminClient.rustFS != nil {
+		return minIOAdminClient.rustFS.RequestPayload(ctx, http.MethodPut, "/rustfs/admin/v3/add-canned-policy", url.Values{"name": []string{policyName}}, policy, "application/json")
+	}
+	return minIOAdminClient.adminClient.AddCannedPolicy(ctx, policyName, policy)
+}
 
-	rs := "arn:aws:s3:::" + bucketName + "/*"
+func (minIOAdminClient *MinIOAdminClient) setPolicy(ctx context.Context, policyName, entityName string, isGroup bool) error {
+	if minIOAdminClient.rustFS != nil {
+		return minIOAdminClient.rustFS.RequestPayload(ctx, http.MethodPut, "/rustfs/admin/v3/set-user-or-group-policy", url.Values{
+			"policyName":  []string{policyName},
+			"userOrGroup": []string{entityName},
+			"isGroup":     []string{fmt.Sprintf("%t", isGroup)},
+		}, []byte("{}"), "application/json")
+	}
+	return minIOAdminClient.adminClient.SetPolicy(ctx, policyName, entityName, isGroup)
+}
+
+func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, policyName string, isGroup bool) error {
+	resources := bucketResourceARNs(bucketName)
 	policyInfo, errInfo := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), policyName)
 	if errInfo != nil {
 		return fmt.Errorf("policy '%s' does not exist: %v", policyName, errInfo)
@@ -890,15 +924,26 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 	if jsonErr != nil {
 		return jsonErr
 	}
-	if len(actualPolicy.Statement[0].Resource) == 1 {
-
-	} else {
-		for i, r := range actualPolicy.Statement[0].Resource {
-			if r == rs {
-				actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource[:i], actualPolicy.Statement[0].Resource[i+1:]...)
+	if len(actualPolicy.Statement) == 0 {
+		return nil
+	}
+	filtered := actualPolicy.Statement[0].Resource[:0]
+	for _, r := range actualPolicy.Statement[0].Resource {
+		keep := true
+		for _, resource := range resources {
+			if r == resource {
+				keep = false
 				break
 			}
 		}
+		if keep {
+			filtered = append(filtered, r)
+		}
+	}
+	actualPolicy.Statement[0].Resource = filtered
+	if len(filtered) == 0 {
+		actualPolicy.Statement[0].Effect = "Deny"
+		actualPolicy.Statement[0].Resource = []string{"arn:aws:s3:::" + bucketName + "notValid/*"}
 	}
 
 	policy, jsonErr := json.Marshal(actualPolicy)
@@ -906,12 +951,12 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 		return jsonErr
 	}
 
-	err := minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), policyName, []byte(policy))
+	err := minIOAdminClient.addCannedPolicy(context.TODO(), policyName, policy)
 	if err != nil {
 		return fmt.Errorf("error creating MinIO policy for user %s: %v", policyName, err)
 	}
 
-	err = minIOAdminClient.adminClient.SetPolicy(context.TODO(), policyName, policyName, isGroup)
+	err = minIOAdminClient.setPolicy(context.TODO(), policyName, policyName, isGroup)
 	if err != nil {
 		return fmt.Errorf("error setting MinIO policy for user %s: %v", policyName, err)
 	}
@@ -944,7 +989,7 @@ func (minIOAdminClient *MinIOAdminClient) RemoveResource(bucketName string, poli
 	var policy []byte
 	var jsonErr error
 
-	resource := "arn:aws:s3:::" + bucketName + "/*"
+	resources := bucketResourceARNs(bucketName)
 	policyInfo, errInfo := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), policyName)
 	if errInfo != nil {
 		return fmt.Errorf("policy '%s' does not exist: %v", policyName, errInfo)
@@ -954,28 +999,38 @@ func (minIOAdminClient *MinIOAdminClient) RemoveResource(bucketName string, poli
 	if jsonErr != nil {
 		return jsonErr
 	}
-	if len(actualPolicy.Statement[0].Resource) == 1 {
-		actualPolicy.Statement[0].Effect = "Deny"
-		actualPolicy.Statement[0].Resource = []string{"arn:aws:s3:::" + bucketName + "notValid" + "/*"}
-	} else {
-		for i, rs := range actualPolicy.Statement[0].Resource {
-			if rs == resource {
-				actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource[:i], actualPolicy.Statement[0].Resource[i+1:]...)
+	if len(actualPolicy.Statement) == 0 {
+		return nil
+	}
+	filtered := actualPolicy.Statement[0].Resource[:0]
+	for _, r := range actualPolicy.Statement[0].Resource {
+		keep := true
+		for _, resource := range resources {
+			if r == resource {
+				keep = false
 				break
 			}
 		}
+		if keep {
+			filtered = append(filtered, r)
+		}
+	}
+	actualPolicy.Statement[0].Resource = filtered
+	if len(filtered) == 0 {
+		actualPolicy.Statement[0].Effect = "Deny"
+		actualPolicy.Statement[0].Resource = []string{"arn:aws:s3:::" + bucketName + "notValid/*"}
 	}
 	policy, jsonErr = json.Marshal(actualPolicy)
 	if jsonErr != nil {
 		return jsonErr
 	}
 
-	err := minIOAdminClient.adminClient.AddCannedPolicy(context.TODO(), policyName, []byte(policy))
+	err := minIOAdminClient.addCannedPolicy(context.TODO(), policyName, policy)
 	if err != nil {
 		return fmt.Errorf("error creating MinIO policy %s: %v", policyName, err)
 	}
 
-	err = minIOAdminClient.adminClient.SetPolicy(context.TODO(), policyName, policyName, isGroup)
+	err = minIOAdminClient.setPolicy(context.TODO(), policyName, policyName, isGroup)
 	if err != nil {
 		return fmt.Errorf("error setting MinIO policy for user %s: %v", policyName, err)
 	}
