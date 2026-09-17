@@ -45,7 +45,7 @@ var isAdminUser = false
 // @Description Create a user MinIO bucket with the desired visibility.
 // @Tags buckets
 // @Accept json
-// @Param bucket body utils.MinIOBucket true "Bucket definition"
+// @Param bucket body types.MinIOBucket true "Bucket definition"
 // @Success 201 {string} string "Created"
 // @Failure 400 {string} string "Bad Request"
 // @Failure 401 {string} string "Unauthorized"
