@@ -528,6 +528,37 @@ func TestCreateMinIOUser(t *testing.T) {
 	defer server.Close()
 }
 
+func TestRemoveFromPolicyRemovesBucketResourceARNs(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	mock := newMinioMock()
+	mock.policies["owner"] = []string{"arn:aws:s3:::bucket/*", "arn:aws:s3:::bucket"}
+	server := httptest.NewServer(mock)
+	defer server.Close()
+
+	cfg := Config{
+		MinIOProvider: &MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+
+	client, err := MakeMinIOAdminClient(&cfg)
+	if err != nil {
+		t.Fatalf("unexpected error creating client: %v", err)
+	}
+
+	if err := client.RemoveFromPolicy("bucket", "owner", false); err != nil {
+		t.Fatalf("unexpected error removing policy resource: %v", err)
+	}
+	if got := mock.policies["owner"]; len(got) != 0 {
+		t.Fatalf("expected bucket policy resources to be cleared, got %v", got)
+	}
+}
+
 func TestResourceInPolicy(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
 

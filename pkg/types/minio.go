@@ -914,8 +914,7 @@ func (minIOAdminClient *MinIOAdminClient) setPolicy(ctx context.Context, policyN
 }
 
 func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, policyName string, isGroup bool) error {
-
-	rs := "arn:aws:s3:::" + bucketName + "/*"
+	resources := bucketResourceARNs(bucketName)
 	policyInfo, errInfo := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), policyName)
 	if errInfo != nil {
 		return fmt.Errorf("policy '%s' does not exist: %v", policyName, errInfo)
@@ -925,15 +924,28 @@ func (minIOAdminClient *MinIOAdminClient) RemoveFromPolicy(bucketName string, po
 	if jsonErr != nil {
 		return jsonErr
 	}
-	if len(actualPolicy.Statement[0].Resource) == 1 {
+	if len(actualPolicy.Statement) == 0 {
+		return nil
+	}
 
-	} else {
-		for i, r := range actualPolicy.Statement[0].Resource {
-			if r == rs {
-				actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource[:i], actualPolicy.Statement[0].Resource[i+1:]...)
+	filtered := actualPolicy.Statement[0].Resource[:0]
+	for _, r := range actualPolicy.Statement[0].Resource {
+		keep := true
+		for _, resource := range resources {
+			if r == resource {
+				keep = false
 				break
 			}
 		}
+		if keep {
+			filtered = append(filtered, r)
+		}
+	}
+	actualPolicy.Statement[0].Resource = filtered
+
+	if len(filtered) == 0 {
+		actualPolicy.Statement[0].Effect = "Deny"
+		actualPolicy.Statement[0].Resource = []string{"arn:aws:s3:::" + bucketName + "notValid" + "/*"}
 	}
 
 	policy, jsonErr := json.Marshal(actualPolicy)
@@ -979,7 +991,7 @@ func (minIOAdminClient *MinIOAdminClient) RemoveResource(bucketName string, poli
 	var policy []byte
 	var jsonErr error
 
-	resource := "arn:aws:s3:::" + bucketName + "/*"
+	resources := bucketResourceARNs(bucketName)
 	policyInfo, errInfo := minIOAdminClient.adminClient.InfoCannedPolicyV2(context.TODO(), policyName)
 	if errInfo != nil {
 		return fmt.Errorf("policy '%s' does not exist: %v", policyName, errInfo)
@@ -989,17 +1001,30 @@ func (minIOAdminClient *MinIOAdminClient) RemoveResource(bucketName string, poli
 	if jsonErr != nil {
 		return jsonErr
 	}
-	if len(actualPolicy.Statement[0].Resource) == 1 {
-		actualPolicy.Statement[0].Effect = "Deny"
-		actualPolicy.Statement[0].Resource = []string{"arn:aws:s3:::" + bucketName + "notValid" + "/*"}
-	} else {
-		for i, rs := range actualPolicy.Statement[0].Resource {
-			if rs == resource {
-				actualPolicy.Statement[0].Resource = append(actualPolicy.Statement[0].Resource[:i], actualPolicy.Statement[0].Resource[i+1:]...)
+	if len(actualPolicy.Statement) == 0 {
+		return nil
+	}
+
+	filtered := actualPolicy.Statement[0].Resource[:0]
+	for _, r := range actualPolicy.Statement[0].Resource {
+		keep := true
+		for _, resource := range resources {
+			if r == resource {
+				keep = false
 				break
 			}
 		}
+		if keep {
+			filtered = append(filtered, r)
+		}
 	}
+	actualPolicy.Statement[0].Resource = filtered
+
+	if len(filtered) == 0 {
+		actualPolicy.Statement[0].Effect = "Deny"
+		actualPolicy.Statement[0].Resource = []string{"arn:aws:s3:::" + bucketName + "notValid" + "/*"}
+	}
+
 	policy, jsonErr = json.Marshal(actualPolicy)
 	if jsonErr != nil {
 		return jsonErr
