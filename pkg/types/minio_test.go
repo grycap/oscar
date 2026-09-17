@@ -554,8 +554,13 @@ func TestRemoveFromPolicyRemovesBucketResourceARNs(t *testing.T) {
 	if err := client.RemoveFromPolicy("bucket", "owner", false); err != nil {
 		t.Fatalf("unexpected error removing policy resource: %v", err)
 	}
-	if got := mock.policies["owner"]; len(got) != 0 {
-		t.Fatalf("expected bucket policy resources to be cleared, got %v", got)
+
+	got := mock.policies["owner"]
+	if len(got) != 1 || got[0] != "arn:aws:s3:::bucketnotValid/*" {
+		t.Fatalf("expected bucket ARNs to be removed and deny fallback to remain, got %v", got)
+	}
+	if slices.Contains(got, "arn:aws:s3:::bucket/*") || slices.Contains(got, "arn:aws:s3:::bucket") {
+		t.Fatalf("expected bucket resource arns to be removed, got %v", got)
 	}
 }
 
