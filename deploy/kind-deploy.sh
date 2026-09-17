@@ -1228,3 +1228,5 @@ rm $CONFIG_FILEPATH
 if [ $(echo $use_knative | tr '[:upper:]' '[:lower:]') == "y" ]; then 
     rm $KNATIVE_FILEPATH
 fi
+
+docker exec "$CLUSTER_NAME-control-plane"  sh -c 'echo "$(getent hosts host.docker.internal | awk "{print \$1}") host.docker.internal" >> /etc/hosts'
