@@ -361,7 +361,7 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 		}
 
 		// Delegate job if can't be scheduled and has defined replicas
-		if rm != nil && service.HasFederationMembers() {
+		if rm != nil && service.HasActiveFederationMembers() {
 			uid, _ := auth.GetUIDFromContext(c)
 			//Get local quota
 			quota, e := FetchQuota(c.Request.Context(), cfg, backendQuota, uid)
@@ -420,7 +420,7 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 		}
 
 		// Add ReScheduler label if there are replicas defined and the cfg.ReSchedulerEnable is true
-		if service.HasFederationMembers() && cfg.ReSchedulerEnable {
+		if service.HasActiveFederationMembers() && cfg.ReSchedulerEnable {
 			if service.Federation != nil && service.Federation.ReschedulerThreshold != 0 {
 				job.Labels[types.ReSchedulerLabelKey] = strconv.Itoa(service.Federation.ReschedulerThreshold)
 			} else {

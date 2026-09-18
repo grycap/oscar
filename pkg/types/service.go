@@ -850,6 +850,11 @@ func (service *Service) HasFederationMembers() bool {
 
 }
 
+// HasActiveFederationMembers checks whether delegation is enabled and members exist.
+func (service *Service) HasActiveFederationMembers() bool {
+	return service.HasFederationMembers() && !strings.EqualFold(strings.TrimSpace(service.Federation.Topology), "none")
+}
+
 // GetExposedBasePath returns the OSCAR exposed-service base path or an empty string.
 func (service *Service) GetExposedBasePath() string {
 
