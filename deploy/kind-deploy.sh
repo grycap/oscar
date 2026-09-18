@@ -818,6 +818,11 @@ if [ "$STORAGE_BACKEND" != "minio" ] && [ "$STORAGE_BACKEND" != "rustfs" ]; then
     exit 1
 fi
 
+if [ "$STORAGE_BACKEND" != "minio" ] && [ "$ENABLE_MINIO_QUOTAS" == "true" ]; then
+    echo -e "$ORANGE[*]$END_COLOR MinIO bucket quotas are only supported with the MinIO storage backend. Disabling quota support for $STORAGE_BACKEND."
+    ENABLE_MINIO_QUOTAS="false"
+fi
+
 echo -e "\n[*] Checking prerequisites ..."
 checkDocker
 checkKubectl
@@ -883,7 +888,7 @@ else
     if [ "$ENABLE_KUEUE" != "true" ]; then
         read -p "Do you want to enable CPU and memory quotas with Kueue? [y/n] " use_kueue </dev/tty
     fi
-    if [ "$ENABLE_MINIO_QUOTAS" != "true" ]; then
+    if [ "$ENABLE_MINIO_QUOTAS" != "true" ] && [ "$STORAGE_BACKEND" == "minio" ]; then
         read -p "Do you want to enable MinIO bucket quotas? This deploys MinIO with 1 replica and 4 PVCs. [y/n] " use_minio_quotas </dev/tty
     fi
 fi
