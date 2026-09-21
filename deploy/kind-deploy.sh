@@ -548,13 +548,7 @@ deployMetrics(){
     helm repo add --force-update prometheus-community https://prometheus-community.github.io/helm-charts
     helm repo update
     helm upgrade --install prometheus-operator prometheus-community/kube-prometheus-stack \
-        --namespace monitoring \
-        --set server.service.type=ClusterIP \
-        --set server.persistentVolume.storageClass=nfs \
-        --set alertmanager.enabled=false \
-        --set pushgateway.enabled=false \
-        --set kubeStateMetrics.enabled=true \
-        --set nodeExporter.enabled=true
+        --namespace monitoring --values "$SCRIPT_DIR/../deploy/metrics/prometheus-values.kind.yaml" 2>/dev/null || true
 
     echo -e "\n[*] Deploying Geo Ip ..."
     if [ -f "$SCRIPT_DIR/../deploy/metrics/geoip-pvc.yaml" ]; then
