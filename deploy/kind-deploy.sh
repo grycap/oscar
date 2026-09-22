@@ -68,7 +68,7 @@ Options:
     --storage=(minio|rustfs)     Select the storage backend to use (default: minio).
     --minio-quotas               Deploy MinIO with 1 replica and 4 PVCs to support bucket quotas.
     --wildcards[=true|false]     Enable or disable DNS wildcard support for Traefik (default: true).
-    --host HOST                  Use HOST as OSCAR host (default: localhost).
+    --host HOST                  Use HOST as OSCAR host (default: localhost.direct).
     --ingress                    Use NGINX Ingress as gateway controller.
     --traefik                    Use Traefik as gateway controller (default).
     -h, --help                   Show this help message and exit.
@@ -1124,8 +1124,6 @@ else
     --set service.endpoint.port=$HOST_MINIO_API_PORT \
     --set config.rustfs.address=":$HOST_MINIO_API_PORT" \
     --set service.type=NodePort \
-    --set 'extraEnv[0].name=RUSTFS_BROWSER_REDIRECT_URL' \
-    --set "extraEnv[0].value=http://localhost:$HOST_MINIO_CONSOLE_PORT" \
     --set 'extraEnv[1].name=RUSTFS_CORS_ALLOWED_ORIGINS' \
     --set-string 'extraEnv[1].value=*' \
     --set 'extraEnv[2].name=RUSTFS_OUTBOUND_ALLOW_ORIGINS' \
