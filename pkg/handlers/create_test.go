@@ -225,7 +225,6 @@ func TestMakeCreateHandler(t *testing.T) {
 					"cpu": "1.0",
 					"log_level": "CRITICAL",
 					"image": "ghcr.io/grycap/cowsay",
-					"alpine": false,
 					"script": "test",
 					"input": [
 					],
