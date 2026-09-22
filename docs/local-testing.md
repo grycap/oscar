@@ -53,7 +53,12 @@ To skip the wizard prompts and automatically install from the `devel` branch, ru
 ```sh
 bash oscar/deploy/kind-deploy.sh --devel
 ```
-This flag auto-enables Knative Serving and the local Docker registry so you can test the full development stack without manual input.
+This flag auto-enables **Knative Serving** and the **local Docker registry**. By default it will use **traefik**, **DNS subdomains (wildcards)** and **localhost.direct** as the OSCAR hostname, that way you can test the full development stack with latest features without manual input.
+
+If you want to use ingress with subpaths and ingress, use:  
+```sh
+bash oscar/deploy/kind-deploy.sh --devel --ingress --wildcards="false" --host="localhost"  
+```
 
 To enable OIDC authentication support in the deployed OSCAR (disabled by default), add:
 

@@ -34,19 +34,32 @@ expose:
   api_port: 5000
 ```
 
-Once the service is deployed, you can check if it was created correctly by making an HTTP request to the exposed endpoint. By default, the endpoint is:
+Once the service is deployed, you can check if it was created correctly by making an HTTP request to the exposed endpoint. The format of the endpoint depends on how the exposed services are routed:
+
+### Path-based routing (default)
+
+By default, each service is exposed under a subpath of the OSCAR endpoint:
 
 ``` bash
 https://{oscar_endpoint}/system/services/{service_name}/exposed/{path_resource} 
 ```
 
-When `EXPOSED_SERVICES_ROUTE_KIND=httproute` and `EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE=true`, each service is exposed at the root of its own subdomain:
+This is the endpoint used in every case where the DNS subdomain route is not active. In particular, the subpath fallback applies when:
+
+- `EXPOSED_SERVICES_ROUTE_KIND=ingress` (the default; DNS subdomains are not supported by Ingress), or
+- `EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE=false` (the default), or
+- `INGRESS_HOST` is not configured, or
+- the service defines a `NodePort` access method.
+
+### DNS subdomain routing (HTTPRoute only)
+
+When `EXPOSED_SERVICES_ROUTE_KIND=httproute`, `EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE=true` and the service does not define a `NodePort`, each service is exposed at the root of its own subdomain:
 
 ``` bash
 https://{service_name}.{INGRESS_HOST}/{path_resource}
 ```
 
-This requires `INGRESS_HOST` to be configured and wildcard DNS and TLS for `*.{INGRESS_HOST}` to point to and be accepted by the cluster Gateway.
+This requires `INGRESS_HOST` to be configured and wildcard DNS and TLS for `*.{INGRESS_HOST}` to point to and be accepted by the cluster Gateway. If `INGRESS_HOST` is empty while `EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE=true` and `EXPOSED_SERVICES_ROUTE_KIND=httproute`, service deployment fails with a configuration validation error instead of falling back to the subpath endpoint.
 
 For exposed services, OSCAR sets `OSCAR_SERVICE_BASE_PATH` in the container environment. Its value is `/system/services/{service_name}/exposed` in default mode and `/` when services are exposed through DNS in HTTPRoute mode. The full list of OSCAR-managed environment variables is documented in [FDL](fdl.md#envvarsmap).
 

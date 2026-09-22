@@ -153,25 +153,25 @@ description: "Task list template for feature implementation"
 - [X] T058 Document Loki + Alloy deployment steps in docs/local-testing.md
 - [X] T059 Document Loki configuration env vars in docs/api.md
 - [ ] T044 Conduct stakeholder review of summary output and record notes in specs/001-metrics-collection/research.md
-- [X] T060 Update Alloy log collection to only include OSCAR manager pods in docs/snippets/alloy-values.kind.yaml
+- [X] T060 Update Alloy log collection to only include OSCAR manager pods in deploy/metrics/alloy-values.kind.yaml
 - [X] T074 Update summary contracts/spec/data-model for exposed requests in specs/001-metrics-collection/spec.md, specs/001-metrics-collection/data-model.md, and specs/001-metrics-collection/contracts/metrics.yaml
-- [X] T075 Update Alloy log collection to include ingress-nginx controller logs in docs/snippets/alloy-values.kind.yaml
+- [X] T075 Update Alloy log collection to include ingress-nginx controller logs in deploy/metrics/alloy-values.kind.yaml
 - [X] T076 Allow optional start/end with 24h default range in pkg/handlers/metrics.go and update specs/001-metrics-collection/spec.md
 - [X] T077 Rename metrics endpoints to /system/metrics and /system/metrics/{serviceName} in main.go, handlers, and specs/docs/tests
 - [X] T078 Allow /system/metrics/{serviceName} without metric to return all per-service metrics in pkg/handlers/metrics.go and docs/specs/contracts
 - [X] T061 Update local testing docs to note OSCAR-only log filtering in docs/local-testing.md
 - [X] T062 Apply Alloy configuration update in the local kind cluster (helm upgrade) from repo root
-- [X] T063 Add minimal Prometheus values file to collect only OSCAR CPU/GPU metrics in docs/snippets/prometheus-values.kind.yaml
+- [X] T063 Add minimal Prometheus values file to collect only OSCAR CPU/GPU metrics in deploy/metrics/prometheus-values.kind.yaml
 - [X] T064 Update local testing docs to use minimal Prometheus values in docs/local-testing.md
 - [X] T065 Apply minimal Prometheus configuration in the local kind cluster (helm upgrade) from repo root
-- [X] T066 Add Grafana values and dashboard snippets in docs/snippets/grafana-values.kind.yaml and docs/snippets/oscar-metrics-dashboard.json
+- [X] T066 Add Grafana values and dashboard snippets in deploy/metrics/grafana-values.kind.yaml and deploy/metrics/oscar-metrics-dashboard.json
 - [X] T067 Document Grafana deployment and dashboard notes in specs/001-metrics-collection/monitoring-docs.md
 - [X] T068 Apply Grafana deployment in the local kind cluster (helm upgrade) from repo root
-- [X] T069 Update Alloy config to enrich logs with GeoIP labels in docs/snippets/alloy-values.kind.yaml
+- [X] T069 Update Alloy config to enrich logs with GeoIP labels in deploy/metrics/alloy-values.kind.yaml
 - [X] T070 Populate request country from Loki stream labels in pkg/metrics/sources.go
 - [X] T071 Document GeoIP enrichment requirements in specs/001-metrics-collection/monitoring-docs.md
-- [X] T079 Restrict Loki ingestion to OSCAR manager /job and /run log lines in docs/snippets/alloy-values.kind.yaml
-- [X] T080 Reduce Prometheus label cardinality (derive service label, drop pod) and set scrape_timeout to 5s in docs/snippets/prometheus-values.kind.yaml and pkg/types/config.go
+- [X] T079 Restrict Loki ingestion to OSCAR manager /job and /run log lines in deploy/metrics/alloy-values.kind.yaml
+- [X] T080 Reduce Prometheus label cardinality (derive service label, drop pod) and set scrape_timeout to 5s in deploy/metrics/prometheus-values.kind.yaml and pkg/types/config.go
 
 ---
 

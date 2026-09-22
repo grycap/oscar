@@ -72,7 +72,27 @@ to Kubernetes pod logs.
 - `LOKI_EXPOSED_NAMESPACE` (gateway namespace; default `ingress-nginx`)
 - `LOKI_EXPOSED_APP` (gateway app label; default `ingress-nginx`)
 
-With Traefik HTTPRoutes and DNS subdomains, OSCAR identifies the service from
-`RequestAddr` and obtains its namespace from Traefik's `ServiceName` access-log
-field. The Alloy pipeline must retain the JSON access log body; the provided
-Traefik configuration already does so.
+When exposed services are routed through DNS subdomains (see
+[Exposed services](exposed-services.md)), expose the gateway access logs of the
+routing gateway. For Traefik HTTPRoutes, set `LOKI_EXPOSED_NAMESPACE` and
+`LOKI_EXPOSED_APP` to the gateway namespace and app label used by the Traefik
+installation (e.g., `traefik`) instead of the `ingress-nginx` defaults. The
+provided Alloy configuration keeps the full JSON body of the Traefik access
+logs so that OSCAR can attribute requests.
+
+#### Configuration validation
+
+Check the effective configuration before relying on exposed-service metrics:
+
+- If `EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE=true` and
+  `EXPOSED_SERVICES_ROUTE_KIND=httproute`, `INGRESS_HOST` must be set; otherwise
+  requests cannot be attributed from the DNS host.
+- The gateway access logs must contain the JSON fields used for attribution:
+  with DNS subdomains, OSCAR identifies the service from the request host
+  (`RequestHost`, falling back to `RequestAddr`) and obtains its namespace from
+  Traefik's `ServiceName` access-log field. Without DNS subdomains, the service
+  is extracted from `RequestPath` (`/system/services/{service_name}/exposed/...`).
+- The Alloy pipeline must retain the JSON access log body; if the access log is
+  reformatted or relabeled before reaching Loki, the fields above are lost and
+  requests will not be attributed. The provided Traefik configuration already
+  does so.
