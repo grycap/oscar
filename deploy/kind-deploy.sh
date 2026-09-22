@@ -68,7 +68,7 @@ Options:
     --storage=(minio|rustfs)     Select the storage backend to use (default: minio).
     --minio-quotas               Deploy MinIO with 1 replica and 4 PVCs to support bucket quotas.
     --wildcards[=true|false]     Enable or disable DNS wildcard support for Traefik (default: true).
-    --host HOST                  Use HOST as OSCAR host (default: localhost).
+    --host HOST                  Use HOST as OSCAR host (default: localhost.direct).
     --ingress                    Use NGINX Ingress as gateway controller.
     --traefik                    Use Traefik as gateway controller (default).
     -h, --help                   Show this help message and exit.
@@ -1100,15 +1100,17 @@ deployGatewayController
 #Deploy storage backend
 if [ "$STORAGE_BACKEND" == "minio" ]; then
     echo -e "\n[*] Deploying MinIO storage provider ..."
+    STORAGE_ENDPOINT_HOST="minio.minio"
     helm repo add --force-update minio https://charts.min.io
     MINIO_HELM_MODE_ARGS="--set mode=standalone"
     if [ "$ENABLE_MINIO_QUOTAS" == "true" ]; then
         MINIO_HELM_MODE_ARGS="--set mode=distributed --set replicas=1 --set drivesPerNode=4 --set persistence.size=2Gi"
     fi
-    helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT $MINIO_HELM_MODE_ARGS --create-namespace --version 5.4.0
+    helm install minio minio/minio --namespace minio --set minioAPIPort="$HOST_MINIO_API_PORT" --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.port="$HOST_MINIO_API_PORT",service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT $MINIO_HELM_MODE_ARGS --create-namespace --version 5.4.0
 else
     echo -e "\n[*] Deploying RustFS storage provider ..."
     STORAGE_ACCESS_KEY="rustfs"
+    STORAGE_ENDPOINT_HOST="rustfs-svc.rustfs"
     helm repo add rustfs https://charts.rustfs.com
     helm install rustfs rustfs/rustfs --namespace rustfs --create-namespace --version '>=1.0.0-0'\
     --set secret.rustfs.access_key=$STORAGE_ACCESS_KEY \
@@ -1119,9 +1121,9 @@ else
     --set mode.standalone.enabled=true --set mode.distributed.enabled=false \
     --set service.console.nodePort=$HOST_MINIO_CONSOLE_PORT \
     --set service.endpoint.nodePort=$HOST_MINIO_API_PORT \
+    --set service.endpoint.port=$HOST_MINIO_API_PORT \
+    --set config.rustfs.address=":$HOST_MINIO_API_PORT" \
     --set service.type=NodePort \
-    --set 'extraEnv[0].name=RUSTFS_BROWSER_REDIRECT_URL' \
-    --set "extraEnv[0].value=http://localhost:$HOST_MINIO_CONSOLE_PORT" \
     --set 'extraEnv[1].name=RUSTFS_CORS_ALLOWED_ORIGINS' \
     --set-string 'extraEnv[1].value=*' \
     --set 'extraEnv[2].name=RUSTFS_OUTBOUND_ALLOW_ORIGINS' \
@@ -1175,9 +1177,9 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 echo -e "\n[*] Deploying OSCAR ..."
 helm repo add --force-update grycap https://grycap.github.io/helm-charts/
 if [ $(echo $use_knative | tr '[:upper:]' '[:lower:]') == "y" ]; then 
-    helm install --namespace=oscar oscar grycap/oscar $OSCAR_EXPOSURE_HELM_ARGS --set httproute.host="$OSCAR_HOST" --set authPass="$OSCAR_PASSWORD" --set service.type=ClusterIP --set volume.storageClassName=nfs --set minIO.object_storage_type="$STORAGE_BACKEND" --set minIO.endpoint=http://host.docker.internal:$HOST_MINIO_API_PORT  --set minIO.TLSVerify=false --set minIO.accessKey=$STORAGE_ACCESS_KEY --set minIO.secretKey="$MINIO_PASSWORD" --set minIO.quota.enabled="$ENABLE_MINIO_QUOTAS" --set serverlessBackend=knative --set resourceManager.enable=true --set kueue.enable="$ENABLE_KUEUE" $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar $OSCAR_EXPOSURE_HELM_ARGS --set httproute.host="$OSCAR_HOST" --set authPass="$OSCAR_PASSWORD" --set service.type=ClusterIP --set volume.storageClassName=nfs --set minIO.object_storage_type="$STORAGE_BACKEND" --set minIO.endpoint="http://$STORAGE_ENDPOINT_HOST:$HOST_MINIO_API_PORT"  --set minIO.TLSVerify=false --set minIO.accessKey=$STORAGE_ACCESS_KEY --set minIO.secretKey="$MINIO_PASSWORD" --set minIO.quota.enabled="$ENABLE_MINIO_QUOTAS" --set serverlessBackend=knative --set resourceManager.enable=true --set kueue.enable="$ENABLE_KUEUE" $OSCAR_HELM_IMAGE_OVERRIDES
 else
-    helm install --namespace=oscar oscar grycap/oscar $OSCAR_EXPOSURE_HELM_ARGS --set httproute.host="$OSCAR_HOST" --set authPass="$OSCAR_PASSWORD" --set service.type=ClusterIP --set volume.storageClassName=nfs --set minIO.object_storage_type="$STORAGE_BACKEND" --set minIO.endpoint=http://host.docker.internal:$HOST_MINIO_API_PORT --set minIO.TLSVerify=false --set minIO.accessKey=$STORAGE_ACCESS_KEY --set minIO.secretKey="$MINIO_PASSWORD" --set minIO.quota.enabled="$ENABLE_MINIO_QUOTAS" --set resourceManager.enable=true --set kueue.enable="$ENABLE_KUEUE" $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar $OSCAR_EXPOSURE_HELM_ARGS --set httproute.host="$OSCAR_HOST" --set authPass="$OSCAR_PASSWORD" --set service.type=ClusterIP --set volume.storageClassName=nfs --set minIO.object_storage_type="$STORAGE_BACKEND" --set minIO.endpoint="http://$STORAGE_ENDPOINT_HOST:$HOST_MINIO_API_PORT" --set minIO.TLSVerify=false --set minIO.accessKey=$STORAGE_ACCESS_KEY --set minIO.secretKey="$MINIO_PASSWORD" --set minIO.quota.enabled="$ENABLE_MINIO_QUOTAS" --set resourceManager.enable=true --set kueue.enable="$ENABLE_KUEUE" $OSCAR_HELM_IMAGE_OVERRIDES
 fi
 
 if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
