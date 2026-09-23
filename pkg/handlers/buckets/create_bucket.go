@@ -132,6 +132,13 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 
 		// Bucket metadata for filtering
 		tags := utils.BucketTags(bucket, ownerName)
+		// Preserve existing tags (e.g. from_service) when the bucket already exists
+		oldTags, _ := objectStorageIAM.GetClient(c.Request.Context()).GetTaggedMetadata(splitPath[0])
+		for key, value := range oldTags {
+			if _, reserved := tags[key]; !reserved {
+				tags[key] = value
+			}
+		}
 
 		if err := objectStorageIAM.GetClient(c.Request.Context()).SetTags(splitPath[0], tags); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
