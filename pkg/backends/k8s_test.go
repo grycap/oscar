@@ -41,7 +41,6 @@ total_memory: ""
 total_cpu: ""
 log_level: ""
 image: testimage
-alpine: false
 token: ""
 input: []
 output: []
