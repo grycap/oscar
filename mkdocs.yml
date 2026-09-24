@@ -23,6 +23,7 @@ nav:
   - usage-dashboard.md  
   - api.md
   - MinIO: minio-usage.md
+  - RustFS: rustfs-usage.md
 
 - Service Deployment:
   - deployment-api.md

@@ -84,6 +84,17 @@ four PVC-backed drives, which is required by the MinIO bucket quota admin API.
 Without this option, the local deployment keeps the simpler standalone MinIO
 mode.
 
+To use RustFS instead of MinIO as the object storage backend, add:
+
+```sh
+bash oscar/deploy/kind-deploy.sh --storage=rustfs
+```
+
+This installs the RustFS Helm chart in the `rustfs` namespace and configures
+OSCAR with `OBJECT_STORAGE_TYPE=rustfs`. It is not compatible with the
+`--minio-quotas` option, which needs the erasure-coded distributed MinIO
+layout. See the [RustFS storage provider](rustfs-usage.md) for details.
+
 To enable the KServe module in the deployed OSCAR, add:
 
 ```sh

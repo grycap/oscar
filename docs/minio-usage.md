@@ -4,11 +4,8 @@ Each OSCAR cluster includes a deployed MinIO instance, which is used to trigger 
 
 Additionally, OSCAR allows direct operations on the MinIO instance—such as creating, updating, and deleting buckets—that are independent of any specific service but still governed by the same visibility rules as services.
 
-## RustFS permissions
-
-RustFS notification configuration and IAM operations use its native `/rustfs/admin/v3` routes.
-
-With `OBJECT_STORAGE_TYPE=rustfs`, OSCAR uses the same policy creation, assignment, update and removal flow as MinIO through the RustFS-native IAM API. Group membership requests use the RustFS JSON format and group status.
+OSCAR can also use [RustFS](rustfs-usage.md) as an alternative object storage
+provider.
 
 ## Using graphical interfaces
 
