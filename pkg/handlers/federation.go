@@ -24,6 +24,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -52,16 +53,21 @@ func MakeFederationGetHandler(back types.ServerlessBackend) gin.HandlerFunc {
 		}
 
 		topology := "none"
+		delegation := "static"
 		if service.Federation != nil && service.Federation.Topology != "" {
 			topology = service.Federation.Topology
+		}
+		if service.Federation != nil && service.Federation.Delegation != "" {
+			delegation = service.Federation.Delegation
 		}
 		var replicas types.ReplicaList
 		if service.Federation != nil && len(service.Federation.Members) > 0 {
 			replicas = service.Federation.Members
 		}
 		resp := types.FederationResponse{
-			Topology: topology,
-			Members:  replicas,
+			Topology:   topology,
+			Delegation: delegation,
+			Members:    replicas,
 		}
 		c.JSON(http.StatusOK, resp)
 	}
@@ -69,7 +75,7 @@ func MakeFederationGetHandler(back types.ServerlessBackend) gin.HandlerFunc {
 
 // MakeFederationPostHandler godoc
 // @Summary Add federation members to a service
-// @Description Add federation members to a service and propagate to the topology.
+// @Description Add federation members to a service, creating missing remote services and updating existing ones.
 // @Tags federation
 // @Accept json
 // @Produce json
@@ -79,16 +85,35 @@ func MakeFederationGetHandler(back types.ServerlessBackend) gin.HandlerFunc {
 // @Failure 400 {string} string "Bad Request"
 // @Failure 404 {string} string "Not Found"
 // @Failure 500 {string} string "Internal Server Error"
+// @Failure 502 {string} string "Federation propagation failed"
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/federation/{serviceName} [post]
 func MakeFederationPostHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		updated, err := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) {
+		updated, err := updateFederationFromRequest(c, back, true, func(service *types.Service, req *types.FederationRequest) {
 			if service.Federation == nil {
-				service.Federation = &types.Federation{}
+				service.Federation = &types.Federation{
+					GroupID:    service.Name,
+					Topology:   "star",
+					Delegation: "static",
+				}
+			} else if !service.HasFederationMembers() {
+				if service.Federation.Topology == "" || service.Federation.Topology == "none" {
+					service.Federation.Topology = "star"
+				}
+				if service.Federation.Delegation == "" {
+					service.Federation.Delegation = "static"
+				}
+				if service.Federation.GroupID == "" {
+					service.Federation.GroupID = service.Name
+				}
 			}
-			service.Federation.Members = append(service.Federation.Members, req.Members...)
+			for _, member := range req.Members {
+				if !containsReplica(service.Federation.Members, member) {
+					service.Federation.Members = append(service.Federation.Members, member)
+				}
+			}
 		})
 		if err != nil {
 			return
@@ -109,12 +134,13 @@ func MakeFederationPostHandler(back types.ServerlessBackend) gin.HandlerFunc {
 // @Failure 400 {string} string "Bad Request"
 // @Failure 404 {string} string "Not Found"
 // @Failure 500 {string} string "Internal Server Error"
+// @Failure 502 {string} string "Federation propagation failed"
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/federation/{serviceName} [put]
 func MakeFederationPutHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		updated, err := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) {
+		updated, err := updateFederationFromRequest(c, back, false, func(service *types.Service, req *types.FederationRequest) {
 			if service.Federation == nil {
 				service.Federation = &types.Federation{}
 			}
@@ -145,12 +171,13 @@ func MakeFederationPutHandler(back types.ServerlessBackend) gin.HandlerFunc {
 // @Failure 400 {string} string "Bad Request"
 // @Failure 404 {string} string "Not Found"
 // @Failure 500 {string} string "Internal Server Error"
+// @Failure 502 {string} string "Federation propagation failed"
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/federation/{serviceName} [delete]
 func MakeFederationDeleteHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		updated, err := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) {
+		updated, err := updateFederationFromRequest(c, back, false, func(service *types.Service, req *types.FederationRequest) {
 			if service.Federation == nil {
 				service.Federation = &types.Federation{}
 			}
@@ -186,7 +213,7 @@ func MakeFederationDeleteHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	}
 }
 
-func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, mutator func(service *types.Service, req *types.FederationRequest)) (*types.FederationResponse, error) {
+func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, upsert bool, mutator func(service *types.Service, req *types.FederationRequest)) (*types.FederationResponse, error) {
 	var req types.FederationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.String(http.StatusBadRequest, fmt.Sprintf("Invalid payload: %v", err))
@@ -202,6 +229,17 @@ func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, m
 		}
 		return nil, err
 	}
+	if isBearerRequest(c) {
+		uid, uidErr := auth.GetUIDFromContext(c)
+		if uidErr != nil {
+			c.String(http.StatusUnauthorized, uidErr.Error())
+			return nil, uidErr
+		}
+		if !isServiceOwnedByUser(service, uid) {
+			c.Status(http.StatusForbidden)
+			return nil, fmt.Errorf("user is not allowed to modify this service")
+		}
+	}
 
 	if req.Clusters != nil {
 		if service.Clusters == nil {
@@ -211,11 +249,80 @@ func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, m
 			service.Clusters[k] = v
 		}
 	}
+	if strings.TrimSpace(req.ClusterID) != "" {
+		service.ClusterID = strings.TrimSpace(req.ClusterID)
+	}
 	if req.StorageProviders != nil {
 		service.StorageProviders = req.StorageProviders
 	}
 
 	mutator(service, &req)
+	if req.Topology != "" {
+		topology := strings.ToLower(strings.TrimSpace(req.Topology))
+		if topology != "none" && topology != "star" && topology != "mesh" {
+			err := fmt.Errorf("federation topology must be none, star or mesh")
+			c.String(http.StatusBadRequest, err.Error())
+			return nil, err
+		}
+		if topology == "mesh" {
+			if strings.TrimSpace(service.ClusterID) == "" {
+				err := fmt.Errorf("service cluster_id is required for mesh federation")
+				c.String(http.StatusBadRequest, err.Error())
+				return nil, err
+			}
+			if _, ok := service.Clusters[service.ClusterID]; !ok {
+				err := fmt.Errorf("coordinator cluster %q must be defined for mesh federation", service.ClusterID)
+				c.String(http.StatusBadRequest, err.Error())
+				return nil, err
+			}
+		}
+		if service.Federation == nil {
+			service.Federation = &types.Federation{Delegation: "static"}
+		}
+		if service.Federation.GroupID == "" {
+			service.Federation.GroupID = service.Name
+		}
+		service.Federation.Topology = topology
+	}
+	if req.Delegation != "" {
+		delegation := strings.ToLower(strings.TrimSpace(req.Delegation))
+		if delegation != "static" && delegation != "random" && delegation != "load-based" {
+			err := fmt.Errorf("federation delegation must be static, random or load-based")
+			c.String(http.StatusBadRequest, err.Error())
+			return nil, err
+		}
+		if service.Federation == nil {
+			service.Federation = &types.Federation{Topology: "none"}
+		}
+		if service.Federation.Topology == "" {
+			service.Federation.Topology = "none"
+		}
+		if service.Federation.GroupID == "" {
+			service.Federation.GroupID = service.Name
+		}
+		service.Federation.Delegation = delegation
+	}
+
+	refreshToken := strings.TrimSpace(req.RefreshToken)
+	if service.HasFederationMembers() {
+		if service.Namespace == "" {
+			c.String(http.StatusInternalServerError, "error storing federation credentials: service namespace is empty")
+			return nil, fmt.Errorf("service namespace is empty")
+		}
+		if refreshToken != "" {
+			if err := upsertRefreshTokenSecret(service, service.Namespace, refreshToken, back.GetKubeClientset()); err != nil {
+				c.String(http.StatusInternalServerError, "error storing refresh-token secret: %v", err)
+				return nil, err
+			}
+		} else if service.HasActiveFederationMembers() {
+			var err error
+			refreshToken, err = readRefreshTokenSecretValue(service.Name, service.Namespace, back.GetKubeClientset())
+			if err != nil {
+				c.String(http.StatusBadRequest, "refresh_token is required for active federation: %v", err)
+				return nil, err
+			}
+		}
+	}
 
 	if err := back.UpdateService(*service); err != nil {
 		c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating service: %v", err))
@@ -224,32 +331,34 @@ func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, m
 
 	if service.HasFederationMembers() {
 		authHeader := c.GetHeader("Authorization")
-		if service.Namespace == "" {
-			c.String(http.StatusInternalServerError, "error reading refresh-token secret: service namespace is empty")
-			return nil, fmt.Errorf("service namespace is empty")
+		var errs []error
+		if upsert {
+			errs = utils.UpsertFederation(service, authHeader, refreshToken)
+		} else {
+			errs = utils.ExpandFederation(service, authHeader, http.MethodPut, refreshToken)
 		}
-		refreshToken, err := readRefreshTokenSecretValue(service.Name, service.Namespace, back.GetKubeClientset())
-		if err != nil {
-			c.String(http.StatusInternalServerError, "error reading refresh-token secret: %v", err)
-			return nil, err
-		}
-		if errs := utils.ExpandFederation(service, authHeader, http.MethodPut, refreshToken); len(errs) > 0 {
-			c.String(http.StatusOK, fmt.Sprintf("Updated with federation warnings: %v", errs))
-			return nil, fmt.Errorf("federation propagation warnings")
+		if len(errs) > 0 {
+			c.String(http.StatusBadGateway, fmt.Sprintf("federation propagation failed: %v", errs))
+			return nil, fmt.Errorf("federation propagation failed")
 		}
 	}
 
 	topology := "none"
+	delegation := "static"
 	if service.Federation != nil && service.Federation.Topology != "" {
 		topology = service.Federation.Topology
+	}
+	if service.Federation != nil && service.Federation.Delegation != "" {
+		delegation = service.Federation.Delegation
 	}
 	var replicas types.ReplicaList
 	if service.Federation != nil && len(service.Federation.Members) > 0 {
 		replicas = service.Federation.Members
 	}
 	resp := &types.FederationResponse{
-		Topology: topology,
-		Members:  replicas,
+		Topology:   topology,
+		Delegation: delegation,
+		Members:    replicas,
 	}
 	return resp, nil
 }

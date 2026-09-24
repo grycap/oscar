@@ -1,0 +1,38 @@
+functions:
+  oscar:
+  - local:
+      name: sleep-test-fed
+      memory: 256Mi
+      cpu: '1.0'
+      image: ubuntu:22.04
+      script: script.sh
+      log_level: INFO
+      input:
+      - storage_provider: minio.default
+        path: sleep-test-fed/input
+      output:
+      - storage_provider: minio.default
+        path: sleep-test-fed/output
+      environment:
+        variables:
+          SLEEP_SECONDS: "90"
+        secrets:
+          # Override with --env-file containing refresh_token=<OIDC_REFRESH_TOKEN>.
+          refresh_token: YOUR_OIDC_REFRESH_TOKEN
+      federation:
+        group_id: sleep-test-fed
+        topology: star
+        delegation: static
+        members:
+        - type: oscar
+          cluster_id: local-replica
+          service_name: sleep-test-fed-replica
+          priority: 0
+
+clusters:
+  # Public or internally resolvable DNS name of the member cluster.
+  local-replica:
+    endpoint: https://oscar-member.172.18.0.3.nip.io:30443
+    auth_user: ''
+    auth_password: ''
+    ssl_verify: false
