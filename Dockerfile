@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM --platform=$BUILDPLATFORM golang:1.25 AS build
+FROM golang:1.25 AS build
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 
@@ -26,7 +26,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     -o oscar .
 
 
-FROM --platform=$BUILDPLATFORM node:20-alpine AS ui-build
+FROM node:20-alpine AS ui-build
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 
@@ -43,7 +43,7 @@ RUN --mount=type=cache,target=/root/.npm \
     node scripts/deploy_container.cjs && npm run build
 
 
-FROM --platform=$BUILDPLATFORM alpine:3.14
+FROM alpine:3.14
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 
