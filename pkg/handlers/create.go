@@ -425,6 +425,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						storageQuota = minIOQuota.StoragePerBucket
 					}*/
 					tags := utils.BucketTags(b, ownerName)
+					addServiceBucketTag(tags, service.Name)
 					if err := objectStorageIAM.GetClient(c.Request.Context()).SetTags(b.BucketName, tags); err != nil {
 						c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
 						return
@@ -1042,14 +1043,11 @@ func serviceWithSameNameExists(name string, back types.ServerlessBackend) (bool,
 	return len(services) > 0, nil
 }
 
-func getBucketTags(service *types.Service, uid, ownerName, bucketName string) map[string]string {
-	tags := map[string]string{
-		"owner":        uid,
-		"from_service": service.Name,
-		"owner_name":   ownerName,
+func addServiceBucketTag(tags map[string]string, serviceName string) {
+	if tags == nil {
+		tags = make(map[string]string)
 	}
-
-	return tags
+	tags["from_service"] = serviceName
 }
 
 func validateServiceCreation(service *types.Service, cfg *types.Config) error {
