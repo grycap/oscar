@@ -308,8 +308,10 @@ func createBucket(bucketKey string, s3Client *s3.S3) error {
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			// Check if the error is caused because the bucket already exists
-			if aerr.Code() == s3.ErrCodeBucketAlreadyExists || aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
+			if aerr.Code() == s3.ErrCodeBucketAlreadyExists {
 				return fmt.Errorf("the bucket \"%s\" already exists\n", bucketKey)
+			} else if aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
+				return nil
 			} else {
 				return fmt.Errorf("error creating bucket %s: %v", bucketKey, err)
 			}

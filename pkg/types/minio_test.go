@@ -1048,9 +1048,8 @@ func TestCreateS3PathDuplicateBucket(t *testing.T) {
 	client := &MinIOAdminClient{}
 	fake.buckets["bucket"] = struct{}{}
 
-	err := client.CreateS3Path(fake.client, []string{"bucket"}, false)
-	if err == nil || !strings.Contains(err.Error(), "already exists") {
-		t.Fatalf("expected duplicate bucket error, got %v", err)
+	if err := client.CreateS3Path(fake.client, []string{"bucket"}, false); err != nil {
+		t.Fatalf("unexpected error when bucket already exists: %v", err)
 	}
 }
 
