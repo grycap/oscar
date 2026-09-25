@@ -26,6 +26,8 @@ const (
 	bucketVisibilityTag   = "visibility"
 	bucketAllowedUsersTag = "allowed_users"
 	bucketStorageQuotaTag = "storage_quota"
+	bucketServicesTag     = "from_service"
+	bucketServicesSep     = " "
 	bucketAllowedUsersSep = " "
 )
 
@@ -62,6 +64,56 @@ func BucketTags(bucket types.MinIOBucket, ownerName string) map[string]string {
 	}
 	if bucket.StorageQuota != nil && bucket.StorageQuota.Max != "" {
 		tags[bucketStorageQuotaTag] = bucket.StorageQuota.Max
+	}
+	return tags
+}
+
+func ServicesFromBucketTags(metadata map[string]string) []string {
+	if metadata == nil {
+		return nil
+	}
+	raw := strings.TrimSpace(metadata[bucketServicesTag])
+	if raw == "" {
+		return nil
+	}
+	values := strings.Fields(strings.ReplaceAll(raw, ",", bucketServicesSep))
+	services := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			services = append(services, value)
+		}
+	}
+	return services
+}
+
+func AddServiceToBucketTag(tags map[string]string, service string) map[string]string {
+	if tags == nil {
+		tags = map[string]string{}
+	}
+	services := ServicesFromBucketTags(tags)
+	for _, s := range services {
+		if s == service {
+			return tags
+		}
+	}
+	services = append(services, service)
+	tags[bucketServicesTag] = strings.Join(services, bucketServicesSep)
+	return tags
+}
+
+func RemoveServiceFromBucketTag(tags map[string]string, service string) map[string]string {
+	services := ServicesFromBucketTags(tags)
+	out := services[:0]
+	for _, s := range services {
+		if s != service {
+			out = append(out, s)
+		}
+	}
+	if len(out) == 0 {
+		delete(tags, bucketServicesTag)
+	} else {
+		tags[bucketServicesTag] = strings.Join(out, bucketServicesSep)
 	}
 	return tags
 }

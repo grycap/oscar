@@ -315,6 +315,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 							tags[key] = value
 						}
 					}
+					tags = utils.AddServiceToBucketTag(tags, newService.Name)
 					if err := objectStorageIAM.GetClient(c.Request.Context()).SetTags(b.BucketName, tags); err != nil {
 						c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
 						return

@@ -930,9 +930,10 @@ func TestGetSimpleClientAndRestartServer(t *testing.T) {
 // S3 path helpers (merged from minio_s3_test.go)
 
 type fakeS3Client struct {
-	client        *s3.S3
-	buckets       map[string]struct{}
-	notifications map[string][]*s3.QueueConfiguration
+	client              *s3.S3
+	buckets             map[string]struct{}
+	notifications       map[string][]*s3.QueueConfiguration
+	existsBucketErrCode string
 }
 
 func newFakeS3Client(t *testing.T) *fakeS3Client {
@@ -967,7 +968,11 @@ func newFakeS3Client(t *testing.T) *fakeS3Client {
 		case "CreateBucket":
 			name := aws.StringValue(r.Params.(*s3.CreateBucketInput).Bucket)
 			if _, ok := f.buckets[name]; ok {
-				r.Error = awserr.New(s3.ErrCodeBucketAlreadyOwnedByYou, "bucket exists", nil)
+				code := f.existsBucketErrCode
+				if code == "" {
+					code = s3.ErrCodeBucketAlreadyOwnedByYou
+				}
+				r.Error = awserr.New(code, "bucket exists", nil)
 				return
 			}
 			f.buckets[name] = struct{}{}
@@ -1047,10 +1052,21 @@ func TestCreateS3PathDuplicateBucket(t *testing.T) {
 	fake := newFakeS3Client(t)
 	client := &MinIOAdminClient{}
 	fake.buckets["bucket"] = struct{}{}
+	fake.existsBucketErrCode = s3.ErrCodeBucketAlreadyExists
 
 	err := client.CreateS3Path(fake.client, []string{"bucket"}, false)
 	if err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Fatalf("expected duplicate bucket error, got %v", err)
+	}
+}
+
+func TestCreateS3PathBucketOwnedByYou(t *testing.T) {
+	fake := newFakeS3Client(t)
+	client := &MinIOAdminClient{}
+	fake.buckets["bucket"] = struct{}{}
+
+	if err := client.CreateS3Path(fake.client, []string{"bucket"}, false); err != nil {
+		t.Fatalf("unexpected error when bucket is already owned by the user: %v", err)
 	}
 }
 
