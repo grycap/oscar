@@ -1106,7 +1106,10 @@ if [ "$STORAGE_BACKEND" == "minio" ]; then
     if [ "$ENABLE_MINIO_QUOTAS" == "true" ]; then
         MINIO_HELM_MODE_ARGS="--set mode=distributed --set replicas=1 --set drivesPerNode=4 --set persistence.size=2Gi"
     fi
-    helm install minio minio/minio --namespace minio --set minioAPIPort="$HOST_MINIO_API_PORT" --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.port="$HOST_MINIO_API_PORT",service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT $MINIO_HELM_MODE_ARGS --create-namespace --version 5.4.0
+    helm install minio minio/minio --namespace minio --set minioAPIPort="$HOST_MINIO_API_PORT" \
+     --set image.repository="pgsty/silo" --set image.tag="RELEASE.2026-09-16T00-00-00Z" \
+     --set mcImage.repository="pgsty/mc" --set mcImage.tag="RELEASE.2026-09-16T00-00-00Z" \
+     --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.port="$HOST_MINIO_API_PORT",service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT $MINIO_HELM_MODE_ARGS --create-namespace 
 else
     echo -e "\n[*] Deploying RustFS storage provider ..."
     STORAGE_ACCESS_KEY="rustfs"
