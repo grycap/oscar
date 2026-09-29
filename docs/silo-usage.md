@@ -28,7 +28,7 @@ release instead of using `latest` so upgrades are explicit and reversible.
 
 ### Deploying Silo with Helm
 
-The `minio/minio` chart takes the image from the `image.repository` and
+The `minio/minio` chart takes the server image from the `image.repository` and
 `image.tag` values, so Silo can be installed directly by overriding them:
 
 ```bash
@@ -40,6 +40,33 @@ environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301,\
 image.repository=pgsty/silo,image.tag=RELEASE.2026-09-16T00-00-00Z \
  --create-namespace
 ```
+
+When deploying a **new** cluster, the `mc` client image must be overridden as
+well, so the chart's post-install job (the `minio-make-bucket`, `minio-make-policy`,
+`minio-make-user` and `minio-custom-command` jobs) also runs against Silo. The
+chart takes this image from the `mcImage.repository` and `mcImage.tag` values,
+so add:
+
+```bash
+--set mcImage.repository="pgsty/mc" --set mcImage.tag="RELEASE.2026-09-16T00-00-00Z"
+```
+
+A complete install of a new cluster with both images overridden looks like:
+
+```bash
+helm install minio minio/minio --namespace minio --set rootUser=minio,\
+rootPassword=<MINIO_PASSWORD>,service.type=NodePort,service.nodePort=30300,\
+consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,\
+resources.requests.memory=512Mi,\
+environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301,\
+image.repository=pgsty/silo,image.tag=RELEASE.2026-09-16T00-00-00Z,\
+mcImage.repository=pgsty/mc,mcImage.tag=RELEASE.2026-09-16T00-00-00Z \
+ --create-namespace
+```
+
+*Note that overriding `mcImage` is only needed for new deployments. The
+`mcImage` values have no effect on an existing MinIO installation, as the
+post-install job has already run by then.*
 
 ### Migrating an existing MinIO deployment
 
@@ -92,8 +119,9 @@ and that a new upload triggers the associated service, as described in the
   `storage_per_bucket` quotas and the erasure-coded layout provided by the
   `--minio-quotas` option keep working.
 - The upstream [MinIO client](https://min.io/docs/minio/linux/reference/minio-mc.html)
-  works unchanged against Silo. An optional client fork is also published as
-  `pgsty/mc`, shipped as `mcli`.
+  works unchanged against Silo. A maintained client fork is also published as
+  `pgsty/mc`, shipped as `mcli`, and is the image recommended above for the
+  `minio/minio` chart post-install jobs.
 - Do not delete the persistent volumes when replacing MinIO, as the data is
   reused in place.
 - Read the [release notes](https://silo.pgsty.com) and the compatibility notes
