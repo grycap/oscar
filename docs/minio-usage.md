@@ -4,8 +4,8 @@ Each OSCAR cluster includes a deployed MinIO instance, which is used to trigger 
 
 Additionally, OSCAR allows direct operations on the MinIO instance—such as creating, updating, and deleting buckets—that are independent of any specific service but still governed by the same visibility rules as services.
 
-OSCAR can also use [RustFS](rustfs-usage.md) as an alternative object storage
-provider.
+OSCAR can also use [RustFS](rustfs-usage.md) or [Silo](silo-usage.md) as an
+alternative object storage provider.
 
 ## Using graphical interfaces
 
