@@ -60,6 +60,50 @@ exact user namespace for OIDC requests. The legacy `{{services_namespace}}`
 placeholder remains supported for existing installations, but custom templates
 using it should be migrated.
 
+#### Storage and data persistence
+
+The `prometheus-community/prometheus` chart sets
+`server.persistentVolume.enabled: true` by default, so the Prometheus server
+mounts its `/data` directory on a PersistentVolumeClaim named
+`prometheus-server` that the chart itself creates. The access mode is
+`ReadWriteOnce` and the size is 2Gi.
+
+This means the data survives a Prometheus failure. If the pod is restarted,
+rescheduled or replaced by an upgrade, the TSDB blocks and the write-ahead log
+remain in the volume and are recovered on startup, instead of the metrics
+endpoints returning an empty history for the affected range. Note that the
+default retention is 15 days, so the stored history does not grow
+indefendently.
+
+The size and the storage class can be changed at install time. Setting
+`storageClass` is needed when the default provisioner of the cluster is not the
+one to use, for example to place Prometheus on the NFS storage class of a local
+deployment:
+
+```sh
+helm upgrade --install prometheus prometheus-community/prometheus \
+  --namespace monitoring \
+  --set server.persistentVolume.size=20Gi \
+  --set server.persistentVolume.storageClass=nfs
+```
+
+An already provisioned claim can be reused instead with
+`server.persistentVolume.existingClaim`, in which case the PVC must exist
+before the volume is bound.
+
+The claim protects the data against the loss of the Prometheus process, but not
+against the deletion of the claim itself: removing the `prometheus-server`
+PersistentVolumeClaim deletes the stored blocks with it. A storage class that
+cannot provision on demand is also a common cause for the pod to stay
+`Pending`.
+
+To check how much space the installation is using and which capacity backs the
+claim, the repository provides a helper script:
+
+```sh
+bash deploy/metrics/check-monitoring-storage.sh
+```
+
 ### Loki request logs (durable breakdowns)
 
 Request-based metrics (breakdowns, request counts) can be sourced from Loki for
