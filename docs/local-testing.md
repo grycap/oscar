@@ -151,13 +151,19 @@ To enable Ingress support for accessing the OSCAR server, we must deploy the
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/kind/deploy.yaml
 ```
 
-### Deploy MinIO
+### Deploy MinIO (Silo)
 
 OSCAR depends on [MinIO](https://min.io/) as a storage provider and function
-trigger. The easy way to run MinIO in a Kubernetes cluster is by installing
-its [helm chart](https://github.com/minio/helm). To install the helm MinIO
-repo and install the chart, run the following commands replacing
-`<MINIO_PASSWORD>` with a password. It must have at least 8 characters:
+trigger. The easiest way to run it in a Kubernetes cluster is still to use the
+official [MinIO Helm chart](https://github.com/minio/helm) for compatibility
+and deployment automation, but in practice the deployment is switched to the
+[Silo](https://github.com/pgsty/silo) image, a maintained fork of MinIO. This
+is intentional because the upstream MinIO image reached end-of-life and Silo
+continues providing the same MinIO-compatible behavior with active maintenance.
+
+To install the helm MinIO repo and deploy the chart run the following commands
+replacing `<MINIO_PASSWORD>` with a password. It must have at least 8
+characters:
 
 ```sh
 helm repo add minio https://charts.min.io
@@ -165,7 +171,9 @@ helm install minio minio/minio --namespace minio --set rootUser=minio,\
 rootPassword=<MINIO_PASSWORD>,service.type=NodePort,service.nodePort=30300,\
 consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,\
 resources.requests.memory=512Mi,\
-environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 \
+environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301,\
+image.repository="pgsty/silo",image.tag="RELEASE.2026-09-16T00-00-00Z",\
+mcImage.repository="pgsty/mc",mcImage.tag="RELEASE.2026-09-16T00-00-00Z" \
  --create-namespace
 ```
 
@@ -178,7 +186,9 @@ rootPassword=<MINIO_PASSWORD>,service.type=NodePort,service.nodePort=30300,\
 consoleService.type=NodePort,consoleService.nodePort=30301,mode=distributed,\
 replicas=1,drivesPerNode=4,persistence.size=2Gi,\
 resources.requests.memory=512Mi,\
-environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 \
+environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301,\
+image.repository="pgsty/silo",image.tag="RELEASE.2026-09-16T00-00-00Z",\
+mcImage.repository="pgsty/mc",mcImage.tag="RELEASE.2026-09-16T00-00-00Z" \
  --create-namespace
 ```
 
