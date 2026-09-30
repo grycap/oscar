@@ -231,7 +231,6 @@ kubectl -n kube-system patch deployment metrics-server --type='json' -p='[{"op":
 
 > Note that the local testing environment uses Kind, therefore the metrics will not work as expected.
 
-<<<<<<< HEAD
 ### Monitoring stack (Prometheus + Loki + Alloy)
 
 Monitoring deployment and verification steps were moved to
@@ -294,8 +293,6 @@ subjects:
 EOF
 ```
 
-=======
->>>>>>> 478f4b4a11475418256e28140153fd408ff4afcd
 ### Deploy Knative Serving as Serverless Backend (OPTIONAL)
 
 OSCAR supports [Knative Serving](https://knative.dev/docs/serving/) as
