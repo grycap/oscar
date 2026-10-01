@@ -31,10 +31,12 @@ Further information about the MinIO Console is available in the [MinIO Console d
 
 MinIO buckets can also be managed through [oscar-cli command-line](https://github.com/grycap/oscar-cli) or the official [MinIO client](https://min.io/docs/minio/linux/reference/minio-mc.html). 
 
-- **oscar-cli**: The OSCAR client provides a dedicated set of commands for accessing files within buckets. It is important to note that this interface does not support DELETE or UPDATE operations. Below is a brief overview of the available commands and their functionalities.
-  - [get-file](oscar-cli.md#get-file): Get file from a service's storage provider.
+- **oscar-cli**: The OSCAR client provides commands for accessing and managing files. Available operations include:
+  - [get-file](oscar-cli.md#get-file): Get a file from a service's storage provider.
   - [list-files](oscar-cli.md#list-files): List files from a service's storage provider path.
-  - [put-file](oscar-cli.md#put-file): Upload a file on a service storage provider.
+  - [put-file](oscar-cli.md#put-file): Upload a file to a service storage provider.
+  - `oscar-cli service delete-file SERVICE_NAME STORAGE_PROVIDER REMOTE_FILE`: Delete a file from a service storage provider (MinIO, S3, or Onedata).
+  - `oscar-cli bucket delete-file BUCKET_NAME REMOTE_PATH`: Delete a file from a MinIO bucket.
   
   An example of a put-file operation:
 
