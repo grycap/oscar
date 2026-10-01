@@ -351,10 +351,10 @@ Global Flags:
 > The following subcommands will not work with MinIO if you use a local deployment due to DNS resolutions, so if you want to use a command line put/get/list files from your buckets, you can use the [MinIO client](https://min.io/docs/minio/linux/reference/minio-mc.html) command line. <br>
 > Once you have the client installed you can define the cluster with the `mc alias` command like it follows:
 > ```
-> mc alias set myminio https://localhost:30000 minioadminuser minioadminpassword
+> mc alias set myminio http://localhost:30300 minioadminuser minioadminpassword
 > ```
 > So, instead of the next subcommands, you would use:
-> - [`mc cp`](https://min.io/docs/minio/linux/reference/minio-mc/mc-cp.html) to put/get files fron a bucket. <br>
+> - [`mc cp`](https://min.io/docs/minio/linux/reference/minio-mc/mc-cp.html) to put/get files from a bucket. <br>
 > - [`mc ls`](https://min.io/docs/minio/linux/reference/minio-mc/mc-ls.html) to list files from a bucket.
 
 ##### get-file
