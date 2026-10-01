@@ -59,3 +59,9 @@ The results may vary depending on the browser. For example, they will show up in
 If you deploy using IM, certificates are generated automatically via cert-manager, so no further action is required. 
 However, if you deploy "manually", it is the admin's responsibility to obtain the certificate—either by using cert-manager with DNS01 support configured or by creating it manually.
 In the manual scenario, when the certificate expires, you will need to obtain a new one and add it manually by recreating the corresponding secret.
+
+- **Should I use Silo instead of MinIO?**
+
+Yes, [Silo](https://silo.pgsty.com) is recommended over upstream MinIO for new deployments. Silo is a community-maintained fork of the open-source MinIO server (published as `pgsty/silo`) that keeps a MinIO-compatible release line alive, including security fixes and the web console.
+
+It is a drop-in replacement: it preserves the S3 API, the MinIO admin API used by OSCAR (bucket policies, tags, quotas and notification webhooks), and the on-disk format, so only the container image changes (e.g. `pgsty/silo:RELEASE.2026-09-16T00-00-00Z`, pinned instead of `latest`) while keeping the same credentials and persistent volumes. No OSCAR configuration change is needed. See [Using Silo as a MinIO alternative](silo-usage.md) for the switching steps.
