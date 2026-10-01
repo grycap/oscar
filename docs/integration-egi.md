@@ -13,9 +13,9 @@ resources and built around open standards. Its development is driven by
 requirements of the scientific communities.
 
 The OSCAR platform can be deployed on the EGI Federated Cloud resources
-through the [IM Dashboard](https://im.egi.ei).
+through the [IM Dashboard](https://im.egi.eu).
 
-You can follow [EGI's IM Dashboard documentation](https://docs.egi.eu/users/compute/orchestration/im/dashboard/) or the [OSCAR's IM Dasboard](deploy-im-dashboard.md) documentation.
+You can follow [EGI's IM Dashboard documentation](https://docs.egi.eu/users/compute/orchestration/im/dashboard/) or the [OSCAR's IM Dashboard](deploy-im-dashboard.md) documentation.
 
 ![OSCAR on IM](images/oscar-egi-im.png)
 
