@@ -354,7 +354,7 @@ Global Flags:
 > mc alias set myminio https://localhost:30000 minioadminuser minioadminpassword
 > ```
 > So, instead of the next subcommands, you would use:
-> - [`mc cp`](https://min.io/docs/minio/linux/reference/minio-mc/mc-cp.html) to put/get files fron a bucket. <br>
+> - [`mc cp`](https://min.io/docs/minio/linux/reference/minio-mc/mc-cp.html) to put/get files from a bucket. <br>
 > - [`mc ls`](https://min.io/docs/minio/linux/reference/minio-mc/mc-ls.html) to list files from a bucket.
 
 ##### get-file

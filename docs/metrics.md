@@ -73,7 +73,7 @@ rescheduled or replaced by an upgrade, the TSDB blocks and the write-ahead log
 remain in the volume and are recovered on startup, instead of the metrics
 endpoints returning an empty history for the affected range. Note that the
 default retention is 15 days, so the stored history does not grow
-indefendently.
+indefinitely.
 
 The size and the storage class can be changed at install time. Setting
 `storageClass` is needed when the default provisioner of the cluster is not the
