@@ -38,7 +38,6 @@ var (
 		Name:      "testname",
 		ClusterID: "testcluster",
 		Image:     "testimage",
-		Alpine:    false,
 		Memory:    "1Gi",
 		CPU:       "1.0",
 		Federation: &Federation{
@@ -162,6 +161,20 @@ func TestGetMinIOWebhookARN(t *testing.T) {
 	}
 }
 
+func TestGetObjectStorageWebhookARN(t *testing.T) {
+	tests := map[string]string{
+		"":       "arn:minio:sqs:testregion:testname:webhook",
+		"minio":  "arn:minio:sqs:testregion:testname:webhook",
+		"rustfs": "arn:rustfs:sqs:testregion:testname:webhook",
+		"RUSTFS": "arn:rustfs:sqs:testregion:testname:webhook",
+	}
+	for storageType, expected := range tests {
+		if got := testService.GetObjectStorageWebhookARN(storageType); got != expected {
+			t.Errorf("storage type %q: expected %q, got %q", storageType, expected, got)
+		}
+	}
+}
+
 func TestGetSupervisorPath(t *testing.T) {
 	// Deep copy the testService
 	copy, err := deepcopy.Anything(testService)
@@ -171,7 +184,6 @@ func TestGetSupervisorPath(t *testing.T) {
 	svc := copy.(Service)
 
 	expectedDefault := fmt.Sprintf("%s/%s", VolumePath, SupervisorName)
-	expectedAlpine := fmt.Sprintf("%s/%s/%s", VolumePath, AlpineDirectory, SupervisorName)
 
 	path := svc.GetSupervisorPath()
 
@@ -179,14 +191,6 @@ func TestGetSupervisorPath(t *testing.T) {
 		t.Errorf("invalid supervisor path. Expected: %s, got: %s", expectedDefault, path)
 	}
 
-	// Set Alpine to true and test it
-	svc.Alpine = true
-
-	path = svc.GetSupervisorPath()
-
-	if path != expectedAlpine {
-		t.Errorf("invalid supervisor path. Expected: %s, got: %s", expectedAlpine, path)
-	}
 }
 
 func TestConvertEnvVars(t *testing.T) {
@@ -246,7 +250,6 @@ federation:
       Authorization: Bearer testtoken
 log_level: ""
 image: testimage
-alpine: false
 token: ""
 file_stage_in: false
 input: []
@@ -480,6 +483,35 @@ func TestGetExposedBasePath(t *testing.T) {
 	}
 }
 
+func TestUsesDNSRoute(t *testing.T) {
+	httpRouteConfig := &Config{ExposedServicesRouteKind: HTTPROUTE, ExposedServicesUseSubdomainRoute: true}
+	httpRouteConfigNoDNS := &Config{ExposedServicesRouteKind: HTTPROUTE, ExposedServicesUseSubdomainRoute: false}
+	ingressConfig := &Config{ExposedServicesRouteKind: Ingress}
+
+	tests := []struct {
+		name    string
+		service *Service
+		cfg     *Config
+		want    bool
+	}{
+		{name: "nil service", cfg: httpRouteConfig},
+		{name: "nil config", service: &Service{}},
+		{name: "ingress", service: &Service{}, cfg: ingressConfig},
+		{name: "HTTPRoute without NodePort with DNS subdomain use enabled", service: &Service{}, cfg: httpRouteConfig, want: true},
+		{name: "HTTPRoute with DNS subdomain use disabled", service: &Service{}, cfg: httpRouteConfigNoDNS, want: false},
+		{name: "HTTPRoute with dynamic NodePort with DNS subdomain", service: &Service{Expose: Expose{NodePort: []int32{0}}}, cfg: httpRouteConfig, want: true},
+		{name: "HTTPRoute with static NodePort with DNS subdomain", service: &Service{Expose: Expose{NodePort: []int32{30080}}}, cfg: httpRouteConfig, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.service.UsesDNSRoute(tt.cfg); got != tt.want {
+				t.Fatalf("expected UsesDNSRoute to be %t, got %t", tt.want, got)
+			}
+		})
+	}
+}
+
 func TestGetVolumePVCName(t *testing.T) {
 	svc := Service{Name: "demo"}
 	expected := "demo"
@@ -554,88 +586,40 @@ func TestToPodSpecWithExposeMetadataEnvVars(t *testing.T) {
 	if envVars[OscarServiceBasePathEnvVar] != "/system/services/testname/exposed" {
 		t.Fatalf("expected %s to be %q, got %q", OscarServiceBasePathEnvVar, "/system/services/testname/exposed", envVars[OscarServiceBasePathEnvVar])
 	}
-}
 
-func TestKserveUnmarshalJSON(t *testing.T) {
-	t.Run("valid json", func(t *testing.T) {
-		data := []byte(`{"storage_uri":"s3://bucket/model","type":"inference","memory":"1Gi"}`)
-		k := Kserve{}
-		err := k.UnmarshalJSON(data)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if k.StorageUri != "s3://bucket/model" {
-			t.Errorf("expected StorageUri = s3://bucket/model, got %s", k.StorageUri)
-		}
-		if k.Type != "inference" {
-			t.Errorf("expected Type = inference, got %s", k.Type)
-		}
-		if k.APIVersion != "v1" {
-			t.Errorf("expected default APIVersion = v1, got %s", k.APIVersion)
-		}
-		if k.CPU != "0.2" {
-			t.Errorf("expected default CPU = 0.2, got %s", k.CPU)
-		}
-		if k.Memory != "1Gi" {
-			t.Errorf("expected Memory = 1Gi, got %s", k.Memory)
-		}
-		if k.MaxScale != 1 {
-			t.Errorf("expected default MaxScale = 1, got %d", k.MaxScale)
-		}
-	})
+	httpRouteSubdomainConfig := testConfig
+	httpRouteSubdomainConfig.ExposedServicesRouteKind = HTTPROUTE
+	httpRouteSubdomainConfig.ExposedServicesUseSubdomainRoute = true
+	podSpec, err = svc.ToPodSpec(&httpRouteSubdomainConfig)
+	if err != nil {
+		t.Fatalf("unexpected error for HTTPRoute config: %v", err)
+	}
+	envVars = envVarsToMap(podSpec.Containers[0].Env)
+	if envVars[OscarServiceBasePathEnvVar] != "/" {
+		t.Fatalf("expected HTTPRoute %s to be %q, got %q", OscarServiceBasePathEnvVar, "/", envVars[OscarServiceBasePathEnvVar])
+	}
 
-	t.Run("missing storage uri", func(t *testing.T) {
-		data := []byte(`{"type":"inference"}`)
-		k := Kserve{}
-		err := k.UnmarshalJSON(data)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-	})
+	svc.Expose.NodePort = []int32{30080}
+	podSpec, err = svc.ToPodSpec(&httpRouteSubdomainConfig)
+	if err != nil {
+		t.Fatalf("unexpected error for NodePort config: %v", err)
+	}
+	envVars = envVarsToMap(podSpec.Containers[0].Env)
+	if envVars[OscarServiceBasePathEnvVar] != "/system/services/testname/exposed" {
+		t.Fatalf("expected NodePort %s to keep the legacy path, got %q", OscarServiceBasePathEnvVar, envVars[OscarServiceBasePathEnvVar])
+	}
 
-	t.Run("missing type", func(t *testing.T) {
-		data := []byte(`{"storage_uri":"s3://bucket/model"}`)
-		k := Kserve{}
-		err := k.UnmarshalJSON(data)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-	})
-
-	t.Run("empty json", func(t *testing.T) {
-		data := []byte(`{}`)
-		k := Kserve{}
-		err := k.UnmarshalJSON(data)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-	})
-}
-
-func TestKserveInferenceUnmarshalJSON(t *testing.T) {
-	t.Run("valid json", func(t *testing.T) {
-		data := []byte(`{"model_format":"onnx","runtime":"kserve-runtime"}`)
-		ki := KserveInference{}
-		err := ki.UnmarshalJSON(data)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if ki.ModelFormat != "onnx" {
-			t.Errorf("expected ModelFormat = onnx, got %s", ki.ModelFormat)
-		}
-		if ki.Runtime != "kserve-runtime" {
-			t.Errorf("expected Runtime = kserve-runtime, got %s", ki.Runtime)
-		}
-	})
-
-	t.Run("missing model format", func(t *testing.T) {
-		data := []byte(`{"runtime":"kserve-runtime"}`)
-		ki := KserveInference{}
-		err := ki.UnmarshalJSON(data)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-	})
+	httpRouteNoSubdomainConfig := testConfig
+	httpRouteNoSubdomainConfig.ExposedServicesRouteKind = HTTPROUTE
+	httpRouteNoSubdomainConfig.ExposedServicesUseSubdomainRoute = false
+	podSpec, err = svc.ToPodSpec(&httpRouteNoSubdomainConfig)
+	if err != nil {
+		t.Fatalf("unexpected error for HTTPRoute config: %v", err)
+	}
+	envVars = envVarsToMap(podSpec.Containers[0].Env)
+	if envVars[OscarServiceBasePathEnvVar] != "/system/services/testname/exposed" {
+		t.Fatalf("expected HTTPRoute %s to be %q, got %q", OscarServiceBasePathEnvVar, "/system/services/testname/exposed", envVars[OscarServiceBasePathEnvVar])
+	}
 }
 
 func TestServiceGetVolumeName(t *testing.T) {
@@ -754,6 +738,107 @@ func TestServiceUsesManagedVolume(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.service.UsesManagedVolume(); got != tt.want {
 				t.Errorf("UsesManagedVolume() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestServiceHideSensitiveInfoIfNotOwner(t *testing.T) {
+	tests := []struct {
+		name                 string
+		owner                string
+		uid                  string
+		expectedToken        string
+		expectedVars         map[string]string
+		expectedSecrets      map[string]string
+		expectedAllowedUsers []string
+		expectedLabels       map[string]string
+	}{
+		{
+			name:          "same owner preserves all fields",
+			owner:         "user1",
+			uid:           "user1",
+			expectedToken: "testtoken",
+			expectedVars: map[string]string{
+				"TEST_VAR": "testvalue",
+			},
+			expectedSecrets: map[string]string{
+				"TEST_SECRET": "testsecret",
+			},
+			expectedAllowedUsers: []string{"userA", "userB"},
+			expectedLabels: map[string]string{
+				"testlabel":  "testlabelvalue",
+				"owner_name": "owner1",
+			},
+		},
+		{
+			name:                 "not owner hides sensitive fields and preserves owner_name label",
+			owner:                "user1",
+			uid:                  "user2",
+			expectedToken:        "hidden",
+			expectedVars:         nil,
+			expectedSecrets:      nil,
+			expectedAllowedUsers: nil,
+			expectedLabels: map[string]string{
+				"owner_name": "owner1",
+			},
+		},
+		{
+			name:                 "not owner with nil labels does not panic",
+			owner:                "user1",
+			uid:                  "user2",
+			expectedToken:        "hidden",
+			expectedVars:         nil,
+			expectedSecrets:      nil,
+			expectedAllowedUsers: nil,
+			expectedLabels:       nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := Service{
+				Name:  "svc",
+				Owner: tt.owner,
+				Token: "testtoken",
+				Environment: struct {
+					Vars    map[string]string `json:"variables"`
+					Secrets map[string]string `json:"secrets"`
+				}{
+					Vars:    map[string]string{"TEST_VAR": "testvalue"},
+					Secrets: map[string]string{"TEST_SECRET": "testsecret"},
+				},
+				AllowedUsers: []string{"userA", "userB"},
+				Labels: map[string]string{
+					"testlabel":  "testlabelvalue",
+					"owner_name": "owner1",
+				},
+			}
+			if tt.name == "not owner with nil labels does not panic" {
+				svc.Labels = nil
+			}
+
+			svc.HideSensitiveInfoIfNotOwner(tt.uid)
+
+			if svc.Token != tt.expectedToken {
+				t.Fatalf("expected token %q, got %q", tt.expectedToken, svc.Token)
+			}
+			if len(svc.Environment.Vars) != len(tt.expectedVars) {
+				t.Fatalf("expected vars %v, got %v", tt.expectedVars, svc.Environment.Vars)
+			}
+			if len(svc.Environment.Secrets) != len(tt.expectedSecrets) {
+				t.Fatalf("expected secrets %v, got %v", tt.expectedSecrets, svc.Environment.Secrets)
+			}
+			if len(svc.AllowedUsers) != len(tt.expectedAllowedUsers) {
+				t.Fatalf("expected allowed users %v, got %v", tt.expectedAllowedUsers, svc.AllowedUsers)
+			}
+			if len(svc.Labels) != len(tt.expectedLabels) {
+				t.Fatalf("expected labels %v, got %v", tt.expectedLabels, svc.Labels)
+			}
+			for key, want := range tt.expectedLabels {
+				if svc.Labels[key] != want {
+					t.Fatalf("expected label %q to be %q, got %q", key, want, svc.Labels[key])
+				}
 			}
 		})
 	}

@@ -20,7 +20,7 @@ Steps:
 kubectl create namespace monitoring
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
-cp docs/snippets/prometheus-values.kind.yaml /tmp/prometheus-values.yaml
+cp deploy/metrics/prometheus-values.kind.yaml /tmp/prometheus-values.yaml
 helm upgrade --install prometheus prometheus-community/prometheus \
   --namespace monitoring \
   --set server.service.type=ClusterIP \
@@ -85,7 +85,7 @@ Steps:
 kubectl create namespace monitoring
 helm repo add grafana https://grafana.github.io/helm-charts
 helm repo update
-cp docs/snippets/loki-values.kind.yaml /tmp/loki-values.yaml
+cp deploy/metrics/loki-values.kind.yaml /tmp/loki-values.yaml
 helm upgrade --install loki grafana/loki --namespace monitoring --values /tmp/loki-values.yaml
 ```
 
@@ -104,8 +104,8 @@ resource usage low. It also shows how to enrich OSCAR manager logs with GeoIP
 data via `loki.process` (requires a GeoIP database file mounted into the pod):
 
 ```sh
-kubectl apply -f docs/snippets/geoip-pvc.yaml
-cp docs/snippets/alloy-values.kind.yaml /tmp/alloy-values.yaml
+kubectl apply -f deploy/metrics/geoip-pvc.yaml
+cp deploy/metrics/alloy-values.kind.yaml /tmp/alloy-values.yaml
 helm upgrade --install alloy grafana/alloy --namespace monitoring --values /tmp/alloy-values.yaml
 ```
 
@@ -116,7 +116,7 @@ Notes:
 - To load the GeoIP DB into the PVC locally, use the loader pod:
 
 ```sh
-kubectl apply -f docs/snippets/geoip-loader-pod.yaml
+kubectl apply -f deploy/metrics/geoip-loader-pod.yaml
 kubectl -n monitoring cp /path/to/GeoLite2-Country.mmdb \
   geoip-loader:/var/lib/geoip/GeoLite2-Country.mmdb
 kubectl -n monitoring delete pod geoip-loader
@@ -125,7 +125,7 @@ kubectl -n monitoring delete pod geoip-loader
 Example (local file already downloaded):
 
 ```sh
-kubectl apply -f docs/snippets/geoip-loader-pod.yaml
+kubectl apply -f deploy/metrics/geoip-loader-pod.yaml
 kubectl -n monitoring cp /Users/gmolto/Downloads/GeoLite2-Country.mmdb \
   geoip-loader:/var/lib/geoip/GeoLite2-Country.mmdb
 kubectl -n monitoring delete pod geoip-loader
@@ -201,8 +201,8 @@ Steps:
 kubectl create namespace monitoring
 helm repo add grafana https://grafana.github.io/helm-charts
 helm repo update
-cp docs/snippets/grafana-values.kind.yaml /tmp/grafana-values.yaml
-cp docs/snippets/oscar-metrics-dashboard.json /tmp/oscar-metrics-dashboard.json
+cp deploy/metrics/grafana-values.kind.yaml /tmp/grafana-values.yaml
+cp deploy/metrics/oscar-metrics-dashboard.json /tmp/oscar-metrics-dashboard.json
 
 kubectl -n monitoring create configmap grafana-oscar-dashboard \
   --from-file=dashboard.json=/tmp/oscar-metrics-dashboard.json \

@@ -344,7 +344,7 @@ func TestFetchQuotaIncludesVolumeQuotas(t *testing.T) {
 		},
 	)
 
-	resp, err := fetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
+	resp, err := FetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
 	if err != nil {
 		t.Fatalf("unexpected fetchQuota error: %v", err)
 	}
@@ -364,7 +364,7 @@ func TestFetchQuotaIncludesVolumeQuotas(t *testing.T) {
 
 func TestFetchQuotaIncludesMinIOQuotas(t *testing.T) {
 	user := "user@example.org"
-	cfg := &types.Config{ServicesNamespace: "oscar-svc"}
+	cfg := &types.Config{ServicesNamespace: "oscar-svc", MinIOQuotaEnabled: true}
 	namespace := utils.BuildUserNamespace(cfg, user)
 	client := fake.NewSimpleClientset(
 		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}},
@@ -377,7 +377,7 @@ func TestFetchQuotaIncludesMinIOQuotas(t *testing.T) {
 		},
 	)
 
-	resp, err := fetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
+	resp, err := FetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
 	if err != nil {
 		t.Fatalf("unexpected fetchQuota error: %v", err)
 	}
@@ -394,11 +394,11 @@ func TestFetchQuotaIncludesMinIOQuotas(t *testing.T) {
 
 func TestFetchQuotaIncludesUnsetMinIOQuotas(t *testing.T) {
 	user := "user@example.org"
-	cfg := &types.Config{ServicesNamespace: "oscar-svc"}
+	cfg := &types.Config{ServicesNamespace: "oscar-svc", MinIOQuotaEnabled: true}
 	namespace := utils.BuildUserNamespace(cfg, user)
 	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})
 
-	resp, err := fetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
+	resp, err := FetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
 	if err != nil {
 		t.Fatalf("unexpected fetchQuota error: %v", err)
 	}
@@ -444,6 +444,7 @@ func TestFetchQuotaCountsMinIOBucketsWithoutConfiguredLimit(t *testing.T) {
 
 	cfg := &types.Config{
 		ServicesNamespace: "oscar-svc",
+		MinIOQuotaEnabled: true,
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
 			Region:    "us-east-1",
@@ -455,7 +456,7 @@ func TestFetchQuotaCountsMinIOBucketsWithoutConfiguredLimit(t *testing.T) {
 	namespace := utils.BuildUserNamespace(cfg, user)
 	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})
 
-	resp, err := fetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
+	resp, err := FetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
 	if err != nil {
 		t.Fatalf("unexpected fetchQuota error: %v", err)
 	}
@@ -598,7 +599,7 @@ func TestUpdateVolumeQuotaStoresUserVisibleDiskQuota(t *testing.T) {
 		t.Fatalf("expected raw volume quota to include non-managed PVC count, got %s", rawVolumes.String())
 	}
 
-	resp, err := fetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
+	resp, err := FetchQuota(t.Context(), cfg, types.QuotaBackend{KubeClientset: client}, user)
 	if err != nil {
 		t.Fatalf("unexpected fetchQuota error: %v", err)
 	}
@@ -623,6 +624,12 @@ func TestEnsureKueueQuotasEnabled(t *testing.T) {
 			t.Fatalf("expected nil error, got %v", err)
 		}
 	})
+}
+
+func TestEnsureQuotasEnabledAllowsMinIOOnly(t *testing.T) {
+	if err := ensureQuotasEnabled(&types.Config{MinIOQuotaEnabled: true}); err != nil {
+		t.Fatalf("expected minio-only quotas to be enabled, got %v", err)
+	}
 }
 
 func TestIsMissingKueueAPI(t *testing.T) {

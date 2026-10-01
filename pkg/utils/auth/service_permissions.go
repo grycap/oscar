@@ -23,7 +23,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -82,13 +81,13 @@ func GetServicePermissionsMiddleware(back types.ServerlessBackend) gin.HandlerFu
 
 func hasPermission(service *types.Service, uid string) bool {
 	switch service.Visibility {
-	case utils.PUBLIC:
+	case types.PUBLIC:
 		return true
-	case utils.PRIVATE:
+	case types.PRIVATE:
 		if service.Owner == uid {
 			return true
 		}
-	case utils.RESTRICTED:
+	case types.RESTRICTED:
 		if service.Owner == uid || slices.Contains(service.AllowedUsers, uid) {
 			return true
 		}

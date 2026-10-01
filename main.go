@@ -103,16 +103,16 @@ func main() {
 	} else if cfg.VolumeEnable {
 		qb = &types.QuotaBackend{KubeClientset: kubeClientset}
 	}
-	if qb == nil && (cfg.KueueEnable || cfg.VolumeEnable) {
+	if qb == nil && (cfg.KueueEnable || cfg.VolumeEnable || cfg.MinIOQuotaEnabled) {
 		qb = &types.QuotaBackend{KubeClientset: kubeClientset}
 	}
 
 	// Create the router
 	r := gin.Default()
 
-	r.GET("/system/services/:serviceName/auth",
-		append(auth.BuildServiceAuthMiddlewareChain(cfg, kubeClientset, back), handlers.MakeServiceAuthHandler())...,
-	)
+	serviceAuthMiddleware := append(auth.BuildServiceAuthMiddlewareChain(cfg, kubeClientset, back), handlers.MakeServiceAuthHandler(cfg))
+	r.GET("/system/services/:serviceName/auth", serviceAuthMiddleware...)
+	r.POST("/system/services/:serviceName/auth", serviceAuthMiddleware...)
 
 	// Swagger UI endpoint (disabled in production)
 	// r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -171,17 +171,19 @@ func main() {
 	metricsSources := metrics.DefaultSources(cfg, back, kubeClientset)
 	metricsAgg := &metrics.Aggregator{Sources: metricsSources}
 	metricsGroup := r.Group("/system/metrics", auth.GetAuthMiddleware(cfg, kubeClientset))
-	metricsGroup.GET("", handlers.MakeMetricsSummaryHandler(back, metricsAgg))
-	metricsGroup.GET("/breakdown", handlers.MakeMetricsBreakdownHandler(back, metricsAgg))
-	metricsGroup.GET("/:serviceName", handlers.MakeMetricValueHandler(back, metricsAgg))
+	metricsGroup.GET("", handlers.MakeMetricsSummaryHandler(cfg, back, metricsAgg))
+	metricsGroup.GET("/breakdown", handlers.MakeMetricsBreakdownHandler(cfg, back, metricsAgg))
+	metricsGroup.GET("/owners", handlers.MakeMetricsOwnersHandler(cfg, back))
+	metricsGroup.GET("/:serviceName", handlers.MakeMetricValueHandler(cfg, back, metricsAgg))
+
 	// Quotas
-	if cfg.KueueEnable || cfg.VolumeEnable {
+	if cfg.KueueEnable || cfg.VolumeEnable || cfg.MinIOQuotaEnabled {
 		system.GET("/quotas/user", handlers.MakeGetOwnQuotaHandler(*qb, cfg))
 		system.GET("/quotas/user/:userId", handlers.MakeGetUserQuotaHandler(*qb, cfg))
 		system.PUT("/quotas/user/:userId", handlers.MakeUpdateUserQuotaHandler(*qb, cfg))
 	}
 	// Job path for async invocations
-	r.POST("/job/:serviceName", auth.GetLoggerMiddleware(), handlers.MakeJobHandler(cfg, kubeClientset, back, resMan))
+	r.POST("/job/:serviceName", auth.GetLoggerMiddleware(), handlers.MakeJobHandler(cfg, *qb, back, resMan))
 
 	// Service path for sync invocations (only if ServerlessBackend is enabled)
 	syncBack, ok := back.(types.SyncBackend)

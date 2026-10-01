@@ -34,6 +34,13 @@ const (
 var (
 	defaultCpuRequest    = resource.MustParse("0.2")
 	defaultMemoryRequest = resource.MustParse("256Mi")
+	newKueueClient       = func() (kueueclientset.Interface, error) {
+		restCfg, err := rest.InClusterConfig()
+		if err != nil {
+			return nil, err
+		}
+		return kueueclientset.NewForConfig(restCfg)
+	}
 )
 
 var KueueLogger = log.New(os.Stdout, "[KUEUE-SERVICE] ", log.Flags())
@@ -412,30 +419,22 @@ func getWorkloadSpec(service types.Service, namespace string, cfg *types.Config,
 }
 
 func getResourceOnlyWorkloadSpec(service *types.Service, cfg *types.Config, namespace, workloadName, localQueueName string) (*kueuev1.Workload, error) {
-	serviceRequests, err := getServiceResourceRequests(service, cfg)
-	if err != nil {
-		return nil, err
-	}
-	var serviceReplicas int32 = 1
 
-	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 && service.Expose.MinScale > 1 {
-		serviceReplicas = service.Expose.MinScale
-	} else if service.Synchronous.MinScale > 1 {
-		if service.Synchronous.MinScale > math.MaxInt32 {
-			return nil, fmt.Errorf("synchronous min_scale %d exceeds int32 range", service.Synchronous.MinScale)
+	podSets := []kueuev1.PodSet{}
+	if service.Image != "" {
+		serviceRequests, serviceReplicas, err := getServiceResourceRequests(service, cfg)
+		if err != nil {
+			return nil, err
 		}
-		serviceReplicas = int32(service.Synchronous.MinScale)
+
+		podSets = append(podSets, buildResourceCheckPodSet("oscar-service", serviceReplicas, serviceRequests))
 	}
 
-	podSets := []kueuev1.PodSet{
-		buildResourceCheckPodSet("oscar-service", serviceReplicas, serviceRequests),
-	}
-
-	kserveRequests, kserveReplicas, hasKservePodSet, err := getKserveResourceRequests(service, cfg)
-	if err != nil {
-		return nil, err
-	}
-	if hasKservePodSet {
+	if service.IsKserve() {
+		kserveRequests, kserveReplicas, err := getKserveResourceRequests(service, cfg)
+		if err != nil {
+			return nil, err
+		}
 		podSets = append(podSets, buildResourceCheckPodSet("kserve-service", kserveReplicas, kserveRequests))
 	}
 
@@ -475,7 +474,7 @@ func buildResourceCheckPodSet(name string, replicas int32, requests v1.ResourceL
 	}
 }
 
-func getServiceResourceRequests(service *types.Service, cfg *types.Config) (v1.ResourceList, error) {
+func getServiceResourceRequests(service *types.Service, cfg *types.Config) (v1.ResourceList, int32, error) {
 	requests := v1.ResourceList{}
 	var cpuQty resource.Quantity = defaultCpuRequest
 	var memoryQty resource.Quantity = defaultMemoryRequest
@@ -483,14 +482,14 @@ func getServiceResourceRequests(service *types.Service, cfg *types.Config) (v1.R
 	if len(service.CPU) > 0 {
 		parsedCPU, err := resource.ParseQuantity(service.CPU)
 		if err != nil {
-			return nil, fmt.Errorf("invalid service CPU %q: %w", service.CPU, err)
+			return nil, 0, fmt.Errorf("invalid service CPU %q: %w", service.CPU, err)
 		}
 		cpuQty = parsedCPU
 	}
 	if len(service.Memory) > 0 {
 		parsedMemory, err := resource.ParseQuantity(service.Memory)
 		if err != nil {
-			return nil, fmt.Errorf("invalid service memory %q: %w", service.Memory, err)
+			return nil, 0, fmt.Errorf("invalid service memory %q: %w", service.Memory, err)
 		}
 		memoryQty = parsedMemory
 	}
@@ -502,7 +501,7 @@ func getServiceResourceRequests(service *types.Service, cfg *types.Config) (v1.R
 	if len(service.EphemeralStorageRequest) > 0 {
 		parsedEphemeral, err := resource.ParseQuantity(service.EphemeralStorageRequest)
 		if err != nil {
-			return nil, fmt.Errorf("invalid service ephemeral storage %q: %w", service.EphemeralStorageRequest, err)
+			return nil, 0, fmt.Errorf("invalid service ephemeral storage %q: %w", service.EphemeralStorageRequest, err)
 		}
 		requests[v1.ResourceEphemeralStorage] = parsedEphemeral
 	}
@@ -510,7 +509,7 @@ func getServiceResourceRequests(service *types.Service, cfg *types.Config) (v1.R
 	if service.EnableGPU {
 		gpu, err := resource.ParseQuantity("1")
 		if err != nil {
-			return nil, fmt.Errorf("invalid service GPU quantity: %w", err)
+			return nil, 0, fmt.Errorf("invalid service GPU quantity: %w", err)
 		}
 		requests["nvidia.com/gpu"] = gpu
 	}
@@ -518,22 +517,32 @@ func getServiceResourceRequests(service *types.Service, cfg *types.Config) (v1.R
 	if service.EnableSGX {
 		sgx, err := resource.ParseQuantity("1")
 		if err != nil {
-			return nil, fmt.Errorf("invalid service SGX quantity: %w", err)
+			return nil, 0, fmt.Errorf("invalid service SGX quantity: %w", err)
 		}
 		requests["sgx.intel.com/enclave"] = sgx
 	}
 
 	if len(requests) == 0 {
-		return nil, fmt.Errorf("service %q has no resource requests to validate", service.Name)
+		return nil, 0, fmt.Errorf("service %q has no resource requests to validate", service.Name)
 	}
 
-	return requests, nil
+	var serviceReplicas int32 = 1
+	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 && service.Expose.MinScale > 1 {
+		serviceReplicas = service.Expose.MinScale
+	} else if service.Synchronous.MinScale > 1 {
+		if service.Synchronous.MinScale > math.MaxInt32 {
+			return nil, 0, fmt.Errorf("synchronous min_scale %d exceeds int32 range", service.Synchronous.MinScale)
+		}
+		serviceReplicas = int32(service.Synchronous.MinScale)
+	}
+
+	return requests, serviceReplicas, nil
 }
 
-func getKserveResourceRequests(service *types.Service, cfg *types.Config) (v1.ResourceList, int32, bool, error) {
-	isKserveService := IsKserveService(service) && IsKserveSupported(cfg)
-	if !isKserveService {
-		return nil, 0, false, nil
+func getKserveResourceRequests(service *types.Service, cfg *types.Config) (v1.ResourceList, int32, error) {
+
+	if !service.IsKserve() || !IsKserveSupported(cfg) {
+		return nil, 0, fmt.Errorf("KServe is not supported in the current configuration")
 	}
 
 	requests := v1.ResourceList{}
@@ -543,14 +552,14 @@ func getKserveResourceRequests(service *types.Service, cfg *types.Config) (v1.Re
 	if len(service.Kserve.CPU) > 0 {
 		parsedCPU, err := resource.ParseQuantity(service.Kserve.CPU)
 		if err != nil {
-			return nil, 0, false, fmt.Errorf("invalid KServe service CPU %q: %w", service.Kserve.CPU, err)
+			return nil, 0, fmt.Errorf("invalid KServe service CPU %q: %w", service.Kserve.CPU, err)
 		}
 		cpuQty = parsedCPU
 	}
 	if len(service.Kserve.Memory) > 0 {
 		parsedMemory, err := resource.ParseQuantity(service.Kserve.Memory)
 		if err != nil {
-			return nil, 0, false, fmt.Errorf("invalid KServe service memory %q: %w", service.Kserve.Memory, err)
+			return nil, 0, fmt.Errorf("invalid KServe service memory %q: %w", service.Kserve.Memory, err)
 		}
 		memoryQty = parsedMemory
 	}
@@ -561,7 +570,7 @@ func getKserveResourceRequests(service *types.Service, cfg *types.Config) (v1.Re
 	if service.Kserve.EnableGPU {
 		gpu, err := resource.ParseQuantity("1")
 		if err != nil {
-			return nil, 0, false, fmt.Errorf("invalid KServe service GPU quantity: %w", err)
+			return nil, 0, fmt.Errorf("invalid KServe service GPU quantity: %w", err)
 		}
 		requests["nvidia.com/gpu"] = gpu
 	}
@@ -572,7 +581,7 @@ func getKserveResourceRequests(service *types.Service, cfg *types.Config) (v1.Re
 	}
 
 	// resoures, replicas, hasKservePodSet, err
-	return requests, kserveMinScale, true, nil
+	return requests, kserveMinScale, nil
 }
 
 // checkQueueReferences validates that the specified LocalQueue and ClusterQueue exist and are correctly linked.
@@ -618,61 +627,9 @@ func buildVerificationWorkloadName(serviceName string) string {
 }
 
 func CheckWorkloadAdmited(service types.Service, namespace string, cfg *types.Config, kubeClientset kubernetes.Interface, templateFunction func(types.Service, string, *types.Config) *apps.Deployment) error {
-	restCfg, err := rest.InClusterConfig()
-	if err != nil {
-		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
-		return err
-	}
-
-	kueueClient, err := kueueclientset.NewForConfig(restCfg)
-	if err != nil {
-		KueueLogger.Printf("error building kueue clientset: %v", err)
-		return err
-	}
-	factory := kueueinformers.NewSharedInformerFactory(kueueClient, 0)
-	workloadsInformer := factory.Kueue().V1beta2().Workloads().Informer()
-
-	resource, err := workloadsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			_, ok := newObj.(*kueuev1.Workload)
-			if !ok {
-				KueueLogger.Printf("error: unexpected type in workload informer")
-				return
-			}
-		},
-	})
-	if err != nil {
-		KueueLogger.Printf("error adding event handler to workload informer: %v, %v", err, resource)
-	}
-
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
-	factory.Start(stopCh)
-
-	if !cache.WaitForCacheSync(stopCh, workloadsInformer.HasSynced) {
-		return fmt.Errorf("failed to sync workload informer")
-	}
-	obj, exists, err := workloadsInformer.GetIndexer().GetByKey(namespace + "/" + service.Name)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return fmt.Errorf("workload not found")
-	}
-
-	wl := obj.(*kueuev1.Workload)
-	admitted := false
-	for _, c := range wl.Status.Conditions {
-		if c.Type == kueuev1.WorkloadAdmitted &&
-			c.Status == metav1.ConditionTrue {
-			admitted = true
-			break
-		}
-	}
-	if !admitted {
+	if !onlyCheckWorkloadAdmited(namespace, service.Name, defaultKueueAdmissionTimeout) {
 		DeleteWorkload(service.Name, namespace, cfg)
-		return fmt.Errorf("workload for exposed service '%s' is NOT admitted", service.Name)
+		return fmt.Errorf("workload for exposed service '%s' was not admitted within %s", service.Name, defaultKueueAdmissionTimeout)
 	} else {
 		KueueLogger.Printf("workload for exposed service '%s' is admitted", service.Name)
 		deployment := templateFunction(service, namespace, cfg) //getDeploymentSpec
@@ -706,7 +663,7 @@ func VerifyWorkload(service types.Service, namespace string, cfg *types.Config) 
 	if !CreateWorkload(service, namespace, cfg, getPodTemplateSpec) {
 		return false
 	}
-	check := onlyCheckWorkloadAdmited(service.Name, defaultKueueAdmissionTimeout)
+	check := onlyCheckWorkloadAdmited(namespace, service.Name, defaultKueueAdmissionTimeout)
 	delete := DeleteWorkload(service.Name, namespace, cfg)
 	return check && delete
 }
@@ -759,7 +716,7 @@ func VerifyWorkloadByResources(service types.Service, cfg *types.Config) bool {
 		return false
 	}
 
-	check := onlyCheckWorkloadAdmited(workloadName, 4*time.Second)
+	check := onlyCheckWorkloadAdmited(namespace, workloadName, 1*time.Second)
 	delete := DeleteWorkload(workloadName, namespace, cfg)
 	return check && delete
 }
@@ -787,13 +744,8 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 	}
 }
 
-func onlyCheckWorkloadAdmited(serviceName string, timeout time.Duration) bool {
-	restCfg, err := rest.InClusterConfig()
-	if err != nil {
-		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
-		return false
-	}
-	kueueClient, err := kueueclientset.NewForConfig(restCfg)
+func onlyCheckWorkloadAdmited(namespace, serviceName string, timeout time.Duration) bool {
+	kueueClient, err := newKueueClient()
 	if err != nil {
 		KueueLogger.Printf("error building kueue clientset: %v", err)
 		return false
@@ -807,7 +759,7 @@ func onlyCheckWorkloadAdmited(serviceName string, timeout time.Duration) bool {
 	resource, err := workloadsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newWL := newObj.(*kueuev1.Workload)
-			if newWL.Name != serviceName {
+			if newWL.Namespace != namespace || newWL.Name != serviceName {
 				return
 			}
 			if workloadIsAdmitted(newWL) {
@@ -831,7 +783,7 @@ func onlyCheckWorkloadAdmited(serviceName string, timeout time.Duration) bool {
 	}
 
 	for _, obj := range workloadsInformer.GetStore().List() {
-		if wl, ok := obj.(*kueuev1.Workload); ok && wl.Name == serviceName && workloadIsAdmitted(wl) {
+		if wl, ok := obj.(*kueuev1.Workload); ok && wl.Namespace == namespace && wl.Name == serviceName && workloadIsAdmitted(wl) {
 			KueueLogger.Printf("Workload %s admitted", serviceName)
 			return true
 		}

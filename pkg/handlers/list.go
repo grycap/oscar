@@ -24,7 +24,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	"k8s.io/client-go/kubernetes"
 )
@@ -63,15 +62,17 @@ func MakeListHandler(back types.ServerlessBackend, kubeClientset kubernetes.Inte
 			allowedServicesForUser := []*types.Service{}
 			for _, service := range services {
 				switch service.Visibility {
-				case utils.PUBLIC:
+				case types.PUBLIC:
 					isAllowedServiceForUser = true
-				case utils.PRIVATE:
+					service.HideSensitiveInfoIfNotOwner(uid)
+				case types.PRIVATE:
 					if service.Owner == uid {
 						isAllowedServiceForUser = true
 					}
-				case utils.RESTRICTED:
+				case types.RESTRICTED:
 					if service.Owner == uid || slices.Contains(service.AllowedUsers, uid) {
 						isAllowedServiceForUser = true
+						service.HideSensitiveInfoIfNotOwner(uid)
 					}
 				}
 				// If the service is allowed for the user,

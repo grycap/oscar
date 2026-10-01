@@ -53,7 +53,12 @@ To skip the wizard prompts and automatically install from the `devel` branch, ru
 ```sh
 bash oscar/deploy/kind-deploy.sh --devel
 ```
-This flag auto-enables Knative Serving and the local Docker registry so you can test the full development stack without manual input.
+This flag auto-enables **Knative Serving** and the **local Docker registry**. By default it will use **traefik**, **DNS subdomains (wildcards)** and **localhost.direct** as the OSCAR hostname, that way you can test the full development stack with latest features without manual input.
+
+If you want to use ingress with subpaths and ingress, use:  
+```sh
+bash oscar/deploy/kind-deploy.sh --devel --ingress --wildcards="false" --host="localhost"  
+```
 
 To enable OIDC authentication support in the deployed OSCAR (disabled by default), add:
 
@@ -79,6 +84,17 @@ four PVC-backed drives, which is required by the MinIO bucket quota admin API.
 Without this option, the local deployment keeps the simpler standalone MinIO
 mode.
 
+To use RustFS instead of MinIO as the object storage backend, add:
+
+```sh
+bash oscar/deploy/kind-deploy.sh --storage=rustfs
+```
+
+This installs the RustFS Helm chart in the `rustfs` namespace and configures
+OSCAR with `OBJECT_STORAGE_TYPE=rustfs`. It is not compatible with the
+`--minio-quotas` option, which needs the erasure-coded distributed MinIO
+layout. See the [RustFS storage provider](rustfs-usage.md) for details.
+
 To enable the KServe module in the deployed OSCAR, add:
 
 ```sh
@@ -88,6 +104,16 @@ bash oscar/deploy/kind-deploy.sh --kserve
 This option deploys KServe InferenceService and LLMInferenceService controllers and is required in order to use [KServe settings](fdl.md#kservesettings) in the FDL.
 
 *Note that in order to enable KServe, you must use Traefik as the Gateway API provider (the script uses it by default).*
+
+To deploy the metrics stack (Prometheus, Loki and Alloy) in the local cluster, add:
+
+```sh
+bash oscar/deploy/kind-deploy.sh --metrics
+```
+
+This option installs the `kube-prometheus-stack`, Loki and Alloy charts in the
+`monitoring` namespace, which is required for the usage metrics reported by the
+[`/system/metrics` endpoints](metrics.md).
 
 ## Steps for manual local deployment
 
@@ -135,13 +161,19 @@ To enable Ingress support for accessing the OSCAR server, we must deploy the
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/kind/deploy.yaml
 ```
 
-### Deploy MinIO
+### Deploy MinIO (Silo)
 
 OSCAR depends on [MinIO](https://min.io/) as a storage provider and function
-trigger. The easy way to run MinIO in a Kubernetes cluster is by installing
-its [helm chart](https://github.com/minio/helm). To install the helm MinIO
-repo and install the chart, run the following commands replacing
-`<MINIO_PASSWORD>` with a password. It must have at least 8 characters:
+trigger. The easiest way to run it in a Kubernetes cluster is still to use the
+official [MinIO Helm chart](https://github.com/minio/helm) for compatibility
+and deployment automation, but in practice the deployment is switched to the
+[Silo](https://github.com/pgsty/silo) image, a maintained fork of MinIO. This
+is intentional because the upstream MinIO image reached end-of-life and Silo
+continues providing the same MinIO-compatible behavior with active maintenance.
+
+To install the helm MinIO repo and deploy the chart run the following commands
+replacing `<MINIO_PASSWORD>` with a password. It must have at least 8
+characters:
 
 ```sh
 helm repo add minio https://charts.min.io
@@ -149,7 +181,9 @@ helm install minio minio/minio --namespace minio --set rootUser=minio,\
 rootPassword=<MINIO_PASSWORD>,service.type=NodePort,service.nodePort=30300,\
 consoleService.type=NodePort,consoleService.nodePort=30301,mode=standalone,\
 resources.requests.memory=512Mi,\
-environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 \
+environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301,\
+image.repository="pgsty/silo",image.tag="RELEASE.2026-09-16T00-00-00Z",\
+mcImage.repository="pgsty/mc",mcImage.tag="RELEASE.2026-09-16T00-00-00Z" \
  --create-namespace
 ```
 
@@ -162,7 +196,9 @@ rootPassword=<MINIO_PASSWORD>,service.type=NodePort,service.nodePort=30300,\
 consoleService.type=NodePort,consoleService.nodePort=30301,mode=distributed,\
 replicas=1,drivesPerNode=4,persistence.size=2Gi,\
 resources.requests.memory=512Mi,\
-environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301 \
+environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:30301,\
+image.repository="pgsty/silo",image.tag="RELEASE.2026-09-16T00-00-00Z",\
+mcImage.repository="pgsty/mc",mcImage.tag="RELEASE.2026-09-16T00-00-00Z" \
  --create-namespace
 ```
 
@@ -205,7 +241,6 @@ kubectl -n kube-system patch deployment metrics-server --type='json' -p='[{"op":
 
 > Note that the local testing environment uses Kind, therefore the metrics will not work as expected.
 
-<<<<<<< HEAD
 ### Monitoring stack (Prometheus + Loki + Alloy)
 
 Monitoring deployment and verification steps were moved to
@@ -268,8 +303,6 @@ subjects:
 EOF
 ```
 
-=======
->>>>>>> 478f4b4a11475418256e28140153fd408ff4afcd
 ### Deploy Knative Serving as Serverless Backend (OPTIONAL)
 
 OSCAR supports [Knative Serving](https://knative.dev/docs/serving/) as

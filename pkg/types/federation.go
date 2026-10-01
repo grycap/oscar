@@ -16,16 +16,69 @@ limitations under the License.
 
 package types
 
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+)
+
 // Federation defines a group of services replicated across clusters.
 type Federation struct {
 	// GroupID identifies the federation network.
 	GroupID string `json:"group_id"`
 	// Topology defines the federation topology: none, star, mesh.
 	Topology string `json:"topology"`
-	// Delegation defines the delegation policy: static, random, load-based.
+	// Delegation defines the delegation policy: static, random, load-based,quota-based.
 	Delegation string `json:"delegation,omitempty"`
 	// ReschedulerThreshold time (in seconds) that a job (with replicas) can be queued before delegating it.
 	ReschedulerThreshold int `json:"rescheduler_threshold,omitempty"`
 	// Members list of replica references in the federation.
 	Members ReplicaList `json:"members,omitempty"`
+}
+
+func (f *Federation) UnmarshalJSON(data []byte) error {
+	type Alias Federation
+
+	// Default values for the Federation struct
+	aux := Alias{
+		Delegation: "static",
+		Topology:   "none",
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if strings.TrimSpace(aux.Delegation) == "" {
+		aux.Delegation = "static"
+	}
+	if strings.TrimSpace(aux.Topology) == "" {
+		aux.Topology = "none"
+	}
+
+	*f = Federation(aux)
+	return nil
+}
+
+func (f Federation) Validate() error {
+
+	delegation := f.Delegation
+	switch delegation {
+	case "static", "random", "load-based":
+	default:
+		return fmt.Errorf(
+			"federation delegation must be static, random or load-based",
+		)
+	}
+
+	topology := f.Topology
+	switch topology {
+	case "none", "star", "mesh":
+	default:
+		return fmt.Errorf(
+			"federation topology must be none, star or mesh",
+		)
+	}
+
+	return nil
 }

@@ -165,7 +165,7 @@ func inspectDeploymentRuntime(back types.ServerlessBackend, kubeClientset kubern
 	namespace := resolveServiceNamespace(service, cfg)
 	service.Namespace = namespace
 
-	if utils.IsKserveService(service) && utils.IsKserveSupported(cfg) {
+	if service.IsKserve() && utils.IsKserveSupported(cfg) {
 		return inspectKserveDeploymentRuntime(kubeClientset, service)
 	}
 
@@ -333,7 +333,7 @@ func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.D
 	}
 
 	resourcesKind := types.DeploymentResourceKindExposedService
-	if utils.IsKserveService(service) {
+	if service.IsKserve() {
 		resourcesKind = types.DeploymentResourceKindKserveService
 	}
 
@@ -705,7 +705,7 @@ func inspectDeploymentRuntimeStatusOnly(back types.ServerlessBackend, kubeClient
 	namespace := resolveServiceNamespace(service, cfg)
 	service.Namespace = namespace
 
-	if utils.IsKserveService(service) && utils.IsKserveSupported(cfg) {
+	if service.IsKserve() && utils.IsKserveSupported(cfg) {
 		return inspectKserveDeploymentRuntimeStatusOnly(kubeClientset, service)
 	}
 

@@ -125,8 +125,7 @@ storage_providers:
 | `cluster_id` </br> *string*                                       | Identifier for the current cluster, used to specify the cluster's StorageProvider in job delegations. OSCAR-CLI sets it using the _cluster_id_ from the FDL. Optional. (default: "")                                                                            |
 | `image` </br> *string*                                            | Docker image for the service                                                                                                    |
 | `vo` </br> *string*                                               | Virtual Organization (VO) in which the user creating the service is enrolled. (Required for multitenancy)                                                             |
-| `allowed_users` </br> *string array*                    | Array of EGI UIDs to grant specific user permissions on the service. If empty, the service is considered as accessible to all the users with access to the OSCAR cluster. (Enabled since OSCAR version v3.0.0).                                                                                                                                                                |
-| `alpine` </br> *boolean*                                          | Set if the Docker image is based on Alpine. If `true`, a custom release of the [faas-supervisor](https://github.com/grycap/faas-supervisor) will be used. Optional (default: false)                                                                                                                   |
+| `allowed_users` </br> *string array*                    | Array of EGI UIDs to grant specific user permissions on the service. If empty, the service is considered as accessible to all the users with access to the OSCAR cluster. (Enabled since OSCAR version v3.0.0).                                                                                                                                                                |                                                                                                                 |
 | `script` </br> *string*                                           | Local path to the user script to be executed inside the container created out of the service invocation                                                                                                                                                                                        |
 | `file_stage_in` </br> *bool*                                      | Skip the download of the input files by the [faas-supervisor](https://github.com/grycap/faas-supervisor) (default: false)                                   |
 | `image_pull_secrets` </br> *string array*                         | Array of Kubernetes secrets. Only needed to use private images located on private registries.                                                                                            |
@@ -183,7 +182,7 @@ storage_providers:
 | `nodePort` </br> *integer* | Change the access method from the domain name to the public ip. Optional.   |
 | `set_auth` </br> *bool* | Create credentials for the service, composed of the service name as the user and the service token as the password. (default: false). Optional.  |
 | `auth_type` </br> *string* | Authentication middleware used when `set_auth` is enabled. Supported values are `basic` (default) and `forward`. `forward` is only supported for Gateway API/Traefik exposed services and delegates checks to OSCAR service authorization. Optional. |
-| `rewrite_target` </br> *bool* | It is an expose boolean in the FDL that controls how OSCAR configures the NGINX Ingress/HTTProute rewrite for exposed services. If rewrite_target: false, ingress rewrites to /$1. If rewrite_target: true, ingress rewrites to /system/services/<service>/exposed/$1 (default: false). Optional.  |
+| `rewrite_target` </br> *bool* | Controls the historical NGINX Ingress rewrite. If false, Ingress removes the OSCAR exposed-service prefix; if true, it preserves it (default: false). DNS-based HTTPRoutes always expose the container from `/` and ignore this option. Optional. |
 | `default_command` </br> *bool* | Select between executing the container's default command and executing the script inside the container. (default: false). Optional.  |
 | `health_path` </br> *string* | Change the service readiness and liveness check path/endpoint. (default: "/"). Optional.  |
 | `probe_mode` </br> *string* | Probe path mode for exposed-service pod health checks. `legacy` (default) keeps current behavior; `direct` probes only `health_path` on the container without the OSCAR ingress prefix. Optional. |
@@ -196,8 +195,7 @@ storage_providers:
 | `storage_uri` </br> *string* | Model storage URI consumed by KServe (for example `hf://...`, `oci://...`, or other KServe-compatible URIs). Required. |
 | `inference` </br> *[KServeInferenceSettings](#kserveinferencesettings)* | Inference-specific configuration. Required when `type` is `inference`. It must be omitted when `type` is `llm_inference`. |
 | `llm_inference` </br> *[KServeLLMInferenceSettings](#kservellminferencesettings)* | LLM inference configuration used with `llm_inference` services. Optional. |
-| `api_version` </br> *string* | Protocol version used by KServe predictors. Allowed values: `v1`, `v2`. Optional. (default: `v1`) |
-| `min_scale` </br> *integer* | Minimum number of predictor replicas. Optional. (default: `0`; for `llm_inference`, OSCAR enforces at least `1`) |
+| `min_scale` </br> *integer* | Minimum number of predictor replicas. Set to `0` to allow scale-to-zero (only available for `inference` type and dependent on cluster configuration). Optional. (default: `1`; for `llm_inference`, OSCAR enforces at least `1`) |
 | `max_scale` </br> *integer* | Maximum number of predictor replicas. Optional. (default: `1`). If `min_scale` is greater than `max_scale`, OSCAR sets `max_scale` equal to `min_scale`. |
 | `cpu` </br> *string* | CPU resources for the KServe workload in Kubernetes quantity format. Optional. (default: `0.2`) |
 | `memory` </br> *string* | Memory resources for the KServe workload in Kubernetes quantity format. Optional. (default: `256Mi`) |
@@ -210,8 +208,9 @@ storage_providers:
 
 | Field                        | Description                                 |
 |------------------------------| --------------------------------------------|
-| `model_format` </br> *string* | Model format expected by KServe for `inference` services. Required when `type` is `inference`. Typical values include: `onnx`, `sklearn`, `xgboost`, `pytorch`, `tensorflow`, `triton`, `huggingface`. |
-| `runtime` </br> *string* | Explicit KServe ServingRuntime name to use for `inference` services. Optional. |
+| `model_format` </br> *string* | Model format expected by KServe for `inference` services. Required when `type` is `inference`. Typical values include: `onnx`, `sklearn`, `xgboost`, `pytorch`, `tensorflow`, `triton`, `huggingface`. Every model format has its own runtime and the available runtimes may vary depending on the cluster configuration |
+| `runtime_image` </br> *string* | Explicit KServe ServingRuntime name to use for `inference` services. Use if the model format are not enough. Optional. |
+| `api_version` </br> *string* | Protocol version used by KServe predictors. Allowed values: `v1`, `v2`. Optional. (default: `v1`) |
 
 ## KServeLLMInferenceSettings
 
@@ -269,7 +268,7 @@ OSCAR also injects a small set of reserved environment variables in every servic
 |----------|-------------|
 | `OSCAR_SERVICE_NAME` | Service name. |
 | `OSCAR_SERVICE_TOKEN` | Generated OSCAR service token. |
-| `OSCAR_SERVICE_BASE_PATH` | Base exposed path, for example `/system/services/{service_name}/exposed`. It is an empty string for non-exposed services. |
+| `OSCAR_SERVICE_BASE_PATH` | Base exposed path: `/system/services/{service_name}/exposed` in default mode or `/` when using DNS in HTTPRoute mode (Ingress don't support DNS subdomains). It is an empty string for non-exposed services. |
 
 These variables are managed by OSCAR and are available in addition to the user-defined entries declared in `environment.variables`.
 

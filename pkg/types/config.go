@@ -235,6 +235,8 @@ type Config struct {
 	//
 	IngressHost string `json:"-"`
 
+	ExposedServicesUseSubdomainRoute bool `json:"exposed_services_use_subdomain_route"`
+
 	// ExposedServicesRouteKind determines which Kubernetes resource is used to expose services (ingress|httproute)
 	ExposedServicesRouteKind string `json:"-"`
 
@@ -270,10 +272,10 @@ type Config struct {
 	// PrometheusBaseURL base URL for Prometheus HTTP API
 	PrometheusBaseURL string `json:"-"`
 
-	// PrometheusCPUQuery query template for CPU hours (use {{service}}, {{range}}, and {{services_namespace}})
+	// PrometheusCPUQuery query template for CPU hours (use {{service}}, {{range}}, and {{namespace}})
 	PrometheusCPUQuery string `json:"-"`
 
-	// PrometheusGPUQuery query template for GPU hours (use {{service}}, {{range}}, and {{services_namespace}})
+	// PrometheusGPUQuery query template for GPU hours (use {{service}}, {{range}}, and {{namespace}})
 	PrometheusGPUQuery string `json:"-"`
 
 	// LokiBaseURL base URL for Loki HTTP API
@@ -293,6 +295,10 @@ type Config struct {
 
 	// MinIOQuotaEnabled option to enable the creation of ConfigMaps with MinIO quotas for each user
 	MinIOQuotaEnabled bool `json:"minio_quota_enabled"`
+
+	// ObjectStorageType selects the implementation used for object-storage IAM operations.
+	// Supported values are "minio" and "rustfs".
+	ObjectStorageType string `json:"-"`
 
 	// MinIOQuotaBuckets default number of buckets allowed per user
 	MinIOQuotaBuckets string `json:"-"`
@@ -315,6 +321,7 @@ var configVars = []configVar{
 	{"MinIOProvider.Region", "MINIO_REGION", false, stringType, "us-east-1"},
 	{"MinIOProvider.Verify", "MINIO_TLS_VERIFY", false, boolType, "true"},
 	{"MinIOProvider.Endpoint", "MINIO_ENDPOINT", false, urlType, "https://minio-service.minio:9000"},
+	{"ObjectStorageType", "OBJECT_STORAGE_TYPE", false, stringType, "minio"},
 	{"Name", "OSCAR_NAME", false, stringType, "oscar"},
 	{"Namespace", "OSCAR_NAMESPACE", false, stringType, "oscar"},
 	{"ServicesNamespace", "OSCAR_SERVICES_NAMESPACE", false, stringType, "oscar-svc"},
@@ -362,6 +369,7 @@ var configVars = []configVar{
 	{"OIDCClientSecret", "OIDC_CLIENT_SECRET", false, stringType, ""},
 	{"UsersAdmin", "USERS_ADMIN", false, stringSliceType, ""},
 	{"IngressHost", "INGRESS_HOST", false, stringType, ""},
+	{"ExposedServicesUseSubdomainRoute", "EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE", false, boolType, "false"},
 	{"ExposedServicesRouteKind", "EXPOSED_SERVICES_ROUTE_KIND", false, routeKindType, "ingress"},
 	{"HTTPRouteGatewayName", "HTTPROUTE_GATEWAY_NAME", false, stringType, "traefik-gateway"},
 	{"HTTPRouteGatewayNamespace", "HTTPROUTE_GATEWAY_NAMESPACE", false, stringType, "traefik"},
@@ -374,11 +382,11 @@ var configVars = []configVar{
 	{"JobListingLimit", "JOB_LISTING_LIMIT", false, intType, "70"},
 	{"KserveEnable", "KSERVE_ENABLE", false, boolType, "false"},
 	{"PrometheusBaseURL", "PROMETHEUS_URL", false, urlType, ""},
-	{"PrometheusCPUQuery", "PROMETHEUS_CPU_QUERY", false, stringType, "sum(increase(container_cpu_usage_seconds_total{namespace=~\"{{services_namespace}}.*\",service=~\"{{service}}\"}[{{range}}])) / 3600"},
-	{"PrometheusGPUQuery", "PROMETHEUS_GPU_QUERY", false, stringType, "sum(increase(container_gpu_usage_seconds_total{namespace=~\"{{services_namespace}}.*\",service=~\"{{service}}\"}[{{range}}])) / 3600"},
+	{"PrometheusCPUQuery", "PROMETHEUS_CPU_QUERY", false, stringType, "sum(increase(container_cpu_usage_seconds_total{namespace=~\"{{namespace}}\",service=~\"{{service}}\"}[{{range}}])) / 3600"},
+	{"PrometheusGPUQuery", "PROMETHEUS_GPU_QUERY", false, stringType, "sum(increase(container_gpu_usage_seconds_total{namespace=~\"{{namespace}}\",service=~\"{{service}}\"}[{{range}}])) / 3600"},
 	{"LokiBaseURL", "LOKI_URL", false, urlType, ""},
 	{"LokiQuery", "LOKI_QUERY", false, stringType, "{namespace=\"{{namespace}}\", app=\"{{app}}\"} |~ \"/(job|run)/\""},
-	{"LokiExposedQuery", "LOKI_EXPOSED_QUERY", false, stringType, "{namespace=\"{{namespace}}\", app=\"{{app}}\"} |~ \"/system/services/.+/exposed\""},
+	{"LokiExposedQuery", "LOKI_EXPOSED_QUERY", false, stringType, "{namespace=\"{{namespace}}\", app=\"{{app}}\"}"},
 	{"LokiExposedNamespace", "LOKI_EXPOSED_NAMESPACE", false, stringType, "ingress-nginx"},
 	{"LokiExposedAppLabel", "LOKI_EXPOSED_APP", false, stringType, "ingress-nginx"},
 	{"MinIOQuotaEnabled", "MINIO_QUOTA_ENABLED", false, boolType, "false"},

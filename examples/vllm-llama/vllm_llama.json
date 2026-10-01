@@ -16,7 +16,6 @@
   "rescheduler_threshold": 0,
   "log_level": "INFO",
   "image": "ghcr.io/grycap/vllm-llama",
-  "alpine": false,
   "script": "#!/bin/bash\npython3 -m vllm.entrypoints.openai.api_server --root-path $OPENAI_BASE_URL --model unsloth/Llama-3.2-1B-Instruct --max_model_len $MAX_MODEL_LEN --enforce-eager --gpu-memory-utilization $GPU_MEMORY_UTILIZATION \n",
   "environment": {
     "Variables": {

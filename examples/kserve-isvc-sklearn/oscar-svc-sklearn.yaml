@@ -6,7 +6,6 @@ functions:
       memory: 1Gi
       image: docker.io/curlimages/curl:8.18.0
       script: script.sh
-      alpine: true
       kserve:
         type: inference
         inference:

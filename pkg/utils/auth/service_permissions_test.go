@@ -23,7 +23,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 )
 
 func TestHasPermission(t *testing.T) {
@@ -44,7 +43,7 @@ func TestHasPermission(t *testing.T) {
 		{
 			name: "public service allows everyone",
 			service: &types.Service{
-				Visibility: utils.PUBLIC,
+				Visibility: types.PUBLIC,
 				Owner:      "owner",
 			},
 			uid:  "any-user",
@@ -53,7 +52,7 @@ func TestHasPermission(t *testing.T) {
 		{
 			name: "private service allows owner",
 			service: &types.Service{
-				Visibility: utils.PRIVATE,
+				Visibility: types.PRIVATE,
 				Owner:      "owner",
 			},
 			uid:  "owner",
@@ -62,7 +61,7 @@ func TestHasPermission(t *testing.T) {
 		{
 			name: "private service denies non-owner",
 			service: &types.Service{
-				Visibility: utils.PRIVATE,
+				Visibility: types.PRIVATE,
 				Owner:      "owner",
 			},
 			uid:  "other-user",
@@ -71,7 +70,7 @@ func TestHasPermission(t *testing.T) {
 		{
 			name: "restricted service allows owner",
 			service: &types.Service{
-				Visibility:   utils.RESTRICTED,
+				Visibility:   types.RESTRICTED,
 				Owner:        "owner",
 				AllowedUsers: []string{"allowed-user"},
 			},
@@ -81,7 +80,7 @@ func TestHasPermission(t *testing.T) {
 		{
 			name: "restricted service allows listed user",
 			service: &types.Service{
-				Visibility:   utils.RESTRICTED,
+				Visibility:   types.RESTRICTED,
 				Owner:        "owner",
 				AllowedUsers: []string{"allowed-user"},
 			},
@@ -91,7 +90,7 @@ func TestHasPermission(t *testing.T) {
 		{
 			name: "restricted service denies non-listed user",
 			service: &types.Service{
-				Visibility:   utils.RESTRICTED,
+				Visibility:   types.RESTRICTED,
 				Owner:        "owner",
 				AllowedUsers: []string{"allowed-user"},
 			},

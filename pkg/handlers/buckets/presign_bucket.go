@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	objectstorage "github.com/grycap/oscar/v4/pkg/backends/object_storage"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	"github.com/minio/minio-go/v7"
 )
@@ -42,17 +42,17 @@ const (
 type adminClientFactory func(cfg *types.Config) (presignAdminClient, error)
 
 var newPresignAdminClient adminClientFactory = func(cfg *types.Config) (presignAdminClient, error) {
-	client, err := utils.MakeMinIOAdminClient(cfg)
+	objectStorageIAM, err := objectstorage.MakeObjectStorageIAM(cfg)
 	if err != nil {
 		return nil, err
 	}
-	return &defaultPresignAdminClient{delegate: client}, nil
+	return &defaultPresignAdminClient{delegate: objectStorageIAM.GetClient(context.Background())}, nil
 }
 
 type presignAdminClient interface {
 	SimpleClient() presignSimpleClient
 	GetTaggedMetadata(bucket string) (map[string]string, error)
-	GetCurrentResourceVisibility(bucket utils.MinIOBucket) string
+	GetCurrentResourceVisibility(bucket types.MinIOBucket) string
 	ResourceInPolicy(policyName string, resource string) bool
 	GetBucketMembers(bucket string) ([]string, error)
 }
@@ -176,20 +176,20 @@ func MakePresignHandler(cfg *types.Config) gin.HandlerFunc {
 			owner = types.DefaultOwner
 		}
 
-		visibility := adminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: owner})
+		visibility := adminClient.GetCurrentResourceVisibility(types.MinIOBucket{BucketName: bucketName, Owner: owner})
 		if visibility == "" && !isAdmin {
-			visibility = adminClient.GetCurrentResourceVisibility(utils.MinIOBucket{BucketName: bucketName, Owner: requester})
+			visibility = adminClient.GetCurrentResourceVisibility(types.MinIOBucket{BucketName: bucketName, Owner: requester})
 		}
 
 		if !isAdmin {
 			allowed := requester == owner
 			if !allowed {
 				switch visibility {
-				case utils.PUBLIC:
+				case types.PUBLIC:
 					allowed = true
-				case utils.PRIVATE:
+				case types.PRIVATE:
 					allowed = adminClient.ResourceInPolicy(requester, bucketName)
-				case utils.RESTRICTED:
+				case types.RESTRICTED:
 					if adminClient.ResourceInPolicy(requester, bucketName) {
 						allowed = true
 					} else {
@@ -291,7 +291,7 @@ func flattenHeaders(headers http.Header) map[string]string {
 }
 
 type defaultPresignAdminClient struct {
-	delegate *utils.MinIOAdminClient
+	delegate *types.MinIOAdminClient
 }
 
 func (d *defaultPresignAdminClient) SimpleClient() presignSimpleClient {
@@ -302,7 +302,7 @@ func (d *defaultPresignAdminClient) GetTaggedMetadata(bucket string) (map[string
 	return d.delegate.GetTaggedMetadata(bucket)
 }
 
-func (d *defaultPresignAdminClient) GetCurrentResourceVisibility(bucket utils.MinIOBucket) string {
+func (d *defaultPresignAdminClient) GetCurrentResourceVisibility(bucket types.MinIOBucket) string {
 	return d.delegate.GetCurrentResourceVisibility(bucket)
 }
 

@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/backends"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -78,10 +77,10 @@ func TestMakeReadHandlerVisibility(t *testing.T) {
 		uid        string
 		status     int
 	}{
-		{"public_with_bearer", utils.PUBLIC, "any", http.StatusOK},
-		{"private_owner", utils.PRIVATE, "owner", http.StatusOK},
-		{"restricted_allowed", utils.RESTRICTED, "friend", http.StatusOK},
-		{"no_token_defaults", utils.RESTRICTED, "", http.StatusOK},
+		{"public_with_bearer", types.PUBLIC, "any", http.StatusOK},
+		{"private_owner", types.PRIVATE, "owner", http.StatusOK},
+		{"restricted_allowed", types.RESTRICTED, "friend", http.StatusOK},
+		{"no_token_defaults", types.RESTRICTED, "", http.StatusOK},
 	}
 
 	for _, tt := range cases {

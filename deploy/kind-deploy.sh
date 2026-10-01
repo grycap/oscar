@@ -35,6 +35,7 @@ DEFAULT_MINIO_API_PORT=30300
 DEFAULT_MINIO_CONSOLE_PORT=30301
 DEFAULT_REGISTRY_PORT=5001
 DEFAULT_TRAEFIK_DASHBOARD_PORT=9080
+STORAGE_BACKEND="minio"
 OSCAR_IMAGE_BRANCH="master"
 OSCAR_HELM_IMAGE_OVERRIDES=""
 OSCAR_POST_DEPLOYMENT_IMAGE=""
@@ -46,31 +47,37 @@ ENABLE_OIDC="false"
 ENABLE_KUEUE="false"
 ENABLE_KSERVE="false"
 ENABLE_MINIO_QUOTAS="false"
+OSCAR_HOST="localhost.direct"
 OIDC_ISSUERS_DEFAULT="https://keycloak.grycap.net/realms/grycap"
 OIDC_GROUPS_DEFAULT="/oscar-staff, /oscar-test"
 GATEWAY_CONTROLLER="traefik"
 GATEWAY_CONTROLLER_SET="false"
+USE_DNS_WILDCARDS="true"
+STORAGE_ACCESS_KEY="minio"
 
 usage(){
     cat <<EOF
 Usage: $(basename "$0") [options]
 
 Options:
-  --devel        Deploy using the OSCAR devel branch without interactive prompts.
-  --metrics      Deploy metrics stack (Prometheus + Loki + Alloy) for reporting.
-  --oidc         Enable OIDC support for OSCAR (default: disabled).
-  --kueue        Enable Kueue support for CPU and memory quotas (default: disabled).
-  --kserve       Install KServe using deploy/kind-oscar-kserve.sh (default: disabled).
-  --minio-quotas Deploy MinIO with 1 replica and 4 PVCs to support bucket quotas.
-  --ingress      Use NGINX Ingress as gateway controller.
-  --traefik      Use Traefik as gateway controller (default).
-  -h, --help     Show this help message and exit.
+    --devel                      Deploy using the OSCAR devel branch without interactive prompts.
+    --metrics                    Deploy metrics stack (Prometheus + Loki + Alloy) for reporting.
+    --oidc                       Enable OIDC support for OSCAR (default: disabled).
+    --kueue                      Enable Kueue support for CPU and memory quotas (default: disabled).
+    --kserve                     Install KServe using deploy/kind-oscar-kserve.sh (default: disabled).
+    --storage=(minio|rustfs)     Select the storage backend to use (default: minio).
+    --minio-quotas               Deploy MinIO with 1 replica and 4 PVCs to support bucket quotas.
+    --wildcards[=true|false]     Enable or disable DNS wildcard support for Traefik (default: true).
+    --host HOST                  Use HOST as OSCAR host (default: localhost.direct).
+    --ingress                    Use NGINX Ingress as gateway controller.
+    --traefik                    Use Traefik as gateway controller (default).
+    -h, --help                   Show this help message and exit.
 EOF
 }
 
 showInfo(){
     echo "[*] This script will install a Kubernetes cluster using Kind along with all the required OSCAR services (if not installed): "
-    echo -e "\n- MinIO"
+    echo -e "\n- MinIO | RustFS"
     echo -e "- Helm"
     echo -e "- Kubectl\n"
 
@@ -399,9 +406,10 @@ metadata:
     namespace: traefik
 spec:
     secretName: traefik-gateway-tls
-    commonName: localhost
+    commonName: $OSCAR_HOST
     dnsNames:
-        - localhost
+        - $OSCAR_HOST
+        - "*.$OSCAR_HOST"
     ipAddresses:
         - 127.0.0.1
     issuerRef:
@@ -494,9 +502,9 @@ checkOSCARDeploy(){
     fi
     echo -e "\n[$GREEN$CHECK$END_COLOR] OSCAR platform deployed correctly"
     if [ "$HOST_HTTPS_PORT" == "$DEFAULT_HTTPS_PORT" ]; then
-        oscar_url="https://localhost"
+        oscar_url="https://$OSCAR_HOST"
     else
-        oscar_url="https://localhost:$HOST_HTTPS_PORT"
+        oscar_url="https://$OSCAR_HOST:$HOST_HTTPS_PORT"
     fi
 }
 
@@ -539,14 +547,8 @@ deployMetrics(){
     echo -e "\n[*] Deploying Prometheus ..."
     helm repo add --force-update prometheus-community https://prometheus-community.github.io/helm-charts
     helm repo update
-    helm upgrade --install prometheus prometheus-community/prometheus \
-        --namespace monitoring \
-        --set server.service.type=ClusterIP \
-        --set server.persistentVolume.storageClass=nfs \
-        --set alertmanager.enabled=false \
-        --set pushgateway.enabled=false \
-        --set kubeStateMetrics.enabled=true \
-        --set nodeExporter.enabled=true
+    helm upgrade --install prometheus-operator prometheus-community/kube-prometheus-stack \
+        --namespace monitoring --values "$SCRIPT_DIR/../deploy/metrics/prometheus-values.kind.yaml" 2>/dev/null || true
 
     echo -e "\n[*] Deploying Geo Ip ..."
     if [ -f "$SCRIPT_DIR/../deploy/metrics/geoip-pvc.yaml" ]; then
@@ -734,8 +736,35 @@ while [ "$#" -gt 0 ]; do
             ENABLE_KSERVE="true"
             shift
             ;;
+        --storage)
+            shift
+            if [ "$#" -eq 0 ]; then
+                echo -e "$RED[!]$END_COLOR Missing value for --storage"
+                usage
+                exit 1
+            fi
+            STORAGE_BACKEND="$1"
+            shift
+            ;;
+        --storage=*)
+            STORAGE_BACKEND="${1#*=}"
+            shift
+            ;;
         --minio-quotas)
             ENABLE_MINIO_QUOTAS="true"
+            shift
+            ;;
+        --wildcards)
+            USE_DNS_WILDCARDS="true"
+            shift
+            ;;
+        --wildcards=*)
+            USE_DNS_WILDCARDS="${1#*=}"
+            if [ "$USE_DNS_WILDCARDS" != "true" ] && [ "$USE_DNS_WILDCARDS" != "false" ]; then
+                echo -e "$RED[!]$END_COLOR Invalid value for --wildcards: $USE_DNS_WILDCARDS (expected: true|false)"
+                usage
+                exit 1
+            fi
             shift
             ;;
         --ingress)
@@ -746,6 +775,20 @@ while [ "$#" -gt 0 ]; do
         --traefik)
             GATEWAY_CONTROLLER="traefik"
             GATEWAY_CONTROLLER_SET="true"
+            shift
+            ;;
+        --host=*)
+            OSCAR_HOST="${1#*=}"
+            shift
+            ;;
+        --host)
+            shift
+            if [ "$#" -eq 0 ]; then
+                echo -e "$RED[!]$END_COLOR Missing value for --host"
+                usage
+                exit 1
+            fi
+            OSCAR_HOST="$1"
             shift
             ;;
         -h|--help)
@@ -761,6 +804,18 @@ while [ "$#" -gt 0 ]; do
 done
 
 showInfo
+
+STORAGE_BACKEND=$(echo "$STORAGE_BACKEND" | tr '[:upper:]' '[:lower:]')
+if [ "$STORAGE_BACKEND" != "minio" ] && [ "$STORAGE_BACKEND" != "rustfs" ]; then
+    echo -e "$RED[!]$END_COLOR Invalid storage backend: $STORAGE_BACKEND (expected: minio|rustfs)"
+    usage
+    exit 1
+fi
+
+if [ "$STORAGE_BACKEND" != "minio" ] && [ "$ENABLE_MINIO_QUOTAS" == "true" ]; then
+    echo -e "$ORANGE[*]$END_COLOR MinIO bucket quotas are only supported with the MinIO storage backend. Disabling quota support for $STORAGE_BACKEND."
+    ENABLE_MINIO_QUOTAS="false"
+fi
 
 echo -e "\n[*] Checking prerequisites ..."
 checkDocker
@@ -778,8 +833,17 @@ use_kserve="n"
 use_kueue="n"
 use_minio_quotas="n"
 if [ "$SKIP_PROMPTS" == "true" ]; then
-    echo "[*] Running in non-interactive mode: Knative, local registry, and OSCAR devel branch enabled."
+    echo "[*] Running in non-interactive mode: Knative, local registry, OSCAR devel branch, and default storage backend ($STORAGE_BACKEND) enabled."
 else
+    read -p "Choose the storage backend to use [minio/rustfs] (default: minio): " storage_choice </dev/tty
+    storage_choice=$(echo "$storage_choice" | tr '[:upper:]' '[:lower:]')
+    if [ -n "$storage_choice" ]; then
+        if [ "$storage_choice" != "minio" ] && [ "$storage_choice" != "rustfs" ]; then
+            echo -e "$RED[!]$END_COLOR Invalid storage backend: $storage_choice (expected: minio|rustfs)"
+            exit 1
+        fi
+        STORAGE_BACKEND="$storage_choice"
+    fi
     read -p "Do you want to use Knative Serving as Serverless Backend? [y/n] " use_knative </dev/tty
     read -p "Do you want suport for local docker images? [y/n] " local_reg </dev/tty
     read -p "Do you want to install OSCAR from the devel branch? [y/n] (default uses master) " use_devel_branch </dev/tty
@@ -793,6 +857,16 @@ else
                 exit 1
             fi
             GATEWAY_CONTROLLER="$gateway_controller_choice"
+        fi
+        if [ "$GATEWAY_CONTROLLER" == "traefik" ]; then
+            echo -e "\n[*] Traefik also supports DNS wildcard subdomains"
+            read -p "Do you want to enable wildcard DNS? [y/n] (default: y) " use_dns_wildcards </dev/tty
+            use_dns_wildcards=$(echo "$use_dns_wildcards" | tr '[:upper:]' '[:lower:]')
+            if [ "$use_dns_wildcards" == "n" ]; then
+                USE_DNS_WILDCARDS="false"
+            else
+                USE_DNS_WILDCARDS="true"
+            fi
         fi
     fi
     if [ "$ENABLE_OIDC" != "true" ]; then
@@ -808,7 +882,7 @@ else
     if [ "$ENABLE_KUEUE" != "true" ]; then
         read -p "Do you want to enable CPU and memory quotas with Kueue? [y/n] " use_kueue </dev/tty
     fi
-    if [ "$ENABLE_MINIO_QUOTAS" != "true" ]; then
+    if [ "$ENABLE_MINIO_QUOTAS" != "true" ] && [ "$STORAGE_BACKEND" == "minio" ]; then
         read -p "Do you want to enable MinIO bucket quotas? This deploys MinIO with 1 replica and 4 PVCs. [y/n] " use_minio_quotas </dev/tty
     fi
 fi
@@ -824,6 +898,9 @@ if [ $(echo $use_oidc | tr '[:upper:]' '[:lower:]') == "y" ]; then
 fi
 if [ $(echo $use_kserve | tr '[:upper:]' '[:lower:]') == "y" ]; then
     ENABLE_KSERVE="true"
+fi
+if [ $(echo $use_kueue | tr '[:upper:]' '[:lower:]') == "y" ]; then
+    ENABLE_KUEUE="true"
 fi
 if [ $(echo $use_minio_quotas | tr '[:upper:]' '[:lower:]') == "y" ]; then
     ENABLE_MINIO_QUOTAS="true"
@@ -841,6 +918,7 @@ else
     OSCAR_EXPOSURE_HELM_ARGS="--set httproute.create=false --set ingress.create=true "
     KIND_HTTP_CONTAINER_PORT=80
     KIND_HTTPS_CONTAINER_PORT=443
+    USE_DNS_WILDCARDS="false"
 fi
 
 HTTP_PORT_FALLBACKS=(8080 8081 8082 8880 9080 10080)
@@ -1019,15 +1097,44 @@ fi
 
 deployGatewayController
   
-#Deploy MinIO
-echo -e "\n[*] Deploying MinIO storage provider ..."
-helm repo add --force-update minio https://charts.min.io
-MINIO_HELM_MODE_ARGS="--set mode=standalone"
-if [ "$ENABLE_MINIO_QUOTAS" == "true" ]; then
-    MINIO_HELM_MODE_ARGS="--set mode=distributed --set replicas=1 --set drivesPerNode=4 --set persistence.size=2Gi"
+#Deploy storage backend
+if [ "$STORAGE_BACKEND" == "minio" ]; then
+    echo -e "\n[*] Deploying MinIO storage provider ..."
+    STORAGE_ENDPOINT_HOST="minio.minio"
+    helm repo add --force-update minio https://charts.min.io
+    MINIO_HELM_MODE_ARGS="--set mode=standalone"
+    if [ "$ENABLE_MINIO_QUOTAS" == "true" ]; then
+        MINIO_HELM_MODE_ARGS="--set mode=distributed --set replicas=1 --set drivesPerNode=4 --set persistence.size=2Gi"
+    fi
+    helm install minio minio/minio --namespace minio --set minioAPIPort="$HOST_MINIO_API_PORT" \
+     --set image.repository="pgsty/silo" --set image.tag="RELEASE.2026-09-16T00-00-00Z" \
+     --set mcImage.repository="pgsty/mc" --set mcImage.tag="RELEASE.2026-09-16T00-00-00Z" \
+     --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.port="$HOST_MINIO_API_PORT",service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT $MINIO_HELM_MODE_ARGS --create-namespace 
+else
+    echo -e "\n[*] Deploying RustFS storage provider ..."
+    STORAGE_ACCESS_KEY="rustfs"
+    STORAGE_ENDPOINT_HOST="rustfs-svc.rustfs"
+    helm repo add rustfs https://charts.rustfs.com
+    helm install rustfs rustfs/rustfs --namespace rustfs --create-namespace --version '>=1.0.0-0'\
+    --set secret.rustfs.access_key=$STORAGE_ACCESS_KEY \
+    --set secret.rustfs.secret_key=$MINIO_PASSWORD \
+    --set storageclass.name=standard \
+    --set storageclass.dataStorageSize=100Gi \
+    --set storageclass.logStorageSize=1Gi \
+    --set mode.standalone.enabled=true --set mode.distributed.enabled=false \
+    --set service.console.nodePort=$HOST_MINIO_CONSOLE_PORT \
+    --set service.endpoint.nodePort=$HOST_MINIO_API_PORT \
+    --set service.endpoint.port=$HOST_MINIO_API_PORT \
+    --set config.rustfs.address=":$HOST_MINIO_API_PORT" \
+    --set service.type=NodePort \
+    --set 'extraEnv[1].name=RUSTFS_CORS_ALLOWED_ORIGINS' \
+    --set-string 'extraEnv[1].value=*' \
+    --set 'extraEnv[2].name=RUSTFS_OUTBOUND_ALLOW_ORIGINS' \
+    --set-string 'extraEnv[2].value=http://oscar.oscar:8080' 
+    # Set sessionAffinity to None for rustfs-svc to avoid issues with access to the nodePort on localhost
+    # Production deployments should not use NodePort
+    kubectl patch svc rustfs-svc -n rustfs -p '{"spec":{"sessionAffinity":"None"}}'
 fi
-helm install minio minio/minio --namespace minio --set rootUser=minio,rootPassword=$MINIO_PASSWORD,service.type=NodePort,service.nodePort=$HOST_MINIO_API_PORT,consoleService.type=NodePort,consoleService.nodePort=$HOST_MINIO_CONSOLE_PORT,resources.requests.memory=512Mi,environment.MINIO_BROWSER_REDIRECT_URL=http://localhost:$HOST_MINIO_CONSOLE_PORT $MINIO_HELM_MODE_ARGS --create-namespace --version 5.4.0
-
 
 #Deploy NFS server provisioner
 echo -e "\n[*] Deploying NFS server provider ..."
@@ -1073,9 +1180,9 @@ kubectl apply -f https://raw.githubusercontent.com/grycap/oscar/master/deploy/ya
 echo -e "\n[*] Deploying OSCAR ..."
 helm repo add --force-update grycap https://grycap.github.io/helm-charts/
 if [ $(echo $use_knative | tr '[:upper:]' '[:lower:]') == "y" ]; then 
-    helm install --namespace=oscar oscar grycap/oscar $OSCAR_EXPOSURE_HELM_ARGS --set httproute.host=localhost --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set serverlessBackend=knative --set resourceManager.enable=true --set kueue.enable=$ENABLE_KUEUE $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar $OSCAR_EXPOSURE_HELM_ARGS --set httproute.host="$OSCAR_HOST" --set authPass="$OSCAR_PASSWORD" --set service.type=ClusterIP --set volume.storageClassName=nfs --set minIO.object_storage_type="$STORAGE_BACKEND" --set minIO.endpoint="http://$STORAGE_ENDPOINT_HOST:$HOST_MINIO_API_PORT"  --set minIO.TLSVerify=false --set minIO.accessKey=$STORAGE_ACCESS_KEY --set minIO.secretKey="$MINIO_PASSWORD" --set minIO.quota.enabled="$ENABLE_MINIO_QUOTAS" --set serverlessBackend=knative --set resourceManager.enable=true --set kueue.enable="$ENABLE_KUEUE" $OSCAR_HELM_IMAGE_OVERRIDES
 else
-    helm install --namespace=oscar oscar grycap/oscar $OSCAR_EXPOSURE_HELM_ARGS --set httproute.host=localhost --set authPass=$OSCAR_PASSWORD --set service.type=ClusterIP --set volume.storageClassName=nfs --set minIO.endpoint=http://minio.minio:9000 --set minIO.TLSVerify=false --set minIO.accessKey=minio --set minIO.secretKey=$MINIO_PASSWORD --set resourceManager.enable=true --set kueue.enable=$ENABLE_KUEUE $OSCAR_HELM_IMAGE_OVERRIDES
+    helm install --namespace=oscar oscar grycap/oscar $OSCAR_EXPOSURE_HELM_ARGS --set httproute.host="$OSCAR_HOST" --set authPass="$OSCAR_PASSWORD" --set service.type=ClusterIP --set volume.storageClassName=nfs --set minIO.object_storage_type="$STORAGE_BACKEND" --set minIO.endpoint="http://$STORAGE_ENDPOINT_HOST:$HOST_MINIO_API_PORT" --set minIO.TLSVerify=false --set minIO.accessKey=$STORAGE_ACCESS_KEY --set minIO.secretKey="$MINIO_PASSWORD" --set minIO.quota.enabled="$ENABLE_MINIO_QUOTAS" --set resourceManager.enable=true --set kueue.enable="$ENABLE_KUEUE" $OSCAR_HELM_IMAGE_OVERRIDES
 fi
 
 if [ -n "$OSCAR_POST_DEPLOYMENT_IMAGE" ]; then
@@ -1094,8 +1201,16 @@ fi
 if [ "$ENABLE_METRICS" == "true" ]; then
     echo -e "\n[*] Configuring OSCAR to use Prometheus and Loki ..."
     if ! kubectl -n oscar set env deployment/oscar \
-        PROMETHEUS_URL="http://prometheus-server.monitoring.svc.cluster.local" \
-        LOKI_URL="http://loki-gateway.monitoring.svc.cluster.local"; then
+        PROMETHEUS_URL="http://prometheus-operator-kube-p-prometheus.monitoring.svc.cluster.local:9090" \
+        LOKI_URL="http://loki-gateway.monitoring.svc.cluster.local" \
+        LOKI_QUERY="{namespace=\"oscar\"}" \
+        LOKI_EXPOSED_QUERY="{app=\"traefik\"}" \
+        LOKI_EXPOSED_NAMESPACE="traefik" \
+        LOKI_EXPOSED_APP_LABEL="traefik" \
+        EXPOSED_SERVICES_ROUTE_KIND="httproute" \
+        INGRESS_HOST="$OSCAR_HOST" \
+        HTTPROUTE_GATEWAY_NAME="traefik-gateway" \
+        HTTPROUTE_GATEWAY_NAMESPACE="traefik"; then
         echo -e "$RED[!]$END_COLOR Failed to configure OSCAR metrics endpoints"
     fi
 fi
@@ -1127,6 +1242,12 @@ if [ $(echo $ENABLE_KSERVE | tr '[:upper:]' '[:lower:]') == "true" ]; then
     fi
 fi
 
+if $USE_DNS_WILDCARDS ; then
+    echo -e "\n[*] Patching OSCAR to use subdomain routing for '$OSCAR_HOST' ..."
+    kubectl set env deployment/oscar -n oscar INGRESS_HOST="$OSCAR_HOST"
+    kubectl set env deployment/oscar -n oscar EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE="true"
+fi
+
 #Wait for OSCAR deployment
 checkOSCARDeploy
  
@@ -1134,14 +1255,14 @@ echo -e "\n[*] Deployment details:"
 echo "  - Kind cluster name: $CLUSTER_NAME"
 echo "  - Kind context: $KIND_CONTEXT"
 if [ "$HOST_HTTP_PORT" == "$DEFAULT_HTTP_PORT" ]; then
-    oscar_http_url="http://localhost"
+    oscar_http_url="http://$OSCAR_HOST"
 else
-    oscar_http_url="http://localhost:$HOST_HTTP_PORT"
+    oscar_http_url="http://$OSCAR_HOST:$HOST_HTTP_PORT"
 fi
 if [ "$HOST_HTTPS_PORT" == "$DEFAULT_HTTPS_PORT" ]; then
-    oscar_https_url="https://localhost"
+    oscar_https_url="https://$OSCAR_HOST"
 else
-    oscar_https_url="https://localhost:$HOST_HTTPS_PORT"
+    oscar_https_url="https://$OSCAR_HOST:$HOST_HTTPS_PORT"
 fi
 minio_api_url="http://localhost:$HOST_MINIO_API_PORT"
 minio_console_url="http://localhost:$HOST_MINIO_CONSOLE_PORT"
@@ -1151,10 +1272,11 @@ echo "  - MinIO API NodePort/host port: $HOST_MINIO_API_PORT ($minio_api_url)"
 echo "  - MinIO console NodePort/host port: $HOST_MINIO_CONSOLE_PORT ($minio_console_url)"
 echo "  - MinIO bucket quotas enabled: $ENABLE_MINIO_QUOTAS"
 echo "  - Gateway controller: $GATEWAY_CONTROLLER"
+echo "  - Storage backend: $STORAGE_BACKEND"
 echo "  - KServe enabled: $ENABLE_KSERVE"
 echo "  - OSCAR image branch: $OSCAR_IMAGE_BRANCH"
 echo "  - OSCAR credentials: username='oscar', password='$OSCAR_PASSWORD'"
-echo "  - MinIO credentials: username='minio', password='$MINIO_PASSWORD'"
+echo "  - MinIO credentials: username=$STORAGE_ACCESS_KEY, password='$MINIO_PASSWORD'"
 if [ $(echo $local_reg | tr '[:upper:]' '[:lower:]') == "y" ]; then
     echo "  - Local registry: ${reg_name} (port ${reg_port}, ${registry_status})"
 else

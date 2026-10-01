@@ -34,25 +34,46 @@ expose:
   api_port: 5000
 ```
 
-Once the service is deployed, you can check if it was created correctly by making an HTTP request to the exposed endpoint: 
+Once the service is deployed, you can check if it was created correctly by making an HTTP request to the exposed endpoint. The format of the endpoint depends on how the exposed services are routed:
+
+### Path-based routing (default)
+
+By default, each service is exposed under a subpath of the OSCAR endpoint:
 
 ``` bash
 https://{oscar_endpoint}/system/services/{service_name}/exposed/{path_resource} 
 ```
 
-For exposed services, OSCAR sets `OSCAR_SERVICE_BASE_PATH` in the container environment with the base path `/system/services/{service_name}/exposed`. The full list of OSCAR-managed environment variables is documented in [FDL](fdl.md#envvarsmap).
+This is the endpoint used in every case where the DNS subdomain route is not active. In particular, the subpath fallback applies when:
 
-Notice that if you get a `502 Bad Gateway` error, it is most likely because the specified port on the service does not match the API port.
+- `EXPOSED_SERVICES_ROUTE_KIND=ingress` (the default; DNS subdomains are not supported by Ingress), or
+- `EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE=false` (the default), or
+- `INGRESS_HOST` is not configured, or
+- the service defines a `NodePort` access method.
+
+### DNS subdomain routing (HTTPRoute only)
+
+When `EXPOSED_SERVICES_ROUTE_KIND=httproute`, `EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE=true` and the service does not define a `NodePort`, each service is exposed at the root of its own subdomain:
+
+``` bash
+https://{service_name}.{INGRESS_HOST}/{path_resource}
+```
+
+This requires `INGRESS_HOST` to be configured and wildcard DNS and TLS for `*.{INGRESS_HOST}` to point to and be accepted by the cluster Gateway. If `INGRESS_HOST` is empty while `EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE=true` and `EXPOSED_SERVICES_ROUTE_KIND=httproute`, service deployment fails with a configuration validation error instead of falling back to the subpath endpoint.
+
+For exposed services, OSCAR sets `OSCAR_SERVICE_BASE_PATH` in the container environment. Its value is `/system/services/{service_name}/exposed` in default mode and `/` when services are exposed through DNS in HTTPRoute mode. The full list of OSCAR-managed environment variables is documented in [FDL](fdl.md#envvarsmap).
+
+Notice that the use of DNS subdomains is only available with HTTPRoute; Ingress is not supported. Also, if you get a `502 Bad Gateway` error, it is most likely because the specified port on the service does not match the API port.
 
 Additional options can be defined in the "expose" section of the FDL (some previously mentioned), such as:
 
 - `min_scale`: The minimum number of active pods (default: 1).
 - `max_scale`: The maximum number of active pods (default: 10) or the CPU threshold, which, once exceeded, will trigger the creation of additional pods (default: 80%).
-- `rewrite_target`: Target the URI where the traffic is redirected (default: false).
+- `rewrite_target`: Controls the historical path rewrite in Ingress mode (default: false). It is ignored by DNS-based HTTPRoutes, which expose services from `/`.
 - `NodePort`: The access method from the domain name to the public ip `<cluster_ip>:<NodePort>`.
 - `default_command`: Selects between executing the container's default command and executing the script inside the container. (default: false, it executes the script)
 - `set_auth`: The credentials are composed of the service name as the user and the service token as the password. Turn off this field if the container provides its own authentication method. It does not work with `NodePort` (default: false, it has no authentication).
-- `auth_type`: Authentication middleware used when `set_auth` is enabled. `basic` keeps the existing Basic Auth behavior. `forward` uses Traefik ForwardAuth to delegate checks to OSCAR service authorization and can bootstrap browser sessions from `?token=<service-token>` on Gateway API/Traefik exposed services.
+- `auth_type`: Authentication middleware used when `set_auth` is enabled. `basic` keeps the existing Basic Auth behavior. `forward` uses Traefik ForwardAuth to delegate checks to OSCAR service authorization and can bootstrap browser sessions from `?token=<service-token>` on Gateway API/Traefik exposed services. A valid OIDC access token sent as a Bearer credential to `GET /system/services/{service_name}/auth`, or in a Dashboard form POST to the same endpoint, establishes the service-scoped browser cookie. Form redirects are restricted to the exposed path of that service. Note that when forward auth is used with OIDC tokens, the exposed service always receives the token in the Authorization header, whether the client authenticates via cookie or sends the token directly as a Bearer token.
 - `health_path`: The path where the service readiness and liveness status are checked. Only if the root path `/` returns status 4XX or 5XX.
 
 

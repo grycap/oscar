@@ -17,16 +17,29 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	objectstorage "github.com/grycap/oscar/v4/pkg/backends/object_storage"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 	"k8s.io/client-go/kubernetes"
 )
+
+const (
+	metricsServiceNameContextKey      = "metricsServiceName"
+	metricsServiceNamespaceContextKey = "metricsServiceNamespace"
+)
+
+// SetMetricsServiceContext adds the resolved service identity to the execution
+// log without changing the public request path.
+func SetMetricsServiceContext(c *gin.Context, serviceName, serviceNamespace string) {
+	c.Set(metricsServiceNameContextKey, serviceName)
+	c.Set(metricsServiceNamespaceContextKey, serviceNamespace)
+}
 
 // GetAuthMiddleware returns the appropriate gin auth middleware
 func GetAuthMiddleware(cfg *types.Config, kubeClientset kubernetes.Interface) gin.HandlerFunc {
@@ -62,7 +75,13 @@ func BuildServiceAuthMiddlewareChain(cfg *types.Config, kubeClientset kubernetes
 		authHandler(c)
 	}
 
-	return []gin.HandlerFunc{GetServiceTokenMiddleware(back), wrapperHandler, GetServicePermissionsMiddleware(back)}
+	return []gin.HandlerFunc{
+		GetOIDCServiceAuthFormMiddleware(),
+		GetOIDCServiceAuthCookieMiddleware(cfg),
+		GetServiceTokenMiddleware(back, cfg),
+		wrapperHandler,
+		GetServicePermissionsMiddleware(back),
+	}
 }
 
 // CustomAuth returns a custom auth handler (gin middleware)
@@ -72,14 +91,19 @@ func CustomAuth(cfg *types.Config, kubeClientset kubernetes.Interface) gin.Handl
 		cfg.Username: cfg.Password,
 	})
 
-	minIOAdminClient, _ := utils.MakeMinIOAdminClient(cfg)
+	objectStorageIAM, err := objectstorage.MakeObjectStorageIAM(cfg)
+	if err != nil {
+		return func(c *gin.Context) {
+			c.AbortWithStatusJSON(500, gin.H{"error": fmt.Sprintf("error creating object-storage IAM client: %v", err)})
+		}
+	}
 	// Slice to add default user to all users group on MinIO
 	var oscarUser = []string{"console"}
 
-	minIOAdminClient.CreateAllUsersGroup()                               // #nosec G104
-	minIOAdminClient.CreateAddGroup("all_users_group", oscarUser, false) // #nosec G104
+	objectStorageIAM.CreateGroup(context.Background(), types.ALL_USERS_GROUP)                          // #nosec G104
+	objectStorageIAM.UpdateGroupMembers(context.Background(), types.ALL_USERS_GROUP, oscarUser, false) // #nosec G104
 
-	oidcHandler := getOIDCMiddleware(kubeClientset, minIOAdminClient, cfg, nil)
+	oidcHandler := getOIDCMiddleware(kubeClientset, objectStorageIAM, cfg, nil)
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
@@ -128,8 +152,10 @@ func GetLoggerMiddleware() gin.HandlerFunc {
 			clientIP, _ = IPAddress.(string)
 		}
 
-		log.Printf("[GIN-EXECUTIONS-LOGGER] %s | %3d | %13v | %s | %-7s %s | %s", // #nosec
-			logTime, status, latency, clientIP, method, path, user) // #nosec
+		serviceName := c.GetString(metricsServiceNameContextKey)
+		serviceNamespace := c.GetString(metricsServiceNamespaceContextKey)
+		log.Printf("[GIN-EXECUTIONS-LOGGER] %s | %3d | %13v | %s | %-7s %s | %s | %s | %s", // #nosec
+			logTime, status, latency, clientIP, method, path, user, serviceName, serviceNamespace) // #nosec
 	}
 }
 

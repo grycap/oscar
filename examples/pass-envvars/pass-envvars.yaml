@@ -1,0 +1,12 @@
+functions:
+  oscar:
+  - oscar-cluster:
+      name: pass-envvars
+      memory: 256Mi
+      cpu: "1.0"
+      image: ghcr.io/grycap/cowsay
+      script: script.sh
+      log_level: CRITICAL
+      environment:
+        variables:
+          MESSAGE: configured-value

@@ -73,7 +73,7 @@ func TestGetReSchedulablePods(t *testing.T) {
 	kubeClientset := fake.NewSimpleClientset(pods)
 
 	// Call the function to test
-	reSchedulablePods, err := getReSchedulablePods(kubeClientset, namespace)
+	_, reSchedulablePods, err := getReSchedulablePods(kubeClientset, namespace)
 	if err != nil {
 		t.Fatalf("error getting reschedulable pods: %v", err)
 	}

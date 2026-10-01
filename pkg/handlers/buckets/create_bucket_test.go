@@ -72,9 +72,11 @@ func TestMakeCreateBucketHandler(t *testing.T) {
 						_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
 					case r.Method == http.MethodPut && strings.Contains(r.URL.RawQuery, "tagging"):
 						w.WriteHeader(http.StatusOK)
+					case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/info-canned-policy"):
+						w.WriteHeader(http.StatusNotFound)
 					case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/"):
 						w.WriteHeader(http.StatusOK)
-						_, _ = w.Write([]byte(`{"status":"success"}`))
+						_, _ = w.Write([]byte(`{"Status":"success"}`))
 					default:
 						w.WriteHeader(http.StatusOK)
 					}
@@ -204,6 +206,116 @@ func TestMakeCreateBucketHandlerMissingUID(t *testing.T) {
 	}
 }
 
+func TestMakeCreateBucketHandlerReturnsWhenPolicyCreationFails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	testsupport.SkipIfCannotListen(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && strings.Contains(r.URL.RawQuery, "location"):
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
+		case r.Method == http.MethodPut && strings.Contains(r.URL.RawQuery, "tagging"):
+			w.WriteHeader(http.StatusOK)
+		case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/"):
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"error":"policy failure"}`))
+		default:
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer server.Close()
+
+	cfg := &types.Config{
+		Name:        "oscar",
+		Namespace:   "oscar",
+		ServicePort: 8080,
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "alice@example.org")
+		c.Set("userName", "Alice")
+	})
+	router.POST("/system/buckets", MakeCreateHandler(cfg, nil))
+
+	req := httptest.NewRequest(http.MethodPost, "/system/buckets", strings.NewReader(`{"bucket_name":"new-bucket","visibility":"private"}`))
+	req.Header.Set("Authorization", "Bearer token")
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+
+	if res.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusInternalServerError, res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), "Error creating policies for bucket") {
+		t.Fatalf("expected policy error body, got %q", res.Body.String())
+	}
+}
+
+func TestMakeCreateBucketHandlerReportsPolicyErrorsForRustFS(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	testsupport.SkipIfCannotListen(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && strings.Contains(r.URL.RawQuery, "location"):
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
+		case r.Method == http.MethodPut && strings.Contains(r.URL.RawQuery, "tagging"):
+			w.WriteHeader(http.StatusOK)
+		case r.URL.Path == "/minio/admin/v3/info-canned-policy":
+			w.WriteHeader(http.StatusNotFound)
+		case strings.HasPrefix(r.URL.Path, "/rustfs/admin/v3/"):
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"error":"policy API unavailable"}`))
+		default:
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer server.Close()
+
+	cfg := &types.Config{
+		Name:              "oscar",
+		Namespace:         "oscar",
+		ServicePort:       8080,
+		ObjectStorageType: types.ObjectStorageRustFS,
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "alice@example.org")
+		c.Set("userName", "Alice")
+	})
+	router.POST("/system/buckets", MakeCreateHandler(cfg, nil))
+
+	req := httptest.NewRequest(http.MethodPost, "/system/buckets", strings.NewReader(`{"bucket_name":"new-bucket","visibility":"private"}`))
+	req.Header.Set("Authorization", "Bearer token")
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+
+	if res.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusInternalServerError, res.Code, res.Body.String())
+	}
+}
+
 func TestMakeCreateBucketHandlerEnforcesMinIOQuota(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	testsupport.SkipIfCannotListen(t)
@@ -231,6 +343,7 @@ func TestMakeCreateBucketHandlerEnforcesMinIOQuota(t *testing.T) {
 		Name:              "oscar",
 		Namespace:         "oscar",
 		ServicesNamespace: "oscar-svc",
+		MinIOQuotaEnabled: true,
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
 			Region:    "us-east-1",
@@ -302,6 +415,7 @@ func TestMakeCreateBucketHandlerAppliesStoragePerBucketQuota(t *testing.T) {
 		Name:              "oscar",
 		Namespace:         "oscar",
 		ServicesNamespace: "oscar-svc",
+		MinIOQuotaEnabled: true,
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
 			Region:    "us-east-1",
@@ -366,6 +480,7 @@ func TestMakeCreateBucketHandlerFailsSafelyWhenMinIOBucketCountingFails(t *testi
 		Name:              "oscar",
 		Namespace:         "oscar",
 		ServicesNamespace: "oscar-svc",
+		MinIOQuotaEnabled: true,
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
 			Region:    "us-east-1",
@@ -377,7 +492,7 @@ func TestMakeCreateBucketHandlerFailsSafelyWhenMinIOBucketCountingFails(t *testi
 	namespace := utils.BuildUserNamespace(cfg, user)
 	client := fake.NewSimpleClientset(&corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "oscar-minio-quota", Namespace: namespace},
-		Data:       map[string]string{"buckets": "1"},
+		Data:       map[string]string{"buckets": "2", "storage_per_bucket": "100Gi"},
 	})
 
 	router := gin.New()
@@ -438,6 +553,7 @@ func TestMakeCreateBucketHandlerReturnsErrorWhenStorageQuotaApplyFails(t *testin
 		Name:              "oscar",
 		Namespace:         "oscar",
 		ServicesNamespace: "oscar-svc",
+		MinIOQuotaEnabled: true,
 		MinIOProvider: &types.MinIOProvider{
 			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
 			Region:    "us-east-1",

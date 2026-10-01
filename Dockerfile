@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
 FROM golang:1.25 AS build
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
 
 ARG VERSION
 ARG GIT_COMMIT
@@ -25,6 +27,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 
 FROM node:20-alpine AS ui-build
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
 
 WORKDIR /dashboard
 
@@ -40,6 +44,8 @@ RUN --mount=type=cache,target=/root/.npm \
 
 
 FROM alpine:3.14
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
 
 LABEL org.label-schema.license="Apache 2.0" \
     org.label-schema.vcs-url="https://github.com/grycap/oscar" \

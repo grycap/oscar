@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +12,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/metrics"
 	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 )
 
 type userBreakdownItem struct {
@@ -55,6 +58,7 @@ type serviceBreakdownResponse struct {
 // @Param metric query string false "Metric key"
 // @Param start query string false "RFC3339 start timestamp (defaults to end-24h)"
 // @Param end query string false "RFC3339 end timestamp (defaults to now)"
+// @Param owner query string false "Service owner filter (admin Basic Auth only)"
 // @Success 200 {object} types.MetricValueResponse
 // @Success 200 {object} types.ServiceMetricsResponse
 // @Failure 400 {string} string "Invalid parameters"
@@ -62,7 +66,7 @@ type serviceBreakdownResponse struct {
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/metrics/{serviceName} [get]
-func MakeMetricValueHandler(back types.ServerlessBackend, agg *metrics.Aggregator) gin.HandlerFunc {
+func MakeMetricValueHandler(cfg *types.Config, back types.ServerlessBackend, agg *metrics.Aggregator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		serviceName := strings.TrimSpace(c.Param("serviceName"))
 		if serviceName == "" {
@@ -70,7 +74,7 @@ func MakeMetricValueHandler(back types.ServerlessBackend, agg *metrics.Aggregato
 			return
 		}
 		if isBearerRequest(c) {
-			if _, ok := getAuthorizedServiceForMetrics(c, back, serviceName); !ok {
+			if !authorizeServiceMetricsQuery(c, back, serviceName) {
 				return
 			}
 		}
@@ -80,14 +84,14 @@ func MakeMetricValueHandler(back types.ServerlessBackend, agg *metrics.Aggregato
 			return
 		}
 
-		scopedAgg, ok := scopedMetricsAggregator(c, back, agg)
+		scopedAgg, ok := scopedMetricsAggregator(c, cfg, back, agg)
 		if !ok {
 			return
 		}
 
 		metricRaw := strings.TrimSpace(c.Query("metric"))
 		if metricRaw == "" {
-			metricsList, err := loadAllServiceMetrics(c, scopedAgg, tr, serviceName)
+			metricsList, err := loadAllServiceMetrics(c, cfg, scopedAgg, tr, serviceName)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
@@ -107,7 +111,7 @@ func MakeMetricValueHandler(back types.ServerlessBackend, agg *metrics.Aggregato
 			return
 		}
 
-		resp, err := scopedAgg.MetricValue(c.Request.Context(), tr, serviceName, metricKey)
+		resp, err := scopedAgg.MetricValue(c.Request.Context(), cfg, tr, serviceName, metricKey)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -116,7 +120,7 @@ func MakeMetricValueHandler(back types.ServerlessBackend, agg *metrics.Aggregato
 	}
 }
 
-func loadAllServiceMetrics(c *gin.Context, agg *metrics.Aggregator, tr metrics.TimeRange, serviceName string) ([]types.ServiceMetricValue, error) {
+func loadAllServiceMetrics(c *gin.Context, cfg *types.Config, agg *metrics.Aggregator, tr metrics.TimeRange, serviceName string) ([]types.ServiceMetricValue, error) {
 	keys := []types.MetricKey{
 		types.MetricCPUHours,
 		types.MetricGPUHours,
@@ -127,7 +131,7 @@ func loadAllServiceMetrics(c *gin.Context, agg *metrics.Aggregator, tr metrics.T
 	}
 	items := make([]types.ServiceMetricValue, 0, len(keys))
 	for _, key := range keys {
-		resp, err := agg.MetricValue(c.Request.Context(), tr, serviceName, key)
+		resp, err := agg.MetricValue(c.Request.Context(), cfg, tr, serviceName, key)
 		if err != nil {
 			return nil, err
 		}
@@ -147,25 +151,26 @@ func loadAllServiceMetrics(c *gin.Context, agg *metrics.Aggregator, tr metrics.T
 // @Produce json
 // @Param start query string false "RFC3339 start timestamp (defaults to end-24h)"
 // @Param end query string false "RFC3339 end timestamp (defaults to now)"
+// @Param owner query string false "Service owner filter (admin Basic Auth only)"
 // @Success 200 {object} types.MetricsSummaryResponse
 // @Failure 400 {string} string "Invalid parameters"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/metrics [get]
-func MakeMetricsSummaryHandler(back types.ServerlessBackend, agg *metrics.Aggregator) gin.HandlerFunc {
+func MakeMetricsSummaryHandler(cfg *types.Config, back types.ServerlessBackend, agg *metrics.Aggregator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tr, ok := parseTimeRange(c)
 		if !ok {
 			return
 		}
 
-		scopedAgg, ok := scopedMetricsAggregator(c, back, agg)
+		scopedAgg, ok := scopedMetricsAggregator(c, cfg, back, agg)
 		if !ok {
 			return
 		}
 
-		resp, err := scopedAgg.Summary(c.Request.Context(), tr)
+		resp, err := scopedAgg.Summary(c.Request.Context(), cfg, tr)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -183,6 +188,7 @@ func MakeMetricsSummaryHandler(back types.ServerlessBackend, agg *metrics.Aggreg
 // @Param group_by query string true "Breakdown dimension" Enums(service,user,country)
 // @Param include_users query bool false "Include user list when group_by=service"
 // @Param format query string false "Response format" Enums(json,csv) default(json)
+// @Param owner query string false "Service owner filter (admin Basic Auth only)"
 // @Success 200 {object} types.MetricsBreakdownResponse
 // @Success 200 {string} string "CSV response"
 // @Failure 400 {string} string "Invalid parameters"
@@ -190,7 +196,7 @@ func MakeMetricsSummaryHandler(back types.ServerlessBackend, agg *metrics.Aggreg
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/metrics/breakdown [get]
-func MakeMetricsBreakdownHandler(back types.ServerlessBackend, agg *metrics.Aggregator) gin.HandlerFunc {
+func MakeMetricsBreakdownHandler(cfg *types.Config, back types.ServerlessBackend, agg *metrics.Aggregator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tr, ok := parseTimeRange(c)
 		if !ok {
@@ -210,12 +216,12 @@ func MakeMetricsBreakdownHandler(back types.ServerlessBackend, agg *metrics.Aggr
 		}
 
 		includeUsers := strings.ToLower(strings.TrimSpace(c.DefaultQuery("include_users", "false"))) == "true"
-		scopedAgg, ok := scopedMetricsAggregator(c, back, agg)
+		scopedAgg, ok := scopedMetricsAggregator(c, cfg, back, agg)
 		if !ok {
 			return
 		}
 
-		resp, err := scopedAgg.Breakdown(c.Request.Context(), tr, groupBy, includeUsers)
+		resp, err := scopedAgg.Breakdown(c.Request.Context(), cfg, tr, groupBy, includeUsers)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -281,8 +287,69 @@ func MakeMetricsBreakdownHandler(back types.ServerlessBackend, agg *metrics.Aggr
 	}
 }
 
-func scopedMetricsAggregator(c *gin.Context, back types.ServerlessBackend, agg *metrics.Aggregator) (*metrics.Aggregator, bool) {
-	allowedServices, scoped, ok := allowedMetricsServiceIDs(c, back)
+// MakeMetricsOwnersHandler godoc
+// @Summary List owners available for administrative metrics filtering
+// @Tags metrics
+// @Produce json
+// @Success 200 {object} types.MetricsOwnersResponse
+// @Failure 403 {string} string "Forbidden"
+// @Failure 500 {string} string "Internal Server Error"
+// @Security BasicAuth
+// @Router /system/metrics/owners [get]
+func MakeMetricsOwnersHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if isBearerRequest(c) {
+			c.Status(http.StatusForbidden)
+			return
+		}
+
+		managedNamespaces, err := utils.ListManagedUserNamespaces(c.Request.Context(), back.GetKubeClientset())
+		if err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		namesByOwner := map[string]string{}
+		services, err := back.ListServices()
+		if err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+		for _, service := range services {
+			if service == nil || service.Owner == "" {
+				continue
+			}
+			if ownerName := strings.TrimSpace(service.Labels["owner_name"]); ownerName != "" {
+				namesByOwner[service.Owner] = strings.ReplaceAll(ownerName, "_", " ")
+			}
+		}
+
+		owners := make([]types.MetricsOwner, 0, len(managedNamespaces)+1)
+		owners = append(owners, types.MetricsOwner{
+			ID:        types.DefaultOwner,
+			Name:      "oscar",
+			Namespace: cfg.ServicesNamespace,
+		})
+		for _, namespace := range managedNamespaces {
+			name := namesByOwner[namespace.Owner]
+			if name == "" {
+				name = namespace.Owner
+			}
+			owners = append(owners, types.MetricsOwner{
+				ID:        namespace.Owner,
+				Name:      name,
+				Namespace: namespace.Name,
+			})
+		}
+		sort.Slice(owners, func(i, j int) bool {
+			return strings.ToLower(owners[i].Name) < strings.ToLower(owners[j].Name)
+		})
+		c.JSON(http.StatusOK, types.MetricsOwnersResponse{Owners: owners})
+	}
+}
+
+func scopedMetricsAggregator(c *gin.Context, cfg *types.Config, back types.ServerlessBackend, agg *metrics.Aggregator) (*metrics.Aggregator, bool) {
+	scope, scoped, ok := metricsQueryScope(c, cfg, back)
 	if !ok {
 		return nil, false
 	}
@@ -290,28 +357,95 @@ func scopedMetricsAggregator(c *gin.Context, back types.ServerlessBackend, agg *
 		return agg, true
 	}
 	return &metrics.Aggregator{
-		Sources: metrics.ScopeSources(agg.Sources, allowedServices),
+		Sources: metrics.ScopeSources(agg.Sources, scope),
 	}, true
 }
 
-func allowedMetricsServiceIDs(c *gin.Context, back types.ServerlessBackend) (map[string]struct{}, bool, bool) {
+func metricsQueryScope(c *gin.Context, cfg *types.Config, back types.ServerlessBackend) (metrics.QueryScope, bool, bool) {
+	ownerFilter := strings.TrimSpace(c.Query("owner"))
 	if !isBearerRequest(c) {
-		return nil, false, true
+		if ownerFilter == "" {
+			return metrics.QueryScope{}, false, true
+		}
+		return adminOwnerMetricsQueryScope(c, cfg, back, ownerFilter)
+	}
+	if ownerFilter != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "owner filter is only available with admin authentication"})
+		return metrics.QueryScope{}, false, false
+	}
+	uid, err := auth.GetUIDFromContext(c)
+	if err != nil {
+		c.String(http.StatusUnauthorized, err.Error())
+		return metrics.QueryScope{}, false, false
 	}
 
 	services, ok := listAuthorizedServicesForMetrics(c, back)
 	if !ok {
-		return nil, false, false
+		return metrics.QueryScope{}, false, false
 	}
 
-	allowed := make(map[string]struct{}, len(services))
+	scope := metrics.QueryScope{
+		OwnerNamespace: utils.BuildUserNamespace(cfg, uid),
+		ActiveServices: make([]metrics.ServiceScope, 0, len(services)),
+	}
 	for _, service := range services {
 		if service == nil {
 			continue
 		}
-		allowed[service.Name] = struct{}{}
+		namespace := service.Namespace
+		if namespace == "" {
+			namespace = utils.BuildUserNamespace(cfg, service.Owner)
+		}
+		scope.ActiveServices = append(scope.ActiveServices, metrics.ServiceScope{
+			Name:      service.Name,
+			Namespace: namespace,
+		})
 	}
-	return allowed, true, true
+	return scope, true, true
+}
+
+func adminOwnerMetricsQueryScope(c *gin.Context, cfg *types.Config, back types.ServerlessBackend, owner string) (metrics.QueryScope, bool, bool) {
+	namespace := ""
+	if owner == types.DefaultOwner {
+		namespace = cfg.ServicesNamespace
+	} else {
+		managedNamespaces, err := utils.ListManagedUserNamespaces(c.Request.Context(), back.GetKubeClientset())
+		if err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return metrics.QueryScope{}, false, false
+		}
+		for _, candidate := range managedNamespaces {
+			if candidate.Owner == owner {
+				namespace = candidate.Name
+				break
+			}
+		}
+	}
+	if namespace == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "metrics owner not found"})
+		return metrics.QueryScope{}, false, false
+	}
+
+	services, err := back.ListServices()
+	if err != nil {
+		c.String(http.StatusInternalServerError, err.Error())
+		return metrics.QueryScope{}, false, false
+	}
+	scope := metrics.QueryScope{OwnerNamespace: namespace}
+	for _, service := range services {
+		if service == nil || service.Owner != owner {
+			continue
+		}
+		serviceNamespace := service.Namespace
+		if serviceNamespace == "" {
+			serviceNamespace = namespace
+		}
+		scope.ActiveServices = append(scope.ActiveServices, metrics.ServiceScope{
+			Name:      service.Name,
+			Namespace: serviceNamespace,
+		})
+	}
+	return scope, true, true
 }
 
 func parseTimeRange(c *gin.Context) (metrics.TimeRange, bool) {

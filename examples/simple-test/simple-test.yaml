@@ -4,7 +4,7 @@ functions:
      name: simple-test
      memory: 256Mi
      cpu: '1.0'
-     image: ubuntu
+     image: ubuntu:22.04
      script: script.sh
      allowed_users: []
      log_level: CRITICAL		

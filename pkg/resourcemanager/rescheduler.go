@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/grycap/oscar/v4/pkg/types"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -42,11 +43,11 @@ type reScheduleInfo struct {
 	namespace string
 }
 
-// StartReScheduler starts the ReScheduler loop to check if there are pending pods exceeding the cfg.ReSchedulerThreshold every cfg.ReSchedulerInterval
+// StartReScheduler starts the ReScheduler loop to check if there are pending and suspended pods exceeding the cfg.ReSchedulerThreshold every cfg.ReSchedulerInterval
 func StartReScheduler(cfg *types.Config, back types.ServerlessBackend, kubeClientset kubernetes.Interface) {
 	for {
-		// Get ReSchedulable pods
-		pods, err := getReSchedulablePods(kubeClientset, cfg.ServicesNamespace)
+		// Get ReSchedulable pods and jobs
+		jobs, pods, err := getReSchedulablePods(kubeClientset, cfg.ServicesNamespace)
 		if err != nil {
 			reSchedulerLogger.Println(err.Error())
 			continue
@@ -54,8 +55,36 @@ func StartReScheduler(cfg *types.Config, back types.ServerlessBackend, kubeClien
 
 		// Get all reScheduleInfo elements
 		reScheduleInfos := getReScheduleInfos(pods, back)
+		infoJobs := getReScheduleJobs(jobs, back)
 
-		// Delegate jobs
+		// delegate pods (Suspended)
+		for _, rsi := range infoJobs {
+
+			if rsi.service == nil {
+				reSchedulerLogger.Printf("skip reschedule for job %q: service not found", rsi.jobName)
+				continue
+			}
+
+			err := delegateJobFunc(rsi.service, rsi.event, rsi.jobName, "", reSchedulerLogger, cfg, kubeClientset)
+			if err != nil {
+				reSchedulerLogger.Println(err.Error())
+			} else {
+				// Delete successfully reScheduled pods from the cluster
+				// Create DeleteOptions and configure PropagationPolicy for deleting associated pods in background
+				background := metav1.DeletePropagationBackground
+				delOpts := metav1.DeleteOptions{
+					PropagationPolicy: &background,
+				}
+				err := kubeClientset.BatchV1().Jobs(rsi.namespace).Delete(context.TODO(), rsi.jobName, delOpts)
+				if err != nil {
+					reSchedulerLogger.Printf("error deleting job \"%s\" in namespace \"%s\": %v", rsi.jobName, rsi.namespace, err)
+				}
+				//fmt.Println("Delete successfully reScheduled pod (Suspended) from the cluster ")
+			}
+
+		}
+
+		// Delegate jobs (Pending)
 		for _, rsi := range reScheduleInfos {
 			if rsi.service == nil {
 				reSchedulerLogger.Printf("skip reschedule for job %q: service not found", rsi.jobName)
@@ -76,6 +105,7 @@ func StartReScheduler(cfg *types.Config, back types.ServerlessBackend, kubeClien
 				if err != nil {
 					reSchedulerLogger.Printf("error deleting job \"%s\" in namespace \"%s\": %v", rsi.jobName, rsi.namespace, err)
 				}
+				//fmt.Println("Delete successfully reScheduled job (Pending) from the cluster ")
 			}
 		}
 
@@ -83,9 +113,9 @@ func StartReScheduler(cfg *types.Config, back types.ServerlessBackend, kubeClien
 	}
 }
 
-func getReSchedulablePods(kubeClientset kubernetes.Interface, namespace string) ([]v1.Pod, error) {
+func getReSchedulablePods(kubeClientset kubernetes.Interface, namespace string) ([]batchv1.Job, []v1.Pod, error) {
 	reSchedulablePods := []v1.Pod{}
-
+	reSchedulableJobs := []batchv1.Job{}
 	targetNamespaces, err := getReschedulerNamespaces(kubeClientset, namespace)
 	if err != nil {
 		reSchedulerLogger.Printf("error getting namespaces for rescheduler: %v\n", err)
@@ -93,11 +123,36 @@ func getReSchedulablePods(kubeClientset kubernetes.Interface, namespace string) 
 	}
 
 	for _, ns := range targetNamespaces {
-		// List all schedulable jobs' pods (pending)
+		listOpts1 := metav1.ListOptions{
+			LabelSelector: types.ReSchedulerLabelKey,
+		}
+		// suspended jobs
+		jobs, err := kubeClientset.BatchV1().Jobs(ns).List(context.TODO(), listOpts1)
+		if err != nil {
+			reSchedulerLogger.Printf("error getting job list in namespace %s: %v\n", ns, err)
+			continue
+		}
+		for _, job := range jobs.Items {
+			if job.Spec.Suspend != nil && *job.Spec.Suspend == true {
+
+				exceeded, err := isThresholdExceeded(job.CreationTimestamp.Time, job.Labels[types.ReSchedulerLabelKey])
+				if err != nil {
+					reSchedulerLogger.Printf("Error parsing threshold for job %s: %v\n", job.Name, err)
+					continue
+				}
+
+				if exceeded {
+					reSchedulableJobs = append(reSchedulableJobs, job)
+				}
+			}
+		}
+
 		listOpts := metav1.ListOptions{
 			LabelSelector: types.ReSchedulerLabelKey,
 			FieldSelector: fmt.Sprintf("status.phase=%s", v1.PodPending),
 		}
+
+		// pending pods
 		pods, err := kubeClientset.CoreV1().Pods(ns).List(context.TODO(), listOpts)
 		if err != nil {
 			reSchedulerLogger.Printf("error getting pod list in namespace %s: %v\n", ns, err)
@@ -107,22 +162,21 @@ func getReSchedulablePods(kubeClientset kubernetes.Interface, namespace string) 
 		for _, pod := range pods.Items {
 			// Check that pod has the ServiceLabel
 			if _, ok := pod.Labels[types.ServiceLabel]; ok {
-				now := time.Now()
-				pendingTime := now.Sub(pod.CreationTimestamp.Time).Seconds()
-				threshold, err := strconv.Atoi(pod.Labels[types.ReSchedulerLabelKey])
+
+				exceeded, err := isThresholdExceeded(pod.CreationTimestamp.Time, pod.Labels[types.ReSchedulerLabelKey])
 				if err != nil {
-					reSchedulerLogger.Printf("unable to parse rescheduler threshold from pod %s. Error: %v\n", pod.Name, err)
+					reSchedulerLogger.Printf("Error parsing threshold for pod %s: %v\n", pod.Name, err)
 					continue
 				}
-				// Check if threshold is exceeded
-				if int(pendingTime) > threshold {
+
+				if exceeded {
 					reSchedulablePods = append(reSchedulablePods, pod)
 				}
 			}
 		}
 	}
 
-	return reSchedulablePods, nil
+	return reSchedulableJobs, reSchedulablePods, nil
 }
 
 func getReschedulerNamespaces(kubeClientset kubernetes.Interface, servicesNamespace string) ([]string, error) {
@@ -150,6 +204,7 @@ func getReschedulerNamespaces(kubeClientset kubernetes.Interface, servicesNamesp
 	return result, nil
 }
 
+// Get information from the pods
 func getReScheduleInfos(pods []v1.Pod, back types.ServerlessBackend) []reScheduleInfo {
 	rsi := []reScheduleInfo{}
 
@@ -188,6 +243,44 @@ func getReScheduleInfos(pods []v1.Pod, back types.ServerlessBackend) []reSchedul
 	return rsi
 }
 
+// Get information from the jobs
+func getReScheduleJobs(jobs []batchv1.Job, back types.ServerlessBackend) []reScheduleInfo {
+	rsi := []reScheduleInfo{}
+
+	svcPtrs := map[string]*types.Service{}
+
+	for _, job := range jobs {
+		// get the service name from the job labels
+		serviceName := job.Spec.Template.Labels[types.ServiceLabel]
+		if serviceName == "" {
+			continue
+		}
+
+		serviceKey := fmt.Sprintf("%s/%s", job.Namespace, serviceName)
+
+		if _, ok := svcPtrs[serviceKey]; !ok {
+			var err error
+			svcPtrs[serviceKey], err = back.ReadService(job.Namespace, serviceName)
+			if err != nil {
+				reSchedulerLogger.Printf("error getting service %s: %v\n", serviceName, err)
+				svcPtrs[serviceKey] = nil
+			}
+		}
+
+		if svcPtrs[serviceKey] != nil {
+			rsi = append(rsi, reScheduleInfo{
+				service:   svcPtrs[serviceKey],
+				event:     getEvent(job.Spec.Template.Spec),
+				jobName:   job.Name,
+				namespace: job.Namespace,
+			})
+		}
+
+	}
+
+	return rsi
+}
+
 func getEvent(podSpec v1.PodSpec) string {
 	for _, c := range podSpec.Containers {
 		if c.Name == types.ContainerName {
@@ -200,4 +293,16 @@ func getEvent(podSpec v1.PodSpec) string {
 	}
 
 	return ""
+}
+
+func isThresholdExceeded(startTime time.Time, thresholdStr string) (bool, error) {
+	// Convert string threshold to integer
+	threshold, err := strconv.Atoi(thresholdStr)
+	if err != nil {
+		return false, err
+	}
+	// Calculate the time elapsed since the start
+	elapsedTime := time.Since(startTime).Seconds()
+	// Compare and return result
+	return int(elapsedTime) > threshold, nil
 }

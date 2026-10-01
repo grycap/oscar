@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/grycap/oscar/v4/pkg/types"
@@ -48,6 +49,41 @@ const (
 )
 
 var sanitizeRegexp = regexp.MustCompile(namespaceSanitizePattern)
+
+type ManagedUserNamespace struct {
+	Name  string
+	Owner string
+}
+
+// ListManagedUserNamespaces returns the persistent OSCAR namespace-to-owner
+// mappings. The shared cluster-admin namespace is intentionally omitted because
+// it does not store owner information.
+func ListManagedUserNamespaces(ctx context.Context, kubeClientset kubernetes.Interface) ([]ManagedUserNamespace, error) {
+	if kubeClientset == nil {
+		return nil, fmt.Errorf("kubernetes clientset cannot be nil")
+	}
+	if ctx == nil {
+		ctx = context.TODO()
+	}
+
+	namespaces, err := kubeClientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
+		LabelSelector: namespaceManagedByLabel + "=" + namespaceManagedByValue,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]ManagedUserNamespace, 0, len(namespaces.Items))
+	for _, namespace := range namespaces.Items {
+		owner := strings.TrimSpace(namespace.Annotations[namespaceOwnerLabel])
+		if owner == "" {
+			continue
+		}
+		result = append(result, ManagedUserNamespace{Name: namespace.Name, Owner: owner})
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Owner < result[j].Owner })
+	return result, nil
+}
 
 // BuildUserNamespace returns the namespace name that should be used to deploy
 // services owned by the provided user. When no owner is provided (i.e. cluster admin)
