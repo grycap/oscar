@@ -105,6 +105,16 @@ This option deploys KServe InferenceService and LLMInferenceService controllers 
 
 *Note that in order to enable KServe, you must use Traefik as the Gateway API provider (the script uses it by default).*
 
+To deploy the metrics stack (Prometheus, Loki and Alloy) in the local cluster, add:
+
+```sh
+bash oscar/deploy/kind-deploy.sh --metrics
+```
+
+This option installs the `kube-prometheus-stack`, Loki and Alloy charts in the
+`monitoring` namespace, which is required for the usage metrics reported by the
+[`/system/metrics` endpoints](metrics.md).
+
 ## Steps for manual local deployment
 
 If you want to do it manually you can follow the listed steps.
