@@ -10,7 +10,7 @@ Synchronous invocations can be made through [OSCAR CLI](oscar-cli.md), using the
 `oscar-cli service run`:
 
 ```sh
-oscar-cli service run [SERVICE_NAME] {--input | --text-input} {-o | --output}
+oscar-cli service run [SERVICE_NAME] {--file-input | --text-input} {-o | --output}
 ```
 
 You can check these examples:
@@ -18,11 +18,11 @@ You can check these examples:
 - [plant-classification-sync](https://oscar.grycap.net/blog/post-oscar-faas-sync-ml-inference/)
 - [text-to-speech](https://oscar.grycap.net/blog/post-oscar-text-to-speech/).
 
-The input can be sent as a file via the `--input` flag, and the result of the
+The input can be sent as a file via the `--file-input` flag, and the result of the
 execution will be displayed directly in the terminal:
 
 ```sh
-oscar-cli service run plant-classification-sync --input images/image3.jpg
+oscar-cli service run plant-classification-sync --file-input images/image3.jpg
 ```
 
 Alternatively, it can be sent as plain text using the `--text-input` flag and
