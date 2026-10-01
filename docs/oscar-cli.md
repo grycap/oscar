@@ -69,6 +69,9 @@ oscar-cli cluster add IDENTIFIER ENDPOINT --oidc-account-name SHORTNAME
         - [get-file](#get-file)
         - [put-file](#put-file)
         - [list-files](#list-files)
+        - [service delete-file](#service-delete-file)
+    - [bucket](#bucket)
+      - [delete-file](#delete-file)
     - [version](#version)
     - [help](#help)
 
@@ -430,6 +433,46 @@ Aliases:
 Flags:
   -c, --cluster string   set the cluster
   -h, --help             help for list-files
+
+Global Flags:
+      --config string   set the location of the config file (YAML or JSON)
+```
+
+##### service delete-file
+
+Delete a file in a service's storage provider. The `STORAGE_PROVIDER` argument
+uses the format `STORAGE_PROVIDER_TYPE.STORAGE_PROVIDER_NAME`; supported types
+are MinIO, S3, and Onedata.
+
+```
+Usage:
+  oscar-cli service delete-file SERVICE_NAME STORAGE_PROVIDER REMOTE_FILE [flags]
+
+Flags:
+  -c, --cluster string   set the cluster
+  -h, --help             help for delete-file
+
+Global Flags:
+      --config string   set the location of the config file (YAML or JSON)
+```
+
+### bucket
+
+Manages files in OSCAR buckets.
+
+#### Subcommands
+
+##### delete-file
+
+Delete a file at the specified remote path from a MinIO bucket.
+
+```
+Usage:
+  oscar-cli bucket delete-file BUCKET_NAME REMOTE_PATH [flags]
+
+Flags:
+  -c, --cluster string   set the cluster
+  -h, --help             help for delete-file
 
 Global Flags:
       --config string   set the location of the config file (YAML or JSON)
