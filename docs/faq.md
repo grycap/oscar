@@ -53,3 +53,9 @@ The buckets will be shown only in the browser where you do this process.
 The results may vary depending on the browser. For example, they will show up in Firefox but not in Chrome.
 
 ![got-buckets.png](images/faq/certificates/06.-got-buckets.png)
+
+- **Wildcard certificates**
+
+If you deploy using IM, certificates are generated automatically via cert-manager, so no further action is required. 
+However, if you deploy "manually", it is the admin's responsibility to obtain the certificate—either by using cert-manager with DNS01 support configured or by creating it manually.
+In the manual scenario, when the certificate expires, you will need to obtain a new one and add it manually by recreating the corresponding secret.
