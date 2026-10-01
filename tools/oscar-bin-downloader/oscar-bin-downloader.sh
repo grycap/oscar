@@ -2,28 +2,19 @@
 ARCH=$(uname -m)
 
 FAAS_SUPERVISOR_NAME=supervisor
-FAAS_SUPERVISOR_ALPINE_NAME=supervisor-alpine
 WATCHDOG_NAME=fwatchdog-amd64
 
 echo "Downloading binaries for $ARCH..."
 
 if [[ $ARCH == "aarch64" ]] || [[ $ARCH == "arm64" ]]; then
     FAAS_SUPERVISOR_NAME=$FAAS_SUPERVISOR_NAME-arm64
-    FAAS_SUPERVISOR_ALPINE_NAME=$FAAS_SUPERVISOR_ALPINE_NAME-arm64
     WATCHDOG_NAME=fwatchdog-arm64
 fi
 
-# Download FaaS Supervisor and unzip
-wget "https://github.com/grycap/faas-supervisor/releases/download/$FAAS_SUPERVISOR_VERSION/$FAAS_SUPERVISOR_NAME.zip" -O /tmp/supervisor.zip
-unzip /tmp/supervisor.zip -d /tmp
-cp -r /tmp/supervisor/* /data
-
-# Download Alpine release of FaaS Supervisor and unzip
-wget "https://github.com/grycap/faas-supervisor/releases/download/$FAAS_SUPERVISOR_VERSION/$FAAS_SUPERVISOR_ALPINE_NAME.zip" -O /tmp/supervisor-alpine.zip
-mkdir /data/alpine
-mkdir /tmp/alpine
-unzip /tmp/supervisor-alpine.zip -d /tmp/alpine
-cp -r /tmp/alpine/supervisor/* /data/alpine
+# Download OSCAR Supervisor binary
+wget "https://github.com/grycap/oscar-supervisor/releases/download/v$OSCAR_SUPERVISOR_VERSION/$FAAS_SUPERVISOR_NAME" -O /tmp/supervisor
+cp -r /tmp/supervisor /data/supervisor
+chmod +x /data/supervisor
 
 # Download OpenFaaS watchdog and set execution permissions
 wget "https://github.com/openfaas/classic-watchdog/releases/download/$WATCHDOG_VERSION/$WATCHDOG_NAME" -O /data/fwatchdog

@@ -38,7 +38,6 @@ var (
 		Name:      "testname",
 		ClusterID: "testcluster",
 		Image:     "testimage",
-		Alpine:    false,
 		Memory:    "1Gi",
 		CPU:       "1.0",
 		Federation: &Federation{
@@ -185,7 +184,6 @@ func TestGetSupervisorPath(t *testing.T) {
 	svc := copy.(Service)
 
 	expectedDefault := fmt.Sprintf("%s/%s", VolumePath, SupervisorName)
-	expectedAlpine := fmt.Sprintf("%s/%s/%s", VolumePath, AlpineDirectory, SupervisorName)
 
 	path := svc.GetSupervisorPath()
 
@@ -193,14 +191,6 @@ func TestGetSupervisorPath(t *testing.T) {
 		t.Errorf("invalid supervisor path. Expected: %s, got: %s", expectedDefault, path)
 	}
 
-	// Set Alpine to true and test it
-	svc.Alpine = true
-
-	path = svc.GetSupervisorPath()
-
-	if path != expectedAlpine {
-		t.Errorf("invalid supervisor path. Expected: %s, got: %s", expectedAlpine, path)
-	}
 }
 
 func TestConvertEnvVars(t *testing.T) {
@@ -260,7 +250,6 @@ federation:
       Authorization: Bearer testtoken
 log_level: ""
 image: testimage
-alpine: false
 token: ""
 file_stage_in: false
 input: []
