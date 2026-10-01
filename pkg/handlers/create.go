@@ -418,17 +418,18 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 				oldTags, _ := objectStorageIAM.GetClient(c.Request.Context()).GetTaggedMetadata(b.BucketName)
 				// Bucket metadata for filtering
-				// If bucket dont have already the tags, set them.
-				if oldTags == nil || len(oldTags) == 0 {
-					/*storageQuota := ""
-					if minIOQuota != nil {
-						storageQuota = minIOQuota.StoragePerBucket
-					}*/
-					tags := utils.BucketTags(b, ownerName)
-					if err := objectStorageIAM.GetClient(c.Request.Context()).SetTags(b.BucketName, tags); err != nil {
-						c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
-						return
+				// Merge existing tags with the new service metadata and register
+				// the service in the bucket's from_service tag list.
+				tags := utils.BucketTags(b, ownerName)
+				for key, value := range oldTags {
+					if _, reserved := tags[key]; !reserved {
+						tags[key] = value
 					}
+				}
+				tags = utils.AddServiceToBucketTag(tags, service.Name)
+				if err := objectStorageIAM.GetClient(c.Request.Context()).SetTags(b.BucketName, tags); err != nil {
+					c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
+					return
 				}
 				if minIOQuota != nil && minIOQuota.StoragePerBucket != "" {
 					if err := objectStorageIAM.GetClient(c.Request.Context()).SetBucketStorageQuota(b.BucketName, minIOQuota.StoragePerBucket); err != nil {

@@ -2,9 +2,12 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -20,7 +23,7 @@ func TestMakeDeleteHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
 
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
-		if hreq.URL.Path != "/input" && hreq.URL.Path != "/output" && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
+		if (hreq.URL.Path != "/input" && hreq.URL.Path != "/output" && hreq.URL.Path != "/input/" && hreq.URL.Path != "/output/") && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
 			t.Errorf("Unexpected path in request, got: %s", hreq.URL.Path)
 		}
 		if hreq.URL.Path == "/minio/admin/v3/info" {
@@ -126,6 +129,129 @@ func TestMakeDeleteHandler(t *testing.T) {
 
 	// Close the fake MinIO server
 	defer server.Close()
+}
+
+func TestMakeDeleteHandlerKeepsSharedBucket(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	scenarios := []struct {
+		name         string
+		fromService  string // existing from_service tag on the shared bucket
+		wantDeleted  bool   // whether the bucket should be physically deleted
+		wantFromServ string // expected from_service value in the PUT ?tagging body when kept
+	}{
+		{
+			name:         "bucket shared with another service is kept",
+			fromService:  "svcA svcB",
+			wantDeleted:  false,
+			wantFromServ: "svcA",
+		},
+		{
+			name:        "bucket used only by the deleted service is removed",
+			fromService: "svcB",
+			wantDeleted: true,
+		},
+	}
+
+	for _, s := range scenarios {
+		t.Run(s.name, func(t *testing.T) {
+			var mu sync.Mutex
+			var sharedDeleted bool
+			var putTagBodies []string
+
+			server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+				if strings.Contains(hreq.URL.RawQuery, "tagging") {
+					mu.Lock()
+					defer mu.Unlock()
+					switch hreq.Method {
+					case http.MethodGet:
+						rw.WriteHeader(http.StatusOK)
+						rw.Write([]byte(fmt.Sprintf(`<Tagging><TagSet><Tag><Key>from_service</Key><Value>%s</Value></Tag></TagSet></Tagging>`, s.fromService)))
+					case http.MethodPut:
+						body, _ := io.ReadAll(hreq.Body)
+						putTagBodies = append(putTagBodies, string(body))
+						rw.WriteHeader(http.StatusNoContent)
+					default:
+						rw.WriteHeader(http.StatusMethodNotAllowed)
+					}
+					return
+				}
+				if hreq.Method == http.MethodDelete && !strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
+					mu.Lock()
+					sharedDeleted = true
+					mu.Unlock()
+					rw.WriteHeader(http.StatusNoContent)
+					return
+				}
+				if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/") {
+					if hreq.URL.Path == "/minio/admin/v3/info" {
+						rw.WriteHeader(http.StatusOK)
+						rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+						return
+					}
+					rw.WriteHeader(http.StatusOK)
+					rw.Write([]byte(`{"status": "success"}`))
+					return
+				}
+				// S3 bucket operations (e.g. notification configuration)
+				rw.WriteHeader(http.StatusOK)
+				rw.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?><NotificationConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"></NotificationConfiguration>`))
+			}))
+			defer server.Close()
+
+			cfg := &types.Config{
+				MinIOProvider: &types.MinIOProvider{
+					Endpoint:  server.URL,
+					Region:    "us-east-1",
+					AccessKey: "ak",
+					SecretKey: "sk",
+					Verify:    false,
+				},
+			}
+
+			back := backends.MakeFakeBackend()
+			back.Service = &types.Service{
+				Name:  "svcB",
+				Owner: types.DefaultOwner,
+				Input: []types.StorageIOConfig{
+					{Provider: "minio." + types.DefaultProvider, Path: "/shared"},
+				},
+				StorageProviders: &types.StorageProviders{
+					MinIO: map[string]*types.MinIOProvider{types.DefaultProvider: {
+						Region:    "us-east-1",
+						Endpoint:  server.URL,
+						AccessKey: "ak",
+						SecretKey: "sk"}},
+				},
+			}
+
+			r := gin.Default()
+			r.DELETE("/system/services/:serviceName", MakeDeleteHandler(cfg, back))
+
+			req, _ := http.NewRequest("DELETE", "/system/services/svcB", nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != http.StatusNoContent {
+				t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+			}
+
+			mu.Lock()
+			defer mu.Unlock()
+			if sharedDeleted != s.wantDeleted {
+				t.Fatalf("expected bucket deleted=%v, got %v", s.wantDeleted, sharedDeleted)
+			}
+			if s.wantFromServ != "" {
+				if len(putTagBodies) == 0 {
+					t.Fatalf("expected a PUT ?tagging to keep the bucket tags, got none")
+				}
+				body := putTagBodies[len(putTagBodies)-1]
+				if !strings.Contains(body, "from_service") || !strings.Contains(body, s.wantFromServ) {
+					t.Fatalf("expected from_service tag %q in PUT body, got: %s", s.wantFromServ, body)
+				}
+			}
+		})
+	}
 }
 
 func TestMakeDeleteHandlerPassesVolumeLifecycleService(t *testing.T) {

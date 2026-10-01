@@ -213,7 +213,13 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 		}
 		// Check if the bucket is in the mount path
-		if !sameStorage(in, service.Mount) {
+		if isBucketSharedWithOtherService(minIOAdminClient, bucketName, service) {
+			// Keep the bucket: it is still used by another service, only unlink
+			// the deleted service from its tags.
+			if err := retagSharedBucket(minIOAdminClient, bucketName, service); err != nil {
+				return err
+			}
+		} else if !sameStorage(in, service.Mount) {
 			err := deleteObjectStorageBuckets(s3Client, minIOAdminClient, types.MinIOBucket{
 				BucketName:   bucketName,
 				Visibility:   service.Visibility,
@@ -225,13 +231,10 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				return fmt.Errorf("error while removing MinIO bucket %v", err)
 			}
 		} else {
-			// Bucket metadata for filtering
-			tags := map[string]string{
-				"owner":   service.Owner,
-				"service": "false",
-			}
-			if err := minIOAdminClient.SetTags(bucketName, tags); err != nil {
-				return fmt.Errorf("Error tagging bucket: %v", err)
+			// Preserve tags (visibility, allowed_users, from_service) when the
+			// bucket is the mount, only removing the deleted service.
+			if err := retagSharedBucket(minIOAdminClient, bucketName, service); err != nil {
+				return err
 			}
 		}
 
@@ -274,7 +277,13 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				if err := disableInputNotifications(s3Client, service.GetObjectStorageWebhookARN(cfg.ObjectStorageType), outBucket); err != nil {
 					log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 				}
-				if !sameStorage(out, service.Mount) {
+				if isBucketSharedWithOtherService(minIOAdminClient, outBucket, service) {
+					// Keep the bucket: it is still used by another service, only
+					// unlink the deleted service from its tags.
+					if err := retagSharedBucket(minIOAdminClient, outBucket, service); err != nil {
+						return err
+					}
+				} else if !sameStorage(out, service.Mount) {
 					err := deleteObjectStorageBuckets(s3Client, minIOAdminClient, types.MinIOBucket{
 						BucketName:   outBucket,
 						Visibility:   service.Visibility,
@@ -285,13 +294,10 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 						return fmt.Errorf("error while removing MinIO bucket %v", err)
 					}
 				} else {
-					// Bucket metadata for filtering
-					tags := map[string]string{
-						"owner":   service.Owner,
-						"service": "false",
-					}
-					if err := minIOAdminClient.SetTags(outBucket, tags); err != nil {
-						return fmt.Errorf("Error tagging bucket: %v", err)
+					// Preserve tags (visibility, allowed_users, from_service) when the
+					// bucket is the mount, only removing the deleted service.
+					if err := retagSharedBucket(minIOAdminClient, outBucket, service); err != nil {
+						return err
 					}
 				}
 
@@ -325,16 +331,17 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	// Only for Default MinIO provider
 	if service.Mount.Provider == "minio.default" {
 		bucketName := getBucketNameFromPath(service.Mount.Path)
-		oldTags, _ := minIOAdminClient.GetTaggedMetadata(bucketName)
+		oldTags, err := minIOAdminClient.GetTaggedMetadata(bucketName)
+		if err != nil {
+			oldTags = map[string]string{}
+		}
 		// Bucket metadata for filtering
-		// If bucket dont have already the tags, set them.
-		if oldTags != nil && len(oldTags) > 0 && oldTags["from_service"] != "" {
-			taggedService := oldTags["from_service"]
-			if taggedService == service.Name {
-				oldTags["from_service"] = ""
-				if err := minIOAdminClient.SetTags(bucketName, oldTags); err != nil {
-					return fmt.Errorf("Error updating bucket tags: %v", err)
-				}
+		// Remove the deleted service from the bucket's from_service tag list.
+		taggedServices := utils.ServicesFromBucketTags(oldTags)
+		oldTags = utils.RemoveServiceFromBucketTag(oldTags, service.Name)
+		if len(taggedServices) > 0 {
+			if err := minIOAdminClient.SetTags(bucketName, oldTags); err != nil {
+				return fmt.Errorf("Error updating bucket tags: %v", err)
 			}
 		}
 	}
@@ -344,6 +351,34 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 
 func DeleteMinIOBuckets(s3Client *s3.S3, minIOAdminClient *types.MinIOAdminClient, bucket types.MinIOBucket) error {
 	return deleteObjectStorageBuckets(s3Client, minIOAdminClient, bucket, false)
+}
+
+// retagSharedBucket preserves the tags of a bucket that is kept because it is
+// shared (e.g. used by another service or as mount), removing only the deleted
+// service and marking it as no longer an active service bucket.
+func retagSharedBucket(minIOAdminClient *types.MinIOAdminClient, bucketName string, service *types.Service) error {
+	oldTags, err := minIOAdminClient.GetTaggedMetadata(bucketName)
+	if err != nil {
+		oldTags = map[string]string{}
+	}
+	oldTags = utils.RemoveServiceFromBucketTag(oldTags, service.Name)
+	oldTags["owner"] = service.Owner
+	oldTags["service"] = "false"
+	if err := minIOAdminClient.SetTags(bucketName, oldTags); err != nil {
+		return fmt.Errorf("Error tagging bucket: %v", err)
+	}
+	return nil
+}
+
+// isBucketSharedWithOtherService reports whether the bucket's from_service tag
+// list still holds services other than the one being deleted.
+func isBucketSharedWithOtherService(minIOAdminClient *types.MinIOAdminClient, bucketName string, service *types.Service) bool {
+	oldTags, _ := minIOAdminClient.GetTaggedMetadata(bucketName)
+	if oldTags == nil {
+		oldTags = map[string]string{}
+	}
+	otherTags := utils.RemoveServiceFromBucketTag(oldTags, service.Name)
+	return len(utils.ServicesFromBucketTags(otherTags)) > 0
 }
 
 func deleteObjectStorageBuckets(s3Client *s3.S3, minIOAdminClient *types.MinIOAdminClient, bucket types.MinIOBucket, skipPolicies bool) error {
