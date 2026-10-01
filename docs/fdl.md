@@ -138,7 +138,7 @@ storage_providers:
 | `total_memory` </br> *string*                                     | Limit for the memory used by all the service's jobs running simultaneously. [Apache YuniKorn](https://yunikorn.apache.org)'s scheduler is required to work. Same format as Memory, but internally translated to MB (integer). Optional (default: "")                                          |
 | `total_cpu` </br> *string*                                        | Limit for the virtual CPUs used by all the service's jobs running simultaneously. [Apache YuniKorn](https://yunikorn.apache.org)'s scheduler is required to work. Same format as CPU, but internally translated to millicores (integer). Optional (default: "")                               |
 | `ephemeral_storage_request` </br> *string*                        | Request size for ephemeral storage following the [kubernetes format](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-ephemeral-storage). Optional (default: "")                |
-| `delegation` </br> *string*                                       | Mode of job delegation for replicas. Optional. Values: `static` (default), `random`, `load-based`, `topsis`.                                                                                                                    |
+| `delegation` </br> *string*                                       | Mode of job delegation for replicas. Optional. Values: `static` (default), `random`, `load-based`.                                                                                                                    |
 | `synchronous` </br> *[SynchronousSettings](#synchronoussettings)* | Struct to configure specific sync parameters. These settings are only applied on Knative ServerlessBackend. Optional.                                                                                                                                         |
 | `expose` </br> *[ExposeSettings](#exposesettings)* | Allows to expose the API or UI of the application run in the OSCAR service outside of the Kubernetes cluster. Optional.                                                                                                                                         |
 | `federation` </br> *[Federation](#federation)*                     | Federation configuration (topology, members, delegation, rescheduler threshold). Optional.                                                                                                                                                                  |
@@ -167,10 +167,17 @@ storage_providers:
 | Field                        | Description                                 |
 |------------------------------| --------------------------------------------|
 | `group_id` </br> *string*                                       | Identifier for the federation group. Optional (default: service name). |
-| `topology` </br> *string*                                       | Federation topology: `none`, `star`, `mesh`. Optional. |
-| `delegation` </br> *string*                                     | Mode of job delegation for federation members. Optional. Values: `static` (default), `random`, `load-based`, `topsis`. |
+| `topology` </br> *string*                                       | Federation topology: `none` (delegation disabled), `star` (only the coordinator delegates), or `mesh` (all members can delegate). Optional. |
+| `delegation` </br> *string*                                     | Mode of job delegation for federation members. Optional. Values: `static` (default, priority order), `random`, `load-based`. |
 | `rescheduler_threshold` </br> *integer*                         | Time (in seconds) that a job (with members) can be queued before delegating it. Optional. |
 | `members` </br> *[Replica](#replica) array*                    | List of federation members to delegate jobs. Optional. |
+
+Federation members can also be deployed incrementally through the Dashboard or
+the `/system/federation/{serviceName}` API. Adding the first member to a service
+without federation settings initializes a `star` topology with `static`
+delegation, so the service FDL does not need to be edited first. An active
+federation requires a `refresh_token`, either supplied in the request or already
+stored for the service.
 
 ## ExposeSettings
 
