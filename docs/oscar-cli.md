@@ -56,16 +56,16 @@ oscar-cli cluster add IDENTIFIER ENDPOINT --oidc-account-name SHORTNAME
         - [default](#default)
         - [info](#info)
         - [list](#list)
-        - [remove](#remove)
+        - [delete](#delete)
     - [service](#service)
       - [Subcommands of services](#subcommands-of-services)
         - [get](#get)
         - [list services](#list-services)
-        - [remove services](#remove-services)
+        - [delete services](#delete-services)
         - [run](#run)
         - [logs list](#logs-list)
         - [logs get](#logs-get)
-        - [logs remove](#logs-remove)
+        - [logs delete](#logs-delete)
         - [get-file](#get-file)
         - [put-file](#put-file)
         - [list-files](#list-files)
@@ -182,19 +182,19 @@ Global Flags:
       --config string   set the location of the config file (YAML or JSON)
 ```
 
-##### remove
+##### delete
 
 Remove a cluster from the configuration file.
 
 ```
 Usage:
-  oscar-cli cluster remove IDENTIFIER [flags]
+  oscar-cli cluster delete IDENTIFIER [flags]
 
 Aliases:
-  remove, rm
+  delete, d, del, remove, rm
 
 Flags:
-  -h, --help   help for remove
+  -h, --help   help for delete
 
 Global Flags:
       --config string   set the location of the config file (YAML or JSON)
@@ -244,20 +244,20 @@ Global Flags:
       --config string   set the location of the config file (YAML or JSON)
 ```
 
-##### remove services
+##### delete services
 
 Remove a service from the cluster.
 
 ```
 Usage:
-  oscar-cli service remove SERVICE_NAME... [flags]
+  oscar-cli service delete SERVICE_NAME... [flags]
 
 Aliases:
-  remove, rm
+  delete, d, del, remove, rm
 
 Flags:
   -c, --cluster string   set the cluster
-  -h, --help             help for remove
+  -h, --help             help for delete
 
 Global Flags:
       --config string   set the location of the config file (YAML or JSON)
@@ -329,21 +329,21 @@ Global Flags:
       --config string    set the location of the config file (YAML or JSON)
 ```
 
-##### logs remove
+##### logs delete
 
 Remove a service's job along with its logs.
 
 ```
 Usage:
-  oscar-cli service logs remove SERVICE_NAME \
+  oscar-cli service logs delete SERVICE_NAME \
    {JOB_NAME... | --succeeded | --all} [flags]
 
 Aliases:
-  remove, rm
+  delete, d, del, remove, rm
 
 Flags:
   -a, --all         remove all logs from the service
-  -h, --help        help for remove
+  -h, --help        help for delete
   -s, --succeeded   remove succeeded logs from the service
 
 Global Flags:
@@ -354,10 +354,10 @@ Global Flags:
 > The following subcommands will not work with MinIO if you use a local deployment due to DNS resolutions, so if you want to use a command line put/get/list files from your buckets, you can use the [MinIO client](https://min.io/docs/minio/linux/reference/minio-mc.html) command line. <br>
 > Once you have the client installed you can define the cluster with the `mc alias` command like it follows:
 > ```
-> mc alias set myminio https://localhost:30000 minioadminuser minioadminpassword
+> mc alias set myminio http://localhost:30300 minioadminuser minioadminpassword
 > ```
 > So, instead of the next subcommands, you would use:
-> - [`mc cp`](https://min.io/docs/minio/linux/reference/minio-mc/mc-cp.html) to put/get files fron a bucket. <br>
+> - [`mc cp`](https://min.io/docs/minio/linux/reference/minio-mc/mc-cp.html) to put/get files from a bucket. <br>
 > - [`mc ls`](https://min.io/docs/minio/linux/reference/minio-mc/mc-ls.html) to list files from a bucket.
 
 ##### get-file
