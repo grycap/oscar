@@ -216,7 +216,7 @@ to mount the volume with the
 containers.
 
 To deploy it you can use
-[this chart](https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner/tree/master/deploy/helm)
+[this chart](https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner/blob/master/README.md)
 executing:
 
 ```sh
