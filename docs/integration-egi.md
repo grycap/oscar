@@ -46,7 +46,7 @@ And the path where you want to store the files in the "OUTPUTS" tab:
 ![Onedata output](images/onedata-output.png)
 
 This means that scientists can store their output files on their Onedata space
-in the EGI DataHub for long-time persistence and easy sharing of experimental
+in the EGI DataHub for long-term persistence and easy sharing of experimental
 results between researchers.
 
 
@@ -80,7 +80,7 @@ via OIDC tokens thanks to the integration with
 [oidc-agent](https://indigo-dc.gitbook.io/oidc-agent/).
 
 Users must install `oidc-agent` following its
-[instructions](https://indigo-dc.gitbook.io/oidc-agent/installation) and
+[instructions](https://github.com/indigo-dc/oidc-agent/blob/master/README.md) and
 create a new account configuration for the
 `https://aai.egi.eu/auth/realms/egi/` issuer. 
 

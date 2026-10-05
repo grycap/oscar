@@ -34,7 +34,7 @@ These are the steps:
     Once logged in, you need to define the access credentials to the Cloud on
     which the OSCAR cluster will be deployed. These should be temporary
     credentials under the
-    [principle of least privilege (PoLP)](https://searchsecurity.techtarget.com/definition/principle-of-least-privilege-POLP).
+    [principle of least privilege (PoLP)](https://en.wikipedia.org/wiki/Principle_of_least_privilege).
 
     ![credentials](images/im-dashboard/im-dashboard-00-2.png)
 
