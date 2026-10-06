@@ -1,507 +1,245 @@
 # OSCAR CLI
 
-OSCAR CLI provides a command line interface to interact with
-OSCAR. It supports cluster registrations,
-service management, workflows definition from [FDL](fdl.md) files and the ability to manage files from OSCAR's compatible
-storage providers (MinIO, AWS S3 and Onedata). The folder
-[`example-workflow`](https://github.com/grycap/oscar-cli/tree/main/example-workflow)
-contains all the necessary files to create a simple workflow to test the tool.
-
+OSCAR CLI provides a command-line interface for configuring OSCAR clusters, deploying services from [FDL](fdl.md) files, invoking services, managing storage, and inspecting deployments. See the [`oscar-cli` repository](https://github.com/grycap/oscar-cli) for the source.
 
 ## Download
 
-### Releases
-
-The easy way to download OSCAR-CLI is through the GitHub
-[releases page](https://github.com/grycap/oscar-cli/releases). There are
-binaries for multiple platforms and OS. If you need a binary for another
-platform, please open an [issue](https://github.com/grycap/oscar-cli/issues).
-
-### Install from source
-
-If you have the [Go](https://golang.org/doc/install) programming language installed and
-[configured](https://github.com/golang/go/wiki/SettingGOPATH), you can get it directly
-from the source by executing:
+Prebuilt binaries for supported platforms are available on the [releases page](https://github.com/grycap/oscar-cli/releases). With [Go](https://go.dev/doc/install) installed, you can instead run:
 
 ```sh
-go install github.com/grycap/oscar-cli@latest
+go install github.com/grycap/oscar-cli/v2@latest
 ```
 
-### OIDC (OpenID Connect)
+## Authentication and configuration
 
-If your cluster has OIDC available, follow these steps to use `oscar-cli` to interact with it using the OpenID Connect.
+Clusters are registered in `~/.oscar-cli/config.yaml` by default. Use `--config FILE` to select another YAML or JSON configuration file. Commands that target a cluster use the configured default unless you pass `-c, --cluster CLUSTER` (where supported).
 
-- Install [oidc-agent](https://indigo-dc.gitbook.io/oidc-agent/intro)
-- Register the [EGI client](https://indigo-dc.gitbook.io/oidc-agent/user/oidc-gen/provider/egi)
-- Add a cluster in `oscar-cli` with oidc credentials (More info about the usage of the `cluster add` command [here](#add))
-
-``` bash
+```sh
+oscar-cli cluster add IDENTIFIER ENDPOINT USERNAME --password-stdin
 oscar-cli cluster add IDENTIFIER ENDPOINT --oidc-account-name SHORTNAME
+oscar-cli cluster add IDENTIFIER ENDPOINT --oidc-refresh-token TOKEN
+oscar-cli cluster default --set IDENTIFIER
 ```
 
+The OIDC account-name form requires a configured [oidc-agent](https://indigo-dc.gitbook.io/oidc-agent/intro); `cluster add` also accepts `--disable-ssl` for clusters with untrusted certificates; leave certificate verification enabled when possible.
 
 ## Available commands
 
+The commands and flags below correspond to the `oscar-cli`. Use `oscar-cli COMMAND --help` for full argument and alias details. `-h, --help` is available throughout; flags shown for a parent command are inherited by its children. Commands marked **changes state** create, update, invoke, or delete resources; inspect your target cluster before using them.
 
-- [OSCAR CLI](#oscar-cli)
-  - [Download](#download)
-    - [Releases](#releases)
-    - [Install from source](#install-from-source)
-    - [OIDC (OpenID Connect)](#oidc-openid-connect)
-  - [Available commands](#available-commands)
-    - [apply](#apply)
-    - [cluster](#cluster)
-      - [Subcommands](#subcommands)
-        - [add](#add)
-        - [default](#default)
-        - [info](#info)
-        - [list](#list)
-        - [delete](#delete)
-    - [service](#service)
-      - [Subcommands of services](#subcommands-of-services)
-        - [get](#get)
-        - [list services](#list-services)
-        - [delete services](#delete-services)
-        - [run](#run)
-        - [logs list](#logs-list)
-        - [logs get](#logs-get)
-        - [logs delete](#logs-delete)
-        - [get-file](#get-file)
-        - [put-file](#put-file)
-        - [list-files](#list-files)
-        - [service delete-file](#service-delete-file)
-    - [bucket](#bucket)
-      - [delete-file](#delete-file)
-    - [version](#version)
-    - [help](#help)
+## Command index
 
-### apply
+Select a command to jump to its description and options.
 
-Apply a FDL file to create or edit services in clusters.
+- [FDL workflows](#fdl-workflows)
+  - [`apply`](#cmd-apply)
+  - [`delete`](#cmd-delete)
+- [Cluster](#cluster)
+  - [`cluster add`](#cmd-cluster-add)
+  - [`cluster default`](#cmd-cluster-default)
+  - [`cluster info`](#cmd-cluster-info)
+  - [`cluster status`](#cmd-cluster-status)
+  - [`cluster list`](#cmd-cluster-list)
+  - [`cluster delete`](#cmd-cluster-delete)
+- [OSCAR Hub](#oscar-hub)
+  - [`hub list`](#cmd-hub-list)
+  - [`hub deploy`](#cmd-hub-deploy)
+  - [`hub validate`](#cmd-hub-validate)
+- [Service](#service)
+  - [`service get`](#cmd-service-get)
+  - [`service list`](#cmd-service-list)
+  - [`service delete`](#cmd-service-delete)
+  - [`service run`](#cmd-service-run)
+  - [`service job`](#cmd-service-job)
+  - [`service get-file`](#cmd-service-get-file)
+  - [`service put-file`](#cmd-service-put-file)
+  - [`service list-files`](#cmd-service-list-files)
+  - [`service delete-file`](#cmd-service-delete-file)
+  - [`service system-logs`](#cmd-service-system-logs)
+  - [`service deployment status`](#cmd-service-deployment-status)
+  - [`service deployment logs`](#cmd-service-deployment-logs)
+- [Service job logs](#service-job-logs)
+  - [`service logs list`](#cmd-service-logs-list)
+  - [`service logs get`](#cmd-service-logs-get)
+  - [`service logs delete`](#cmd-service-logs-delete)
+- [Bucket](#bucket)
+  - [`bucket list`](#cmd-bucket-list)
+  - [`bucket get`](#cmd-bucket-get)
+  - [`bucket create`](#cmd-bucket-create)
+  - [`bucket update`](#cmd-bucket-update)
+  - [`bucket delete`](#cmd-bucket-delete)
+  - [`bucket put-file`](#cmd-bucket-put-file)
+  - [`bucket delete-file`](#cmd-bucket-delete-file)
+  - [`bucket presign`](#cmd-bucket-presign)
+- [Managed volumes](#managed-volumes)
+  - [`volume list`](#cmd-volume-list)
+  - [`volume get`](#cmd-volume-get)
+  - [`volume create`](#cmd-volume-create)
+  - [`volume delete`](#cmd-volume-delete)
+- [User quotas](#user-quotas)
+  - [`quota get`](#cmd-quota-get)
+  - [`quota update`](#cmd-quota-update)
+- [Metrics](#metrics)
+  - [`metrics summary`](#cmd-metrics-summary)
+  - [`metrics breakdown`](#cmd-metrics-breakdown)
+  - [`metrics service`](#cmd-metrics-service)
+- [Federation](#federation)
+  - [`federation get`](#cmd-federation-get)
+  - [`federation add-member`](#cmd-federation-add-member)
+  - [`federation update`](#cmd-federation-update)
+  - [`federation delete`](#cmd-federation-delete)
+- [Other commands](#other-commands)
+  - [`health`](#cmd-health)
+  - [`interactive`](#cmd-interactive)
+  - [`version`](#cmd-version)
+  - [`completion`](#cmd-completion)
+  - [`help`](#cmd-help)
 
-```
-Usage:
-  oscar-cli apply FDL_FILE [flags]
+### FDL workflows
 
-Aliases:
-  apply, a
+| Command | Purpose and options |
+| --- | --- |
+| <a id="cmd-apply"></a>`apply FDL_FILE` | Create or update services (**changes state**). `-c, --cluster CLUSTER` overrides the FDL cluster, `-n, --name SERVICE_NAME` overrides the service and primary bucket names, `--env-file FILE` loads environment variables, and `--default` selects the configured default cluster instead of the FDL cluster. |
+| <a id="cmd-delete"></a>`delete FDL_FILE` | Delete services defined in the FDL (**destructive**). `--default` selects the configured default cluster instead of the FDL cluster. |
 
-Flags:
-      --config string   set the location of the config file (YAML or JSON)
-  -h, --help            help for apply
-```
-
-### cluster
-
-Manages the configuration of clusters.
-
-#### Subcommands
-
-##### add
-
-Add a new existing cluster to oscar-cli.
-
-```
-Usage:
-  oscar-cli cluster add IDENTIFIER ENDPOINT {USERNAME {PASSWORD | \
-  --password-stdin} | --oidc-account-name ACCOUNT} [flags]
-
-Aliases:
-  add, a
-
-Flags:
-      --disable-ssl               disable verification of ssl certificates for the
-                                  added cluster
-  -h, --help                      help for add
-  -o, --oidc-account-name string  OIDC account name to authenticate using
-                                  oidc-agent. Note that oidc-agent must be
-                                  started and properly configured
-                                  (See:https://indigo-dc.gitbook.io/oidc-agent/)
-  -t, --oidc-refresh-token string OIDC token to authenticate using oidc-token. 
-                                  Note that oidc-token must be started and 
-                                  properly configured
-      --password-stdin            take the password from stdin
-
-Global Flags:
-      --config string   set the location of the config file (YAML or JSON)
+```sh
+oscar-cli apply service.yaml --cluster CLUSTER --name SERVICE_NAME
 ```
 
-##### default
+### Cluster
 
-Show or set the default cluster.
+| Command | Purpose and options |
+| --- | --- |
+| <a id="cmd-cluster-add"></a>`cluster add IDENTIFIER ENDPOINT ...` | Register a cluster (**changes local configuration**). Authenticate with `USERNAME PASSWORD`, `USERNAME --password-stdin`, `-o, --oidc-account-name ACCOUNT`, or `-t, --oidc-refresh-token TOKEN`; optional `--disable-ssl`. |
+| <a id="cmd-cluster-default"></a>`cluster default` | Show the default cluster or set it with `-s, --set IDENTIFIER` (**changes local configuration** when setting). |
+| <a id="cmd-cluster-info"></a>`cluster info` | Show cluster information; `-c, --cluster CLUSTER`. |
+| <a id="cmd-cluster-status"></a>`cluster status` | Show OSCAR Manager status and readiness; `-c, --cluster CLUSTER`, `-o, --output json` for structured output. |
+| <a id="cmd-cluster-list"></a>`cluster list` | List configured clusters. |
+| <a id="cmd-cluster-delete"></a>`cluster delete IDENTIFIER` | Remove a cluster from the **local CLI configuration**, not from OSCAR (**changes local configuration**); `remove` is an alias. |
 
-```
-Usage:
-  oscar-cli cluster default [flags]
-
-Aliases:
-  default, d
-
-Flags:
-  -h, --help         help for default
-  -s, --set string   set a default cluster by passing its IDENTIFIER
-
-Global Flags:
-      --config string   set the location of the config file (YAML or JSON)
+```sh
+oscar-cli cluster status --cluster CLUSTER --output json
 ```
 
-##### info
+### OSCAR Hub
 
-Show information of an OSCAR cluster.
+Curated services are read from `grycap/oscar-hub` at reference `main`, under `crates`, unless overridden with `--owner`, `--repo`, `--ref`, or `--path`. `--local-path DIRECTORY` for `deploy` and `validate` selects a local directory containing the service crates.
 
-```
-Usage:
-  oscar-cli cluster info [flags]
+| Command | Purpose and options |
+| --- | --- |
+| <a id="cmd-hub-list"></a>`hub list` | List curated services; `--json`, `--owner`, `--repo`, `--ref`, `--path`. |
+| <a id="cmd-hub-deploy"></a>`hub deploy SERVICE-SLUG` | Deploy a service (**changes state**); `-c, --cluster CLUSTER`, `-n, --name SERVICE_NAME`, `--env-file FILE`, `--local-path DIRECTORY`, and source flags above. The name override also changes the primary bucket name. |
+| <a id="cmd-hub-validate"></a>`hub validate SERVICE_SLUG` | Run RO-Crate acceptance tests (**may invoke services and write objects**); `-c, --cluster CLUSTER`, `-n, --name SERVICE_NAME`, `-H, --header HEADER`, `--local-path DIRECTORY`, and source flags above. `--print-acceptance-commands` prints commands **without running them**. |
 
-Aliases:
-  info, i
-
-Flags:
-  -c, --cluster string   set the cluster
-  -h, --help             help for info
-
-Global Flags:
-      --config string   set the location of the config file (YAML or JSON)
+```sh
+oscar-cli hub list --json
+oscar-cli hub deploy SERVICE-SLUG --cluster CLUSTER
+oscar-cli hub validate SERVICE-SLUG --print-acceptance-commands
+oscar-cli hub validate SERVICE-SLUG --cluster CLUSTER
 ```
 
-##### list
+### Service
 
-List the configured OSCAR clusters.
+`STORAGE_PROVIDER` has the form `minio.NAME`, `s3.NAME`, or `onedata.NAME`, matching the provider in the service definition. File operations can fail if an internal storage endpoint is not reachable from the CLI host; in local deployments, check the storage endpoint exposed to the host before using a storage client as a fallback.
 
-```
-Usage:
-  oscar-cli cluster list [flags]
+| Command | Purpose and options |
+| --- | --- |
+| <a id="cmd-service-get"></a>`service get SERVICE_NAME` | Show a service definition; `-c, --cluster CLUSTER`. Treat the output as potentially sensitive. |
+| <a id="cmd-service-list"></a>`service list` | List services; `-c, --cluster CLUSTER`. |
+| <a id="cmd-service-delete"></a>`service delete SERVICE_NAME...` | Delete one or more services (**destructive**); `-c, --cluster CLUSTER`. `remove` is an alias. |
+| <a id="cmd-service-run"></a>`service run SERVICE_NAME` | Synchronous invocation (**changes state**; requires a serverless backend). `-f, --file-input FILE` or `-i, --text-input TEXT`; `-o, --output FILE`, `--decode-output`, `-H, --header HEADER`, `-e, --endpoint URL`, `-t, --token TOKEN`, `-c, --cluster CLUSTER`. |
+| <a id="cmd-service-job"></a>`service job SERVICE_NAME` | Asynchronous invocation (**changes state**; MinIO provider required). `-f, --file-input FILE` or `-i, --text-input TEXT`; `-e, --endpoint URL`, `-t, --token TOKEN`, `-c, --cluster CLUSTER`. |
+| <a id="cmd-service-get-file"></a>`service get-file SERVICE_NAME [STORAGE_PROVIDER] [REMOTE_PATH] [LOCAL_FILE]` | Download from a service output provider; by default uses the first output provider. `--download-latest-into [DESTINATION]` downloads the newest file (the remote path can then be omitted); `--no-progress`, `-c, --cluster CLUSTER`. |
+| <a id="cmd-service-put-file"></a>`service put-file SERVICE_NAME [STORAGE_PROVIDER] LOCAL_FILE [REMOTE_FILE]` | Upload to a service input path (**changes state**). Defaults to `minio.default`; when `REMOTE_FILE` is omitted, uses the configured input path and local filename. `--no-progress`, `-c, --cluster CLUSTER`. |
+| <a id="cmd-service-list-files"></a>`service list-files SERVICE_NAME STORAGE_PROVIDER REMOTE_PATH` | List files; `-c, --cluster CLUSTER`. |
+| <a id="cmd-service-delete-file"></a>`service delete-file SERVICE_NAME STORAGE_PROVIDER REMOTE_FILE` | Delete a stored file (**destructive**); `-c, --cluster CLUSTER`. |
+| <a id="cmd-service-system-logs"></a>`service system-logs` | Read OSCAR Manager logs (Basic Auth only); `-o, --output text\|json\|csv`, `-p, --previous`, `-t, --timestamps`, `-c, --cluster CLUSTER`. |
+| <a id="cmd-service-deployment-status"></a>`service deployment status SERVICE_NAME` | Show deployment status; `-o, --output yaml\|json\|table`, `-c, --cluster CLUSTER`. |
+| <a id="cmd-service-deployment-logs"></a>`service deployment logs SERVICE_NAME` | Show deployment logs; `-o, --output yaml\|json\|table\|csv`, `-c, --cluster CLUSTER`. |
 
-Aliases:
-  list, ls
-
-Flags:
-  -h, --help   help for list
-
-Global Flags:
-      --config string   set the location of the config file (YAML or JSON)
-```
-
-##### delete
-
-Remove a cluster from the configuration file.
-
-```
-Usage:
-  oscar-cli cluster delete IDENTIFIER [flags]
-
-Aliases:
-  delete, d, del, remove, rm
-
-Flags:
-  -h, --help   help for delete
-
-Global Flags:
-      --config string   set the location of the config file (YAML or JSON)
+```sh
+oscar-cli service run SERVICE_NAME --cluster CLUSTER --text-input 'hello'
+oscar-cli service job SERVICE_NAME --cluster CLUSTER --text-input 'hello'
+oscar-cli service deployment status SERVICE_NAME --cluster CLUSTER
 ```
 
-### service
+#### Service job logs
 
-Manages the services within a cluster.
+| Command | Purpose and options |
+| --- | --- |
+| <a id="cmd-service-logs-list"></a>`service logs list SERVICE_NAME` | List jobs/logs; `-s, --status STATUS` filters by Pending, Running, Succeeded, or Failed (comma-separated values supported). |
+| <a id="cmd-service-logs-get"></a>`service logs get SERVICE_NAME [JOB_NAME]` | Show job logs; `-l, --latest` selects the newest job, `-t, --show-timestamps` includes timestamps. |
+| <a id="cmd-service-logs-delete"></a>`service logs delete SERVICE_NAME {JOB_NAME... \| --succeeded \| --all}` | Delete jobs and logs (**destructive**); `-s, --succeeded` or `-a, --all`. `remove` is an alias. |
 
-#### Subcommands of services
+These log commands inherit `-c, --cluster CLUSTER` from `service logs`. For asynchronous file inputs, upload the file to the service's input path before `service job`; then inspect logs and the output bucket.
 
-##### get
+### Bucket
 
-Get the definition of a service.
+Bucket commands inherit `-c, --cluster CLUSTER`. `bucket get` **lists objects**; it does not download their contents. Use service file operations to retrieve service output files.
 
-```
-Usage:
-  oscar-cli service get SERVICE_NAME [flags]
+| Command | Purpose and options |
+| --- | --- |
+| <a id="cmd-bucket-list"></a>`bucket list` | List visible buckets; `-o, --output table\|json`. No bucket name argument. |
+| <a id="cmd-bucket-get"></a>`bucket get BUCKET_NAME` | List objects in a bucket; `--prefix PREFIX`, `--limit NUMBER`, `--page TOKEN`, `--all` to fetch all pages, `-o, --output table\|json`. |
+| <a id="cmd-bucket-create"></a>`bucket create BUCKET_NAME` | Create a bucket (**changes state**); `--visibility public\|private`, `--allowed-users USER1,USER2`. |
+| <a id="cmd-bucket-update"></a>`bucket update BUCKET_NAME` | Update bucket access (**changes state**); `--visibility public\|private`, `--allowed-users USER1,USER2`. |
+| <a id="cmd-bucket-delete"></a>`bucket delete BUCKET_NAME` | Delete a bucket (**destructive**). |
+| <a id="cmd-bucket-put-file"></a>`bucket put-file BUCKET_NAME LOCAL_FILE REMOTE_PATH` | Upload a file (**changes state**); `--no-progress`. |
+| <a id="cmd-bucket-delete-file"></a>`bucket delete-file BUCKET_NAME REMOTE_PATH` | Delete an object (**destructive**). |
+| <a id="cmd-bucket-presign"></a>`bucket presign BUCKET_NAME FILE_NAME` | Generate a presigned URL; `-X, --operation get\|put\|head\|delete`, `--expires SECONDS`, `--content-type TYPE`, `--extra-headers KEY=VALUE,...`. The URL may grant object access: handle it as a secret. |
 
-Aliases:
-  get, g
-
-Flags:
-  -c, --cluster string   set the cluster
-  -h, --help             help for get
-
-Global Flags:
-      --config string   set the location of the config file (YAML or JSON)
-```
-
-##### list services
-
-List the available services in a cluster.
-
-```
-Usage:
-  oscar-cli service list [flags]
-
-Aliases:
-  list, ls
-
-Flags:
-  -c, --cluster string   set the cluster
-  -h, --help             help for list
-
-Global Flags:
-      --config string   set the location of the config file (YAML or JSON)
+```sh
+oscar-cli bucket list --cluster CLUSTER
+oscar-cli bucket get BUCKET_NAME --cluster CLUSTER --prefix output/ --all --output json
 ```
 
-##### delete services
+### Managed volumes
 
-Remove a service from the cluster.
+Volume commands inherit `-c, --cluster CLUSTER`.
 
-```
-Usage:
-  oscar-cli service delete SERVICE_NAME... [flags]
+| Command | Purpose and options |
+| --- | --- |
+| <a id="cmd-volume-list"></a>`volume list` | List managed volumes; `-o, --output table\|json`. |
+| <a id="cmd-volume-get"></a>`volume get VOLUME_NAME` | Show volume details; `-o, --output yaml\|json`. |
+| <a id="cmd-volume-create"></a>`volume create VOLUME_NAME` | Create a managed volume (**changes state**); `--size SIZE` (for example `1Gi`). |
+| <a id="cmd-volume-delete"></a>`volume delete VOLUME_NAME` | Delete a managed volume (**destructive**). |
 
-Aliases:
-  delete, d, del, remove, rm
+### User quotas
 
-Flags:
-  -c, --cluster string   set the cluster
-  -h, --help             help for delete
+Quota commands inherit `-c, --cluster CLUSTER`. Updating quotas requires appropriate administrative authorization.
 
-Global Flags:
-      --config string   set the location of the config file (YAML or JSON)
-```
+| Command | Purpose and options |
+| --- | --- |
+| <a id="cmd-quota-get"></a>`quota get [USER_ID]` | Show the quota of the current user or an explicitly identified user. |
+| <a id="cmd-quota-update"></a>`quota update USER_ID` | Update quota (**changes state**); `--cpu QUANTITY`, `--memory QUANTITY`, `--volume-count COUNT`, `--volume-disk SIZE`, `--volume-max-disk SIZE`, `--volume-min-disk SIZE`. |
 
-##### run
+### Metrics
 
-Invoke a service synchronously (a Serverless backend in the cluster is required).
+Metrics commands inherit `-c, --cluster CLUSTER` and accept `--start RFC3339` and `--end RFC3339` time filters.
 
-```
-Usage:
-  oscar-cli service run SERVICE_NAME {--file-input | --text-input} [flags]
+| Command | Purpose and options |
+| --- | --- |
+| <a id="cmd-metrics-summary"></a>`metrics summary` | Show cluster-wide totals. |
+| <a id="cmd-metrics-breakdown"></a>`metrics breakdown` | Group cluster metrics; `--group-by service\|user\|country`. |
+| <a id="cmd-metrics-service"></a>`metrics service SERVICE_NAME` | Show metrics for a service. |
 
-Aliases:
-  run, invoke, r
+### Federation
 
-Flags:
-  -c, --cluster string      set the cluster
-  -e, --endpoint string     endpoint of a non registered cluster
-  -f, --file-input string   input file for the request
-  -h, --help                help for run
-  -o, --output string       file path to store the output
-  -i, --text-input string   text input string for the request
-  -t, --token string        token of the service
+Federation commands inherit `-c, --cluster CLUSTER`. For `--type oscar`, specify `--cluster-id` and `--service-name`; for `--type endpoint`, use `--url`. `--priority` controls delegation priority (0 is highest).
 
-Global Flags:
-      --config string   set the location of the config file (YAML or JSON)
-```
+| Command | Purpose and options |
+| --- | --- |
+| <a id="cmd-federation-get"></a>`federation get SERVICE_NAME` | List federation members; `-o, --output text\|json\|table`. |
+| <a id="cmd-federation-add-member"></a>`federation add-member SERVICE_NAME` | Add a member (**changes state**); `--type oscar\|endpoint`, `--cluster-id ID`, `--service-name NAME`, `--url URL`, `--priority NUMBER`. |
+| <a id="cmd-federation-update"></a>`federation update SERVICE_NAME` | Update a member (**changes state**); `--type`, `--cluster-id`, `--service-name`, `--url`, `--priority`. |
+| <a id="cmd-federation-delete"></a>`federation delete SERVICE_NAME MEMBER_NAME` | Delete a member (**destructive**); `--cluster-id ID`, `--service-name NAME`. |
 
-##### logs list
+### Other commands
 
-List the logs from a service.
-
-```
-Usage:
-  oscar-cli service logs list SERVICE_NAME [flags]
-
-Aliases:
-  list, ls
-
-Flags:
-  -h, --help             help for list
-  -s, --status strings   filter by status (Pending, Running, Succeeded or
-                         Failed), multiple values can be specified by a
-                         comma-separated string
-
-Global Flags:
-  -c, --cluster string   set the cluster
-      --config string    set the location of the config file (YAML or JSON)
-```
-
-##### logs get
-
-Get the logs from a service's job.
-
-```
-Usage:
-  oscar-cli service logs get SERVICE_NAME JOB_NAME [flags]
-
-Aliases:
-  get, g
-
-Flags:
-  -h, --help              help for get
-  -t, --show-timestamps   show timestamps in the logs
-
-Global Flags:
-  -c, --cluster string   set the cluster
-      --config string    set the location of the config file (YAML or JSON)
-```
-
-##### logs delete
-
-Remove a service's job along with its logs.
-
-```
-Usage:
-  oscar-cli service logs delete SERVICE_NAME \
-   {JOB_NAME... | --succeeded | --all} [flags]
-
-Aliases:
-  delete, d, del, remove, rm
-
-Flags:
-  -a, --all         remove all logs from the service
-  -h, --help        help for delete
-  -s, --succeeded   remove succeeded logs from the service
-
-Global Flags:
-  -c, --cluster string   set the cluster
-      --config string    set the location of the config file (YAML or JSON)
-```
-> **Note**
-> The following subcommands will not work with MinIO if you use a local deployment due to DNS resolutions, so if you want to use a command line put/get/list files from your buckets, you can use the [MinIO client](https://min.io/docs/minio/linux/reference/minio-mc.html) command line. <br>
-> Once you have the client installed you can define the cluster with the `mc alias` command like it follows:
-> ```
-> mc alias set myminio http://localhost:30300 minioadminuser minioadminpassword
-> ```
-> So, instead of the next subcommands, you would use:
-> - [`mc cp`](https://min.io/docs/minio/linux/reference/minio-mc/mc-cp.html) to put/get files from a bucket. <br>
-> - [`mc ls`](https://min.io/docs/minio/linux/reference/minio-mc/mc-ls.html) to list files from a bucket.
-
-##### get-file
-
-Get a file from a service's storage provider.
-
-The STORAGE_PROVIDER argument follows the format
-STORAGE_PROVIDER_TYPE.STORAGE_PROVIDER_NAME, being the STORAGE_PROVIDER_TYPE
-one of the three supported storage providers (MinIO, S3 or Onedata) and the
-STORAGE_PROVIDER_NAME is the identifier for the provider set in the service's
-definition.
-
-```
-Usage:
-  oscar-cli service get-file SERVICE_NAME STORAGE_PROVIDER REMOTE_FILE \
-   LOCAL_FILE [flags]
-
-Aliases:
-  get-file, gf
-
-Flags:
-  -c, --cluster string   set the cluster
-  -h, --help             help for get-file
-
-Global Flags:
-      --config string   set the location of the config file (YAML or JSON)
-```
-
-##### put-file
-
-Put a file in a service's storage provider.
-
-The STORAGE_PROVIDER argument follows the format
-STORAGE_PROVIDER_TYPE.STORAGE_PROVIDER_NAME, being the STORAGE_PROVIDER_TYPE
-one of the three supported storage providers (MinIO, S3 or Onedata) and the
-STORAGE_PROVIDER_NAME is the identifier for the provider set in the service's
-definition.
-
-**_NOTE:_** This command can not be used in a [local testing deployment](local-testing.md).
-
-```
-Usage:
-  oscar-cli service put-file SERVICE_NAME STORAGE_PROVIDER LOCAL_FILE \
-   REMOTE_FILE [flags]
-
-Aliases:
-  put-file, pf
-
-Flags:
-  -c, --cluster string   set the cluster
-  -h, --help             help for put-file
-
-Global Flags:
-      --config string   set the location of the config file (YAML or JSON)
-```
-
-##### list-files
-
-List files from a service's storage provider path.
-
-The STORAGE_PROVIDER argument follows the format STORAGE_PROVIDER_TYPE.STORAGE_PROVIDER_NAME,
-being the STORAGE_PROVIDER_TYPE one of the three supported storage providers
-(MinIO, S3 or Onedata) and the STORAGE_PROVIDER_NAME is the identifier for the
-provider set in the service's definition.
-
-```
-Usage:
-  oscar-cli service list-files SERVICE_NAME STORAGE_PROVIDER REMOTE_PATH [flags]
-
-Aliases:
-  list-files, list-file, lsf
-
-Flags:
-  -c, --cluster string   set the cluster
-  -h, --help             help for list-files
-
-Global Flags:
-      --config string   set the location of the config file (YAML or JSON)
-```
-
-##### service delete-file
-
-Delete a file in a service's storage provider. The `STORAGE_PROVIDER` argument
-uses the format `STORAGE_PROVIDER_TYPE.STORAGE_PROVIDER_NAME`; supported types
-are MinIO, S3, and Onedata.
-
-```
-Usage:
-  oscar-cli service delete-file SERVICE_NAME STORAGE_PROVIDER REMOTE_FILE [flags]
-
-Flags:
-  -c, --cluster string   set the cluster
-  -h, --help             help for delete-file
-
-Global Flags:
-      --config string   set the location of the config file (YAML or JSON)
-```
-
-### bucket
-
-Manages files in OSCAR buckets.
-
-#### Subcommands
-
-##### delete-file
-
-Delete a file at the specified remote path from a MinIO bucket.
-
-```
-Usage:
-  oscar-cli bucket delete-file BUCKET_NAME REMOTE_PATH [flags]
-
-Flags:
-  -c, --cluster string   set the cluster
-  -h, --help             help for delete-file
-
-Global Flags:
-      --config string   set the location of the config file (YAML or JSON)
-```
-
-### version
-
-Print the version.
-
-```
-Usage:
-  oscar-cli version [flags]
-
-Aliases:
-  version, v
-
-Flags:
-  -h, --help   help for version
-```
-
-### help
-
-Help provides help for any command in the application.
-Simply type oscar-cli help [path to command] for full details.
-
-```
-Usage:
-  oscar-cli help [command] [flags]
-
-Flags:
-  -h, --help   help for help
-```
+| Command | Purpose and options |
+| --- | --- |
+| <a id="cmd-health"></a>`health` | Check the health endpoint; `-c, --cluster CLUSTER`, `-o, --output json` for structured output. |
+| <a id="cmd-interactive"></a>`interactive` | Launch the terminal UI for browsing and managing cluster resources. |
+| <a id="cmd-version"></a>`version` | Print the CLI version. |
+| <a id="cmd-completion"></a>`completion` | Generate shell completion; run `oscar-cli completion --help` for supported shells. |
+| <a id="cmd-help"></a>`help [command]` | Show help for any command or subcommand. |
