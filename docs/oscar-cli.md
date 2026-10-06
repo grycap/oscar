@@ -25,7 +25,7 @@ The OIDC account-name form requires a configured [oidc-agent](https://indigo-dc.
 
 ## Available commands
 
-The commands and flags below correspond to the `oscar-cli` **devel** branch. Use `oscar-cli COMMAND --help` for full argument and alias details. `-h, --help` is available throughout; flags shown for a parent command are inherited by its children. Commands marked **changes state** create, update, invoke, or delete resources; inspect your target cluster before using them.
+The commands and flags below correspond to the `oscar-cli`. Use `oscar-cli COMMAND --help` for full argument and alias details. `-h, --help` is available throughout; flags shown for a parent command are inherited by its children. Commands marked **changes state** create, update, invoke, or delete resources; inspect your target cluster before using them.
 
 ## Command index
 
