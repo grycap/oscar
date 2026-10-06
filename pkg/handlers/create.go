@@ -48,7 +48,6 @@ var errInput = errors.New("unrecognized input (valid inputs are MinIO and dCache
 
 // Custom logger
 var createLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
-var isAdminUser = false
 
 // MakeCreateHandler godoc
 // @Summary Create service
@@ -67,7 +66,7 @@ var isAdminUser = false
 func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var service types.Service
-		isAdminUser = false
+		isAdminUser := false
 		authHeader := c.GetHeader("Authorization")
 		//Error creating the service: Service.serving.knative.dev "cowsay-s" is invalid: metadata.labels:
 		//  Invalid value: "platform-access:vo.ai4eosc.eu": a valid label must be an empty string or
@@ -86,6 +85,9 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			isAdminUser = true
 			service.Owner = types.DefaultOwner
 			createLogger.Printf("Creating service '%s' for user '%s'", service.Name, service.Owner)
+		} else if service.Namespace != "" {
+			c.String(http.StatusBadRequest, "namespace cannot be specified by non-admin users")
+			return
 		}
 		rawInput := cloneStorageIOConfigs(service.Input)
 		rawOutput := cloneStorageIOConfigs(service.Output)
@@ -225,7 +227,9 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 			}
 		}
-		if service.Namespace == "" {
+		if !isAdminUser {
+			service.Namespace = namespace
+		} else if service.Namespace == "" {
 			service.Namespace = namespace
 		}
 		if !isAdminUser {
@@ -374,7 +378,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			strings.EqualFold(strings.TrimSpace(service.Annotations[types.FederationWorkerAnnotation]), "true") &&
 			service.Federation != nil &&
 			strings.EqualFold(strings.TrimSpace(service.Federation.Topology), "mesh")) {
-			if buckets, err = createBuckets(&service, cfg, objectStorageIAM.GetClient(c.Request.Context()), false); err != nil {
+			if buckets, err = createBuckets(&service, cfg, objectStorageIAM.GetClient(c.Request.Context()), false, isAdminUser); err != nil {
 				createLogger.Printf("Error creating buckets for service '%s': %v", service.Name, err)
 				if err == errInput {
 					c.String(http.StatusBadRequest, err.Error())
@@ -644,7 +648,7 @@ func cloneStorageIOConfigs(items []types.StorageIOConfig) []types.StorageIOConfi
 	return append([]types.StorageIOConfig(nil), items...)
 }
 
-func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *types.MinIOAdminClient, isUpdate bool) ([]types.MinIOBucket, error) {
+func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *types.MinIOAdminClient, isUpdate, isAdminUser bool) ([]types.MinIOBucket, error) {
 	var s3Client *s3.S3
 	var cdmiClient *cdmi.Client
 	var provName, provID string

@@ -254,7 +254,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Use create buckets function to create new inputs/outputs if needed
 		var newServiceBuckets []types.MinIOBucket
-		if newServiceBuckets, err = createBuckets(&newService, cfg, objectStorageIAM.GetClient(c.Request.Context()), true); err != nil {
+		if newServiceBuckets, err = createBuckets(&newService, cfg, objectStorageIAM.GetClient(c.Request.Context()), true, isAdminUser); err != nil {
 			if err == errInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {
