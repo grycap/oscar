@@ -84,11 +84,12 @@ func MakeFederationGetHandler(back types.ServerlessBackend) gin.HandlerFunc {
 // @Router /system/federation/{serviceName} [post]
 func MakeFederationPostHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		updated, err := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) {
+		updated, err := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) error {
 			if service.Federation == nil {
 				service.Federation = &types.Federation{}
 			}
 			service.Federation.Members = append(service.Federation.Members, req.Members...)
+			return nil
 		})
 		if err != nil {
 			return
@@ -114,7 +115,7 @@ func MakeFederationPostHandler(back types.ServerlessBackend) gin.HandlerFunc {
 // @Router /system/federation/{serviceName} [put]
 func MakeFederationPutHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		updated, err := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) {
+		updated, err := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) error {
 			if service.Federation == nil {
 				service.Federation = &types.Federation{}
 			}
@@ -125,6 +126,7 @@ func MakeFederationPutHandler(back types.ServerlessBackend) gin.HandlerFunc {
 					}
 				}
 			}
+			return nil
 		})
 		if err != nil {
 			return
@@ -150,34 +152,29 @@ func MakeFederationPutHandler(back types.ServerlessBackend) gin.HandlerFunc {
 // @Router /system/federation/{serviceName} [delete]
 func MakeFederationDeleteHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		updated, err := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) {
+		updated, err := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) error {
 			if service.Federation == nil {
 				service.Federation = &types.Federation{}
 			}
-			//Possibility of deleting service in a federation
 			if req.Delete {
-				// We safely iterate through each member sent in the JSON
-				for d := 0; d < len(req.Members); d++ {
-					targetServiceName := req.Members[d].ServiceName
-
-					if targetServiceName != "" {
-						// We create a temporary struct of type types.Service
-						serviceToDelete := types.Service{
-							Name:      targetServiceName,
-							Namespace: service.Namespace,
-						}
-
-						// We pass the complete object to DeleteService
-						errDelete := back.DeleteService(serviceToDelete)
-						if errDelete != nil {
-							fmt.Printf("Error removing the federated service %s: %v\n", targetServiceName, errDelete)
-						} else {
-							fmt.Printf(" Federated service removed: %s - %v\n", targetServiceName, errDelete)
-						}
+				for _, target := range req.Members {
+					if !containsReplica(service.Federation.Members, target) {
+						c.String(http.StatusBadRequest, "cannot delete a service that is not a federation member")
+						return fmt.Errorf("requested federation member %q is not stored", target.ServiceName)
+					}
+				}
+				for _, target := range req.Members {
+					if target.ServiceName == "" {
+						continue
+					}
+					if err := back.DeleteService(types.Service{Name: target.ServiceName, Namespace: service.Namespace}); err != nil {
+						c.String(http.StatusInternalServerError, fmt.Sprintf("Error removing federated service %s: %v", target.ServiceName, err))
+						return err
 					}
 				}
 			}
 			service.Federation.Members = filterReplicas(service.Federation.Members, req.Members)
+			return nil
 		})
 		if err != nil {
 			return
@@ -186,7 +183,7 @@ func MakeFederationDeleteHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	}
 }
 
-func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, mutator func(service *types.Service, req *types.FederationRequest)) (*types.FederationResponse, error) {
+func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, mutator func(service *types.Service, req *types.FederationRequest) error) (*types.FederationResponse, error) {
 	var req types.FederationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.String(http.StatusBadRequest, fmt.Sprintf("Invalid payload: %v", err))
@@ -215,7 +212,9 @@ func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, m
 		service.StorageProviders = req.StorageProviders
 	}
 
-	mutator(service, &req)
+	if err := mutator(service, &req); err != nil {
+		return nil, err
+	}
 
 	if err := back.UpdateService(*service); err != nil {
 		c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating service: %v", err))
