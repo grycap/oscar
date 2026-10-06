@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -34,7 +35,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
+	ktesting "k8s.io/client-go/testing"
 )
 
 type fakeObjectStorageIAM struct{}
@@ -368,6 +371,122 @@ func TestGetOIDCMiddleware(t *testing.T) {
 			middleware(c)
 			if c.Writer.Status() != s.code {
 				t.Errorf("expected status to be %v, got %v", s.code, c.Writer.Status())
+			}
+		})
+	}
+}
+
+func TestOIDCRejectedRequestsDoNotReachProtectedHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	kubeClientset := fake.NewSimpleClientset()
+	middleware := getOIDCMiddleware(kubeClientset, fakeObjectStorageIAM{}, &types.Config{}, nil)
+
+	tests := []struct {
+		name   string
+		header string
+		status int
+	}{
+		{name: "missing bearer token", status: http.StatusUnauthorized},
+		{name: "malformed token", header: "Bearer invalid-token", status: http.StatusBadRequest},
+		{name: "unlisted issuer", header: "Bearer " + GetToken(jwt.MapClaims{"iss": "https://unlisted.example"}), status: http.StatusUnauthorized},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			protectedCalls := 0
+			router := gin.New()
+			router.Use(middleware)
+			router.POST("/system/federation", func(c *gin.Context) {
+				protectedCalls++
+				c.Status(http.StatusNoContent)
+			})
+
+			req := httptest.NewRequest(http.MethodPost, "/system/federation", nil)
+			if tt.header != "" {
+				req.Header.Set("Authorization", tt.header)
+			}
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			if w.Code != tt.status {
+				t.Errorf("expected status %d, got %d", tt.status, w.Code)
+			}
+			if protectedCalls != 0 {
+				t.Errorf("protected handler called %d times for rejected request", protectedCalls)
+			}
+		})
+	}
+}
+
+func TestOIDCBackendFailuresDoNotReachProtectedHandler(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+	gin.SetMode(gin.TestMode)
+
+	for _, tt := range []struct {
+		name         string
+		failUserInfo bool
+		failSecret   bool
+		invalidToken bool
+		status       int
+	}{
+		{name: "invalid token", invalidToken: true, status: http.StatusUnauthorized},
+		{name: "userinfo failure", failUserInfo: true, status: http.StatusInternalServerError},
+		{name: "secret creation failure", failSecret: true, status: http.StatusInternalServerError},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var issuer string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch req.URL.Path {
+				case "/.well-known/openid-configuration":
+					fmt.Fprintf(w, `{"issuer":%q,"userinfo_endpoint":%q}`, issuer, issuer+"/userinfo")
+				case "/userinfo":
+					if tt.failUserInfo {
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					w.Write([]byte(`{"sub":"test-user","group_membership":["test-group"]}`))
+				}
+			}))
+			defer server.Close()
+			issuer = server.URL
+
+			client := fake.NewSimpleClientset()
+			if tt.failSecret {
+				client.PrependReactor("create", "secrets", func(action ktesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("secret creation failed")
+				})
+			}
+			cfg := &types.Config{OIDCValidIssuers: []string{issuer}, OIDCGroups: []string{"test-group"}}
+			middleware := getOIDCMiddleware(client, fakeObjectStorageIAM{}, cfg, &oidc.Config{
+				InsecureSkipSignatureCheck: true,
+				SkipClientIDCheck:          true,
+			})
+			claims := jwt.MapClaims{"iss": issuer, "sub": "test-user", "exp": time.Now().Add(time.Hour).Unix()}
+			if tt.invalidToken {
+				claims["exp"] = time.Now().Add(-time.Hour).Unix()
+			}
+			token := GetToken(claims)
+			if tt.failUserInfo {
+				// Authentication uses cached groups; the subsequent UserInfo call fails.
+				ClusterOidcManagers[issuer].tokenCache[token] = &userInfo{Groups: []string{"test-group"}}
+			}
+
+			protectedCalls := 0
+			router := gin.New()
+			router.Use(middleware)
+			router.POST("/system/federation", func(c *gin.Context) {
+				protectedCalls++
+				c.Status(http.StatusNoContent)
+			})
+			req := httptest.NewRequest(http.MethodPost, "/system/federation", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			if w.Code != tt.status {
+				t.Errorf("expected status %d, got %d: %s", tt.status, w.Code, w.Body.String())
+			}
+			if protectedCalls != 0 {
+				t.Errorf("protected handler called %d times for rejected request", protectedCalls)
 			}
 		})
 	}
