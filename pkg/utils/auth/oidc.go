@@ -135,11 +135,13 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, objectStorageIAM obje
 		iss, err := GetIssuerFromToken(rawToken)
 		if err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("%v", err))
+			c.Abort()
 			return
 		}
 		oidcManager := ClusterOidcManagers[iss]
 		if oidcManager == nil {
 			c.String(http.StatusUnauthorized, fmt.Sprintf("'%s' is not listed as an authorized issuer", iss))
+			c.Abort()
 			return
 		}
 		// Check the token
@@ -151,6 +153,7 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, objectStorageIAM obje
 		ui, err := oidcManager.GetUserInfo(rawToken)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("%v", err))
+			c.Abort()
 			return
 		}
 		uid := ui.Subject
@@ -167,11 +170,13 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, objectStorageIAM obje
 			err = mc.CreateSecretForOIDC(uid, sk)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating secret for user %s: %v", uid, err))
+				c.Abort()
 				return
 			}
 			err = objectStorageIAM.CreateUser(c.Request.Context(), uid, sk)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating object-storage user for uid %s: %v", uid, err))
+				c.Abort()
 				return
 			}
 		}
@@ -179,17 +184,20 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, objectStorageIAM obje
 		// Create Kueue ClusterQueue and LocalQueue for the user if they don't exist
 		if err := utils.CreateKueueUserQueuesIfDontExist(cfg, uid); err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating Kueue ClusterQueue for user %s: %v", uid, err))
+			c.Abort()
 			return
 		}
 		namespace, err := utils.EnsureUserNamespace(c.Request.Context(), kubeClientset, cfg, uid)
 		if err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring namespace for user %s: %v", uid, err))
+			c.Abort()
 			return
 		}
 
 		// Ensure Volume Quotas for the user
 		if _, err := utils.CreateMinIOQuotaConfigMapIfDontExist(c.Request.Context(), cfg, kubeClientset, namespace); err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating Kueue ClusterQueue for user %s: %v", uid, err))
+			c.Abort()
 			return
 		}
 
