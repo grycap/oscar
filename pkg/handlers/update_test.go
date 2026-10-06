@@ -15,6 +15,34 @@ import (
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
 
+func TestMakeUpdateHandlerRejectsForgedOwnerBeforeSecretCopy(t *testing.T) {
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{Name: "svc", Owner: "owner", Namespace: "owner-ns"}
+	client := testclient.NewSimpleClientset()
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "owner")
+		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(client, "owner"))
+		c.Next()
+	})
+	r.PUT("/system/services", MakeUpdateHandler(&types.Config{MinIOProvider: &types.MinIOProvider{}}, back))
+	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(`{"name":"svc","owner":"victim","image":"img","script":"echo"}`))
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+	if resp.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", resp.Code, resp.Body.String())
+	}
+	for _, action := range client.Actions() {
+		if action.GetResource().Resource == "secrets" {
+			t.Fatalf("foreign owner triggered secret action %s", action.GetVerb())
+		}
+	}
+	if back.UpdatedService != nil {
+		t.Fatal("forged owner updated service")
+	}
+}
+
 func TestMakeUpdateHandler(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
 
