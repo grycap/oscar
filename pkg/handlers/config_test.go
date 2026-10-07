@@ -100,8 +100,8 @@ func TestMakeConfigHandler(t *testing.T) {
 				Namespace: auth.ServicesNamespace,
 			},
 			Data: map[string][]byte{
-				"accessKey": []byte("accessKey"),
-				"secretKey": []byte("secretKey"),
+				auth.AccessKey: []byte("accessKey"),
+				auth.SecretKey: []byte("secretKey"),
 			},
 		},
 	}
