@@ -20,18 +20,36 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/grycap/oscar/v4/pkg/types"
 )
 
+const federationRequestTimeout = 20 * time.Second
+
 // ExpandFederation propagates service definitions to federation members.
 func ExpandFederation(service *types.Service, authHeader string, method string, refreshToken string) []error {
+	return expandFederation(service, refreshToken, func(worker *types.Service, cluster types.Cluster) error {
+		return sendFederatedService(worker, cluster, authHeader, method)
+	})
+}
+
+// UpsertFederation updates existing federation members and creates members that
+// are not deployed yet.
+func UpsertFederation(service *types.Service, authHeader string, refreshToken string) []error {
+	return expandFederation(service, refreshToken, func(worker *types.Service, cluster types.Cluster) error {
+		return upsertFederatedService(worker, cluster, authHeader)
+	})
+}
+
+func expandFederation(service *types.Service, refreshToken string, send func(*types.Service, types.Cluster) error) []error {
 	if service == nil || service.Federation == nil || len(service.Federation.Members) == 0 {
 		return nil
 	}
@@ -52,7 +70,7 @@ func ExpandFederation(service *types.Service, authHeader string, method string, 
 			continue
 		}
 
-		if err := sendFederatedService(worker, cluster, authHeader, method); err != nil {
+		if err := send(worker, cluster); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -194,6 +212,27 @@ func stripClusterCredentials(clusters map[string]types.Cluster) map[string]types
 	return clean
 }
 
+type federationHTTPError struct {
+	statusCode int
+	message    string
+}
+
+func (e *federationHTTPError) Error() string {
+	if e.message != "" {
+		return fmt.Sprintf("cluster responded with status %d: %s", e.statusCode, e.message)
+	}
+	return fmt.Sprintf("cluster responded with status %d", e.statusCode)
+}
+
+func upsertFederatedService(service *types.Service, cluster types.Cluster, authHeader string) error {
+	err := sendFederatedService(service, cluster, authHeader, http.MethodPut)
+	var responseErr *federationHTTPError
+	if errors.As(err, &responseErr) && responseErr.statusCode == http.StatusNotFound {
+		return sendFederatedService(service, cluster, authHeader, http.MethodPost)
+	}
+	return err
+}
+
 func sendFederatedService(service *types.Service, cluster types.Cluster, authHeader string, method string) error {
 	endpoint := strings.TrimSpace(cluster.Endpoint)
 	if endpoint == "" {
@@ -228,6 +267,7 @@ func sendFederatedService(service *types.Service, cluster types.Cluster, authHea
 		Transport: &http.Transport{
 			TLSClientConfig: buildTLSConfig(cluster.SSLVerify),
 		},
+		Timeout: federationRequestTimeout,
 	}
 
 	resp, err := client.Do(req)
@@ -239,10 +279,7 @@ func sendFederatedService(service *types.Service, cluster types.Cluster, authHea
 	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		msg := strings.TrimSpace(string(body))
-		if msg != "" {
-			return fmt.Errorf("cluster responded with status %d: %s", resp.StatusCode, msg)
-		}
-		return fmt.Errorf("cluster responded with status %d", resp.StatusCode)
+		return &federationHTTPError{statusCode: resp.StatusCode, message: msg}
 	}
 	return nil
 }

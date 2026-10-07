@@ -21,6 +21,7 @@ paths:
                 $ref: '#/components/schemas/FederationResponse'
     post:
       summary: Add member(s) to a service federation
+      description: Creates missing target services (or updates existing ones). If this is the first member, the service is initialized with star topology and static delegation.
       parameters:
         - name: serviceName
           in: path
@@ -36,6 +37,8 @@ paths:
       responses:
         '200':
           description: Member(s) added
+        '502':
+          description: Federation propagation failed
     put:
       summary: Update member(s) for a service federation
       parameters:
@@ -53,6 +56,8 @@ paths:
       responses:
         '200':
           description: Member(s) updated
+        '502':
+          description: Federation propagation failed
     delete:
       summary: Remove member(s) from a service federation
       parameters:
@@ -70,6 +75,8 @@ paths:
       responses:
         '200':
           description: Member(s) removed
+        '502':
+          description: Federation propagation failed
   /system/status:
     get:
       summary: Get cluster status for delegation
@@ -103,11 +110,14 @@ components:
         topology:
           type: string
           enum: [none, star, mesh]
+        delegation:
+          type: string
+          enum: [static, random, load-based]
         members:
           type: array
           items:
             $ref: '#/components/schemas/ReplicaRef'
-      required: [topology, members]
+      required: [topology, delegation, members]
 
     FederationAddRequest:
       type: object
@@ -122,6 +132,19 @@ components:
             type: object
         storage_providers:
           type: object
+        refresh_token:
+          type: string
+          format: password
+          description: OIDC refresh token stored as a Kubernetes Secret. Required for an active federation unless already stored for the service.
+        delegation:
+          type: string
+          enum: [static, random, load-based]
+        topology:
+          type: string
+          enum: [none, star, mesh]
+        cluster_id:
+          type: string
+          description: Coordinator cluster identifier, required when selecting mesh topology.
       required: [members]
 
     FederationUpdateRequest:
@@ -141,7 +164,20 @@ components:
             type: object
         storage_providers:
           type: object
-      required: [members, update]
+        refresh_token:
+          type: string
+          format: password
+          description: OIDC refresh token stored as a Kubernetes Secret. Required for an active federation unless already stored for the service.
+        delegation:
+          type: string
+          enum: [static, random, load-based]
+        topology:
+          type: string
+          enum: [none, star, mesh]
+        cluster_id:
+          type: string
+          description: Coordinator cluster identifier, required when selecting mesh topology.
+      required: [members]
 
     FederationDeleteRequest:
       type: object

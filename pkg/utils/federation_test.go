@@ -17,11 +17,169 @@ limitations under the License.
 package utils
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/grycap/oscar/v4/pkg/types"
 )
+
+func TestUpsertFederationCreatesMissingMemberPreservingServiceConfiguration(t *testing.T) {
+	putRequests := 0
+	postRequests := 0
+	var deployed types.Service
+	expectedHost := ""
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Host != expectedHost {
+			t.Errorf("expected endpoint host %q to be preserved, got %q", expectedHost, r.Host)
+		}
+		if r.URL.Path != "/system/services" {
+			t.Errorf("expected request path /system/services, got %q", r.URL.Path)
+		}
+		switch r.Method {
+		case http.MethodPut:
+			putRequests++
+			http.NotFound(w, r)
+		case http.MethodPost:
+			postRequests++
+			if err := json.NewDecoder(r.Body).Decode(&deployed); err != nil {
+				t.Errorf("failed to decode deployed service: %v", err)
+			}
+			w.WriteHeader(http.StatusCreated)
+		default:
+			t.Errorf("unexpected method %s", r.Method)
+		}
+	}))
+	defer server.Close()
+	expectedHost = strings.TrimPrefix(server.URL, "http://")
+
+	service := &types.Service{
+		Name:      "coordinator",
+		ClusterID: "local",
+		CPU:       "0.2",
+		Memory:    "256Mi",
+		Input: []types.StorageIOConfig{
+			{Provider: "minio.default", Path: "coordinator/input"},
+			{Provider: "webdav.external", Path: "coordinator/shared"},
+		},
+		Output: []types.StorageIOConfig{
+			{Provider: "s3.archive", Path: "coordinator/output"},
+		},
+		Federation: &types.Federation{
+			Topology:   "star",
+			Delegation: "static",
+			Members: types.ReplicaList{
+				{
+					Type:        "oscar",
+					ClusterID:   "local",
+					ServiceName: "coordinator-replica",
+				},
+			},
+		},
+		Clusters: map[string]types.Cluster{
+			"local": {Endpoint: server.URL, SSLVerify: true},
+		},
+	}
+
+	if errs := UpsertFederation(service, "", ""); len(errs) > 0 {
+		t.Fatalf("expected successful upsert, got %v", errs)
+	}
+	if putRequests != 1 || postRequests != 1 {
+		t.Fatalf("expected one PUT and one POST, got PUT=%d POST=%d", putRequests, postRequests)
+	}
+	if deployed.Name != "coordinator-replica" {
+		t.Errorf("expected replica service name, got %q", deployed.Name)
+	}
+	if deployed.CPU != service.CPU || deployed.Memory != service.Memory {
+		t.Errorf("expected replica to inherit cpu=%q memory=%q, got cpu=%q memory=%q", service.CPU, service.Memory, deployed.CPU, deployed.Memory)
+	}
+	if deployed.Input[0].Path != "coordinator/input" {
+		t.Errorf("expected default MinIO input to keep the origin bucket, got %q", deployed.Input[0].Path)
+	}
+	if deployed.Output[0].Path != "coordinator/output" {
+		t.Errorf("expected S3 output path to remain shared, got %q", deployed.Output[0].Path)
+	}
+	if deployed.Input[1].Path != "coordinator/shared" {
+		t.Errorf("expected non-bucket storage path to remain unchanged, got %q", deployed.Input[1].Path)
+	}
+}
+
+func TestUpsertFederationDoesNotCreateMemberAfterUpdateFailure(t *testing.T) {
+	putRequests := 0
+	postRequests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			putRequests++
+			http.Error(w, "remote update failed", http.StatusInternalServerError)
+		case http.MethodPost:
+			postRequests++
+			w.WriteHeader(http.StatusCreated)
+		}
+	}))
+	defer server.Close()
+
+	service := &types.Service{
+		Name: "coordinator",
+		Federation: &types.Federation{
+			Topology: "star",
+			Members: types.ReplicaList{
+				{Type: "oscar", ClusterID: "target", ServiceName: "replica"},
+			},
+		},
+		Clusters: map[string]types.Cluster{
+			"target": {Endpoint: server.URL, SSLVerify: true},
+		},
+	}
+
+	errs := UpsertFederation(service, "", "")
+	if len(errs) != 1 {
+		t.Fatalf("expected one propagation error, got %v", errs)
+	}
+	if !strings.Contains(errs[0].Error(), "status 500") {
+		t.Fatalf("expected remote status in error, got %v", errs[0])
+	}
+	if putRequests != 1 || postRequests != 0 {
+		t.Fatalf("expected one PUT and no POST, got PUT=%d POST=%d", putRequests, postRequests)
+	}
+}
+
+func TestUpsertFederationUpdatesExistingMember(t *testing.T) {
+	putRequests := 0
+	postRequests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			putRequests++
+			w.WriteHeader(http.StatusNoContent)
+		case http.MethodPost:
+			postRequests++
+			w.WriteHeader(http.StatusCreated)
+		}
+	}))
+	defer server.Close()
+
+	service := &types.Service{
+		Federation: &types.Federation{
+			Members: types.ReplicaList{
+				{Type: "oscar", ClusterID: "target", ServiceName: "replica"},
+			},
+		},
+		Clusters: map[string]types.Cluster{
+			"target": {Endpoint: server.URL, SSLVerify: true},
+		},
+	}
+
+	if errs := UpsertFederation(service, "", ""); len(errs) > 0 {
+		t.Fatalf("expected successful upsert, got %v", errs)
+	}
+	if putRequests != 1 || postRequests != 0 {
+		t.Fatalf("expected one PUT and no POST, got PUT=%d POST=%d", putRequests, postRequests)
+	}
+}
 
 func TestExpandFederation(t *testing.T) {
 	t.Run("nil service", func(t *testing.T) {
