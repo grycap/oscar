@@ -227,9 +227,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 			}
 		}
-		if !isAdminUser {
-			service.Namespace = namespace
-		} else if service.Namespace == "" {
+		if !isAdminUser || service.Namespace == "" {
 			service.Namespace = namespace
 		}
 		if !isAdminUser {
