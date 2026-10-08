@@ -686,7 +686,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		splitPath := strings.SplitN(path, "/", 2)
 		folderKey := ""
 		if len(splitPath) > 1 && strings.TrimSpace(splitPath[1]) != "" {
-			folderKey = fmt.Sprintf("%s/", splitPath[1])
+			folderKey = fmt.Sprintf("%s", splitPath[1])
 		}
 
 		err := minIOAdminClient.CreateS3PathWithWebhook(s3Client, splitPath, service.GetObjectStorageWebhookARN(cfg.ObjectStorageType), false)
@@ -1026,7 +1026,10 @@ func checkIdentity(service *types.Service, authHeader string) error {
 }
 
 func registerMinIOWebhook(name string, token string, cfg *types.Config) error {
-	if err := utils.RegisterObjectStorageWebhook(context.TODO(), cfg, name, token); err != nil {
+	if cfg.MinIOProvider == nil || cfg.MinIOProvider.SecretKey == "" {
+		return fmt.Errorf("object-storage secret key is required for webhook authentication")
+	}
+	if err := utils.RegisterObjectStorageWebhook(context.TODO(), cfg, name, webhookToken(name, token, cfg.MinIOProvider.SecretKey)); err != nil {
 		return fmt.Errorf("error registering the service's webhook: %v", err)
 	}
 	return nil
