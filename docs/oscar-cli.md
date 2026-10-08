@@ -142,6 +142,8 @@ oscar-cli hub validate SERVICE-SLUG --cluster CLUSTER
 
 `STORAGE_PROVIDER` has the form `minio.NAME`, `s3.NAME`, or `onedata.NAME`, matching the provider in the service definition. File operations can fail if an internal storage endpoint is not reachable from the CLI host; in local deployments, check the storage endpoint exposed to the host before using a storage client as a fallback.
 
+Also note that the `REMOTE_FILE` must include the bucket name, since a service can have more than one bucket (e.g., `bucket-name/folder/new-file-name`).
+
 | Command | Purpose and options |
 | --- | --- |
 | <a id="cmd-service-get"></a>`service get SERVICE_NAME` | Show a service definition; `-c, --cluster CLUSTER`. Treat the output as potentially sensitive. |
