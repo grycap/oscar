@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -241,6 +242,61 @@ func TestMakeFederationDeleteHandler(t *testing.T) {
 	}
 	if back.UpdatedService.Federation.Members[0].ServiceName != "svc-b" {
 		t.Errorf("expected remaining member 'svc-b', got %q", back.UpdatedService.Federation.Members[0].ServiceName)
+	}
+}
+
+func TestMakeFederationDeleteHandlerRejectsNonMember(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name:      "svc",
+		Namespace: "oscar-svc-test",
+		Federation: &types.Federation{
+			Members: types.ReplicaList{{Type: "oscar", ClusterID: "cluster-a", ServiceName: "svc-a"}},
+		},
+	}
+	r := gin.New()
+	r.DELETE("/system/federation/:serviceName", MakeFederationDeleteHandler(back))
+	body := `{"members":[{"type":"oscar","cluster_id":"cluster-b","service_name":"unrelated"}],"delete":true}`
+	req := httptest.NewRequest(http.MethodDelete, "/system/federation/svc", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if back.DeletedService != nil {
+		t.Fatalf("non-member service was deleted: %q", back.DeletedService.Name)
+	}
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMakeFederationDeleteHandlerPropagatesDeleteError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name:      "svc",
+		Namespace: "oscar-svc-test",
+		Federation: &types.Federation{
+			Members: types.ReplicaList{{Type: "oscar", ClusterID: "cluster-a", ServiceName: "svc-a"}},
+		},
+	}
+	back.AddError("DeleteService", errors.New("backend unavailable"))
+	r := gin.New()
+	r.DELETE("/system/federation/:serviceName", MakeFederationDeleteHandler(back))
+	body := `{"members":[{"type":"oscar","cluster_id":"cluster-a","service_name":"svc-a"}],"delete":true}`
+	req := httptest.NewRequest(http.MethodDelete, "/system/federation/svc", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d: %s", w.Code, w.Body.String())
+	}
+	if back.DeletedService == nil || back.DeletedService.Name != "svc-a" {
+		t.Fatalf("expected deletion attempt for stored member, got %#v", back.DeletedService)
 	}
 }
 
