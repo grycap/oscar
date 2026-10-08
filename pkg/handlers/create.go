@@ -684,7 +684,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		splitPath := strings.SplitN(path, "/", 2)
 		folderKey := ""
 		if len(splitPath) > 1 && strings.TrimSpace(splitPath[1]) != "" {
-			folderKey = fmt.Sprintf("%s/", splitPath[1])
+			folderKey = fmt.Sprintf("%s", splitPath[1])
 		}
 
 		err := minIOAdminClient.CreateS3PathWithWebhook(s3Client, splitPath, service.GetObjectStorageWebhookARN(cfg.ObjectStorageType), false)
