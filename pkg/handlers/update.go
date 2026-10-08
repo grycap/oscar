@@ -132,25 +132,31 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln("Couldn't get UID from context"))
+				return
 			}
 
 			if oldService.Owner != uid {
 				c.String(http.StatusForbidden, "User %s doesn't have permision to modify this service", uid)
 				return
 			}
+			if newService.Owner != "" && newService.Owner != uid {
+				c.String(http.StatusForbidden, "service owner cannot be changed")
+				return
+			}
+			// The request body cannot select which user's credentials are copied.
+			newService.Owner = oldService.Owner
+
 			mc, err = auth.GetMultitenancyConfigFromContext(c)
 
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintln("Couldn't get UID from context"))
-			}
-
-			if err := mc.EnsureSecretInNamespace(newService.Owner, serviceNamespace); err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", newService.Owner, err))
 				return
 			}
 
-			// Set the owner on the new service definition
-			newService.Owner = oldService.Owner
+			if err := mc.EnsureSecretInNamespace(uid, serviceNamespace); err != nil {
+				c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", uid, err))
+				return
+			}
 
 			// If the service has changed VO check permisions again
 			if newService.VO != "" && newService.VO != oldService.VO {
@@ -254,7 +260,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		// Use create buckets function to create new inputs/outputs if needed
 		var newServiceBuckets []types.MinIOBucket
-		if newServiceBuckets, err = createBuckets(&newService, cfg, objectStorageIAM.GetClient(c.Request.Context()), true); err != nil {
+		if newServiceBuckets, err = createBuckets(&newService, cfg, objectStorageIAM.GetClient(c.Request.Context()), true, isAdminUser); err != nil {
 			if err == errInput {
 				c.String(http.StatusBadRequest, err.Error())
 			} else {
@@ -357,15 +363,6 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 						c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating the service: %v", err))
 						return
 					}
-					// Register minio webhook and restart the server
-					if err = registerMinIOWebhook(newService.Name, newService.Token, cfg); err != nil {
-						uerr := back.UpdateService(*oldService)
-						if uerr != nil {
-							log.Println(uerr.Error())
-						}
-						c.String(http.StatusInternalServerError, err.Error())
-						return
-					}
 				}
 			}
 		}
@@ -424,6 +421,13 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			for secretKey := range newService.Environment.Secrets {
 				newService.Environment.Secrets[secretKey] = ""
 			}
+		}
+
+		// Refresh existing webhook targets as well: pre-upgrade targets still
+		// use the public service token and must be migrated to the private one.
+		if err := registerMinIOWebhook(newService.Name, newService.Token, cfg); err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return
 		}
 
 		if err := back.UpdateService(newService); err != nil {

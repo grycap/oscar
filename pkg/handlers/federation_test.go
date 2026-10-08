@@ -32,6 +32,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestFederationPostUpdatesServiceWithoutFederation(t *testing.T) {
@@ -296,5 +297,78 @@ func TestMakeFederationDeleteHandlerPropagatesDeleteError(t *testing.T) {
 	}
 	if back.DeletedService == nil || back.DeletedService.Name != "svc-a" {
 		t.Fatalf("expected deletion attempt for stored member, got %#v", back.DeletedService)
+	}
+}
+
+func TestFederationHandlersRequireServiceOwner(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	methods := []struct {
+		name    string
+		method  string
+		handler func(types.ServerlessBackend) gin.HandlerFunc
+	}{
+		{"get", http.MethodGet, MakeFederationGetHandler},
+		{"post", http.MethodPost, MakeFederationPostHandler},
+		{"put", http.MethodPut, MakeFederationPutHandler},
+		{"delete", http.MethodDelete, MakeFederationDeleteHandler},
+	}
+	identities := []struct {
+		name       string
+		header     string
+		uid        string
+		wantStatus int
+	}{
+		{"owner", "Bearer owner-token", "owner", http.StatusOK},
+		{"other tenant", "Bearer other-token", "other", http.StatusForbidden},
+		{"missing identity", "Bearer unknown-token", "", http.StatusUnauthorized},
+		{"basic admin", "Basic admin-credentials", "", http.StatusOK},
+	}
+
+	for _, method := range methods {
+		for _, identity := range identities {
+			t.Run(method.name+"/"+identity.name, func(t *testing.T) {
+				back := backends.MakeFakeBackend()
+				back.Service = &types.Service{
+					Name: "svc", Namespace: "oscar-svc-test", Owner: "owner",
+					Federation: &types.Federation{Topology: "star"},
+				}
+				r := gin.New()
+				r.Use(func(c *gin.Context) {
+					if identity.uid != "" {
+						c.Set("uidOrigin", identity.uid)
+					}
+					c.Next()
+				})
+				r.Handle(method.method, "/system/federation/:serviceName", method.handler(back))
+
+				payload := `{"members":[]}`
+				if identity.wantStatus != http.StatusOK {
+					payload = `{"members":[{"type":"oscar","cluster_id":"remote","service_name":"victim"}],"delete":true,"clusters":{"remote":{}}}`
+				}
+				req := httptest.NewRequest(method.method, "/system/federation/svc", strings.NewReader(payload))
+				req.Header.Set("Authorization", identity.header)
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+				r.ServeHTTP(w, req)
+
+				if w.Code != identity.wantStatus {
+					t.Fatalf("status = %d, want %d; body: %s", w.Code, identity.wantStatus, w.Body.String())
+				}
+				if identity.wantStatus != http.StatusOK {
+					if back.UpdatedService != nil || back.DeletedService != nil {
+						t.Fatal("unauthorized request modified a service")
+					}
+					if len(back.GetKubeClientset().(*fake.Clientset).Actions()) != 0 {
+						t.Fatal("unauthorized request accessed Kubernetes resources")
+					}
+					if strings.Contains(w.Body.String(), "star") {
+						t.Fatal("unauthorized response exposed federation topology")
+					}
+				} else if method.method != http.MethodGet && back.UpdatedService == nil {
+					t.Fatal("authorized request did not update the service")
+				}
+			})
+		}
 	}
 }

@@ -24,7 +24,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
-	"k8s.io/apimachinery/pkg/api/errors"
 )
 
 // MakeFederationGetHandler godoc
@@ -34,6 +33,8 @@ import (
 // @Produce json
 // @Param serviceName path string true "Service name"
 // @Success 200 {object} types.FederationResponse
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 403 {string} string "Forbidden"
 // @Failure 404 {string} string "Not Found"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
@@ -41,13 +42,8 @@ import (
 // @Router /system/federation/{serviceName} [get]
 func MakeFederationGetHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		service, err := back.ReadService("", c.Param("serviceName"))
-		if err != nil {
-			if errors.IsNotFound(err) || errors.IsGone(err) {
-				c.Status(http.StatusNotFound)
-			} else {
-				c.String(http.StatusInternalServerError, err.Error())
-			}
+		service, ok := getAuthorizedServiceOwner(c, back, c.Param("serviceName"))
+		if !ok {
 			return
 		}
 
@@ -77,6 +73,8 @@ func MakeFederationGetHandler(back types.ServerlessBackend) gin.HandlerFunc {
 // @Param payload body types.FederationRequest true "Federation members add payload"
 // @Success 200 {string} string "OK"
 // @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 403 {string} string "Forbidden"
 // @Failure 404 {string} string "Not Found"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
@@ -84,14 +82,14 @@ func MakeFederationGetHandler(back types.ServerlessBackend) gin.HandlerFunc {
 // @Router /system/federation/{serviceName} [post]
 func MakeFederationPostHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		updated, err := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) error {
+		updated, ok := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) error {
 			if service.Federation == nil {
 				service.Federation = &types.Federation{}
 			}
 			service.Federation.Members = append(service.Federation.Members, req.Members...)
 			return nil
 		})
-		if err != nil {
+		if !ok {
 			return
 		}
 		c.JSON(http.StatusOK, updated)
@@ -108,6 +106,8 @@ func MakeFederationPostHandler(back types.ServerlessBackend) gin.HandlerFunc {
 // @Param payload body types.FederationRequest true "Federation members update payload"
 // @Success 200 {string} string "OK"
 // @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 403 {string} string "Forbidden"
 // @Failure 404 {string} string "Not Found"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
@@ -115,7 +115,7 @@ func MakeFederationPostHandler(back types.ServerlessBackend) gin.HandlerFunc {
 // @Router /system/federation/{serviceName} [put]
 func MakeFederationPutHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		updated, err := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) error {
+		updated, ok := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) error {
 			if service.Federation == nil {
 				service.Federation = &types.Federation{}
 			}
@@ -128,7 +128,7 @@ func MakeFederationPutHandler(back types.ServerlessBackend) gin.HandlerFunc {
 			}
 			return nil
 		})
-		if err != nil {
+		if !ok {
 			return
 		}
 		c.JSON(http.StatusOK, updated)
@@ -145,6 +145,8 @@ func MakeFederationPutHandler(back types.ServerlessBackend) gin.HandlerFunc {
 // @Param payload body types.FederationRequest true "Federation members delete payload"
 // @Success 200 {string} string "OK"
 // @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 403 {string} string "Forbidden"
 // @Failure 404 {string} string "Not Found"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
@@ -152,7 +154,7 @@ func MakeFederationPutHandler(back types.ServerlessBackend) gin.HandlerFunc {
 // @Router /system/federation/{serviceName} [delete]
 func MakeFederationDeleteHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		updated, err := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) error {
+		updated, ok := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) error {
 			if service.Federation == nil {
 				service.Federation = &types.Federation{}
 			}
@@ -176,28 +178,23 @@ func MakeFederationDeleteHandler(back types.ServerlessBackend) gin.HandlerFunc {
 			service.Federation.Members = filterReplicas(service.Federation.Members, req.Members)
 			return nil
 		})
-		if err != nil {
+		if !ok {
 			return
 		}
 		c.JSON(http.StatusOK, updated)
 	}
 }
 
-func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, mutator func(service *types.Service, req *types.FederationRequest) error) (*types.FederationResponse, error) {
+func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, mutator func(service *types.Service, req *types.FederationRequest) error) (*types.FederationResponse, bool) {
 	var req types.FederationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.String(http.StatusBadRequest, fmt.Sprintf("Invalid payload: %v", err))
-		return nil, err
+		return nil, false
 	}
 
-	service, err := back.ReadService("", c.Param("serviceName"))
-	if err != nil {
-		if errors.IsNotFound(err) || errors.IsGone(err) {
-			c.Status(http.StatusNotFound)
-		} else {
-			c.String(http.StatusInternalServerError, err.Error())
-		}
-		return nil, err
+	service, ok := getAuthorizedServiceOwner(c, back, c.Param("serviceName"))
+	if !ok {
+		return nil, false
 	}
 
 	if req.Clusters != nil {
@@ -213,28 +210,28 @@ func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, m
 	}
 
 	if err := mutator(service, &req); err != nil {
-		return nil, err
+		return nil, false
 	}
 
 	if err := back.UpdateService(*service); err != nil {
 		c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating service: %v", err))
-		return nil, err
+		return nil, false
 	}
 
 	if service.HasFederationMembers() {
 		authHeader := c.GetHeader("Authorization")
 		if service.Namespace == "" {
 			c.String(http.StatusInternalServerError, "error reading refresh-token secret: service namespace is empty")
-			return nil, fmt.Errorf("service namespace is empty")
+			return nil, false
 		}
 		refreshToken, err := readRefreshTokenSecretValue(service.Name, service.Namespace, back.GetKubeClientset())
 		if err != nil {
 			c.String(http.StatusInternalServerError, "error reading refresh-token secret: %v", err)
-			return nil, err
+			return nil, false
 		}
 		if errs := utils.ExpandFederation(service, authHeader, http.MethodPut, refreshToken); len(errs) > 0 {
 			c.String(http.StatusOK, fmt.Sprintf("Updated with federation warnings: %v", errs))
-			return nil, fmt.Errorf("federation propagation warnings")
+			return nil, false
 		}
 	}
 
@@ -250,7 +247,7 @@ func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, m
 		Topology: topology,
 		Members:  replicas,
 	}
-	return resp, nil
+	return resp, true
 }
 
 func filterReplicas(current types.ReplicaList, remove types.ReplicaList) types.ReplicaList {
