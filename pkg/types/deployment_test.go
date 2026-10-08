@@ -61,6 +61,31 @@ func TestServiceDeploymentStatusJSON(t *testing.T) {
 	}
 }
 
+func TestDeploymentStateInitJSON(t *testing.T) {
+	status := ServiceDeploymentStatus{
+		ServiceName: "svc",
+		State:       DeploymentStateInit,
+		Reason:      "service is initializing",
+	}
+
+	data, err := json.Marshal(status)
+	if err != nil {
+		t.Fatalf("marshal init status: %v", err)
+	}
+
+	var decoded ServiceDeploymentStatus
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal init status: %v", err)
+	}
+
+	if decoded.State != DeploymentStateInit {
+		t.Fatalf("expected init state %q, got %q", DeploymentStateInit, decoded.State)
+	}
+	if decoded.Reason != "service is initializing" {
+		t.Fatalf("expected init reason, got %q", decoded.Reason)
+	}
+}
+
 func TestDeploymentLogStreamJSON(t *testing.T) {
 	stream := DeploymentLogStream{
 		ServiceName: "svc",

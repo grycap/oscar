@@ -290,6 +290,225 @@ func TestMakeGetDeploymentStatusHandlerPending(t *testing.T) {
 	}
 }
 
+func TestMakeGetDeploymentStatusHandlerPodInitializingIsInit(t *testing.T) {
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name: "svc",
+		Expose: types.Expose{
+			APIPort: []int{8080},
+		},
+		Namespace: "ns",
+	}
+
+	replicas := int32(1)
+	kubeClientset := testclient.NewSimpleClientset(
+		&appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "svc-dpl",
+				Namespace: "ns",
+			},
+			Spec: appsv1.DeploymentSpec{
+				Replicas: &replicas,
+			},
+			Status: appsv1.DeploymentStatus{
+				Replicas:          1,
+				AvailableReplicas: 0,
+			},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "svc-pod",
+				Namespace: "ns",
+				Labels: map[string]string{
+					"app":              "oscar-svc-exp-svc",
+					types.ServiceLabel: "svc",
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase:  corev1.PodPending,
+				Reason: "PodInitializing",
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						State: corev1.ContainerState{
+							Waiting: &corev1.ContainerStateWaiting{
+								Reason:  "PodInitializing",
+								Message: "pod is being initialized",
+							},
+						},
+					},
+				},
+			},
+		},
+	)
+
+	r := gin.Default()
+	r.GET("/system/services/:serviceName/deployment", MakeGetDeploymentStatusHandler(back, kubeClientset, &types.Config{}))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/system/services/svc/deployment", nil)
+	r.ServeHTTP(w, req)
+
+	var response types.ServiceDeploymentStatus
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.State != types.DeploymentStateInit {
+		t.Fatalf("expected init state for PodInitializing, got %s", response.State)
+	}
+	if !strings.Contains(response.Reason, "initializing") {
+		t.Fatalf("expected initializing reason, got %q", response.Reason)
+	}
+}
+
+func TestMakeGetDeploymentStatusHandlerInitializingWinsOverTimeoutFailure(t *testing.T) {
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name: "svc",
+		Expose: types.Expose{
+			APIPort: []int{8080},
+		},
+		Namespace: "ns",
+	}
+
+	replicas := int32(1)
+	now := metav1.NewTime(time.Now().UTC())
+	kubeClientset := testclient.NewSimpleClientset(
+		&appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "svc-dpl",
+				Namespace: "ns",
+			},
+			Spec: appsv1.DeploymentSpec{
+				Replicas: &replicas,
+			},
+			Status: appsv1.DeploymentStatus{
+				Replicas:          1,
+				AvailableReplicas: 0,
+				Conditions: []appsv1.DeploymentCondition{
+					{
+						Type:           appsv1.DeploymentProgressing,
+						Status:         corev1.ConditionFalse,
+						Reason:         "ProgressDeadlineExceeded",
+						Message:        "ReplicaSet \"svc\" has timed out progressing.",
+						LastUpdateTime: now,
+					},
+				},
+			},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "svc-pod",
+				Namespace: "ns",
+				Labels: map[string]string{
+					"app":              "oscar-svc-exp-svc",
+					types.ServiceLabel: "svc",
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase:  corev1.PodPending,
+				Reason: "PodInitializing",
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						State: corev1.ContainerState{
+							Waiting: &corev1.ContainerStateWaiting{
+								Reason:  "PodInitializing",
+								Message: "pod is being initialized",
+							},
+						},
+					},
+				},
+			},
+		},
+	)
+
+	r := gin.Default()
+	r.GET("/system/services/:serviceName/deployment", MakeGetDeploymentStatusHandler(back, kubeClientset, &types.Config{}))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/system/services/svc/deployment", nil)
+	r.ServeHTTP(w, req)
+
+	var response types.ServiceDeploymentStatus
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.State != types.DeploymentStateInit {
+		t.Fatalf("expected init state while pod is still initializing, got %s", response.State)
+	}
+	if !strings.Contains(response.Reason, "initializing") {
+		t.Fatalf("expected init reason, got %q", response.Reason)
+	}
+}
+
+func TestMakeGetDeploymentStatusHandlerCrashLoopBackOffIsFailed(t *testing.T) {
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name: "svc",
+		Expose: types.Expose{
+			APIPort: []int{8080},
+		},
+		Namespace: "ns",
+	}
+
+	replicas := int32(1)
+	kubeClientset := testclient.NewSimpleClientset(
+		&appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "svc-dpl",
+				Namespace: "ns",
+			},
+			Spec: appsv1.DeploymentSpec{
+				Replicas: &replicas,
+			},
+			Status: appsv1.DeploymentStatus{
+				Replicas:          1,
+				AvailableReplicas: 0,
+			},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "svc-pod",
+				Namespace: "ns",
+				Labels: map[string]string{
+					"app":              "oscar-svc-exp-svc",
+					types.ServiceLabel: "svc",
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						State: corev1.ContainerState{
+							Waiting: &corev1.ContainerStateWaiting{
+								Reason:  "CrashLoopBackOff",
+								Message: "back-off 5m restarting failed container",
+							},
+						},
+					},
+				},
+			},
+		},
+	)
+
+	r := gin.Default()
+	r.GET("/system/services/:serviceName/deployment", MakeGetDeploymentStatusHandler(back, kubeClientset, &types.Config{}))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/system/services/svc/deployment", nil)
+	r.ServeHTTP(w, req)
+
+	var response types.ServiceDeploymentStatus
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.State != types.DeploymentStateFailed {
+		t.Fatalf("expected failed state for CrashLoopBackOff, got %s", response.State)
+	}
+	if !strings.Contains(response.Reason, "CrashLoopBackOff") {
+		t.Fatalf("expected CrashLoopBackOff in reason, got %q", response.Reason)
+	}
+}
+
 func TestMakeGetDeploymentStatusHandlerFailed(t *testing.T) {
 	back := backends.MakeFakeBackend()
 	back.Service = &types.Service{
