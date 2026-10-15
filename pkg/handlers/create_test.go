@@ -898,8 +898,9 @@ func TestValidateServiceCreation(t *testing.T) {
 				Name:           "svc",
 				Image:          "img",
 				CPU:            "0.2",
-				Visibility:     "public",
+				Visibility:     types.PUBLIC,
 				IsolationLevel: types.IsolationLevelService,
+				Script:         "echo test",
 			},
 			cfg:     cfg,
 			wantErr: false,
@@ -912,6 +913,7 @@ func TestValidateServiceCreation(t *testing.T) {
 				CPU:            "0.2",
 				Visibility:     "invalid",
 				IsolationLevel: types.IsolationLevelService,
+				Script:         "echo test",
 			},
 			cfg:     cfg,
 			wantErr: true,
@@ -922,8 +924,9 @@ func TestValidateServiceCreation(t *testing.T) {
 				Name:           "svc",
 				Image:          "img",
 				CPU:            "0.2",
-				Visibility:     "public",
+				Visibility:     types.PUBLIC,
 				IsolationLevel: types.IsolationLevelUser,
+				Script:         "echo test",
 			},
 			cfg:     cfg,
 			wantErr: false,
@@ -933,6 +936,7 @@ func TestValidateServiceCreation(t *testing.T) {
 			service: types.Service{
 				Name:           "svc",
 				IsolationLevel: types.IsolationLevelService,
+				Visibility:     types.PRIVATE,
 				Kserve: &types.Kserve{
 					Type:       types.KserveTypeInferenceService,
 					StorageUri: "s3://model",
@@ -940,12 +944,56 @@ func TestValidateServiceCreation(t *testing.T) {
 						ModelFormat: "onnx",
 					},
 				},
+				Script: "echo test",
 			},
 			cfg: &types.Config{
 				KserveEnable:             false,
 				ExposedServicesRouteKind: types.HTTPROUTE,
 			},
 			wantErr: true,
+		},
+		{
+			name: "kserve service when supported",
+			service: types.Service{
+				Name:           "svc",
+				IsolationLevel: types.IsolationLevelService,
+				Visibility:     types.PRIVATE,
+				Kserve: &types.Kserve{
+					Type:       types.KserveTypeInferenceService,
+					StorageUri: "s3://model",
+					Inference: &types.KserveInference{
+						ModelFormat: "onnx",
+						APIVersion:  "v2",
+					},
+				},
+			},
+			cfg: &types.Config{
+				KserveEnable:             true,
+				ExposedServicesRouteKind: types.HTTPROUTE,
+			},
+			wantErr: false,
+		},
+		{
+			name: "exposed service with default command true",
+			service: types.Service{
+				Name:           "svc",
+				Image:          "img",
+				CPU:            "0.2",
+				Memory:         "256Mi",
+				Visibility:     types.PRIVATE,
+				IsolationLevel: types.IsolationLevelService,
+				Expose: types.Expose{
+					APIPort:        []int{8080},
+					ProbeMode:      "legacy",
+					AuthType:       "basic",
+					DefaultCommand: true,
+				},
+			},
+			cfg: &types.Config{
+				KserveEnable:             false,
+				ExposedServicesRouteKind: types.HTTPROUTE,
+			},
+			wantErr: false,
 		},
 	}
 
