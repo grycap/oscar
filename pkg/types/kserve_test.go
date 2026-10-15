@@ -55,8 +55,8 @@ func TestKserveUnmarshalJSON(t *testing.T) {
 func TestKserveValidateInvalidType(t *testing.T) {
 	// Test unknown type
 	kserve := Kserve{
-		Type:       "unknown_type",
-		StorageUri: "some_uri",
+		Type:   "unknown_type",
+		Source: "some_uri",
 	}
 	err := kserve.Validate()
 	if err == nil {
@@ -75,7 +75,7 @@ func TestKserveValidateMissingStorageUri(t *testing.T) {
 			ModelFormat: "onnx",
 			APIVersion:  "v1",
 		},
-		StorageUri: "", // Missing
+		Source: "", // Missing
 	}
 	err := kserve.Validate()
 	if err == nil {
@@ -89,9 +89,9 @@ func TestKserveValidateMissingStorageUri(t *testing.T) {
 
 func TestKserveValidateInferenceServiceMissingInferenceConfig(t *testing.T) {
 	kserve := Kserve{
-		Type:       KserveTypeInferenceService,
-		StorageUri: "some_uri",
-		Inference:  nil, // Missing
+		Type:      KserveTypeInferenceService,
+		Source:    "some_uri",
+		Inference: nil, // Missing
 	}
 	err := kserve.Validate()
 	if err == nil {
@@ -112,7 +112,7 @@ func TestKserveValidateInferenceServiceHasLLMInferenceConfig(t *testing.T) {
 		LLMInference: &KserveLLMInference{
 			RuntimeImage: "vLLM",
 		},
-		StorageUri: "some_uri",
+		Source: "some_uri",
 	}
 	err := kserve.Validate()
 	if err == nil {
@@ -130,7 +130,7 @@ func TestKserveValidateLLMInferenceServiceHasInferenceConfig(t *testing.T) {
 		Inference: &KserveInference{
 			ModelFormat: "pytorch",
 		},
-		StorageUri: "some_uri",
+		Source: "some_uri",
 	}
 	err := kserve.Validate()
 	if err == nil {
@@ -144,83 +144,83 @@ func TestKserveValidateLLMInferenceServiceHasInferenceConfig(t *testing.T) {
 
 func TestKserveValidateEqual(t *testing.T) {
 	kserve1 := Kserve{
-		Type:       "inference",
-		StorageUri: "uri1",
-		MinScale:   1,
-		MaxScale:   2,
-		CPU:        "0.5",
-		Memory:     "512Mi",
+		Type:     "inference",
+		Source:   "uri1",
+		MinScale: 1,
+		MaxScale: 2,
+		CPU:      "0.5",
+		Memory:   "512Mi",
 		Inference: &KserveInference{
 			ModelFormat: "onnx",
 			APIVersion:  "v2",
 		},
-		SetAuth: true,
-		Args:    []string{"arg1"},
-		Env:     map[string]string{"KEY": "VAL1"},
+		SetAuth:     true,
+		Args:        []string{"arg1"},
+		Environment: kserveEnvironment{Vars: map[string]string{"KEY": "VAL1"}},
 	}
 
 	kserve2 := Kserve{
-		Type:       "inference",
-		StorageUri: "uri1",
-		MinScale:   1,
-		MaxScale:   2,
-		CPU:        "0.5",
-		Memory:     "512Mi",
+		Type:     "inference",
+		Source:   "uri1",
+		MinScale: 1,
+		MaxScale: 2,
+		CPU:      "0.5",
+		Memory:   "512Mi",
 		Inference: &KserveInference{
 			ModelFormat: "onnx",
 			APIVersion:  "v2",
 		},
-		SetAuth: true,
-		Args:    []string{"arg1"},
-		Env:     map[string]string{"KEY": "VAL1"},
+		SetAuth:     true,
+		Args:        []string{"arg1"},
+		Environment: kserveEnvironment{Vars: map[string]string{"KEY": "VAL1"}},
 	}
 
 	kserve3 := Kserve{
-		Type:       "inference",
-		StorageUri: "uri2", // Different URI
-		MinScale:   1,
-		MaxScale:   2,
-		CPU:        "0.5",
-		Memory:     "512Mi",
+		Type:     "inference",
+		Source:   "uri2", // Different URI
+		MinScale: 1,
+		MaxScale: 2,
+		CPU:      "0.5",
+		Memory:   "512Mi",
 		Inference: &KserveInference{
 			ModelFormat: "onnx",
 			APIVersion:  "v2",
 		},
-		SetAuth: true,
-		Args:    []string{"arg1"},
-		Env:     map[string]string{"KEY": "VAL1"},
+		SetAuth:     true,
+		Args:        []string{"arg1"},
+		Environment: kserveEnvironment{Vars: map[string]string{"KEY": "VAL1"}},
 	}
 
 	kserve4 := Kserve{
-		Type:       "llm_inference", // Different Type
-		StorageUri: "uri1",
-		MinScale:   1,
-		MaxScale:   2,
-		CPU:        "0.5",
-		Memory:     "512Mi",
-		Inference:  nil,
+		Type:      "llm_inference", // Different Type
+		Source:    "uri1",
+		MinScale:  1,
+		MaxScale:  2,
+		CPU:       "0.5",
+		Memory:    "512Mi",
+		Inference: nil,
 		LLMInference: &KserveLLMInference{
 			RuntimeImage: "vLLM",
 		},
-		SetAuth: true,
-		Args:    []string{"arg1"},
-		Env:     map[string]string{"KEY": "VAL1"},
+		SetAuth:     true,
+		Args:        []string{"arg1"},
+		Environment: kserveEnvironment{Vars: map[string]string{"KEY": "VAL1"}},
 	}
 
 	kserve5 := Kserve{
-		Type:       "inference",
-		StorageUri: "uri1",
-		MinScale:   2, // Different MinScale
-		MaxScale:   2,
-		CPU:        "0.5",
-		Memory:     "512Mi",
+		Type:     "inference",
+		Source:   "uri1",
+		MinScale: 2, // Different MinScale
+		MaxScale: 2,
+		CPU:      "0.5",
+		Memory:   "512Mi",
 		Inference: &KserveInference{
 			ModelFormat: "onnx",
 			APIVersion:  "v2",
 		},
-		SetAuth: true,
-		Args:    []string{"arg1"},
-		Env:     map[string]string{"KEY": "VAL1"},
+		SetAuth:     true,
+		Args:        []string{"arg1"},
+		Environment: kserveEnvironment{Vars: map[string]string{"KEY": "VAL1"}},
 	}
 
 	t.Run("Equal_True", func(t *testing.T) {

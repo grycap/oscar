@@ -3,11 +3,8 @@ package utils
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
 	"strings"
 
-	"github.com/foomo/htpasswd"
 	"github.com/grycap/oscar/v4/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -52,7 +49,7 @@ var (
 	kserveIsvcGVR              = schema.GroupVersionResource{Group: "serving.kserve.io", Version: "v1beta1", Resource: "inferenceservices"}
 	kserveHTTPRouteGVR         = schema.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "httproutes"}
 	kserveTraefikMiddlewareGVR = schema.GroupVersionResource{Group: "traefik.io", Version: "v1alpha1", Resource: "middlewares"}
-	kserveSecretGVR            = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
+	//kserveSecretGVR            = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
 	defaultKserveCpuRequest    = resource.MustParse("0.2")
 	defaultKserveMemoryRequest = resource.MustParse("256Mi")
 )
@@ -75,7 +72,7 @@ var newDynamicClient dynamicClientFactory = func() (*dynamic.DynamicClient, erro
 	return dynamic.NewForConfig(restCfg)
 }
 
-var kserveLogger = log.New(os.Stdout, "[KSERVE-SERVICE] ", log.Flags())
+//var kserveLogger = log.New(os.Stdout, "[KSERVE-SERVICE] ", log.Flags())
 
 func IsKserveSupported(cfg *types.Config) bool {
 	return cfg.KserveEnable && cfg.ExposedServicesRouteKind == types.HTTPROUTE
@@ -370,7 +367,7 @@ func newKserveInferenceServiceSpec(service *types.Service, owner *KserveServiceO
 
 	modelSpec := map[string]any{
 		"modelFormat":     map[string]any{"name": service.Kserve.Inference.ModelFormat},
-		"storageUri":      service.Kserve.StorageUri,
+		"storageUri":      service.Kserve.Source,
 		"protocolVersion": service.Kserve.Inference.APIVersion,
 	}
 
@@ -382,7 +379,7 @@ func newKserveInferenceServiceSpec(service *types.Service, owner *KserveServiceO
 
 	modelSpec["resources"] = resources
 	modelSpec["args"] = service.Kserve.Args
-	modelSpec["env"] = types.ConvertEnvVars(service.Kserve.Env)
+	modelSpec["env"] = types.ConvertEnvVars(service.Kserve.Environment.Vars)
 
 	predictor := map[string]any{
 		"model": modelSpec,
@@ -435,7 +432,7 @@ func updateKserveInferenceServiceSpec(service *types.Service, oldIsvc *unstructu
 
 	modelSpec := map[string]any{
 		"modelFormat":     map[string]any{"name": service.Kserve.Inference.ModelFormat},
-		"storageUri":      service.Kserve.StorageUri,
+		"storageUri":      service.Kserve.Source,
 		"protocolVersion": service.Kserve.Inference.APIVersion,
 	}
 	if service.Kserve.Inference.RuntimeImage != "" {
@@ -444,7 +441,7 @@ func updateKserveInferenceServiceSpec(service *types.Service, oldIsvc *unstructu
 
 	modelSpec["resources"] = resources
 	modelSpec["args"] = service.Kserve.Args
-	modelSpec["env"] = types.ConvertEnvVars(service.Kserve.Env)
+	modelSpec["env"] = types.ConvertEnvVars(service.Kserve.Environment.Vars)
 
 	predictor := map[string]any{
 		"model": modelSpec,
@@ -488,7 +485,7 @@ func newKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServi
 	}
 	container["resources"] = resources
 	container["args"] = service.Kserve.Args
-	container["env"] = types.ConvertEnvVars(service.Kserve.Env)
+	container["env"] = types.ConvertEnvVars(service.Kserve.Environment.Vars)
 
 	minScale, _ := normalizeScaleFromKserveService(service.Kserve)
 
@@ -520,7 +517,7 @@ func newKserveLLMInferenceServiceSpec(service *types.Service, owner *KserveServi
 		},
 		"spec": map[string]any{
 			"model": map[string]any{
-				"uri":  service.Kserve.StorageUri,
+				"uri":  service.Kserve.Source,
 				"name": service.Name,
 			},
 			"replicas": minScale,
@@ -556,7 +553,7 @@ func updateKserveLLMInferenceServiceSpec(service *types.Service, oldLLMIsvc *uns
 	}
 	container["resources"] = resources
 	container["args"] = service.Kserve.Args
-	container["env"] = types.ConvertEnvVars(service.Kserve.Env)
+	container["env"] = types.ConvertEnvVars(service.Kserve.Environment.Vars)
 
 	minScale, _ := normalizeScaleFromKserveService(service.Kserve)
 
@@ -567,7 +564,7 @@ func updateKserveLLMInferenceServiceSpec(service *types.Service, oldLLMIsvc *uns
 
 	oldLLMIsvc.Object["spec"] = map[string]any{
 		"model": map[string]any{
-			"uri":  service.Kserve.StorageUri,
+			"uri":  service.Kserve.Source,
 			"name": service.Name,
 		},
 		"replicas": minScale,
@@ -687,6 +684,7 @@ func buildTraefikOIDCMiddlewareSpec(service *types.Service, owner *KserveService
 	}}
 }
 
+/*
 func createTraefikAuthMiddleware(dynClient dynamic.Interface, service *types.Service, owner *KserveServiceOwner) error {
 	err := createTraefikAuthSecret(dynClient, service, owner)
 	if err != nil {
@@ -719,6 +717,7 @@ func buildTraefikAuthMiddlewareSpec(service *types.Service, owner *KserveService
 	}}
 }
 
+
 func createTraefikAuthSecret(dynClient dynamic.Interface, service *types.Service, owner *KserveServiceOwner) error {
 	hash := make(htpasswd.HashedPasswords)
 	err := hash.SetPassword(service.Name, service.Token, htpasswd.HashAPR1)
@@ -748,7 +747,7 @@ func buildTraefikAuthSecretSpec(service *types.Service, owner *KserveServiceOwne
 		},
 		"type": "Opaque",
 	}}
-}
+}*/
 
 func getTraefikAuthMiddlewareName(serviceName string) string {
 	return serviceName + "-auth-mdw"
@@ -918,7 +917,7 @@ func getOwnerReference(owner *KserveServiceOwner) []metav1.OwnerReference {
 	blockOwnerDeletion := true
 
 	return []metav1.OwnerReference{
-		metav1.OwnerReference{
+		{
 			APIVersion:         owner.APIVersion,
 			Kind:               owner.Kind,
 			Name:               owner.Name,
@@ -961,6 +960,7 @@ func buildUnstructuredServiceOwnerRef(kserveSvc *unstructured.Unstructured) *Kse
 	}
 }
 
+/*
 func buildKserveLLMServiceRouter(service *types.Service, owner *KserveServiceOwner, cfg *types.Config) (map[string]any, error) {
 	gwName := strings.TrimSpace(cfg.HTTPRouteGatewayName)
 	gwNamespace := strings.TrimSpace(cfg.HTTPRouteGatewayNamespace)
@@ -982,6 +982,7 @@ func buildKserveLLMServiceRouter(service *types.Service, owner *KserveServiceOwn
 	}
 	return getKserveLLMServiceRouterSpec(service, owner.Namespace, cfg), nil
 }
+*/
 
 // getKserveLLMServiceRouterSpec returns a router configuration for LLM InferenceServices
 // to route requests based on the service name.
