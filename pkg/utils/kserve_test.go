@@ -10,11 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types" // for UID
 	"k8s.io/client-go/dynamic"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
 	knv1 "knative.dev/serving/pkg/apis/serving/v1"
 )
 
@@ -56,20 +53,20 @@ func kserveService() *oscarType.Service {
 				ModelFormat: "sklearn",
 				APIVersion:  "v1",
 			},
-			StorageUri: "s3://my-bucket/model",
-			MinScale:   minScale,
-			MaxScale:   maxScale,
-			CPU:        "1.0",
-			Memory:     "2Gi",
+			Source:   "s3://my-bucket/model",
+			MinScale: minScale,
+			MaxScale: maxScale,
+			CPU:      "1.0",
+			Memory:   "2Gi",
 		},
 	}
 }
 
-func invalidKserveService() *oscarType.Service {
+/*func invalidKserveService() *oscarType.Service {
 	svc := kserveService()
-	svc.Kserve.StorageUri = ""
+	svc.Kserve.Source = ""
 	return svc
-}
+}*/
 
 func llmKserveService() *oscarType.Service {
 	return &oscarType.Service{
@@ -77,12 +74,12 @@ func llmKserveService() *oscarType.Service {
 		Namespace: "oscar-svc",
 		Token:     "llm-token",
 		Kserve: &oscarType.Kserve{
-			Type:       oscarType.KserveTypeLLMInferenceService,
-			StorageUri: "s3://my-bucket/llm-model",
-			MinScale:   2,
-			MaxScale:   4,
-			CPU:        "1",
-			Memory:     "2Gi",
+			Type:     oscarType.KserveTypeLLMInferenceService,
+			Source:   "s3://my-bucket/llm-model",
+			MinScale: 2,
+			MaxScale: 4,
+			CPU:      "1",
+			Memory:   "2Gi",
 		},
 	}
 }
@@ -190,8 +187,8 @@ func TestNewKserveInferenceServiceDefinition_Success(t *testing.T) {
 	if v := getNestedString(t, isvc, "spec", "predictor", "model", "modelFormat", "name"); v != svc.Kserve.Inference.ModelFormat {
 		t.Errorf("modelFormat.name = %q, want %q", v, svc.Kserve.Inference.ModelFormat)
 	}
-	if v := getNestedString(t, isvc, "spec", "predictor", "model", "storageUri"); v != svc.Kserve.StorageUri {
-		t.Errorf("storageUri = %q, want %q", v, svc.Kserve.StorageUri)
+	if v := getNestedString(t, isvc, "spec", "predictor", "model", "storageUri"); v != svc.Kserve.Source {
+		t.Errorf("storageUri = %q, want %q", v, svc.Kserve.Source)
 	}
 	if v := getNestedString(t, isvc, "spec", "predictor", "model", "protocolVersion"); v != "v1" {
 		t.Errorf("protocolVersion = %q, want %q", v, "v1")
@@ -397,8 +394,8 @@ func TestNewKserveLLMInferenceServiceDefinition(t *testing.T) {
 				t.Errorf("metadata.namespace = %q, want %q", got, knSvc.Namespace)
 			}
 
-			if got := getNestedString(t, isvc, "spec", "model", "uri"); got != svc.Kserve.StorageUri {
-				t.Errorf("model.uri = %q, want %q", got, svc.Kserve.StorageUri)
+			if got := getNestedString(t, isvc, "spec", "model", "uri"); got != svc.Kserve.Source {
+				t.Errorf("model.uri = %q, want %q", got, svc.Kserve.Source)
 			}
 			if got := getNestedString(t, isvc, "spec", "model", "name"); got != tt.wantModelName {
 				t.Errorf("model.name = %q, want %q", got, tt.wantModelName)
@@ -558,7 +555,7 @@ func TestUpdateKserveInferenceServiceDefinition_Success(t *testing.T) {
 
 	updated := kserveService()
 	updated.Kserve.Inference.ModelFormat = "tensorflow"
-	updated.Kserve.StorageUri = "s3://new-bucket/model"
+	updated.Kserve.Source = "s3://new-bucket/model"
 	updated.Kserve.MinScale = 2
 	updated.Kserve.MaxScale = 5
 	updated.Kserve.CPU = "1"
@@ -680,7 +677,7 @@ func TestValidateKserveService_DecisionPaths(t *testing.T) {
 			name: "missing storage uri",
 			build: func() *oscarType.Service {
 				svc := kserveService()
-				svc.Kserve.StorageUri = ""
+				svc.Kserve.Source = ""
 				return svc
 			},
 			wantErr: "missing model storage URI",
@@ -1017,7 +1014,7 @@ func TestCheckKserveUpdate(t *testing.T) {
 		{
 			name: "cannot change storage uri",
 			mutate: func(oldSvc, newSvc *oscarType.Service) {
-				newSvc.Kserve.StorageUri = "s3://another-bucket/model"
+				newSvc.Kserve.Source = "s3://another-bucket/model"
 			},
 			wantErr: true,
 		},
@@ -1125,8 +1122,8 @@ func TestUpdateKserveLLMInferenceServiceDefinition(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if v := getNestedString(t, updated, "spec", "model", "uri"); v != svc.Kserve.StorageUri {
-				t.Errorf("model.uri = %q, want %q", v, svc.Kserve.StorageUri)
+			if v := getNestedString(t, updated, "spec", "model", "uri"); v != svc.Kserve.Source {
+				t.Errorf("model.uri = %q, want %q", v, svc.Kserve.Source)
 			}
 			if v := getNestedString(t, updated, "spec", "model", "name"); v != tt.wantModelName {
 				t.Errorf("model.name = %q, want %q", v, tt.wantModelName)
@@ -1555,6 +1552,7 @@ func TestExistsKserveHTTPRouteByServiceName_DynamicClientError(t *testing.T) {
 	}
 }
 
+/*
 func newHTTPRouteForTest(name, namespace, path string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "gateway.networking.k8s.io/v1",
@@ -1593,7 +1591,7 @@ func newFakeDynamicClientForHTTPRoutes(routes ...*unstructured.Unstructured) *dy
 		objects...,
 	)
 }
-
+*/
 // ─── DeleteKserveInferenceService ───────────────────────────────────────────
 
 func TestDeleteKserveInferenceService_DynamicClientError(t *testing.T) {

@@ -13,6 +13,10 @@ const (
 	KserveTypeLLMInferenceService = "llm_inference"
 )
 
+type kserveEnvironment struct {
+	Vars map[string]string `json:"variables"`
+}
+
 type Kserve struct {
 	// Type the type of KServe service to deploy
 	// Required. Set the type of KServe service, either "inference" for a standard InferenceService
@@ -27,9 +31,9 @@ type Kserve struct {
 	// It is required when Type is set to "llm_inference"
 	LLMInference *KserveLLMInference `json:"llm_inference,omitempty"`
 
-	// StorageUri the URI of the model storage for KServe
+	// Source the URI of the model storage for KServe
 	// Required. It should follow the format expected by KServe, for example:
-	StorageUri string `json:"storage_uri"`
+	Source string `json:"source"`
 
 	// MinScale minimum number of active replicas (pods) for the service
 	// Optional. (default: 1)
@@ -55,7 +59,7 @@ type Kserve struct {
 
 	// Environment variables to be passed to the container
 	// Optional
-	Env map[string]string `json:"env,omitempty"`
+	Environment kserveEnvironment `json:"environment,omitempty"`
 
 	// EnableGPU parameter to request gpu usage in KServe InferenceService
 	// Optional. (default: false)
@@ -116,7 +120,7 @@ func (k Kserve) Validate() error {
 		)
 	}
 
-	if k.StorageUri == "" {
+	if k.Source == "" {
 		return fmt.Errorf("missing model storage URI in KServe configuration")
 	}
 
@@ -124,7 +128,7 @@ func (k Kserve) Validate() error {
 }
 
 func (k Kserve) ValidateUpdate(old Kserve) error {
-	if old.StorageUri != k.StorageUri {
+	if old.Source != k.Source {
 		return fmt.Errorf("cannot update model storage configuration for KServe")
 	}
 	// TODO
@@ -170,7 +174,7 @@ func (k Kserve) validateLLMInferenceService() error {
 
 func (k Kserve) Equal(other Kserve) bool {
 	return k.Type == other.Type &&
-		k.StorageUri == other.StorageUri &&
+		k.Source == other.Source &&
 		k.MinScale == other.MinScale &&
 		k.MaxScale == other.MaxScale &&
 		k.CPU == other.CPU &&
@@ -181,7 +185,7 @@ func (k Kserve) Equal(other Kserve) bool {
 		((k.LLMInference == nil) == (other.LLMInference == nil)) &&
 		(k.Inference == nil || k.Inference.Equal(*other.Inference)) &&
 		(k.LLMInference == nil || k.LLMInference.Equal(*other.LLMInference)) &&
-		maps.Equal(k.Env, other.Env) &&
+		maps.Equal(k.Environment.Vars, other.Environment.Vars) &&
 		slices.Equal(k.Args, other.Args)
 }
 

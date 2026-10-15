@@ -934,8 +934,8 @@ func TestValidateServiceCreation(t *testing.T) {
 				Name:           "svc",
 				IsolationLevel: types.IsolationLevelService,
 				Kserve: &types.Kserve{
-					Type:       types.KserveTypeInferenceService,
-					StorageUri: "s3://model",
+					Type:   types.KserveTypeInferenceService,
+					Source: "s3://model",
 					Inference: &types.KserveInference{
 						ModelFormat: "onnx",
 					},
