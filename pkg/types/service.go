@@ -412,30 +412,39 @@ func (s Service) Validate() error {
 		)
 	}
 
-	if strings.TrimSpace(s.Image) == "" && s.Kserve == nil {
+	s.Image = strings.TrimSpace(s.Image)
+	if s.Image == "" && s.Kserve == nil {
 		return fmt.Errorf("service Image is required")
 	}
 
-	if strings.TrimSpace(s.Image) != "" {
+	if s.Image != "" {
 		if cpu, err := resource.ParseQuantity(s.CPU); err != nil || cpu.Cmp(resource.MustParse("0.2")) < 0 {
 			return fmt.Errorf("service CPU must be greater than or equal to 0.2")
 		}
 	}
 
 	if s.IsKserve() {
-		return s.Kserve.Validate()
+		if err := s.Kserve.Validate(); err != nil {
+			return err
+		}
 	}
 
 	if s.IsExposed() {
-		return s.Expose.Validate()
+		if err := s.Expose.Validate(); err != nil {
+			return err
+		}
 	}
 
 	if s.HasManagedVolume() {
-		return s.Volume.Validate()
+		if err := s.Volume.Validate(); err != nil {
+			return err
+		}
 	}
 
 	if s.HasFederation() {
-		return s.Federation.Validate()
+		if err := s.Federation.Validate(); err != nil {
+			return err
+		}
 	}
 
 	return nil
