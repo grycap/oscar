@@ -247,7 +247,7 @@ type Service struct {
 	Output []StorageIOConfig `json:"output"`
 
 	// Script the user script to execute when the service is invoked
-	Script string `json:"script,omitempty" binding:"required"`
+	Script string `json:"script,omitempty"`
 
 	// ImagePullSecrets list of Kubernetes secrets to login to a private registry
 	// Optional
@@ -412,30 +412,50 @@ func (s Service) Validate() error {
 		)
 	}
 
-	if strings.TrimSpace(s.Image) == "" && s.Kserve == nil {
+	s.Image = strings.TrimSpace(s.Image)
+	if s.Image == "" && s.Kserve == nil {
 		return fmt.Errorf("service Image is required")
 	}
 
-	if strings.TrimSpace(s.Image) != "" {
+	if s.Image != "" {
 		if cpu, err := resource.ParseQuantity(s.CPU); err != nil || cpu.Cmp(resource.MustParse("0.2")) < 0 {
 			return fmt.Errorf("service CPU must be greater than or equal to 0.2")
 		}
 	}
 
+	// If the service is KServe or exposed with a default command, then the script is optional.
+	scriptIsRequired := true
+
 	if s.IsKserve() {
-		return s.Kserve.Validate()
+		if err := s.Kserve.Validate(); err != nil {
+			return err
+		}
+		scriptIsRequired = false
 	}
 
 	if s.IsExposed() {
-		return s.Expose.Validate()
+		if err := s.Expose.Validate(); err != nil {
+			return err
+		}
+		if s.Expose.DefaultCommand {
+			scriptIsRequired = false
+		}
+	}
+
+	if scriptIsRequired && strings.TrimSpace(s.Script) == "" {
+		return fmt.Errorf("service script is required")
 	}
 
 	if s.HasManagedVolume() {
-		return s.Volume.Validate()
+		if err := s.Volume.Validate(); err != nil {
+			return err
+		}
 	}
 
 	if s.HasFederation() {
-		return s.Federation.Validate()
+		if err := s.Federation.Validate(); err != nil {
+			return err
+		}
 	}
 
 	return nil
