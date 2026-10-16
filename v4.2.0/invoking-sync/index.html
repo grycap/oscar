@@ -2219,16 +2219,16 @@ the execution to a serverless back-end (e.g. <a href="https://knative.dev">Knati
 <p><img alt="oscar-sync.png" src="../images/oscar-sync.png" /></p>
 <p>Synchronous invocations can be made through <a href="../oscar-cli/">OSCAR CLI</a>, using the command
 <code>oscar-cli service run</code>:</p>
-<pre><code class="language-sh">oscar-cli service run [SERVICE_NAME] {--input | --text-input} {-o | --output}
+<pre><code class="language-sh">oscar-cli service run [SERVICE_NAME] {--file-input | --text-input} {-o | --output}
 </code></pre>
 <p>You can check these examples:</p>
 <ul>
 <li><a href="https://oscar.grycap.net/blog/post-oscar-faas-sync-ml-inference/">plant-classification-sync</a></li>
 <li><a href="https://oscar.grycap.net/blog/post-oscar-text-to-speech/">text-to-speech</a>.</li>
 </ul>
-<p>The input can be sent as a file via the <code>--input</code> flag, and the result of the
+<p>The input can be sent as a file via the <code>--file-input</code> flag, and the result of the
 execution will be displayed directly in the terminal:</p>
-<pre><code class="language-sh">oscar-cli service run plant-classification-sync --input images/image3.jpg
+<pre><code class="language-sh">oscar-cli service run plant-classification-sync --file-input images/image3.jpg
 </code></pre>
 <p>Alternatively, it can be sent as plain text using the <code>--text-input</code> flag and
 the result stored in a file using the <code>--output</code> flag:</p>

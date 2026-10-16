@@ -2206,10 +2206,12 @@ alternative object storage provider.</p>
 <h2 id="using-command-line-interfaces">Using command-line interfaces</h2>
 <p>MinIO buckets can also be managed through <a href="https://github.com/grycap/oscar-cli">oscar-cli command-line</a> or the official <a href="https://min.io/docs/minio/linux/reference/minio-mc.html">MinIO client</a>. </p>
 <ul>
-<li><strong>oscar-cli</strong>: The OSCAR client provides a dedicated set of commands for accessing files within buckets. It is important to note that this interface does not support DELETE or UPDATE operations. Below is a brief overview of the available commands and their functionalities.</li>
-<li><a href="../oscar-cli/#get-file">get-file</a>: Get file from a service's storage provider.</li>
+<li><strong>oscar-cli</strong>: The OSCAR client provides commands for accessing and managing files. Available operations include:</li>
+<li><a href="../oscar-cli/#get-file">get-file</a>: Get a file from a service's storage provider.</li>
 <li><a href="../oscar-cli/#list-files">list-files</a>: List files from a service's storage provider path.</li>
-<li><a href="../oscar-cli/#put-file">put-file</a>: Upload a file on a service storage provider.</li>
+<li><a href="../oscar-cli/#put-file">put-file</a>: Upload a file to a service storage provider.</li>
+<li><a href="../oscar-cli/#service-delete-file">service delete-file</a>: Delete a file from a service storage provider (MinIO, S3, or Onedata).</li>
+<li><a href="../oscar-cli/#delete-file">bucket delete-file</a>: Delete a file from a MinIO bucket.</li>
 </ul>
 <p>An example of a put-file operation:</p>
 <p><code>bash

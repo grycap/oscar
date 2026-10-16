@@ -1827,6 +1827,14 @@ paths:
           description: Bad Request
           schema:
             type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "404":
           description: Not Found
           schema:
@@ -1856,6 +1864,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/types.FederationResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "404":
           description: Not Found
           schema:
@@ -1897,6 +1913,14 @@ paths:
           description: Bad Request
           schema:
             type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "404":
           description: Not Found
           schema:
@@ -1936,6 +1960,14 @@ paths:
             type: string
         "400":
           description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
           schema:
             type: string
         "404":
