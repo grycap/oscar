@@ -83,13 +83,13 @@ func MakeGetDeploymentStatusHandler(back types.ServerlessBackend, kubeClientset 
 			return
 		}
 
-		runtimeCtx, err := inspectDeploymentRuntime(back, kubeClientset, service, cfg)
+		status, err := inspectDeploymentRuntimeStatusOnly(back, kubeClientset, service, cfg)
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
 
-		c.JSON(http.StatusOK, runtimeCtx.status)
+		c.JSON(http.StatusOK, status)
 	}
 }
 
@@ -216,9 +216,10 @@ func inspectExposedDeploymentRuntime(kubeClientset kubernetes.Interface, service
 		return deploymentRuntimeContext{}, err
 	}
 
+	items := podItems(pods)
 	return deploymentRuntimeContext{
-		status:  deploymentStatusFromDeployment(service, deployment),
-		logPods: podItems(pods),
+		status:  deploymentStatusFromDeployment(service, deployment, items),
+		logPods: items,
 	}, nil
 }
 
@@ -282,13 +283,14 @@ func inspectKserveDeploymentRuntime(kubeClientset kubernetes.Interface, service 
 		return deploymentRuntimeContext{}, err
 	}
 
+	items := podItems(pods)
 	return deploymentRuntimeContext{
-		status:  deploymentStatusFromDeployment(service, deployment),
-		logPods: podItems(pods),
+		status:  deploymentStatusFromDeployment(service, deployment, items),
+		logPods: items,
 	}, nil
 }
 
-func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.Deployment) types.ServiceDeploymentStatus {
+func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.Deployment, pods []corev1.Pod) types.ServiceDeploymentStatus {
 	var desired int32 = 1
 	if deployment.Spec.Replicas != nil {
 		desired = *deployment.Spec.Replicas
@@ -307,6 +309,9 @@ func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.D
 		affected = 0
 	}
 
+	crashLoop := hasCrashLoopBackOff(pods)
+	podInitializing := hasPodInitializing(pods)
+
 	state := types.DeploymentStatePending
 	switch {
 	case desired == 0:
@@ -315,6 +320,10 @@ func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.D
 		state = types.DeploymentStateReady
 	case available > 0:
 		state = types.DeploymentStateDegraded
+	case crashLoop:
+		state = types.DeploymentStateFailed
+	case podInitializing:
+		state = types.DeploymentStateInit
 	case hasDeploymentFailureCondition(deployment.Status.Conditions):
 		state = types.DeploymentStateFailed
 	default:
@@ -324,6 +333,18 @@ func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.D
 	reason, transitioned := latestDeploymentCondition(deployment.Status.Conditions)
 	if state == types.DeploymentStateStopped {
 		reason = "Deployment is stopped."
+	}
+	if state == types.DeploymentStatePending && crashLoop {
+		state = types.DeploymentStateFailed
+	}
+	if state == types.DeploymentStatePending && podInitializing {
+		state = types.DeploymentStateInit
+	}
+	if state == types.DeploymentStateInit {
+		reason = "Deployment is initializing."
+	}
+	if state == types.DeploymentStateFailed && crashLoop {
+		reason = firstCrashLoopBackOffReason(pods)
 	}
 	if reason == "" && state == types.DeploymentStateDegraded {
 		reason = fmt.Sprintf("%d of %d instances are affected.", affected, desired)
@@ -374,9 +395,14 @@ func deploymentStatusFromKnativeService(service *types.Service, knService *knv1.
 			state = types.DeploymentStatePending
 		}
 	}
+	if state == types.DeploymentStatePending && total == 0 {
+		state = types.DeploymentStateInit
+	}
 
 	if reason == "" {
 		switch state {
+		case types.DeploymentStateInit:
+			reason = "Runtime service is initializing."
 		case types.DeploymentStateReady:
 			reason = "Runtime service is ready."
 		case types.DeploymentStatePending:
@@ -535,6 +561,63 @@ func podFailureReason(pod corev1.Pod) (string, *metav1.Time) {
 		return string(pod.Status.Phase), pod.Status.StartTime
 	}
 	return "", pod.Status.StartTime
+}
+
+func hasPodInitializing(pods []corev1.Pod) bool {
+	for _, pod := range pods {
+		if pod.Status.Reason == "PodInitializing" {
+			return true
+		}
+		for _, status := range pod.Status.InitContainerStatuses {
+			if status.State.Waiting != nil && (status.State.Waiting.Reason == "PodInitializing" || strings.HasPrefix(status.State.Waiting.Reason, "Init:")) {
+				return true
+			}
+		}
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.State.Waiting != nil {
+				switch status.State.Waiting.Reason {
+				case "PodInitializing", "ContainerCreating":
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func hasCrashLoopBackOff(pods []corev1.Pod) bool {
+	for _, pod := range pods {
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.State.Waiting != nil && status.State.Waiting.Reason == "CrashLoopBackOff" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func firstCrashLoopBackOffReason(pods []corev1.Pod) string {
+	for _, pod := range pods {
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.State.Waiting != nil && status.State.Waiting.Reason == "CrashLoopBackOff" {
+				message := strings.Trim(strings.TrimSpace(status.State.Waiting.Reason+": "+status.State.Waiting.Message), ": ")
+				if status.LastTerminationState.Terminated != nil {
+					term := status.LastTerminationState.Terminated
+					if term.ExitCode != 0 {
+						if message != "" {
+							return fmt.Sprintf("%s (exit code %d)", message, term.ExitCode)
+						}
+						return fmt.Sprintf("CrashLoopBackOff (exit code %d)", term.ExitCode)
+					}
+				}
+				if message != "" {
+					return message
+				}
+				return status.State.Waiting.Reason
+			}
+		}
+	}
+	return ""
 }
 
 func latestDeploymentCondition(conditions []appsv1.DeploymentCondition) (string, *metav1.Time) {
@@ -758,7 +841,12 @@ func inspectExposedDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interfac
 		return types.ServiceDeploymentStatus{}, err
 	}
 
-	return deploymentStatusFromDeployment(service, deployment), nil
+	pods, err := backends.ListExposedServicePods(kubeClientset, service.Namespace, service.Name)
+	if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+		return types.ServiceDeploymentStatus{}, err
+	}
+
+	return deploymentStatusFromDeployment(service, deployment, podItems(pods)), nil
 }
 
 func inspectKserveDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interface, service *types.Service) (types.ServiceDeploymentStatus, error) {
@@ -770,5 +858,10 @@ func inspectKserveDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interface
 		return types.ServiceDeploymentStatus{}, err
 	}
 
-	return deploymentStatusFromDeployment(service, deployment), nil
+	pods, err := backends.ListKserveServicePods(kubeClientset, service.Namespace, service.Name)
+	if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+		return types.ServiceDeploymentStatus{}, err
+	}
+	//var pods corev1.PodList
+	return deploymentStatusFromDeployment(service, deployment, podItems(pods)), nil
 }

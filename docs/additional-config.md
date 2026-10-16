@@ -9,15 +9,13 @@ metadata:
   name: config.yaml
   namespace: oscar
 data:
-  config.yaml: |
-    images:
-      allowed_image_repositories:  '["ghcr.io/grycap",...]'
+  allowed_image_repositories:  '["ghcr.io/grycap",...]'
 ```
 
 Also, the administrator can use the PUT /system/config API call to modify the trusted image repositories. The next example only allows images from the `ghcr.io/grycap` repository/owner.
 
 ```
-curl -vX PUT  -H "Authorization: Basic <echo 'user:password' -n | base64>"  https://<oscar_endpoint>/system/config -d '{"allowed_image_repositories":["ghcr.io/grycap"]}'
+curl -vX PUT -H "Authorization: Basic $(echo -n 'user:password' | base64)" https://<oscar_endpoint>/system/config -d '{"allowed_image_repositories":["ghcr.io/grycap"]}'
 ```
 
 Additionally, this property can be added when creating an OSCAR cluster through the IM, which will automatically create the ConfigMap.

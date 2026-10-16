@@ -13,9 +13,9 @@ resources and built around open standards. Its development is driven by
 requirements of the scientific communities.
 
 The OSCAR platform can be deployed on the EGI Federated Cloud resources
-through the [IM Dashboard](https://im.egi.ei).
+through the [IM Dashboard](https://im.egi.eu).
 
-You can follow [EGI's IM Dashboard documentation](https://docs.egi.eu/users/compute/orchestration/im/dashboard/) or the [OSCAR's IM Dasboard](deploy-im-dashboard.md) documentation.
+You can follow [EGI's IM Dashboard documentation](https://docs.egi.eu/users/compute/orchestration/im/dashboard/) or the [OSCAR's IM Dashboard](deploy-im-dashboard.md) documentation.
 
 ![OSCAR on IM](images/oscar-egi-im.png)
 
@@ -46,7 +46,7 @@ And the path where you want to store the files in the "OUTPUTS" tab:
 ![Onedata output](images/onedata-output.png)
 
 This means that scientists can store their output files on their Onedata space
-in the EGI DataHub for long-time persistence and easy sharing of experimental
+in the EGI DataHub for long-term persistence and easy sharing of experimental
 results between researchers.
 
 
@@ -80,7 +80,7 @@ via OIDC tokens thanks to the integration with
 [oidc-agent](https://indigo-dc.gitbook.io/oidc-agent/).
 
 Users must install `oidc-agent` following its
-[instructions](https://indigo-dc.gitbook.io/oidc-agent/installation) and
+[instructions](https://github.com/indigo-dc/oidc-agent/blob/master/README.md) and
 create a new account configuration for the
 `https://aai.egi.eu/auth/realms/egi/` issuer. 
 

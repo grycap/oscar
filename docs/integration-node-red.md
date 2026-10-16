@@ -78,7 +78,7 @@ Drag and drop the boxes to the canvas and then connect the components as shown:
 
 Now we need to configure the components. To configure the *HTTP request node* double-click on it:
 
-- **URL**: URL of an image you want to analyze with YOLO (for example, you can use this [`image`](https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Cat_August_2010-4.jpg/640px-Cat_August_2010-4.jpg))
+- **URL**: URL of an image you want to analyze with YOLO (for example, you can use this [`image`](https://upload.wikimedia.org/wikipedia/commons/1/15/Cat_August_2010-4.jpg))
 - **Payload**: _Send as request body_
 - **Return**: _A binary buffer_
 

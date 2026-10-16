@@ -199,10 +199,13 @@ func TestMakeCreateHandler(t *testing.T) {
 		visibility     string
 		allowedUsers   []string
 		expectedStatus int
+		namespace      string
+		authHeader     string
 	}{
-		{"PublicVisibility", "public", []string{}, http.StatusCreated},
-		{"InvalidVisibility", "private", []string{}, http.StatusCreated},
-		{"EmptyVisibility", "", []string{}, http.StatusCreated}, // Assuming default is allowed
+		{name: "PublicVisibility", visibility: "public", expectedStatus: http.StatusCreated},
+		{name: "InvalidVisibility", visibility: "private", expectedStatus: http.StatusCreated},
+		{name: "EmptyVisibility", expectedStatus: http.StatusCreated}, // Assuming default is allowed
+		{name: "AdminCustomNamespace", visibility: "private", expectedStatus: http.StatusCreated, namespace: "custom-admin-ns", authHeader: "Basic admin"},
 	}
 
 	for _, s := range scenarios {
@@ -216,6 +219,10 @@ func TestMakeCreateHandler(t *testing.T) {
 				allowedUsersJSON += `"` + user + `"`
 			}
 			allowedUsersJSON += "]"
+			namespaceJSON := ""
+			if s.namespace != "" {
+				namespaceJSON = `,"namespace":"` + s.namespace + `"`
+			}
 
 			body := strings.NewReader(`
 				{
@@ -246,22 +253,66 @@ func TestMakeCreateHandler(t *testing.T) {
 					"isolation_level": "",
 					"bucket_list": [],
 					"visibility": "` + s.visibility + `",
-					"allowed_users": []
+					"allowed_users": []` + namespaceJSON + `
 				}`)
 
 			req, _ := http.NewRequest("POST", "/system/services", body)
-			req.Header.Add("Authorization", "Bearer token")
+			if s.authHeader == "" {
+				req.Header.Add("Authorization", "Bearer token")
+			} else {
+				req.Header.Add("Authorization", s.authHeader)
+			}
 			r.ServeHTTP(w, req)
 
 			if w.Code != s.expectedStatus {
 				fmt.Println("response: ", w.Body)
 				t.Errorf("expecting code %d, got %d", s.expectedStatus, w.Code)
 			}
+			if w.Code == http.StatusCreated {
+				expectedNamespace := utils.BuildUserNamespace(&cfg, "somelonguid@egi.eu")
+				if s.namespace != "" {
+					expectedNamespace = s.namespace
+				}
+				if back.CreatedService == nil || back.CreatedService.Namespace != expectedNamespace {
+					t.Fatalf("expected service in namespace %q, got %+v", expectedNamespace, back.CreatedService)
+				}
+			}
 		})
 	}
 
 	// Close the fake MinIO server
 	defer server.Close()
+}
+
+func TestMakeCreateHandlerRejectsClientNamespace(t *testing.T) {
+	for _, namespace := range []string{"other-tenant", "oscar-svc"} {
+		t.Run(namespace, func(t *testing.T) {
+			kubeClientset := testclient.NewSimpleClientset()
+			back := backends.MakeFakeBackend()
+			back.SetKubeClientset(kubeClientset)
+			cfg := &types.Config{ServicesNamespace: "oscar-svc", MinIOProvider: &types.MinIOProvider{Endpoint: "http://127.0.0.1:1"}}
+			r := gin.New()
+			r.Use(func(c *gin.Context) {
+				c.Set("uidOrigin", "owner@example.com")
+				c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "owner@example.com"))
+				c.Next()
+			})
+			r.POST("/system/services", MakeCreateHandler(cfg, back))
+
+			body := fmt.Sprintf(`{"name":"svc","image":"img","script":"echo test","namespace":%q,"environment":{"secrets":{"key":"value"}}}`, namespace)
+			req := httptest.NewRequest(http.MethodPost, "/system/services", strings.NewReader(body))
+			req.Header.Set("Authorization", "Bearer token")
+			resp := httptest.NewRecorder()
+			r.ServeHTTP(resp, req)
+
+			if resp.Code != http.StatusBadRequest || !strings.Contains(resp.Body.String(), "namespace") {
+				t.Fatalf("expected namespace rejection (400), got %d: %s", resp.Code, resp.Body.String())
+			}
+			if back.CreatedService != nil || len(kubeClientset.Actions()) != 0 {
+				t.Fatalf("rejected request wrote resources: service=%v, actions=%v", back.CreatedService, kubeClientset.Actions())
+			}
+		})
+	}
 }
 
 func TestMakeCreateHandlerWebhookError(t *testing.T) {
@@ -847,8 +898,9 @@ func TestValidateServiceCreation(t *testing.T) {
 				Name:           "svc",
 				Image:          "img",
 				CPU:            "0.2",
-				Visibility:     "public",
+				Visibility:     types.PUBLIC,
 				IsolationLevel: types.IsolationLevelService,
+				Script:         "echo test",
 			},
 			cfg:     cfg,
 			wantErr: false,
@@ -861,6 +913,7 @@ func TestValidateServiceCreation(t *testing.T) {
 				CPU:            "0.2",
 				Visibility:     "invalid",
 				IsolationLevel: types.IsolationLevelService,
+				Script:         "echo test",
 			},
 			cfg:     cfg,
 			wantErr: true,
@@ -871,8 +924,9 @@ func TestValidateServiceCreation(t *testing.T) {
 				Name:           "svc",
 				Image:          "img",
 				CPU:            "0.2",
-				Visibility:     "public",
+				Visibility:     types.PUBLIC,
 				IsolationLevel: types.IsolationLevelUser,
+				Script:         "echo test",
 			},
 			cfg:     cfg,
 			wantErr: false,
@@ -882,6 +936,7 @@ func TestValidateServiceCreation(t *testing.T) {
 			service: types.Service{
 				Name:           "svc",
 				IsolationLevel: types.IsolationLevelService,
+				Visibility:     types.PRIVATE,
 				Kserve: &types.Kserve{
 					Type:       types.KserveTypeInferenceService,
 					StorageUri: "s3://model",
@@ -889,12 +944,56 @@ func TestValidateServiceCreation(t *testing.T) {
 						ModelFormat: "onnx",
 					},
 				},
+				Script: "echo test",
 			},
 			cfg: &types.Config{
 				KserveEnable:             false,
 				ExposedServicesRouteKind: types.HTTPROUTE,
 			},
 			wantErr: true,
+		},
+		{
+			name: "kserve service when supported",
+			service: types.Service{
+				Name:           "svc",
+				IsolationLevel: types.IsolationLevelService,
+				Visibility:     types.PRIVATE,
+				Kserve: &types.Kserve{
+					Type:       types.KserveTypeInferenceService,
+					StorageUri: "s3://model",
+					Inference: &types.KserveInference{
+						ModelFormat: "onnx",
+						APIVersion:  "v2",
+					},
+				},
+			},
+			cfg: &types.Config{
+				KserveEnable:             true,
+				ExposedServicesRouteKind: types.HTTPROUTE,
+			},
+			wantErr: false,
+		},
+		{
+			name: "exposed service with default command true",
+			service: types.Service{
+				Name:           "svc",
+				Image:          "img",
+				CPU:            "0.2",
+				Memory:         "256Mi",
+				Visibility:     types.PRIVATE,
+				IsolationLevel: types.IsolationLevelService,
+				Expose: types.Expose{
+					APIPort:        []int{8080},
+					ProbeMode:      "legacy",
+					AuthType:       "basic",
+					DefaultCommand: true,
+				},
+			},
+			cfg: &types.Config{
+				KserveEnable:             false,
+				ExposedServicesRouteKind: types.HTTPROUTE,
+			},
+			wantErr: false,
 		},
 	}
 

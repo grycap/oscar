@@ -18,7 +18,10 @@ package handlers
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -115,12 +118,19 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 
 		// Check if reqToken is the service token
 		var uidFromToken string
+		isStorageWebhook := false
 		var minIOSecretKey string
 		rawToken := strings.TrimSpace(splitToken[1])
 		if len(rawToken) == tokenLength {
 			for _, serviceIter := range serviceList {
-				if rawToken == serviceIter.Token {
+				if hmac.Equal([]byte(rawToken), []byte(serviceIter.Token)) {
 					service = serviceIter
+					break
+				}
+				if cfg.MinIOProvider != nil && cfg.MinIOProvider.SecretKey != "" && hmac.Equal([]byte(rawToken), []byte(webhookToken(serviceIter.Name, serviceIter.Token, cfg.MinIOProvider.SecretKey))) {
+					service = serviceIter
+					isStorageWebhook = true
+					break
 				}
 			}
 			if service == nil {
@@ -228,6 +238,18 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 				c.Set("uidOrigin", "nil")
 			}
 		} else {
+			// The body cannot choose credentials for a service-token or OIDC
+			// invocation. Only the separate webhook credential attests its principal.
+			if !isStorageWebhook {
+				caller := uidFromToken
+				if caller == "" {
+					caller = service.Owner
+				}
+				if requestUserUID != caller {
+					c.Status(http.StatusForbidden)
+					return
+				}
+			}
 			if service.Labels == nil {
 				service.Labels = make(map[string]string)
 			}
@@ -487,6 +509,14 @@ func rewriteRustFSEventSource(eventBytes []byte) []byte {
 
 type configForUser struct {
 	MinIOProvider *types.MinIOProvider `json:"minio_provider"`
+}
+
+// webhookToken is scoped to one service and never exposed with the service FDL.
+// The object-storage administrator configures it as the notification auth_token.
+func webhookToken(name, serviceToken, serverSecret string) string {
+	mac := hmac.New(sha256.New, []byte(serverSecret))
+	mac.Write([]byte("oscar-storage-webhook-v1\x00" + name + "\x00" + serviceToken))
+	return hex.EncodeToString(mac.Sum(nil))
 }
 
 func decodeEventBytes(eventBytes []byte) (string, string, error) {

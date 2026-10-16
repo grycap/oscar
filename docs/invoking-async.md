@@ -1,7 +1,7 @@
 # Asynchronous invocations
 
 For event-driven file processing, OSCAR automatically manages the creation
-and [notification system](https://docs.min.io/minio/baremetal/monitoring/bucket-notifications/bucket-notifications.html#minio-bucket-notifications)
+and [notification system](https://min.io/docs/minio/linux/administration/monitoring/bucket-notifications.html)
 of MinIO buckets. This allows the event-driven invocation of services
 using asynchronous requests for every file uploaded to the bucket, which generates a Kubernetes job for every file to be processed.
 

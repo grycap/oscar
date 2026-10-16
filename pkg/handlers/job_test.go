@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,7 +14,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/backends"
 	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	batchv1 "k8s.io/api/batch/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestRewriteRustFSEventSource(t *testing.T) {
@@ -53,6 +57,7 @@ func TestMakeJobHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
 	back.Services = []*types.Service{{
 		Name:   "testName",
+		Owner:  "uid",
 		Token:  "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf",
 		CPU:    "100m",
 		Memory: "128Mi",
@@ -99,5 +104,76 @@ func TestMakeJobHandler(t *testing.T) {
 	}
 	if *job.Spec.Template.Spec.EnableServiceLinks {
 		t.Fatal("expected job pod spec to disable service links")
+	}
+}
+
+func TestJobEventPrincipalCannotSelectForeignSecret(t *testing.T) {
+	const token = "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf"
+	for _, tc := range []struct {
+		name, credential string
+		status           int
+		secret           string
+	}{
+		{"service token, forged principal", token, http.StatusForbidden, ""},
+		{"service token, owner principal", token, http.StatusCreated, "minio"},
+		{"storage webhook, event principal", webhookToken("testName", token, "server-secret"), http.StatusCreated, auth.FormatUID("victim")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			back := backends.MakeFakeBackend()
+			back.Services = []*types.Service{{Name: "testName", Token: token, Owner: "owner", Namespace: "owner-ns", CPU: "100m", Memory: "128Mi"}}
+			client := back.GetKubeClientset().(*testclient.Clientset)
+			_, err := client.CoreV1().Secrets(auth.ServicesNamespace).Create(context.Background(), &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: auth.FormatUID("victim"), Namespace: auth.ServicesNamespace},
+				Data:       map[string][]byte{"accessKey": []byte("victim-credential")},
+			}, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = client.CoreV1().Secrets(auth.ServicesNamespace).Create(context.Background(), &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "minio", Namespace: auth.ServicesNamespace},
+			}, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			client.ClearActions()
+			principal := "victim"
+			if tc.secret == "minio" {
+				principal = "owner"
+			}
+			r := gin.New()
+			cfg := &types.Config{ServicesNamespace: "owner-ns", MinIOProvider: &types.MinIOProvider{SecretKey: "server-secret"}}
+			r.POST("/job/:serviceName", MakeJobHandler(cfg, types.QuotaBackend{KubeClientset: client}, back, nil))
+			req := httptest.NewRequest(http.MethodPost, "/job/testName", strings.NewReader(`{"Records":[{"requestParameters":{"principalId":"`+principal+`","sourceIPAddress":"ip"}}]}`))
+			req.Header.Set("Authorization", "Bearer "+tc.credential)
+			resp := httptest.NewRecorder()
+			r.ServeHTTP(resp, req)
+			if resp.Code != tc.status {
+				t.Fatalf("expected %d, got %d: %s", tc.status, resp.Code, resp.Body.String())
+			}
+			foundJob := false
+			for _, action := range client.Actions() {
+				if action.GetVerb() == "create" && action.GetResource().Resource == "jobs" {
+					foundJob = true
+					job := action.(k8stesting.CreateAction).GetObject().(*batchv1.Job)
+					for _, volume := range job.Spec.Template.Spec.Volumes {
+						if volume.Name == MinIOSecretVolumeName && volume.Secret.SecretName != tc.secret {
+							t.Fatalf("mounted %q, wanted %q", volume.Secret.SecretName, tc.secret)
+						}
+					}
+				}
+				if tc.secret == "" && action.GetVerb() == "create" && action.GetResource().Resource == "secrets" {
+					t.Fatal("forged principal copied a secret")
+				}
+			}
+			if foundJob != (tc.status == http.StatusCreated) {
+				t.Fatalf("job created: %v", foundJob)
+			}
+			if tc.secret == auth.FormatUID("victim") {
+				copied, err := client.CoreV1().Secrets("owner-ns").Get(context.Background(), tc.secret, metav1.GetOptions{})
+				if err != nil || string(copied.Data["accessKey"]) != "victim-credential" {
+					t.Fatalf("expected webhook to copy the event principal's credentials: %v", err)
+				}
+			}
+		})
 	}
 }

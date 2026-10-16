@@ -412,30 +412,39 @@ func (s Service) Validate() error {
 		)
 	}
 
-	if strings.TrimSpace(s.Image) == "" && s.Kserve == nil {
+	s.Image = strings.TrimSpace(s.Image)
+	if s.Image == "" && s.Kserve == nil {
 		return fmt.Errorf("service Image is required")
 	}
 
-	if strings.TrimSpace(s.Image) != "" {
+	if s.Image != "" {
 		if cpu, err := resource.ParseQuantity(s.CPU); err != nil || cpu.Cmp(resource.MustParse("0.2")) < 0 {
 			return fmt.Errorf("service CPU must be greater than or equal to 0.2")
 		}
 	}
 
 	if s.IsKserve() {
-		return s.Kserve.Validate()
+		if err := s.Kserve.Validate(); err != nil {
+			return err
+		}
 	}
 
 	if s.IsExposed() {
-		return s.Expose.Validate()
+		if err := s.Expose.Validate(); err != nil {
+			return err
+		}
 	}
 
 	if s.HasManagedVolume() {
-		return s.Volume.Validate()
+		if err := s.Volume.Validate(); err != nil {
+			return err
+		}
 	}
 
 	if s.HasFederation() {
-		return s.Federation.Validate()
+		if err := s.Federation.Validate(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -630,10 +639,16 @@ func (service *Service) ToPodSpec(cfg *Config) (*v1.PodSpec, error) {
 	}
 
 	// Add OSCAR-managed environment variables
-	addServiceMetadataEnvVars(podSpec, service, cfg)
+	err = addServiceMetadataEnvVars(podSpec, service, cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	// Add the required environment variables for the watchdog
-	addWatchdogEnvVars(podSpec, cfg, service)
+	err = addWatchdogEnvVars(podSpec, cfg, service)
+	if err != nil {
+		return nil, err
+	}
 
 	if service.EnableSGX {
 		SetSecurityContext(podSpec)
@@ -759,7 +774,7 @@ func CreateResources(service *Service) (v1.ResourceRequirements, error) {
 	return resources, nil
 }
 
-func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) {
+func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) error {
 	requiredEnvVars := []v1.EnvVar{
 		// Use FaaS Supervisor to handle requests
 		{
@@ -796,12 +811,16 @@ func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) {
 
 	for i, cont := range p.Containers {
 		if cont.Name == ContainerName {
+			if dup := findFirstDuplicateEnvVar(requiredEnvVars, p.Containers[i].Env); dup != "" {
+				return fmt.Errorf("Trying to set reserved environment variable: %s", dup)
+			}
 			p.Containers[i].Env = append(p.Containers[i].Env, requiredEnvVars...)
 		}
 	}
+	return nil
 }
 
-func addServiceMetadataEnvVars(p *v1.PodSpec, service *Service, cfg *Config) {
+func addServiceMetadataEnvVars(p *v1.PodSpec, service *Service, cfg *Config) error {
 	exposedBasePath := service.GetExposedBasePath()
 	if exposedBasePath != "" && service.UsesDNSRoute(cfg) {
 		exposedBasePath = "/"
@@ -823,9 +842,24 @@ func addServiceMetadataEnvVars(p *v1.PodSpec, service *Service, cfg *Config) {
 
 	for i, cont := range p.Containers {
 		if cont.Name == ContainerName {
+			if dup := findFirstDuplicateEnvVar(requiredEnvVars, p.Containers[i].Env); dup != "" {
+				return fmt.Errorf("Trying to set reserved environment variable: %s", dup)
+			}
 			p.Containers[i].Env = append(p.Containers[i].Env, requiredEnvVars...)
 		}
 	}
+	return nil
+}
+
+func findFirstDuplicateEnvVar(envVars []v1.EnvVar, envVars2 []v1.EnvVar) string {
+	for _, envVar := range envVars {
+		for _, existingEnvVar := range envVars2 {
+			if existingEnvVar.Name == envVar.Name {
+				return envVar.Name
+			}
+		}
+	}
+	return ""
 }
 
 // GetSupervisorPath returns the appropriate supervisor path
