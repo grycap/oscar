@@ -22,9 +22,6 @@ nav:
   - oscar-cli.md
   - usage-dashboard.md  
   - api.md
-  - MinIO: minio-usage.md
-  - RustFS: rustfs-usage.md
-  - Silo: silo-usage.md
 
 - Service Deployment:
   - deployment-api.md
@@ -45,6 +42,10 @@ nav:
   - integration-compss.md
   - integration-node-red.md
   - integration-jupyter.md
+  - Storage providers:
+    - MinIO: minio-usage.md
+    - RustFS: rustfs-usage.md
+    - Silo: silo-usage.md
 
 - Training:
   - Hands-on Labs:
