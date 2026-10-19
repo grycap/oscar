@@ -9,7 +9,6 @@ nav:
 - Deployment:
   - local-testing.md
   - deploy-im-dashboard.md
-  - deploy-ec3.md
   - deploy-helm.md
   - deploy-k3s-ansible.md
   
