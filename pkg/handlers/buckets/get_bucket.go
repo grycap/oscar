@@ -19,6 +19,7 @@ package buckets
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -109,6 +110,16 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 		if !isAdmin && visibility == "" {
 			c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", requester))
 			return
+		}
+		if !isAdmin && !utils.IsRustFSConfig(cfg) {
+			if visibility == types.PRIVATE && requester != ownerCandidate {
+				c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", requester))
+				return
+			}
+			if visibility == types.RESTRICTED && requester != ownerCandidate && !slices.Contains(allowedUsers, requester) {
+				c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", requester))
+				return
+			}
 		}
 
 		pageToken := c.DefaultQuery("page", "")
