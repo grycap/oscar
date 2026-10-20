@@ -478,6 +478,7 @@ func TestMakeGetDeploymentStatusHandlerCrashLoopBackOffIsFailed(t *testing.T) {
 				Phase: corev1.PodRunning,
 				ContainerStatuses: []corev1.ContainerStatus{
 					{
+						Name: types.ContainerName,
 						State: corev1.ContainerState{
 							Waiting: &corev1.ContainerStateWaiting{
 								Reason:  "CrashLoopBackOff",
@@ -506,6 +507,89 @@ func TestMakeGetDeploymentStatusHandlerCrashLoopBackOffIsFailed(t *testing.T) {
 	}
 	if !strings.Contains(response.Reason, "CrashLoopBackOff") {
 		t.Fatalf("expected CrashLoopBackOff in reason, got %q", response.Reason)
+	}
+}
+
+func TestMakeGetDeploymentStatusHandlerManyRestartsRunningIsCrashLoop(t *testing.T) {
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name:      "svc",
+		Expose:    types.Expose{APIPort: []int{8080}},
+		Namespace: "ns",
+	}
+
+	replicas := int32(1)
+	now := metav1.NewTime(time.Now().UTC())
+	kubeClientset := testclient.NewSimpleClientset(
+		&appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{Name: "svc-dpl", Namespace: "ns"},
+			Spec:       appsv1.DeploymentSpec{Replicas: &replicas},
+			Status: appsv1.DeploymentStatus{
+				Replicas:          1,
+				AvailableReplicas: 0,
+				Conditions: []appsv1.DeploymentCondition{
+					{
+						Type:           appsv1.DeploymentProgressing,
+						Status:         corev1.ConditionFalse,
+						Reason:         "ProgressDeadlineExceeded",
+						LastUpdateTime: now,
+					},
+				},
+			},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "svc-pod",
+				Namespace: "ns",
+				Labels: map[string]string{
+					"app":              "oscar-svc-exp-svc",
+					types.ServiceLabel: "svc",
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						Name:         "sidecar",
+						RestartCount: 9,
+						State: corev1.ContainerState{
+							Waiting: &corev1.ContainerStateWaiting{Reason: "CrashLoopBackOff"},
+						},
+					},
+					{
+						Name:         types.ContainerName,
+						RestartCount: 5,
+						State: corev1.ContainerState{
+							Running: &corev1.ContainerStateRunning{},
+						},
+						LastTerminationState: corev1.ContainerState{
+							Terminated: &corev1.ContainerStateTerminated{ExitCode: 137, Reason: "OOMKilled"},
+						},
+					},
+				},
+			},
+		},
+	)
+
+	r := gin.Default()
+	r.GET("/system/services/:serviceName/deployment", MakeGetDeploymentStatusHandler(back, kubeClientset, &types.Config{}))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/system/services/svc/deployment", nil)
+	r.ServeHTTP(w, req)
+
+	var response types.ServiceDeploymentStatus
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.State != types.DeploymentStateFailed {
+		t.Fatalf("expected failed state, got %s", response.State)
+	}
+	if !strings.Contains(response.Reason, "CrashLoopBackOff") || strings.Contains(response.Reason, "ProgressDeadlineExceeded") {
+		t.Fatalf("expected crash loop reason, got %q", response.Reason)
+	}
+	if !strings.Contains(response.Reason, "exit code 137") {
+		t.Fatalf("expected reason from the main container, not the sidecar, got %q", response.Reason)
 	}
 }
 
@@ -972,6 +1056,203 @@ func TestMakeGetDeploymentLogsHandlerUnauthorized(t *testing.T) {
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMakeGetDeploymentLogsHandlerCrashLoopBackOff(t *testing.T) {
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name:      "svc",
+		Namespace: "ns",
+		Expose: types.Expose{
+			APIPort: []int{8080},
+		},
+	}
+
+	kubeClientset := testclient.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "svc-crash-pod",
+			Namespace: "ns",
+			Labels:    map[string]string{"app": "oscar-svc-exp-svc"},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name:         types.ContainerName,
+					RestartCount: 3,
+					State: corev1.ContainerState{
+						Waiting: &corev1.ContainerStateWaiting{Reason: "CrashLoopBackOff"},
+					},
+					LastTerminationState: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{
+							Reason:     "OOMKilled",
+							ExitCode:   137,
+							FinishedAt: metav1.Now(),
+						},
+					},
+				},
+			},
+		},
+	})
+
+	r := gin.Default()
+	r.GET("/system/services/:serviceName/deployment/logs", MakeGetDeploymentLogsHandler(back, kubeClientset, &types.Config{}))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/system/services/svc/deployment/logs", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var response types.DeploymentLogStream
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if !response.Available {
+		t.Fatalf("expected logs to be available, got %q", response.Message)
+	}
+	if len(response.Entries) != 1 {
+		t.Fatalf("expected a single previous log fetch (one entry from the fake client), got %+v", response.Entries)
+	}
+}
+
+func TestMakeGetDeploymentLogsHandlerNoRestarts(t *testing.T) {
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name:      "svc",
+		Namespace: "ns",
+		Expose: types.Expose{
+			APIPort: []int{8080},
+		},
+	}
+
+	kubeClientset := testclient.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "svc-ok-pod",
+			Namespace: "ns",
+			Labels:    map[string]string{"app": "oscar-svc-exp-svc"},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name:  types.ContainerName,
+					State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
+				},
+			},
+		},
+	})
+
+	r := gin.Default()
+	r.GET("/system/services/:serviceName/deployment/logs", MakeGetDeploymentLogsHandler(back, kubeClientset, &types.Config{}))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/system/services/svc/deployment/logs", nil)
+	r.ServeHTTP(w, req)
+
+	var response types.DeploymentLogStream
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(response.Entries) != 1 {
+		t.Fatalf("expected only current logs, got %+v", response.Entries)
+	}
+}
+
+func TestMakeGetDeploymentLogsHandlerRestartedNotCrashLooping(t *testing.T) {
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name:      "svc",
+		Namespace: "ns",
+		Expose: types.Expose{
+			APIPort: []int{8080},
+		},
+	}
+
+	kubeClientset := testclient.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "svc-restarted-pod",
+			Namespace: "ns",
+			Labels:    map[string]string{"app": "oscar-svc-exp-svc"},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name:         types.ContainerName,
+					RestartCount: 2,
+					State:        corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
+					LastTerminationState: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{Reason: "Error", ExitCode: 1},
+					},
+				},
+			},
+		},
+	})
+
+	r := gin.Default()
+	r.GET("/system/services/:serviceName/deployment/logs", MakeGetDeploymentLogsHandler(back, kubeClientset, &types.Config{}))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/system/services/svc/deployment/logs", nil)
+	r.ServeHTTP(w, req)
+
+	var response types.DeploymentLogStream
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(response.Entries) != 1 {
+		t.Fatalf("previous logs must only be fetched when crash-looping, got %+v", response.Entries)
+	}
+}
+
+func TestMakeGetDeploymentLogsHandlerManyRestartsRunning(t *testing.T) {
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name:      "svc",
+		Namespace: "ns",
+		Expose: types.Expose{
+			APIPort: []int{8080},
+		},
+	}
+
+	kubeClientset := testclient.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "svc-flapping-pod",
+			Namespace: "ns",
+			Labels:    map[string]string{"app": "oscar-svc-exp-svc"},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name:         types.ContainerName,
+					RestartCount: 5,
+					State:        corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
+					LastTerminationState: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{Reason: "OOMKilled", ExitCode: 137},
+					},
+				},
+			},
+		},
+	})
+
+	r := gin.Default()
+	r.GET("/system/services/:serviceName/deployment/logs", MakeGetDeploymentLogsHandler(back, kubeClientset, &types.Config{}))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/system/services/svc/deployment/logs", nil)
+	r.ServeHTTP(w, req)
+
+	var response types.DeploymentLogStream
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(response.Entries) != 2 {
+		t.Fatalf("expected current and previous logs for a container with more than 4 restarts, got %+v", response.Entries)
 	}
 }
 
