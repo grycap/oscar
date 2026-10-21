@@ -153,3 +153,22 @@ These are the steps:
 
     You can terminate the OSCAR cluster from the IM Dashboard:
     ![terminate](images/im-dashboard/im-dashboard-12.png)
+
+## Service endpoints and credentials
+
+After the infrastructure reaches the "configured" state, open its **Outputs**
+in the IM Dashboard for the endpoints of this deployment. Use the credentials
+you specified during deployment, rather than assuming a front-node address or
+default port:
+
+| Service | IM Dashboard output | Access |
+|---------|---------------------|--------|
+| OSCAR Dashboard | `local_oscarui_endpoint` | Username `oscar` and the OSCAR password specified during deployment. |
+| OSCAR Dashboard (with EGI Check-In) | `oscarui_endpoint` | The same username/password, or EGI Check-In for eligible users. |
+| MinIO API | `minio_endpoint` | Endpoint for programmatic access; use the MinIO password specified during deployment. |
+| MinIO web UI | `console_minio_endpoint` | Username `minio` and the MinIO password specified during deployment. |
+| Kubernetes Dashboard | `dashboard_endpoint` | The Kubernetes admin access token specified during deployment. |
+
+The Kubernetes API is not listed among these dashboard endpoints; do not
+assume that the Kubernetes Dashboard URL is also an API endpoint. Consult the
+deployed cluster's configuration for Kubernetes API access.

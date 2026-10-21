@@ -22,9 +22,8 @@ Follow the [deployment instructions](https://docs.oscar.grycap.net/deploy-im-das
 
 ## STEP 2: Log in the OSCAR UI
 
-Log in into the OSCAR UI using the
-[Default Service Endpoints](https://o-scar.readthedocs.io/en/latest/usage.html#default-service-endpoints)
-and access credentials.
+Log in to the OSCAR UI using the endpoint and credentials described in
+[Deployment with IM](https://docs.oscar.grycap.net/latest/deploy-im-dashboard/#service-endpoints-and-credentials).
 
 ![01-oscar-login.png](img/01-oscar-login.png)
 
@@ -131,8 +130,5 @@ Then, delete the bucket:
 ## STEP 8: Terminate the OSCAR Cluster
 
 You can terminate the Kubernetes cluster with the
-[EC3](https://github.com/grycap/ec3) command:
-
-```sh
-ec3 destroy <cluster-name>
-```
+[IM Dashboard](https://docs.oscar.grycap.net/latest/deploy-im-dashboard/)
+as described in the deployment instructions.
