@@ -17,7 +17,7 @@ limitations under the License.
 package resources
 
 import (
-	"log"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -26,9 +26,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// validMountOptsRe matches only safe characters for rclone mount flags.
-// Allows alphanumeric, dash, underscore, dot, colon, equals, comma, slash, and whitespace.
-var validMountOptsRe = regexp.MustCompile(`^[a-zA-Z0-9\-_.:=,/ ]+$`)
+var (
+	mountSizeRe     = regexp.MustCompile(`^[0-9]+[kKmMgGtT]?$`)
+	mountDurationRe = regexp.MustCompile(`^[0-9]+(ms|s|m|h)$`)
+)
 
 var (
 	// Don't restart jobs in order to keep logs
@@ -76,14 +77,64 @@ func addVolume(podSpec *v1.PodSpec) {
 	podSpec.Volumes = append(podSpec.Volumes, volumeshare)
 }
 
-// ValidateMountOpts sanitizes mount options to prevent shell injection.
-// Only allows characters valid for rclone CLI flags.
-func ValidateMountOpts(opts string) string {
-	if opts != "" && !validMountOptsRe.MatchString(opts) {
-		log.Printf("WARNING: mount options contain invalid characters, ignoring: %q", opts)
-		return ""
+// ParseMountOptions accepts only OSCAR's documented rclone mount tuning flags.
+// Return a canonical shell-safe string; neither unknown flags nor shell syntax
+// may reach the privileged mounting container.
+func ParseMountOptions(opts string) (string, error) {
+	if opts == "" {
+		return "", nil
 	}
-	return opts
+	// Do not allow quoting, shell metacharacters, tabs or line breaks. Only
+	// explicitly recognized flags and values are emitted below.
+	for _, c := range opts {
+		if !(c == ' ' || c == '-' || c == '=' || c >= '0' && c <= '9' ||
+			c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') {
+			return "", fmt.Errorf("mount options contain invalid characters")
+		}
+	}
+	fields := strings.Fields(opts)
+	if len(fields) == 0 {
+		return "", fmt.Errorf("mount options must not be whitespace only")
+	}
+	var parsed []string
+	for i := 0; i < len(fields); i++ {
+		flag, value, hasEquals := strings.Cut(fields[i], "=")
+		var validValue *regexp.Regexp
+		switch flag {
+		case "--buffer-size", "--vfs-read-chunk-size", "--vfs-cache-max-size":
+			validValue = mountSizeRe
+		case "--dir-cache-time", "--timeout":
+			validValue = mountDurationRe
+		case "--read-only", "--no-checksum":
+			if hasEquals {
+				return "", fmt.Errorf("mount option %s does not accept a value", flag)
+			}
+			parsed = append(parsed, flag)
+			continue
+		default:
+			return "", fmt.Errorf("unsupported mount option %q", flag)
+		}
+		if !hasEquals {
+			i++
+			if i == len(fields) {
+				return "", fmt.Errorf("mount option %s requires a value", flag)
+			}
+			value = fields[i]
+		}
+		if !validValue.MatchString(value) {
+			return "", fmt.Errorf("invalid value for mount option %s", flag)
+		}
+		parsed = append(parsed, flag, value)
+	}
+	return strings.Join(parsed, " "), nil
+}
+
+// ValidateMountOpts drops all custom options for legacy stored definitions
+// that no longer pass the allowlist. API create/update use ParseMountOptions
+// and reject invalid definitions before any external mutation.
+func ValidateMountOpts(opts string) string {
+	parsed, _ := ParseMountOptions(opts)
+	return parsed
 }
 
 func sidecarPodSpec(service types.Service, cfg *types.Config) v1.Container {
