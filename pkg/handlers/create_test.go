@@ -893,6 +893,15 @@ func TestValidateServiceCreation(t *testing.T) {
 		wantErr bool
 	}{
 		{
+			name: "documented notebook mount options",
+			service: types.Service{
+				Name: "notebook", Image: "img", CPU: "0.2", Script: "echo test",
+				Visibility: types.PUBLIC, IsolationLevel: types.IsolationLevelService,
+				Mount: types.StorageIOConfig{Provider: "minio.default", Path: "/notebook", Options: "--buffer-size 128M --vfs-read-chunk-size 64M"},
+			},
+			cfg: cfg,
+		},
+		{
 			name: "valid non-kserve service",
 			service: types.Service{
 				Name:           "svc",

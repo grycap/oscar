@@ -814,8 +814,8 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	}
 
 	if service.Mount.Provider != "" {
-		if resources.ValidateMountOpts(service.Mount.Options) == "" && service.Mount.Options != "" {
-			return nil, fmt.Errorf("mount options contain invalid characters")
+		if _, err := resources.ParseMountOptions(service.Mount.Options); err != nil {
+			return nil, err
 		}
 		provID, provName = getProviderInfo(service.Mount.Provider)
 		if provName == types.MinIOName {
@@ -1060,8 +1060,19 @@ func validateServiceCreation(service *types.Service, cfg *types.Config) error {
 	if err := service.Validate(); err != nil {
 		return err
 	}
+	if err := validateServiceMountOptions(service); err != nil {
+		return err
+	}
 	if service.IsKserve() && !utils.IsKserveSupported(cfg) {
 		return fmt.Errorf("KServe is not supported in this OSCAR deployment")
 	}
 	return nil
+}
+
+func validateServiceMountOptions(service *types.Service) error {
+	if service.Mount.Provider == "" && service.Mount.Options != "" {
+		return fmt.Errorf("mount options require a mount storage provider")
+	}
+	_, err := resources.ParseMountOptions(service.Mount.Options)
+	return err
 }
