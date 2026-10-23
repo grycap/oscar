@@ -4,17 +4,18 @@ on:
   push:
     branches:
       - master
-
+  workflow_dispatch:
+    inputs:
+      confirm_execution:
+        description: 'Do you want to execute this workflow?'
+        required: true
+        type: boolean
+        default: false
 
 jobs:
-  approve:
-    runs-on: ubuntu-22.04
-    environment: docs-approval
-    steps:
-      - name: Despliegue aprobado
-        run: echo "Despliegue de documentación aprobado"
+
   deploy:
-    needs: approve
+    if: ${{ inputs.confirm_execution }}
     uses: ./.github/workflows/mkdocs_common.yaml
     permissions:
       contents: write
