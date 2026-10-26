@@ -182,12 +182,13 @@ func getPod(kubeClientset kubernetes.Interface, serviceNamespace string, jobName
 
 // MakeDeleteJobsHandler godoc
 // @Summary Delete jobs
-// @Description Delete jobs created by the provided service. If `all` is true pending, running and failed jobs are also removed.
+// @Description Delete jobs created by the provided service. If `all` is true pending, running and failed jobs are also removed. Bearer users other than the service owner or an admin user may only delete the jobs they themselves created.
 // @Tags logs
 // @Param serviceName path string true "Service name"
 // @Param all query bool false "Delete running and failed jobs as well"
 // @Success 204 {string} string "No Content"
 // @Failure 401 {string} string "Unauthorized"
+// @Failure 403 {string} string "Forbidden"
 // @Failure 404 {string} string "Not Found"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
@@ -203,6 +204,16 @@ func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset kubernete
 		}
 		serviceNamespace := resolveServiceNamespace(service, cfg)
 
+		// Service visibility does not grant deletion rights: Bearer users
+		// other than the service owner or an admin user may only delete the
+		// jobs they themselves created (see jobDeletionRights).
+		full, owner := jobDeletionRights(c, cfg, service)
+		if !full && owner == "" {
+			// Scoped but no resolvable UID: fail closed
+			c.String(http.StatusForbidden, "You do not have permission to delete jobs for this service")
+			return
+		}
+
 		// Get timestamps querystring (default to false)
 		all, err := strconv.ParseBool(c.DefaultQuery("all", "false"))
 		if err != nil {
@@ -210,8 +221,12 @@ func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset kubernete
 		}
 
 		// Delete jobs
+		labelSelector := fmt.Sprintf("%s=%s", types.ServiceLabel, serviceName)
+		if !full {
+			labelSelector += fmt.Sprintf(",%s=%s", types.JobOwnerExecutionAnnotation, owner)
+		}
 		listOpts := metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s", types.ServiceLabel, serviceName),
+			LabelSelector: labelSelector,
 		}
 
 		if !all {
@@ -499,12 +514,13 @@ func parseExecutionLogs(raw string) []executionLogEntry {
 // MakeDeleteJobHandler makes a handler for removing a job
 // MakeDeleteJobHandler godoc
 // @Summary Delete job
-// @Description Delete a specific job and its pod.
+// @Description Delete a specific job and its pod. Bearer users other than the service owner or an admin user may only delete the jobs they themselves created.
 // @Tags logs
 // @Param serviceName path string true "Service name"
 // @Param jobName path string true "Job name"
 // @Success 204 {string} string "No Content"
 // @Failure 401 {string} string "Unauthorized"
+// @Failure 403 {string} string "Forbidden"
 // @Failure 404 {string} string "Not Found"
 // @Failure 500 {string} string "Internal Server Error"
 // @Security BasicAuth
@@ -538,6 +554,16 @@ func MakeDeleteJobHandler(back types.ServerlessBackend, kubeClientset kubernetes
 		if job.Labels[types.ServiceLabel] != serviceName {
 			c.Status(http.StatusNotFound)
 			return
+		}
+
+		// Service visibility does not grant deletion rights: a shared
+		// service must not let a reader delete other users' executions.
+		full, owner := jobDeletionRights(c, cfg, service)
+		if !full {
+			if owner == "" || job.Labels[types.JobOwnerExecutionAnnotation] != owner {
+				c.String(http.StatusForbidden, "You do not have permission to delete this job")
+				return
+			}
 		}
 
 		// Create DeleteOptions and configure PropagationPolicy for deleting associated pods in background
@@ -578,6 +604,36 @@ func getAuthorizedService(c *gin.Context, back types.ServerlessBackend, serviceN
 	}
 
 	return service, true
+}
+
+// jobDeletionRights separates visibility from destructive rights on a
+// service's executions. Returning full=true grants deletion of any job of
+// the service; returning full=false scopes deletion to jobs created by the
+// identified caller, whose owning is recorded in each job's
+// types.JobOwnerExecutionAnnotation label.
+//
+// Basic/system callers keep the legacy behavior (full deletion rights).
+// For Bearer users, the service owner and admin users (cfg.UsersAdmin)
+// keep full deletion rights; any other authorized (e.g. shared) user is
+// restricted to self-service deletion of its own executions.
+func jobDeletionRights(c *gin.Context, cfg *types.Config, service *types.Service) (full bool, owner string) {
+	authHeader := c.GetHeader("Authorization")
+	if len(strings.Split(authHeader, "Bearer")) > 1 {
+		uid, err := auth.GetUIDFromContext(c)
+		if err != nil {
+			// Scoped user without a resolvable UID: fail closed
+			return false, ""
+		}
+		if uid == service.Owner || slices.Contains(cfg.UsersAdmin, uid) {
+			return true, ""
+		}
+		uidFormatted := auth.FormatUID(uid)
+		if len(uidFormatted) > 62 {
+			uidFormatted = uidFormatted[:62]
+		}
+		return false, uidFormatted
+	}
+	return true, ""
 }
 
 func authorizeRequest(c *gin.Context, service *types.Service) bool {

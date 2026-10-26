@@ -17,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	testclient "k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 func TestMakeJobsInfoHandler(t *testing.T) {
@@ -388,5 +389,208 @@ func TestParseExecutionLogs(t *testing.T) {
 	}
 	if second.Path != "/job/simple-test" || second.Status != 201 {
 		t.Fatalf("unexpected second entry: %+v", second)
+	}
+}
+
+// TestMakeDeleteJobHandlerDeniesOtherUserJobs checks that a Bearer user with
+// visibility over a shared job, a visibility that is not the service's
+// owner (the job does not belong to the caller), cannot delete the job.
+func TestMakeDeleteJobHandlerDeniesOtherUserJobs(t *testing.T) {
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Visibility: types.PUBLIC,
+		Owner:      "owner@example.org",
+	}
+	cfg := types.Config{
+		JobListingLimit:   70,
+		ServicesNamespace: "namespace",
+	}
+	K8sObjects := []runtime.Object{
+		&batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "job",
+				Namespace: "namespace",
+				Labels: map[string]string{
+					types.ServiceLabel:                "test",
+					types.JobOwnerExecutionAnnotation: "stranger",
+				},
+			},
+		},
+	}
+	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
+
+	r := gin.Default()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "other@example.org")
+		c.Next()
+	})
+	r.DELETE("/system/logs/:serviceName/:jobName", MakeDeleteJobHandler(back, kubeClientset, &cfg))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", "/system/logs/test/job", nil)
+	req.Header.Set("Authorization", "Bearer 11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		fmt.Println(w.Body)
+		t.Errorf("expecting code %d, got %d", http.StatusForbidden, w.Code)
+	}
+
+	// Jobs of other users must not be deleted: no delete action must have occurred
+	for _, action := range kubeClientset.Actions() {
+		if action.GetVerb() == "delete" || action.GetVerb() == "delete-collection" {
+			t.Errorf("deletion action must not have occurred: %s %s", action.GetVerb(), action.GetResource().Resource)
+		}
+	}
+}
+
+// TestMakeDeleteJobHandlerAllowsOwnJob checks that a Bearer user can
+// delete jobs it created itself even when it is not the service's owner
+// (visibility only).
+func TestMakeDeleteJobHandlerAllowsOwnJob(t *testing.T) {
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Visibility: types.PUBLIC,
+		Owner:      "owner@example.org",
+	}
+	cfg := types.Config{
+		JobListingLimit:   70,
+		ServicesNamespace: "namespace",
+	}
+	K8sObjects := []runtime.Object{
+		&batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "job",
+				Namespace: "namespace",
+				Labels: map[string]string{
+					types.ServiceLabel:                "test",
+					types.JobOwnerExecutionAnnotation: "other",
+				},
+			},
+		},
+	}
+	kubeClientset := testclient.NewSimpleClientset(K8sObjects...)
+
+	r := gin.Default()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "other@example.org")
+		c.Next()
+	})
+	r.DELETE("/system/logs/:serviceName/:jobName", MakeDeleteJobHandler(back, kubeClientset, &cfg))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", "/system/logs/test/job", nil)
+	req.Header.Set("Authorization", "Bearer 11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNoContent {
+		fmt.Println(w.Body)
+		t.Errorf("expecting code %d, got %d", http.StatusNoContent, w.Code)
+	}
+
+	actions := kubeClientset.Actions()
+	if len(actions) != 2 {
+		t.Fatalf("expecting 2 actions, got %d", len(actions))
+	}
+
+	if actions[0].GetVerb() != "get" || actions[0].GetResource().Resource != "jobs" {
+		t.Errorf("expecting get jobs, got %s %s", actions[0].GetVerb(), actions[0].GetResource().Resource)
+	}
+
+	if actions[1].GetVerb() != "delete" || actions[1].GetResource().Resource != "jobs" {
+		t.Errorf("expecting delete jobs, got %s %s", actions[1].GetVerb(), actions[1].GetResource().Resource)
+	}
+}
+
+func assertDeleteCollectionSelector(t *testing.T, actions []k8stesting.Action, serviceName string, serviceOwner string) {
+	t.Helper()
+	if len(actions) != 1 {
+		t.Fatalf("expecting 1 action, got %d", len(actions))
+	}
+	dc, ok := actions[0].(k8stesting.DeleteCollectionActionImpl)
+	if !ok {
+		t.Fatalf("expecting a DeleteCollection action, got %T", actions[0])
+	}
+	if dc.GetResource().Resource != "jobs" {
+		t.Errorf("expecting delete-collection on jobs, got %s", dc.GetResource().Resource)
+	}
+	expected := fmt.Sprintf("%s=%s,%s=%s", types.ServiceLabel, serviceName, types.JobOwnerExecutionAnnotation, serviceOwner)
+	if got := dc.ListOptions.LabelSelector; got != expected {
+		t.Errorf("expecting selector %q, got %q", expected, got)
+	}
+}
+
+// TestMakeDeleteJobsHandlerOwnersLimitsToCallerJobs checks that a Bearer user
+// other than the service owner only deletes jobs it has created,
+// by scoping the DeleteCollection to its own uid.
+func TestMakeDeleteJobsHandlerOwnersLimitsToCallerJobs(t *testing.T) {
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Visibility: types.PUBLIC,
+		Owner:      "owner@example.org",
+	}
+	cfg := types.Config{
+		JobListingLimit:   70,
+		ServicesNamespace: "namespace",
+	}
+	kubeClientset := testclient.NewSimpleClientset()
+
+	r := gin.Default()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "other@example.org")
+		c.Next()
+	})
+	r.DELETE("/system/logs/:serviceName", MakeDeleteJobsHandler(back, kubeClientset, &cfg))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", "/system/logs/test", nil)
+	req.Header.Set("Authorization", "Bearer 11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNoContent {
+		fmt.Println(w.Body)
+		t.Errorf("expecting code %d, got %d", http.StatusNoContent, w.Code)
+	}
+
+	assertDeleteCollectionSelector(t, kubeClientset.Actions(), "test", "other")
+}
+
+// TestMakeDeleteJobsHandlerNoBearerDoesNotLimit checks that in the absence of a
+// Bearer token (basic/system authentication), the deletion is not limited
+// to the caller's jobs, as before.
+func TestMakeDeleteJobsHandlerNoBearerDoesNotLimit(t *testing.T) {
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Visibility: types.PUBLIC,
+		Owner:      "owner@example.org",
+	}
+	cfg := types.Config{
+		JobListingLimit:   70,
+		ServicesNamespace: "namespace",
+	}
+	kubeClientset := testclient.NewSimpleClientset()
+
+	r := gin.Default()
+	r.DELETE("/system/logs/:serviceName", MakeDeleteJobsHandler(back, kubeClientset, &cfg))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", "/system/logs/test", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNoContent {
+		fmt.Println(w.Body)
+		t.Errorf("expecting code %d, got %d", http.StatusNoContent, w.Code)
+	}
+
+	if len(kubeClientset.Actions()) != 1 {
+		t.Fatalf("expecting 1 action, got %d", len(kubeClientset.Actions()))
+	}
+	dc, ok := kubeClientset.Actions()[0].(k8stesting.DeleteCollectionAction)
+	if !ok {
+		t.Fatalf("expecting a DeleteCollection action, got %T", kubeClientset.Actions()[0])
+	}
+	expected := fmt.Sprintf("%s=test", types.ServiceLabel)
+	if got := dc.GetListRestrictions().Labels.String(); got != expected {
+		t.Errorf("expecting selector %q, got %q", expected, got)
 	}
 }
