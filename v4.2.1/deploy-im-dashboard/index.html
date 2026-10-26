@@ -14,7 +14,7 @@
         <link rel="prev" href="../local-testing/">
       
       
-        <link rel="next" href="../deploy-ec3/">
+        <link rel="next" href="../deploy-helm/">
       
       
         
@@ -460,6 +460,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment with IM
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -477,34 +495,36 @@
 
       </a>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../deploy-ec3/" class="md-nav__link">
         
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
   
   
-  <span class="md-ellipsis">
+  
     
   
-    Deployment with EC3
   
-
-    
-  </span>
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#service-endpoints-and-credentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Service endpoints and credentials
+      
+    </span>
+  </a>
   
+</li>
+      
+    </ul>
   
-
-      </a>
+</nav>
+      
     </li>
   
 
@@ -829,90 +849,6 @@
     
   
     OSCAR API
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../minio-usage/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    MinIO
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../rustfs-usage/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    RustFS
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../silo-usage/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Silo
   
 
     
@@ -1475,6 +1411,145 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_7" id="__nav_7_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage providers
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Storage providers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../minio-usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MinIO
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rustfs-usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RustFS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../silo-usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Silo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -2247,6 +2322,50 @@ deployment time.
 <img alt="terminate" src="../images/im-dashboard/im-dashboard-12.png" /></p>
 </li>
 </ol>
+<h2 id="service-endpoints-and-credentials">Service endpoints and credentials</h2>
+<p>After the infrastructure reaches the "configured" state, open its <strong>Outputs</strong>
+in the IM Dashboard for the endpoints of this deployment. Use the credentials
+you specified during deployment, rather than assuming a front-node address or
+default port:</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>IM Dashboard output</th>
+<th>Access</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OSCAR Dashboard</td>
+<td><code>local_oscarui_endpoint</code></td>
+<td>Username <code>oscar</code> and the OSCAR password specified during deployment.</td>
+</tr>
+<tr>
+<td>OSCAR Dashboard (with EGI Check-In)</td>
+<td><code>oscarui_endpoint</code></td>
+<td>The same username/password, or EGI Check-In for eligible users.</td>
+</tr>
+<tr>
+<td>MinIO API</td>
+<td><code>minio_endpoint</code></td>
+<td>Endpoint for programmatic access; use the MinIO password specified during deployment.</td>
+</tr>
+<tr>
+<td>MinIO web UI</td>
+<td><code>console_minio_endpoint</code></td>
+<td>Username <code>minio</code> and the MinIO password specified during deployment.</td>
+</tr>
+<tr>
+<td>Kubernetes Dashboard</td>
+<td><code>dashboard_endpoint</code></td>
+<td>The Kubernetes admin access token specified during deployment.</td>
+</tr>
+</tbody>
+</table>
+<p>The Kubernetes API is not listed among these dashboard endpoints; do not
+assume that the Kubernetes Dashboard URL is also an API endpoint. Consult the
+deployed cluster's configuration for Kubernetes API access.</p>
 
 
 
