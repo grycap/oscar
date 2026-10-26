@@ -2,7 +2,7 @@ name: mkdocs Release
 
 on:
   release:
-    types: [created]
+    types: [created, updated]
 
 
 jobs:
