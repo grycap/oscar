@@ -1,21 +1,20 @@
 name: mkdocs Master Push
-
+ 
 on:
   push:
     branches:
       - master
-  workflow_dispatch:
-    inputs:
-      confirm_execution:
-        description: 'Do you want to execute this workflow?'
-        required: true
-        type: boolean
-        default: false
-
+ 
+ 
 jobs:
-
+  approve:
+    runs-on: ubuntu-22.04
+    environment: docs-approval
+    steps:
+      - name: Deployment approved
+        run: echo "Documentation deployment approved"
   deploy:
-    if: ${{ inputs.confirm_execution }}
+    needs: approve
     uses: ./.github/workflows/mkdocs_common.yaml
     permissions:
       contents: write
