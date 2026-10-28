@@ -318,7 +318,7 @@ func (m ModelServing) GetKueueResourceList(service *Service) (corev1.ResourceLis
 	return m.Spec.getKueueResourceList(service)
 }
 
-func (m ModelServing) UpdateModelServingService(service *Service, oldService *Service, namespace string) error {
+func (m *ModelServing) UpdateModelServingService(service *Service, oldService *Service, namespace string) error {
 	if m.Spec == nil {
 		return fmt.Errorf("model serving backend is nil")
 	}
@@ -338,7 +338,7 @@ func (m ModelServing) UpdateModelServingService(service *Service, oldService *Se
 	return m.Spec.updateModelServingService(service, oldService, namespace)
 }
 
-func (m ModelServing) CreateModelServingService(service *Service, knativeService *knv1.Service, cfg *Config) error {
+func (m *ModelServing) CreateModelServingService(service *Service, knativeService *knv1.Service, cfg *Config) error {
 	if m.Spec == nil {
 		return fmt.Errorf("model serving backend is nil")
 	}
@@ -351,7 +351,7 @@ func (m ModelServing) CreateModelServingService(service *Service, knativeService
 	return m.Spec.createModelServingService(service, knativeService, cfg)
 }
 
-func (m ModelServing) DeleteModelServingService(service *Service, namespace string) error {
+func (m *ModelServing) DeleteModelServingService(service *Service, namespace string) error {
 	if m.Spec == nil {
 		return fmt.Errorf("model serving backend is nil")
 	}
