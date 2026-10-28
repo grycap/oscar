@@ -389,13 +389,13 @@ func ListExposedServicePods(kubeClientset kubernetes.Interface, namespace, servi
 	})
 }
 
-func GetKserveServiceDeployment(kubeClientset kubernetes.Interface, namespace, serviceName, kserveType string) (*appsv1.Deployment, error) {
-	return kubeClientset.AppsV1().Deployments(namespace).Get(context.TODO(), utils.GetKservePodAndDplName(serviceName, kserveType), metav1.GetOptions{})
+func GetModelServingServiceDeployment(kubeClientset kubernetes.Interface, namespace, podAndDplName string) (*appsv1.Deployment, error) {
+	return kubeClientset.AppsV1().Deployments(namespace).Get(context.TODO(), podAndDplName, metav1.GetOptions{})
 }
 
-func ListKserveServicePods(kubeClientset kubernetes.Interface, namespace, serviceName string) (*v1.PodList, error) {
+func ListModelServingServicePods(kubeClientset kubernetes.Interface, namespace, labelSelector string) (*v1.PodList, error) {
 	return kubeClientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: utils.GetKserveLabelSelector(serviceName),
+		LabelSelector: labelSelector,
 	})
 }
 
