@@ -289,3 +289,45 @@ func TestModelServingCheckIfIsPartOfService(t *testing.T) {
 		t.Error("service must not be modified")
 	}
 }
+
+func TestModelServingServiceMethodsCheckServiceMembership(t *testing.T) {
+	tests := []struct {
+		name string
+		call func(*ModelServing, *Service) error
+	}{
+		{
+			name: "create",
+			call: func(ms *ModelServing, service *Service) error {
+				return ms.CreateModelServingService(service, nil, &Config{})
+			},
+		},
+		{
+			name: "update",
+			call: func(ms *ModelServing, service *Service) error {
+				return ms.UpdateModelServingService(service, nil, "")
+			},
+		},
+		{
+			name: "delete",
+			call: func(ms *ModelServing, service *Service) error {
+				return ms.DeleteModelServingService(service, "")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ms := &ModelServing{Spec: &fakeServingSpec{}}
+			service := &Service{ModelServing: &ModelServing{Spec: &fakeServingSpec{}}}
+
+			defer func() {
+				got := recover()
+				if got != "the ModelServing service is not part of the provided Service object" {
+					t.Errorf("panic = %v, want membership validation panic", got)
+				}
+			}()
+			_ = tt.call(ms, service)
+			t.Fatal("expected membership validation panic")
+		})
+	}
+}
