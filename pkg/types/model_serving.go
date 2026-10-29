@@ -345,8 +345,7 @@ func (m *ModelServing) UpdateModelServingService(service *Service, oldService *S
 		return fmt.Errorf("invalid ModelServing service update: %v", err)
 	}
 
-	if m.Equal(*oldService.ModelServing) {
-		// No changes in the ModelServing spec, no need to update the service.
+	if !modelServingNeedUpdate(oldService, service) {
 		return nil
 	}
 
@@ -395,4 +394,12 @@ func (m ModelServing) IsTypeSupportedByOSCAR(cfg *Config) bool {
 	default:
 		return false
 	}
+}
+
+// modelServingNeedUpdate checks if the ModelServing service needs to be updated based on the differences between the old and new Service objects.
+// The update is needed if there where changes in ModelServing configuration, dedicated resources (CPU, GPU, Memory) or environment variables.
+func modelServingNeedUpdate(old, new *Service) bool {
+	return old.CPU != new.CPU || old.EnableGPU != new.EnableGPU || old.Memory != new.Memory ||
+		!reflect.DeepEqual(old.Environment.Vars, new.Environment.Vars) ||
+		!old.ModelServing.Equal(*new.ModelServing)
 }

@@ -259,6 +259,88 @@ func TestModelServingEqualDeepComparison(t *testing.T) {
 	}
 }
 
+func TestModelServingNeedUpdate(t *testing.T) {
+	newInferenceService := func() *Service {
+		service := &Service{
+			CPU:    "1",
+			Memory: "1Gi",
+			ModelServing: &ModelServing{Spec: &KserveInference{
+				ModelFormat: "sklearn",
+				RuntimeImage: "runtime:v1",
+				APIVersion:   "v1",
+				Source:       "s3://models/inference",
+				MinScale:     1,
+				MaxScale:     2,
+				Args:         []string{"--workers=1"},
+				SetAuth:      true,
+			}},
+			Labels: map[string]string{"kueue.x-k8s.io/queue-name": "queue-a"},
+		}
+		service.Environment.Vars = map[string]string{"MODEL_MODE": "test"}
+		service.Environment.Secrets = map[string]string{"TOKEN": "secret"}
+		return service
+	}
+	newLLMService := func() *Service {
+		service := &Service{
+			CPU:    "1",
+			Memory: "1Gi",
+			ModelServing: &ModelServing{Spec: &KserveLLMInference{
+				RuntimeImage: "runtime:v1",
+				Source:       "s3://models/llm",
+				MinScale:     1,
+				MaxScale:     2,
+				Args:         []string{"--workers=1"},
+				SetAuth:      true,
+			}},
+		}
+		service.Environment.Vars = map[string]string{"MODEL_MODE": "test"}
+		return service
+	}
+
+	tests := []struct {
+		name       string
+		newService func() *Service
+		mutate     func(*Service)
+		want       bool
+	}{
+		{name: "unchanged inference service", newService: newInferenceService},
+		{name: "CPU change", newService: newInferenceService, mutate: func(s *Service) { s.CPU = "2" }, want: true},
+		{name: "memory change", newService: newInferenceService, mutate: func(s *Service) { s.Memory = "2Gi" }, want: true},
+		{name: "GPU change", newService: newInferenceService, mutate: func(s *Service) { s.EnableGPU = true }, want: true},
+		{name: "environment variable change", newService: newInferenceService, mutate: func(s *Service) { s.Environment.Vars["MODEL_MODE"] = "production" }, want: true},
+		{name: "inference model format change", newService: newInferenceService, mutate: func(s *Service) { s.ModelServing.Inference().ModelFormat = "onnx" }, want: true},
+		{name: "inference runtime change", newService: newInferenceService, mutate: func(s *Service) { s.ModelServing.Inference().RuntimeImage = "runtime:v2" }, want: true},
+		{name: "inference API version change", newService: newInferenceService, mutate: func(s *Service) { s.ModelServing.Inference().APIVersion = "v2" }, want: true},
+		{name: "inference source change", newService: newInferenceService, mutate: func(s *Service) { s.ModelServing.Inference().Source = "s3://models/updated" }, want: true},
+		{name: "inference minimum scale change", newService: newInferenceService, mutate: func(s *Service) { s.ModelServing.Inference().MinScale = 2 }, want: true},
+		{name: "inference maximum scale change", newService: newInferenceService, mutate: func(s *Service) { s.ModelServing.Inference().MaxScale = 3 }, want: true},
+		{name: "inference arguments change", newService: newInferenceService, mutate: func(s *Service) { s.ModelServing.Inference().Args[0] = "--workers=2" }, want: true},
+		{name: "inference authentication change", newService: newInferenceService, mutate: func(s *Service) { s.ModelServing.Inference().SetAuth = false }, want: true},
+		{name: "LLM source change", newService: newLLMService, mutate: func(s *Service) { s.ModelServing.LLMInference().Source = "s3://models/updated" }, want: true},
+		{name: "LLM runtime change", newService: newLLMService, mutate: func(s *Service) { s.ModelServing.LLMInference().RuntimeImage = "runtime:v2" }, want: true},
+		{name: "LLM minimum scale change", newService: newLLMService, mutate: func(s *Service) { s.ModelServing.LLMInference().MinScale = 2 }, want: true},
+		{name: "LLM maximum scale change", newService: newLLMService, mutate: func(s *Service) { s.ModelServing.LLMInference().MaxScale = 3 }, want: true},
+		{name: "LLM arguments change", newService: newLLMService, mutate: func(s *Service) { s.ModelServing.LLMInference().Args[0] = "--workers=2" }, want: true},
+		{name: "LLM authentication change", newService: newLLMService, mutate: func(s *Service) { s.ModelServing.LLMInference().SetAuth = false }, want: true},
+		{name: "environment secret change is not applied to KServe", newService: newInferenceService, mutate: func(s *Service) { s.Environment.Secrets["TOKEN"] = "new-secret" }},
+		{name: "queue label change is not applied to KServe", newService: newInferenceService, mutate: func(s *Service) { s.Labels["kueue.x-k8s.io/queue-name"] = "queue-b" }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oldService := tt.newService()
+			newService := tt.newService()
+			if tt.mutate != nil {
+				tt.mutate(newService)
+			}
+
+			if got := modelServingNeedUpdate(oldService, newService); got != tt.want {
+				t.Errorf("modelServingNeedUpdate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestModelServingIsTypeSupportedByOSCAR(t *testing.T) {
 	tests := []struct {
 		name string
