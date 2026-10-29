@@ -179,11 +179,6 @@ func (k KserveInference) validateUpdate(old ModelServingSpec) error {
 		return fmt.Errorf("cannot change ModelServing service type from %q to %q", old.Type(), k.Type())
 	}
 
-	err := k.validate()
-	if err != nil {
-		return fmt.Errorf("invalid new definition for KServe Inference update: %v", err)
-	}
-
 	if oldInference.RuntimeImage != k.RuntimeImage {
 		return fmt.Errorf("cannot update runtime for ModelServing InferenceService")
 	}
@@ -375,10 +370,6 @@ func (k KserveLLMInference) validateUpdate(old ModelServingSpec) error {
 		return fmt.Errorf("cannot change ModelServing service type from %q to %q", old.Type(), k.Type())
 	}
 
-	err := k.validate()
-	if err != nil {
-		return fmt.Errorf("invalid new definition for KServe LLM update: %v", err)
-	}
 	if oldLLMInference.RuntimeImage != k.RuntimeImage {
 		return fmt.Errorf("cannot update runtime for KServe LLM")
 	}

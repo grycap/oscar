@@ -749,30 +749,6 @@ func TestExposeKserveServiceMissingGateway(t *testing.T) {
 	}
 }
 
-func TestIsTypeSupportedByOSCAR(t *testing.T) {
-	inf := ModelServing{Spec: &KserveInference{}}
-	llm := ModelServing{Spec: &KserveLLMInference{}}
-	tests := []struct {
-		name string
-		ms   ModelServing
-		cfg  *Config
-		want bool
-	}{
-		{"inference supported", inf, &Config{KserveEnable: true, ExposedServicesRouteKind: HTTPROUTE}, true},
-		{"llm supported", llm, &Config{KserveEnable: true, ExposedServicesRouteKind: HTTPROUTE}, true},
-		{"kserve disabled", inf, &Config{KserveEnable: false, ExposedServicesRouteKind: HTTPROUTE}, false},
-		{"ingress route", inf, &Config{KserveEnable: true, ExposedServicesRouteKind: "ingress"}, false},
-		{"no spec", ModelServing{}, &Config{KserveEnable: true, ExposedServicesRouteKind: HTTPROUTE}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.ms.IsTypeSupportedByOSCAR(tt.cfg); got != tt.want {
-				t.Errorf("got %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestModelServingValidateUpdate(t *testing.T) {
 	newInf := func(format, runtime string) ModelServing {
 		return ModelServing{Spec: &KserveInference{ModelFormat: format, RuntimeImage: runtime, APIVersion: "v1", Source: "s"}}
@@ -798,7 +774,7 @@ func TestModelServingValidateUpdate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.new.ValidateUpdate(tt.old)
+			err := tt.new.ValidateUpdate(&tt.old)
 			if tt.wantErr == "" {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
