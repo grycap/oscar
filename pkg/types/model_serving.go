@@ -244,16 +244,26 @@ func (m ModelServing) Validate() error {
 }
 
 func (m ModelServing) ValidateUpdate(old *ModelServing) error {
+	if m.Spec == nil {
+		return ErrModelServingTypeInvalid
+	}
+
 	newType := m.GetType()
 	oldType := old.GetType()
 	if oldType != newType {
 		return fmt.Errorf("cannot change ModelServing service type from %q to %q", oldType, newType)
 	}
-	if m.Spec == nil {
-		return ErrModelServingTypeInvalid
-	}
+
 	if err := m.Validate(); err != nil {
 		return fmt.Errorf("invalid ModelServing service: %v", err)
+	}
+
+	// Check if the authentication setting has changed
+	// The same type of ModelServing have same interface, so we can safely assert the type to ModelServingAuthSpec
+	newAuth, _ := m.GetAuth()
+	oldAuth, _ := old.GetAuth()
+	if newAuth != oldAuth {
+		return fmt.Errorf("cannot change ModelServing service authentication")
 	}
 
 	return m.Spec.validateUpdate(old.Spec)
@@ -333,6 +343,11 @@ func (m *ModelServing) UpdateModelServingService(service *Service, oldService *S
 
 	if err := m.ValidateUpdate(oldService.ModelServing); err != nil {
 		return fmt.Errorf("invalid ModelServing service update: %v", err)
+	}
+
+	if m.Equal(*oldService.ModelServing) {
+		// No changes in the ModelServing spec, no need to update the service.
+		return nil
 	}
 
 	return m.Spec.updateModelServingService(service, oldService, namespace)
