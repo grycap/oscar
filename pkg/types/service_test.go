@@ -176,6 +176,110 @@ func TestGetObjectStorageWebhookARN(t *testing.T) {
 	}
 }
 
+func TestServiceValidateUpdate(t *testing.T) {
+	validInference := func() *ModelServing {
+		return &ModelServing{Spec: &KserveInference{
+			ModelFormat: "onnx",
+			Source:      "s3://model",
+			APIVersion:  "v1",
+		}}
+	}
+	validService := func() *Service {
+		return &Service{
+			Name:           "svc",
+			CPU:            "0.2",
+			Visibility:     PRIVATE,
+			IsolationLevel: IsolationLevelService,
+			Image:          "example/image",
+		}
+	}
+
+	tests := []struct {
+		name        string
+		newService  func() *Service
+		oldService  func() *Service
+		wantErrText string
+	}{
+		{
+			name: "service name cannot change",
+			newService: func() *Service {
+				service := validService()
+				service.Name = "changed"
+				return service
+			},
+			oldService:  validService,
+			wantErrText: "service name cannot be changed",
+		},
+		{
+			name: "invalid new service",
+			newService: func() *Service {
+				service := validService()
+				service.Image = ""
+				return service
+			},
+			oldService:  validService,
+			wantErrText: "invalid new service definition: service Image is required",
+		},
+		{
+			name: "cannot convert a regular service to ModelServing",
+			newService: func() *Service {
+				service := validService()
+				service.ModelServing = validInference()
+				return service
+			},
+			oldService:  validService,
+			wantErrText: "cannot change service type to ModelServing",
+		},
+		{
+			name: "cannot change ModelServing type",
+			newService: func() *Service {
+				service := validService()
+				service.ModelServing = &ModelServing{Spec: &KserveLLMInference{Source: "hf://model"}}
+				return service
+			},
+			oldService: func() *Service {
+				service := validService()
+				service.ModelServing = validInference()
+				return service
+			},
+			wantErrText: `cannot change ModelServing service type from "inference" to "llm_inference"`,
+		},
+		{
+			name: "valid ModelServing update",
+			newService: func() *Service {
+				service := validService()
+				service.ModelServing = validInference()
+				return service
+			},
+			oldService: func() *Service {
+				service := validService()
+				service.ModelServing = validInference()
+				return service
+			},
+		},
+		{
+			name:       "valid regular service update",
+			newService: validService,
+			oldService: validService,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.newService().ValidateUpdate(tt.oldService())
+			if tt.wantErrText == "" {
+				if err != nil {
+					t.Fatalf("ValidateUpdate() error = %v, want nil", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.wantErrText) {
+				t.Fatalf("ValidateUpdate() error = %v, want text %q", err, tt.wantErrText)
+			}
+		})
+	}
+}
+
 func TestGetSupervisorPath(t *testing.T) {
 	// Deep copy the testService
 	copy, err := deepcopy.Anything(testService)

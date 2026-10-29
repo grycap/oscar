@@ -1,6 +1,6 @@
 # KServe Sklearn Iris Classification Example
 
-This example demonstrates how to deploy a scikit-learn Iris classification model as a KServe InferenceService and integrate it with OSCAR. When a JSON file is uploaded to the configured MinIO bucket, OSCAR triggers `script.sh`, which calls the KServe v1 inference endpoint and writes the predictions back to MinIO.
+This example demonstrates how to deploy a scikit-learn Iris classification model with Model Serving's KServe backend and integrate it with OSCAR. When a JSON file is uploaded to the configured MinIO bucket, OSCAR triggers `script.sh`, which calls the KServe v1 inference endpoint and writes the predictions back to MinIO.
 
 ## Architecture
 
@@ -34,6 +34,9 @@ Deploy the OSCAR service, which also provisions the KServe InferenceService auto
 ```bash
 oscar-cli apply oscar-svc-sklearn.yaml
 ```
+
+> Note: the direct apply works only with OSCAR's admin user. If you use OIDC you must modify MODEL_SERVING_ENDPOINT variable substitute "oscar-svc" by "oscar-svc-{OIDC ID's forst egth digits}". Example http://yolo8n-onnx-model-predictor.oscar-svc-666d7ac0.svc.cluster.local.
+
 
 Verify the service was created:
 

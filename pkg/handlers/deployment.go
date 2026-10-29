@@ -29,7 +29,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/backends"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -143,7 +142,7 @@ func MakeGetDeploymentLogsHandler(back types.ServerlessBackend, kubeClientset ku
 			return
 		}
 
-		entries := collectDeploymentLogs(kubeClientset, service.Namespace, runtimeCtx.logPods, tailLines, includeTimestamps)
+		entries := collectDeploymentLogs(kubeClientset, service, runtimeCtx.logPods, tailLines, includeTimestamps)
 		if len(entries) == 0 {
 			response.Available = false
 			response.Message = "Deployment logs are not yet available."
@@ -165,8 +164,8 @@ func inspectDeploymentRuntime(back types.ServerlessBackend, kubeClientset kubern
 	namespace := resolveServiceNamespace(service, cfg)
 	service.Namespace = namespace
 
-	if service.IsKserve() && utils.IsKserveSupported(cfg) {
-		return inspectKserveDeploymentRuntime(kubeClientset, service)
+	if service.IsModelServing() && service.ModelServing.IsTypeSupportedByOSCAR(cfg) {
+		return inspectModelServingDeploymentRuntime(kubeClientset, service)
 	}
 
 	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 {
@@ -177,8 +176,7 @@ func inspectDeploymentRuntime(back types.ServerlessBackend, kubeClientset kubern
 		knService, err := getter.GetRuntimeService(namespace, service.Name)
 		if err == nil {
 			return inspectKnativeDeploymentRuntime(kubeClientset, service, knService)
-		}
-		if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+		} else if !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
 			return deploymentRuntimeContext{}, err
 		}
 	}
@@ -264,13 +262,13 @@ func inspectPodBackedDeploymentRuntime(kubeClientset kubernetes.Interface, servi
 	}, nil
 }
 
-func inspectKserveDeploymentRuntime(kubeClientset kubernetes.Interface, service *types.Service) (deploymentRuntimeContext, error) {
-	pods, err := backends.ListKserveServicePods(kubeClientset, service.Namespace, service.Name)
+func inspectModelServingDeploymentRuntime(kubeClientset kubernetes.Interface, service *types.Service) (deploymentRuntimeContext, error) {
+	pods, err := backends.ListModelServingServicePods(kubeClientset, service.Namespace, service.ModelServing.GetLabelSelector(service.Name))
 	if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
 		return deploymentRuntimeContext{}, err
 	}
 
-	deployment, err := backends.GetKserveServiceDeployment(kubeClientset, service.Namespace, service.Name, service.Kserve.Type)
+	deployment, err := backends.GetModelServingServiceDeployment(kubeClientset, service.Namespace, service.ModelServing.GetPodAndDplName(service.Name))
 	if err != nil {
 		if apierrors.IsNotFound(err) || apierrors.IsGone(err) {
 			items := podItems(pods)
@@ -354,8 +352,8 @@ func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.D
 	}
 
 	resourcesKind := types.DeploymentResourceKindExposedService
-	if service.IsKserve() {
-		resourcesKind = types.DeploymentResourceKindKserveService
+	if service.IsModelServing() {
+		resourcesKind = types.DeploymentResourceKindModelServingService
 	}
 
 	return types.ServiceDeploymentStatus{
@@ -672,10 +670,10 @@ func parseTailLines(value string) int64 {
 	return tailLines
 }
 
-func collectDeploymentLogs(kubeClientset kubernetes.Interface, namespace string, pods []corev1.Pod, tailLines int64, includeTimestamps bool) []types.DeploymentLogEntry {
+func collectDeploymentLogs(kubeClientset kubernetes.Interface, service *types.Service, pods []corev1.Pod, tailLines int64, includeTimestamps bool) []types.DeploymentLogEntry {
 	entries := make([]logEntryWithTime, 0, len(pods))
 	for _, pod := range pods {
-		podEntries, err := getPodDeploymentLogs(kubeClientset, &pod, namespace, tailLines)
+		podEntries, err := getPodDeploymentLogs(kubeClientset, &pod, service, tailLines)
 		if err != nil {
 			continue
 		}
@@ -710,18 +708,14 @@ func collectDeploymentLogs(kubeClientset kubernetes.Interface, namespace string,
 	return responseEntries
 }
 
-func getPodDeploymentLogs(kubeClientset kubernetes.Interface, pod *corev1.Pod, namespace string, tailLines int64) ([]logEntryWithTime, error) {
+func getPodDeploymentLogs(kubeClientset kubernetes.Interface, pod *corev1.Pod, service *types.Service, tailLines int64) ([]logEntryWithTime, error) {
 	containerName := types.ContainerName
 
-	if len(pod.Spec.Containers) > 0 {
-		// TO DO: See somthing better
-		if pod.Spec.Containers[0].Name == utils.KserveISVCContainerName {
-			containerName = utils.KserveISVCContainerName
-		} else if pod.Labels[utils.KserveLLMISVCLabelKey] == utils.KserveLLMISVCLabelValue && pod.Spec.Containers[0].Name == utils.KserveLLMISVCContainerName {
-			containerName = utils.KserveLLMISVCContainerName
-		}
+	if service.IsModelServing() {
+		containerName = service.ModelServing.GetContainerName()
 	}
 
+	namespace := service.Namespace
 	req := kubeClientset.CoreV1().Pods(namespace).GetLogs(pod.Name, &corev1.PodLogOptions{
 		Container:  containerName,
 		Timestamps: true,
@@ -788,8 +782,8 @@ func inspectDeploymentRuntimeStatusOnly(back types.ServerlessBackend, kubeClient
 	namespace := resolveServiceNamespace(service, cfg)
 	service.Namespace = namespace
 
-	if service.IsKserve() && utils.IsKserveSupported(cfg) {
-		return inspectKserveDeploymentRuntimeStatusOnly(kubeClientset, service)
+	if service.IsModelServing() && service.ModelServing.IsTypeSupportedByOSCAR(cfg) {
+		return inspectModelServingDeploymentRuntimeStatusOnly(kubeClientset, service)
 	}
 
 	if len(service.Expose.APIPort) > 0 && service.Expose.APIPort[0] != 0 {
@@ -800,8 +794,7 @@ func inspectDeploymentRuntimeStatusOnly(back types.ServerlessBackend, kubeClient
 		knService, err := getter.GetRuntimeService(namespace, service.Name)
 		if err == nil {
 			return inspectKnativeDeploymentRuntimeStatusOnly(kubeClientset, service, knService)
-		}
-		if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+		} else if !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
 			return types.ServiceDeploymentStatus{}, err
 		}
 	}
@@ -849,8 +842,8 @@ func inspectExposedDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interfac
 	return deploymentStatusFromDeployment(service, deployment, podItems(pods)), nil
 }
 
-func inspectKserveDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interface, service *types.Service) (types.ServiceDeploymentStatus, error) {
-	deployment, err := backends.GetKserveServiceDeployment(kubeClientset, service.Namespace, service.Name, service.Kserve.Type)
+func inspectModelServingDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interface, service *types.Service) (types.ServiceDeploymentStatus, error) {
+	deployment, err := backends.GetModelServingServiceDeployment(kubeClientset, service.Namespace, service.ModelServing.GetPodAndDplName(service.Name))
 	if err != nil {
 		if apierrors.IsNotFound(err) || apierrors.IsGone(err) {
 			return unavailableDeploymentStatus(service, "Current deployment resources are unavailable."), nil
@@ -858,7 +851,7 @@ func inspectKserveDeploymentRuntimeStatusOnly(kubeClientset kubernetes.Interface
 		return types.ServiceDeploymentStatus{}, err
 	}
 
-	pods, err := backends.ListKserveServicePods(kubeClientset, service.Namespace, service.Name)
+	pods, err := backends.ListModelServingServicePods(kubeClientset, service.Namespace, service.ModelServing.GetLabelSelector(service.Name))
 	if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
 		return types.ServiceDeploymentStatus{}, err
 	}

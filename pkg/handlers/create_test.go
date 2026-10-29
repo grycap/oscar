@@ -887,10 +887,12 @@ func TestValidateServiceCreation(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		service types.Service
-		cfg     *types.Config
-		wantErr bool
+		name            string
+		service         types.Service
+		cfg             *types.Config
+		wantErr         bool
+		wantErrContains string
+		wantKserveTag   bool
 	}{
 		{
 			name: "valid non-kserve service",
@@ -935,13 +937,15 @@ func TestValidateServiceCreation(t *testing.T) {
 			name: "kserve service when unsupported",
 			service: types.Service{
 				Name:           "svc",
+				CPU:            "0.2",
+				Memory:         "256Mi",
 				IsolationLevel: types.IsolationLevelService,
 				Visibility:     types.PRIVATE,
-				Kserve: &types.Kserve{
-					Type:       types.KserveTypeInferenceService,
-					StorageUri: "s3://model",
-					Inference: &types.KserveInference{
+				ModelServing: &types.ModelServing{
+					Spec: &types.KserveInference{
+						Source:      "s3://model",
 						ModelFormat: "onnx",
+						APIVersion:  "v1",
 					},
 				},
 				Script: "echo test",
@@ -950,19 +954,21 @@ func TestValidateServiceCreation(t *testing.T) {
 				KserveEnable:             false,
 				ExposedServicesRouteKind: types.HTTPROUTE,
 			},
-			wantErr: true,
+			wantErr:         true,
+			wantErrContains: "not supported",
 		},
 		{
 			name: "kserve service when supported",
 			service: types.Service{
 				Name:           "svc",
+				CPU:            "0.2",
+				Memory:         "256Mi",
 				IsolationLevel: types.IsolationLevelService,
 				Visibility:     types.PRIVATE,
-				Kserve: &types.Kserve{
-					Type:       types.KserveTypeInferenceService,
-					StorageUri: "s3://model",
-					Inference: &types.KserveInference{
+				ModelServing: &types.ModelServing{
+					Spec: &types.KserveInference{
 						ModelFormat: "onnx",
+						Source:      "s3://model",
 						APIVersion:  "v2",
 					},
 				},
@@ -971,7 +977,78 @@ func TestValidateServiceCreation(t *testing.T) {
 				KserveEnable:             true,
 				ExposedServicesRouteKind: types.HTTPROUTE,
 			},
-			wantErr: false,
+			wantErr:       false,
+			wantKserveTag: true,
+		},
+		{
+			name: "kserve llm service when supported",
+			service: types.Service{
+				Name:           "svc",
+				CPU:            "0.2",
+				IsolationLevel: types.IsolationLevelService,
+				Visibility:     types.PRIVATE,
+				ModelServing: &types.ModelServing{
+					Spec: &types.KserveLLMInference{Source: "hf://model"},
+				},
+			},
+			cfg: &types.Config{
+				KserveEnable:             true,
+				ExposedServicesRouteKind: types.HTTPROUTE,
+			},
+			wantErr:       false,
+			wantKserveTag: true,
+		},
+		{
+			name: "model serving without spec",
+			service: types.Service{
+				Name:           "svc",
+				CPU:            "0.2",
+				IsolationLevel: types.IsolationLevelService,
+				Visibility:     types.PRIVATE,
+				ModelServing:   &types.ModelServing{},
+			},
+			cfg: &types.Config{
+				KserveEnable:             true,
+				ExposedServicesRouteKind: types.HTTPROUTE,
+			},
+			wantErr:         true,
+			wantErrContains: "invalid ModelServing service type",
+		},
+		{
+			name: "kserve inference without source",
+			service: types.Service{
+				Name:           "svc",
+				CPU:            "0.2",
+				IsolationLevel: types.IsolationLevelService,
+				Visibility:     types.PRIVATE,
+				ModelServing: &types.ModelServing{
+					Spec: &types.KserveInference{ModelFormat: "onnx", APIVersion: "v1"},
+				},
+			},
+			cfg: &types.Config{
+				KserveEnable:             true,
+				ExposedServicesRouteKind: types.HTTPROUTE,
+			},
+			wantErr:         true,
+			wantErrContains: "model Source is required",
+		},
+		{
+			name: "kserve service with unsupported route kind",
+			service: types.Service{
+				Name:           "svc",
+				CPU:            "0.2",
+				IsolationLevel: types.IsolationLevelService,
+				Visibility:     types.PRIVATE,
+				ModelServing: &types.ModelServing{
+					Spec: &types.KserveInference{ModelFormat: "onnx", Source: "s3://model", APIVersion: "v1"},
+				},
+			},
+			cfg: &types.Config{
+				KserveEnable:             true,
+				ExposedServicesRouteKind: "ingress",
+			},
+			wantErr:         true,
+			wantErrContains: "not supported",
 		},
 		{
 			name: "exposed service with default command true",
@@ -1005,6 +1082,12 @@ func TestValidateServiceCreation(t *testing.T) {
 			}
 			if !tt.wantErr && err != nil {
 				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.wantErrContains != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErrContains)) {
+				t.Fatalf("error = %v, want to contain %q", err, tt.wantErrContains)
+			}
+			if tt.wantKserveTag && tt.service.Labels["kserve"] != "true" {
+				t.Fatalf("expected label kserve=true, got %v", tt.service.Labels)
 			}
 		})
 	}

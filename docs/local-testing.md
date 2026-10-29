@@ -101,7 +101,7 @@ To enable the KServe module in the deployed OSCAR, add:
 bash oscar/deploy/kind-deploy.sh --kserve
 ```
 
-This option deploys KServe InferenceService and LLMInferenceService controllers and is required in order to use [KServe settings](fdl.md#kservesettings) in the FDL.
+This option installs the KServe components needed to create `InferenceService` and `LLMInferenceService` resources. It is required to use [Model Serving settings](fdl.md#modelservingsettings) in the FDL. Other backends may be supported in the future.
 
 *Note that in order to enable KServe, you must use Traefik as the Gateway API provider (the script uses it by default).*
 
@@ -410,6 +410,6 @@ We suggest you follow the instructions for the [simple-test](https://github.com/
 
 ## Limitations
 
-Please note that the local deployment has several limitations in terms of functionality, which includes:
+Please note that the local deployment has several functional limitations, including:
 
-- Inaccurate information obtained via `/status`
+- Inaccurate information from the `/status` endpoint.

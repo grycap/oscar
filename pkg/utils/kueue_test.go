@@ -405,9 +405,8 @@ func TestVerifyWorkload(t *testing.T) {
 func TestGetResourceOnlyWorkloadSpec(t *testing.T) {
 	service := newTestService("test-service", "testuser")
 	service.Expose.MinScale = 2
-	cfg := newTestConfig()
 
-	workload, err := getResourceOnlyWorkloadSpec(&service, cfg, "test-ns", "verify-test-service", "oscar-lq-test-service")
+	workload, err := getResourceOnlyWorkloadSpec(&service, "test-ns", "verify-test-service", "oscar-lq-test-service")
 	if err != nil {
 		t.Fatalf("getResourceOnlyWorkloadSpec() returned error: %v", err)
 	}
@@ -442,9 +441,8 @@ func TestGetResourceOnlyWorkloadSpecUsesSynchronousMinScale(t *testing.T) {
 	service := newTestService("test-service", "testuser")
 	service.Expose.APIPort = []int{0}
 	service.Synchronous.MinScale = 3
-	cfg := newTestConfig()
 
-	workload, err := getResourceOnlyWorkloadSpec(&service, cfg, "test-ns", "verify-test-service", "oscar-lq-test-service")
+	workload, err := getResourceOnlyWorkloadSpec(&service, "test-ns", "verify-test-service", "oscar-lq-test-service")
 	if err != nil {
 		t.Fatalf("getResourceOnlyWorkloadSpec() returned error: %v", err)
 	}
@@ -463,9 +461,8 @@ func TestGetResourceOnlyWorkloadSpecSynchronousMinScaleOverflow(t *testing.T) {
 	service.Expose.APIPort = []int{0}
 	overflowMinScale := int64(math.MaxInt32) + 1
 	service.Synchronous.MinScale = int(overflowMinScale)
-	cfg := newTestConfig()
 
-	workload, err := getResourceOnlyWorkloadSpec(&service, cfg, "test-ns", "verify-test-service", "oscar-lq-test-service")
+	workload, err := getResourceOnlyWorkloadSpec(&service, "test-ns", "verify-test-service", "oscar-lq-test-service")
 	if err == nil {
 		t.Fatalf("getResourceOnlyWorkloadSpec() expected overflow error, got workload: %#v", workload)
 	}
@@ -476,8 +473,7 @@ func TestGetResourceOnlyWorkloadSpecWithoutResources(t *testing.T) {
 	service.CPU = ""
 	service.Memory = ""
 
-	cfg := newTestConfig()
-	workload, err := getResourceOnlyWorkloadSpec(&service, cfg, "test-ns", "verify-test-service", "oscar-lq-test-service")
+	workload, err := getResourceOnlyWorkloadSpec(&service, "test-ns", "verify-test-service", "oscar-lq-test-service")
 	if err != nil {
 		t.Fatalf("getResourceOnlyWorkloadSpec() returned error: %v", err)
 	}
@@ -504,26 +500,20 @@ func TestGetResourceOnlyWorkloadSpecWithoutResources(t *testing.T) {
 	}
 }
 
-func TestGetResourceOnlyWorkloadSpecWithKServePodSet(t *testing.T) {
+func TestGetResourceOnlyWorkloadSpecWithModelServingPodSet(t *testing.T) {
 	service := newTestService("test-service", "testuser")
-	service.Expose.MinScale = 2
-	service.Kserve = &types.Kserve{
-		Type: types.KserveTypeInferenceService,
-		Inference: &types.KserveInference{
+	service.CPU = "1"
+	service.Memory = "2Gi"
+	service.EnableGPU = true
+	service.ModelServing = &types.ModelServing{
+		Spec: &types.KserveInference{
 			ModelFormat: "sklearn",
+			Source:      "s3://models/sklearn",
+			MinScale:    3,
 		},
-		StorageUri: "s3://models/sklearn",
-		MinScale:   3,
-		CPU:        "1",
-		Memory:     "2Gi",
-		EnableGPU:  true,
 	}
 
-	cfg := newTestConfig()
-	cfg.KserveEnable = true
-	cfg.ExposedServicesRouteKind = types.HTTPROUTE
-
-	workload, err := getResourceOnlyWorkloadSpec(&service, cfg, "test-ns", "verify-test-service", "oscar-lq-test-service")
+	workload, err := getResourceOnlyWorkloadSpec(&service, "test-ns", "verify-test-service", "oscar-lq-test-service")
 	if err != nil {
 		t.Fatalf("getResourceOnlyWorkloadSpec() returned error: %v", err)
 	}
@@ -531,18 +521,20 @@ func TestGetResourceOnlyWorkloadSpecWithKServePodSet(t *testing.T) {
 		t.Fatal("getResourceOnlyWorkloadSpec() returned nil workload")
 	}
 
-	if len(workload.Spec.PodSets) != 2 {
-		t.Fatalf("PodSets length = %d, want 2", len(workload.Spec.PodSets))
+	if len(workload.Spec.PodSets) != 1 {
+		t.Fatalf("PodSets length = %d, want 1", len(workload.Spec.PodSets))
 	}
 
-	servicePodSet := workload.Spec.PodSets[0]
-	if servicePodSet.Count != service.Expose.MinScale {
-		t.Fatalf("service podset replicas = %d, want %d", servicePodSet.Count, service.Expose.MinScale)
+	kservePodSet := workload.Spec.PodSets[0]
+	if kservePodSet.Name != "model-serving-service" {
+		t.Fatalf("podset name = %s, want model-serving-service", kservePodSet.Name)
 	}
-
-	kservePodSet := workload.Spec.PodSets[1]
-	if kservePodSet.Count != service.Kserve.MinScale {
-		t.Fatalf("kserve podset replicas = %d, want %d", kservePodSet.Count, service.Kserve.MinScale)
+	scaling, ok := service.ModelServing.GetScaling()
+	if !ok {
+		t.Fatal("expected ModelServing to have scaling settings")
+	}
+	if kservePodSet.Count != scaling.MinScale {
+		t.Fatalf("kserve podset replicas = %d, want %d", kservePodSet.Count, scaling.MinScale)
 	}
 
 	kserveResources := kservePodSet.Template.Spec.Containers[0].Resources
@@ -551,16 +543,16 @@ func TestGetResourceOnlyWorkloadSpecWithKServePodSet(t *testing.T) {
 	if !ok {
 		t.Fatal("expected KServe CPU request in resource-only workload")
 	}
-	if cpuReq.String() != "1" {
-		t.Fatalf("KServe CPU request = %s, want %s", cpuReq.String(), "1")
+	if cpuReq.String() != "990m" {
+		t.Fatalf("KServe CPU request = %s, want %s", cpuReq.String(), "990m")
 	}
 
 	memReq, ok := kserveResources.Requests[v1.ResourceMemory]
 	if !ok {
 		t.Fatal("expected KServe memory request in resource-only workload")
 	}
-	if memReq.String() != "2Gi" {
-		t.Fatalf("KServe memory request = %s, want %s", memReq.String(), "2Gi")
+	if memReq.String() != "2033Mi" {
+		t.Fatalf("KServe memory request = %s, want %s", memReq.String(), "2033Mi")
 	}
 
 	gpuReq, ok := kserveResources.Requests["nvidia.com/gpu"]
@@ -569,6 +561,31 @@ func TestGetResourceOnlyWorkloadSpecWithKServePodSet(t *testing.T) {
 	}
 	if gpuReq.String() != "1" {
 		t.Fatalf("KServe GPU request = %s, want %s", gpuReq.String(), "1")
+	}
+}
+
+func TestGetResourceOnlyWorkloadSpecWithoutModelServing(t *testing.T) {
+	service := newTestService("test-service", "testuser")
+
+	workload, err := getResourceOnlyWorkloadSpec(&service, "test-ns", "verify-test-service", "oscar-lq-test-service")
+	if err != nil {
+		t.Fatalf("getResourceOnlyWorkloadSpec() returned error: %v", err)
+	}
+	if len(workload.Spec.PodSets) != 1 || workload.Spec.PodSets[0].Name != "oscar-service" {
+		t.Fatalf("unexpected PodSets: %#v", workload.Spec.PodSets)
+	}
+	cpuReq := workload.Spec.PodSets[0].Template.Spec.Containers[0].Resources.Requests[v1.ResourceCPU]
+	if cpuReq.String() != "500m" {
+		t.Fatalf("CPU request = %s, want 500m", cpuReq.String())
+	}
+
+	service.Image = ""
+	workload, err = getResourceOnlyWorkloadSpec(&service, "test-ns", "verify-test-service", "oscar-lq-test-service")
+	if err != nil {
+		t.Fatalf("getResourceOnlyWorkloadSpec() returned error: %v", err)
+	}
+	if len(workload.Spec.PodSets) != 0 {
+		t.Fatalf("expected no PodSets without image nor model serving, got %d", len(workload.Spec.PodSets))
 	}
 }
 
@@ -814,8 +831,6 @@ func TestGetWorkloadSpecInvalidResources(t *testing.T) {
 }
 
 func TestGetServiceResourceRequestsDecisionGraph(t *testing.T) {
-	cfg := newTestConfig()
-
 	// Decision paths covered:
 	// P1: default CPU/memory when empty
 	// P2: custom CPU/memory accepted
@@ -922,7 +937,7 @@ func TestGetServiceResourceRequestsDecisionGraph(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			requests, _, err := getServiceResourceRequests(tt.service, cfg)
+			requests, _, err := getServiceResourceRequests(tt.service)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error containing %q, got nil", tt.wantErrText)
@@ -989,7 +1004,6 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 	tests := []struct {
 		name        string
 		service     *types.Service
-		cfg         *types.Config
 		wantErr     bool
 		wantErrText string
 		wantScale   int32
@@ -999,80 +1013,84 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 		wantGPUQty  string
 	}{
 		{
-			name: "not a kserve service",
-			service: func() *types.Service {
-				s := newTestService("svc-non-kserve", "owner")
-				s.Kserve = nil
-				return &s
-			}(),
-			cfg:     newTestConfig(),
-			wantErr: true,
-		},
-		{
-			name: "kserve service but unsupported route kind",
-			service: func() *types.Service {
-				s := newTestService("svc-kserve-ingress", "owner")
-				s.Kserve = &types.Kserve{Type: types.KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn"}
-				return &s
-			}(),
-			cfg: func() *types.Config {
-				c := newTestConfig()
-				c.KserveEnable = true
-				c.ExposedServicesRouteKind = "ingress"
-				return c
-			}(),
-			wantErr: true,
-		},
-		{
 			name: "kserve Inference defaults and min scale fallback",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-default", "owner")
-				s.Kserve = &types.Kserve{Type: types.KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", MinScale: 0}
+				s.CPU = ""
+				s.Memory = ""
+				s.ModelServing = &types.ModelServing{Spec: &types.KserveInference{ModelFormat: "sklearn", Source: "s3://models/sklearn", MinScale: 0}}
 				return &s
 			}(),
-			cfg: func() *types.Config {
-				c := newTestConfig()
-				c.KserveEnable = true
-				c.ExposedServicesRouteKind = "httproute"
-				return c
-			}(),
 			wantScale:  1,
-			wantCPU:    defaultKserveCpuRequest.String(),
-			wantMemory: defaultKserveMemoryRequest.String(),
+			wantCPU:    "200m",
+			wantMemory: "256Mi",
 		},
 		{
 			name: "kserve LLMInference defaults and min scale fallback",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-default", "owner")
-				s.Kserve = &types.Kserve{Type: types.KserveTypeLLMInferenceService, StorageUri: "s3://models/llama", MinScale: 0}
+				s.CPU = ""
+				s.Memory = ""
+				s.ModelServing = &types.ModelServing{Spec: &types.KserveLLMInference{Source: "s3://models/llama", MinScale: 0}}
 				return &s
 			}(),
-			cfg: func() *types.Config {
-				c := newTestConfig()
-				c.KserveEnable = true
-				c.ExposedServicesRouteKind = "httproute"
-				return c
+			wantScale:  1,
+			wantCPU:    "200m",
+			wantMemory: "256Mi",
+		},
+		{
+			name: "kserve resources include modelcar overhead",
+			service: func() *types.Service {
+				s := newTestService("svc-kserve-overhead", "owner")
+				s.ModelServing = &types.ModelServing{Spec: &types.KserveInference{ModelFormat: "sklearn", Source: "s3://models/sklearn", MinScale: 1}}
+				return &s
 			}(),
 			wantScale:  1,
-			wantCPU:    defaultKserveCpuRequest.String(),
-			wantMemory: defaultKserveMemoryRequest.String(),
+			wantCPU:    "490m",
+			wantMemory: "1009Mi",
+		},
+		{
+			name: "kserve custom memory only",
+			service: func() *types.Service {
+				s := newTestService("svc-kserve-mem", "owner")
+				s.CPU = ""
+				s.Memory = "2Gi"
+				s.ModelServing = &types.ModelServing{Spec: &types.KserveInference{ModelFormat: "sklearn", Source: "s3://models/sklearn"}}
+				return &s
+			}(),
+			wantScale:  1,
+			wantCPU:    "200m",
+			wantMemory: "2033Mi",
+		},
+		{
+			name: "kserve gpu with default resources",
+			service: func() *types.Service {
+				s := newTestService("svc-kserve-gpu", "owner")
+				s.CPU = ""
+				s.Memory = ""
+				s.EnableGPU = true
+				s.ModelServing = &types.ModelServing{Spec: &types.KserveLLMInference{Source: "s3://models/llama"}}
+				return &s
+			}(),
+			wantScale:  1,
+			wantCPU:    "200m",
+			wantMemory: "256Mi",
+			wantGPU:    true,
+			wantGPUQty: "1",
 		},
 		{
 			name: "kserve custom resources and gpu",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-custom", "owner")
-				s.Kserve = &types.Kserve{Type: types.KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", MinScale: 3, CPU: "1", Memory: "2Gi", EnableGPU: true}
+				s.CPU = "1"
+				s.Memory = "2Gi"
+				s.EnableGPU = true
+				s.ModelServing = &types.ModelServing{Spec: &types.KserveInference{ModelFormat: "sklearn", Source: "s3://models/sklearn", MinScale: 3}}
 				return &s
 			}(),
-			cfg: func() *types.Config {
-				c := newTestConfig()
-				c.KserveEnable = true
-				c.ExposedServicesRouteKind = "httproute"
-				return c
-			}(),
 			wantScale:  3,
-			wantCPU:    "1",
-			wantMemory: "2Gi",
+			wantCPU:    "990m",
+			wantMemory: "2033Mi",
 			wantGPU:    true,
 			wantGPUQty: "1",
 		},
@@ -1080,39 +1098,39 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 			name: "kserve invalid cpu",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-badcpu", "owner")
-				s.Kserve = &types.Kserve{Type: types.KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", CPU: "bad-cpu"}
+				s.CPU = "bad-cpu"
+				s.ModelServing = &types.ModelServing{Spec: &types.KserveInference{ModelFormat: "sklearn", Source: "s3://models/sklearn"}}
 				return &s
 			}(),
-			cfg: func() *types.Config {
-				c := newTestConfig()
-				c.KserveEnable = true
-				c.ExposedServicesRouteKind = "httproute"
-				return c
-			}(),
 			wantErr:     true,
-			wantErrText: "invalid KServe service CPU",
+			wantErrText: "failed to create Kserve resources for Kueue",
 		},
 		{
 			name: "kserve invalid memory",
 			service: func() *types.Service {
 				s := newTestService("svc-kserve-badmem", "owner")
-				s.Kserve = &types.Kserve{Type: types.KserveTypeInferenceService, Inference: &types.KserveInference{ModelFormat: "sklearn"}, StorageUri: "s3://models/sklearn", Memory: "bad-memory"}
+				s.Memory = "bad-memory"
+				s.ModelServing = &types.ModelServing{Spec: &types.KserveInference{ModelFormat: "sklearn", Source: "s3://models/sklearn"}}
 				return &s
 			}(),
-			cfg: func() *types.Config {
-				c := newTestConfig()
-				c.KserveEnable = true
-				c.ExposedServicesRouteKind = "httproute"
-				return c
+			wantErr:     true,
+			wantErrText: "failed to create Kserve resources for Kueue",
+		},
+		{
+			name: "model serving without spec",
+			service: func() *types.Service {
+				s := newTestService("svc-no-spec", "owner")
+				s.ModelServing = &types.ModelServing{}
+				return &s
 			}(),
 			wantErr:     true,
-			wantErrText: "invalid KServe service memory",
+			wantErrText: "model serving backend is nil",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			requests, scale, err := getKserveResourceRequests(tt.service, tt.cfg)
+			requests, scale, err := tt.service.ModelServing.GetKueueResourceList(tt.service)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error containing %q, got nil", tt.wantErrText)

@@ -65,10 +65,6 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
-		if newService.IsKserve() && !utils.IsKserveSupported(cfg) {
-			c.String(http.StatusBadRequest, "KServe is not supported in this deployment")
-			return
-		}
 		rawInput := cloneStorageIOConfigs(newService.Input)
 		rawOutput := cloneStorageIOConfigs(newService.Output)
 		if err := normalizeStoragePaths(&newService); err != nil {
@@ -93,7 +89,6 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 		// Read the current service
 		oldService, err := back.ReadService("", newService.Name)
-
 		if err != nil {
 			// Check if error is caused because the service is not found
 			if errors.IsNotFound(err) || errors.IsGone(err) {
@@ -101,6 +96,11 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			} else {
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
 			}
+			return
+		}
+
+		if err := validateServiceUpdate(oldService, &newService, cfg); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
 
@@ -118,14 +118,6 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			serviceNamespace = cfg.ServicesNamespace
 		}
 		newService.Namespace = serviceNamespace
-
-		// Check if the service is a KServe service and validate the update
-		if oldService.IsKserve() || newService.IsKserve() {
-			if err := utils.CheckKserveUpdate(oldService, &newService); err != nil {
-				c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
-				return
-			}
-		}
 
 		if !isAdminUser {
 			uid, err = auth.GetUIDFromContext(c)
@@ -461,4 +453,26 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 
 		c.Status(http.StatusNoContent)
 	}
+}
+
+func validateServiceUpdate(oldService, newService *types.Service, cfg *types.Config) error {
+	// Validate the service specification (including KServe configuration if present)
+	if err := newService.ValidateUpdate(oldService); err != nil {
+		return err
+	}
+
+	// Check if any Model Serving backends is supported in this OSCAR deployment
+	// If not supported, return an error
+	// If supported, add a label to the service indicating that it is a KServe service
+	if newService.IsModelServing() {
+		if !newService.ModelServing.IsTypeSupportedByOSCAR(cfg) {
+			return fmt.Errorf("Model Serving is not supported in this OSCAR deployment")
+		}
+		if newService.Labels == nil {
+			newService.Labels = make(map[string]string)
+		}
+		newService.Labels["kserve"] = "true"
+	}
+
+	return nil
 }

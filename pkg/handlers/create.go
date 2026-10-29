@@ -282,7 +282,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			service.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 			// At the moment check only for KServe service
-			if service.IsKserve() && !utils.VerifyWorkloadByResources(service, cfg) {
+			if service.IsModelServing() && !utils.VerifyWorkloadByResources(service, cfg) {
 				if err := utils.DeleteKueueLocalQueue(context.TODO(), cfg, service.Namespace, service.Name); err != nil {
 					createLogger.Printf("Error deleting Kueue local queue: %v", err)
 				}
@@ -324,13 +324,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
-		// Set the KSERVE_HOST environment variable for KServe servicescd
-		if service.IsKserve() {
-			if service.Environment.Vars == nil {
-				service.Environment.Vars = make(map[string]string)
-			}
-			service.Environment.Vars["KSERVE_HOST"] = fmt.Sprintf("%s.%s.svc.cluster.local", utils.GetKserveSvcName(service.Name, service.Kserve.Type), service.Namespace)
-		}
 		// Create service
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
@@ -497,18 +490,6 @@ func checkValues(service *types.Service, cfg *types.Config) {
 		service.CPU = defaultCPU
 	}
 
-	if service.IsKserve() && utils.IsKserveSupported(cfg) {
-		if service.Kserve.CPU == "" {
-			service.Kserve.CPU = defaultCPU
-		}
-		if service.Kserve.Memory == "" {
-			service.Kserve.Memory = defaultMemory
-		}
-		if service.Labels == nil {
-			service.Labels = make(map[string]string)
-		}
-		service.Labels["kserve"] = "true"
-	}
 	// Check if visibility has been set. If not set default private.
 	if service.Visibility == "" {
 		service.Visibility = types.PRIVATE
@@ -1060,8 +1041,18 @@ func validateServiceCreation(service *types.Service, cfg *types.Config) error {
 	if err := service.Validate(); err != nil {
 		return err
 	}
-	if service.IsKserve() && !utils.IsKserveSupported(cfg) {
-		return fmt.Errorf("KServe is not supported in this OSCAR deployment")
+	// Check if any Model Serving backends is supported in this OSCAR deployment
+	// If not supported, return an error
+	// If supported, add a label to the service indicating that it is a KServe service
+	if service.IsModelServing() {
+		if !service.ModelServing.IsTypeSupportedByOSCAR(cfg) {
+			return fmt.Errorf("Model Serving is not supported in this OSCAR deployment")
+		}
+		if service.Labels == nil {
+			service.Labels = make(map[string]string)
+		}
+		service.Labels["kserve"] = "true"
 	}
+
 	return nil
 }

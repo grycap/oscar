@@ -27,10 +27,10 @@ const (
 	DeploymentStateStopped     = "stopped"
 	DeploymentStateUnavailable = "unavailable"
 
-	DeploymentResourceKindExposedService = "exposed_service"
-	DeploymentResourceKindKserveService  = "kserve_service"
-	DeploymentResourceKindKnativeService = "knative_service"
-	DeploymentResourceKindUnavailable    = "unavailable"
+	DeploymentResourceKindExposedService      = "exposed_service"
+	DeploymentResourceKindModelServingService = "model_serving_service"
+	DeploymentResourceKindKnativeService      = "knative_service"
+	DeploymentResourceKindUnavailable         = "unavailable"
 )
 
 type ServiceDeploymentStatus struct {

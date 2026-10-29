@@ -19,8 +19,8 @@ MODEL_INPUT_W="${MODEL_INPUT_W:-640}"
 MODEL_INPUT_H="${MODEL_INPUT_H:-640}"
 NORMALIZE_INPUT="${NORMALIZE_INPUT:-true}"
 USE_BGR="${USE_BGR:-false}"
-KSERVE_INPUT_NAME="${KSERVE_INPUT_NAME:-images}"
-KSERVE_URL="${KSERVE_URL:-http://$KSERVE_HOST/v2/models/yolo8n/infer}"
+MODEL_SERVING_INPUT_NAME="${MODEL_SERVING_INPUT_NAME:-images}"
+MODEL_SERVING_URL="${MODEL_SERVING_URL:-$MODEL_SERVING_ENDPOINT/v2/models/yolo8n/infer}"
 CONF_THRESHOLD="${CONF_THRESHOLD:-0.10}"
 NMS_IOU="${NMS_IOU:-0.45}"
 MAX_DETECTIONS="${MAX_DETECTIONS:-100}"
@@ -45,9 +45,9 @@ x = np.transpose(x, (2, 0, 1))
 # Add batch dimension: [1,3,H,W]
 x = np.expand_dims(x, axis=0)
 
-input_name = "${KSERVE_INPUT_NAME}".strip()
+input_name = "${MODEL_SERVING_INPUT_NAME}".strip()
 if not input_name:
-    raise SystemExit("KSERVE_INPUT_NAME must be set for v2 protocol")
+    raise SystemExit("MODEL_SERVING_INPUT_NAME must be set for v2 protocol")
 
 payload = {
     "inputs": [
@@ -63,14 +63,14 @@ payload = {
 print(json.dumps(payload))
 EOF
 
-echo "Calling KServe endpoint: $KSERVE_URL"
+echo "Calling KServe endpoint: $MODEL_SERVING_URL"
 REQUEST_START_MS="$(date +%s%3N)"
 curl \
   --fail \
   --silent --show-error \
   -H "Content-Type: application/json" \
   -d @/tmp/input.json \
-  "$KSERVE_URL" > "$OUT_JSON_PATH"
+  "$MODEL_SERVING_URL" > "$OUT_JSON_PATH"
 REQUEST_END_MS="$(date +%s%3N)"
 REQUEST_DURATION_MS="$((REQUEST_END_MS - REQUEST_START_MS))"
 REQUEST_DURATION_S="$(awk "BEGIN {printf \"%.3f\", ${REQUEST_DURATION_MS}/1000}")"
