@@ -243,7 +243,7 @@ func (m ModelServing) Validate() error {
 	return m.Spec.validate()
 }
 
-func (m ModelServing) ValidateUpdate(old ModelServing) error {
+func (m ModelServing) ValidateUpdate(old *ModelServing) error {
 	newType := m.GetType()
 	oldType := old.GetType()
 	if oldType != newType {
@@ -331,7 +331,7 @@ func (m *ModelServing) UpdateModelServingService(service *Service, oldService *S
 		panic("unexpected error in ModelServing service update validation: service tokens do not match")
 	}
 
-	if err := m.ValidateUpdate(*oldService.ModelServing); err != nil {
+	if err := m.ValidateUpdate(oldService.ModelServing); err != nil {
 		return fmt.Errorf("invalid ModelServing service update: %v", err)
 	}
 
@@ -374,9 +374,8 @@ func (m *ModelServing) checkIfIsPartOfService(service *Service) {
 // IsTypeSupported checks if the ModelServing service is supported in the current OSCAR deployment configuration.
 func (m ModelServing) IsTypeSupportedByOSCAR(cfg *Config) bool {
 	typeName := m.GetType()
-	switch {
-	// KServe Backends
-	case typeName == kserveTypeInferenceService || typeName == kserveTypeLLMInferenceService:
+	switch typeName {
+	case kserveTypeInferenceService, kserveTypeLLMInferenceService:
 		return cfg.KserveEnable && cfg.ExposedServicesRouteKind == HTTPROUTE
 	default:
 		return false
