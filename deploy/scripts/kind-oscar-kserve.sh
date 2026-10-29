@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-KSERVE_VERSION="v0.20.0"
+KSERVE_VERSION="v0.21.0"
 
 if kubectl get namespace cert-manager >/dev/null 2>&1 && \
   kubectl get deployment -n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook >/dev/null 2>&1; then
@@ -31,6 +31,7 @@ helm upgrade --install kserve-resources oci://ghcr.io/kserve/charts/kserve-resou
   --set kserve.controller.gateway.ingressGateway.enableGatewayApi=true \
   --set kserve.controller.gateway.ingressGateway.kserveGateway="traefik/traefik-gateway" \
   --set kserve.controller.gateway.ingressGateway.createGateway=false \
+  --set kserve.router.imagePullPolicy="Always" \
   --wait
 
 helm upgrade --install kserve-llmisvc-crd oci://ghcr.io/kserve/charts/kserve-llmisvc-crd \

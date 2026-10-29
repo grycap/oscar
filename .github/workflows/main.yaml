@@ -30,10 +30,16 @@ jobs:
 
         if [[ $GITHUB_REF == refs/heads/devel ]]; then
           TAGS="--tag ${DOCKER_HUB_IMAGE}:devel --tag ${GHCR_IMAGE}:devel"
-        else
-          TAGS="--tag ${DOCKER_HUB_IMAGE}:latest --tag ${GHCR_IMAGE}:latest"
         fi
-        
+
+        if [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
+          IS_PRERELEASE=$(jq -r '.release.prerelease' "$GITHUB_EVENT_PATH")
+
+          if [[ "$IS_PRERELEASE" == "false" ]]; then
+            TAGS="$TAGS --tag ${DOCKER_HUB_IMAGE}:latest --tag ${GHCR_IMAGE}:latest"
+          fi
+        fi
+
         if [[ ! -z "$VERSION" ]]; then
           TAGS="$TAGS --tag ${DOCKER_HUB_IMAGE}:${VERSION} --tag ${GHCR_IMAGE}:${VERSION}"
         fi

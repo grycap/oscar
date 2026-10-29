@@ -1,0 +1,14 @@
+name: mkdocs Release
+
+on:
+  release:
+    types: [created, updated]
+
+
+jobs:
+  deploy:
+    if: ${{ !github.event.release.prerelease }}
+    uses: ./.github/workflows/mkdocs_common.yaml
+    permissions:
+      contents: write
+    with: {}

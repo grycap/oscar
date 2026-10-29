@@ -1,0 +1,21 @@
+name: mkdocs Master Push
+ 
+on:
+  push:
+    branches:
+      - master
+ 
+ 
+jobs:
+  approve:
+    runs-on: ubuntu-22.04
+    environment: docs-approval
+    steps:
+      - name: Deployment approved
+        run: echo "Documentation deployment approved"
+  deploy:
+    needs: approve
+    uses: ./.github/workflows/mkdocs_common.yaml
+    permissions:
+      contents: write
+    with: {}
