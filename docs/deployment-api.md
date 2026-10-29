@@ -10,7 +10,7 @@ Two simple alternatives will be given on how to interact with the API to deploy 
 
 [cURL](https://curl.se/), a command-line interface based HTTP client.
 
-To deploy a service, you must have the [FDL](fdl.md) file that defines the service and the script that will be executed on it.
+To deploy a service, you must have the [FDL](fdl.md) file that defines the service. A script is required for regular services that process files or run a custom command. It is optional only for KServe services or for exposed services when `expose.default_command` is set to `true`, in which case OSCAR executes the container default command instead.
 
 First, you need the credentials to access the cluster. This can be via an [OIDC Token](integration-egi.md) or basic authentication.
 

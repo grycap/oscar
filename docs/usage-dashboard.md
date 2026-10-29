@@ -45,8 +45,7 @@ For the invocation you can see the [synchronous invocation via dashboard](invoki
 ## Manual deployment
 
 To do the manual deployment, you need to click on "New" on the Service page, which is the first page you see after you log in.
-Press the button and follow the wizard. For an [OSCAR Service](oscar-service.md) a script must be provided for the
-processing of files. This script must use the environment variables
+Press the button and follow the wizard. For a regular [OSCAR Service](oscar-service.md), a script is required for file-processing workflows. It is optional only for KServe services or for exposed services with `expose.default_command: true`, where OSCAR runs the container default command instead. When a script is used, it should use the environment variables
 `INPUT_FILE_PATH` and `TMP_OUTPUT_DIR` to refer to the input file and the
 folder where to save the results respectively:
 

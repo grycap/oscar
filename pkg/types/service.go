@@ -247,7 +247,7 @@ type Service struct {
 	Output []StorageIOConfig `json:"output"`
 
 	// Script the user script to execute when the service is invoked
-	Script string `json:"script,omitempty" binding:"required"`
+	Script string `json:"script,omitempty"`
 
 	// ImagePullSecrets list of Kubernetes secrets to login to a private registry
 	// Optional
@@ -423,16 +423,27 @@ func (s Service) Validate() error {
 		}
 	}
 
+	// If the service is KServe or exposed with a default command, then the script is optional.
+	scriptIsRequired := true
+
 	if s.IsKserve() {
 		if err := s.Kserve.Validate(); err != nil {
 			return err
 		}
+		scriptIsRequired = false
 	}
 
 	if s.IsExposed() {
 		if err := s.Expose.Validate(); err != nil {
 			return err
 		}
+		if s.Expose.DefaultCommand {
+			scriptIsRequired = false
+		}
+	}
+
+	if scriptIsRequired && strings.TrimSpace(s.Script) == "" {
+		return fmt.Errorf("service script is required")
 	}
 
 	if s.HasManagedVolume() {
