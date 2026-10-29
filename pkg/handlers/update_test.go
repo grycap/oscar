@@ -62,6 +62,7 @@ func TestMakeUpdateHandler(t *testing.T) {
 	}))
 
 	svc := &types.Service{
+		Name:  "cowsay",
 		Token: "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf",
 		CPU:   "2.0",
 		StorageProviders: &types.StorageProviders{
@@ -306,5 +307,124 @@ func TestMakeUpdateHandlerLegacyServiceWithoutVolume(t *testing.T) {
 	}
 	if back.UpdatedService.Volume != nil {
 		t.Fatalf("expected legacy service update to keep volume nil, got %+v", back.UpdatedService.Volume)
+	}
+}
+
+func TestValidateServiceUpdateModelServingErrors(t *testing.T) {
+	inferenceService := func() *types.Service {
+		return &types.Service{
+			Name:           "svc",
+			CPU:            "0.2",
+			Visibility:     types.PRIVATE,
+			IsolationLevel: types.IsolationLevelService,
+			ModelServing: &types.ModelServing{
+				Spec: &types.KserveInference{
+					ModelFormat: "onnx",
+					Source:      "s3://model",
+					APIVersion:  "v1",
+				},
+			},
+		}
+	}
+
+	t.Run("rejects ModelServing type change", func(t *testing.T) {
+		oldService := inferenceService()
+		newService := inferenceService()
+		newService.ModelServing = &types.ModelServing{
+			Spec: &types.KserveLLMInference{Source: "hf://model"},
+		}
+
+		err := validateServiceUpdate(oldService, newService, &types.Config{
+			KserveEnable:             true,
+			ExposedServicesRouteKind: types.HTTPROUTE,
+		})
+		if err == nil || !strings.Contains(err.Error(), `cannot change ModelServing service type from "inference" to "llm_inference"`) {
+			t.Fatalf("expected ModelServing type change error, got %v", err)
+		}
+	})
+
+	t.Run("rejects unsupported Model Serving", func(t *testing.T) {
+		oldService := inferenceService()
+		newService := inferenceService()
+
+		err := validateServiceUpdate(oldService, newService, &types.Config{
+			KserveEnable:             false,
+			ExposedServicesRouteKind: types.HTTPROUTE,
+		})
+		if err == nil || !strings.Contains(err.Error(), "Model Serving is not supported in this OSCAR deployment") {
+			t.Fatalf("expected unsupported Model Serving error, got %v", err)
+		}
+	})
+}
+
+func TestMakeUpdateHandlerValidatesModelServingUpdates(t *testing.T) {
+	tests := []struct {
+		name        string
+		oldService  *types.Service
+		cfg         *types.Config
+		body        string
+		wantErrText string
+	}{
+		{
+			name: "ModelServing type change",
+			oldService: &types.Service{
+				Name: "svc",
+				ModelServing: &types.ModelServing{
+					Spec: &types.KserveInference{
+						ModelFormat: "onnx",
+						Source:      "s3://model",
+						APIVersion:  "v1",
+					},
+				},
+			},
+			cfg: &types.Config{
+				KserveEnable:             true,
+				ExposedServicesRouteKind: types.HTTPROUTE,
+			},
+			body:        `{"name":"svc","model_serving":{"llm_inference":{"source":"hf://model"}}}`,
+			wantErrText: `cannot change ModelServing service type from "inference" to "llm_inference"`,
+		},
+		{
+			name: "unsupported Model Serving",
+			oldService: &types.Service{
+				Name: "svc",
+				ModelServing: &types.ModelServing{
+					Spec: &types.KserveInference{
+						ModelFormat: "onnx",
+						Source:      "s3://model",
+						APIVersion:  "v1",
+					},
+				},
+			},
+			cfg:         &types.Config{ExposedServicesRouteKind: types.HTTPROUTE},
+			body:        `{"name":"svc","model_serving":{"inference":{"model_format":"onnx","source":"s3://model","api_version":"v1"}}}`,
+			wantErrText: "Model Serving is not supported in this OSCAR deployment",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			back := backends.MakeFakeBackend()
+			back.Service = tt.oldService
+			router := gin.New()
+			router.PUT("/system/services", MakeUpdateHandler(tt.cfg, back))
+
+			req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "******")
+			resp := httptest.NewRecorder()
+			router.ServeHTTP(resp, req)
+
+			if resp.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d; body: %s", resp.Code, http.StatusBadRequest, resp.Body.String())
+			}
+			if !strings.Contains(resp.Body.String(), tt.wantErrText) {
+				t.Fatalf("response body = %q, want it to contain %q", resp.Body.String(), tt.wantErrText)
+			}
+			if back.UpdatedService != nil {
+				t.Fatalf("expected validation to prevent backend update, got %+v", back.UpdatedService)
+			}
+		})
 	}
 }
