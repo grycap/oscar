@@ -368,7 +368,8 @@ func TestMakeUpdateHandlerValidatesModelServingUpdates(t *testing.T) {
 		{
 			name: "ModelServing type change",
 			oldService: &types.Service{
-				Name: "svc",
+				Name:   "svc",
+				Script: "echo 'Hello, World!'",
 				ModelServing: &types.ModelServing{
 					Spec: &types.KserveInference{
 						ModelFormat: "onnx",
@@ -380,14 +381,16 @@ func TestMakeUpdateHandlerValidatesModelServingUpdates(t *testing.T) {
 			cfg: &types.Config{
 				KserveEnable:             true,
 				ExposedServicesRouteKind: types.HTTPROUTE,
+				MinIOProvider:            &types.MinIOProvider{},
 			},
-			body:        `{"name":"svc","model_serving":{"llm_inference":{"source":"hf://model"}}}`,
+			body:        `{"name":"svc","script":"echo","model_serving":{"llm_inference":{"source":"hf://model"}}}`,
 			wantErrText: `cannot change ModelServing service type from "inference" to "llm_inference"`,
 		},
 		{
 			name: "unsupported Model Serving",
 			oldService: &types.Service{
-				Name: "svc",
+				Name:   "svc",
+				Script: "echo 'Hello, World!'",
 				ModelServing: &types.ModelServing{
 					Spec: &types.KserveInference{
 						ModelFormat: "onnx",
@@ -396,8 +399,11 @@ func TestMakeUpdateHandlerValidatesModelServingUpdates(t *testing.T) {
 					},
 				},
 			},
-			cfg:         &types.Config{ExposedServicesRouteKind: types.HTTPROUTE},
-			body:        `{"name":"svc","model_serving":{"inference":{"model_format":"onnx","source":"s3://model","api_version":"v1"}}}`,
+			cfg: &types.Config{
+				ExposedServicesRouteKind: types.HTTPROUTE,
+				MinIOProvider:            &types.MinIOProvider{},
+			},
+			body:        `{"name":"svc","script":"echo","model_serving":{"inference":{"model_format":"onnx","source":"s3://model","api_version":"v1"}}}`,
 			wantErrText: "Model Serving is not supported in this OSCAR deployment",
 		},
 	}
