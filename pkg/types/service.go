@@ -448,6 +448,26 @@ func (s Service) Validate() error {
 	return nil
 }
 
+func (s Service) ValidateUpdate(old *Service) error {
+	if s.Name != old.Name {
+		return fmt.Errorf("service name cannot be changed")
+	}
+
+	if err := s.Validate(); err != nil {
+		return fmt.Errorf("invalid new service definition: %v", err)
+	}
+
+	if s.IsModelServing() {
+		if !old.IsModelServing() {
+			return fmt.Errorf("cannot change service type to ModelServing")
+		}
+		if err := s.ModelServing.ValidateUpdate(old.ModelServing); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ServiceVolumeConfig stores the requested size and mount path for a managed volume.
 type ServiceVolumeConfig struct {
 	// Name is the logical volume name. It is optional for service-created volumes.
