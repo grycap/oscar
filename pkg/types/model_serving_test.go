@@ -221,7 +221,7 @@ func TestModelServingValidateWithCustomSpec(t *testing.T) {
 
 func TestModelServingValidateUpdateWithCustomSpec(t *testing.T) {
 	updErr := errors.New("not allowed")
-	old := ModelServing{Spec: &fakeServingSpec{}}
+	old := &ModelServing{Spec: &fakeServingSpec{}}
 
 	if err := (ModelServing{Spec: &fakeServingSpec{}}).ValidateUpdate(old); err != nil {
 		t.Errorf("unexpected error %v", err)
@@ -233,7 +233,7 @@ func TestModelServingValidateUpdateWithCustomSpec(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "invalid ModelServing service: bad") {
 		t.Errorf("got %v", err)
 	}
-	err = (ModelServing{Spec: &fakeServingSpec{}}).ValidateUpdate(ModelServing{Spec: &KserveInference{}})
+	err = (ModelServing{Spec: &fakeServingSpec{}}).ValidateUpdate(&ModelServing{Spec: &KserveInference{}})
 	if err == nil || !strings.Contains(err.Error(), `cannot change ModelServing service type from "inference" to "fake_serving"`) {
 		t.Errorf("got %v", err)
 	}
@@ -259,10 +259,63 @@ func TestModelServingEqualDeepComparison(t *testing.T) {
 	}
 }
 
-func TestModelServingIsTypeSupportedByOSCARUnknownType(t *testing.T) {
-	cfg := &Config{KserveEnable: true, ExposedServicesRouteKind: HTTPROUTE}
-	if (ModelServing{Spec: &fakeServingSpec{}}).IsTypeSupportedByOSCAR(cfg) {
-		t.Error("unknown types must not be supported")
+func TestModelServingIsTypeSupportedByOSCAR(t *testing.T) {
+	tests := []struct {
+		name string
+		ms   ModelServing
+		cfg  *Config
+		want bool
+	}{
+		{
+			name: "inference supported",
+			ms:   ModelServing{Spec: &KserveInference{}},
+			cfg:  &Config{KserveEnable: true, ExposedServicesRouteKind: HTTPROUTE},
+			want: true,
+		},
+		{
+			name: "llm inference supported",
+			ms:   ModelServing{Spec: &KserveLLMInference{}},
+			cfg:  &Config{KserveEnable: true, ExposedServicesRouteKind: HTTPROUTE},
+			want: true,
+		},
+		{
+			name: "inference unsupported when kserve is disabled",
+			ms:   ModelServing{Spec: &KserveInference{}},
+			cfg:  &Config{KserveEnable: false, ExposedServicesRouteKind: HTTPROUTE},
+		},
+		{
+			name: "llm inference unsupported when kserve is disabled",
+			ms:   ModelServing{Spec: &KserveLLMInference{}},
+			cfg:  &Config{KserveEnable: false, ExposedServicesRouteKind: HTTPROUTE},
+		},
+		{
+			name: "inference unsupported with ingress route",
+			ms:   ModelServing{Spec: &KserveInference{}},
+			cfg:  &Config{KserveEnable: true, ExposedServicesRouteKind: "ingress"},
+		},
+		{
+			name: "llm inference unsupported with ingress route",
+			ms:   ModelServing{Spec: &KserveLLMInference{}},
+			cfg:  &Config{KserveEnable: true, ExposedServicesRouteKind: "ingress"},
+		},
+		{
+			name: "unsupported type",
+			ms:   ModelServing{Spec: &fakeServingSpec{}},
+			cfg:  &Config{KserveEnable: true, ExposedServicesRouteKind: HTTPROUTE},
+		},
+		{
+			name: "missing type",
+			ms:   ModelServing{},
+			cfg:  &Config{KserveEnable: true, ExposedServicesRouteKind: HTTPROUTE},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.ms.IsTypeSupportedByOSCAR(tt.cfg); got != tt.want {
+				t.Errorf("IsTypeSupportedByOSCAR() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
