@@ -1,17 +1,23 @@
 package handlers
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/grycap/oscar/v4/pkg/backends"
 	"github.com/grycap/oscar/v4/pkg/testsupport"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
 
@@ -144,37 +150,108 @@ func TestMakeUpdateHandler(t *testing.T) {
 	}
 }
 
-func TestMakeUpdateHandlerUnauthorizedVO(t *testing.T) {
+func TestMakeUpdateHandlerVOTransitions(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
-
-	back := backends.MakeFakeBackend()
-	cfg := types.Config{
-		OIDCGroups: []string{"vo1"},
-		MinIOProvider: &types.MinIOProvider{
-			Endpoint:  "http://minio:9000",
-			Region:    "us-east-1",
-			AccessKey: "ak",
-			SecretKey: "sk",
-		},
+	priv, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatal(err)
 	}
-	// Existing service owned by user with different VO
-	back.Service = &types.Service{Name: "svc", Owner: "owner", VO: "vo2"}
-
-	r := gin.Default()
-	r.Use(func(c *gin.Context) {
-		c.Set("uidOrigin", "owner")
-		c.Next()
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/.well-known/openid-configuration":
+			fmt.Fprintf(w, `{"issuer":%q,"userinfo_endpoint":%q,"jwks_uri":%q}`, server.URL, server.URL+"/userinfo", server.URL+"/keys")
+		case "/userinfo":
+			fmt.Fprint(w, `{"sub":"owner","group_membership":["vo1"]}`)
+		case "/keys":
+			fmt.Fprint(w, buildRSAJWK(&priv.PublicKey))
+		case "/minio/admin/v3/info":
+			fmt.Fprint(w, `{"Mode":"local","Region":"us-east-1"}`)
+		default:
+			fmt.Fprint(w, `{"status":"success"}`)
+		}
+	}))
+	defer server.Close()
+	manager, err := auth.NewOIDCManager(server.URL, "owner", []string{"vo1", "vo2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	auth.ClusterOidcManagers[server.URL] = manager
+	defer delete(auth.ClusterOidcManagers, server.URL)
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+		"iss": server.URL, "sub": "owner", "exp": time.Now().Add(time.Hour).Unix(),
 	})
-	r.PUT("/system/services", MakeUpdateHandler(&cfg, back))
+	rawToken, err := token.SignedString(priv)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	body := `{"name":"svc","vo":"vo1","token":"t","visibility":"private"}`
-	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
-	req.Header.Set("Authorization", "Bearer token")
-	resp := httptest.NewRecorder()
-	r.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 when VO not authorized, got %d", resp.Code)
+	for _, tc := range []struct {
+		name, vo, authorization string
+		status                  int
+	}{
+		{"configured but not member", "vo2", "Bearer " + rawToken, http.StatusBadRequest},
+		{"invalid identity token", "vo1", "Bearer invalid", http.StatusBadRequest},
+		{"unconfigured VO", "vo3", "Bearer " + rawToken, http.StatusBadRequest},
+		{"authorized transition", "vo1", "Bearer " + rawToken, http.StatusNoContent},
+		{"admin transition", "vo3", "Basic admin", http.StatusNoContent},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := testclient.NewSimpleClientset(&corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: auth.FormatUID("owner"), Namespace: auth.ServicesNamespace},
+				Data:       map[string][]byte{"accessKey": []byte("owner"), "secretKey": []byte("test")},
+			})
+			back := backends.MakeFakeBackend()
+			back.SetKubeClientset(client)
+			back.Service = &types.Service{Name: "svc", Owner: "owner", VO: "old", Namespace: "owner-ns"}
+			cfg := &types.Config{
+				OIDCGroups: []string{"vo1", "vo2"},
+				MinIOProvider: &types.MinIOProvider{
+					Endpoint: server.URL, Region: "us-east-1", AccessKey: "ak", SecretKey: "sk",
+				},
+			}
+			r := gin.New()
+			r.Use(func(c *gin.Context) {
+				c.Set("uidOrigin", "owner")
+				c.Set("multitenancyConfig", auth.NewMultitenancyConfig(client, "owner"))
+				c.Next()
+			})
+			r.PUT("/system/services", MakeUpdateHandler(cfg, back))
+			body := fmt.Sprintf(`{"name":"svc","vo":%q,"image":"img","script":"echo","environment":{"secrets":{"PASSWORD":"value"}}}`, tc.vo)
+			req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
+			req.Header.Set("Authorization", tc.authorization)
+			resp := httptest.NewRecorder()
+			r.ServeHTTP(resp, req)
+			if resp.Code != tc.status {
+				t.Fatalf("expected %d, got %d: %s", tc.status, resp.Code, resp.Body.String())
+			}
+			if tc.status == http.StatusBadRequest {
+				if back.UpdatedService != nil {
+					t.Fatal("rejected VO transition updated backend")
+				}
+				for _, action := range client.Actions() {
+					if action.GetResource().Resource == "secrets" && action.GetVerb() != "get" {
+						t.Fatalf("rejected VO transition wrote secret: %s", action.GetVerb())
+					}
+				}
+				return
+			}
+			if back.UpdatedService == nil || back.UpdatedService.VO != tc.vo {
+				t.Fatalf("authorized VO transition did not reach backend: %+v", back.UpdatedService)
+			}
+			if tc.authorization != "Basic admin" && back.UpdatedService.Labels["vo"] != tc.vo {
+				t.Fatalf("VO label not set: %+v", back.UpdatedService.Labels)
+			}
+			secretWritten := false
+			for _, action := range client.Actions() {
+				if action.GetResource().Resource == "secrets" && action.GetVerb() == "create" {
+					secretWritten = true
+				}
+			}
+			if !secretWritten {
+				t.Fatal("authorized transition did not create service credentials/secrets")
+			}
+		})
 	}
 }
 
