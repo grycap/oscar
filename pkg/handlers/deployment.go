@@ -177,8 +177,7 @@ func inspectDeploymentRuntime(back types.ServerlessBackend, kubeClientset kubern
 		knService, err := getter.GetRuntimeService(namespace, service.Name)
 		if err == nil {
 			return inspectKnativeDeploymentRuntime(kubeClientset, service, knService)
-		}
-		if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+		} else if !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
 			return deploymentRuntimeContext{}, err
 		}
 	}
@@ -585,39 +584,36 @@ func hasPodInitializing(pods []corev1.Pod) bool {
 	return false
 }
 
+// hasCrashLoopBackOff also covers the window in which a crash-looping container
+// is briefly Running between restarts (see isCrashLoopBackOff). Only the main
+// container of each pod is considered; sidecars are ignored.
 func hasCrashLoopBackOff(pods []corev1.Pod) bool {
-	for _, pod := range pods {
-		for _, status := range pod.Status.ContainerStatuses {
-			if status.State.Waiting != nil && status.State.Waiting.Reason == "CrashLoopBackOff" {
-				return true
-			}
+	for i := range pods {
+		if status := mainContainerStatus(&pods[i]); status != nil && !status.Ready && isCrashLoopBackOff(status) {
+			return true
 		}
 	}
 	return false
 }
 
 func firstCrashLoopBackOffReason(pods []corev1.Pod) string {
-	for _, pod := range pods {
-		for _, status := range pod.Status.ContainerStatuses {
-			if status.State.Waiting != nil && status.State.Waiting.Reason == "CrashLoopBackOff" {
-				message := strings.Trim(strings.TrimSpace(status.State.Waiting.Reason+": "+status.State.Waiting.Message), ": ")
-				if status.LastTerminationState.Terminated != nil {
-					term := status.LastTerminationState.Terminated
-					if term.ExitCode != 0 {
-						if message != "" {
-							return fmt.Sprintf("%s (exit code %d)", message, term.ExitCode)
-						}
-						return fmt.Sprintf("CrashLoopBackOff (exit code %d)", term.ExitCode)
-					}
-				}
-				if message != "" {
-					return message
-				}
-				return status.State.Waiting.Reason
-			}
+	for i := range pods {
+		status := mainContainerStatus(&pods[i])
+		if status == nil || status.Ready || !isCrashLoopBackOff(status) {
+			continue
 		}
+
+		message := fmt.Sprintf("CrashLoopBackOff: container restarted %d times", status.RestartCount)
+		if term := status.LastTerminationState.Terminated; term != nil && term.ExitCode != 0 {
+			return fmt.Sprintf("%s (exit code %d)", message, term.ExitCode)
+		}
+		return message
 	}
 	return ""
+}
+
+func mainContainerStatus(pod *corev1.Pod) *corev1.ContainerStatus {
+	return findContainerStatus(pod, podLogContainerName(pod))
 }
 
 func latestDeploymentCondition(conditions []appsv1.DeploymentCondition) (string, *metav1.Time) {
@@ -672,32 +668,39 @@ func parseTailLines(value string) int64 {
 	return tailLines
 }
 
+// collectDeploymentLogs returns the recent logs of the current container
+// instances plus, for crash-looping containers, the logs of their last
+// terminated instance (a single previous-log request per container, never
+// older restarts). The tail limit is applied separately to current and
+// previous entries so that the logs of a crashed instance are not evicted by
+// the ones of the new instance.
 func collectDeploymentLogs(kubeClientset kubernetes.Interface, namespace string, pods []corev1.Pod, tailLines int64, includeTimestamps bool) []types.DeploymentLogEntry {
-	entries := make([]logEntryWithTime, 0, len(pods))
-	for _, pod := range pods {
-		podEntries, err := getPodDeploymentLogs(kubeClientset, &pod, namespace, tailLines)
-		if err != nil {
-			continue
+	current := make([]logEntryWithTime, 0, len(pods))
+	previous := []logEntryWithTime{}
+
+	for i := range pods {
+		pod := &pods[i]
+		containerName := podLogContainerName(pod)
+		status := findContainerStatus(pod, containerName)
+
+		// A waiting container (e.g. CrashLoopBackOff) has no current logs, so
+		// the request would always fail.
+		if status == nil || status.State.Waiting == nil {
+			if podEntries, err := getPodDeploymentLogs(kubeClientset, pod, namespace, containerName, tailLines, false); err == nil {
+				current = append(current, podEntries...)
+			}
 		}
-		entries = append(entries, podEntries...)
+
+		if status != nil && isCrashLoopBackOff(status) {
+			// The API only exposes the logs of the last terminated instance.
+			if podEntries, err := getPodDeploymentLogs(kubeClientset, pod, namespace, containerName, tailLines, true); err == nil {
+				previous = append(previous, podEntries...)
+			}
+		}
 	}
 
-	sort.Slice(entries, func(i, j int) bool {
-		switch {
-		case entries[i].hasTime && entries[j].hasTime:
-			return entries[i].sortKey.Before(entries[j].sortKey)
-		case entries[i].hasTime:
-			return true
-		case entries[j].hasTime:
-			return false
-		default:
-			return entries[i].entry.Message < entries[j].entry.Message
-		}
-	})
-
-	if len(entries) > int(tailLines) {
-		entries = entries[len(entries)-int(tailLines):]
-	}
+	entries := append(tailSortedLogs(previous, tailLines), tailSortedLogs(current, tailLines)...)
+	sortLogEntries(entries)
 
 	responseEntries := make([]types.DeploymentLogEntry, 0, len(entries))
 	for _, item := range entries {
@@ -710,7 +713,30 @@ func collectDeploymentLogs(kubeClientset kubernetes.Interface, namespace string,
 	return responseEntries
 }
 
-func getPodDeploymentLogs(kubeClientset kubernetes.Interface, pod *corev1.Pod, namespace string, tailLines int64) ([]logEntryWithTime, error) {
+func sortLogEntries(entries []logEntryWithTime) {
+	sort.SliceStable(entries, func(i, j int) bool {
+		switch {
+		case entries[i].hasTime && entries[j].hasTime:
+			return entries[i].sortKey.Before(entries[j].sortKey)
+		case entries[i].hasTime:
+			return true
+		case entries[j].hasTime:
+			return false
+		default:
+			return entries[i].entry.Message < entries[j].entry.Message
+		}
+	})
+}
+
+func tailSortedLogs(entries []logEntryWithTime, tailLines int64) []logEntryWithTime {
+	sortLogEntries(entries)
+	if len(entries) > int(tailLines) {
+		return entries[len(entries)-int(tailLines):]
+	}
+	return entries
+}
+
+func podLogContainerName(pod *corev1.Pod) string {
 	containerName := types.ContainerName
 
 	if len(pod.Spec.Containers) > 0 {
@@ -721,11 +747,35 @@ func getPodDeploymentLogs(kubeClientset kubernetes.Interface, pod *corev1.Pod, n
 			containerName = utils.KserveLLMISVCContainerName
 		}
 	}
+	return containerName
+}
 
+func findContainerStatus(pod *corev1.Pod, containerName string) *corev1.ContainerStatus {
+	for i := range pod.Status.ContainerStatuses {
+		if pod.Status.ContainerStatuses[i].Name == containerName {
+			return &pod.Status.ContainerStatuses[i]
+		}
+	}
+	return nil
+}
+
+// crashLoopRestartThreshold is the number of restarts above which a container
+// is considered to be crash-looping even if it is not currently in CrashLoopBackOff.
+const crashLoopRestartThreshold = 4
+
+func isCrashLoopBackOff(status *corev1.ContainerStatus) bool {
+	if status.RestartCount > crashLoopRestartThreshold {
+		return true
+	}
+	return status.State.Waiting != nil && status.State.Waiting.Reason == "CrashLoopBackOff"
+}
+
+func getPodDeploymentLogs(kubeClientset kubernetes.Interface, pod *corev1.Pod, namespace, containerName string, tailLines int64, previous bool) ([]logEntryWithTime, error) {
 	req := kubeClientset.CoreV1().Pods(namespace).GetLogs(pod.Name, &corev1.PodLogOptions{
 		Container:  containerName,
 		Timestamps: true,
 		TailLines:  &tailLines,
+		Previous:   previous,
 	})
 	result := req.Do(context.TODO())
 
@@ -800,8 +850,7 @@ func inspectDeploymentRuntimeStatusOnly(back types.ServerlessBackend, kubeClient
 		knService, err := getter.GetRuntimeService(namespace, service.Name)
 		if err == nil {
 			return inspectKnativeDeploymentRuntimeStatusOnly(kubeClientset, service, knService)
-		}
-		if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+		} else if !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
 			return types.ServiceDeploymentStatus{}, err
 		}
 	}
