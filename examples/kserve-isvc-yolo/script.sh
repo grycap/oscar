@@ -63,7 +63,7 @@ payload = {
 print(json.dumps(payload))
 EOF
 
-echo "Calling KServe endpoint: $MODEL_SERVING_URL"
+echo "Calling Model Serving endpoint: $MODEL_SERVING_URL"
 REQUEST_START_MS="$(date +%s%3N)"
 curl \
   --fail \
