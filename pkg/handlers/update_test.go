@@ -21,6 +21,51 @@ import (
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
 
+func TestCreateAndUpdateRejectUnsafeMountBeforeMutation(t *testing.T) {
+	for _, method := range []string{http.MethodPost, http.MethodPut} {
+		for _, options := range []string{"--rc", "--rc-addr=0.0.0.0:5572", "--config /tmp/config", "--buffer-size --rc"} {
+			t.Run(method+"/"+options, func(t *testing.T) {
+				back := backends.MakeFakeBackend()
+				r := gin.New()
+				cfg := &types.Config{MinIOProvider: &types.MinIOProvider{}}
+				if method == http.MethodPost {
+					r.POST("/system/services", MakeCreateHandler(cfg, back))
+				} else {
+					r.PUT("/system/services", MakeUpdateHandler(cfg, back))
+				}
+				body := fmt.Sprintf(`{"name":"svc","image":"img","script":"echo test","mount":{"storage_provider":"minio.default","path":"notebook","options":%q}}`, options)
+				resp := httptest.NewRecorder()
+				r.ServeHTTP(resp, httptest.NewRequest(method, "/system/services", strings.NewReader(body)))
+				if resp.Code != http.StatusBadRequest || !strings.Contains(resp.Body.String(), "mount option") {
+					t.Fatalf("expected mount option 400, got %d: %s", resp.Code, resp.Body.String())
+				}
+				if back.Service != nil || back.UpdatedService != nil {
+					t.Fatal("invalid options reached backend")
+				}
+			})
+		}
+	}
+}
+
+func TestValidateServiceMountOptions(t *testing.T) {
+	for _, tc := range []struct {
+		provider string
+		options  string
+		valid    bool
+	}{
+		{"", "", true},
+		{"minio.default", "", true},
+		{"minio.default", "--buffer-size 128M --vfs-read-chunk-size 64M", true},
+		{"webdav.default", "--timeout=30s", true},
+		{"minio.default", "--rc", false},
+		{"", "--read-only", false},
+	} {
+		if err := validateServiceMountOptions(&types.Service{Mount: types.StorageIOConfig{Provider: tc.provider, Options: tc.options}}); (err == nil) != tc.valid {
+			t.Errorf("provider %q options %q: err %v; valid %t", tc.provider, tc.options, err, tc.valid)
+		}
+	}
+}
+
 func TestMakeUpdateHandlerRejectsForgedOwnerBeforeSecretCopy(t *testing.T) {
 	back := backends.MakeFakeBackend()
 	back.Service = &types.Service{Name: "svc", Owner: "owner", Namespace: "owner-ns"}

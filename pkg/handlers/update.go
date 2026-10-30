@@ -65,6 +65,10 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
 			return
 		}
+		if err := validateServiceMountOptions(&newService); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("The service specification is not valid: %v", err))
+			return
+		}
 		if newService.IsKserve() && !utils.IsKserveSupported(cfg) {
 			c.String(http.StatusBadRequest, "KServe is not supported in this deployment")
 			return

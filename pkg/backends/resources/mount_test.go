@@ -237,7 +237,7 @@ func TestSetWebDavEnvVars(t *testing.T) {
 	}
 }
 
-func TestValidateMountOpts(t *testing.T) {
+func TestParseMountOptions(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
@@ -259,9 +259,42 @@ func TestValidateMountOpts(t *testing.T) {
 			want:  "--read-only --no-checksum",
 		},
 		{
-			name:  "valid with dots and colons",
-			input: "--config /etc/rclone/rclone.conf --timeout 30s",
-			want:  "--config /etc/rclone/rclone.conf --timeout 30s",
+			name:  "valid tuning flags",
+			input: "--timeout 30s --dir-cache-time=10s --vfs-cache-max-size 0",
+			want:  "--timeout 30s --dir-cache-time 10s --vfs-cache-max-size 0",
+		},
+		{
+			name: "legacy config rejected", input: "--config /etc/rclone/rclone.conf --timeout 30s", want: "",
+		},
+		{
+			name: "rc rejected", input: "--buffer-size 128M --rc --rc-no-auth", want: "",
+		},
+		{
+			name: "network rejected", input: "--http", want: "",
+		},
+		{
+			name: "override rejected", input: "--s3-endpoint=attacker", want: "",
+		},
+		{
+			name: "unknown rejected", input: "--foo", want: "",
+		},
+		{
+			name: "missing value rejected", input: "--buffer-size", want: "",
+		},
+		{
+			name: "flag as value rejected", input: "--buffer-size --rc", want: "",
+		},
+		{
+			name: "invalid size rejected", input: "--buffer-size 128MB", want: "",
+		},
+		{
+			name: "invalid duration rejected", input: "--timeout 0", want: "",
+		},
+		{
+			name: "boolean value rejected", input: "--read-only=false", want: "",
+		},
+		{
+			name: "tabs rejected", input: "--buffer-size	128M", want: "",
 		},
 		{
 			name:  "rejects shell semicolon",
@@ -291,11 +324,49 @@ func TestValidateMountOpts(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ValidateMountOpts(tt.input)
-			if got != tt.want {
-				t.Errorf("validateMountOpts(%q) = %q, want %q", tt.input, got, tt.want)
+			parsed, err := ParseMountOptions(tt.input)
+			if tt.want == "" && tt.input != "" {
+				if err == nil {
+					t.Errorf("ParseMountOptions(%q) = %q; expected rejection", tt.input, parsed)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("ParseMountOptions(%q) returned unexpected error: %v", tt.input, err)
+			}
+			if parsed != tt.want {
+				t.Errorf("ParseMountOptions(%q) = %q, want %q", tt.input, parsed, tt.want)
 			}
 		})
+	}
+}
+
+func TestParseMountOptionsRejectsInvalidInput(t *testing.T) {
+	for _, opts := range []string{"  ", "--rc", "--config /tmp/config", "--buffer-size", "--buffer-size=--rc", "--timeout 1d", "--read-only=true"} {
+		if parsed, err := ParseMountOptions(opts); err == nil || parsed != "" {
+			t.Errorf("ParseMountOptions(%q) = %q, %v; expected rejection", opts, parsed, err)
+		}
+	}
+}
+
+func TestSidecarPodSpecRejectsStoredNetworkOptionsForAllProviders(t *testing.T) {
+	service := types.Service{
+		Mount: types.StorageIOConfig{Path: "bucket", Options: "--buffer-size 128M --rc"},
+		StorageProviders: &types.StorageProviders{
+			MinIO:  map[string]*types.MinIOProvider{"test": {}},
+			S3:     map[string]*types.S3Provider{"test": {}},
+			WebDav: map[string]*types.WebDavProvider{"test": {}},
+		},
+	}
+	for _, provider := range []string{"minio.test", "s3.test", "webdav.test"} {
+		service.Mount.Provider = provider
+		container := sidecarPodSpec(service, &types.Config{})
+		if len(container.Args) != 2 {
+			t.Fatalf("unexpected %s sidecar args: %v", provider, container.Args)
+		}
+		if strings.Contains(container.Args[1], "--rc") || strings.Contains(container.Args[1], "--buffer-size") {
+			t.Errorf("unsafe stored options reached %s sidecar: %v", provider, container.Args)
+		}
 	}
 }
 
@@ -425,5 +496,14 @@ func TestSetMountRejectsMaliciousOptions(t *testing.T) {
 	// But the normal rclone content should still be there
 	if !strings.Contains(args, "--allow-other") {
 		t.Errorf("expected default communCommand flags in args, got: %s", args)
+	}
+	for _, legacy := range []string{"--rc", "--config /etc/rclone/rclone.conf", "--buffer-size 128M --rc"} {
+		service.Mount.Options = legacy
+		podSpec.InitContainers = nil
+		SetMount(podSpec, service, cfg)
+		command := podSpec.InitContainers[0].Args[1]
+		if strings.Contains(command, "--rc") || strings.Contains(command, "--config") || strings.Contains(command, "--buffer-size 128M") {
+			t.Errorf("legacy options %q reached mount command", legacy)
+		}
 	}
 }
