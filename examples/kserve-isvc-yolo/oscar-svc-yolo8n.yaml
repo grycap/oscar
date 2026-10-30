@@ -31,5 +31,3 @@ functions:
           model_format: onnx
           api_version: "v2"
           source: "oci://ghcr.io/grycap/kserve-yolo8n-onnx"
-          cpu: '1.0'
-          memory: 2Gi
