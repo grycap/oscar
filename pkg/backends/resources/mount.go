@@ -129,14 +129,6 @@ func ParseMountOptions(opts string) (string, error) {
 	return strings.Join(parsed, " "), nil
 }
 
-// ValidateMountOpts drops all custom options for legacy stored definitions
-// that no longer pass the allowlist. API create/update use ParseMountOptions
-// and reject invalid definitions before any external mutation.
-func ValidateMountOpts(opts string) string {
-	parsed, _ := ParseMountOptions(opts)
-	return parsed
-}
-
 func sidecarPodSpec(service types.Service, cfg *types.Config) v1.Container {
 	bidirectional := v1.MountPropagationBidirectional
 	var ptr *bool // Uninitialized pointer
@@ -170,7 +162,10 @@ func sidecarPodSpec(service types.Service, cfg *types.Config) v1.Container {
 	}
 
 	provider := strings.Split(service.Mount.Provider, ".")
-	mountOpts := ValidateMountOpts(service.Mount.Options)
+	// Legacy stored definitions may contain options that no longer pass the
+	// allowlist; drop them silently instead of rejecting the whole service.
+	mountOpts, _ := ParseMountOptions(service.Mount.Options)
+	// Ensure a separator space after communCommand; empty options add nothing.
 	if mountOpts != "" {
 		mountOpts = " " + mountOpts
 	}

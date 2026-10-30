@@ -237,7 +237,7 @@ func TestSetWebDavEnvVars(t *testing.T) {
 	}
 }
 
-func TestValidateMountOpts(t *testing.T) {
+func TestParseMountOptions(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
@@ -324,9 +324,18 @@ func TestValidateMountOpts(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ValidateMountOpts(tt.input)
-			if got != tt.want {
-				t.Errorf("validateMountOpts(%q) = %q, want %q", tt.input, got, tt.want)
+			parsed, err := ParseMountOptions(tt.input)
+			if tt.want == "" && tt.input != "" {
+				if err == nil {
+					t.Errorf("ParseMountOptions(%q) = %q; expected rejection", tt.input, parsed)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("ParseMountOptions(%q) returned unexpected error: %v", tt.input, err)
+			}
+			if parsed != tt.want {
+				t.Errorf("ParseMountOptions(%q) = %q, want %q", tt.input, parsed, tt.want)
 			}
 		})
 	}
