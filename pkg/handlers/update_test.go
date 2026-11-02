@@ -31,6 +31,7 @@ func TestCreateAndUpdateRejectUnsafeMountBeforeMutation(t *testing.T) {
 				if method == http.MethodPost {
 					r.POST("/system/services", MakeCreateHandler(cfg, back))
 				} else {
+					back.Service = &types.Service{Name: "svc"}
 					r.PUT("/system/services", MakeUpdateHandler(cfg, back))
 				}
 				body := fmt.Sprintf(`{"name":"svc","image":"img","script":"echo test","mount":{"storage_provider":"minio.default","path":"notebook","options":%q}}`, options)
@@ -39,7 +40,7 @@ func TestCreateAndUpdateRejectUnsafeMountBeforeMutation(t *testing.T) {
 				if resp.Code != http.StatusBadRequest || !strings.Contains(resp.Body.String(), "mount option") {
 					t.Fatalf("expected mount option 400, got %d: %s", resp.Code, resp.Body.String())
 				}
-				if back.Service != nil || back.UpdatedService != nil {
+				if back.CreatedService != nil || back.UpdatedService != nil {
 					t.Fatal("invalid options reached backend")
 				}
 			})
