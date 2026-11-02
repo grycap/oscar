@@ -7,10 +7,6 @@ functions:
       image: ghcr.io/grycap/kserve-yolo8n-onnx-script
       script: script.sh
       log_level: CRITICAL
-      model_:
-        ref: 
-          inference:
-            name: yolo8n-onnx-model
       environment:
         variables:
           MODEL_SERVING_ENDPOINT: "http://yolo8n-onnx-model-predictor.oscar-svc.svc.cluster.local"
