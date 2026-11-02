@@ -1,0 +1,14 @@
+name: mkdocs Devel Push
+
+on:
+  push:
+    branches:
+      - devel
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/mkdocs_common.yaml
+    permissions:
+      contents: write
+    with:
+      development: true

@@ -1,9 +1,12 @@
 name: mkdocs
 
-
 on:
   workflow_call:
-
+    inputs:
+      development:
+        description: Publish the devel branch without changing the stable aliases
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -29,18 +32,36 @@ jobs:
       run: |
         git config --global user.name 'github-actions'
         git config --global user.email 'github-actions@github.com'
-    - name: Get release latest version 
-      id: latest
-      run: |
-        latest=$(curl -s https://api.github.com/repos/grycap/oscar/releases/latest | jq -r .tag_name)
-        echo "Last release tag: $latest"
-        echo "tag_name=$latest" >> $GITHUB_OUTPUT
     - name: Install swag
       run: go install github.com/swaggo/swag/cmd/swag@v1.16.4
     - name: Generate SWAG file
       run: ~/go/bin/swag init -g main.go -o docs --outputTypes yaml
-    - name: Build and deploy to gh-pages
+    - name: Publish documentation to gh-pages
+      env:
+        DEVELOPMENT: ${{ inputs.development }}
+        EVENT_NAME: ${{ github.event_name }}
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
       run: |
-        git fetch origin gh-pages:gh-pages
-        mike deploy --push --update-aliases ${{ steps.latest.outputs.tag_name }} latest
-        mike set-default --push latest
+        set -euo pipefail
+        git fetch --no-tags origin +refs/heads/gh-pages:refs/remotes/origin/gh-pages
+        git branch -f gh-pages refs/remotes/origin/gh-pages
+
+        if [[ "$DEVELOPMENT" == "true" ]]; then
+          mike deploy devel
+        else
+          latest=$(curl -fsSL --retry 3 https://api.github.com/repos/grycap/oscar/releases/latest | jq -er .tag_name)
+          version="$latest"
+          if [[ "$EVENT_NAME" == "release" ]]; then
+            version="${RELEASE_TAG:?missing release tag}"
+          fi
+          if [[ "$version" == "$latest" ]]; then
+            mike deploy --update-aliases "$version" latest
+            mike set-default latest
+          else
+            # An older release must remain available without moving latest back.
+            mike deploy "$version"
+          fi
+        fi
+
+        # A concurrent update rejects this non-forced push; the job then fails visibly.
+        git push origin gh-pages:gh-pages
