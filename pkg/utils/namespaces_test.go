@@ -24,6 +24,7 @@ import (
 
 	"github.com/grycap/oscar/v4/pkg/types"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -481,6 +482,72 @@ func TestEnsureUserNamespaceBasic(t *testing.T) {
 			t.Errorf("Expected empty namespace when config is nil, got %s", namespace)
 		}
 	})
+}
+
+func TestEnsureUserNamespaceNetworkPolicy(t *testing.T) {
+	ctx := context.Background()
+	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "user-ns"}})
+	cfg := &types.Config{PodCIDR: "10.20.0.0/16", ServiceCIDR: "10.30.0.0/16", HTTPRouteGatewayNamespace: "edge"}
+
+	if err := ensureUserNamespaceNetworkPolicy(ctx, client, cfg, "user-ns"); err != nil {
+		t.Fatalf("ensureUserNamespaceNetworkPolicy() error: %v", err)
+	}
+	policy, err := client.NetworkingV1().NetworkPolicies("user-ns").Get(ctx, userNamespaceNetworkPolicyName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("get NetworkPolicy: %v", err)
+	}
+	if len(policy.Spec.PolicyTypes) != 2 || policy.Spec.PolicyTypes[0] != networkingv1.PolicyTypeIngress || policy.Spec.PolicyTypes[1] != networkingv1.PolicyTypeEgress {
+		t.Fatalf("unexpected policyTypes: %v", policy.Spec.PolicyTypes)
+	}
+	if len(policy.Spec.Ingress) != 3 || len(policy.Spec.Egress) != 3 {
+		t.Fatalf("expected 3 ingress and 3 egress rules, got %d and %d", len(policy.Spec.Ingress), len(policy.Spec.Egress))
+	}
+	if got := policy.Spec.Ingress[1].From[0].NamespaceSelector.MatchLabels["kubernetes.io/metadata.name"]; got != "edge" {
+		t.Fatalf("Traefik namespace selector = %q, want edge", got)
+	}
+	if got := policy.Spec.Ingress[2].From[0].IPBlock.Except; !reflect.DeepEqual(got, []string{"10.20.0.0/16", "10.30.0.0/16"}) {
+		t.Fatalf("external ingress CIDR exceptions = %v", got)
+	}
+	if got := policy.Spec.Egress[1].Ports; len(got) != 2 || got[0].Port.IntValue() != 53 || *got[0].Protocol != corev1.ProtocolUDP || got[1].Port.IntValue() != 53 || *got[1].Protocol != corev1.ProtocolTCP {
+		t.Fatalf("unexpected DNS ports: %+v", got)
+	}
+
+	policy.Spec.Ingress = nil
+	if _, err := client.NetworkingV1().NetworkPolicies("user-ns").Update(ctx, policy, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("make policy drift: %v", err)
+	}
+	if err := ensureUserNamespaceNetworkPolicy(ctx, client, cfg, "user-ns"); err != nil {
+		t.Fatalf("reconcile NetworkPolicy: %v", err)
+	}
+	policy, err = client.NetworkingV1().NetworkPolicies("user-ns").Get(ctx, userNamespaceNetworkPolicyName, metav1.GetOptions{})
+	if err != nil || len(policy.Spec.Ingress) != 3 {
+		t.Fatalf("NetworkPolicy was not reconciled: policy=%+v err=%v", policy, err)
+	}
+}
+
+func TestEnsureUserNamespaceNetworkPolicyRejectsInvalidCIDR(t *testing.T) {
+	err := ensureUserNamespaceNetworkPolicy(context.Background(), fake.NewSimpleClientset(), &types.Config{PodCIDR: "not-a-cidr"}, "user-ns")
+	if err == nil || !strings.Contains(err.Error(), "invalid pod CIDR") {
+		t.Fatalf("expected invalid pod CIDR error, got %v", err)
+	}
+}
+
+func TestEnsureControllerRoleAddsNetworkPolicyPermissionToExistingRole(t *testing.T) {
+	ctx := context.Background()
+	client := fake.NewSimpleClientset(&rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{Name: controllerRoleName, Namespace: "user-ns"},
+		Rules: []rbacv1.PolicyRule{{APIGroups: []string{"networking.k8s.io"}, Resources: []string{"ingresses"}, Verbs: []string{"get", "create", "update"}}},
+	})
+	if err := ensureControllerRole(ctx, client, "user-ns"); err != nil {
+		t.Fatalf("ensureControllerRole() error: %v", err)
+	}
+	role, err := client.RbacV1().Roles("user-ns").Get(ctx, controllerRoleName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("get Role: %v", err)
+	}
+	if !containsString(role.Rules[0].Resources, "networkpolicies") {
+		t.Fatalf("existing Role did not gain NetworkPolicy permission: %v", role.Rules)
+	}
 }
 
 func TestListManagedUserNamespaces(t *testing.T) {
