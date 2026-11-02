@@ -145,23 +145,22 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				return
 			}
 
+			// If the service has changed VO, verify it before copying credentials
+			// or changing any service resources.
+			if newService.VO != "" && newService.VO != oldService.VO {
+				if !slices.Contains(cfg.OIDCGroups, newService.VO) {
+					c.String(http.StatusBadRequest, "service VO is not configured")
+					return
+				}
+				if err := checkIdentity(&newService, authHeader); err != nil {
+					c.String(http.StatusBadRequest, fmt.Sprintln(err))
+					return
+				}
+			}
+
 			if err := mc.EnsureSecretInNamespace(uid, serviceNamespace); err != nil {
 				c.String(http.StatusInternalServerError, fmt.Sprintf("error ensuring credentials for user %s: %v", uid, err))
 				return
-			}
-
-			// If the service has changed VO check permisions again
-			if newService.VO != "" && newService.VO != oldService.VO {
-				for _, vo := range cfg.OIDCGroups {
-					if vo == newService.VO {
-						authHeader := c.GetHeader("Authorization")
-						err := checkIdentity(&newService, authHeader)
-						if err != nil {
-							c.String(http.StatusBadRequest, fmt.Sprintln(err))
-						}
-						break
-					}
-				}
 			}
 		}
 
@@ -458,6 +457,10 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 func validateServiceUpdate(oldService, newService *types.Service, cfg *types.Config) error {
 	// Validate the service specification (including KServe configuration if present)
 	if err := newService.ValidateUpdate(oldService); err != nil {
+		return err
+	}
+
+	if err := validateServiceMountOptions(newService); err != nil {
 		return err
 	}
 

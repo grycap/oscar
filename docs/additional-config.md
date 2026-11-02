@@ -1,21 +1,26 @@
 # Additional configuration
 
-To give the administrator a more personalized cluster configuration, the OSCAR manager searches for a config map on the cluster with the additional properties to apply. Since this is still a work in progress, the only configurable property currently is the container images' origin. As seen in the following ConfigMap definition, you can set a list of "prefixes" that you consider secure repositories, so images that do not come from one of these are restricted.
+To configure trusted image origins, OSCAR reads the `allowed_image_repositories` JSON array from an additional ConfigMap. Each entry must be a fully qualified registry and repository path (for example, `ghcr.io/grycap`). OSCAR compares the registry and complete repository path components, not substrings: `ghcr.io/grycap` permits `ghcr.io/grycap/imagemagick` (including tags and digests) but **not** `ghcr.io/grycap-other/image` or `other.example/ghcr.io/grycap/image`. A more specific entry such as `ghcr.io/grycap/imagemagick` permits that image and its subpaths, but not `ghcr.io/grycap/imagemagick-other`.
 
-``` yaml
+If the ConfigMap is absent or the array is empty (`[]`), images are unrestricted. If the ConfigMap exists but its policy cannot be read or parsed, service creation and updates fail instead of silently disabling the restriction.
+
+```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: config.yaml
   namespace: oscar
 data:
-  allowed_image_repositories:  '["ghcr.io/grycap",...]'
+  allowed_image_repositories: '["ghcr.io/grycap"]'
 ```
 
-Also, the administrator can use the PUT /system/config API call to modify the trusted image repositories. The next example only allows images from the `ghcr.io/grycap` repository/owner.
+The administrator can also update the policy using `PUT /system/config` with Basic authentication. This example allows images from the `ghcr.io/grycap` owner only:
 
-```
-curl -vX PUT -H "Authorization: Basic $(echo -n 'user:password' | base64)" https://<oscar_endpoint>/system/config -d '{"allowed_image_repositories":["ghcr.io/grycap"]}'
+```sh
+curl -X PUT -u '<admin-user>:<admin-password>' \
+  -H 'Content-Type: application/json' \
+  -d '{"allowed_image_repositories":["ghcr.io/grycap"]}' \
+  'https://<oscar_endpoint>/system/config'
 ```
 
 Additionally, this property can be added when creating an OSCAR cluster through the IM, which will automatically create the ConfigMap.

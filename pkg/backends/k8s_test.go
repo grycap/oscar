@@ -67,6 +67,9 @@ storage_providers:
 	}
 
 	validConfigMapReaction = func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+		if action.GetVerb() == "get" && action.(k8stesting.GetAction).GetName() != "test" {
+			return false, nil, nil // Let the fake client report an absent policy ConfigMap.
+		}
 		validCM := &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
@@ -492,6 +495,9 @@ func TestKubeUpdateService(t *testing.T) {
 	}
 
 	validConfigMapReactor := func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+		if action.GetVerb() == "get" && action.(k8stesting.GetAction).GetName() != "test" {
+			return false, nil, nil // Let the fake client report an absent policy ConfigMap.
+		}
 		cm := &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",

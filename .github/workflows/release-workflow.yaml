@@ -1,14 +1,14 @@
-name: release-helm
+name: publish pkg.go.dev
 
 on:
   release:
-    types: [created]
+    types: [created, updated]
 
 jobs:
 
   update-pkgdev:    
     runs-on: ubuntu-22.04
-    if: github.event_name == 'release'
+    if: ${{ !github.event.release.prerelease }}
     steps:
       - name: Trigger pkg.go.dev indexing
         run: |

@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
+	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/grycap/oscar/v4/pkg/backends/resources"
 	"github.com/grycap/oscar/v4/pkg/imagepuller"
 	"github.com/grycap/oscar/v4/pkg/types"
@@ -412,29 +413,45 @@ func ListKnativeServicePods(kubeClientset kubernetes.Interface, namespace, servi
 }
 
 func checkAdditionalConfig(configName string, configNamespace string, service types.Service, cfg *types.Config, kubeClientset kubernetes.Interface) error {
-	// Get the configMapwith the service additional settings
 	cm, err := GetOSCARCMConfiguration(kubeClientset, cfg.AdditionalConfigPath, cfg.Namespace)
+	if apierrors.IsNotFound(err) {
+		return nil // No additional configuration: images are unrestricted.
+	}
 	if err != nil {
-		return nil
+		return fmt.Errorf("cannot read image repository policy: %w", err)
 	}
 
-	var air []string
-	// Unmarshal the FDL stored in the configMap
-	err = json.Unmarshal([]byte(cm.Data[types.AIR]), &air)
-	if err != nil {
-		return nil
+	var allowed []string
+	if err := json.Unmarshal([]byte(cm.Data[types.AIR]), &allowed); err != nil || allowed == nil {
+		return fmt.Errorf("invalid image repository policy in %q", cfg.AdditionalConfigPath)
+	}
+	if len(allowed) == 0 {
+		return nil // An empty allowlist explicitly disables the restriction.
 	}
 
-	if len(air) > 0 {
-		for _, prefix := range air {
-			if strings.Contains(service.Image, prefix) {
-				return nil
-			}
+	repositories := make([]name.Repository, 0, len(allowed))
+	for _, entry := range allowed {
+		// Require a fully qualified registry/repository, not an implicit Docker Hub name.
+		allowedRepo, err := name.NewRepository(entry, name.StrictValidation)
+		if err != nil {
+			return fmt.Errorf("invalid allowed image repository %q: %w", entry, err)
 		}
-		return fmt.Errorf("image %s is not allowed for pull on the cluster. Check the additional configuration file on '%s'", service.Image, cfg.AdditionalConfigPath)
+		repositories = append(repositories, allowedRepo)
 	}
 
-	return nil
+	image, err := name.ParseReference(service.Image)
+	if err != nil {
+		return fmt.Errorf("invalid image reference %q: %w", service.Image, err)
+	}
+	imageRepo := image.Context()
+	for _, allowedRepo := range repositories {
+		if imageRepo.RegistryStr() == allowedRepo.RegistryStr() &&
+			(imageRepo.RepositoryStr() == allowedRepo.RepositoryStr() ||
+				strings.HasPrefix(imageRepo.RepositoryStr(), allowedRepo.RepositoryStr()+"/")) {
+			return nil
+		}
+	}
+	return fmt.Errorf("image %s is not allowed for pull on the cluster. Check the additional configuration file on '%s'", service.Image, cfg.AdditionalConfigPath)
 }
 
 func createServiceConfigMap(service *types.Service, namespace string, kubeClientset kubernetes.Interface) error {

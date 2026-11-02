@@ -47,7 +47,15 @@ mount:
   options: "--buffer-size 128M --vfs-read-chunk-size 64M"
 ```
 
-These options are appended after the default mount flags, so they can override any built-in setting.
+OSCAR accepts only the following additional flags (as `--flag value` or `--flag=value` for flags with values):
+
+| Flag | Value |
+| --- | --- |
+| `--buffer-size`, `--vfs-read-chunk-size`, `--vfs-cache-max-size` | Nonnegative integer, optionally followed by `K`, `M`, `G`, or `T` (case-insensitive), e.g. `128M` |
+| `--dir-cache-time`, `--timeout` | Nonnegative integer followed by `ms`, `s`, `m`, or `h`, e.g. `30s` |
+| `--read-only`, `--no-checksum` | No value |
+
+Flags and values must be separated by ordinary spaces; quoting, tabs, shell syntax, unknown flags, network/control flags (including `--rc`), and configuration or provider overrides (including `--config`) are rejected. The flags above are appended after OSCAR's built-in mount settings. Existing service definitions using any other custom options must remove or replace them before an update; on PodSpec generation, OSCAR drops **all** custom options from a stored definition if any one is invalid. The default mount settings and mounts without custom options remain unchanged.
 
 **Note**: You can find the files of this example on [OSCAR's repository examples](https://github.com/grycap/oscar/tree/master/examples/expose_services/jupyter)
 

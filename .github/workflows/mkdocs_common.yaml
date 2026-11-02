@@ -1,10 +1,9 @@
 name: mkdocs
 
+
 on:
-  push:
-    branches: [master]
-  release:
-    types: [created]
+  workflow_call:
+
 
 jobs:
   build:
