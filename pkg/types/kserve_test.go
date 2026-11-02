@@ -823,7 +823,7 @@ func TestModelServingGetKueueResourceList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if minScale != 3 || req.Cpu().String() != "490m" || req.Memory().String() != "1009Mi" {
+	if minScale != 3 || req.Cpu().String() != "500m" || req.Memory().String() != "1Gi" {
 		t.Errorf("got %s/%s min=%d", req.Cpu(), req.Memory(), minScale)
 	}
 

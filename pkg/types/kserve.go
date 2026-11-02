@@ -234,6 +234,8 @@ func (k KserveInference) getKueueResourceList(service *Service) (request corev1.
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to create Kserve resources for Kueue: %w", err)
 	}
+	// createKserveResources substracts the overhead from the resources, so we need to add it back for Kueue
+	addOverheadToKserveResources(&kserveResourcesRequests)
 	requests = kserveResourcesRequests.Requests
 	var kserveMinScale int32 = 1
 	if scaling, ok := service.ModelServing.GetScaling(); ok && scaling.MinScale > 1 {
@@ -426,6 +428,8 @@ func (k KserveLLMInference) getKueueResourceList(service *Service) (request core
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to create Kserve resources for Kueue: %w", err)
 	}
+	// createKserveResources substracts the overhead from the resources, so we need to add it back for Kueue
+	addOverheadToKserveResources(&kserveResourcesRequests)
 	requests = kserveResourcesRequests.Requests
 	var kserveMinScale int32 = 1
 	if scaling, ok := service.ModelServing.GetScaling(); ok && scaling.MinScale > 1 {
@@ -1109,4 +1113,21 @@ func buildUnstructuredServiceOwnerRef(kserveSvc *unstructured.Unstructured) *Kse
 		UID:        kserveSvc.GetUID(),
 		Kind:       kserveSvc.GetKind(),
 	}
+}
+
+func addOverheadToKserveResources(resources *corev1.ResourceRequirements) {
+	if resources == nil {
+		return
+	}
+	// Substract 10m from the requested CPU due to KServe modelcar overhead
+	cpu := resources.Limits[corev1.ResourceCPU]
+	cpu.Add(resource.MustParse(kserveCpuOverhead))
+	resources.Limits[corev1.ResourceCPU] = cpu
+	resources.Requests[corev1.ResourceCPU] = cpu
+
+	// Substract 15Mi from the requested memory due to KServe modelcar overhead
+	memory := resources.Limits[corev1.ResourceMemory]
+	memory.Add(resource.MustParse(kserveMemoryOverhead))
+	resources.Limits[corev1.ResourceMemory] = memory
+	resources.Requests[corev1.ResourceMemory] = memory
 }
