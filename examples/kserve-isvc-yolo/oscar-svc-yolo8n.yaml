@@ -21,7 +21,7 @@ functions:
       name: yolo8n-onnx-model
       cpu: '1.0'
       memory: 2Gi
-      script: ""
+      script: script.sh
       model_serving:
         inference:
           model_format: onnx

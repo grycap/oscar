@@ -21,7 +21,7 @@ functions:
       name: sklearn-model
       cpu: '1.0'
       memory: 1Gi
-      script: ""
+      script: script.sh
       model_serving:
         inference:
           model_format: sklearn

@@ -2,7 +2,7 @@ functions:
   oscar:
   - oscar-model-serving:
       name: qwen2-5-05b-instruct
-      script: ""
+      script: script.sh
       cpu: '2.0'
       memory: 6Gi
       model_serving:
