@@ -35,27 +35,49 @@ func getServiceAuthCookieDomain(_ string, cfg *types.Config) string {
 	return "." + cfg.IngressHost
 }
 
+// serviceAuthCookieScope holds the attributes that give a service auth cookie
+// its browser identity: its name, Path and Domain. A Set-Cookie header only
+// replaces or deletes the cookie that was issued with the exact same scope.
+type serviceAuthCookieScope struct {
+	name   string
+	path   string
+	domain string
+}
+
+// getServiceAuthCookieScope computes the cookie scope shared by the issuing
+// and the expiring code paths, so an expiring Set-Cookie always targets the
+// cookie that was originally issued. In path-based routing the cookie is
+// scoped to the service's exposed path with a host-only domain; in subdomain
+// routing it is scoped to the parent ingress domain with the root path.
+func getServiceAuthCookieScope(serviceName string, isServiceScopedCookieName, isPathBased bool, cfg *types.Config) serviceAuthCookieScope {
+	scope := serviceAuthCookieScope{
+		name:   GLOBAL_SERVICE_AUTH_COOKIE_NAME,
+		path:   "/",
+		domain: getServiceAuthCookieDomain(serviceName, cfg),
+	}
+
+	if isServiceScopedCookieName || isPathBased {
+		scope.name = getServiceAuthCookieName(serviceName)
+	}
+	if isPathBased {
+		scope.path = getServiceAuthCookiePath(serviceName)
+		scope.domain = ""
+	}
+
+	return scope
+}
+
 // The service-scoped authentication cookie can carry either a service token or
 // an OIDC access token. The corresponding middleware validates its contents.
 func setServiceAuthCookie(c *gin.Context, serviceName, credential string, isServiceScopedCookieName, isPathBased bool, cfg *types.Config) {
 	secure := strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") || c.Request.TLS != nil
-	path := "/"
-	name := GLOBAL_SERVICE_AUTH_COOKIE_NAME
-	domain := getServiceAuthCookieDomain(serviceName, cfg)
-
-	if isServiceScopedCookieName || isPathBased {
-		name = getServiceAuthCookieName(serviceName)
-	}
-	if isPathBased {
-		path = getServiceAuthCookiePath(serviceName)
-		domain = ""
-	}
+	scope := getServiceAuthCookieScope(serviceName, isServiceScopedCookieName, isPathBased, cfg)
 
 	http.SetCookie(c.Writer, &http.Cookie{ // #nosec G124
-		Name:     name,
+		Name:     scope.name,
 		Value:    credential,
-		Path:     path,
-		Domain:   domain,
+		Path:     scope.path,
+		Domain:   scope.domain,
 		MaxAge:   0,
 		Secure:   secure,
 		HttpOnly: true,
@@ -66,18 +88,15 @@ func setServiceAuthCookie(c *gin.Context, serviceName, credential string, isServ
 // The service-scoped authentication cookie can carry either a service token or
 // an OIDC access token. The corresponding middleware validates its contents.
 // This function sets the cookie with an expired value, so it will be deleted by the browser.
-func setExpiredServiceCookie(c *gin.Context, serviceName string, serviceScopedCookieName bool) {
+func setExpiredServiceCookie(c *gin.Context, serviceName string, isServiceScopedCookieName, isPathBased bool, cfg *types.Config) {
 	secure := strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") || c.Request.TLS != nil
-	name := GLOBAL_SERVICE_AUTH_COOKIE_NAME
-	if serviceScopedCookieName {
-		name = getServiceAuthCookieName(serviceName)
-	}
+	scope := getServiceAuthCookieScope(serviceName, isServiceScopedCookieName, isPathBased, cfg)
 
 	http.SetCookie(c.Writer, &http.Cookie{ // #nosec G124
-		Name:  name,
-		Value: "",
-		//Path:     getServiceAuthCookiePath(serviceName, cfg),
-		//Domain:   getServiceAuthCookieDomain(serviceName, cfg),
+		Name:     scope.name,
+		Value:    "",
+		Path:     scope.path,
+		Domain:   scope.domain,
 		MaxAge:   -1,
 		Secure:   secure,
 		HttpOnly: true,
