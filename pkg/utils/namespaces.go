@@ -252,7 +252,7 @@ func ensureUserNamespaceNetworkPolicy(ctx context.Context, kubeClientset kuberne
 	for name, cidr := range map[string]string{"pod CIDR": podCIDR, "service CIDR": serviceCIDR} {
 		ip, _, err := net.ParseCIDR(cidr)
 		if err != nil || ip.To4() == nil {
-			return fmt.Errorf("invalid IPv4 %s %q", name, cidr)
+			return fmt.Errorf("invalid %s %q: must be a valid IPv4 CIDR", name, cidr)
 		}
 	}
 

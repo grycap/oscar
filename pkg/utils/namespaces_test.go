@@ -722,7 +722,13 @@ func TestEnsureControllerRoleReconcilesMissingPodDeleteCollection(t *testing.T) 
 		t.Fatalf("Unable to retrieve controller role: %v", err)
 	}
 
-	if len(role.Rules) != 1 {
-		t.Fatalf("Expected existing role to be preserved (no reconciliation), got %d rules", len(role.Rules))
+	if len(role.Rules) != 2 {
+		t.Fatalf("Expected existing role plus NetworkPolicy permissions, got %d rules", len(role.Rules))
+	}
+	if !containsString(role.Rules[0].Resources, "pods") || !containsString(role.Rules[0].Resources, "services") {
+		t.Fatalf("Expected existing role rule to be preserved, got %+v", role.Rules[0])
+	}
+	if !containsString(role.Rules[1].APIGroups, "networking.k8s.io") || !containsString(role.Rules[1].Resources, "networkpolicies") {
+		t.Fatalf("Expected NetworkPolicy permissions to be added, got %+v", role.Rules[1])
 	}
 }
