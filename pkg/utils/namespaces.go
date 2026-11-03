@@ -268,11 +268,13 @@ func ensureUserNamespaceNetworkPolicy(ctx context.Context, kubeClientset kuberne
 			Ingress: []networkingv1.NetworkPolicyIngressRule{
 				{From: []networkingv1.NetworkPolicyPeer{{PodSelector: &metav1.LabelSelector{}}}},
 				{From: []networkingv1.NetworkPolicyPeer{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": traefikNamespace}}}}},
+				{From: []networkingv1.NetworkPolicyPeer{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": "knative-serving"}}}}},
 				// Permit external clients to reach pods directly or through NodePort.
 				{From: []networkingv1.NetworkPolicyPeer{{IPBlock: &networkingv1.IPBlock{CIDR: "0.0.0.0/0", Except: []string{podCIDR, serviceCIDR}}}}},
 			},
 			Egress: []networkingv1.NetworkPolicyEgressRule{
 				{To: []networkingv1.NetworkPolicyPeer{{PodSelector: &metav1.LabelSelector{}}}},
+				{To: []networkingv1.NetworkPolicyPeer{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": "knative-serving"}}}}},
 				{
 					To: []networkingv1.NetworkPolicyPeer{{
 						NamespaceSelector: &metav1.LabelSelector{
