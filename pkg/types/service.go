@@ -457,10 +457,9 @@ func (s Service) ValidateUpdate(old *Service) error {
 		return fmt.Errorf("invalid new service definition: %v", err)
 	}
 
-	if s.IsModelServing() {
-		if !old.IsModelServing() {
-			return fmt.Errorf("cannot change service type to ModelServing")
-		}
+	if s.IsModelServing() != old.IsModelServing() {
+		return fmt.Errorf("cannot change service type between ModelServing and non-ModelServing")
+	} else if s.IsModelServing() {
 		if err := s.ModelServing.ValidateUpdate(old.ModelServing); err != nil {
 			return err
 		}

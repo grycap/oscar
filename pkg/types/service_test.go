@@ -228,7 +228,7 @@ func TestServiceValidateUpdate(t *testing.T) {
 				return service
 			},
 			oldService:  validService,
-			wantErrText: "cannot change service type to ModelServing",
+			wantErrText: "cannot change service type between ModelServing and non-ModelServing",
 		},
 		{
 			name: "cannot change ModelServing type",
