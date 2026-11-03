@@ -1038,44 +1038,35 @@ func buildHTTPRouteSpec(service *Service, owner *KserveServiceOwner, cfg *Config
 
 func createKserveResources(service *Service) (v1.ResourceRequirements, error) {
 	resources := corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    defaultKserveCpuRequest,
-			corev1.ResourceMemory: defaultKserveMemoryRequest,
-		},
-		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    defaultKserveCpuRequest,
-			corev1.ResourceMemory: defaultKserveMemoryRequest,
-		},
+		Limits:   corev1.ResourceList{},
+		Requests: corev1.ResourceList{},
 	}
 
-	if len(service.CPU) > 0 {
-		cpu, err := resource.ParseQuantity(service.CPU)
-		if err != nil {
-			return resources, err
+	for _, configuredResource := range []struct {
+		name         corev1.ResourceName
+		value        string
+		defaultValue resource.Quantity
+		overhead     string
+	}{
+		{name: corev1.ResourceCPU, value: service.CPU, defaultValue: defaultKserveCpuRequest, overhead: kserveCpuOverhead},
+		{name: corev1.ResourceMemory, value: service.Memory, defaultValue: defaultKserveMemoryRequest, overhead: kserveMemoryOverhead},
+	} {
+		quantity := configuredResource.defaultValue.DeepCopy()
+		if configuredResource.value != "" {
+			parsedQuantity, err := resource.ParseQuantity(configuredResource.value)
+			if err != nil {
+				return resources, err
+			}
+			quantity = parsedQuantity
 		}
-		// Substract 10m from the requested CPU due to KServe modelcar overhead
-		cpu.Sub(resource.MustParse(kserveCpuOverhead))
-		resources.Limits[corev1.ResourceCPU] = cpu
-		resources.Requests[corev1.ResourceCPU] = cpu
-	}
-
-	if len(service.Memory) > 0 {
-		memory, err := resource.ParseQuantity(service.Memory)
-		if err != nil {
-			return resources, err
-		}
-		// Substract 15Mi from the requested memory due to KServe modelcar overhead
-		memory.Sub(resource.MustParse(kserveMemoryOverhead))
-		resources.Limits[corev1.ResourceMemory] = memory
-		resources.Requests[corev1.ResourceMemory] = memory
+		quantity.Sub(resource.MustParse(configuredResource.overhead))
+		resources.Limits[configuredResource.name] = quantity.DeepCopy()
+		resources.Requests[configuredResource.name] = quantity
 	}
 
 	if service.EnableGPU {
-		gpu, err := resource.ParseQuantity("1")
-		if err != nil {
-			return resources, err
-		}
-		resources.Limits["nvidia.com/gpu"] = gpu
+		gpu := resource.MustParse("1")
+		resources.Limits["nvidia.com/gpu"] = gpu.DeepCopy()
 		resources.Requests["nvidia.com/gpu"] = gpu
 	}
 

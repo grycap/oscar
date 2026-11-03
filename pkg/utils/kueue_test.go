@@ -541,26 +541,26 @@ func TestGetResourceOnlyWorkloadSpecWithModelServingPodSet(t *testing.T) {
 
 	cpuReq, ok := kserveResources.Requests[v1.ResourceCPU]
 	if !ok {
-		t.Fatal("expected KServe CPU request in resource-only workload")
+		t.Fatal("expected ModelServing CPU request in resource-only workload")
 	}
-	if cpuReq.String() != "990m" {
-		t.Fatalf("KServe CPU request = %s, want %s", cpuReq.String(), "990m")
+	if cpuReq.String() != "1" {
+		t.Fatalf("ModelServing CPU request = %s, want %s", cpuReq.String(), "1")
 	}
 
 	memReq, ok := kserveResources.Requests[v1.ResourceMemory]
 	if !ok {
-		t.Fatal("expected KServe memory request in resource-only workload")
+		t.Fatal("expected ModelServing memory request in resource-only workload")
 	}
 	if memReq.String() != "2033Mi" {
-		t.Fatalf("KServe memory request = %s, want %s", memReq.String(), "2033Mi")
+		t.Fatalf("ModelServing memory request = %s, want %s", memReq.String(), "2033Mi")
 	}
 
 	gpuReq, ok := kserveResources.Requests["nvidia.com/gpu"]
 	if !ok {
-		t.Fatal("expected KServe GPU request in resource-only workload")
+		t.Fatal("expected ModelServing GPU request in resource-only workload")
 	}
 	if gpuReq.String() != "1" {
-		t.Fatalf("KServe GPU request = %s, want %s", gpuReq.String(), "1")
+		t.Fatalf("ModelServing GPU request = %s, want %s", gpuReq.String(), "1")
 	}
 }
 
@@ -1046,8 +1046,8 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 				return &s
 			}(),
 			wantScale:  1,
-			wantCPU:    "490m",
-			wantMemory: "1009Mi",
+			wantCPU:    "500m",
+			wantMemory: "1Gi",
 		},
 		{
 			name: "kserve custom memory only",
@@ -1060,7 +1060,7 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 			}(),
 			wantScale:  1,
 			wantCPU:    "200m",
-			wantMemory: "2033Mi",
+			wantMemory: "2Gi",
 		},
 		{
 			name: "kserve gpu with default resources",
@@ -1089,8 +1089,8 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 				return &s
 			}(),
 			wantScale:  3,
-			wantCPU:    "990m",
-			wantMemory: "2033Mi",
+			wantCPU:    "1",
+			wantMemory: "2Gi",
 			wantGPU:    true,
 			wantGPUQty: "1",
 		},
@@ -1150,32 +1150,32 @@ func TestGetKserveResourceRequestsDecisionGraph(t *testing.T) {
 
 			cpuReq, ok := requests[v1.ResourceCPU]
 			if !ok {
-				t.Fatal("expected KServe CPU request")
+				t.Fatal("expected ModelServing CPU request")
 			}
 			if cpuReq.String() != tt.wantCPU {
-				t.Fatalf("KServe CPU request = %s, want %s", cpuReq.String(), tt.wantCPU)
+				t.Fatalf("ModelServing CPU request = %s, want %s", cpuReq.String(), tt.wantCPU)
 			}
 
 			memReq, ok := requests[v1.ResourceMemory]
 			if !ok {
-				t.Fatal("expected KServe memory request")
+				t.Fatal("expected ModelServing memory request")
 			}
 			if memReq.String() != tt.wantMemory {
-				t.Fatalf("KServe memory request = %s, want %s", memReq.String(), tt.wantMemory)
+				t.Fatalf("ModelServing memory request = %s, want %s", memReq.String(), tt.wantMemory)
 			}
 
 			_, hasGPU := requests["nvidia.com/gpu"]
 			if hasGPU != tt.wantGPU {
-				t.Fatalf("KServe GPU request present = %v, want %v", hasGPU, tt.wantGPU)
+				t.Fatalf("ModelServing GPU request present = %v, want %v", hasGPU, tt.wantGPU)
 			}
 			if tt.wantGPU {
 				gpuReq := requests["nvidia.com/gpu"]
 				expectedGPU, err := resource.ParseQuantity(tt.wantGPUQty)
 				if err != nil {
-					t.Fatalf("invalid expected KServe GPU quantity %q: %v", tt.wantGPUQty, err)
+					t.Fatalf("invalid expected ModelServing GPU quantity %q: %v", tt.wantGPUQty, err)
 				}
 				if !gpuReq.Equal(expectedGPU) {
-					t.Fatalf("KServe GPU request quantity = %s, want %s", gpuReq.String(), expectedGPU.String())
+					t.Fatalf("ModelServing GPU request quantity = %s, want %s", gpuReq.String(), expectedGPU.String())
 				}
 			}
 		})

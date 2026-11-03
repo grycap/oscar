@@ -455,14 +455,23 @@ func TestCreateKserveResources(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := res.Requests.Cpu().String(); got != "200m" {
-			t.Errorf("cpu = %s, want 200m", got)
+		if got := res.Requests.Cpu().String(); got != "190m" {
+			t.Errorf("cpu = %s, want 190m", got)
 		}
-		if got := res.Requests.Memory().String(); got != "256Mi" {
-			t.Errorf("memory = %s, want 256Mi", got)
+		if got := res.Requests.Memory().String(); got != "241Mi" {
+			t.Errorf("memory = %s, want 241Mi", got)
+		}
+		if got := res.Limits.Cpu().String(); got != "190m" {
+			t.Errorf("cpu limit = %s, want 190m", got)
+		}
+		if got := res.Limits.Memory().String(); got != "241Mi" {
+			t.Errorf("memory limit = %s, want 241Mi", got)
 		}
 		if _, ok := res.Requests["nvidia.com/gpu"]; ok {
 			t.Error("unexpected GPU request")
+		}
+		if _, ok := res.Limits["nvidia.com/gpu"]; ok {
+			t.Error("unexpected GPU limit")
 		}
 	})
 	t.Run("custom with overhead and gpu", func(t *testing.T) {
