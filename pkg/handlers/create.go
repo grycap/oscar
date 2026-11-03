@@ -308,8 +308,19 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", objectStorageIAMErr))
 					return
 				}
-				if err := ValidateMinIOBucketCountQuota(cfg, objectStorageIAM.GetClient(c.Request.Context()), minIOQuota, uid, collectMinIOBucketCandidates(&service)); err != nil {
-					c.String(http.StatusForbidden, err.Error())
+				// Hold the per-user bucket quota lock from the validation until
+				// the service (and its buckets) have been created so concurrent
+				// creations cannot all pass the count check and overtake the limit.
+				// The lock is distributed (Kubernetes Lease) so it also serializes
+				// across manager replicas.
+				var lock *MinIOBucketQuotaLock
+				defer func() {
+					if releaseErr := ReleaseMinIOBucketQuota(c.Request.Context(), back.GetKubeClientset(), lock); releaseErr != nil {
+						createLogger.Printf("Error releasing MinIO bucket quota lock for user %s: %v", uid, releaseErr)
+					}
+				}()
+				lock, ok := AcquireMinIOBucketQuotaLockForRequest(c, back.GetKubeClientset(), cfg, uid, objectStorageIAM.GetClient(c.Request.Context()), minIOQuota, collectMinIOBucketCandidates(&service))
+				if !ok {
 					return
 				}
 			}

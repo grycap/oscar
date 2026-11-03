@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"slices"
+	"sync/atomic"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -1131,5 +1132,95 @@ func TestDeleteBucketRemovesResources(t *testing.T) {
 
 	if _, ok := fake.buckets["bucket"]; ok {
 		t.Fatalf("expected bucket to be deleted")
+	}
+}
+
+func newMinIOQuotaClient(t *testing.T, handler http.HandlerFunc) (*MinIOAdminClient, *httptest.Server) {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut && r.URL.Path == "/minio/admin/v3/set-bucket-quota" {
+			handler(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"Status":"success"}`))
+	}))
+	cfg := Config{
+		MinIOProvider: &MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+	client, err := MakeMinIOAdminClient(&cfg)
+	if err != nil {
+		t.Fatalf("unexpected client error: %v", err)
+	}
+	return client, server
+}
+
+func TestSetBucketStorageQuotaRetriesTransientMinIOErrors(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	var attempts atomic.Int32
+	client, server := newMinIOQuotaClient(t, func(w http.ResponseWriter, r *http.Request) {
+		attempts.Add(1)
+		if attempts.Load() <= 2 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"code":"ServiceUnavailable","message":"service unavailable"}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"Status":"success"}`))
+	})
+	defer server.Close()
+
+	if err := client.SetBucketStorageQuota("bucket", "100Mi"); err != nil {
+		t.Fatalf("expected transient MinIO errors to be retried until success, got %v after %d attempts", err, attempts.Load())
+	}
+	if attempts.Load() != 3 {
+		t.Fatalf("expected 3 attempts for a transient failure, got %d", attempts.Load())
+	}
+}
+
+func TestSetBucketStorageQuotaGivesUpAfterMaxRetries(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	var attempts atomic.Int32
+	client, server := newMinIOQuotaClient(t, func(w http.ResponseWriter, r *http.Request) {
+		attempts.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"code":"ServiceUnavailable","message":"service unavailable"}`))
+	})
+	defer server.Close()
+
+	err := client.SetBucketStorageQuota("bucket", "100Mi")
+	if err == nil {
+		t.Fatalf("expected an error after exhausting the retry budget")
+	}
+	if attempts.Load() != 3 {
+		t.Fatalf("expected exactly 3 attempts before giving up, got %d", attempts.Load())
+	}
+}
+
+func TestSetBucketStorageQuotaDoesNotRetryPermanentErrors(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	var attempts atomic.Int32
+	client, server := newMinIOQuotaClient(t, func(w http.ResponseWriter, r *http.Request) {
+		attempts.Add(1)
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"code":"InvalidArgument","message":"invalid argument"}`))
+	})
+	defer server.Close()
+
+	err := client.SetBucketStorageQuota("bucket", "100Mi")
+	if err == nil {
+		t.Fatalf("expected an error for a non-retriable MinIO response")
+	}
+	if attempts.Load() != 1 {
+		t.Fatalf("expected exactly 1 attempt for a permanent failure, got %d", attempts.Load())
 	}
 }

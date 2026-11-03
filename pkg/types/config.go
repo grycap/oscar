@@ -342,11 +342,11 @@ var configVars = []configVar{
 	{"YunikornConfigFileName", "YUNIKORN_CONFIG_FILENAME", false, stringType, "queues.yaml"},
 
 	{"KueueEnable", "KUEUE_ENABLE", false, boolType, "true"},
-	{"KueueDefaultCPU", "KUEUE_DEFAULT_CPU", false, stringType, "2"},
-	{"KueueDefaultMemory", "KUEUE_DEFAULT_MEMORY", false, stringType, "2Gi"},
+	{"KueueDefaultCPU", "KUEUE_DEFAULT_CPU", false, stringType, "4"},
+	{"KueueDefaultMemory", "KUEUE_DEFAULT_MEMORY", false, stringType, "4Gi"},
 	{"KueueDefaultGPU", "KUEUE_DEFAULT_GPU", false, stringType, "0"},
 	{"KueueDefaultFlavor", "KUEUE_DEFAULT_FLAVOR", false, stringType, "oscar-default-flavor"},
-	{"KueueDefaultEphemeralStorage", "KUEUE_DEFAULT_EPHEMERAL_STORAGE", false, stringType, "1Gi"},
+	{"KueueDefaultEphemeralStorage", "KUEUE_DEFAULT_EPHEMERAL_STORAGE", false, stringType, "2Gi"},
 
 	{"VolumeEnable", "VOLUME_ENABLE", false, boolType, "true"},
 	{"StorageClassName", "STORAGE_CLASS_NAME", false, stringType, "nfs"},
@@ -390,7 +390,7 @@ var configVars = []configVar{
 	{"LokiExposedNamespace", "LOKI_EXPOSED_NAMESPACE", false, stringType, "ingress-nginx"},
 	{"LokiExposedAppLabel", "LOKI_EXPOSED_APP", false, stringType, "ingress-nginx"},
 	{"MinIOQuotaEnabled", "MINIO_QUOTA_ENABLED", false, boolType, "false"},
-	{"MinIOQuotaBuckets", "MINIO_QUOTA_BUCKETS", false, stringType, "5"},
+	{"MinIOQuotaBuckets", "MINIO_QUOTA_BUCKETS", false, stringType, "100"},
 	{"MinIOQuotaStorage", "MINIO_QUOTA_STORAGE", false, stringType, "5Gi"},
 }
 
