@@ -499,8 +499,8 @@ func TestEnsureUserNamespaceNetworkPolicy(t *testing.T) {
 	if len(policy.Spec.PolicyTypes) != 2 || policy.Spec.PolicyTypes[0] != networkingv1.PolicyTypeIngress || policy.Spec.PolicyTypes[1] != networkingv1.PolicyTypeEgress {
 		t.Fatalf("unexpected policyTypes: %v", policy.Spec.PolicyTypes)
 	}
-	if len(policy.Spec.Ingress) != 4 || len(policy.Spec.Egress) != 4 {
-		t.Fatalf("expected 4 ingress and 4 egress rules, got %d and %d", len(policy.Spec.Ingress), len(policy.Spec.Egress))
+	if len(policy.Spec.Ingress) != 4 || len(policy.Spec.Egress) != 5 {
+		t.Fatalf("expected 4 ingress and 5 egress rules, got %d and %d", len(policy.Spec.Ingress), len(policy.Spec.Egress))
 	}
 	if got := policy.Spec.Ingress[1].From[0].NamespaceSelector.MatchLabels["kubernetes.io/metadata.name"]; got != "edge" {
 		t.Fatalf("Traefik namespace selector = %q, want edge", got)
@@ -514,7 +514,13 @@ func TestEnsureUserNamespaceNetworkPolicy(t *testing.T) {
 	if got := policy.Spec.Egress[1].To[0].NamespaceSelector.MatchLabels["kubernetes.io/metadata.name"]; got != "knative-serving" {
 		t.Fatalf("Knative egress namespace selector = %q, want knative-serving", got)
 	}
-	if got := policy.Spec.Egress[2].Ports; len(got) != 2 || got[0].Port.IntValue() != 53 || *got[0].Protocol != corev1.ProtocolUDP || got[1].Port.IntValue() != 53 || *got[1].Protocol != corev1.ProtocolTCP {
+	if got := policy.Spec.Egress[2].To[0].NamespaceSelector.MatchLabels["kubernetes.io/metadata.name"]; got != "minio" {
+		t.Fatalf("MinIO egress namespace selector = %q, want minio", got)
+	}
+	if len(policy.Spec.Egress[2].Ports) != 0 {
+		t.Fatalf("MinIO egress should not restrict ports, got %+v", policy.Spec.Egress[2].Ports)
+	}
+	if got := policy.Spec.Egress[3].Ports; len(got) != 2 || got[0].Port.IntValue() != 53 || *got[0].Protocol != corev1.ProtocolUDP || got[1].Port.IntValue() != 53 || *got[1].Protocol != corev1.ProtocolTCP {
 		t.Fatalf("unexpected DNS ports: %+v", got)
 	}
 
@@ -526,7 +532,7 @@ func TestEnsureUserNamespaceNetworkPolicy(t *testing.T) {
 		t.Fatalf("reconcile NetworkPolicy: %v", err)
 	}
 	policy, err = client.NetworkingV1().NetworkPolicies("user-ns").Get(ctx, userNamespaceNetworkPolicyName, metav1.GetOptions{})
-	if err != nil || len(policy.Spec.Ingress) != 4 {
+	if err != nil || len(policy.Spec.Ingress) != 4 || len(policy.Spec.Egress) != 5 {
 		t.Fatalf("NetworkPolicy was not reconciled: policy=%+v err=%v", policy, err)
 	}
 }
