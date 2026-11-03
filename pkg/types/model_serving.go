@@ -172,7 +172,10 @@ func (m ModelServing) MarshalYAML() (interface{}, error) {
 		return nil, err
 	}
 	var out map[string]interface{}
-	return out, json.Unmarshal(data, &out)
+	if err := json.Unmarshal(data, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // UnmarshalYAML implements yaml.BytesUnmarshaler.
