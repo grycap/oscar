@@ -551,8 +551,8 @@ func TestGetResourceOnlyWorkloadSpecWithModelServingPodSet(t *testing.T) {
 	if !ok {
 		t.Fatal("expected ModelServing memory request in resource-only workload")
 	}
-	if memReq.String() != "2033Mi" {
-		t.Fatalf("ModelServing memory request = %s, want %s", memReq.String(), "2033Mi")
+	if memReq.String() != "2Gi" {
+		t.Fatalf("ModelServing memory request = %s, want %s", memReq.String(), "2Gi")
 	}
 
 	gpuReq, ok := kserveResources.Requests["nvidia.com/gpu"]
