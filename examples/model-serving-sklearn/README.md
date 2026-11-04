@@ -1,11 +1,11 @@
-# KServe Sklearn Iris Classification Example
+# Model Serving Sklearn Iris Classification Example
 
-This example demonstrates how to deploy a scikit-learn Iris classification model with Model Serving's KServe backend and integrate it with OSCAR. When a JSON file is uploaded to the configured MinIO bucket, OSCAR triggers `script.sh`, which calls the KServe v1 inference endpoint and writes the predictions back to MinIO.
+This example demonstrates how to deploy a scikit-learn Iris classification model with OSCAR Model Serving. Model Serving uses KServe underneath, which must be enabled in the cluster to deploy and use this example. When a JSON file is uploaded to the configured MinIO bucket, OSCAR triggers `script.sh`, which calls the Model Serving v1 inference endpoint and writes the predictions back to MinIO.
 
 ## Architecture
 
 ```
-MinIO (input) → OSCAR service → script.sh → KServe (sklearn Iris model) → MinIO (output)
+MinIO (input) → OSCAR service → script.sh → Model Serving (KServe underneath; sklearn Iris model) → MinIO (output)
 ```
 
 **Output per inference:**
@@ -13,29 +13,28 @@ MinIO (input) → OSCAR service → script.sh → KServe (sklearn Iris model) �
 
 ## Prerequisites
 
-- OSCAR cluster with KServe installed
+- OSCAR cluster with KServe enabled (required by Model Serving)
 - `oscar-cli` configured to point to the cluster or `https://dashboard.oscar.grycap.net`
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `oscar-svc-sklearn.yaml` | OSCAR FDL definition with embedded KServe configuration |
-| `isvc-sklearn.yaml` | Raw KServe `InferenceService` manifest (sklearn format, model from GCS) |
-| `script.sh` | Inference script run by OSCAR (sends input JSON to KServe and saves the response) |
+| `oscar-svc-sklearn.yaml` | OSCAR FDL definition with a Model Serving configuration |
+| `script.sh` | Inference script run by OSCAR (sends input JSON to the Model Serving endpoint and saves the response) |
 | `iris-input.json` | Sample input with two Iris flower measurements |
 
 ## Deployment Steps
 
 ### 1. Deploy via OSCAR
 
-Deploy the OSCAR service, which also provisions the KServe InferenceService automatically:
+Deploy the OSCAR service, which also provisions the model-serving deployment using KServe:
 
 ```bash
 oscar-cli apply oscar-svc-sklearn.yaml
 ```
 
-> Note: the direct apply works only with OSCAR's admin user. If you use OIDC you must modify MODEL_SERVING_ENDPOINT variable substitute "oscar-svc" by "oscar-svc-{OIDC ID's forst egth digits}". Example http://yolo8n-onnx-model-predictor.oscar-svc-666d7ac0.svc.cluster.local.
+> Note: direct apply works only with OSCAR's admin user. If you use OIDC, update `MODEL_SERVING_ENDPOINT` to replace `oscar-svc` with `oscar-svc-{first eight characters of the OIDC ID}`. For example: `http://sklearn-model-predictor.oscar-svc-666d7ac0.svc.cluster.local`.
 
 
 Verify the service was created:
@@ -49,18 +48,18 @@ oscar-cli service list
 Upload the sample input file to the OSCAR service input bucket to trigger processing:
 
 ```bash
-oscar-cli service put-file kserve-isvc-sklearn minio kserve-isvc-sklearn/input iris-input.json
+oscar-cli service put-file sklearn-input-output minio sklearn-input-output/input iris-input.json
 ```
 
-> Note: it can take several minutes to deploy the KServe InferenceService and download the model, especially if it's the first time.
+> Note: it can take several minutes to deploy the model-serving deployment and download the model, especially if it's the first time.
 
 ### 3. Retrieve the Output
 
 Wait a few seconds for the job to complete, then list and download the output files:
 
 ```bash
-oscar-cli service list-files kserve-isvc-sklearn minio kserve-isvc-sklearn/output
-oscar-cli service get-file kserve-isvc-sklearn minio kserve-isvc-sklearn/output <filename> .
+oscar-cli service list-files sklearn-input-output minio sklearn-input-output/output
+oscar-cli service get-file sklearn-input-output minio sklearn-input-output/output <filename> .
 ```
 
 The output JSON will contain the predicted class for each input instance:
@@ -73,7 +72,7 @@ You can also browse results through the Dashboard.
 
 ## Input Format
 
-The input must be a JSON file following the KServe v1 predict protocol:
+The input must be a JSON file following the Model Serving v1 predict protocol:
 
 ```json
 {
