@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -780,10 +781,40 @@ func (minIOAdminClient *MinIOAdminClient) SetBucketStorageQuota(bucket, size str
 	if bytes == 0 {
 		quota.Type = ""
 	}
-	if err := minIOAdminClient.adminClient.SetBucketQuota(context.TODO(), bucket, quota); err != nil {
-		return fmt.Errorf("error setting bucket quota for %s: %w", bucket, err)
+	// The MinIO admin API has been observed to answer 503 under load while
+	// the cluster is busy, so transient failures are retried a couple of
+	// times with a small backoff before giving up.
+	const maxAttempts = 3
+	for attempt := 1; ; attempt++ {
+		err := minIOAdminClient.adminClient.SetBucketQuota(context.TODO(), bucket, quota)
+		if err == nil {
+			return nil
+		}
+		if attempt >= maxAttempts || !isTransientMinIOAdminError(err) {
+			return fmt.Errorf("error setting bucket quota for %s: %w", bucket, err)
+		}
+		time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
 	}
-	return nil
+}
+
+// isTransientMinIOAdminError reports whether the error can reasonably be
+// retried: MinIO asking for a slowDown, a service-availability hiccup, an
+// internal error, a lost HTTP connection, or an expired deadline. Anything
+// else (for example an unsupported admin API) is not worth retrying.
+func isTransientMinIOAdminError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	errResp := madmin.ToErrorResponse(err)
+	switch errResp.Code {
+	case "SlowDown", "ServiceUnavailable", "InternalError":
+		return true
+	}
+	var urlErr *url.Error
+	return errors.As(err, &urlErr)
 }
 
 func (minIOAdminClient *MinIOAdminClient) GetBucketStorageQuota(bucket string) (*MinIOQuota, error) {

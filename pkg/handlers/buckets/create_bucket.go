@@ -108,9 +108,22 @@ func MakeCreateHandler(cfg *types.Config, kubeClientset kubernetes.Interface) gi
 		path := strings.Trim(bucket.BucketName, " /")
 		// Split buckets and folders from path
 		splitPath := strings.SplitN(path, "/", 2)
-		if err := handlers.ValidateMinIOBucketCountQuota(cfg, objectStorageIAM.GetClient(c.Request.Context()), minIOQuota, uid, []string{splitPath[0]}); err != nil {
-			c.String(http.StatusForbidden, err.Error())
-			return
+		// Serialize concurrent bucket creations of the same user around the
+		// quota check so they cannot all pass the count check and overtake it.
+		// The lock is distributed (Kubernetes Lease) so it also serializes
+		// across manager replicas.
+		var lock *handlers.MinIOBucketQuotaLock
+		defer func() {
+			if releaseErr := handlers.ReleaseMinIOBucketQuota(c.Request.Context(), kubeClientset, lock); releaseErr != nil {
+				createLogger.Printf("Error releasing MinIO bucket quota lock for user %s: %v", uid, releaseErr)
+			}
+		}()
+		if minIOQuota != nil {
+			var ok bool
+			lock, ok = handlers.AcquireMinIOBucketQuotaLockForRequest(c, kubeClientset, cfg, uid, objectStorageIAM.GetClient(c.Request.Context()), minIOQuota, []string{splitPath[0]})
+			if !ok {
+				return
+			}
 		}
 		if err := objectStorageIAM.GetClient(c.Request.Context()).CreateS3Path(s3Client, splitPath, false); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("Error creating bucket with name '%s': %v", splitPath[0], err))

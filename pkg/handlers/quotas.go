@@ -17,16 +17,21 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -575,6 +580,214 @@ func applyMinIOStoragePerBucketQuota(owner, storagePerBucket string, cfg *types.
 	return nil
 }
 
+// MinIOBucketQuotaExceededError is returned when the requested buckets would
+// push a user over their configured MinIO bucket-count quota.
+type MinIOBucketQuotaExceededError struct {
+	Owner     string
+	Limit     int
+	Current   int
+	Requested int
+}
+
+func (e MinIOBucketQuotaExceededError) Error() string {
+	return fmt.Sprintf("MinIO bucket quota exceeded for user %s: limit %d, current %d, requested new buckets %d", e.Owner, e.Limit, e.Current, e.Requested)
+}
+
+// ErrMinIOBucketQuotaLockBusy is returned when the distributed MinIO bucket
+// quota lock for a user is currently held by another manager replica.
+var ErrMinIOBucketQuotaLockBusy = errors.New("minio bucket quota lock busy")
+
+// minIOBucketQuotaLockLeaseDurationSeconds is the duration of the Kubernetes
+// Lease used as distributed lock for the MinIO bucket quota check.
+const minIOBucketQuotaLockLeaseDurationSeconds int32 = 30
+
+// MinIOBucketQuotaLock is the distributed lock (Kubernetes Lease) used to
+// serialize the MinIO bucket quota check-and-create flow per user owner.
+type MinIOBucketQuotaLock struct {
+	Owner          string
+	Namespace      string
+	LeaseName      string
+	holderIdentity string
+}
+
+// MinIOBucketQuotaHolderIdentity returns the identity used to claim the
+// distributed MinIO bucket quota lock leases. It defaults to the pod name in
+// in-cluster deployments.
+func MinIOBucketQuotaHolderIdentity() string {
+	if podName := os.Getenv("POD_NAME"); podName != "" {
+		return podName
+	}
+	if hostname := os.Getenv("HOSTNAME"); hostname != "" {
+		return hostname
+	}
+	return "oscar"
+}
+
+func minIOBucketQuotaLockName(owner string) string {
+	sum := sha256.Sum256([]byte(owner))
+	return fmt.Sprintf("oscar-minio-quota-%s", hex.EncodeToString(sum[:4]))
+}
+
+// LockMinIOBucketQuota acquires an exclusive distributed lock for the given
+// user so concurrent bucket creations cannot all pass the quota check and
+// overtake the limit. The lock is backed by a Kubernetes Lease, therefore it
+// is shared across manager replicas. It returns ErrMinIOBucketQuotaLockBusy
+// when the lock is already held by another process.
+func LockMinIOBucketQuota(ctx context.Context, kubeClientset kubernetes.Interface, cfg *types.Config, owner string, holderIdentity string) (*MinIOBucketQuotaLock, error) {
+	lock := &MinIOBucketQuotaLock{
+		Owner:          owner,
+		Namespace:      utils.BuildUserNamespace(cfg, owner),
+		LeaseName:      minIOBucketQuotaLockName(owner),
+		holderIdentity: holderIdentity,
+	}
+	leaseDuration := minIOBucketQuotaLockLeaseDurationSeconds
+	lease := &coordinationv1.Lease{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      lock.LeaseName,
+			Namespace: lock.Namespace,
+		},
+		Spec: coordinationv1.LeaseSpec{
+			HolderIdentity:       &holderIdentity,
+			LeaseDurationSeconds: &leaseDuration,
+		},
+	}
+	if _, err := kubeClientset.CoordinationV1().Leases(lock.Namespace).Create(ctx, lease, metav1.CreateOptions{}); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			return nil, ErrMinIOBucketQuotaLockBusy
+		}
+		return nil, fmt.Errorf("creating MinIO bucket quota lock %s/%s: %w", lock.Namespace, lock.LeaseName, err)
+	}
+	return lock, nil
+}
+
+// ReleaseMinIOBucketQuota releases the distributed MinIO bucket quota lock.
+// Releasing a nil lock is a no-op.
+func ReleaseMinIOBucketQuota(ctx context.Context, kubeClientset kubernetes.Interface, lock *MinIOBucketQuotaLock) error {
+	if lock == nil {
+		return nil
+	}
+	// Release the lock with a context that is not tied to the request context:
+	// when the caller is cancelled or interrupted while holding the lock the
+	// release must still be attempted, otherwise the distributed lock remains
+	// held until the lease TTL expires and new requests keep failing with
+	// ErrMinIOBucketQuotaLockBusy.
+	ctx = context.Background()
+	if err := kubeClientset.CoordinationV1().Leases(lock.Namespace).Delete(ctx, lock.LeaseName, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("releasing MinIO bucket quota lock %s/%s: %w", lock.Namespace, lock.LeaseName, err)
+	}
+	return nil
+}
+
+// lockMinIOBucketQuotaRetryAttempts is the number of attempts made to acquire
+// the distributed MinIO bucket quota lock before giving up.
+const lockMinIOBucketQuotaRetryAttempts = 20
+
+// backoffMinIOBucketQuotaLockMs is the base backoff between MinIO bucket
+// quota lock acquisition attempts while the lock is busy.
+const backoffMinIOBucketQuotaLockMs = 50
+
+// minIOBucketQuotaLockIsStale returns true when the distributed MinIO bucket
+// quota lock for the given owner currently exists but its lease expired, which
+// means the previous holder can no longer release it (e.g. after the manager
+// process was interrupted or crashed).
+func minIOBucketQuotaLockIsStale(ctx context.Context, kubeClientset kubernetes.Interface, cfg *types.Config, owner string) (bool, error) {
+	lock := &MinIOBucketQuotaLock{
+		Owner:     owner,
+		Namespace: utils.BuildUserNamespace(cfg, owner),
+		LeaseName: minIOBucketQuotaLockName(owner),
+	}
+	lease, err := kubeClientset.CoordinationV1().Leases(lock.Namespace).Get(ctx, lock.LeaseName, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// No lease present, so the lock is free.
+			return false, nil
+		}
+		return false, err
+	}
+	leaseDuration := time.Duration(*lease.Spec.LeaseDurationSeconds) * time.Second
+	return time.Now().After(lease.CreationTimestamp.Time.Add(leaseDuration)), nil
+}
+
+// LockMinIOBucketQuotaWithRetry acquires the distributed MinIO bucket quota
+// lock for the given user, retrying while the lock is busy. It gives up with
+// ErrMinIOBucketQuotaLockBusy once the retry budget is exhausted. Stuck
+// leases left behind by dead holders are cleaned up before retrying.
+func LockMinIOBucketQuotaWithRetry(ctx context.Context, kubeClientset kubernetes.Interface, cfg *types.Config, owner string, holderIdentity string) (*MinIOBucketQuotaLock, error) {
+	var lock *MinIOBucketQuotaLock
+	var err error
+	for attempt := 0; attempt < lockMinIOBucketQuotaRetryAttempts; attempt++ {
+		lock, err = LockMinIOBucketQuota(ctx, kubeClientset, cfg, owner, holderIdentity)
+		if err == nil {
+			return lock, nil
+		}
+		if !errors.Is(err, ErrMinIOBucketQuotaLockBusy) {
+			return nil, err
+		}
+		// The lock can be stuck on a stale lease whose holder process is gone
+		// (e.g. after an interrupted request or a crash). Clean it up so the
+		// quota check is not blocked indefinitely.
+		stale, staleErr := minIOBucketQuotaLockIsStale(ctx, kubeClientset, cfg, owner)
+		if staleErr == nil && stale {
+			if delErr := kubeClientset.CoordinationV1().Leases(utils.BuildUserNamespace(cfg, owner)).Delete(ctx, minIOBucketQuotaLockName(owner), metav1.DeleteOptions{}); delErr == nil || apierrors.IsNotFound(delErr) {
+				continue
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(time.Duration(backoffMinIOBucketQuotaLockMs) * time.Duration(1<<uint(attempt)) * time.Millisecond):
+		}
+	}
+	return nil, ErrMinIOBucketQuotaLockBusy
+}
+
+// AcquireMinIOBucketQuotaLockForRequest acquires the distributed per-user
+// MinIO bucket quota lock and validates the requested buckets against the
+// user quota, responding with the quota-exceeded error when the quota is
+// exceeded or when the lock cannot be acquired. It returns the acquired lock
+// (the caller must release it once the bucket creation finishes) and whether
+// the request can proceed.
+func AcquireMinIOBucketQuotaLockForRequest(c *gin.Context, kubeClientset kubernetes.Interface, cfg *types.Config, uid string, minIOAdminClient *types.MinIOAdminClient, quota *types.MinIOQuotaUpdate, bucketNames []string) (*MinIOBucketQuotaLock, bool) {
+	if quota == nil {
+		return nil, true
+	}
+	lock, err := LockMinIOBucketQuotaWithRetry(c.Request.Context(), kubeClientset, cfg, uid, MinIOBucketQuotaHolderIdentity())
+	if err != nil {
+		if errors.Is(err, ErrMinIOBucketQuotaLockBusy) {
+			c.String(http.StatusServiceUnavailable, fmt.Sprintf("MinIO bucket quota lock busy for user %s", uid))
+		} else {
+			c.String(http.StatusServiceUnavailable, fmt.Sprintf("Error acquiring MinIO bucket quota lock: %v", err))
+		}
+		return nil, false
+	}
+	if quotaErr := ValidateMinIOBucketCountQuota(cfg, minIOAdminClient, quota, uid, bucketNames); quotaErr != nil {
+		var quotaExceeded MinIOBucketQuotaExceededError
+		if errors.As(quotaErr, &quotaExceeded) {
+			c.JSON(http.StatusForbidden, QuotaExceededResponse(quotaExceeded))
+		} else {
+			c.String(http.StatusForbidden, quotaErr.Error())
+		}
+		return lock, false
+	}
+	return lock, true
+}
+
+// QuotaExceededResponse builds the machine-readable body sent when a request
+// is rejected because of the MinIO bucket-count quota.
+func QuotaExceededResponse(err MinIOBucketQuotaExceededError) gin.H {
+	return gin.H{
+		"status": "error",
+		"code":   "QuotaExceeded",
+		"error":  err.Error(),
+		"details": gin.H{
+			"owner":     err.Owner,
+			"limit":     err.Limit,
+			"current":   err.Current,
+			"requested": err.Requested,
+		},
+	}
+}
+
 func ValidateMinIOBucketCountQuota(cfg *types.Config, minIOAdminClient *types.MinIOAdminClient, quota *types.MinIOQuotaUpdate, owner string, bucketNames []string) error {
 	if quota == nil || quota.Buckets == "" {
 		return nil
@@ -599,7 +812,12 @@ func ValidateMinIOBucketCountQuota(cfg *types.Config, minIOAdminClient *types.Mi
 		newBuckets[bucketName] = struct{}{}
 	}
 	if int64(len(ownedBuckets)+len(newBuckets)) > limit {
-		return fmt.Errorf("MinIO bucket quota exceeded for user %s: limit %d, current %d, requested new buckets %d", owner, limit, len(ownedBuckets), len(newBuckets))
+		return MinIOBucketQuotaExceededError{
+			Owner:     owner,
+			Limit:     int(limit),
+			Current:   len(ownedBuckets),
+			Requested: len(newBuckets),
+		}
 	}
 	return nil
 }
