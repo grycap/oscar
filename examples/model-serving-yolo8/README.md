@@ -53,7 +53,7 @@ oscar-cli service list
 Upload a test image to the OSCAR service input bucket to trigger processing:
 
 ```bash
-oscar-cli service put-file yolo8n-onnx-input-output minio yolo8n-onnx-input-output/input image01.png
+oscar-cli service put-file yolo8n-onnx-input-output minio image01.png yolo8n-onnx-input-output/input/image01.png
 ```
 > Note: it can take several minutes to deploy the model and download it, especially if it's the first time.
 
@@ -63,7 +63,7 @@ Wait a few seconds for the job to complete, then list and download the output fi
 
 ```bash
 oscar-cli service list-files yolo8n-onnx-input-output minio yolo8n-onnx-input-output/output
-oscar-cli service get-file yolo8n-onnx-input-output minio yolo8n-onnx-input-output/output <filename> .
+oscar-cli service get-file yolo8n-onnx-input-output minio yolo8n-onnx-input-output/output/<filename>
 ```
 
 You can also browse results through the Dashboard.

@@ -48,7 +48,7 @@ oscar-cli service list
 Upload the sample input file to the OSCAR service input bucket to trigger processing:
 
 ```bash
-oscar-cli service put-file sklearn-input-output minio sklearn-input-output/input iris-input.json
+oscar-cli service put-file sklearn-input-output minio iris-input.json sklearn-input-output/input/iris-input.json
 ```
 
 > Note: it can take several minutes to deploy the model-serving deployment and download the model, especially if it's the first time.
@@ -59,7 +59,7 @@ Wait a few seconds for the job to complete, then list and download the output fi
 
 ```bash
 oscar-cli service list-files sklearn-input-output minio sklearn-input-output/output
-oscar-cli service get-file sklearn-input-output minio sklearn-input-output/output <filename> .
+oscar-cli service get-file sklearn-input-output minio sklearn-input-output/output/<filename>
 ```
 
 The output JSON will contain the predicted class for each input instance:
