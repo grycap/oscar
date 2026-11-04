@@ -418,24 +418,25 @@ func getWorkloadSpec(service types.Service, namespace string, cfg *types.Config,
 	return workload
 }
 
-func getResourceOnlyWorkloadSpec(service *types.Service, cfg *types.Config, namespace, workloadName, localQueueName string) (*kueuev1.Workload, error) {
-
+// getResourceOnlyWorkloadSpec creates a Kueue Workload spec that only includes resource requests and replicas,
+// without any container images or commands. This is used for validating resource requests against the
+// ClusterQueue without actually deploying a workload.
+func getResourceOnlyWorkloadSpec(service *types.Service, namespace, workloadName, localQueueName string) (*kueuev1.Workload, error) {
 	podSets := []kueuev1.PodSet{}
-	if service.Image != "" {
-		serviceRequests, serviceReplicas, err := getServiceResourceRequests(service, cfg)
+	// If you have other ModelServingbackend that is not KServe
+	// Add anither method for if else
+	if service.IsModelServing() {
+		modelServeingRequests, modelServeingReplicas, err := service.ModelServing.GetKueueResourceList(service)
 		if err != nil {
 			return nil, err
 		}
-
+		podSets = append(podSets, buildResourceCheckPodSet("model-serving-service", modelServeingReplicas, modelServeingRequests))
+	} else if service.Image != "" {
+		serviceRequests, serviceReplicas, err := getServiceResourceRequests(service)
+		if err != nil {
+			return nil, err
+		}
 		podSets = append(podSets, buildResourceCheckPodSet("oscar-service", serviceReplicas, serviceRequests))
-	}
-
-	if service.IsKserve() {
-		kserveRequests, kserveReplicas, err := getKserveResourceRequests(service, cfg)
-		if err != nil {
-			return nil, err
-		}
-		podSets = append(podSets, buildResourceCheckPodSet("kserve-service", kserveReplicas, kserveRequests))
 	}
 
 	boolActive := true
@@ -474,7 +475,7 @@ func buildResourceCheckPodSet(name string, replicas int32, requests v1.ResourceL
 	}
 }
 
-func getServiceResourceRequests(service *types.Service, cfg *types.Config) (v1.ResourceList, int32, error) {
+func getServiceResourceRequests(service *types.Service) (v1.ResourceList, int32, error) {
 	requests := v1.ResourceList{}
 	var cpuQty resource.Quantity = defaultCpuRequest
 	var memoryQty resource.Quantity = defaultMemoryRequest
@@ -537,51 +538,6 @@ func getServiceResourceRequests(service *types.Service, cfg *types.Config) (v1.R
 	}
 
 	return requests, serviceReplicas, nil
-}
-
-func getKserveResourceRequests(service *types.Service, cfg *types.Config) (v1.ResourceList, int32, error) {
-
-	if !service.IsKserve() || !IsKserveSupported(cfg) {
-		return nil, 0, fmt.Errorf("KServe is not supported in the current configuration")
-	}
-
-	requests := v1.ResourceList{}
-	cpuQty := defaultKserveCpuRequest
-	memoryQty := defaultKserveMemoryRequest
-
-	if len(service.Kserve.CPU) > 0 {
-		parsedCPU, err := resource.ParseQuantity(service.Kserve.CPU)
-		if err != nil {
-			return nil, 0, fmt.Errorf("invalid KServe service CPU %q: %w", service.Kserve.CPU, err)
-		}
-		cpuQty = parsedCPU
-	}
-	if len(service.Kserve.Memory) > 0 {
-		parsedMemory, err := resource.ParseQuantity(service.Kserve.Memory)
-		if err != nil {
-			return nil, 0, fmt.Errorf("invalid KServe service memory %q: %w", service.Kserve.Memory, err)
-		}
-		memoryQty = parsedMemory
-	}
-
-	requests[v1.ResourceCPU] = cpuQty
-	requests[v1.ResourceMemory] = memoryQty
-
-	if service.Kserve.EnableGPU {
-		gpu, err := resource.ParseQuantity("1")
-		if err != nil {
-			return nil, 0, fmt.Errorf("invalid KServe service GPU quantity: %w", err)
-		}
-		requests["nvidia.com/gpu"] = gpu
-	}
-
-	var kserveMinScale int32 = 1
-	if service.Kserve.MinScale > 1 {
-		kserveMinScale = service.Kserve.MinScale
-	}
-
-	// resoures, replicas, hasKservePodSet, err
-	return requests, kserveMinScale, nil
 }
 
 // checkQueueReferences validates that the specified LocalQueue and ClusterQueue exist and are correctly linked.
@@ -704,7 +660,7 @@ func VerifyWorkloadByResources(service types.Service, cfg *types.Config) bool {
 	}
 
 	workloadName := buildVerificationWorkloadName(service.Name)
-	workloadSpec, err := getResourceOnlyWorkloadSpec(&service, cfg, namespace, workloadName, localQueueName)
+	workloadSpec, err := getResourceOnlyWorkloadSpec(&service, namespace, workloadName, localQueueName)
 	if err != nil {
 		KueueLogger.Printf("error building resource-only workload for service '%s': %v", service.Name, err)
 		return false

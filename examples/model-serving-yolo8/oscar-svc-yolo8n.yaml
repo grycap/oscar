@@ -1,0 +1,29 @@
+functions:
+  oscar:
+  - oscar:
+      name: yolo8n-onnx-input-output
+      cpu: '1.0'
+      memory: 1Gi
+      image: ghcr.io/grycap/kserve-yolo8n-onnx-script
+      script: script.sh
+      log_level: CRITICAL
+      environment:
+        variables:
+          MODEL_SERVING_ENDPOINT: "http://yolo8n-onnx-model-predictor.oscar-svc.svc.cluster.local"
+      input:
+      - storage_provider: minio
+        path: yolo8n-onnx-input-output/input
+      output:
+      - storage_provider: minio
+        path: yolo8n-onnx-input-output/output
+
+  - oscar:
+      name: yolo8n-onnx-model
+      cpu: '1.0'
+      memory: 2Gi
+      script: script.sh
+      model_serving:
+        inference:
+          model_format: onnx
+          api_version: "v2"
+          source: "oci://ghcr.io/grycap/kserve-yolo8n-onnx"

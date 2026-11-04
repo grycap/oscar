@@ -1,0 +1,28 @@
+functions:
+  oscar:
+  - oscar:
+      name: sklearn-input-output
+      cpu: '1.0'
+      memory: 1Gi
+      image: docker.io/curlimages/curl:8.18.0
+      script: script.sh
+      log_level: CRITICAL
+      environment:
+        variables:
+          MODEL_SERVING_ENDPOINT: "http://sklearn-model-predictor.oscar-svc.svc.cluster.local"
+      input:
+      - storage_provider: minio
+        path: sklearn-input-output/input
+      output:
+      - storage_provider: minio
+        path: sklearn-input-output/output
+
+  - oscar:
+      name: sklearn-model
+      cpu: '1.0'
+      memory: 1Gi
+      script: script.sh
+      model_serving:
+        inference:
+          model_format: sklearn
+          source: "gs://kfserving-examples/models/sklearn/1.0/model"
