@@ -80,6 +80,36 @@ func TestNewOIDCManager(t *testing.T) {
 	}
 }
 
+func TestOIDCAudiencesFromEnvironmentReachManager(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/.well-known/openid-configuration" {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"issuer":%q}`, "http://"+r.Host)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+	for _, pair := range [][2]string{{"OSCAR_USERNAME", "testuser"}, {"OSCAR_PASSWORD", "testpass"}, {"MINIO_ACCESS_KEY", "testaccess"}, {"MINIO_SECRET_KEY", "testsecret"}} {
+		t.Setenv(pair[0], pair[1])
+	}
+	t.Setenv("OIDC_ISSUERS", server.URL)
+	t.Setenv("OIDC_AUDIENCES", fmt.Sprintf(`{%q:["oscar-client","shared-api"]}`, server.URL))
+	cfg, err := types.ReadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := ClusterOidcManagers
+	ClusterOidcManagers = make(map[string]*oidcManager)
+	t.Cleanup(func() { ClusterOidcManagers = previous })
+	getOIDCMiddleware(fake.NewSimpleClientset(), fakeObjectStorageIAM{}, cfg, nil)
+	manager := ClusterOidcManagers[server.URL]
+	if manager == nil || manager.config.ClientID != "oscar-client" || !reflect.DeepEqual(manager.audiences, []string{"oscar-client", "shared-api"}) {
+		t.Fatalf("configured audiences did not reach issuer manager: %v", manager)
+	}
+}
+
 func TestUserHasVO(t *testing.T) {
 	oidcManager := &oidcManager{
 		groups: []string{"/group/group1", "/group/group2"},
@@ -118,7 +148,7 @@ func TestIsAuthorised(t *testing.T) {
 	subject := "123433g"
 	groups := []string{"/group/group1"}
 
-	oidcManager, err := NewOIDCManager(issuer, subject, groups)
+	oidcManager, err := NewOIDCManager(issuer, subject, groups, "oscar-client", "shared-api")
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
@@ -127,16 +157,43 @@ func TestIsAuthorised(t *testing.T) {
 	claims1 := jwt.MapClaims{
 		"iss":              issuer,
 		"sub":              subject,
+		"aud":              "oscar-client",
 		"exp":              time.Now().Add(1 * time.Hour).Unix(),
 		"iat":              time.Now().Unix(),
 		"group_membership": []string{"/group/group1"},
 	}
 
 	token1 := GetToken(claims1)
-	fmt.Println(token1)
 	// Test when the token is authorised
 	if !oidcManager.IsAuthorised(token1) {
 		t.Errorf("expected token1 to be authorised")
+	}
+	unconfigured, err := NewOIDCManager(issuer, subject, groups)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unconfigured.config.InsecureSkipSignatureCheck = true
+	if unconfigured.IsAuthorised(token1) {
+		t.Error("manager without configured audiences must reject even an otherwise valid token")
+	}
+	for _, tc := range []struct {
+		name    string
+		aud     string
+		allowed bool
+	}{
+		{"shared API audience", "shared-api", true},
+		{"other client", "other-client", false},
+		{"missing audience", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			claims := jwt.MapClaims{"iss": issuer, "sub": subject, "exp": time.Now().Add(time.Hour).Unix()}
+			if tc.aud != "" {
+				claims["aud"] = tc.aud
+			}
+			if got := oidcManager.IsAuthorised(GetToken(claims)); got != tc.allowed {
+				t.Errorf("audience %q: authorised = %v, want %v", tc.aud, got, tc.allowed)
+			}
+		})
 	}
 	claims2 := jwt.MapClaims{
 		"iss":              "asdfas2123",
@@ -147,7 +204,6 @@ func TestIsAuthorised(t *testing.T) {
 	}
 	// Test when the token is not authorised
 	token2 := GetToken(claims2)
-	fmt.Println(token2)
 	if oidcManager.IsAuthorised(token2) {
 		t.Errorf("expected token2 to not be authorised")
 	}
@@ -315,6 +371,7 @@ func TestGetOIDCMiddleware(t *testing.T) {
 		OIDCEnable:       true,
 		OIDCSubject:      "123433g",
 		OIDCValidIssuers: []string{server.URL},
+		OIDCAudiences:    map[string][]string{server.URL: {"oscar-client"}},
 		OIDCGroups:       []string{"/group/group1", "/group/group2"},
 		VolumeAvailable:  "5Gi",
 		VolumeMax:        "7Gi",
@@ -325,7 +382,6 @@ func TestGetOIDCMiddleware(t *testing.T) {
 
 	oidcConfig := &oidc.Config{
 		InsecureSkipSignatureCheck: true,
-		SkipClientIDCheck:          true,
 	}
 	middleware := getOIDCMiddleware(kubeClientset, fakeObjectStorageIAM{}, &cfg, oidcConfig)
 	if middleware == nil {
@@ -333,6 +389,7 @@ func TestGetOIDCMiddleware(t *testing.T) {
 	}
 	validClaims := jwt.MapClaims{
 		"iss":                   issuer,
+		"aud":                   "oscar-client",
 		"sub":                   cfg.OIDCSubject,
 		"exp":                   time.Now().Add(1 * time.Hour).Unix(),
 		"iat":                   time.Now().Unix(),
@@ -348,6 +405,11 @@ func TestGetOIDCMiddleware(t *testing.T) {
 			name:  "invalid-token",
 			token: "invalid-token",
 			code:  http.StatusBadRequest,
+		},
+		{
+			name:  "foreign-client-token",
+			token: GetToken(jwt.MapClaims{"iss": issuer, "sub": cfg.OIDCSubject, "aud": "other-client", "exp": time.Now().Add(time.Hour).Unix()}),
+			code:  http.StatusUnauthorized,
 		},
 		{
 			name:  "valid-token",
@@ -456,12 +518,11 @@ func TestOIDCBackendFailuresDoNotReachProtectedHandler(t *testing.T) {
 					return true, nil, errors.New("secret creation failed")
 				})
 			}
-			cfg := &types.Config{OIDCValidIssuers: []string{issuer}, OIDCGroups: []string{"test-group"}}
+			cfg := &types.Config{OIDCValidIssuers: []string{issuer}, OIDCAudiences: map[string][]string{issuer: {"oscar-client"}}, OIDCGroups: []string{"test-group"}}
 			middleware := getOIDCMiddleware(client, fakeObjectStorageIAM{}, cfg, &oidc.Config{
 				InsecureSkipSignatureCheck: true,
-				SkipClientIDCheck:          true,
 			})
-			claims := jwt.MapClaims{"iss": issuer, "sub": "test-user", "exp": time.Now().Add(time.Hour).Unix()}
+			claims := jwt.MapClaims{"iss": issuer, "sub": "test-user", "aud": "oscar-client", "exp": time.Now().Add(time.Hour).Unix()}
 			if tt.invalidToken {
 				claims["exp"] = time.Now().Add(-time.Hour).Unix()
 			}

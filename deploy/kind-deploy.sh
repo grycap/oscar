@@ -62,7 +62,7 @@ Usage: $(basename "$0") [options]
 Options:
     --devel                      Deploy using the OSCAR devel branch without interactive prompts.
     --metrics                    Deploy metrics stack (Prometheus + Loki + Alloy) for reporting.
-    --oidc                       Enable OIDC support for OSCAR (default: disabled).
+    --oidc                       Enable OIDC support (requires OIDC_AUDIENCES JSON in the environment).
     --kueue                      Enable Kueue support for CPU and memory quotas (default: disabled).
     --kserve                     Install KServe using deploy/kind-oscar-kserve.sh (default: disabled).
     --storage=(minio|rustfs)     Select the storage backend to use (default: minio).
@@ -874,7 +874,8 @@ else
         echo -e "  - OIDC_ENABLE=true"
         echo -e "  - OIDC_ISSUERS=$OIDC_ISSUERS_DEFAULT"
         echo -e "  - OIDC_GROUPS=$OIDC_GROUPS_DEFAULT"
-        read -p "Do you want to enable OIDC authentication support with these defaults? [y/n] " use_oidc </dev/tty
+        echo -e "  - OIDC_AUDIENCES must be supplied for each issuer (no default audience)"
+        read -p "Do you want to enable OIDC authentication support? [y/n] " use_oidc </dev/tty
     fi
     if [ "$ENABLE_KSERVE" != "true" ]; then
         read -p "Do you want to install KServe with deploy/scripts/kind-oscar-kserve.sh? [y/n] " use_kserve </dev/tty
@@ -895,6 +896,27 @@ if [ $(echo $use_metrics | tr '[:upper:]' '[:lower:]') == "y" ]; then
 fi
 if [ $(echo $use_oidc | tr '[:upper:]' '[:lower:]') == "y" ]; then
     ENABLE_OIDC="true"
+fi
+if [ "$ENABLE_OIDC" == "true" ]; then
+    if [ -z "${OIDC_AUDIENCES:-}" ]; then
+        echo -e "$RED[!]$END_COLOR OIDC_AUDIENCES is required when OIDC is enabled. Set a JSON issuer-to-allowed-audiences map before installing (see docs/local-testing.md)."
+        exit 1
+    fi
+    if ! OIDC_ISSUERS_DEFAULT="$OIDC_ISSUERS_DEFAULT" python3 -c 'import json, os, sys
+try:
+    audiences = json.loads(os.environ["OIDC_AUDIENCES"])
+    issuers = [issuer.strip() for issuer in os.environ["OIDC_ISSUERS_DEFAULT"].split(",")]
+    valid = isinstance(audiences, dict) and all(
+        isinstance(audiences.get(issuer), list) and audiences[issuer]
+        and all(isinstance(aud, str) and aud.strip() for aud in audiences[issuer])
+        for issuer in issuers
+    )
+except (ValueError, KeyError):
+    valid = False
+sys.exit(0 if valid else 1)' ; then
+        echo -e "$RED[!]$END_COLOR OIDC_AUDIENCES must be JSON with nonempty audience lists for every configured issuer."
+        exit 1
+    fi
 fi
 if [ $(echo $use_kserve | tr '[:upper:]' '[:lower:]') == "y" ]; then
     ENABLE_KSERVE="true"
@@ -1220,6 +1242,7 @@ if [ "$ENABLE_OIDC" == "true" ]; then
     if ! kubectl -n oscar set env deployment/oscar \
         OIDC_ENABLE="true" \
         OIDC_ISSUERS="$OIDC_ISSUERS_DEFAULT" \
+        OIDC_AUDIENCES="$OIDC_AUDIENCES" \
         OIDC_GROUPS="$OIDC_GROUPS_DEFAULT"; then
         echo -e "$RED[!]$END_COLOR Failed to set OIDC environment variables in OSCAR deployment"
         exit 1

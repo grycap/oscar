@@ -18,6 +18,7 @@ package types
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -40,6 +41,7 @@ const (
 
 	stringType            = "string"
 	stringSliceType       = "slice"
+	audienceMapType       = "audienceMap"
 	intType               = "int"
 	boolType              = "bool"
 	secondsType           = "seconds"
@@ -215,6 +217,10 @@ type Config struct {
 
 	// OIDCValidIssuers List of allowed providers to authenticate
 	OIDCValidIssuers []string `json:"-"`
+	// OIDCAudiences maps each issuer URL to explicitly permitted token audiences.
+	// Set OIDC_AUDIENCES as JSON: {"https://issuer.example":["oscar-client","shared-api"]}.
+	// Unconfigured issuers cannot authenticate; list shared API audiences explicitly.
+	OIDCAudiences map[string][]string `json:"-"`
 
 	// OIDCSubject OpenID Connect Subject (user identifier)
 	OIDCSubject string `json:"-"`
@@ -363,6 +369,7 @@ var configVars = []configVar{
 	{"ReSchedulerThreshold", "RESCHEDULER_THRESHOLD", false, intType, "10"},
 	{"OIDCEnable", "OIDC_ENABLE", false, boolType, "false"},
 	{"OIDCValidIssuers", "OIDC_ISSUERS", false, stringSliceType, ""},
+	{"OIDCAudiences", "OIDC_AUDIENCES", false, audienceMapType, "{}"},
 	{"OIDCSubject", "OIDC_SUBJECT", false, stringType, ""},
 	{"OIDCGroups", "OIDC_GROUPS", false, stringSliceType, ""},
 	{"OIDCClientID", "OIDC_CLIENT_ID", false, stringType, ""},
@@ -516,6 +523,31 @@ func ReadConfig() (*Config, error) {
 			value = strings.TrimSpace(strValue)
 		case stringSliceType:
 			value = parseStringSlice(strValue)
+		case audienceMapType:
+			var audiences map[string][]string
+			parseErr = json.Unmarshal([]byte(strValue), &audiences)
+			if parseErr == nil {
+				if audiences == nil {
+					parseErr = fmt.Errorf("must be an object mapping issuer URLs to audience arrays")
+				} else {
+					for issuer, allowed := range audiences {
+						if strings.TrimSpace(issuer) == "" || len(allowed) == 0 {
+							parseErr = fmt.Errorf("each issuer must have a non-empty audience list")
+							break
+						}
+						for _, audience := range allowed {
+							if strings.TrimSpace(audience) == "" {
+								parseErr = fmt.Errorf("audience values must not be empty")
+								break
+							}
+						}
+						if parseErr != nil {
+							break
+						}
+					}
+				}
+			}
+			value = audiences
 		case intType:
 			value, parseErr = parseInt(strValue)
 		case boolType:
