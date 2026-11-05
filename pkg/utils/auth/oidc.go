@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 
 	"net/http"
 	"strings"
@@ -51,6 +52,7 @@ var ClusterOidcManagers = make(map[string]*oidcManager)
 type oidcManager struct {
 	provider   *oidc.Provider
 	config     *oidc.Config
+	audiences  []string
 	subject    string
 	groups     []string
 	tokenCache map[string]*userInfo
@@ -90,19 +92,22 @@ type GroupAI4EOSC struct {
 }
 
 // newOIDCManager returns a new oidcManager or error if the oidc.Provider can't be created
-func NewOIDCManager(issuer string, subject string, groups []string) (*oidcManager, error) {
+func NewOIDCManager(issuer string, subject string, groups []string, audiences ...string) (*oidcManager, error) {
 	provider, err := oidc.NewProvider(context.TODO(), issuer)
 	if err != nil {
 		return nil, err
 	}
 
-	config := &oidc.Config{
-		SkipClientIDCheck: true,
+	// An unconfigured manager cannot accept tokens: the verifier requires a ClientID.
+	config := &oidc.Config{}
+	if len(audiences) > 0 {
+		config.ClientID = audiences[0]
 	}
 
 	return &oidcManager{
 		provider:   provider,
 		config:     config,
+		audiences:  slices.Clone(audiences),
 		subject:    subject,
 		groups:     groups,
 		tokenCache: map[string]*userInfo{},
@@ -113,11 +118,18 @@ func NewOIDCManager(issuer string, subject string, groups []string) (*oidcManage
 func getOIDCMiddleware(kubeClientset kubernetes.Interface, objectStorageIAM objectstorage.ObjectStorageIAM, cfg *types.Config, oidcConfig *oidc.Config) gin.HandlerFunc {
 
 	for _, iss := range cfg.OIDCValidIssuers {
-		issuerManager, err := NewOIDCManager(iss, cfg.OIDCSubject, cfg.OIDCGroups)
-		if oidcConfig != nil {
-			issuerManager.config = oidcConfig
+		allowed := cfg.OIDCAudiences[iss]
+		if len(allowed) == 0 || slices.Contains(allowed, "") {
+			oidcLogger.Printf("No valid OIDC audiences configured for issuer %q", iss)
+			delete(ClusterOidcManagers, iss)
+			continue
 		}
+		issuerManager, err := NewOIDCManager(iss, cfg.OIDCSubject, cfg.OIDCGroups, allowed...)
 		if err == nil {
+			if oidcConfig != nil {
+				// Retain the test-only signature override, never an audience bypass.
+				issuerManager.config.InsecureSkipSignatureCheck = oidcConfig.InsecureSkipSignatureCheck
+			}
 			ClusterOidcManagers[iss] = issuerManager
 		}
 	}
@@ -213,11 +225,35 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, objectStorageIAM obje
 // clearExpired delete expired tokens from the cache
 func (om *oidcManager) clearExpired() {
 	for rawToken := range om.tokenCache {
-		_, err := om.provider.Verifier(om.config).Verify(context.TODO(), rawToken)
+		err := om.verifyToken(rawToken)
 		if err != nil {
 			delete(om.tokenCache, rawToken)
 		}
 	}
+}
+
+// verifyToken requires the full issuer, signature, expiry and audience check
+// for at least one explicitly permitted audience of this issuer.
+func (om *oidcManager) verifyToken(rawToken string) error {
+	if len(om.audiences) == 0 {
+		return fmt.Errorf("OIDC audiences are not configured")
+	}
+	var err error
+	for _, audience := range om.audiences {
+		if strings.TrimSpace(audience) == "" {
+			continue
+		}
+		config := *om.config
+		config.ClientID = audience
+		config.SkipClientIDCheck = false
+		if _, err = om.provider.Verifier(&config).Verify(context.TODO(), rawToken); err == nil {
+			return nil
+		}
+	}
+	if err == nil {
+		return fmt.Errorf("OIDC audiences are not configured")
+	}
+	return err
 }
 
 // GetUserInfo obtains UserInfo from the issuer
@@ -328,7 +364,7 @@ func (om *oidcManager) GetUID(rawToken string) (string, error) {
 // IsAuthorised checks if a token is authorised to access the API
 func (om *oidcManager) IsAuthorised(rawToken string) bool {
 	// Check if the token is valid
-	_, err := om.provider.Verifier(om.config).Verify(context.TODO(), rawToken)
+	err := om.verifyToken(rawToken)
 	if err != nil {
 		return false
 	}
