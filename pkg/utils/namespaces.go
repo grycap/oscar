@@ -21,14 +21,17 @@ import (
 	"crypto/sha1" // #nosec G505 -- used for deterministic short hash, not for security
 	"encoding/hex"
 	"fmt"
+	"net"
 	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/grycap/oscar/v4/pkg/types"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
@@ -220,6 +223,10 @@ func EnsureUserNamespace(ctx context.Context, kubeClientset kubernetes.Interface
 		return "", err
 	}
 
+	if err := ensureUserNamespaceNetworkPolicy(ctx, kubeClientset, cfg, nsName); err != nil {
+		return "", err
+	}
+
 	if err := ensureSharedRuntimePVC(ctx, kubeClientset, cfg, nsName); err != nil {
 		return "", err
 	}
@@ -227,10 +234,121 @@ func EnsureUserNamespace(ctx context.Context, kubeClientset kubernetes.Interface
 	return nsName, nil
 }
 
+const userNamespaceNetworkPolicyName = "oscar-namespace-isolation"
+
+func ensureUserNamespaceNetworkPolicy(ctx context.Context, kubeClientset kubernetes.Interface, cfg *types.Config, namespace string) error {
+	if cfg == nil {
+		return fmt.Errorf("config cannot be nil")
+	}
+
+	podCIDR := cfg.PodCIDR
+	if podCIDR == "" {
+		podCIDR = "10.244.0.0/16"
+	}
+	serviceCIDR := cfg.ServiceCIDR
+	if serviceCIDR == "" {
+		serviceCIDR = "10.96.0.0/12"
+	}
+	for name, cidr := range map[string]string{"pod CIDR": podCIDR, "service CIDR": serviceCIDR} {
+		ip, _, err := net.ParseCIDR(cidr)
+		if err != nil || ip.To4() == nil {
+			return fmt.Errorf("invalid %s %q: must be a valid IPv4 CIDR", name, cidr)
+		}
+	}
+
+	traefikNamespace := cfg.HTTPRouteGatewayNamespace
+	if traefikNamespace == "" {
+		traefikNamespace = "traefik"
+	}
+	policy := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: userNamespaceNetworkPolicyName, Namespace: namespace},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{},
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{
+				{From: []networkingv1.NetworkPolicyPeer{{PodSelector: &metav1.LabelSelector{}}}},
+				{From: []networkingv1.NetworkPolicyPeer{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": traefikNamespace}}}}},
+				{From: []networkingv1.NetworkPolicyPeer{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": "knative-serving"}}}}},
+				// Permit external clients to reach pods directly or through NodePort.
+				{From: []networkingv1.NetworkPolicyPeer{{IPBlock: &networkingv1.IPBlock{CIDR: "0.0.0.0/0", Except: []string{podCIDR, serviceCIDR}}}}},
+			},
+			Egress: []networkingv1.NetworkPolicyEgressRule{
+				{To: []networkingv1.NetworkPolicyPeer{{PodSelector: &metav1.LabelSelector{}}}},
+				{To: []networkingv1.NetworkPolicyPeer{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": "knative-serving"}}}}},
+				{To: []networkingv1.NetworkPolicyPeer{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": "minio"}}}}},
+				{
+					To: []networkingv1.NetworkPolicyPeer{{
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"kubernetes.io/metadata.name": "kube-system"},
+						},
+						PodSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"k8s-app": "kube-dns"},
+						},
+					}},
+					Ports: []networkingv1.NetworkPolicyPort{
+						{Protocol: protocolPtr(corev1.ProtocolUDP), Port: portPtr(53)},
+						{Protocol: protocolPtr(corev1.ProtocolTCP), Port: portPtr(53)},
+					},
+				},
+				{To: []networkingv1.NetworkPolicyPeer{{IPBlock: &networkingv1.IPBlock{CIDR: "0.0.0.0/0", Except: []string{podCIDR, serviceCIDR}}}}},
+			},
+		},
+	}
+
+	client := kubeClientset.NetworkingV1().NetworkPolicies(namespace)
+	existing, err := client.Get(ctx, policy.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		_, err = client.Create(ctx, policy, metav1.CreateOptions{})
+		if apierrors.IsAlreadyExists(err) {
+			return ensureUserNamespaceNetworkPolicy(ctx, kubeClientset, cfg, namespace)
+		}
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	policy.ResourceVersion = existing.ResourceVersion
+	_, err = client.Update(ctx, policy, metav1.UpdateOptions{})
+	return err
+}
+
+func protocolPtr(protocol corev1.Protocol) *corev1.Protocol { return &protocol }
+
+func portPtr(port int) *intstr.IntOrString {
+	value := intstr.FromInt(port)
+	return &value
+}
+
 func ensureControllerRole(ctx context.Context, kubeClientset kubernetes.Interface, namespace string) error {
 	roleClient := kubeClientset.RbacV1().Roles(namespace)
-	if _, err := roleClient.Get(ctx, controllerRoleName, metav1.GetOptions{}); err == nil {
-		return nil
+	if role, err := roleClient.Get(ctx, controllerRoleName, metav1.GetOptions{}); err == nil {
+		for i := range role.Rules {
+			if containsString(role.Rules[i].APIGroups, "networking.k8s.io") {
+				changed := false
+				if !containsString(role.Rules[i].Resources, "networkpolicies") {
+					role.Rules[i].Resources = append(role.Rules[i].Resources, "networkpolicies")
+					changed = true
+				}
+				for _, verb := range []string{"get", "create", "update"} {
+					if !containsString(role.Rules[i].Verbs, verb) {
+						role.Rules[i].Verbs = append(role.Rules[i].Verbs, verb)
+						changed = true
+					}
+				}
+				if changed {
+					_, err = roleClient.Update(ctx, role, metav1.UpdateOptions{})
+					return err
+				}
+				return nil
+			}
+		}
+		role.Rules = append(role.Rules, rbacv1.PolicyRule{
+			APIGroups: []string{"networking.k8s.io"},
+			Resources: []string{"networkpolicies"},
+			Verbs:     []string{"get", "create", "update"},
+		})
+		_, err = roleClient.Update(ctx, role, metav1.UpdateOptions{})
+		return err
 	} else if !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -263,7 +381,7 @@ func ensureControllerRole(ctx context.Context, kubeClientset kubernetes.Interfac
 			},
 			{
 				APIGroups: []string{"networking.k8s.io"},
-				Resources: []string{"ingresses"},
+				Resources: []string{"ingresses", "networkpolicies"},
 				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
 			},
 			{

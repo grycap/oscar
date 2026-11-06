@@ -711,6 +711,30 @@ createKindCluster(){
         fi
         exit
     fi
+    installCalico
+}
+
+installCalico(){
+    local calico_version="v3.29.3"
+    local calico_manifest
+    calico_manifest=$(mktemp -t oscar-calico.XXXXXX)
+    echo -e "\n[*] Installing Calico CNI ..."
+    if ! curl -fsSL "https://raw.githubusercontent.com/projectcalico/calico/${calico_version}/manifests/calico.yaml" \
+        | sed 's#192.168.0.0/16#10.244.0.0/16#g' > "$calico_manifest"; then
+        echo -e "$RED[!]$END_COLOR Failed to download Calico manifest"
+        rm -f "$calico_manifest"
+        exit 1
+    fi
+    if ! kubectl apply -f "$calico_manifest"; then
+        echo -e "$RED[!]$END_COLOR Failed to install Calico"
+        rm -f "$calico_manifest"
+        exit 1
+    fi
+    rm -f "$calico_manifest"
+    if ! kubectl -n kube-system rollout status daemonset/calico-node --timeout=180s; then
+        echo -e "$RED[!]$END_COLOR Calico did not become ready"
+        exit 1
+    fi
 }
 
 while [ "$#" -gt 0 ]; do
@@ -1002,6 +1026,9 @@ if [ $(echo $local_reg | tr '[:upper:]' '[:lower:]') == "y" ]; then
 cat > $CONFIG_FILEPATH <<EOF
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  disableDefaultCNI: true
+  podSubnet: "10.244.0.0/16"
 containerdConfigPatches:
 - |-
   [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:${reg_port}"]
@@ -1063,6 +1090,9 @@ else
 cat > $CONFIG_FILEPATH <<EOF
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  disableDefaultCNI: true
+  podSubnet: "10.244.0.0/16"
 nodes:
 - role: control-plane
   kubeadmConfigPatches:
@@ -1140,9 +1170,9 @@ fi
 echo -e "\n[*] Deploying NFS server provider ..."
 helm repo add --force-update nfs-ganesha-server-and-external-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
 if [ $ARCH == "arm64" ]; then
-    helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner --set image.repository=ghcr.io/grycap/nfs-provisioner-arm64 --set image.tag=latest
+    helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner --set image.repository=ghcr.io/grycap/nfs-provisioner-arm64 --set image.tag=latest --set storageClass.reclaimPolicy=Retain
 else
-    helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner --set image.tag=v3.0.1
+    helm install nfs-server-provisioner nfs-ganesha-server-and-external-provisioner/nfs-server-provisioner --set image.tag=v3.0.1 --set storageClass.reclaimPolicy=Retain
 fi
 
 #Deploy metrics-server

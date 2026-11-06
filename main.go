@@ -96,15 +96,13 @@ func main() {
 		go resourcemanager.StartReScheduler(cfg, back, kubeClientset)
 	}
 
-	//Create quotaBackend
-	var qb *types.QuotaBackend
+	// Create quotaBackend. The job handler always requires a backend, even
+	// when no quota feature is enabled.
+	qb := &types.QuotaBackend{KubeClientset: kubeClientset}
 	if cfg.KueueEnable {
-		qb = types.CreateQuotaBackend(kubeConfig, kubeClientset)
-	} else if cfg.VolumeEnable {
-		qb = &types.QuotaBackend{KubeClientset: kubeClientset}
-	}
-	if qb == nil && (cfg.KueueEnable || cfg.VolumeEnable || cfg.MinIOQuotaEnabled) {
-		qb = &types.QuotaBackend{KubeClientset: kubeClientset}
+		if kueueQB := types.CreateQuotaBackend(kubeConfig, kubeClientset); kueueQB != nil {
+			qb = kueueQB
+		}
 	}
 
 	// Create the router
