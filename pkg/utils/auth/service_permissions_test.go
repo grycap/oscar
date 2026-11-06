@@ -25,94 +25,29 @@ import (
 	"github.com/grycap/oscar/v4/pkg/types"
 )
 
-func TestHasPermission(t *testing.T) {
-	// Decision graph paths for hasPermission:
-	// 1) public -> allow
-	// 2) private + owner -> allow
-	// 3) private + non-owner -> deny
-	// 4) restricted + owner -> allow
-	// 5) restricted + allowed user -> allow
-	// 6) restricted + non-owner + not allowed -> deny
-	// 7) unknown visibility -> deny
+func TestUserAllowedForVisibility(t *testing.T) {
 	tests := []struct {
-		name    string
-		service *types.Service
-		uid     string
-		want    bool
+		name         string
+		uid          string
+		visibility   string
+		owner        string
+		allowedUsers []string
+		want         bool
 	}{
-		{
-			name: "public service allows everyone",
-			service: &types.Service{
-				Visibility: types.PUBLIC,
-				Owner:      "owner",
-			},
-			uid:  "any-user",
-			want: true,
-		},
-		{
-			name: "private service allows owner",
-			service: &types.Service{
-				Visibility: types.PRIVATE,
-				Owner:      "owner",
-			},
-			uid:  "owner",
-			want: true,
-		},
-		{
-			name: "private service denies non-owner",
-			service: &types.Service{
-				Visibility: types.PRIVATE,
-				Owner:      "owner",
-			},
-			uid:  "other-user",
-			want: false,
-		},
-		{
-			name: "restricted service allows owner",
-			service: &types.Service{
-				Visibility:   types.RESTRICTED,
-				Owner:        "owner",
-				AllowedUsers: []string{"allowed-user"},
-			},
-			uid:  "owner",
-			want: true,
-		},
-		{
-			name: "restricted service allows listed user",
-			service: &types.Service{
-				Visibility:   types.RESTRICTED,
-				Owner:        "owner",
-				AllowedUsers: []string{"allowed-user"},
-			},
-			uid:  "allowed-user",
-			want: true,
-		},
-		{
-			name: "restricted service denies non-listed user",
-			service: &types.Service{
-				Visibility:   types.RESTRICTED,
-				Owner:        "owner",
-				AllowedUsers: []string{"allowed-user"},
-			},
-			uid:  "other-user",
-			want: false,
-		},
-		{
-			name: "unknown visibility denies access",
-			service: &types.Service{
-				Visibility: "custom",
-				Owner:      "owner",
-			},
-			uid:  "owner",
-			want: false,
-		},
+		{name: "public allows everyone", uid: "any-user", visibility: types.PUBLIC, owner: "owner", want: true},
+		{name: "private allows owner", uid: "owner", visibility: types.PRIVATE, owner: "owner", want: true},
+		{name: "private denies non-owner", uid: "other-user", visibility: types.PRIVATE, owner: "owner", want: false},
+		{name: "restricted allows owner", uid: "owner", visibility: types.RESTRICTED, owner: "owner", allowedUsers: []string{"allowed-user"}, want: true},
+		{name: "restricted allows listed user", uid: "allowed-user", visibility: types.RESTRICTED, owner: "owner", allowedUsers: []string{"allowed-user"}, want: true},
+		{name: "restricted denies non-listed user", uid: "other-user", visibility: types.RESTRICTED, owner: "owner", allowedUsers: []string{"allowed-user"}, want: false},
+		{name: "empty visibility denies access", uid: "owner", visibility: "", owner: "owner", want: false},
+		{name: "unknown visibility denies access", uid: "owner", visibility: "custom", owner: "owner", want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := hasPermission(tt.service, tt.uid)
-			if got != tt.want {
-				t.Errorf("hasPermission() = %v, want %v", got, tt.want)
+			if got := UserAllowedForVisibility(tt.uid, tt.visibility, tt.owner, tt.allowedUsers); got != tt.want {
+				t.Errorf("UserAllowedForVisibility() = %v, want %v", got, tt.want)
 			}
 		})
 	}
