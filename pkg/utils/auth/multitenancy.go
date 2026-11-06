@@ -35,6 +35,9 @@ import (
 
 const ServicesNamespace = "oscar-svc"
 const ServiceLabelLength = 8
+const AccessKey = "accessKey"
+const SecretKey = "secretKey"
+const OIDCUID = "oidc_uid"
 
 var mcLogger = log.New(os.Stdout, "[OIDC-AUTH] ", log.Flags())
 
@@ -118,9 +121,9 @@ func (mc *MultitenancyConfig) CheckUsersInCache(uids []string) []string {
 
 func (mc *MultitenancyConfig) CreateSecretForOIDC(uid string, sk string) error {
 	secretData := map[string]string{
-		"oidc_uid":  uid,
-		"accessKey": uid,
-		"secretKey": sk,
+		OIDCUID:   uid,
+		AccessKey: uid,
+		SecretKey: sk,
 	}
 	err := utils.CreateSecret(FormatUID(uid), ServicesNamespace, secretData, mc.kubeClientset)
 	if err != nil {
@@ -142,8 +145,8 @@ func (mc *MultitenancyConfig) GetUserCredentials(uid string) (string, string, er
 	}
 
 	encodedData := secret.Data
-	access_key := string(encodedData["accessKey"])
-	secret_key := string(encodedData["secretKey"])
+	access_key := string(encodedData[AccessKey])
+	secret_key := string(encodedData[SecretKey])
 
 	if access_key != "" && secret_key != "" {
 		return access_key, secret_key, nil

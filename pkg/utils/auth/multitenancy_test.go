@@ -189,8 +189,8 @@ func TestEnsureSecretInNamespace(t *testing.T) {
 				Labels:    map[string]string{"key": "val"},
 			},
 			Data: map[string][]byte{
-				"accessKey": []byte("access"),
-				"secretKey": []byte("secret"),
+				AccessKey: []byte("access"),
+				SecretKey: []byte("secret"),
 			},
 		}
 		clientset.CoreV1().Secrets(ServicesNamespace).Create(context.TODO(), baseSecret, metav1.CreateOptions{})
@@ -202,8 +202,8 @@ func TestEnsureSecretInNamespace(t *testing.T) {
 		if err != nil {
 			t.Errorf("expected secret to exist in target namespace, got error: %v", err)
 		}
-		if string(secret.Data["accessKey"]) != "access" {
-			t.Errorf("expected accessKey 'access', got '%s'", string(secret.Data["accessKey"]))
+		if string(secret.Data[AccessKey]) != "access" {
+			t.Errorf("expected accessKey 'access', got '%s'", string(secret.Data[AccessKey]))
 		}
 		if secret.Labels["key"] != "val" {
 			t.Errorf("expected label 'key'='val', got '%s'", secret.Labels["key"])
