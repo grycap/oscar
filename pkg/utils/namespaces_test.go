@@ -544,11 +544,11 @@ func TestEnsureUserNamespaceNetworkPolicyRejectsInvalidCIDR(t *testing.T) {
 	}
 }
 
-func TestEnsureControllerRoleAddsNetworkPolicyPermissionToExistingRole(t *testing.T) {
+func TestEnsureControllerRolePreservesExistingRole(t *testing.T) {
 	ctx := context.Background()
 	client := fake.NewSimpleClientset(&rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{Name: controllerRoleName, Namespace: "user-ns"},
-		Rules: []rbacv1.PolicyRule{{APIGroups: []string{"networking.k8s.io"}, Resources: []string{"ingresses"}, Verbs: []string{"get", "create", "update"}}},
+		Rules:      []rbacv1.PolicyRule{{APIGroups: []string{"networking.k8s.io"}, Resources: []string{"ingresses"}, Verbs: []string{"get", "create", "update"}}},
 	})
 	if err := ensureControllerRole(ctx, client, "user-ns"); err != nil {
 		t.Fatalf("ensureControllerRole() error: %v", err)
@@ -557,8 +557,11 @@ func TestEnsureControllerRoleAddsNetworkPolicyPermissionToExistingRole(t *testin
 	if err != nil {
 		t.Fatalf("get Role: %v", err)
 	}
-	if !containsString(role.Rules[0].Resources, "networkpolicies") {
-		t.Fatalf("existing Role did not gain NetworkPolicy permission: %v", role.Rules)
+	if len(role.Rules) != 1 {
+		t.Fatalf("expected existing Role rules to be untouched, got %v", role.Rules)
+	}
+	if containsString(role.Rules[0].Resources, "networkpolicies") {
+		t.Fatalf("existing Role should not gain NetworkPolicy permission: %v", role.Rules)
 	}
 }
 
@@ -670,6 +673,7 @@ func TestEnsureControllerRoleIncludesVolumeQuotaPermissionsOnCreate(t *testing.T
 	foundPodsRule := false
 	foundResourceQuotas := false
 	foundLimitRanges := false
+	foundIngresses := false
 	for _, rule := range role.Rules {
 		if containsString(rule.APIGroups, "") && containsString(rule.Resources, "pods") {
 			foundPodsRule = true
@@ -689,6 +693,12 @@ func TestEnsureControllerRoleIncludesVolumeQuotaPermissionsOnCreate(t *testing.T
 				t.Fatalf("Expected limitranges rule to include get/create/update verbs. Verbs: %v", rule.Verbs)
 			}
 		}
+		if containsString(rule.APIGroups, "networking.k8s.io") {
+			foundIngresses = containsString(rule.Resources, "ingresses")
+			if containsString(rule.Resources, "networkpolicies") {
+				t.Fatalf("Expected created Role to not include networkpolicies resource: %v", rule.Resources)
+			}
+		}
 	}
 
 	if !foundPodsRule {
@@ -700,9 +710,12 @@ func TestEnsureControllerRoleIncludesVolumeQuotaPermissionsOnCreate(t *testing.T
 	if !foundLimitRanges {
 		t.Fatal("Expected a core API rule with limitranges resource")
 	}
+	if !foundIngresses {
+		t.Fatal("Expected a networking.k8s.io rule with ingresses resource")
+	}
 }
 
-func TestEnsureControllerRoleReconcilesMissingPodDeleteCollection(t *testing.T) {
+func TestEnsureControllerRoleLeavesDriftedExistingRoleUntouched(t *testing.T) {
 	ctx := context.Background()
 	namespace := "test-ns"
 
@@ -726,7 +739,7 @@ func TestEnsureControllerRoleReconcilesMissingPodDeleteCollection(t *testing.T) 
 	)
 
 	if err := ensureControllerRole(ctx, clientset, namespace); err != nil {
-		t.Fatalf("Unexpected error reconciling controller role: %v", err)
+		t.Fatalf("Unexpected error ensuring controller role: %v", err)
 	}
 
 	role, err := clientset.RbacV1().Roles(namespace).Get(ctx, controllerRoleName, metav1.GetOptions{})
@@ -734,13 +747,10 @@ func TestEnsureControllerRoleReconcilesMissingPodDeleteCollection(t *testing.T) 
 		t.Fatalf("Unable to retrieve controller role: %v", err)
 	}
 
-	if len(role.Rules) != 2 {
-		t.Fatalf("Expected existing role plus NetworkPolicy permissions, got %d rules", len(role.Rules))
+	if len(role.Rules) != 1 {
+		t.Fatalf("Expected drifted existing role to be left untouched, got %d rules", len(role.Rules))
 	}
 	if !containsString(role.Rules[0].Resources, "pods") || !containsString(role.Rules[0].Resources, "services") {
 		t.Fatalf("Expected existing role rule to be preserved, got %+v", role.Rules[0])
-	}
-	if !containsString(role.Rules[1].APIGroups, "networking.k8s.io") || !containsString(role.Rules[1].Resources, "networkpolicies") {
-		t.Fatalf("Expected NetworkPolicy permissions to be added, got %+v", role.Rules[1])
 	}
 }

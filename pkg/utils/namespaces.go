@@ -31,8 +31,8 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
 )
@@ -321,34 +321,8 @@ func portPtr(port int) *intstr.IntOrString {
 
 func ensureControllerRole(ctx context.Context, kubeClientset kubernetes.Interface, namespace string) error {
 	roleClient := kubeClientset.RbacV1().Roles(namespace)
-	if role, err := roleClient.Get(ctx, controllerRoleName, metav1.GetOptions{}); err == nil {
-		for i := range role.Rules {
-			if containsString(role.Rules[i].APIGroups, "networking.k8s.io") {
-				changed := false
-				if !containsString(role.Rules[i].Resources, "networkpolicies") {
-					role.Rules[i].Resources = append(role.Rules[i].Resources, "networkpolicies")
-					changed = true
-				}
-				for _, verb := range []string{"get", "create", "update"} {
-					if !containsString(role.Rules[i].Verbs, verb) {
-						role.Rules[i].Verbs = append(role.Rules[i].Verbs, verb)
-						changed = true
-					}
-				}
-				if changed {
-					_, err = roleClient.Update(ctx, role, metav1.UpdateOptions{})
-					return err
-				}
-				return nil
-			}
-		}
-		role.Rules = append(role.Rules, rbacv1.PolicyRule{
-			APIGroups: []string{"networking.k8s.io"},
-			Resources: []string{"networkpolicies"},
-			Verbs:     []string{"get", "create", "update"},
-		})
-		_, err = roleClient.Update(ctx, role, metav1.UpdateOptions{})
-		return err
+	if _, err := roleClient.Get(ctx, controllerRoleName, metav1.GetOptions{}); err == nil {
+		return nil
 	} else if !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -381,7 +355,7 @@ func ensureControllerRole(ctx context.Context, kubeClientset kubernetes.Interfac
 			},
 			{
 				APIGroups: []string{"networking.k8s.io"},
-				Resources: []string{"ingresses", "networkpolicies"},
+				Resources: []string{"ingresses"},
 				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
 			},
 			{
