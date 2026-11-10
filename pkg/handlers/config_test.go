@@ -41,6 +41,8 @@ func createExpectedBody(access_key string, secret_key string, cfg *types.Config)
 			"namespace":                            "",
 			"services_namespace":                   "",
 			"controller_service_account":           "",
+			"pod_cidr":                             "",
+			"service_cidr":                         "",
 			"gpu_available":                        false,
 			"interLink_available":                  false,
 			"yunikorn_enable":                      false,

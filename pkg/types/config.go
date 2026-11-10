@@ -88,6 +88,12 @@ type Config struct {
 	// Kubernetes service account used by the OSCAR controller to manage user namespaces (default: oscar-sa)
 	ControllerServiceAccount string `json:"controller_service_account"`
 
+	// Kubernetes Pod CIDR excluded from user namespace network policy (default: 10.244.0.0/16)
+	PodCIDR string `json:"pod_cidr"`
+
+	// Kubernetes Service CIDR excluded from user namespace network policy (default: 10.96.0.0/12)
+	ServiceCIDR string `json:"service_cidr"`
+
 	// Parameter used to check if the cluster have GPUs
 	GPUAvailable bool `json:"gpu_available"`
 
@@ -326,6 +332,8 @@ var configVars = []configVar{
 	{"Namespace", "OSCAR_NAMESPACE", false, stringType, "oscar"},
 	{"ServicesNamespace", "OSCAR_SERVICES_NAMESPACE", false, stringType, "oscar-svc"},
 	{"ControllerServiceAccount", "OSCAR_CONTROLLER_SERVICE_ACCOUNT", false, stringType, "oscar-sa"},
+	{"PodCIDR", "OSCAR_POD_CIDR", false, stringType, "10.244.0.0/16"},
+	{"ServiceCIDR", "OSCAR_SERVICE_CIDR", false, stringType, "10.96.0.0/12"},
 	{"ServerlessBackend", "SERVERLESS_BACKEND", false, serverlessBackendType, ""},
 	{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
 	{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
