@@ -43,7 +43,6 @@ import (
 	"github.com/grycap/oscar/v4/pkg/metrics"
 	"github.com/grycap/oscar/v4/pkg/resourcemanager"
 	"github.com/grycap/oscar/v4/pkg/types"
-	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	versioned "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
@@ -56,7 +55,7 @@ func main() {
 	}
 
 	// Create all Kubernetes clients from the shared in-cluster configuration.
-	kubeConfigValue, kubeClientset, _, err := utils.NewClients()
+	kubeConfigValue, kubeClientset, _, err := types.NewClients()
 	if err != nil {
 		log.Fatal(err)
 	}

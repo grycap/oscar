@@ -370,7 +370,7 @@ func deleteRouteResources(serviceName string, namespace string, kubeClientset ku
 }
 
 func getGatewayClientset() (dynamic.Interface, error) {
-	restCfg, err := utils.KubernetesConfig()
+	restCfg, err := types.KubernetesConfig()
 	if err != nil {
 		return nil, err
 	}

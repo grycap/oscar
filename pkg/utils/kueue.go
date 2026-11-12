@@ -34,7 +34,7 @@ var (
 	defaultCpuRequest    = resource.MustParse("0.2")
 	defaultMemoryRequest = resource.MustParse("256Mi")
 	newKueueClient       = func() (kueueclientset.Interface, error) {
-		restCfg, err := KubernetesConfig()
+		restCfg, err := types.KubernetesConfig()
 		if err != nil {
 			return nil, err
 		}
