@@ -43,9 +43,8 @@ import (
 	"github.com/grycap/oscar/v4/pkg/metrics"
 	"github.com/grycap/oscar/v4/pkg/resourcemanager"
 	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	versioned "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
@@ -56,20 +55,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Creates the k8s in-cluster config
-	kubeConfig, err := rest.InClusterConfig()
+	// Create all Kubernetes clients from the shared in-cluster configuration.
+	kubeConfigValue, kubeClientset, _, err := utils.NewClients()
 	if err != nil {
 		log.Fatal(err)
 	}
+	kubeConfig := &kubeConfigValue
 
-	// Create the k8s clientset
-	kubeClientset, err := kubernetes.NewForConfig(kubeConfig)
+	// Create the metrics clientset from the shared configuration.
+	metricsClientset, err := versioned.NewForConfig(kubeConfig)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("creating metrics clientset: %v", err)
 	}
-
-	//Create the metrics clientset
-	metricsClientset := versioned.NewForConfigOrDie(kubeConfig)
 
 	// Check if the cluster has available GPUs
 	cfg.CheckAvailableGPUs(kubeClientset)
