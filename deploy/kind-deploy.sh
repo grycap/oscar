@@ -1278,6 +1278,11 @@ if $USE_DNS_WILDCARDS ; then
     kubectl set env deployment/oscar -n oscar EXPOSED_SERVICES_USE_SUBDOMAIN_ROUTE="true"
 fi
 
+if [ "$OSCAR_IMAGE_BRANCH" == "devel" ]; then
+    echo -e "\n[*] Apply devel RBAC rules ..."
+    kubectl apply --server-side --force-conflicts -f "$SCRIPT_DIR/yaml/oscar-rbac.yaml"
+fi
+
 #Wait for OSCAR deployment
 checkOSCARDeploy
  
