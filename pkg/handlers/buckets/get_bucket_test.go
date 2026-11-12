@@ -67,7 +67,6 @@ func TestMakeGetBucketHandlerAdmin(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"success"}`))
-		return
 	}))
 
 	cfg := &types.Config{
@@ -266,7 +265,6 @@ func TestMakeGetBucketHandlerRestrictedMember(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"success"}`))
-		return
 	}))
 
 	cfg := &types.Config{
@@ -434,7 +432,6 @@ func TestMakeGetBucketHandlerPagination(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"success"}`))
-		return
 	}))
 
 	cfg := &types.Config{

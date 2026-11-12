@@ -108,7 +108,11 @@ func TestRustFSIAMIntegration(t *testing.T) {
 	if _, err := s3Client.CreateBucket(&s3.CreateBucketInput{Bucket: aws.String(bucketName)}); err != nil {
 		t.Fatalf("creating temporary RustFS notification bucket: %v", err)
 	}
-	defer s3Client.DeleteBucket(&s3.DeleteBucketInput{Bucket: aws.String(bucketName)})
+	defer func() {
+		if _, err := s3Client.DeleteBucket(&s3.DeleteBucketInput{Bucket: aws.String(bucketName)}); err != nil {
+			t.Logf("deleting temporary RustFS notification bucket: %v", err)
+		}
+	}()
 
 	adminClient, err := types.MakeMinIOAdminClient(cfg)
 	if err != nil {

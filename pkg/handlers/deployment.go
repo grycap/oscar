@@ -311,7 +311,7 @@ func deploymentStatusFromDeployment(service *types.Service, deployment *appsv1.D
 	crashLoop := hasCrashLoopBackOff(pods, containerName)
 	podInitializing := hasPodInitializing(pods)
 
-	state := types.DeploymentStatePending
+	var state string
 	switch {
 	case desired == 0:
 		state = types.DeploymentStateStopped

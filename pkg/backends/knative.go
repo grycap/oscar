@@ -308,11 +308,11 @@ func (kn *KnativeBackend) UpdateService(service types.Service) error {
 					return err
 				}
 				// Set the new service's values on the old Knative service to avoid update issues
-				oldSvc.ObjectMeta.Labels = knSvc.ObjectMeta.Labels
+				oldSvc.Labels = knSvc.Labels
 				oldSvc.Spec = knSvc.Spec
 				// Update the annotations
-				for k, v := range knSvc.ObjectMeta.Annotations {
-					oldSvc.ObjectMeta.Annotations[k] = v
+				for k, v := range knSvc.Annotations {
+					oldSvc.Annotations[k] = v
 				}
 
 				_, err = kn.knClientset.ServingV1().Services(namespace).Update(context.TODO(), oldSvc, metav1.UpdateOptions{})
@@ -496,14 +496,14 @@ func (kn *KnativeBackend) createKNServiceDefinition(service *types.Service, name
 	}
 	// Add to the service labels the user VO for accounting on knative pods
 	if service.Labels["vo"] != "" {
-		knSvc.Spec.ConfigurationSpec.Template.ObjectMeta.Labels["vo"] = service.Labels["vo"]
+		knSvc.Spec.Template.Labels["vo"] = service.Labels["vo"]
 	}
 	if service.Labels["kueue.x-k8s.io/queue-name"] != "" {
-		knSvc.Spec.ConfigurationSpec.Template.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = service.Labels["kueue.x-k8s.io/queue-name"]
+		knSvc.Spec.Template.Labels["kueue.x-k8s.io/queue-name"] = service.Labels["kueue.x-k8s.io/queue-name"]
 	}
 	if service.EnableSGX {
-		knSvc.Spec.ConfigurationSpec.Template.ObjectMeta.Annotations["kubernetes.podspec-securitycontext"] = "enabled"
-		knSvc.Spec.ConfigurationSpec.Template.ObjectMeta.Annotations["kubernetes.containerspec-addcapabilities"] = "enabled"
+		knSvc.Spec.Template.Annotations["kubernetes.podspec-securitycontext"] = "enabled"
+		knSvc.Spec.Template.Annotations["kubernetes.containerspec-addcapabilities"] = "enabled"
 	}
 
 	return knSvc, nil

@@ -225,7 +225,7 @@ func startS3Server(t *testing.T, buckets []string) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/" {
 			w.Header().Set("Content-Type", "application/xml")
-			fmt.Fprintf(w, `<ListAllMyBucketsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Owner><DisplayName>owner</DisplayName><ID>owner</ID></Owner><Buckets>%s</Buckets></ListAllMyBucketsResult>`, renderBuckets(buckets))
+			_, _ = fmt.Fprintf(w, `<ListAllMyBucketsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Owner><DisplayName>owner</DisplayName><ID>owner</ID></Owner><Buckets>%s</Buckets></ListAllMyBucketsResult>`, renderBuckets(buckets))
 			return
 		}
 		w.WriteHeader(http.StatusOK)

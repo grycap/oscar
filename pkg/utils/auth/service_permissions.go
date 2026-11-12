@@ -75,7 +75,6 @@ func GetServicePermissionsMiddleware(back types.ServerlessBackend) gin.HandlerFu
 		}
 
 		c.AbortWithStatus(http.StatusForbidden)
-		return
 	}
 }
 

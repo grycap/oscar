@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"reflect"
 	"strings"
 
@@ -38,7 +37,6 @@ import (
 
 var allUserGroupNotExist = "unable to remove bucket from policy \"" + types.ALL_USERS_GROUP + "\", policy '" + types.ALL_USERS_GROUP + "' does not exist"
 var bucketNotExist = "NoSuchBucket: The specified bucket does not exist"
-var deleteLogger = log.New(os.Stdout, "[DELETE-HANDLER] ", log.Flags())
 
 // MakeDeleteHandler godoc
 // @Summary Delete service
@@ -328,7 +326,7 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		oldTags, _ := minIOAdminClient.GetTaggedMetadata(bucketName)
 		// Bucket metadata for filtering
 		// If bucket dont have already the tags, set them.
-		if oldTags != nil && len(oldTags) > 0 && oldTags["from_service"] != "" {
+		if len(oldTags) > 0 && oldTags["from_service"] != "" {
 			taggedService := oldTags["from_service"]
 			if taggedService == service.Name {
 				oldTags["from_service"] = ""

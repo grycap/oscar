@@ -18,9 +18,7 @@ package buckets
 
 import (
 	"fmt"
-	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 
@@ -30,8 +28,6 @@ import (
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
 )
-
-var updateLogger = log.New(os.Stdout, "[UPDATE-HANDLER] ", log.Flags())
 
 // MakeUpdateHandler godoc
 // @Summary Update bucket

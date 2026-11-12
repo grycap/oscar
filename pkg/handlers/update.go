@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"slices"
 	"strings"
 
@@ -31,9 +30,6 @@ import (
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
-
-// Custom logger
-var updateLogger = log.New(os.Stdout, "[UPDATE-HANDLER] ", log.Flags())
 
 // MakeUpdateHandler godoc
 // @Summary Update service
@@ -245,9 +241,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		// If isolation level was USER delete all private buckets
-		if strings.ToUpper(oldService.IsolationLevel) == types.IsolationLevelUser && strings.ToUpper(newService.IsolationLevel) == types.IsolationLevelUser {
-			// TODO add/remove users buckets
-		}
+		// TODO add/remove users buckets
 
 		// Use create buckets function to create new inputs/outputs if needed
 		var newServiceBuckets []types.MinIOBucket
@@ -469,7 +463,7 @@ func validateServiceUpdate(oldService, newService *types.Service, cfg *types.Con
 	// If supported, add a label to the service indicating that it is a KServe service
 	if newService.IsModelServing() {
 		if !newService.ModelServing.IsTypeSupportedByOSCAR(cfg) {
-			return fmt.Errorf("Model Serving is not supported in this OSCAR deployment")
+			return fmt.Errorf("model serving is not supported in this OSCAR deployment")
 		}
 		if newService.Labels == nil {
 			newService.Labels = make(map[string]string)

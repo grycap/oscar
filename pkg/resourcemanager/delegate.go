@@ -313,7 +313,7 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 				results = append(results, []float64{20, 0, 0, 0, 1e6, 1e6})
 				continue
 			}
-			defer resp2.Body.Close()
+			defer func() { _ = resp2.Body.Close() }()
 			body, err := io.ReadAll(resp2.Body) //  io.ReadAll-> read body request
 			if err != nil {
 				fmt.Printf("Error to read body request to %s: %v\n", cred.URL, err)
@@ -361,7 +361,7 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 				continue
 			}
 
-			defer resp1.Body.Close()
+			defer func() { _ = resp1.Body.Close() }()
 			var clusterStatus types.StatusInfo
 			err = json.NewDecoder(resp1.Body).Decode(&clusterStatus)
 			if err != nil {
@@ -644,12 +644,6 @@ func getRefreshTokenForService(service *types.Service, kubeClientset kubernetes.
 	}
 
 	return strings.TrimSpace(string(tokenBytes))
-}
-
-type refreshTokenResponse struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpiresIn   int    `json:"expires_in"`
 }
 
 func exchangeRefreshToken(cfg *types.Config, refreshToken string) (string, error) {
@@ -951,7 +945,7 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 							fmt.Printf("Error getting cluster status to ClusterID \"%s\": unable to send request: %v\n", replica.ClusterID, err)
 							continue
 						}
-						defer resp_quota.Body.Close()
+						defer func() { _ = resp_quota.Body.Close() }()
 
 						// Handling the error responses mapped in the OSCAR Handler
 						if resp_quota.StatusCode != http.StatusOK {
@@ -962,7 +956,6 @@ func getClusterStatus(service *types.Service, replicas types.ReplicaList, authHe
 							case http.StatusServiceUnavailable:
 								fmt.Printf("Error 503: The quota system is disabled on the server and has available resources\n")
 								canExecute = true
-								break
 							default:
 								fmt.Printf("Server error (%d): %s\n", resp_quota.StatusCode, string(bodyBytes))
 							}
@@ -1183,7 +1176,7 @@ func countJobs(jobStatuses map[string]JobStatus) (float64, int) {
 		}
 	}
 
-	var averageExecutionTime float64 = 1e6
+	var averageExecutionTime = 1e6
 	if succeededCount > 0 {
 		averageExecutionTime = totalExecutionTime / float64(succeededCount)
 	}

@@ -279,7 +279,7 @@ func FetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, u
 
 	if cfg.VolumeEnable {
 		if qb.KubeClientset == nil {
-			return nil, fmt.Errorf("Kubernetes client is not initialized")
+			return nil, fmt.Errorf("kubernetes client is not initialized")
 		}
 		volumes, err := utils.GetVolumeQuotaInfo(auth.FormatUID(user), utils.BuildUserNamespace(cfg, user), cfg, qb.KubeClientset)
 		if err != nil {
@@ -314,7 +314,7 @@ func updateQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, 
 			return fmt.Errorf("volume quotas require VOLUME_ENABLE=true")
 		}
 		if qb.KubeClientset == nil {
-			return fmt.Errorf("Kubernetes client is not initialized")
+			return fmt.Errorf("kubernetes client is not initialized")
 		}
 		if err := updateVolumeQuota(user, req.Volumes, cfg, qb); err != nil {
 			return err
@@ -323,7 +323,7 @@ func updateQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, 
 
 	if hasMinIOQuotaUpdate(req.MinIO) && cfg.MinIOQuotaEnabled {
 		if qb.KubeClientset == nil {
-			return fmt.Errorf("Kubernetes client is not initialized")
+			return fmt.Errorf("kubernetes client is not initialized")
 		}
 		if err := updateMinIOQuota(ctx, user, req.MinIO, cfg, qb.KubeClientset); err != nil {
 			return err
@@ -671,8 +671,8 @@ func ReleaseMinIOBucketQuota(ctx context.Context, kubeClientset kubernetes.Inter
 	// release must still be attempted, otherwise the distributed lock remains
 	// held until the lease TTL expires and new requests keep failing with
 	// ErrMinIOBucketQuotaLockBusy.
-	ctx = context.Background()
-	if err := kubeClientset.CoordinationV1().Leases(lock.Namespace).Delete(ctx, lock.LeaseName, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+	releaseCtx := context.Background()
+	if err := kubeClientset.CoordinationV1().Leases(lock.Namespace).Delete(releaseCtx, lock.LeaseName, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("releasing MinIO bucket quota lock %s/%s: %w", lock.Namespace, lock.LeaseName, err)
 	}
 	return nil
@@ -705,7 +705,7 @@ func minIOBucketQuotaLockIsStale(ctx context.Context, kubeClientset kubernetes.I
 		return false, err
 	}
 	leaseDuration := time.Duration(*lease.Spec.LeaseDurationSeconds) * time.Second
-	return time.Now().After(lease.CreationTimestamp.Time.Add(leaseDuration)), nil
+	return time.Now().After(lease.CreationTimestamp.Add(leaseDuration)), nil
 }
 
 // LockMinIOBucketQuotaWithRetry acquires the distributed MinIO bucket quota

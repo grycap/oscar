@@ -87,8 +87,8 @@ func ParseMountOptions(opts string) (string, error) {
 	// Do not allow quoting, shell metacharacters, tabs or line breaks. Only
 	// explicitly recognized flags and values are emitted below.
 	for _, c := range opts {
-		if !(c == ' ' || c == '-' || c == '=' || c >= '0' && c <= '9' ||
-			c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') {
+		if c != ' ' && c != '-' && c != '=' && (c < '0' || c > '9') &&
+			(c < 'a' || c > 'z') && (c < 'A' || c > 'Z') {
 			return "", fmt.Errorf("mount options contain invalid characters")
 		}
 	}

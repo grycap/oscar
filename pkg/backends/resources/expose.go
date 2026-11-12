@@ -96,7 +96,7 @@ func CreateExpose(service *types.Service, namespace string, kubeClientset kubern
 		targetNamespace = cfg.ServicesNamespace
 	}
 	if len(service.Expose.NodePort) > 0 && len(service.Expose.APIPort) != len(service.Expose.NodePort) {
-		return fmt.Errorf("The length of nodePort (%d) must be equal to that of api_port (%d)",
+		return fmt.Errorf("the length of nodePort (%d) must be equal to that of api_port (%d)",
 			len(service.Expose.NodePort), len(service.Expose.APIPort))
 	}
 
@@ -238,7 +238,7 @@ func UpdateExpose(service types.Service, namespace string, kubeClientset kuberne
 	if cfg.KueueEnable && service.Owner != types.DefaultOwner {
 		err = utils.CheckWorkloadAdmited(service, namespace, cfg, kubeClientset, getDeploymentSpec)
 		if err != nil {
-			return fmt.Errorf("Invalid workload after update: Error checking workload admission: change the cpu/memory requests")
+			return fmt.Errorf("invalid workload after update: Error checking workload admission: change the cpu/memory requests")
 		}
 	}
 	return nil
@@ -504,17 +504,17 @@ func getDeploymentSpec(service types.Service, namespace string, cfg *types.Confi
 		Status: apps.DeploymentStatus{},
 	}
 	if service.Owner != types.DefaultOwner && cfg.KueueEnable {
-		deployment.Spec.Template.ObjectMeta.Labels[types.KueueOwnerLabel] = uid
+		deployment.Spec.Template.Labels[types.KueueOwnerLabel] = uid
 
 		// TO DO: In KUEUE v0.16.0+ you can simply add quque name to use KUEUE
 		// But here we have separate Workload for the service
 		// if we set the label it will count to times the consumed resources
 		//deployment.Spec.Template.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
-		deployment.Spec.Template.ObjectMeta.Annotations = map[string]string{
+		deployment.Spec.Template.Annotations = map[string]string{
 			"kueue.x-k8s.io/queue-name": utils.BuildLocalQueueName(service.Name),
 		}
 		//deployment.ObjectMeta.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
-		deployment.ObjectMeta.Annotations = map[string]string{
+		deployment.Annotations = map[string]string{
 			"kueue.x-k8s.io/queue-name": utils.BuildLocalQueueName(service.Name),
 		}
 
@@ -600,7 +600,7 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 		}
 	}
 	var num int32 = 0777
-	podSpec.Volumes[0].VolumeSource.ConfigMap.DefaultMode = &num
+	podSpec.Volumes[0].ConfigMap.DefaultMode = &num
 	if service.Mount.Provider != "" {
 		SetMount(podSpec, service, cfg)
 	}
@@ -616,20 +616,6 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 		Spec: *podSpec,
 	}
 	return template
-}
-
-// / List deployment and the horizontal auto scale
-func listDeployments(namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) (*apps.DeploymentList, *autos.HorizontalPodAutoscalerList, error) {
-	deployment, err := kubeClientset.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	hpa, err2 := kubeClientset.AutoscalingV1().HorizontalPodAutoscalers(namespace).List(context.TODO(), metav1.ListOptions{})
-	if err2 != nil {
-		return nil, nil, err2
-	}
-	return deployment, hpa, nil
 }
 
 // Delete Deployment and HPA
@@ -783,16 +769,6 @@ func getServiceSpec(service types.Service, namespace string, cfg *types.Config) 
 		},
 	}
 	return service_spec
-}
-
-/// List services in a certain namespace
-
-func listServices(namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) (*v1.ServiceList, error) {
-	services, err := kubeClientset.CoreV1().Services(namespace).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return services, nil
 }
 
 // / Update a kubernete service
@@ -1044,7 +1020,7 @@ func getIngressSpec(service types.Service, namespace string, cfg *types.Config) 
 	pathofapi := getAPIPath(service.Name)
 	name_service := getServiceName(service.Name)
 	var ptype net.PathType = "ImplementationSpecific"
-	var ingresspath net.HTTPIngressPath = net.HTTPIngressPath{
+	var ingresspath = net.HTTPIngressPath{
 		Path:     pathofapi + "/?(.*)",
 		PathType: &ptype,
 		Backend: net.IngressBackend{
@@ -1056,14 +1032,14 @@ func getIngressSpec(service types.Service, namespace string, cfg *types.Config) 
 			},
 		},
 	}
-	var ingresssrulevalue net.HTTPIngressRuleValue = net.HTTPIngressRuleValue{
+	var ingresssrulevalue = net.HTTPIngressRuleValue{
 		Paths: []net.HTTPIngressPath{ingresspath},
 	}
 	var rule net.IngressRule
 	var tls net.IngressTLS
 	var specification net.IngressSpec
 
-	var host string = cfg.IngressHost
+	var host = cfg.IngressHost
 
 	if host == "" {
 		rule = net.IngressRule{
@@ -1119,16 +1095,6 @@ func getIngressSpec(service types.Service, namespace string, cfg *types.Config) 
 		Status: net.IngressStatus{},
 	}
 	return ingress
-}
-
-/// List the kuberntes ingress
-
-func listIngress(namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) (*net.IngressList, error) {
-	ingress, err := kubeClientset.NetworkingV1().Ingresses(namespace).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return ingress, nil
 }
 
 // Delete a kubernetes ingress

@@ -106,10 +106,10 @@ func TestMakeUpdateHandler(t *testing.T) {
 		}
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 		} else {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"status": "success"}`))
+			_, _ = rw.Write([]byte(`{"status": "success"}`))
 		}
 	}))
 
@@ -207,15 +207,15 @@ func TestMakeUpdateHandlerVOTransitions(t *testing.T) {
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
-			fmt.Fprintf(w, `{"issuer":%q,"userinfo_endpoint":%q,"jwks_uri":%q}`, server.URL, server.URL+"/userinfo", server.URL+"/keys")
+			_, _ = fmt.Fprintf(w, `{"issuer":%q,"userinfo_endpoint":%q,"jwks_uri":%q}`, server.URL, server.URL+"/userinfo", server.URL+"/keys")
 		case "/userinfo":
-			fmt.Fprint(w, `{"sub":"owner","group_membership":["vo1"]}`)
+			_, _ = fmt.Fprint(w, `{"sub":"owner","group_membership":["vo1"]}`)
 		case "/keys":
-			fmt.Fprint(w, buildRSAJWK(&priv.PublicKey))
+			_, _ = fmt.Fprint(w, buildRSAJWK(&priv.PublicKey))
 		case "/minio/admin/v3/info":
-			fmt.Fprint(w, `{"Mode":"local","Region":"us-east-1"}`)
+			_, _ = fmt.Fprint(w, `{"Mode":"local","Region":"us-east-1"}`)
 		default:
-			fmt.Fprint(w, `{"status":"success"}`)
+			_, _ = fmt.Fprint(w, `{"status":"success"}`)
 		}
 	}))
 	defer server.Close()
@@ -375,11 +375,11 @@ func TestMakeUpdateHandlerLegacyServiceWithoutVolume(t *testing.T) {
 		}
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 			return
 		}
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{"status": "success"}`))
+		_, _ = rw.Write([]byte(`{"status": "success"}`))
 	}))
 	defer server.Close()
 
@@ -474,7 +474,7 @@ func TestValidateServiceUpdateModelServingErrors(t *testing.T) {
 			KserveEnable:             false,
 			ExposedServicesRouteKind: types.HTTPROUTE,
 		})
-		if err == nil || !strings.Contains(err.Error(), "Model Serving is not supported in this OSCAR deployment") {
+		if err == nil || !strings.Contains(err.Error(), "model serving is not supported in this OSCAR deployment") {
 			t.Fatalf("expected unsupported Model Serving error, got %v", err)
 		}
 	})
@@ -529,7 +529,7 @@ func TestMakeUpdateHandlerValidatesModelServingUpdates(t *testing.T) {
 				MinIOProvider:            &types.MinIOProvider{},
 			},
 			body:        `{"name":"svc","script":"echo","model_serving":{"inference":{"model_format":"onnx","source":"s3://model","api_version":"v1"}}}`,
-			wantErrText: "Model Serving is not supported in this OSCAR deployment",
+			wantErrText: "model serving is not supported in this OSCAR deployment",
 		},
 	}
 

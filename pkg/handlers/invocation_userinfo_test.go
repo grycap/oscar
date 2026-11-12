@@ -36,16 +36,16 @@ func invocationOIDCFixture(t *testing.T) (string, func() bool, *atomic.Int32, *a
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
-			w.Write([]byte(`{"issuer":"` + server.URL + `","userinfo_endpoint":"` + server.URL + `/userinfo","jwks_uri":"` + server.URL + `/keys"}`))
+			_, _ = w.Write([]byte(`{"issuer":"` + server.URL + `","userinfo_endpoint":"` + server.URL + `/userinfo","jwks_uri":"` + server.URL + `/keys"}`))
 		case "/userinfo":
 			calls.Add(1)
 			if fail.Load() {
 				w.WriteHeader(http.StatusServiceUnavailable)
 				return
 			}
-			w.Write([]byte(`{"sub":"test-user","group_membership":["test-group"]}`))
+			_, _ = w.Write([]byte(`{"sub":"test-user","group_membership":["test-group"]}`))
 		case "/keys":
-			w.Write([]byte(buildRSAJWK(&key.PublicKey)))
+			_, _ = w.Write([]byte(buildRSAJWK(&key.PublicKey)))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}

@@ -125,7 +125,7 @@ func TestMakeFederationGetHandlerNotFound(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	back := backends.MakeFakeBackend()
-	back.AddError("ReadService", k8serr.NewGone("Not Found"))
+	back.AddError("ReadService", k8serr.NewGone("Not Found")) //nolint:staticcheck // handlers rely on IsGone, which matches StatusReasonGone
 
 	r := gin.New()
 	r.GET("/system/federation/:serviceName", MakeFederationGetHandler(back))

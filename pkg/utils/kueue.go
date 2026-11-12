@@ -457,8 +457,8 @@ func buildResourceCheckPodSet(name string, replicas int32, requests v1.ResourceL
 
 func getServiceResourceRequests(service *types.Service) (v1.ResourceList, int32, error) {
 	requests := v1.ResourceList{}
-	var cpuQty resource.Quantity = defaultCpuRequest
-	var memoryQty resource.Quantity = defaultMemoryRequest
+	var cpuQty = defaultCpuRequest
+	var memoryQty = defaultMemoryRequest
 
 	if len(service.CPU) > 0 {
 		parsedCPU, err := resource.ParseQuantity(service.CPU)

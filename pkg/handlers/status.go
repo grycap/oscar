@@ -68,7 +68,7 @@ func MakeStatusHandler(cfg *types.Config, kubeClientset kubernetes.Interface, me
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		clusterInfo := types.StatusInfo{}
-		var isAdmin bool = false
+		var isAdmin = false
 		if len(strings.Split(authHeader, "Bearer")) > 1 {
 			uid, err := auth.GetUIDFromContext(c)
 			if err != nil {
@@ -211,12 +211,12 @@ func getNodesInfo(kubeClientset kubernetes.Interface, clusterInfo *types.StatusI
 				// The Pod needs: Sum of Sidecars + the larger of (Apps or the heaviest Init)
 
 				// We calculate the main block (Apps vs. Classic Init)
-				var mainBlockCPU int64 = podAppCPU
+				var mainBlockCPU = podAppCPU
 				if maxRegularInitCPU > mainBlockCPU {
 					mainBlockCPU = maxRegularInitCPU
 				}
 
-				var mainBlockMem int64 = podAppMem
+				var mainBlockMem = podAppMem
 				if maxRegularInitMem > mainBlockMem {
 					mainBlockMem = maxRegularInitMem
 				}
@@ -426,7 +426,7 @@ func getMinioInfo(cfg *types.Config, clusterInfo *types.StatusInfo) (err error) 
 	}
 
 	bucketCount := len(bucketList.Buckets)
-	var totalObjectCount int = 0
+	var totalObjectCount = 0
 	// Calculate the total object count
 	for _, b := range bucketList.Buckets {
 		bucketName := *b.Name

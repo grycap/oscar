@@ -53,7 +53,7 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 		var uid string
 		bucketName := c.Param("bucket")
 		if bucketName == "" {
-			c.String(http.StatusBadRequest, fmt.Sprintf("Received empty bucket name"))
+			c.String(http.StatusBadRequest, "Received empty bucket name")
 			return
 
 		}
@@ -97,7 +97,7 @@ func MakeDeleteHandler(cfg *types.Config) gin.HandlerFunc {
 			return
 		}
 
-		var bucketOwner string = ""
+		var bucketOwner = ""
 		metadata, metaErr := objectStorageIAM.GetClient(c.Request.Context()).GetTaggedMetadata(bucketName)
 		if metaErr == nil {
 			if owner := strings.TrimSpace(metadata["owner"]); owner != "" {
