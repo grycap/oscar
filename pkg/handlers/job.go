@@ -158,11 +158,15 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 			}
 
 			ui, err := oidcManager.GetUserInfo(rawToken)
-			uidFromToken = ui.Subject
 			if err != nil {
-				c.String(http.StatusInternalServerError, err.Error())
+				c.String(http.StatusBadGateway, "unable to retrieve OIDC user info")
 				return
 			}
+			if ui == nil {
+				c.String(http.StatusBadGateway, "OIDC provider returned no user info")
+				return
+			}
+			uidFromToken = ui.Subject
 			uid := auth.FormatUID(uidFromToken)
 			c.Set("uidOrigin", uid)
 			c.Next()
@@ -186,7 +190,7 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 				uid = uid[:62]
 			}
 			service.Labels[types.JobOwnerExecutionAnnotation] = uid
-			if !oidcManager.IsAuthorised(rawToken) {
+			if !oidcManager.IsAuthorisedWithUserInfo(rawToken, ui) {
 				c.Status(http.StatusUnauthorized)
 				return
 			}

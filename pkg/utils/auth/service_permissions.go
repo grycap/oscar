@@ -68,7 +68,7 @@ func GetServicePermissionsMiddleware(back types.ServerlessBackend) gin.HandlerFu
 				return
 			}
 
-			if hasPermission(service, uid) {
+			if UserAllowedForVisibility(uid, service.Visibility, service.Owner, service.AllowedUsers) {
 				c.Next()
 				return
 			}
@@ -79,22 +79,20 @@ func GetServicePermissionsMiddleware(back types.ServerlessBackend) gin.HandlerFu
 	}
 }
 
-func hasPermission(service *types.Service, uid string) bool {
-	switch service.Visibility {
+// UserAllowedForVisibility reports whether uid is allowed to access a resource
+// with the given visibility, owner and allowed users, following the shared
+// public/private/restricted access policy.
+func UserAllowedForVisibility(uid, visibility, owner string, allowedUsers []string) bool {
+	switch visibility {
 	case types.PUBLIC:
 		return true
 	case types.PRIVATE:
-		if service.Owner == uid {
-			return true
-		}
+		return owner == uid
 	case types.RESTRICTED:
-		if service.Owner == uid || slices.Contains(service.AllowedUsers, uid) {
-			return true
-		}
+		return owner == uid || slices.Contains(allowedUsers, uid)
 	default:
 		return false
 	}
-	return false
 }
 
 func isAuthBearer(c *gin.Context) (string, bool) {

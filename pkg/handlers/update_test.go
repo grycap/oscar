@@ -1,19 +1,71 @@
 package handlers
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/grycap/oscar/v4/pkg/backends"
 	"github.com/grycap/oscar/v4/pkg/testsupport"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	testclient "k8s.io/client-go/kubernetes/fake"
 )
+
+func TestCreateAndUpdateRejectUnsafeMountBeforeMutation(t *testing.T) {
+	for _, method := range []string{http.MethodPost, http.MethodPut} {
+		for _, options := range []string{"--rc", "--rc-addr=0.0.0.0:5572", "--config /tmp/config", "--buffer-size --rc"} {
+			t.Run(method+"/"+options, func(t *testing.T) {
+				back := backends.MakeFakeBackend()
+				r := gin.New()
+				cfg := &types.Config{MinIOProvider: &types.MinIOProvider{}}
+				if method == http.MethodPost {
+					r.POST("/system/services", MakeCreateHandler(cfg, back))
+				} else {
+					back.Service = &types.Service{Name: "svc"}
+					r.PUT("/system/services", MakeUpdateHandler(cfg, back))
+				}
+				body := fmt.Sprintf(`{"name":"svc","image":"img","script":"echo test","mount":{"storage_provider":"minio.default","path":"notebook","options":%q}}`, options)
+				resp := httptest.NewRecorder()
+				r.ServeHTTP(resp, httptest.NewRequest(method, "/system/services", strings.NewReader(body)))
+				if resp.Code != http.StatusBadRequest || !strings.Contains(resp.Body.String(), "mount option") {
+					t.Fatalf("expected mount option 400, got %d: %s", resp.Code, resp.Body.String())
+				}
+				if back.CreatedService != nil || back.UpdatedService != nil {
+					t.Fatal("invalid options reached backend")
+				}
+			})
+		}
+	}
+}
+
+func TestValidateServiceMountOptions(t *testing.T) {
+	for _, tc := range []struct {
+		provider string
+		options  string
+		valid    bool
+	}{
+		{"", "", true},
+		{"minio.default", "", true},
+		{"minio.default", "--buffer-size 128M --vfs-read-chunk-size 64M", true},
+		{"webdav.default", "--timeout=30s", true},
+		{"minio.default", "--rc", false},
+		{"", "--read-only", false},
+	} {
+		if err := validateServiceMountOptions(&types.Service{Mount: types.StorageIOConfig{Provider: tc.provider, Options: tc.options}}); (err == nil) != tc.valid {
+			t.Errorf("provider %q options %q: err %v; valid %t", tc.provider, tc.options, err, tc.valid)
+		}
+	}
+}
 
 func TestMakeUpdateHandlerRejectsForgedOwnerBeforeSecretCopy(t *testing.T) {
 	back := backends.MakeFakeBackend()
@@ -62,6 +114,7 @@ func TestMakeUpdateHandler(t *testing.T) {
 	}))
 
 	svc := &types.Service{
+		Name:  "cowsay",
 		Token: "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf",
 		CPU:   "2.0",
 		StorageProviders: &types.StorageProviders{
@@ -144,37 +197,108 @@ func TestMakeUpdateHandler(t *testing.T) {
 	}
 }
 
-func TestMakeUpdateHandlerUnauthorizedVO(t *testing.T) {
+func TestMakeUpdateHandlerVOTransitions(t *testing.T) {
 	testsupport.SkipIfCannotListen(t)
-
-	back := backends.MakeFakeBackend()
-	cfg := types.Config{
-		OIDCGroups: []string{"vo1"},
-		MinIOProvider: &types.MinIOProvider{
-			Endpoint:  "http://minio:9000",
-			Region:    "us-east-1",
-			AccessKey: "ak",
-			SecretKey: "sk",
-		},
+	priv, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatal(err)
 	}
-	// Existing service owned by user with different VO
-	back.Service = &types.Service{Name: "svc", Owner: "owner", VO: "vo2"}
-
-	r := gin.Default()
-	r.Use(func(c *gin.Context) {
-		c.Set("uidOrigin", "owner")
-		c.Next()
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/.well-known/openid-configuration":
+			fmt.Fprintf(w, `{"issuer":%q,"userinfo_endpoint":%q,"jwks_uri":%q}`, server.URL, server.URL+"/userinfo", server.URL+"/keys")
+		case "/userinfo":
+			fmt.Fprint(w, `{"sub":"owner","group_membership":["vo1"]}`)
+		case "/keys":
+			fmt.Fprint(w, buildRSAJWK(&priv.PublicKey))
+		case "/minio/admin/v3/info":
+			fmt.Fprint(w, `{"Mode":"local","Region":"us-east-1"}`)
+		default:
+			fmt.Fprint(w, `{"status":"success"}`)
+		}
+	}))
+	defer server.Close()
+	manager, err := auth.NewOIDCManager(server.URL, "owner", []string{"vo1", "vo2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	auth.ClusterOidcManagers[server.URL] = manager
+	defer delete(auth.ClusterOidcManagers, server.URL)
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+		"iss": server.URL, "sub": "owner", "exp": time.Now().Add(time.Hour).Unix(),
 	})
-	r.PUT("/system/services", MakeUpdateHandler(&cfg, back))
+	rawToken, err := token.SignedString(priv)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	body := `{"name":"svc","vo":"vo1","token":"t","visibility":"private"}`
-	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
-	req.Header.Set("Authorization", "Bearer token")
-	resp := httptest.NewRecorder()
-	r.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 when VO not authorized, got %d", resp.Code)
+	for _, tc := range []struct {
+		name, vo, authorization string
+		status                  int
+	}{
+		{"configured but not member", "vo2", "Bearer " + rawToken, http.StatusBadRequest},
+		{"invalid identity token", "vo1", "Bearer invalid", http.StatusBadRequest},
+		{"unconfigured VO", "vo3", "Bearer " + rawToken, http.StatusBadRequest},
+		{"authorized transition", "vo1", "Bearer " + rawToken, http.StatusNoContent},
+		{"admin transition", "vo3", "Basic admin", http.StatusNoContent},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := testclient.NewSimpleClientset(&corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: auth.FormatUID("owner"), Namespace: auth.ServicesNamespace},
+				Data:       map[string][]byte{"accessKey": []byte("owner"), "secretKey": []byte("test")},
+			})
+			back := backends.MakeFakeBackend()
+			back.SetKubeClientset(client)
+			back.Service = &types.Service{Name: "svc", Owner: "owner", VO: "old", Namespace: "owner-ns"}
+			cfg := &types.Config{
+				OIDCGroups: []string{"vo1", "vo2"},
+				MinIOProvider: &types.MinIOProvider{
+					Endpoint: server.URL, Region: "us-east-1", AccessKey: "ak", SecretKey: "sk",
+				},
+			}
+			r := gin.New()
+			r.Use(func(c *gin.Context) {
+				c.Set("uidOrigin", "owner")
+				c.Set("multitenancyConfig", auth.NewMultitenancyConfig(client, "owner"))
+				c.Next()
+			})
+			r.PUT("/system/services", MakeUpdateHandler(cfg, back))
+			body := fmt.Sprintf(`{"name":"svc","vo":%q,"image":"img","script":"echo","environment":{"secrets":{"PASSWORD":"value"}}}`, tc.vo)
+			req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
+			req.Header.Set("Authorization", tc.authorization)
+			resp := httptest.NewRecorder()
+			r.ServeHTTP(resp, req)
+			if resp.Code != tc.status {
+				t.Fatalf("expected %d, got %d: %s", tc.status, resp.Code, resp.Body.String())
+			}
+			if tc.status == http.StatusBadRequest {
+				if back.UpdatedService != nil {
+					t.Fatal("rejected VO transition updated backend")
+				}
+				for _, action := range client.Actions() {
+					if action.GetResource().Resource == "secrets" && action.GetVerb() != "get" {
+						t.Fatalf("rejected VO transition wrote secret: %s", action.GetVerb())
+					}
+				}
+				return
+			}
+			if back.UpdatedService == nil || back.UpdatedService.VO != tc.vo {
+				t.Fatalf("authorized VO transition did not reach backend: %+v", back.UpdatedService)
+			}
+			if tc.authorization != "Basic admin" && back.UpdatedService.Labels["vo"] != tc.vo {
+				t.Fatalf("VO label not set: %+v", back.UpdatedService.Labels)
+			}
+			secretWritten := false
+			for _, action := range client.Actions() {
+				if action.GetResource().Resource == "secrets" && action.GetVerb() == "create" {
+					secretWritten = true
+				}
+			}
+			if !secretWritten {
+				t.Fatal("authorized transition did not create service credentials/secrets")
+			}
+		})
 	}
 }
 
@@ -306,5 +430,132 @@ func TestMakeUpdateHandlerLegacyServiceWithoutVolume(t *testing.T) {
 	}
 	if back.UpdatedService.Volume != nil {
 		t.Fatalf("expected legacy service update to keep volume nil, got %+v", back.UpdatedService.Volume)
+	}
+}
+
+func TestValidateServiceUpdateModelServingErrors(t *testing.T) {
+	inferenceService := func() *types.Service {
+		return &types.Service{
+			Name:           "svc",
+			CPU:            "0.2",
+			Visibility:     types.PRIVATE,
+			IsolationLevel: types.IsolationLevelService,
+			ModelServing: &types.ModelServing{
+				Spec: &types.KserveInference{
+					ModelFormat: "onnx",
+					Source:      "s3://model",
+					APIVersion:  "v1",
+				},
+			},
+		}
+	}
+
+	t.Run("rejects ModelServing type change", func(t *testing.T) {
+		oldService := inferenceService()
+		newService := inferenceService()
+		newService.ModelServing = &types.ModelServing{
+			Spec: &types.KserveLLMInference{Source: "hf://model"},
+		}
+
+		err := validateServiceUpdate(oldService, newService, &types.Config{
+			KserveEnable:             true,
+			ExposedServicesRouteKind: types.HTTPROUTE,
+		})
+		if err == nil || !strings.Contains(err.Error(), `cannot change ModelServing service type from "inference" to "llm_inference"`) {
+			t.Fatalf("expected ModelServing type change error, got %v", err)
+		}
+	})
+
+	t.Run("rejects unsupported Model Serving", func(t *testing.T) {
+		oldService := inferenceService()
+		newService := inferenceService()
+
+		err := validateServiceUpdate(oldService, newService, &types.Config{
+			KserveEnable:             false,
+			ExposedServicesRouteKind: types.HTTPROUTE,
+		})
+		if err == nil || !strings.Contains(err.Error(), "Model Serving is not supported in this OSCAR deployment") {
+			t.Fatalf("expected unsupported Model Serving error, got %v", err)
+		}
+	})
+}
+
+func TestMakeUpdateHandlerValidatesModelServingUpdates(t *testing.T) {
+	tests := []struct {
+		name        string
+		oldService  *types.Service
+		cfg         *types.Config
+		body        string
+		wantErrText string
+	}{
+		{
+			name: "ModelServing type change",
+			oldService: &types.Service{
+				Name:   "svc",
+				Script: "echo 'Hello, World!'",
+				ModelServing: &types.ModelServing{
+					Spec: &types.KserveInference{
+						ModelFormat: "onnx",
+						Source:      "s3://model",
+						APIVersion:  "v1",
+						SetAuth:     true,
+					},
+				},
+			},
+			cfg: &types.Config{
+				KserveEnable:             true,
+				ExposedServicesRouteKind: types.HTTPROUTE,
+				MinIOProvider:            &types.MinIOProvider{},
+			},
+			body:        `{"name":"svc","script":"echo","model_serving":{"llm_inference":{"source":"hf://model"}}}`,
+			wantErrText: `cannot change ModelServing service type from "inference" to "llm_inference"`,
+		},
+		{
+			name: "unsupported Model Serving",
+			oldService: &types.Service{
+				Name:   "svc",
+				Script: "echo 'Hello, World!'",
+				ModelServing: &types.ModelServing{
+					Spec: &types.KserveInference{
+						ModelFormat: "onnx",
+						Source:      "s3://model",
+						APIVersion:  "v1",
+						SetAuth:     true,
+					},
+				},
+			},
+			cfg: &types.Config{
+				ExposedServicesRouteKind: types.HTTPROUTE,
+				MinIOProvider:            &types.MinIOProvider{},
+			},
+			body:        `{"name":"svc","script":"echo","model_serving":{"inference":{"model_format":"onnx","source":"s3://model","api_version":"v1"}}}`,
+			wantErrText: "Model Serving is not supported in this OSCAR deployment",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			back := backends.MakeFakeBackend()
+			back.Service = tt.oldService
+			router := gin.New()
+			router.PUT("/system/services", MakeUpdateHandler(tt.cfg, back))
+
+			req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "******")
+			resp := httptest.NewRecorder()
+			router.ServeHTTP(resp, req)
+
+			if resp.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d; body: %s", resp.Code, http.StatusBadRequest, resp.Body.String())
+			}
+			if !strings.Contains(resp.Body.String(), tt.wantErrText) {
+				t.Fatalf("response body = %q, want it to contain %q", resp.Body.String(), tt.wantErrText)
+			}
+			if back.UpdatedService != nil {
+				t.Fatalf("expected validation to prevent backend update, got %+v", back.UpdatedService)
+			}
+		})
 	}
 }

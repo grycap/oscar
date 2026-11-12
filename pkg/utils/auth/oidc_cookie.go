@@ -88,7 +88,10 @@ func GetOIDCServiceAuthCookieMiddleware(cfg *types.Config) gin.HandlerFunc {
 		// Set the cookie as expired and if validation succeeds,
 		// the OIDC middleware will set it again with a renewed expiration time.
 		// This prevents users from being blocked when the cookie is used after the OIDC token has expired.
-		setExpiredServiceCookie(c, c.Param("serviceName"), serviceScopedCookieName)
+		// The OIDC service auth cookie uses its service-scoped name exactly when
+		// routing is path-based, so the same flag selects both the cookie name
+		// and its path/domain scope (see SetOIDCServiceAuthCookie).
+		setExpiredServiceCookie(c, c.Param("serviceName"), serviceScopedCookieName, serviceScopedCookieName, cfg)
 
 		c.Next()
 	}

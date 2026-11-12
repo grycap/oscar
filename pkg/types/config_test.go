@@ -225,6 +225,9 @@ func TestRequiredValues(t *testing.T) {
 	if cfg.MinIOProvider.SecretKey != "miniosecret" {
 		t.Errorf("expected minio secret key: %s, got: %s", "miniosecret", cfg.MinIOProvider.SecretKey)
 	}
+	if cfg.PodCIDR != "10.244.0.0/16" || cfg.ServiceCIDR != "10.96.0.0/12" {
+		t.Errorf("unexpected network CIDR defaults: pod=%q service=%q", cfg.PodCIDR, cfg.ServiceCIDR)
+	}
 }
 
 func TestCustomValues(t *testing.T) {
@@ -240,6 +243,8 @@ func TestCustomValues(t *testing.T) {
 		"OSCAR_NAMESPACE":                  "testnamespace",
 		"OSCAR_SERVICES_NAMESPACE":         "testservicesnamespace",
 		"OSCAR_CONTROLLER_SERVICE_ACCOUNT": "testserviceaccount",
+		"OSCAR_POD_CIDR":                   "10.20.0.0/16",
+		"OSCAR_SERVICE_CIDR":               "10.30.0.0/16",
 		"WATCHDOG_HEALTHCHECK_INTERVAL":    "50",
 		"READ_TIMEOUT":                     "50",
 		"WRITE_TIMEOUT":                    "50",

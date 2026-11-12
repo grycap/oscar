@@ -41,6 +41,11 @@ func TestMakeGetBucketHandlerAdmin(t *testing.T) {
 					<IsTruncated>false</IsTruncated>
 				</ListBucketResult>`))
 			return
+		} else if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/group" &&
+			r.URL.Query().Get("group") == "demo" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"name":"demo","members":["somelonguid@egi.eu"],"policy":"readonly","status":"enabled"}`))
+			return
 		} else if r.Method == http.MethodGet && r.URL.Path == "/demo" &&
 			r.URL.RawQuery == "location=" {
 			w.WriteHeader(http.StatusOK)
@@ -468,4 +473,284 @@ func TestMakeGetBucketHandlerPagination(t *testing.T) {
 	}
 	// Close the fake MinIO server
 	defer server.Close()
+}
+
+func TestMakeGetBucketHandlerPrivateNonOwnerForbidden(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	testsupport.SkipIfCannotListen(t)
+
+	// Acceptance test for issue #525: a private bucket owned by "owner-a"
+	// must be denied to unrelated requester "bob" before any S3 ListObjects
+	// call or quota enrichment.
+	var listObjectsCalls int
+	var dataUsageCalls int
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if (r.URL.Path == "/demo" || r.URL.Path == "/demo/") && r.URL.Query().Has("location") {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+				<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"></LocationConstraint>`))
+			return
+		}
+		if (r.URL.Path == "/demo" || r.URL.Path == "/demo/") && r.URL.Query().Has("tagging") {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+				<Tagging xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+					<TagSet>
+						<Tag><Key>owner</Key><Value>owner-a</Value></Tag>
+					</TagSet>
+				</Tagging>`))
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/demo" && r.URL.Query().Get("list-type") == "2" {
+			listObjectsCalls++
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+				<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+					<IsTruncated>false</IsTruncated>
+				</ListBucketResult>`))
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/datausageinfo" {
+			dataUsageCalls++
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"bucketsUsageInfo":{}}`))
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/info-canned-policy" {
+			w.WriteHeader(http.StatusOK)
+			switch r.URL.Query().Get("name") {
+			case "owner-a":
+				_, _ = w.Write([]byte(`{"PolicyName": "owner-a", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::demo/*"]}]}}`))
+			default:
+				_, _ = w.Write([]byte(`{"PolicyName": "other", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::other/*"]}]}}`))
+			}
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"success"}`))
+	}))
+	defer server.Close()
+
+	cfg := &types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "bob")
+	})
+	router.GET("/system/buckets/:bucket", MakeGetHandler(cfg))
+
+	req := httptest.NewRequest(http.MethodGet, "/system/buckets/demo", nil)
+	req.Header.Set("Authorization", "Bearer token")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d", http.StatusForbidden, res.Code)
+	}
+	if listObjectsCalls != 0 {
+		t.Fatalf("expected zero S3 ListObjects calls on denial, got %d", listObjectsCalls)
+	}
+	if dataUsageCalls != 0 {
+		t.Fatalf("expected zero data usage calls on denial, got %d", dataUsageCalls)
+	}
+}
+
+func TestMakeGetBucketHandlerRestrictedNonMemberForbidden(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	testsupport.SkipIfCannotListen(t)
+
+	// A restricted bucket owned by "owner-a" whose member group does not
+	// include requester "bob" must be denied before any S3 ListObjects call.
+	var listObjectsCalls int
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if (r.URL.Path == "/demo" || r.URL.Path == "/demo/") && r.URL.Query().Has("location") {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+				<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"></LocationConstraint>`))
+			return
+		}
+		if (r.URL.Path == "/demo" || r.URL.Path == "/demo/") && r.URL.Query().Has("tagging") {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+				<Tagging xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+					<TagSet>
+						<Tag><Key>owner</Key><Value>owner-a</Value></Tag>
+					</TagSet>
+				</Tagging>`))
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/demo" && r.URL.Query().Get("list-type") == "2" {
+			listObjectsCalls++
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+				<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+					<IsTruncated>false</IsTruncated>
+				</ListBucketResult>`))
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/group" && r.URL.Query().Get("group") == "demo" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"name":"demo","members":["charlie"],"policy":"readonly","status":"enabled"}`))
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/info-canned-policy" {
+			w.WriteHeader(http.StatusOK)
+			switch r.URL.Query().Get("name") {
+			case "owner-a", "demo":
+				_, _ = w.Write([]byte(`{"PolicyName": "owner-a", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::demo/*"]}]}}`))
+			default:
+				_, _ = w.Write([]byte(`{"PolicyName": "other", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::other/*"]}]}}`))
+			}
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"success"}`))
+	}))
+	defer server.Close()
+
+	cfg := &types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "bob")
+	})
+	router.GET("/system/buckets/:bucket", MakeGetHandler(cfg))
+
+	req := httptest.NewRequest(http.MethodGet, "/system/buckets/demo", nil)
+	req.Header.Set("Authorization", "Bearer token")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d", http.StatusForbidden, res.Code)
+	}
+	if listObjectsCalls != 0 {
+		t.Fatalf("expected zero S3 ListObjects calls on denial, got %d", listObjectsCalls)
+	}
+}
+
+func TestMakeGetBucketHandlerPrivateOwnerAllowed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	testsupport.SkipIfCannotListen(t)
+	lastModified := "2024-05-10T12:00:00Z"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if (r.URL.Path == "/demo" || r.URL.Path == "/demo/") && r.URL.Query().Has("location") {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+				<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"></LocationConstraint>`))
+			return
+		}
+		if (r.URL.Path == "/demo" || r.URL.Path == "/demo/") && r.URL.Query().Has("tagging") {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+				<Tagging xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+					<TagSet>
+						<Tag><Key>owner</Key><Value>owner-a</Value></Tag>
+					</TagSet>
+				</Tagging>`))
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/demo" && r.URL.Query().Get("list-type") == "2" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+				<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+					<Name>demo</Name>
+					<Prefix></Prefix>
+					<KeyCount>1</KeyCount>
+					<MaxKeys>1</MaxKeys>
+					<Contents>
+						<Key>file.txt</Key>
+						<LastModified>` + lastModified + `</LastModified>
+						<ETag>"d41d8cd98f00b204e9800998ecf8427e"</ETag>
+						<Size>42</Size>
+						<StorageClass>STANDARD</StorageClass>
+					</Contents>
+					<IsTruncated>false</IsTruncated>
+				</ListBucketResult>`))
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/datausageinfo" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"bucketsUsageInfo":{"demo":{"size":42,"objectsCount":1}}}`))
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/get-bucket-quota" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"quota":0}`))
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/minio/admin/v3/info-canned-policy" {
+			w.WriteHeader(http.StatusOK)
+			switch r.URL.Query().Get("name") {
+			case "owner-a":
+				_, _ = w.Write([]byte(`{"PolicyName": "owner-a", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::demo/*"]}]}}`))
+			default:
+				_, _ = w.Write([]byte(`{"PolicyName": "other", "Policy": {"Version": "version","Statement": [{"Resource": ["arn:aws:s3:::other/*"]}]}}`))
+			}
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"success"}`))
+	}))
+	defer server.Close()
+
+	cfg := &types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "owner-a")
+	})
+	router.GET("/system/buckets/:bucket", MakeGetHandler(cfg))
+
+	req := httptest.NewRequest(http.MethodGet, "/system/buckets/demo", nil)
+	req.Header.Set("Authorization", "Bearer token")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, res.Code, res.Body.String())
+	}
+
+	var response struct {
+		Objects []struct {
+			ObjectName string `json:"object_name"`
+		} `json:"objects"`
+		ReturnedItems int `json:"returned_items"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if len(response.Objects) != 1 || response.Objects[0].ObjectName != "file.txt" || response.ReturnedItems != 1 {
+		t.Fatalf("unexpected objects payload: %+v (returned_items %d)", response.Objects, response.ReturnedItems)
+	}
 }
