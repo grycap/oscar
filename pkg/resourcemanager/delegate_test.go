@@ -437,36 +437,80 @@ func TestEventBuild(t *testing.T) {
 	}
 }
 
-func TestDelegationStorageProviderFromOutput(t *testing.T) {
+func TestDelegationStorageProviderFromMinioInput(t *testing.T) {
 	service := &types.Service{
 		ClusterID: "origin",
+		Input: []types.StorageIOConfig{
+			{Provider: "minio", Path: "bucket/input"},
+			{Provider: "minio", Path: "bucket/other"},
+		},
 		Output: []types.StorageIOConfig{
-			{Provider: "minio.default"},
+			{Provider: "minio.output"},
 		},
 	}
-	if provider := delegationStorageProvider(service); provider != "minio.default" {
-		t.Fatalf("expected minio.default, got %q", provider)
+	// The reference is derived from the service definition, so the job event must not
+	// change the resolved provider.
+	provider, err := delegationStorageProvider(service)
+	if err != nil || provider != "default" {
+		t.Fatalf("expected bare default ID for a single MinIO input, got %q, %v", provider, err)
+	}
+	// A native notification must be wrapped with the ID understood by the supervisor.
+	native := `{"Records":[{"eventSource":"minio:s3"}]}`
+	delegated, _ := eventBuild(native, provider)
+	var wrapped DelegatedEvent
+	if err := json.Unmarshal(delegated, &wrapped); err != nil || wrapped.StorageProviderID != "default" || wrapped.Event != native {
+		t.Fatalf("native event must retain its payload and use the bare default ID: %v", err)
 	}
 }
 
-func TestDelegationStorageProviderDefaults(t *testing.T) {
+func TestDelegationStorageProviderUsesExplicitMinIOInputID(t *testing.T) {
 	service := &types.Service{
 		ClusterID: "origin",
-		Output: []types.StorageIOConfig{
-			{Provider: "minio"},
-		},
+		Input:     []types.StorageIOConfig{{Provider: "minio.other", Path: "other/input"}},
 	}
-	if provider := delegationStorageProvider(service); provider != "minio.default" {
-		t.Fatalf("expected minio.default, got %q", provider)
+	provider, err := delegationStorageProvider(service)
+	if err != nil || provider != "minio.other" {
+		t.Fatalf("expected minio.other, got %q, %v", provider, err)
+	}
+	// Non-default provider references retain their qualified form for the target
+	// handler; this does not establish end-to-end supervisor support for them.
+	raw := `{"Records":[{"eventSource":"minio:s3","s3":{"bucket":{"name":"other"},"object":{"key":"input/file.txt"}}}]}`
+	delegated, storage := eventBuild(raw, provider)
+	var wrapped DelegatedEvent
+	if err := json.Unmarshal(delegated, &wrapped); err != nil || wrapped.StorageProviderID != "minio.other" || storage != "minio.other" {
+		t.Fatalf("delegated event must carry the input provider reference: %v", err)
 	}
 }
 
-func TestDelegationStorageProviderFallsBackToClusterID(t *testing.T) {
+func TestDelegationStorageProviderWithoutMinIOInput(t *testing.T) {
 	service := &types.Service{
 		ClusterID: "origin",
+		Input:     []types.StorageIOConfig{{Provider: "webdav.store", Path: "bucket"}},
+		Output:    []types.StorageIOConfig{{Provider: "minio.output"}},
 	}
-	if provider := delegationStorageProvider(service); provider != "origin" {
-		t.Fatalf("expected origin, got %q", provider)
+	// Without MinIO inputs, the delegated event still uses the default provider ID.
+	provider, err := delegationStorageProvider(service)
+	if err != nil || provider != "default" {
+		t.Fatalf("expected default, got %q, %v", provider, err)
+	}
+}
+
+func TestDelegationStorageProviderRejectsMultipleMinIOInputs(t *testing.T) {
+	service := &types.Service{
+		Input: []types.StorageIOConfig{
+			{Provider: "minio", Path: "bucket/input"},
+			{Provider: "minio.other", Path: "other/input"},
+		},
+	}
+	if _, err := delegationStorageProvider(service); err == nil {
+		t.Fatal("multiple distinct MinIO input providers must be rejected instead of falling back to event parsing")
+	}
+}
+
+func TestDelegationStorageProviderNilService(t *testing.T) {
+	provider, err := delegationStorageProvider(nil)
+	if provider != "" || err != nil {
+		t.Fatalf("expected empty provider without error, got %q, %v", provider, err)
 	}
 }
 
