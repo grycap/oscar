@@ -17,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sTypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/rest"
 	knv1 "knative.dev/serving/pkg/apis/serving/v1"
 )
 
@@ -516,7 +515,7 @@ type KserveServiceOwner struct {
 type dynamicClientFactory func() (*dynamic.DynamicClient, error)
 
 var newDynamicClient dynamicClientFactory = func() (*dynamic.DynamicClient, error) {
-	restCfg, err := rest.InClusterConfig()
+	restCfg, err := KubernetesConfig()
 	if err != nil {
 		return nil, err
 	}

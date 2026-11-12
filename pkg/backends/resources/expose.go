@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 const (
@@ -371,7 +370,7 @@ func deleteRouteResources(serviceName string, namespace string, kubeClientset ku
 }
 
 func getGatewayClientset() (dynamic.Interface, error) {
-	restCfg, err := rest.InClusterConfig()
+	restCfg, err := types.KubernetesConfig()
 	if err != nil {
 		return nil, err
 	}
