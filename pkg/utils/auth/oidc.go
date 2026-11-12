@@ -347,7 +347,25 @@ func (om *oidcManager) IsAuthorised(rawToken string) bool {
 		// Call clearExpired to delete expired tokens
 		om.clearExpired()
 	}
+	return om.hasAuthorisedGroup(ui)
+}
 
+// IsAuthorisedWithUserInfo checks a token using UserInfo already retrieved by the caller.
+// The token is still verified before its groups are trusted.
+func (om *oidcManager) IsAuthorisedWithUserInfo(rawToken string, ui *userInfo) bool {
+	if ui == nil {
+		return false
+	}
+	// Check if the token is valid
+	_, err := om.provider.Verifier(om.config).Verify(context.TODO(), rawToken)
+	if err != nil {
+		return false
+	}
+	// The caller already fetched current UserInfo; avoid another fetch or a cache write.
+	return om.hasAuthorisedGroup(ui)
+}
+
+func (om *oidcManager) hasAuthorisedGroup(ui *userInfo) bool {
 	// Groups
 	for _, tokenGroup := range ui.Groups {
 		for _, authGroup := range om.groups {

@@ -96,8 +96,16 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 			}
 
 			ui, err := oidcManager.GetUserInfo(rawToken)
+			if err != nil {
+				c.String(http.StatusBadGateway, "unable to retrieve OIDC user info")
+				return
+			}
+			if ui == nil {
+				c.String(http.StatusBadGateway, "OIDC provider returned no user info")
+				return
+			}
 
-			if !oidcManager.IsAuthorised(rawToken) {
+			if !oidcManager.IsAuthorisedWithUserInfo(rawToken, ui) {
 				c.Status(http.StatusNotFound)
 				return
 			}
