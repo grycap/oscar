@@ -20,6 +20,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"strings"
@@ -555,6 +556,10 @@ func TestMakeCreateHandlerEnforcesMinIOQuotaForServiceBuckets(t *testing.T) {
 			w.Header().Set("Content-Type", "application/xml")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`<Tagging><TagSet><Tag><Key>owner</Key><Value>` + user + `</Value></Tag></TagSet></Tagging>`))
+		case r.Method == http.MethodGet && strings.Contains(r.URL.RawQuery, "location"):
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
 		default:
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"Status":"success"}`))
@@ -573,6 +578,24 @@ func TestMakeCreateHandlerEnforcesMinIOQuotaForServiceBuckets(t *testing.T) {
 
 	if resp.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var quotaResp struct {
+		Status  string         `json:"status"`
+		Code    string         `json:"code"`
+		Error   string         `json:"error"`
+		Details map[string]any `json:"details"`
+	}
+	if err := json.Unmarshal(resp.Body.Bytes(), &quotaResp); err != nil {
+		t.Fatalf("expected machine-readable JSON quota response, got %q: %v", resp.Body.String(), err)
+	}
+	if quotaResp.Status != "error" || quotaResp.Code != "QuotaExceeded" {
+		t.Fatalf("unexpected quota rejection body: status=%q code=%q", quotaResp.Status, quotaResp.Code)
+	}
+	if quotaResp.Error == "" {
+		t.Errorf("expected non-empty error message in quota rejection body")
+	}
+	if got, ok := quotaResp.Details["limit"].(float64); !ok || got != 1 {
+		t.Errorf("expected quota limit 1 in details, got %v", quotaResp.Details["limit"])
 	}
 	if back.CreatedService != nil {
 		t.Fatalf("service was created despite bucket quota rejection")

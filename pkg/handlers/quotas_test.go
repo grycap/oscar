@@ -17,16 +17,19 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -878,5 +881,124 @@ func TestValidateMinIOBucketCountQuotaEmptyBuckets(t *testing.T) {
 	err := ValidateMinIOBucketCountQuota(nil, nil, &types.MinIOQuotaUpdate{Buckets: ""}, "", nil)
 	if err != nil {
 		t.Fatalf("expected nil error for empty buckets, got %v", err)
+	}
+}
+
+func TestMinIOBucketQuotaLock(t *testing.T) {
+	ctx := context.Background()
+	ownerA := "lock-unit-a@example.org"
+	ownerB := "lock-unit-b@example.org"
+	cfg := &types.Config{ServicesNamespace: "oscar-svc"}
+	client := fake.NewSimpleClientset()
+
+	holder := "test-holder-1"
+	lock, err := LockMinIOBucketQuota(ctx, client, cfg, ownerA, holder)
+	if err != nil {
+		t.Fatalf("expected lock acquisition to succeed, got %v", err)
+	}
+	if lock == nil {
+		t.Fatalf("expected non-nil lock, got nil")
+	}
+
+	// The lock for ownerA is held, so a new acquisition must not enter.
+	if _, err := LockMinIOBucketQuota(ctx, client, cfg, ownerA, "test-holder-2"); !errors.Is(err, ErrMinIOBucketQuotaLockBusy) {
+		t.Fatalf("expected ErrMinIOBucketQuotaLockBusy, got %v", err)
+	}
+
+	// Holding the lock for one owner must not block another owner.
+	lockB, err := LockMinIOBucketQuota(ctx, client, cfg, ownerB, holder)
+	if err != nil {
+		t.Fatalf("expected the lock for another owner to be free, got %v", err)
+	}
+	if err := ReleaseMinIOBucketQuota(ctx, client, lockB); err != nil {
+		t.Fatalf("expected lock release to succeed, got %v", err)
+	}
+
+	// Releasing the lock must make it acquirable again.
+	if err := ReleaseMinIOBucketQuota(ctx, client, lock); err != nil {
+		t.Fatalf("expected lock release to succeed, got %v", err)
+	}
+	lockAfterRelease, err := LockMinIOBucketQuota(ctx, client, cfg, ownerA, holder)
+	if err != nil {
+		t.Fatalf("expected the lock to be acquirable after release, got %v", err)
+	}
+	if lockAfterRelease == nil {
+		t.Fatalf("expected non-nil lock after release, got nil")
+	}
+	if err := ReleaseMinIOBucketQuota(ctx, client, lockAfterRelease); err != nil {
+		t.Fatalf("expected lock release to succeed, got %v", err)
+	}
+
+	// Releasing a nil lock must be a no-op.
+	if err := ReleaseMinIOBucketQuota(ctx, client, nil); err != nil {
+		t.Fatalf("expected nil lock release to be a no-op, got %v", err)
+	}
+}
+
+func TestReleaseMinIOBucketQuotaWithCancelledContext(t *testing.T) {
+	ctx := context.Background()
+	cfg := &types.Config{ServicesNamespace: "oscar-svc"}
+	client := fake.NewSimpleClientset()
+
+	lock, err := LockMinIOBucketQuota(ctx, client, cfg, "lock-cancelled@example.org", "test-holder-cancelled")
+	if err != nil {
+		t.Fatalf("expected lock acquisition to succeed, got %v", err)
+	}
+
+	// Simulate a request that gets cancelled while holding the lock: the
+	// release must still succeed and free the lock.
+	cancelledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	if err := ReleaseMinIOBucketQuota(cancelledCtx, client, lock); err != nil {
+		t.Fatalf("expected lock release with a cancelled context to succeed, got %v", err)
+	}
+
+	// The lock must be acquirable again after the release.
+	reacquired, err := LockMinIOBucketQuota(ctx, client, cfg, "lock-cancelled@example.org", "test-holder-cancelled")
+	if err != nil {
+		t.Fatalf("expected the lock to be acquirable after releasing with a cancelled context, got %v", err)
+	}
+	if reacquired == nil {
+		t.Fatalf("expected non-nil lock after releasing with a cancelled context, got nil")
+	}
+	if err := ReleaseMinIOBucketQuota(ctx, client, reacquired); err != nil {
+		t.Fatalf("expected lock release to succeed, got %v", err)
+	}
+}
+
+func TestLockMinIOBucketQuotaWithStaleLease(t *testing.T) {
+	ctx := context.Background()
+	cfg := &types.Config{ServicesNamespace: "oscar-svc"}
+	client := fake.NewSimpleClientset()
+
+	owner := "lock-stale@example.org"
+	holder := "oscar-stale-holder"
+	duration := minIOBucketQuotaLockLeaseDurationSeconds
+	staleLease := &coordinationv1.Lease{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              minIOBucketQuotaLockName(owner),
+			Namespace:         utils.BuildUserNamespace(cfg, owner),
+			CreationTimestamp: metav1.NewTime(time.Now().Add(-2 * time.Minute)),
+		},
+		Spec: coordinationv1.LeaseSpec{
+			HolderIdentity:       &holder,
+			LeaseDurationSeconds: &duration,
+		},
+	}
+	if _, err := client.CoordinationV1().Leases(staleLease.Namespace).Create(ctx, staleLease, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("expected to create a stale lease, got %v", err)
+	}
+
+	// The stale lease (older than its duration) must be cleaned up so the lock
+	// can be acquired again instead of failing with ErrMinIOBucketQuotaLockBusy.
+	lock, err := LockMinIOBucketQuotaWithRetry(ctx, client, cfg, owner, holder)
+	if err != nil {
+		t.Fatalf("expected lock acquisition to succeed with a stale lease, got %v", err)
+	}
+	if lock == nil {
+		t.Fatalf("expected non-nil lock, got nil")
+	}
+	if err := ReleaseMinIOBucketQuota(ctx, client, lock); err != nil {
+		t.Fatalf("expected lock release to succeed, got %v", err)
 	}
 }
