@@ -1,6 +1,5 @@
 # OSCAR - Open Source Serverless Computing for Data-Processing Applications
 
-[![golangci-lint](https://golangci-lint.run/status.svg)](https://golangci-lint.run)
 [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/8145efdfb9d24af1b5b53e21c6e2df99)](https://app.codacy.com/gh/grycap/oscar/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage)
 [![tests](https://github.com/grycap/oscar/actions/workflows/tests.yaml/badge.svg?branch=master)](https://github.com/grycap/oscar/actions/workflows/tests.yaml)
 [![build](https://github.com/grycap/oscar/workflows/build/badge.svg)](https://github.com/grycap/oscar/actions?query=workflow%3Abuild)
