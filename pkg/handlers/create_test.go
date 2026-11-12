@@ -556,6 +556,10 @@ func TestMakeCreateHandlerEnforcesMinIOQuotaForServiceBuckets(t *testing.T) {
 			w.Header().Set("Content-Type", "application/xml")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`<Tagging><TagSet><Tag><Key>owner</Key><Value>` + user + `</Value></Tag></TagSet></Tagging>`))
+		case r.Method == http.MethodGet && strings.Contains(r.URL.RawQuery, "location"):
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
 		default:
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"Status":"success"}`))

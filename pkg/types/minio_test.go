@@ -1191,7 +1191,7 @@ func TestSetBucketStorageQuotaGivesUpAfterMaxRetries(t *testing.T) {
 	var attempts atomic.Int32
 	client, server := newMinIOQuotaClient(t, func(w http.ResponseWriter, r *http.Request) {
 		attempts.Add(1)
-		w.WriteHeader(http.StatusServiceUnavailable)
+		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`{"code":"ServiceUnavailable","message":"service unavailable"}`))
 	})
 	defer server.Close()

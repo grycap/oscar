@@ -336,6 +336,10 @@ func TestMakeCreateBucketHandlerEnforcesMinIOQuota(t *testing.T) {
 			w.Header().Set("Content-Type", "application/xml")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`<Tagging xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><TagSet><Tag><Key>owner</Key><Value>` + user + `</Value></Tag></TagSet></Tagging>`))
+		case r.Method == http.MethodGet && strings.Contains(r.URL.RawQuery, "location"):
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
 		default:
 			w.WriteHeader(http.StatusOK)
 		}
@@ -619,7 +623,7 @@ func TestMakeCreateBucketHandlerSerializesConcurrentCreatesAgainstQuota(t *testi
 
 	const (
 		user      = "alice@example.org"
-		requested = 5
+		requested = 2
 		limit     = 2
 	)
 
@@ -660,6 +664,8 @@ func TestMakeCreateBucketHandlerSerializesConcurrentCreatesAgainstQuota(t *testi
 			w.Header().Set("Content-Type", "application/xml")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
+		case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/info-canned-policy"):
+			w.WriteHeader(http.StatusNotFound)
 		default:
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"Status":"success"}`))
