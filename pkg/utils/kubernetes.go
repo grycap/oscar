@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	kubernetesQPS       float32 = 80  // 80 requests per second
-	kubernetesBurst             = 120 // 120 requests in a burst
+	kubernetesQPS       float32 = 120 // 120 requests per second
+	kubernetesBurst             = 180 // 180 requests in a burst
 	kubernetesUserAgent         = "oscar-manager"
 )
 
