@@ -29,8 +29,7 @@ func newKueueMock() *kueueMock {
 }
 func (k *kueueMock) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"Status":"success"}`))
-	return
+	_, _ = w.Write([]byte(`{"Status":"success"}`))
 }
 func newTestConfig() *types.Config {
 	return &types.Config{

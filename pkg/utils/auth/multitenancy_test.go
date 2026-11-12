@@ -67,7 +67,7 @@ func TestUserExists(t *testing.T) {
 			Namespace: ServicesNamespace,
 		},
 	}
-	clientset.CoreV1().Secrets(ServicesNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	_, _ = clientset.CoreV1().Secrets(ServicesNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 
 	exists := mc.UserExists("user1@egi.eu")
 	if !exists {
@@ -108,7 +108,7 @@ func TestGetUserCredentials(t *testing.T) {
 			"secretKey": []byte("secret-key"),
 		},
 	}
-	clientset.CoreV1().Secrets(ServicesNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	_, _ = clientset.CoreV1().Secrets(ServicesNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 
 	accessKey, secretKey, err := mc.GetUserCredentials("user1@egi.eu")
 	if err != nil {
@@ -172,7 +172,7 @@ func TestEnsureSecretInNamespace(t *testing.T) {
 				Namespace: "target-ns",
 			},
 		}
-		clientset.CoreV1().Secrets("target-ns").Create(context.TODO(), secret, metav1.CreateOptions{})
+		_, _ = clientset.CoreV1().Secrets("target-ns").Create(context.TODO(), secret, metav1.CreateOptions{})
 		err := mc.EnsureSecretInNamespace("test-uid", "target-ns")
 		if err != nil {
 			t.Errorf("expected nil, got %v", err)
@@ -193,7 +193,7 @@ func TestEnsureSecretInNamespace(t *testing.T) {
 				"secretKey": []byte("secret"),
 			},
 		}
-		clientset.CoreV1().Secrets(ServicesNamespace).Create(context.TODO(), baseSecret, metav1.CreateOptions{})
+		_, _ = clientset.CoreV1().Secrets(ServicesNamespace).Create(context.TODO(), baseSecret, metav1.CreateOptions{})
 		err := mc.EnsureSecretInNamespace("test-uid", "target-ns")
 		if err != nil {
 			t.Errorf("expected nil, got %v", err)

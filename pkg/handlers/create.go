@@ -148,7 +148,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 			} else {
 				if len(cfg.OIDCGroups) != 0 {
-					var notFound bool = true
+					var notFound = true
 					for _, vo := range cfg.OIDCGroups {
 						service.VO = vo
 						err := checkIdentity(&service, authHeader)
@@ -376,10 +376,8 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		buckets := []types.MinIOBucket{}
-		if !(service.Annotations != nil &&
-			strings.EqualFold(strings.TrimSpace(service.Annotations[types.FederationWorkerAnnotation]), "true") &&
-			service.Federation != nil &&
-			strings.EqualFold(strings.TrimSpace(service.Federation.Topology), "mesh")) {
+		if service.Annotations == nil || !strings.EqualFold(strings.TrimSpace(service.Annotations[types.FederationWorkerAnnotation]), "true") ||
+			service.Federation == nil || !strings.EqualFold(strings.TrimSpace(service.Federation.Topology), "mesh") {
 			if buckets, err = createBuckets(&service, cfg, objectStorageIAM.GetClient(c.Request.Context()), false, isAdminUser); err != nil {
 				createLogger.Printf("Error creating buckets for service '%s': %v", service.Name, err)
 				if err == errInput {
@@ -425,7 +423,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				oldTags, _ := objectStorageIAM.GetClient(c.Request.Context()).GetTaggedMetadata(b.BucketName)
 				// Bucket metadata for filtering
 				// If bucket dont have already the tags, set them.
-				if oldTags == nil || len(oldTags) == 0 {
+				if len(oldTags) == 0 {
 					/*storageQuota := ""
 					if minIOQuota != nil {
 						storageQuota = minIOQuota.StoragePerBucket
@@ -678,7 +676,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		splitPath := strings.SplitN(path, "/", 2)
 		folderKey := ""
 		if len(splitPath) > 1 && strings.TrimSpace(splitPath[1]) != "" {
-			folderKey = fmt.Sprintf("%s", splitPath[1])
+			folderKey = splitPath[1]
 		}
 
 		err := minIOAdminClient.CreateS3PathWithWebhook(s3Client, splitPath, service.GetObjectStorageWebhookARN(cfg.ObjectStorageType), false)
@@ -1062,7 +1060,7 @@ func validateServiceCreation(service *types.Service, cfg *types.Config) error {
 	// If supported, add a label to the service indicating that it is a KServe service
 	if service.IsModelServing() {
 		if !service.ModelServing.IsTypeSupportedByOSCAR(cfg) {
-			return fmt.Errorf("Model Serving is not supported in this OSCAR deployment")
+			return fmt.Errorf("model serving is not supported in this OSCAR deployment")
 		}
 		if service.Labels == nil {
 			service.Labels = make(map[string]string)

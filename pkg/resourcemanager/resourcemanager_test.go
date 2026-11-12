@@ -59,7 +59,7 @@ func TestStartResourceManager(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer func() {
-			recover()
+			_ = recover()
 			close(done)
 		}()
 		StartResourceManager(rm, 0)

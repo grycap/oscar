@@ -41,21 +41,6 @@ func extractRefreshTokenSecret(service *types.Service) string {
 	return strings.TrimSpace(refreshToken)
 }
 
-func createRefreshTokenSecret(service *types.Service, namespace string, refreshToken string, kubeClientset kubernetes.Interface) error {
-	if refreshToken == "" {
-		return nil
-	}
-
-	secretName := utils.RefreshTokenSecretName(service.Name)
-	if utils.SecretExists(secretName, namespace, kubeClientset) {
-		return fmt.Errorf("refresh-token secret already exists")
-	}
-
-	return utils.CreateSecret(secretName, namespace, map[string]string{
-		types.RefreshTokenSecretKey: refreshToken,
-	}, kubeClientset)
-}
-
 func upsertRefreshTokenSecret(service *types.Service, namespace string, refreshToken string, kubeClientset kubernetes.Interface) error {
 	if refreshToken == "" {
 		return nil

@@ -741,7 +741,7 @@ func TestCheckWorkloadAdmited(t *testing.T) {
 	}
 
 	// Should not panic when not in-cluster (test environment)
-	CheckWorkloadAdmited(service, "test-ns", cfg, kubeClient, templateFunc)
+	_ = CheckWorkloadAdmited(service, "test-ns", cfg, kubeClient, templateFunc)
 }
 
 // Integration test that simulates the full queue setup flow

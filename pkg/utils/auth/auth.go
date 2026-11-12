@@ -100,8 +100,8 @@ func CustomAuth(cfg *types.Config, kubeClientset kubernetes.Interface) gin.Handl
 	// Slice to add default user to all users group on MinIO
 	var oscarUser = []string{"console"}
 
-	objectStorageIAM.CreateGroup(context.Background(), types.ALL_USERS_GROUP)                          // #nosec G104
-	objectStorageIAM.UpdateGroupMembers(context.Background(), types.ALL_USERS_GROUP, oscarUser, false) // #nosec G104
+	_ = objectStorageIAM.CreateGroup(context.Background(), types.ALL_USERS_GROUP)
+	_ = objectStorageIAM.UpdateGroupMembers(context.Background(), types.ALL_USERS_GROUP, oscarUser, false)
 
 	oidcHandler := getOIDCMiddleware(kubeClientset, objectStorageIAM, cfg, nil)
 	return func(c *gin.Context) {

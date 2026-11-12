@@ -120,7 +120,7 @@ func TestKubeListServices(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return a valid configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReaction)
 
 		// Call
 		_, err := back.ListServices()
@@ -135,7 +135,7 @@ func TestKubeListServices(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return an error getting the configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", errorReaction)
 
 		// Call
 		_, err := back.ListServices()
@@ -164,7 +164,7 @@ func TestKubeListServices(t *testing.T) {
 		}
 
 		// Return a valid configMap with invalid FDL
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapWithInvalidFDLReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapWithInvalidFDLReactor)
 
 		// Call
 		_, err := back.ListServices()
@@ -220,7 +220,7 @@ func TestKubeCreateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return error creating the configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("create", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("create", "configmaps", errorReaction)
 
 		// Call
 		err := back.CreateService(testService)
@@ -259,7 +259,7 @@ func TestKubeCreateService(t *testing.T) {
 		}
 
 		// Return error deleting the configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "configmaps", errorReaction)
 
 		// Call
 		err := back.CreateService(invalidService)
@@ -274,7 +274,7 @@ func TestKubeCreateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return error creating the podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("create", "podtemplates", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("create", "podtemplates", errorReaction)
 
 		// Call
 		err := back.CreateService(testService)
@@ -289,10 +289,10 @@ func TestKubeCreateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return error creating the podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("create", "podtemplates", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("create", "podtemplates", errorReaction)
 
 		// Return error deleting the configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "configmaps", errorReaction)
 
 		// Call
 		err := back.CreateService(testService)
@@ -442,10 +442,10 @@ func TestKubeReadService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return valid podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "podtemplates", validPodTemplateReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "podtemplates", validPodTemplateReactor)
 
 		// Return valid ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Call
 		_, err := back.ReadService(testConfig.ServicesNamespace, "test")
@@ -460,7 +460,7 @@ func TestKubeReadService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return error getting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "podtemplates", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "podtemplates", errorReaction)
 
 		// Call
 		_, err := back.ReadService(testConfig.ServicesNamespace, "test")
@@ -475,10 +475,10 @@ func TestKubeReadService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return valid podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "podtemplates", validPodTemplateReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "podtemplates", validPodTemplateReactor)
 
 		// Return error creating ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("create", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("create", "configmaps", errorReaction)
 
 		// Call
 		_, err := back.ReadService(testConfig.ServicesNamespace, "test")
@@ -529,13 +529,13 @@ func TestKubeUpdateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return valid ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Return no errors updating ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "configmaps", validConfigMapReactor)
 
 		// Return no errors updating podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "podtemplates", validPodTemplateReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "podtemplates", validPodTemplateReactor)
 
 		// Call
 		err := back.UpdateService(testService)
@@ -550,7 +550,7 @@ func TestKubeUpdateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return error getting the old configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", errorReaction)
 
 		// Call
 		err := back.UpdateService(testService)
@@ -565,7 +565,7 @@ func TestKubeUpdateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return valid configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Return error creating the configMap YAML
 		oldYAMLMarshal := types.YAMLMarshal
@@ -589,10 +589,10 @@ func TestKubeUpdateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return valid old configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Return error updating the configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "configmaps", errorReaction)
 
 		// Call
 		err := back.UpdateService(testService)
@@ -607,10 +607,10 @@ func TestKubeUpdateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return valid ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Return no errors updating ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "configmaps", validConfigMapReactor)
 
 		// Return error creating the podSpec (invalid resources)
 		invalidService := types.Service{
@@ -653,10 +653,10 @@ func TestKubeUpdateService(t *testing.T) {
 		}
 
 		// Return valid ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Return no errors updating ConfigMap the first time is called
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "configmaps", customConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "configmaps", customConfigMapReactor)
 
 		// Return error creating the podSpec (invalid resources)
 		invalidService := types.Service{
@@ -677,13 +677,13 @@ func TestKubeUpdateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return valid ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Return no errors updating ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "configmaps", validConfigMapReactor)
 
 		// Return error updating podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "podtemplates", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "podtemplates", errorReaction)
 
 		// Call
 		err := back.UpdateService(testService)
@@ -720,13 +720,13 @@ func TestKubeUpdateService(t *testing.T) {
 		}
 
 		// Return valid ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Return no errors updating ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "configmaps", customConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "configmaps", customConfigMapReactor)
 
 		// Return error updating podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "podtemplates", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "podtemplates", errorReaction)
 
 		// Call
 		err := back.UpdateService(testService)
@@ -747,13 +747,13 @@ func TestKubeDeleteService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return no error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "podtemplates", validDeleteReaction)
 
 		// Return no error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "configmaps", validDeleteReaction)
 
 		// Return no error deleting jobs
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete-collection", "jobs", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete-collection", "jobs", validDeleteReaction)
 
 		// Call
 		err := back.DeleteService(testService)
@@ -768,7 +768,7 @@ func TestKubeDeleteService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "podtemplates", errorReaction)
 
 		// Call
 		err := back.DeleteService(testService)
@@ -783,10 +783,10 @@ func TestKubeDeleteService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return no error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "podtemplates", validDeleteReaction)
 
 		// Return error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "configmaps", errorReaction)
 
 		// Call
 		err := back.DeleteService(testService)
@@ -801,13 +801,13 @@ func TestKubeDeleteService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return no error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "podtemplates", validDeleteReaction)
 
 		// Return no error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "configmaps", validDeleteReaction)
 
 		// Return no error deleting jobs
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete-collection", "jobs", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete-collection", "jobs", errorReaction)
 
 		// Call
 		err := back.DeleteService(testService)
@@ -822,12 +822,12 @@ func TestKubeDeleteService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return no error deleting service resources before exposed resources.
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", validDeleteReaction)
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", validDeleteReaction)
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete-collection", "jobs", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "podtemplates", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "configmaps", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete-collection", "jobs", validDeleteReaction)
 
 		// Return error deleting HPA inside exposed resources cleanup.
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "horizontalpodautoscalers", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "horizontalpodautoscalers", errorReaction)
 
 		exposedService := testService
 		exposedService.Expose.APIPort = []int{8080}

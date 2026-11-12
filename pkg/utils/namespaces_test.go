@@ -605,7 +605,7 @@ func TestListManagedUserNamespacesInputHandling(t *testing.T) {
 		Labels:      map[string]string{namespaceManagedByLabel: namespaceManagedByValue},
 		Annotations: map[string]string{namespaceOwnerLabel: " user "},
 	}})
-	namespaces, err := ListManagedUserNamespaces(nil, clientset)
+	namespaces, err := ListManagedUserNamespaces(t.Context(), clientset)
 	if err != nil {
 		t.Fatalf("ListManagedUserNamespaces() error: %v", err)
 	}

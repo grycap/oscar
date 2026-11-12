@@ -145,10 +145,10 @@ func TestMakeCreateHandler(t *testing.T) {
 
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 		} else if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/info-canned-policy") {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{
+			_, _ = rw.Write([]byte(`{
 				"Version": "2012-10-17",
 				"Statement": [
 					{
@@ -164,13 +164,13 @@ func TestMakeCreateHandler(t *testing.T) {
 			}`))
 		} else if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/set-user-or-group-policy") {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"status":"success","binding":"done"}`))
+			_, _ = rw.Write([]byte(`{"status":"success","binding":"done"}`))
 		} else if hreq.Method == http.MethodGet && strings.HasPrefix(hreq.URL.Path, "/test") && hreq.URL.RawQuery == "location=" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>`))
+			_, _ = rw.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>`))
 		} else {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"status": "success"}`))
+			_, _ = rw.Write([]byte(`{"status": "success"}`))
 		}
 	}))
 
@@ -212,14 +212,6 @@ func TestMakeCreateHandler(t *testing.T) {
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
-			allowedUsersJSON := "["
-			for i, user := range s.allowedUsers {
-				if i > 0 {
-					allowedUsersJSON += ","
-				}
-				allowedUsersJSON += `"` + user + `"`
-			}
-			allowedUsersJSON += "]"
 			namespaceJSON := ""
 			if s.namespace != "" {
 				namespaceJSON = `,"namespace":"` + s.namespace + `"`
@@ -325,7 +317,7 @@ func TestMakeCreateHandlerWebhookError(t *testing.T) {
 		// Simulate MinIO info ok, but webhook restart error
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 			return
 		}
 		if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/service") {
@@ -333,7 +325,7 @@ func TestMakeCreateHandlerWebhookError(t *testing.T) {
 			return
 		}
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{"Status": "success"}`))
+		_, _ = rw.Write([]byte(`{"Status": "success"}`))
 	}))
 	defer server.Close()
 
@@ -375,12 +367,12 @@ func TestMakeCreateHandlerVolumeFlows(t *testing.T) {
 		}
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 			return
 		}
 		if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/info-canned-policy") {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{
+			_, _ = rw.Write([]byte(`{
 				"Version": "2012-10-17",
 				"Statement": [
 					{
@@ -398,16 +390,16 @@ func TestMakeCreateHandlerVolumeFlows(t *testing.T) {
 		}
 		if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/set-user-or-group-policy") {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"status":"success","binding":"done"}`))
+			_, _ = rw.Write([]byte(`{"status":"success","binding":"done"}`))
 			return
 		}
 		if hreq.Method == http.MethodGet && strings.HasPrefix(hreq.URL.Path, "/test") && hreq.URL.RawQuery == "location=" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>`))
+			_, _ = rw.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>`))
 			return
 		}
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{"status":"success"}`))
+		_, _ = rw.Write([]byte(`{"status":"success"}`))
 	}))
 	defer server.Close()
 
@@ -1153,7 +1145,7 @@ func TestServiceWithSameNameExists(t *testing.T) {
 		},
 		{
 			name:          "gone error treated as not existing",
-			backendErr:    k8serr.NewGone("resource gone"),
+			backendErr:    k8serr.NewGone("resource gone"), //nolint:staticcheck // handlers rely on IsGone, which matches StatusReasonGone
 			expectedExist: false,
 			expectErr:     false,
 		},
@@ -1238,11 +1230,11 @@ func TestCheckIdentity(t *testing.T) {
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
-			w.Write([]byte(`{"issuer":"` + server.URL + `","userinfo_endpoint":"` + server.URL + `/userinfo","jwks_uri":"` + server.URL + `/keys"}`))
+			_, _ = w.Write([]byte(`{"issuer":"` + server.URL + `","userinfo_endpoint":"` + server.URL + `/userinfo","jwks_uri":"` + server.URL + `/keys"}`))
 		case "/userinfo":
-			w.Write([]byte(`{"sub":"user@example.com","group_membership":["` + vo + `"]}`))
+			_, _ = w.Write([]byte(`{"sub":"user@example.com","group_membership":["` + vo + `"]}`))
 		case "/keys":
-			w.Write([]byte(jwk))
+			_, _ = w.Write([]byte(jwk))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}

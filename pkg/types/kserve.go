@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -228,14 +227,13 @@ func (k KserveInference) getConteinerName() string {
 }
 
 func (k KserveInference) getKueueResourceList(service *Service) (request corev1.ResourceList, minScale int32, err error) {
-	requests := v1.ResourceList{}
 	kserveResourcesRequests, err := createKserveResources(service)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to create Kserve resources for Kueue: %w", err)
 	}
 	// createKserveResources substracts the overhead from the resources, so we need to add it back for Kueue
 	addOverheadToKserveResources(&kserveResourcesRequests)
-	requests = kserveResourcesRequests.Requests
+	requests := kserveResourcesRequests.Requests
 	var kserveMinScale int32 = 1
 	if scaling, ok := service.ModelServing.GetScaling(); ok && scaling.MinScale > 1 {
 		kserveMinScale = scaling.MinScale
@@ -422,14 +420,13 @@ func (k KserveLLMInference) getConteinerName() string {
 }
 
 func (k KserveLLMInference) getKueueResourceList(service *Service) (request corev1.ResourceList, minScale int32, err error) {
-	requests := v1.ResourceList{}
 	kserveResourcesRequests, err := createKserveResources(service)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to create Kserve resources for Kueue: %w", err)
 	}
 	// createKserveResources substracts the overhead from the resources, so we need to add it back for Kueue
 	addOverheadToKserveResources(&kserveResourcesRequests)
-	requests = kserveResourcesRequests.Requests
+	requests := kserveResourcesRequests.Requests
 	var kserveMinScale int32 = 1
 	if scaling, ok := service.ModelServing.GetScaling(); ok && scaling.MinScale > 1 {
 		kserveMinScale = scaling.MinScale
@@ -1035,7 +1032,7 @@ func buildHTTPRouteSpec(service *Service, owner *KserveServiceOwner, cfg *Config
 	}}
 }
 
-func createKserveResources(service *Service) (v1.ResourceRequirements, error) {
+func createKserveResources(service *Service) (corev1.ResourceRequirements, error) {
 	resources := corev1.ResourceRequirements{
 		Limits:   corev1.ResourceList{},
 		Requests: corev1.ResourceList{},

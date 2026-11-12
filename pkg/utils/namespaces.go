@@ -581,7 +581,7 @@ func sanitizeOwner(owner string) string {
 			break
 		}
 		// if still invalid, fall back to empty so hash is used
-		return ""
+		sanitized = ""
 	}
 
 	return sanitized

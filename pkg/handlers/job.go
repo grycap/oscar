@@ -394,7 +394,6 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 			localQuota := true
 			if e != nil {
 				fmt.Println(e)
-				localQuota = true
 			} else {
 				//Check for quota availability at the local cluster
 				localQuota = isQuota(quota, service)
@@ -418,10 +417,8 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 
 		// Create job definition
 		ttl := int32(cfg.TTLJob) // #nosec
-		suspend := false
-		if service.Owner != types.DefaultOwner && cfg.KueueEnable {
-			suspend = true
-		}
+		suspend := service.Owner != types.DefaultOwner && cfg.KueueEnable
+
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				// UUID used as a name for jobs
@@ -726,7 +723,7 @@ func fetchMinIOProvider(originEndpoint string, authHeader string, sslVerify bool
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("origin /system/config returned status %d", res.StatusCode)
 	}

@@ -22,11 +22,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"net/http"
 	"net/url"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -48,7 +46,6 @@ var (
 	RESTRICTED_ACTIONS = []string{"s3:ListBucket", "s3:GetObject", "s3:PutObject", "s3:DeleteObject"}
 )
 
-var minioLogger = log.New(os.Stdout, "[MINIO] ", log.Flags())
 var overlappingError = "An object key name filtering rule defined with overlapping prefixes"
 
 const (
@@ -310,7 +307,7 @@ func createBucket(bucketKey string, s3Client *s3.S3) error {
 		if aerr, ok := err.(awserr.Error); ok {
 			// Check if the error is caused because the bucket already exists
 			if aerr.Code() == s3.ErrCodeBucketAlreadyExists {
-				return fmt.Errorf("the bucket \"%s\" already exists\n", bucketKey)
+				return fmt.Errorf("the bucket \"%s\" already exists", bucketKey)
 			} else if aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
 				return nil
 			} else {

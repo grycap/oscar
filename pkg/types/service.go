@@ -829,7 +829,7 @@ func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) error {
 	for i, cont := range p.Containers {
 		if cont.Name == ContainerName {
 			if dup := findFirstDuplicateEnvVar(requiredEnvVars, p.Containers[i].Env); dup != "" {
-				return fmt.Errorf("Trying to set reserved environment variable: %s", dup)
+				return fmt.Errorf("trying to set reserved environment variable: %s", dup)
 			}
 			p.Containers[i].Env = append(p.Containers[i].Env, requiredEnvVars...)
 		}
@@ -860,7 +860,7 @@ func addServiceMetadataEnvVars(p *v1.PodSpec, service *Service, cfg *Config) err
 	for i, cont := range p.Containers {
 		if cont.Name == ContainerName {
 			if dup := findFirstDuplicateEnvVar(requiredEnvVars, p.Containers[i].Env); dup != "" {
-				return fmt.Errorf("Trying to set reserved environment variable: %s", dup)
+				return fmt.Errorf("trying to set reserved environment variable: %s", dup)
 			}
 			p.Containers[i].Env = append(p.Containers[i].Env, requiredEnvVars...)
 		}

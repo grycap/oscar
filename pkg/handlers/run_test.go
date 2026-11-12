@@ -65,7 +65,7 @@ func TestMakeRunHandler(t *testing.T) {
 			if s.returnError {
 				switch s.errType {
 				case "404":
-					back.AddError("ListServicesByName", k8serr.NewGone("Not Found"))
+					back.AddError("ListServicesByName", k8serr.NewGone("Not Found")) //nolint:staticcheck // handlers rely on IsGone, which matches StatusReasonGone
 				case "500":
 					err := errors.New("Not found")
 					back.AddError("ListServicesByName", k8serr.NewInternalError(err))
@@ -114,10 +114,10 @@ func TestMakeRunHandlerOIDCPath(t *testing.T) {
 		}
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 		} else {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"status": "success"}`))
+			_, _ = rw.Write([]byte(`{"status": "success"}`))
 		}
 	}))
 	rawToken := "11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf"
@@ -180,10 +180,10 @@ func TestMakeRunHandlerUnauthorized(t *testing.T) {
 		}
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 		} else {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"status": "success"}`))
+			_, _ = rw.Write([]byte(`{"status": "success"}`))
 		}
 	}))
 	svc := &types.Service{
@@ -230,10 +230,10 @@ func TestMakeRunHandlerWithServiceToken(t *testing.T) {
 		}
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 		} else {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"status": "success"}`))
+			_, _ = rw.Write([]byte(`{"status": "success"}`))
 		}
 	}))
 	svc := &types.Service{
