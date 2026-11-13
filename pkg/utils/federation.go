@@ -124,6 +124,8 @@ func defaultGroupID(service *types.Service) {
 
 func buildWorkerService(service *types.Service, member types.Replica, refreshToken string) (*types.Service, error) {
 	worker := *service
+	// Namespace is local to the origin; the target assigns its own user namespace.
+	worker.Namespace = ""
 	worker.Name = member.ServiceName
 	worker.ClusterID = member.ClusterID
 	worker.Federation = &types.Federation{

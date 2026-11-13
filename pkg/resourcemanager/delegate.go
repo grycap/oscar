@@ -408,7 +408,10 @@ func DelegateJob(service *types.Service, event string, jobID string, authHeader 
 		}
 	}
 
-	storage_provider := delegationStorageProvider(service)
+	storage_provider, err := delegationStorageProvider(service)
+	if err != nil {
+		return fmt.Errorf("unable to resolve delegated input provider: %w", err)
+	}
 	//Create event depending on delegation level
 
 	eventJSON, _ := eventBuild(event, storage_provider)
@@ -572,33 +575,42 @@ func WrapEvent(providerID string, event string) DelegatedEvent {
 	}
 }
 
-func delegationStorageProvider(service *types.Service) string {
+// delegationStorageProvider resolves the storage provider reference that a delegated
+// job must use on the target cluster. Per spec 002 (FR-010/FR-017), delegated jobs
+// read their input from the origin MinIO and write their output to the origin default
+// provider. The supervisor expects the bare ID "default" in the delegated event,
+// even though the service input refers to that provider as "minio.default".
+//
+// It is deliberately not derived from the event: already-wrapped events retain their
+// provider through eventBuild, and re-parsing the event here would only duplicate the
+// bucket/key -> input provider matching the faas-supervisor already performs in runtime.
+func delegationStorageProvider(service *types.Service) (string, error) {
 	if service == nil {
-		return ""
+		return "", nil
 	}
-
 	provider := ""
-	for _, output := range service.Output {
-		trimmed := strings.TrimSpace(output.Provider)
-		if trimmed != "" {
-			provider = trimmed
-			break
+	for _, input := range service.Input {
+		parts := strings.SplitN(strings.TrimSpace(input.Provider), types.ProviderSeparator, 2)
+		if len(parts) == 0 || !strings.EqualFold(parts[0], types.MinIOName) {
+			continue
 		}
+		id := types.DefaultProvider
+		if len(parts) > 1 && strings.TrimSpace(parts[1]) != "" {
+			id = strings.TrimSpace(parts[1])
+		}
+		ref := types.MinIOName + types.ProviderSeparator + id
+		if provider != "" && provider != ref {
+			return "", fmt.Errorf("delegation requires a single MinIO input provider, found %q and %q", provider, ref)
+		}
+		provider = ref
 	}
-
 	if provider == "" {
-		return strings.TrimSpace(service.ClusterID)
+		return types.DefaultProvider, nil
 	}
-
-	parts := strings.SplitN(provider, types.ProviderSeparator, 2)
-	providerName := strings.ToLower(strings.TrimSpace(parts[0]))
-	if providerName == "" {
-		return strings.TrimSpace(service.ClusterID)
+	if provider == types.MinIOName+types.ProviderSeparator+types.DefaultProvider {
+		return types.DefaultProvider, nil
 	}
-	if len(parts) == 1 || strings.TrimSpace(parts[1]) == "" {
-		return providerName + types.ProviderSeparator + types.DefaultProvider
-	}
-	return providerName + types.ProviderSeparator + strings.TrimSpace(parts[1])
+	return provider, nil
 }
 
 func resolveDelegationToken(service *types.Service, authHeader string, logger *log.Logger, cfg *types.Config, kubeClientset kubernetes.Interface) string {
