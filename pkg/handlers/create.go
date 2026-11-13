@@ -380,11 +380,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			service.Federation == nil || !strings.EqualFold(strings.TrimSpace(service.Federation.Topology), "mesh") {
 			if buckets, err = createBuckets(&service, cfg, objectStorageIAM.GetClient(c.Request.Context()), false, isAdminUser); err != nil {
 				createLogger.Printf("Error creating buckets for service '%s': %v", service.Name, err)
-				if err == errInput {
-					c.String(http.StatusBadRequest, err.Error())
-				} else {
-					c.String(http.StatusInternalServerError, err.Error())
-				}
+				c.String(bucketCreationErrorStatus(err), err.Error())
 				derr := back.DeleteService(service)
 				if derr != nil {
 					log.Printf("Error deleting service: %v\n", derr)
@@ -634,6 +630,17 @@ func cloneStorageIOConfigs(items []types.StorageIOConfig) []types.StorageIOConfi
 		return nil
 	}
 	return append([]types.StorageIOConfig(nil), items...)
+}
+
+func bucketCreationErrorStatus(err error) int {
+	switch {
+	case errors.Is(err, types.ErrBucketAlreadyExists):
+		return http.StatusConflict
+	case errors.Is(err, types.ErrBucketCreation), err == errInput:
+		return http.StatusBadRequest
+	default:
+		return http.StatusInternalServerError
+	}
 }
 
 func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *types.MinIOAdminClient, isUpdate, isAdminUser bool) ([]types.MinIOBucket, error) {
