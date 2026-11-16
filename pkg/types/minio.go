@@ -42,8 +42,10 @@ import (
 )
 
 var (
-	ALL_ACTIONS        = []string{"s3:*"}
-	RESTRICTED_ACTIONS = []string{"s3:ListBucket", "s3:GetObject", "s3:PutObject", "s3:DeleteObject"}
+	ErrBucketAlreadyExists = errors.New("bucket already exists")
+	ErrBucketCreation      = errors.New("bucket creation failed")
+	ALL_ACTIONS            = []string{"s3:*"}
+	RESTRICTED_ACTIONS     = []string{"s3:ListBucket", "s3:GetObject", "s3:PutObject", "s3:DeleteObject"}
 )
 
 var overlappingError = "An object key name filtering rule defined with overlapping prefixes"
@@ -307,14 +309,14 @@ func createBucket(bucketKey string, s3Client *s3.S3) error {
 		if aerr, ok := err.(awserr.Error); ok {
 			// Check if the error is caused because the bucket already exists
 			if aerr.Code() == s3.ErrCodeBucketAlreadyExists {
-				return fmt.Errorf("the bucket \"%s\" already exists", bucketKey)
+				return fmt.Errorf("%w: the bucket \"%s\" already exists", ErrBucketAlreadyExists, bucketKey)
 			} else if aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
 				return nil
 			} else {
-				return fmt.Errorf("error creating bucket %s: %v", bucketKey, err)
+				return fmt.Errorf("%w: error creating bucket \"%s\": %v", ErrBucketCreation, bucketKey, err)
 			}
 		} else {
-			return fmt.Errorf("error creating bucket %s: %v", bucketKey, err)
+			return fmt.Errorf("%w: error creating bucket \"%s\": %v", ErrBucketCreation, bucketKey, err)
 		}
 	}
 	return nil
