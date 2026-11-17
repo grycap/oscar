@@ -78,7 +78,7 @@ func TestSetInterlinkService(t *testing.T) {
 		t.Errorf("Unexpected VolumeMounts: %v", podSpec.Containers[0].VolumeMounts)
 	}
 
-	if len(podSpec.Volumes) != 1 || podSpec.Volumes[0].Name != NameSupervisorVolume || podSpec.Volumes[0].VolumeSource.EmptyDir == nil {
+	if len(podSpec.Volumes) != 1 || podSpec.Volumes[0].Name != NameSupervisorVolume || podSpec.Volumes[0].EmptyDir == nil {
 		t.Errorf("Unexpected Volumes: %v", podSpec.Volumes)
 	}
 }

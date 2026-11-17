@@ -20,6 +20,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"strings"
@@ -144,10 +145,10 @@ func TestMakeCreateHandler(t *testing.T) {
 
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 		} else if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/info-canned-policy") {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{
+			_, _ = rw.Write([]byte(`{
 				"Version": "2012-10-17",
 				"Statement": [
 					{
@@ -163,13 +164,13 @@ func TestMakeCreateHandler(t *testing.T) {
 			}`))
 		} else if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/set-user-or-group-policy") {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"status":"success","binding":"done"}`))
+			_, _ = rw.Write([]byte(`{"status":"success","binding":"done"}`))
 		} else if hreq.Method == http.MethodGet && strings.HasPrefix(hreq.URL.Path, "/test") && hreq.URL.RawQuery == "location=" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>`))
+			_, _ = rw.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>`))
 		} else {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"status": "success"}`))
+			_, _ = rw.Write([]byte(`{"status": "success"}`))
 		}
 	}))
 
@@ -211,14 +212,6 @@ func TestMakeCreateHandler(t *testing.T) {
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
-			allowedUsersJSON := "["
-			for i, user := range s.allowedUsers {
-				if i > 0 {
-					allowedUsersJSON += ","
-				}
-				allowedUsersJSON += `"` + user + `"`
-			}
-			allowedUsersJSON += "]"
 			namespaceJSON := ""
 			if s.namespace != "" {
 				namespaceJSON = `,"namespace":"` + s.namespace + `"`
@@ -324,7 +317,7 @@ func TestMakeCreateHandlerWebhookError(t *testing.T) {
 		// Simulate MinIO info ok, but webhook restart error
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 			return
 		}
 		if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/service") {
@@ -332,7 +325,7 @@ func TestMakeCreateHandlerWebhookError(t *testing.T) {
 			return
 		}
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{"Status": "success"}`))
+		_, _ = rw.Write([]byte(`{"Status": "success"}`))
 	}))
 	defer server.Close()
 
@@ -374,12 +367,12 @@ func TestMakeCreateHandlerVolumeFlows(t *testing.T) {
 		}
 		if hreq.URL.Path == "/minio/admin/v3/info" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
+			_, _ = rw.Write([]byte(`{"Mode": "local", "Region": "us-east-1"}`))
 			return
 		}
 		if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/info-canned-policy") {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{
+			_, _ = rw.Write([]byte(`{
 				"Version": "2012-10-17",
 				"Statement": [
 					{
@@ -397,16 +390,16 @@ func TestMakeCreateHandlerVolumeFlows(t *testing.T) {
 		}
 		if strings.HasPrefix(hreq.URL.Path, "/minio/admin/v3/set-user-or-group-policy") {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"status":"success","binding":"done"}`))
+			_, _ = rw.Write([]byte(`{"status":"success","binding":"done"}`))
 			return
 		}
 		if hreq.Method == http.MethodGet && strings.HasPrefix(hreq.URL.Path, "/test") && hreq.URL.RawQuery == "location=" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>`))
+			_, _ = rw.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>`))
 			return
 		}
 		rw.WriteHeader(http.StatusOK)
-		rw.Write([]byte(`{"status":"success"}`))
+		_, _ = rw.Write([]byte(`{"status":"success"}`))
 	}))
 	defer server.Close()
 
@@ -555,6 +548,10 @@ func TestMakeCreateHandlerEnforcesMinIOQuotaForServiceBuckets(t *testing.T) {
 			w.Header().Set("Content-Type", "application/xml")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`<Tagging><TagSet><Tag><Key>owner</Key><Value>` + user + `</Value></Tag></TagSet></Tagging>`))
+		case r.Method == http.MethodGet && strings.Contains(r.URL.RawQuery, "location"):
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
 		default:
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"Status":"success"}`))
@@ -573,6 +570,24 @@ func TestMakeCreateHandlerEnforcesMinIOQuotaForServiceBuckets(t *testing.T) {
 
 	if resp.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var quotaResp struct {
+		Status  string         `json:"status"`
+		Code    string         `json:"code"`
+		Error   string         `json:"error"`
+		Details map[string]any `json:"details"`
+	}
+	if err := json.Unmarshal(resp.Body.Bytes(), &quotaResp); err != nil {
+		t.Fatalf("expected machine-readable JSON quota response, got %q: %v", resp.Body.String(), err)
+	}
+	if quotaResp.Status != "error" || quotaResp.Code != "QuotaExceeded" {
+		t.Fatalf("unexpected quota rejection body: status=%q code=%q", quotaResp.Status, quotaResp.Code)
+	}
+	if quotaResp.Error == "" {
+		t.Errorf("expected non-empty error message in quota rejection body")
+	}
+	if got, ok := quotaResp.Details["limit"].(float64); !ok || got != 1 {
+		t.Errorf("expected quota limit 1 in details, got %v", quotaResp.Details["limit"])
 	}
 	if back.CreatedService != nil {
 		t.Fatalf("service was created despite bucket quota rejection")
@@ -887,11 +902,22 @@ func TestValidateServiceCreation(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		service types.Service
-		cfg     *types.Config
-		wantErr bool
+		name            string
+		service         types.Service
+		cfg             *types.Config
+		wantErr         bool
+		wantErrContains string
+		wantKserveTag   bool
 	}{
+		{
+			name: "documented notebook mount options",
+			service: types.Service{
+				Name: "notebook", Image: "img", CPU: "0.2", Script: "echo test",
+				Visibility: types.PUBLIC, IsolationLevel: types.IsolationLevelService,
+				Mount: types.StorageIOConfig{Provider: "minio.default", Path: "/notebook", Options: "--buffer-size 128M --vfs-read-chunk-size 64M"},
+			},
+			cfg: cfg,
+		},
 		{
 			name: "valid non-kserve service",
 			service: types.Service{
@@ -935,13 +961,15 @@ func TestValidateServiceCreation(t *testing.T) {
 			name: "kserve service when unsupported",
 			service: types.Service{
 				Name:           "svc",
+				CPU:            "0.2",
+				Memory:         "256Mi",
 				IsolationLevel: types.IsolationLevelService,
 				Visibility:     types.PRIVATE,
-				Kserve: &types.Kserve{
-					Type:       types.KserveTypeInferenceService,
-					StorageUri: "s3://model",
-					Inference: &types.KserveInference{
+				ModelServing: &types.ModelServing{
+					Spec: &types.KserveInference{
+						Source:      "s3://model",
 						ModelFormat: "onnx",
+						APIVersion:  "v1",
 					},
 				},
 				Script: "echo test",
@@ -950,19 +978,21 @@ func TestValidateServiceCreation(t *testing.T) {
 				KserveEnable:             false,
 				ExposedServicesRouteKind: types.HTTPROUTE,
 			},
-			wantErr: true,
+			wantErr:         true,
+			wantErrContains: "not supported",
 		},
 		{
 			name: "kserve service when supported",
 			service: types.Service{
 				Name:           "svc",
+				CPU:            "0.2",
+				Memory:         "256Mi",
 				IsolationLevel: types.IsolationLevelService,
 				Visibility:     types.PRIVATE,
-				Kserve: &types.Kserve{
-					Type:       types.KserveTypeInferenceService,
-					StorageUri: "s3://model",
-					Inference: &types.KserveInference{
+				ModelServing: &types.ModelServing{
+					Spec: &types.KserveInference{
 						ModelFormat: "onnx",
+						Source:      "s3://model",
 						APIVersion:  "v2",
 					},
 				},
@@ -971,7 +1001,78 @@ func TestValidateServiceCreation(t *testing.T) {
 				KserveEnable:             true,
 				ExposedServicesRouteKind: types.HTTPROUTE,
 			},
-			wantErr: false,
+			wantErr:       false,
+			wantKserveTag: true,
+		},
+		{
+			name: "kserve llm service when supported",
+			service: types.Service{
+				Name:           "svc",
+				CPU:            "0.2",
+				IsolationLevel: types.IsolationLevelService,
+				Visibility:     types.PRIVATE,
+				ModelServing: &types.ModelServing{
+					Spec: &types.KserveLLMInference{Source: "hf://model"},
+				},
+			},
+			cfg: &types.Config{
+				KserveEnable:             true,
+				ExposedServicesRouteKind: types.HTTPROUTE,
+			},
+			wantErr:       false,
+			wantKserveTag: true,
+		},
+		{
+			name: "model serving without spec",
+			service: types.Service{
+				Name:           "svc",
+				CPU:            "0.2",
+				IsolationLevel: types.IsolationLevelService,
+				Visibility:     types.PRIVATE,
+				ModelServing:   &types.ModelServing{},
+			},
+			cfg: &types.Config{
+				KserveEnable:             true,
+				ExposedServicesRouteKind: types.HTTPROUTE,
+			},
+			wantErr:         true,
+			wantErrContains: "invalid ModelServing service type",
+		},
+		{
+			name: "kserve inference without source",
+			service: types.Service{
+				Name:           "svc",
+				CPU:            "0.2",
+				IsolationLevel: types.IsolationLevelService,
+				Visibility:     types.PRIVATE,
+				ModelServing: &types.ModelServing{
+					Spec: &types.KserveInference{ModelFormat: "onnx", APIVersion: "v1"},
+				},
+			},
+			cfg: &types.Config{
+				KserveEnable:             true,
+				ExposedServicesRouteKind: types.HTTPROUTE,
+			},
+			wantErr:         true,
+			wantErrContains: "model Source is required",
+		},
+		{
+			name: "kserve service with unsupported route kind",
+			service: types.Service{
+				Name:           "svc",
+				CPU:            "0.2",
+				IsolationLevel: types.IsolationLevelService,
+				Visibility:     types.PRIVATE,
+				ModelServing: &types.ModelServing{
+					Spec: &types.KserveInference{ModelFormat: "onnx", Source: "s3://model", APIVersion: "v1"},
+				},
+			},
+			cfg: &types.Config{
+				KserveEnable:             true,
+				ExposedServicesRouteKind: "ingress",
+			},
+			wantErr:         true,
+			wantErrContains: "not supported",
 		},
 		{
 			name: "exposed service with default command true",
@@ -1006,6 +1107,12 @@ func TestValidateServiceCreation(t *testing.T) {
 			if !tt.wantErr && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+			if tt.wantErrContains != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErrContains)) {
+				t.Fatalf("error = %v, want to contain %q", err, tt.wantErrContains)
+			}
+			if tt.wantKserveTag && tt.service.Labels["kserve"] != "true" {
+				t.Fatalf("expected label kserve=true, got %v", tt.service.Labels)
+			}
 		})
 	}
 }
@@ -1038,7 +1145,7 @@ func TestServiceWithSameNameExists(t *testing.T) {
 		},
 		{
 			name:          "gone error treated as not existing",
-			backendErr:    k8serr.NewGone("resource gone"),
+			backendErr:    k8serr.NewGone("resource gone"), //nolint:staticcheck // handlers rely on IsGone, which matches StatusReasonGone
 			expectedExist: false,
 			expectErr:     false,
 		},
@@ -1123,11 +1230,11 @@ func TestCheckIdentity(t *testing.T) {
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
-			w.Write([]byte(`{"issuer":"` + server.URL + `","userinfo_endpoint":"` + server.URL + `/userinfo","jwks_uri":"` + server.URL + `/keys"}`))
+			_, _ = w.Write([]byte(`{"issuer":"` + server.URL + `","userinfo_endpoint":"` + server.URL + `/userinfo","jwks_uri":"` + server.URL + `/keys"}`))
 		case "/userinfo":
-			w.Write([]byte(`{"sub":"user@example.com","group_membership":["` + vo + `"]}`))
+			_, _ = w.Write([]byte(`{"sub":"user@example.com","group_membership":["` + vo + `"]}`))
 		case "/keys":
-			w.Write([]byte(jwk))
+			_, _ = w.Write([]byte(jwk))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}

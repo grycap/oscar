@@ -20,12 +20,11 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
 	"math"
 	"net/http"
 	"net/url"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -43,11 +42,12 @@ import (
 )
 
 var (
-	ALL_ACTIONS        = []string{"s3:*"}
-	RESTRICTED_ACTIONS = []string{"s3:ListBucket", "s3:GetObject", "s3:PutObject", "s3:DeleteObject"}
+	ErrBucketAlreadyExists = errors.New("bucket already exists")
+	ErrBucketCreation      = errors.New("bucket creation failed")
+	ALL_ACTIONS            = []string{"s3:*"}
+	RESTRICTED_ACTIONS     = []string{"s3:ListBucket", "s3:GetObject", "s3:PutObject", "s3:DeleteObject"}
 )
 
-var minioLogger = log.New(os.Stdout, "[MINIO] ", log.Flags())
 var overlappingError = "An object key name filtering rule defined with overlapping prefixes"
 
 const (
@@ -309,14 +309,14 @@ func createBucket(bucketKey string, s3Client *s3.S3) error {
 		if aerr, ok := err.(awserr.Error); ok {
 			// Check if the error is caused because the bucket already exists
 			if aerr.Code() == s3.ErrCodeBucketAlreadyExists {
-				return fmt.Errorf("the bucket \"%s\" already exists\n", bucketKey)
+				return fmt.Errorf("%w: the bucket \"%s\" already exists", ErrBucketAlreadyExists, bucketKey)
 			} else if aerr.Code() == s3.ErrCodeBucketAlreadyOwnedByYou {
 				return nil
 			} else {
-				return fmt.Errorf("error creating bucket %s: %v", bucketKey, err)
+				return fmt.Errorf("%w: error creating bucket \"%s\": %v", ErrBucketCreation, bucketKey, err)
 			}
 		} else {
-			return fmt.Errorf("error creating bucket %s: %v", bucketKey, err)
+			return fmt.Errorf("%w: error creating bucket \"%s\": %v", ErrBucketCreation, bucketKey, err)
 		}
 	}
 	return nil
@@ -780,10 +780,40 @@ func (minIOAdminClient *MinIOAdminClient) SetBucketStorageQuota(bucket, size str
 	if bytes == 0 {
 		quota.Type = ""
 	}
-	if err := minIOAdminClient.adminClient.SetBucketQuota(context.TODO(), bucket, quota); err != nil {
-		return fmt.Errorf("error setting bucket quota for %s: %w", bucket, err)
+	// The MinIO admin API has been observed to answer 503 under load while
+	// the cluster is busy, so transient failures are retried a couple of
+	// times with a small backoff before giving up.
+	const maxAttempts = 3
+	for attempt := 1; ; attempt++ {
+		err := minIOAdminClient.adminClient.SetBucketQuota(context.TODO(), bucket, quota)
+		if err == nil {
+			return nil
+		}
+		if attempt >= maxAttempts || !isTransientMinIOAdminError(err) {
+			return fmt.Errorf("error setting bucket quota for %s: %w", bucket, err)
+		}
+		time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
 	}
-	return nil
+}
+
+// isTransientMinIOAdminError reports whether the error can reasonably be
+// retried: MinIO asking for a slowDown, a service-availability hiccup, an
+// internal error, a lost HTTP connection, or an expired deadline. Anything
+// else (for example an unsupported admin API) is not worth retrying.
+func isTransientMinIOAdminError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	errResp := madmin.ToErrorResponse(err)
+	switch errResp.Code {
+	case "SlowDown", "ServiceUnavailable", "InternalError":
+		return true
+	}
+	var urlErr *url.Error
+	return errors.As(err, &urlErr)
 }
 
 func (minIOAdminClient *MinIOAdminClient) GetBucketStorageQuota(bucket string) (*MinIOQuota, error) {

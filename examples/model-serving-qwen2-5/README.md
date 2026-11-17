@@ -1,20 +1,20 @@
-# KServe LLM: Qwen2.5-0.5B-Instruct (vLLM CPU)
+# Model Serving LLM: Qwen2.5-0.5B-Instruct (vLLM CPU)
 
-This example deploys an LLM service on OSCAR using KServe,
-vLLM on CPU, and an OCI modelcar image that contains the
+This example deploys an LLM service on OSCAR using Model Serving,
+implemented with KServe underneath, vLLM on CPU, and an OCI modelcar image that contains the
 `Qwen/Qwen2.5-0.5B-Instruct` model.
 
 ## Example files
 
 | File | Description |
 |---|---|
-| `fdl.yaml` | OSCAR service definition with a KServe `llm_inference` block. |
+| `fdl.yaml` | OSCAR service definition with a Model Serving `llm_inference` block. |
 | `docker/Dockerfile.vllm` | vLLM CPU runtime wrapper with user `uid=1010` for KServe modelcar compatibility. |
 | `docker/Dockerfile.model` | Modelcar image that downloads the model from Hugging Face. |
 
 ## Requirements
 
-- OSCAR cluster with KServe enabled.
+- OSCAR cluster with KServe enabled. KServe is required to deploy and use Model Serving in this example.
 - `oscar-cli` configured against your cluster.
 
 ## 1. Deploy the service
@@ -48,7 +48,7 @@ Once the service is ready, the model will be exposed on `https://<YOUR_CLUSTER>/
             "messages": [
                 {
                     "role": "user",
-                    "content": "Write a short explanation about KServe"
+                    "content": "Write a short explanation about Model Serving"
                 }
             ]
         }'

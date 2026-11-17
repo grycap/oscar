@@ -86,7 +86,7 @@ func TestUpdateResources(t *testing.T) {
 
 	// Tests UpdateResources() and isNodeReady() call
 	t.Run("valid schedulable nodes", func(t *testing.T) {
-		krm.kubeClientset.(*fake.Clientset).Fake.PrependReactor("list", "nodes", validNodeReactorSchedulable)
+		krm.kubeClientset.(*fake.Clientset).PrependReactor("list", "nodes", validNodeReactorSchedulable)
 		err := krm.UpdateResources()
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -97,22 +97,22 @@ func TestUpdateResources(t *testing.T) {
 	for _, s := range scenariosk8s {
 		t.Run(s.name, func(t *testing.T) {
 			if !s.returnError {
-				krm.kubeClientset.(*fake.Clientset).Fake.PrependReactor("list", "nodes", validNodeReactorUnschedulable)
+				krm.kubeClientset.(*fake.Clientset).PrependReactor("list", "nodes", validNodeReactorUnschedulable)
 				err := krm.UpdateResources()
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
 			} else {
 				if s.name == "error getting pod list" {
-					krm.kubeClientset.(*fake.Clientset).Fake.PrependReactor("list", "nodes", validNodeReactorUnschedulable)
-					krm.kubeClientset.(*fake.Clientset).Fake.PrependReactor("list", "pods", errReactor)
+					krm.kubeClientset.(*fake.Clientset).PrependReactor("list", "nodes", validNodeReactorUnschedulable)
+					krm.kubeClientset.(*fake.Clientset).PrependReactor("list", "pods", errReactor)
 					err := krm.UpdateResources()
 					if err == nil {
 						t.Errorf("expecting error got nil")
 					}
 				}
 				if s.name == "error getting node list" {
-					krm.kubeClientset.(*fake.Clientset).Fake.PrependReactor("list", "nodes", errReactor)
+					krm.kubeClientset.(*fake.Clientset).PrependReactor("list", "nodes", errReactor)
 					err := krm.UpdateResources()
 					if err == nil {
 						t.Errorf("expecting error got nil")
@@ -184,8 +184,8 @@ func TestGetNodeAvailableResources(t *testing.T) {
 		kubeClientset: fake.NewSimpleClientset(),
 	}
 
-	krm.kubeClientset.(*fake.Clientset).Fake.PrependReactor("list", "nodes", validNodeReactorSchedulable)
-	krm.kubeClientset.(*fake.Clientset).Fake.PrependReactor("list", "pods", validPodReactor)
+	krm.kubeClientset.(*fake.Clientset).PrependReactor("list", "nodes", validNodeReactorSchedulable)
+	krm.kubeClientset.(*fake.Clientset).PrependReactor("list", "pods", validPodReactor)
 	err := krm.UpdateResources()
 	if err != nil {
 		t.Errorf("expected error, got nil")

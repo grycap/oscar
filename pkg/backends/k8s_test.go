@@ -67,6 +67,9 @@ storage_providers:
 	}
 
 	validConfigMapReaction = func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+		if action.GetVerb() == "get" && action.(k8stesting.GetAction).GetName() != "test" {
+			return false, nil, nil // Let the fake client report an absent policy ConfigMap.
+		}
 		validCM := &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
@@ -117,7 +120,7 @@ func TestKubeListServices(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return a valid configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReaction)
 
 		// Call
 		_, err := back.ListServices()
@@ -132,7 +135,7 @@ func TestKubeListServices(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return an error getting the configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", errorReaction)
 
 		// Call
 		_, err := back.ListServices()
@@ -161,7 +164,7 @@ func TestKubeListServices(t *testing.T) {
 		}
 
 		// Return a valid configMap with invalid FDL
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapWithInvalidFDLReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapWithInvalidFDLReactor)
 
 		// Call
 		_, err := back.ListServices()
@@ -217,7 +220,7 @@ func TestKubeCreateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return error creating the configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("create", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("create", "configmaps", errorReaction)
 
 		// Call
 		err := back.CreateService(testService)
@@ -256,7 +259,7 @@ func TestKubeCreateService(t *testing.T) {
 		}
 
 		// Return error deleting the configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "configmaps", errorReaction)
 
 		// Call
 		err := back.CreateService(invalidService)
@@ -271,7 +274,7 @@ func TestKubeCreateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return error creating the podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("create", "podtemplates", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("create", "podtemplates", errorReaction)
 
 		// Call
 		err := back.CreateService(testService)
@@ -286,10 +289,10 @@ func TestKubeCreateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return error creating the podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("create", "podtemplates", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("create", "podtemplates", errorReaction)
 
 		// Return error deleting the configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "configmaps", errorReaction)
 
 		// Call
 		err := back.CreateService(testService)
@@ -439,10 +442,10 @@ func TestKubeReadService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return valid podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "podtemplates", validPodTemplateReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "podtemplates", validPodTemplateReactor)
 
 		// Return valid ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Call
 		_, err := back.ReadService(testConfig.ServicesNamespace, "test")
@@ -457,7 +460,7 @@ func TestKubeReadService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return error getting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "podtemplates", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "podtemplates", errorReaction)
 
 		// Call
 		_, err := back.ReadService(testConfig.ServicesNamespace, "test")
@@ -472,10 +475,10 @@ func TestKubeReadService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return valid podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "podtemplates", validPodTemplateReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "podtemplates", validPodTemplateReactor)
 
 		// Return error creating ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("create", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("create", "configmaps", errorReaction)
 
 		// Call
 		_, err := back.ReadService(testConfig.ServicesNamespace, "test")
@@ -492,6 +495,9 @@ func TestKubeUpdateService(t *testing.T) {
 	}
 
 	validConfigMapReactor := func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+		if action.GetVerb() == "get" && action.(k8stesting.GetAction).GetName() != "test" {
+			return false, nil, nil // Let the fake client report an absent policy ConfigMap.
+		}
 		cm := &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
@@ -523,13 +529,13 @@ func TestKubeUpdateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return valid ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Return no errors updating ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "configmaps", validConfigMapReactor)
 
 		// Return no errors updating podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "podtemplates", validPodTemplateReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "podtemplates", validPodTemplateReactor)
 
 		// Call
 		err := back.UpdateService(testService)
@@ -544,7 +550,7 @@ func TestKubeUpdateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return error getting the old configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", errorReaction)
 
 		// Call
 		err := back.UpdateService(testService)
@@ -559,7 +565,7 @@ func TestKubeUpdateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return valid configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Return error creating the configMap YAML
 		oldYAMLMarshal := types.YAMLMarshal
@@ -583,10 +589,10 @@ func TestKubeUpdateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return valid old configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Return error updating the configMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "configmaps", errorReaction)
 
 		// Call
 		err := back.UpdateService(testService)
@@ -601,10 +607,10 @@ func TestKubeUpdateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return valid ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Return no errors updating ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "configmaps", validConfigMapReactor)
 
 		// Return error creating the podSpec (invalid resources)
 		invalidService := types.Service{
@@ -647,10 +653,10 @@ func TestKubeUpdateService(t *testing.T) {
 		}
 
 		// Return valid ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Return no errors updating ConfigMap the first time is called
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "configmaps", customConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "configmaps", customConfigMapReactor)
 
 		// Return error creating the podSpec (invalid resources)
 		invalidService := types.Service{
@@ -671,13 +677,13 @@ func TestKubeUpdateService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return valid ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Return no errors updating ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "configmaps", validConfigMapReactor)
 
 		// Return error updating podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "podtemplates", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "podtemplates", errorReaction)
 
 		// Call
 		err := back.UpdateService(testService)
@@ -714,13 +720,13 @@ func TestKubeUpdateService(t *testing.T) {
 		}
 
 		// Return valid ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("get", "configmaps", validConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("get", "configmaps", validConfigMapReactor)
 
 		// Return no errors updating ConfigMap
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "configmaps", customConfigMapReactor)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "configmaps", customConfigMapReactor)
 
 		// Return error updating podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("update", "podtemplates", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("update", "podtemplates", errorReaction)
 
 		// Call
 		err := back.UpdateService(testService)
@@ -741,13 +747,13 @@ func TestKubeDeleteService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return no error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "podtemplates", validDeleteReaction)
 
 		// Return no error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "configmaps", validDeleteReaction)
 
 		// Return no error deleting jobs
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete-collection", "jobs", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete-collection", "jobs", validDeleteReaction)
 
 		// Call
 		err := back.DeleteService(testService)
@@ -762,7 +768,7 @@ func TestKubeDeleteService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "podtemplates", errorReaction)
 
 		// Call
 		err := back.DeleteService(testService)
@@ -777,10 +783,10 @@ func TestKubeDeleteService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return no error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "podtemplates", validDeleteReaction)
 
 		// Return error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "configmaps", errorReaction)
 
 		// Call
 		err := back.DeleteService(testService)
@@ -795,13 +801,13 @@ func TestKubeDeleteService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return no error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "podtemplates", validDeleteReaction)
 
 		// Return no error deleting podTemplate
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "configmaps", validDeleteReaction)
 
 		// Return no error deleting jobs
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete-collection", "jobs", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete-collection", "jobs", errorReaction)
 
 		// Call
 		err := back.DeleteService(testService)
@@ -816,12 +822,12 @@ func TestKubeDeleteService(t *testing.T) {
 		back := MakeKubeBackend(clientset, testConfig)
 
 		// Return no error deleting service resources before exposed resources.
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "podtemplates", validDeleteReaction)
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "configmaps", validDeleteReaction)
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete-collection", "jobs", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "podtemplates", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "configmaps", validDeleteReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete-collection", "jobs", validDeleteReaction)
 
 		// Return error deleting HPA inside exposed resources cleanup.
-		back.kubeClientset.(*fake.Clientset).Fake.PrependReactor("delete", "horizontalpodautoscalers", errorReaction)
+		back.kubeClientset.(*fake.Clientset).PrependReactor("delete", "horizontalpodautoscalers", errorReaction)
 
 		exposedService := testService
 		exposedService.Expose.APIPort = []int{8080}
@@ -942,33 +948,51 @@ func TestListServicePodsHelpers(t *testing.T) {
 	}
 }
 
-func TestGetKserveServiceDeployment(t *testing.T) {
-	client := fake.NewSimpleClientset(&appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      utils.GetKservePodAndDplName("test-svc", types.KserveTypeInferenceService),
-			Namespace: "ns",
-		},
-	})
-
-	deployment, err := GetKserveServiceDeployment(client, "ns", "test-svc", types.KserveTypeInferenceService)
-	if err != nil {
-		t.Fatalf("get kserve deployment: %v", err)
+func TestGetModelServingServiceDeployment(t *testing.T) {
+	tests := []struct {
+		name    string
+		spec    types.ModelServingSpec
+		wantDpl string
+	}{
+		{name: "inference", spec: &types.KserveInference{}, wantDpl: "test-svc-predictor"},
+		{name: "llm inference", spec: &types.KserveLLMInference{}, wantDpl: "test-svc-kserve"},
 	}
-	if deployment.Name != utils.GetKservePodAndDplName("test-svc", types.KserveTypeInferenceService) {
-		t.Fatalf("expected deployment name %s, got %s", utils.GetKservePodAndDplName("test-svc", types.KserveTypeInferenceService), deployment.Name)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ms := types.ModelServing{Spec: tt.spec}
+			dplName := ms.GetPodAndDplName("test-svc")
+			if dplName != tt.wantDpl {
+				t.Fatalf("deployment name = %s, want %s", dplName, tt.wantDpl)
+			}
+			client := fake.NewSimpleClientset(&appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      dplName,
+					Namespace: "ns",
+				},
+			})
+
+			deployment, err := GetModelServingServiceDeployment(client, "ns", dplName)
+			if err != nil {
+				t.Fatalf("get model serving deployment: %v", err)
+			}
+			if deployment.Name != dplName {
+				t.Fatalf("expected deployment name %s, got %s", dplName, deployment.Name)
+			}
+		})
 	}
 }
 
-func TestGetKserveServiceDeploymentNotFound(t *testing.T) {
+func TestGetModelServingServiceDeploymentNotFound(t *testing.T) {
 	client := fake.NewSimpleClientset()
 
-	_, err := GetKserveServiceDeployment(client, "ns", "non-existent", types.KserveTypeInferenceService)
+	_, err := GetModelServingServiceDeployment(client, "ns", "non-existent")
 	if err == nil {
 		t.Fatal("expected error for non-existent deployment, got nil")
 	}
 }
 
-func TestListKserveServicePods(t *testing.T) {
+func TestListModelServingServicePods(t *testing.T) {
 	client := fake.NewSimpleClientset(
 		&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -989,12 +1013,21 @@ func TestListKserveServicePods(t *testing.T) {
 			},
 		},
 	)
+	ms := types.ModelServing{Spec: &types.KserveInference{}}
 
-	pods, err := ListKserveServicePods(client, "ns", "test-svc")
+	pods, err := ListModelServingServicePods(client, "ns", ms.GetLabelSelector("test-svc"))
 	if err != nil {
 		t.Fatalf("list kserve pods: %v", err)
 	}
 	if len(pods.Items) != 1 || pods.Items[0].Name != "kserve-pod" {
 		t.Fatalf("unexpected kserve pods: %#v", pods.Items)
+	}
+
+	pods, err = ListModelServingServicePods(client, "ns", ms.GetLabelSelector("another-svc"))
+	if err != nil {
+		t.Fatalf("list kserve pods: %v", err)
+	}
+	if len(pods.Items) != 0 {
+		t.Fatalf("expected no pods, got %#v", pods.Items)
 	}
 }

@@ -52,7 +52,7 @@ func TestRustFSPoliciesMatchMinIO(t *testing.T) {
 						if err := json.Unmarshal(mock.policyResponse(name), &info); err != nil {
 							t.Error(err)
 						}
-						json.NewEncoder(w).Encode(map[string]any{"policy_name": name, "policy": info.Policy})
+						_ = json.NewEncoder(w).Encode(map[string]any{"policy_name": name, "policy": info.Policy})
 						return
 					}
 				case "/minio/admin/v3/add-canned-policy", "/rustfs/admin/v3/add-canned-policy":

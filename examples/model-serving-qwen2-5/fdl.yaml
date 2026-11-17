@@ -1,0 +1,17 @@
+functions:
+  oscar:
+  - oscar-model-serving:
+      name: qwen2-5-05b-instruct
+      script: script.sh
+      cpu: '2.0'
+      memory: 6Gi
+      model_serving:
+        llm_inference:
+          runtime_image: ghcr.io/grycap/kserve-vllm-openai-cpu:v0.22.1
+          source: "oci://ghcr.io/grycap/kserve-qwen2-5-05b-instruct:latest"
+          args:
+            - --dtype=auto
+            - --enforce-eager
+      environment:
+        variables:
+          VLLM_CPU_KVCACHE_SPACE: "1"

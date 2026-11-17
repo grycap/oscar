@@ -158,11 +158,15 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 			}
 
 			ui, err := oidcManager.GetUserInfo(rawToken)
-			uidFromToken = ui.Subject
 			if err != nil {
-				c.String(http.StatusInternalServerError, err.Error())
+				c.String(http.StatusBadGateway, "unable to retrieve OIDC user info")
 				return
 			}
+			if ui == nil {
+				c.String(http.StatusBadGateway, "OIDC provider returned no user info")
+				return
+			}
+			uidFromToken = ui.Subject
 			uid := auth.FormatUID(uidFromToken)
 			c.Set("uidOrigin", uid)
 			c.Next()
@@ -186,7 +190,7 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 				uid = uid[:62]
 			}
 			service.Labels[types.JobOwnerExecutionAnnotation] = uid
-			if !oidcManager.IsAuthorised(rawToken) {
+			if !oidcManager.IsAuthorisedWithUserInfo(rawToken, ui) {
 				c.Status(http.StatusUnauthorized)
 				return
 			}
@@ -390,7 +394,6 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 			localQuota := true
 			if e != nil {
 				fmt.Println(e)
-				localQuota = true
 			} else {
 				//Check for quota availability at the local cluster
 				localQuota = isQuota(quota, service)
@@ -414,10 +417,8 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 
 		// Create job definition
 		ttl := int32(cfg.TTLJob) // #nosec
-		suspend := false
-		if service.Owner != types.DefaultOwner && cfg.KueueEnable {
-			suspend = true
-		}
+		suspend := service.Owner != types.DefaultOwner && cfg.KueueEnable
+
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				// UUID used as a name for jobs
@@ -722,7 +723,7 @@ func fetchMinIOProvider(originEndpoint string, authHeader string, sslVerify bool
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("origin /system/config returned status %d", res.StatusCode)
 	}

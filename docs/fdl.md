@@ -57,28 +57,19 @@ functions:
         path: result-example-workflow
       - storage_provider: webdav.dcache
         path: example-workflow/res
-  - oscar-kserve:
-      name: inference
-      memory: 200Mi
-      cpu: '0.5'
-      image: grycap/procces
+  - oscar-model-serving:
+      name: llminference
+      memory: 6Gi
+      cpu: '2.0'
       script: script.sh
-      kserve:
-        type: inference
-        inference:
-          model_format: onnx
-        storage_uri: "oci://ghcr.io/grycap/kserve-yolo8n-onnx"
-        min_scale: 1
-        api_version: "v2"
-        cpu: '1.0'
-        memory: 2Gi
-      log_level: CRITICAL
-      input:
-      - storage_provider: minio
-        path: kserve-isvc-yolo8n-onnx/input
-      output:
-      - storage_provider: minio
-        path: kserve-isvc-yolo8n-onnx/output
+      model_serving:
+        llm_inference:
+          source: "oci://ghcr.io/grycap/kserve-qwen2-5-05b-instruct:latest"
+          args:
+            - --dtype=auto
+            - --enforce-eager
+            - --enable-auto-tool-choice
+            - --tool-call-parser=hermes
 
 storage_providers:
   onedata:
@@ -152,7 +143,7 @@ storage_providers:
 | `visibility` </br> *string*                              |  Select the visibility level of service: `private`, `restricted` or `public` (`private` by default) Optional 
 | `mount` </br> *[MountSettings](#mountsettings)*                   | Configuration to mount a storage provider path inside the service container. Optional. 
 | `volume` </br> *[VolumeSettings](#volumesettings)*       | Configuration for an OSCAR-managed persistent volume attached to the service. Optional. 
-| `kserve` </br> *[KServeSettings](#kservesettings)*       | Configuration to deploy the service using KServe (`InferenceService` or `LLMInferenceService`). Optional. Depends on cluster configuration.
+| `model_serving` </br> *[ModelServingSettings](#modelservingsettings)*       | Configuration for deploying an AI model using one of the available options ([`inference`](#inferencesettings) or [`llm_inference`](#llminferencesettings); other options may be added in the future). Optional. Depends on the cluster configuration.
 
 ## SynchronousSettings
 
@@ -187,36 +178,36 @@ storage_providers:
 | `health_path` </br> *string* | Change the service readiness and liveness check path/endpoint. (default: "/"). Optional.  |
 | `probe_mode` </br> *string* | Probe path mode for exposed-service pod health checks. `legacy` (default) keeps current behavior; `direct` probes only `health_path` on the container without the OSCAR ingress prefix. Optional. |
 
-## KServeSettings
+## ModelServingSettings
 
 | Field                        | Description                                 |
 |------------------------------| --------------------------------------------|
-| `type` </br> *string* | KServe service type. Allowed values: `inference` and `llm_inference`. Required. |
-| `storage_uri` </br> *string* | Model storage URI consumed by KServe (for example `hf://...`, `oci://...`, or other KServe-compatible URIs). Required. |
-| `inference` </br> *[KServeInferenceSettings](#kserveinferencesettings)* | Inference-specific configuration. Required when `type` is `inference`. It must be omitted when `type` is `llm_inference`. |
-| `llm_inference` </br> *[KServeLLMInferenceSettings](#kservellminferencesettings)* | LLM inference configuration used with `llm_inference` services. Optional. |
-| `min_scale` </br> *integer* | Minimum number of predictor replicas. Set to `0` to allow scale-to-zero (only available for `inference` type and dependent on cluster configuration). Optional. (default: `1`; for `llm_inference`, OSCAR enforces at least `1`) |
-| `max_scale` </br> *integer* | Maximum number of predictor replicas. Optional. (default: `1`). If `min_scale` is greater than `max_scale`, OSCAR sets `max_scale` equal to `min_scale`. |
-| `cpu` </br> *string* | CPU resources for the KServe workload in Kubernetes quantity format. Optional. (default: `0.2`) |
-| `memory` </br> *string* | Memory resources for the KServe workload in Kubernetes quantity format. Optional. (default: `256Mi`) |
-| `args` </br> *string array* | Command-line arguments passed to the KServe model container. Optional. |
-| `env` </br> *map[string]string* | Environment variables passed to the KServe model container. Optional. |
-| `enable_gpu` </br> *bool* | Requests one GPU for the KServe workload (`nvidia.com/gpu: 1`). Optional. (default: false) |
-| `set_auth` </br> *bool* | Enables authentication middleware for the exposed KServe route. Optional. (default: true) |
+| `inference` </br> *[InferenceSettings](#inferencesettings)* | Configuration for predictive models, deployed with KServe. Configure either `inference` or `llm_inference`, but not both. |
+| `llm_inference` </br> *[LLMInferenceSettings](#llminferencesettings)* | Configuration for large language models using a vLLM-compatible runtime, deployed with KServe. Configure either `llm_inference` or `inference`, but not both. |
 
-## KServeInferenceSettings
+## InferenceSettings
 
 | Field                        | Description                                 |
 |------------------------------| --------------------------------------------|
-| `model_format` </br> *string* | Model format expected by KServe for `inference` services. Required when `type` is `inference`. Typical values include: `onnx`, `sklearn`, `xgboost`, `pytorch`, `tensorflow`, `triton`, `huggingface`. Every model format has its own runtime and the available runtimes may vary depending on the cluster configuration |
+| `model_format` </br> *string* | Model format expected by KServe. Required for `inference` configuration. Typical values include `onnx`, `sklearn`, `xgboost`, `pytorch`, `tensorflow`, `triton`, and `huggingface`. Each format has its own runtime, and available runtimes may vary depending on the cluster configuration. |
 | `runtime_image` </br> *string* | Explicit KServe ServingRuntime name to use for `inference` services. Use if the model format are not enough. Optional. |
 | `api_version` </br> *string* | Protocol version used by KServe predictors. Allowed values: `v1`, `v2`. Optional. (default: `v1`) |
+| `source` </br> *string* | Model storage URI consumed by KServe (for example `hf://...`, `oci://...`, or other KServe-compatible URIs). Required. |
+| `min_scale` </br> *integer* | Minimum number of replicas. Set to `0` to allow scale-to-zero, depending on the cluster configuration. Optional. (default: `1`) |
+| `max_scale` </br> *integer* | Maximum number of predictor replicas. Optional. (default: `1`). If `min_scale` is greater than `max_scale`, OSCAR sets `max_scale` equal to `min_scale`. |
+| `args` </br> *string array* | Command-line arguments passed to the KServe model container. Optional. |
+| `set_auth` </br> *bool* | Enables authentication for the Model Serving route through Traefik ForwardAuth. Requires a Traefik Gateway API setup. Optional. (default: `true`) |
 
-## KServeLLMInferenceSettings
+## LLMInferenceSettings
 
 | Field                        | Description                                 |
 |------------------------------| --------------------------------------------|
-| `runtime_image` </br> *string* | Runtime image for `llm_inference` services. Optional. If omitted, OSCAR uses the default vLLM-based runtime image. |
+| `runtime_image` </br> *string* | Runtime image for `llm_inference` services. Optional. If omitted, OSCAR selects its default vLLM-based runtime image based. |
+| `source` </br> *string* | Model storage URI consumed by KServe (for example `hf://...`, `oci://...`, or other KServe-compatible URIs). Required. |
+| `min_scale` </br> *integer* | Minimum number of replicas. Must be at least `1`. Optional. (default: `1`) |
+| `max_scale` </br> *integer* | Maximum number of predictor replicas. Optional. (default: `1`). If `min_scale` is greater than `max_scale`, OSCAR sets `max_scale` equal to `min_scale`. |
+| `args` </br> *string array* | Command-line arguments passed to the KServe model container. Optional. |
+| `set_auth` </br> *bool* | Enables authentication for the Model Serving route. Only uses `forward` authentication type that delegates checks to OSCAR service authorization. Requires a Traefik Gateway API setup. Optional. (default: `true`) |
 
 ## MountSettings
 | Field                        | Description                                 |

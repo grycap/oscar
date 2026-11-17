@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 )
 
 func TestParseSeconds(t *testing.T) {
@@ -225,6 +226,9 @@ func TestRequiredValues(t *testing.T) {
 	if cfg.MinIOProvider.SecretKey != "miniosecret" {
 		t.Errorf("expected minio secret key: %s, got: %s", "miniosecret", cfg.MinIOProvider.SecretKey)
 	}
+	if cfg.PodCIDR != "10.244.0.0/16" || cfg.ServiceCIDR != "10.96.0.0/12" {
+		t.Errorf("unexpected network CIDR defaults: pod=%q service=%q", cfg.PodCIDR, cfg.ServiceCIDR)
+	}
 }
 
 func TestCustomValues(t *testing.T) {
@@ -240,6 +244,8 @@ func TestCustomValues(t *testing.T) {
 		"OSCAR_NAMESPACE":                  "testnamespace",
 		"OSCAR_SERVICES_NAMESPACE":         "testservicesnamespace",
 		"OSCAR_CONTROLLER_SERVICE_ACCOUNT": "testserviceaccount",
+		"OSCAR_POD_CIDR":                   "10.20.0.0/16",
+		"OSCAR_SERVICE_CIDR":               "10.30.0.0/16",
 		"WATCHDOG_HEALTHCHECK_INTERVAL":    "50",
 		"READ_TIMEOUT":                     "50",
 		"WRITE_TIMEOUT":                    "50",
@@ -365,5 +371,30 @@ func TestServerlessBackend(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestKubernetesConfigDefaults(t *testing.T) {
+	original := &rest.Config{
+		QPS:       5,
+		Burst:     10,
+		UserAgent: "test-agent",
+	}
+	config := configureKubernetesConfig(original)
+
+	if config.QPS != kubernetesQPS {
+		t.Errorf("QPS = %v, want %v", config.QPS, kubernetesQPS)
+	}
+	if config.Burst != kubernetesBurst {
+		t.Errorf("Burst = %v, want %v", config.Burst, kubernetesBurst)
+	}
+	if config.UserAgent != kubernetesUserAgent {
+		t.Errorf("UserAgent = %q, want %q", config.UserAgent, kubernetesUserAgent)
+	}
+	if config.RateLimiter == nil {
+		t.Error("RateLimiter is nil, want a configured rate limiter")
+	}
+	if original.QPS != 5 || original.Burst != 10 || original.UserAgent != "test-agent" {
+		t.Errorf("configureKubernetesConfig mutated its input: %+v", original)
 	}
 }

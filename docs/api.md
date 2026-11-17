@@ -13,4 +13,22 @@ quota information when those subsystems are enabled. Administrators can update
 per-user MinIO bucket limits through `/system/quotas/user/{userId}` by setting
 the `minio.buckets` and `minio.storage_per_bucket` fields.
 
+When a request would push a user over their MinIO bucket quota, the service
+and bucket creation endpoints (`/system/services` and `/system/buckets`)
+respond with `403 Forbidden` and a machine-readable JSON body:
+
+```json
+{
+  "status": "error",
+  "code": "QuotaExceeded",
+  "error": "MinIO bucket quota exceeded for user <userId>: limit <limit>, current <current>, requested new buckets <requested>",
+  "details": {
+    "owner": "<userId>",
+    "limit": <limit>,
+    "current": <current>,
+    "requested": <requested>
+  }
+}
+```
+
 !!swagger swagger.yaml!!

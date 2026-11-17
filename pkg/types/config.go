@@ -26,10 +26,14 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
 )
 
 const (
@@ -49,6 +53,10 @@ const (
 	AIR                   = "allowed_image_repositories"
 	Ingress               = "ingress"
 	HTTPROUTE             = "httproute"
+
+	kubernetesQPS       float32 = 120 // 120 requests per second
+	kubernetesBurst             = 180 // 180 requests in a burst
+	kubernetesUserAgent         = "oscar-manager"
 )
 
 type configVar struct {
@@ -87,6 +95,12 @@ type Config struct {
 
 	// Kubernetes service account used by the OSCAR controller to manage user namespaces (default: oscar-sa)
 	ControllerServiceAccount string `json:"controller_service_account"`
+
+	// Kubernetes Pod CIDR excluded from user namespace network policy (default: 10.244.0.0/16)
+	PodCIDR string `json:"pod_cidr"`
+
+	// Kubernetes Service CIDR excluded from user namespace network policy (default: 10.96.0.0/12)
+	ServiceCIDR string `json:"service_cidr"`
 
 	// Parameter used to check if the cluster have GPUs
 	GPUAvailable bool `json:"gpu_available"`
@@ -326,6 +340,8 @@ var configVars = []configVar{
 	{"Namespace", "OSCAR_NAMESPACE", false, stringType, "oscar"},
 	{"ServicesNamespace", "OSCAR_SERVICES_NAMESPACE", false, stringType, "oscar-svc"},
 	{"ControllerServiceAccount", "OSCAR_CONTROLLER_SERVICE_ACCOUNT", false, stringType, "oscar-sa"},
+	{"PodCIDR", "OSCAR_POD_CIDR", false, stringType, "10.244.0.0/16"},
+	{"ServiceCIDR", "OSCAR_SERVICE_CIDR", false, stringType, "10.96.0.0/12"},
 	{"ServerlessBackend", "SERVERLESS_BACKEND", false, serverlessBackendType, ""},
 	{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
 	{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
@@ -342,11 +358,11 @@ var configVars = []configVar{
 	{"YunikornConfigFileName", "YUNIKORN_CONFIG_FILENAME", false, stringType, "queues.yaml"},
 
 	{"KueueEnable", "KUEUE_ENABLE", false, boolType, "true"},
-	{"KueueDefaultCPU", "KUEUE_DEFAULT_CPU", false, stringType, "2"},
-	{"KueueDefaultMemory", "KUEUE_DEFAULT_MEMORY", false, stringType, "2Gi"},
+	{"KueueDefaultCPU", "KUEUE_DEFAULT_CPU", false, stringType, "4"},
+	{"KueueDefaultMemory", "KUEUE_DEFAULT_MEMORY", false, stringType, "4Gi"},
 	{"KueueDefaultGPU", "KUEUE_DEFAULT_GPU", false, stringType, "0"},
 	{"KueueDefaultFlavor", "KUEUE_DEFAULT_FLAVOR", false, stringType, "oscar-default-flavor"},
-	{"KueueDefaultEphemeralStorage", "KUEUE_DEFAULT_EPHEMERAL_STORAGE", false, stringType, "1Gi"},
+	{"KueueDefaultEphemeralStorage", "KUEUE_DEFAULT_EPHEMERAL_STORAGE", false, stringType, "2Gi"},
 
 	{"VolumeEnable", "VOLUME_ENABLE", false, boolType, "true"},
 	{"StorageClassName", "STORAGE_CLASS_NAME", false, stringType, "nfs"},
@@ -390,7 +406,7 @@ var configVars = []configVar{
 	{"LokiExposedNamespace", "LOKI_EXPOSED_NAMESPACE", false, stringType, "ingress-nginx"},
 	{"LokiExposedAppLabel", "LOKI_EXPOSED_APP", false, stringType, "ingress-nginx"},
 	{"MinIOQuotaEnabled", "MINIO_QUOTA_ENABLED", false, boolType, "false"},
-	{"MinIOQuotaBuckets", "MINIO_QUOTA_BUCKETS", false, stringType, "5"},
+	{"MinIOQuotaBuckets", "MINIO_QUOTA_BUCKETS", false, stringType, "100"},
 	{"MinIOQuotaStorage", "MINIO_QUOTA_STORAGE", false, stringType, "5Gi"},
 }
 
@@ -583,4 +599,71 @@ func (cfg *Config) CheckAvailableInterLink(kubeClientset kubernetes.Interface) {
 	cfg.InterLinkAvailable = false
 	log.Printf("INFO: InterLink Unavailable")
 
+}
+
+const ()
+
+var (
+	kubernetesConfigOnce sync.Once
+	kubernetesConfig     *rest.Config
+	kubernetesConfigErr  error
+)
+
+func configureKubernetesConfig(config *rest.Config) *rest.Config {
+	config = rest.CopyConfig(config)
+	config.QPS = kubernetesQPS
+	config.Burst = kubernetesBurst
+	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(
+		kubernetesQPS,
+		kubernetesBurst,
+	)
+	config.UserAgent = kubernetesUserAgent
+	return config
+}
+
+// KubernetesConfig returns a copy of the process-wide Kubernetes client config.
+func KubernetesConfig() (*rest.Config, error) {
+	kubernetesConfigOnce.Do(func() {
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			kubernetesConfigErr = fmt.Errorf("loading Kubernetes config: %w", err)
+			return
+		}
+		kubernetesConfig = configureKubernetesConfig(config)
+	})
+	if kubernetesConfigErr != nil {
+		return nil, kubernetesConfigErr
+	}
+
+	return rest.CopyConfig(kubernetesConfig), nil
+}
+
+func NewClients() (
+	rest.Config,
+	kubernetes.Interface,
+	dynamic.Interface,
+	error,
+) {
+	config, err := KubernetesConfig()
+	if err != nil {
+		return rest.Config{}, nil, nil, err
+	}
+
+	// Create the Kubernetes clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return rest.Config{}, nil, nil, fmt.Errorf(
+			"creating Kubernetes clientset: %w", err,
+		)
+	}
+
+	// Create the dynamic client for interacting with custom resources
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return rest.Config{}, nil, nil, fmt.Errorf(
+			"creating dynamic Kubernetes client: %w", err,
+		)
+	}
+
+	return *config, clientset, dynamicClient, nil
 }

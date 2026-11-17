@@ -9,6 +9,7 @@ require (
 	github.com/go-playground/validator/v10 v10.14.0 // indirect
 	github.com/goccy/go-yaml v1.9.8
 	github.com/google/uuid v1.6.0
+	github.com/google/go-containerregistry v0.13.0
 	github.com/grycap/cdmi-client-go v0.1.1
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/minio/madmin-go v1.7.5
@@ -105,7 +106,6 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
-	github.com/google/go-containerregistry v0.13.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect

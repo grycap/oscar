@@ -154,6 +154,9 @@ const (
 	OriginClusterAnnotation    = "oscar.grycap/origin-cluster"
 	OriginServiceAnnotation    = "oscar.grycap/origin-service"
 	FederationWorkerAnnotation = "oscar.grycap/federation-worker"
+
+	DefaultServiceCPU    = "0.2"
+	DefaultServiceMemory = "256Mi"
 )
 
 // YAMLMarshal package-level yaml marshal function
@@ -325,12 +328,12 @@ type Service struct {
 	// Internal/API use only, not part of FDL.
 	Deployment *ServiceDeploymentSummary `json:"deployment,omitempty" yaml:"-"`
 
-	// Kserve configuration to deploy the service using KServe CRD
-	Kserve *Kserve `json:"kserve,omitempty"`
+	// ModelServing configuration to deploy the service using KServe CRD
+	ModelServing *ModelServing `json:"model_serving,omitempty"`
 }
 
-func (s *Service) IsKserve() bool {
-	return s.Kserve != nil
+func (s *Service) IsModelServing() bool {
+	return s.ModelServing != nil
 }
 
 func (s *Service) IsExposed() bool {
@@ -354,8 +357,8 @@ func (s *Service) UnmarshalJSON(data []byte) error {
 	aux := Alias{
 		IsolationLevel: IsolationLevelService,
 		Visibility:     PRIVATE,
-		CPU:            "0.2",
-		Memory:         "256Mi",
+		CPU:            DefaultServiceCPU,
+		Memory:         DefaultServiceMemory,
 	}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -412,21 +415,16 @@ func (s Service) Validate() error {
 		)
 	}
 
-	s.Image = strings.TrimSpace(s.Image)
-	if s.Image == "" && s.Kserve == nil {
-		return fmt.Errorf("service Image is required")
+	if cpu, err := resource.ParseQuantity(s.CPU); err != nil || cpu.Cmp(resource.MustParse(DefaultServiceCPU)) < 0 {
+		return fmt.Errorf("service CPU must be greater than or equal to %s", DefaultServiceCPU)
 	}
 
-	if s.Image != "" {
-		if cpu, err := resource.ParseQuantity(s.CPU); err != nil || cpu.Cmp(resource.MustParse("0.2")) < 0 {
-			return fmt.Errorf("service CPU must be greater than or equal to 0.2")
-		}
-	}
-
-	if s.IsKserve() {
-		if err := s.Kserve.Validate(); err != nil {
+	if s.IsModelServing() {
+		if err := s.ModelServing.Validate(); err != nil {
 			return err
 		}
+	} else if strings.TrimSpace(s.Image) == "" {
+		return fmt.Errorf("service Image is required")
 	}
 
 	if s.IsExposed() {
@@ -447,6 +445,25 @@ func (s Service) Validate() error {
 		}
 	}
 
+	return nil
+}
+
+func (s Service) ValidateUpdate(old *Service) error {
+	if s.Name != old.Name {
+		return fmt.Errorf("service name cannot be changed")
+	}
+
+	if err := s.Validate(); err != nil {
+		return fmt.Errorf("invalid new service definition: %v", err)
+	}
+
+	if s.IsModelServing() != old.IsModelServing() {
+		return fmt.Errorf("cannot change service type between ModelServing and non-ModelServing")
+	} else if s.IsModelServing() {
+		if err := s.ModelServing.ValidateUpdate(old.ModelServing); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -812,7 +829,7 @@ func addWatchdogEnvVars(p *v1.PodSpec, cfg *Config, service *Service) error {
 	for i, cont := range p.Containers {
 		if cont.Name == ContainerName {
 			if dup := findFirstDuplicateEnvVar(requiredEnvVars, p.Containers[i].Env); dup != "" {
-				return fmt.Errorf("Trying to set reserved environment variable: %s", dup)
+				return fmt.Errorf("trying to set reserved environment variable: %s", dup)
 			}
 			p.Containers[i].Env = append(p.Containers[i].Env, requiredEnvVars...)
 		}
@@ -843,7 +860,7 @@ func addServiceMetadataEnvVars(p *v1.PodSpec, service *Service, cfg *Config) err
 	for i, cont := range p.Containers {
 		if cont.Name == ContainerName {
 			if dup := findFirstDuplicateEnvVar(requiredEnvVars, p.Containers[i].Env); dup != "" {
-				return fmt.Errorf("Trying to set reserved environment variable: %s", dup)
+				return fmt.Errorf("trying to set reserved environment variable: %s", dup)
 			}
 			p.Containers[i].Env = append(p.Containers[i].Env, requiredEnvVars...)
 		}

@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"slices"
+	"sync/atomic"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -316,7 +317,7 @@ func (m *minioMock) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write(m.policyResponse(name))
+		_, _ = w.Write(m.policyResponse(name))
 	case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/add-canned-policy"):
 		name := r.URL.Query().Get("name")
 		body, _ := io.ReadAll(r.Body)
@@ -329,18 +330,18 @@ func (m *minioMock) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"Status":"success"}`))
+		_, _ = w.Write([]byte(`{"Status":"success"}`))
 	case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/set-user-or-group-policy"):
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"Status":"success"}`))
+		_, _ = w.Write([]byte(`{"Status":"success"}`))
 	case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/remove-canned-policy"):
 		name := r.URL.Query().Get("name")
 		delete(m.policies, name)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"Status":"success"}`))
+		_, _ = w.Write([]byte(`{"Status":"success"}`))
 	case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/service/restart"):
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"Status":"success"}`))
+		_, _ = w.Write([]byte(`{"Status":"success"}`))
 	case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/update-group-members"):
 		body, _ := io.ReadAll(r.Body)
 		var group madmin.GroupAddRemove
@@ -353,20 +354,20 @@ func (m *minioMock) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"Status":"success"}`))
+		_, _ = w.Write([]byte(`{"Status":"success"}`))
 	case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/group"):
 		group := r.URL.Query().Get("group")
 		members := m.groupMembers[group]
 		membersJSON, _ := json.Marshal(members)
-		fmt.Fprintf(w, `{"name":"%s","status":"enable","members":%s,"policy":""}`, group, string(membersJSON))
+		_, _ = fmt.Fprintf(w, `{"name":"%s","status":"enable","members":%s,"policy":""}`, group, string(membersJSON))
 	case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/set-config-kv"):
 		body, _ := io.ReadAll(r.Body)
 		m.configWrites = append(m.configWrites, string(body))
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"Status":"success"}`))
+		_, _ = w.Write([]byte(`{"Status":"success"}`))
 	case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/del-config-kv"):
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"Status":"success"}`))
+		_, _ = w.Write([]byte(`{"Status":"success"}`))
 	default:
 		if _, ok := r.URL.Query()["tagging"]; ok || strings.Contains(r.URL.RawQuery, "tagging") {
 			bucket := strings.TrimPrefix(r.URL.Path, "/")
@@ -377,13 +378,13 @@ func (m *minioMock) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusNoContent)
 			case http.MethodGet:
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(buildBucketTagsResponse(m.bucketTags[bucket])))
+				_, _ = w.Write([]byte(buildBucketTagsResponse(m.bucketTags[bucket])))
 			default:
 				w.WriteHeader(http.StatusMethodNotAllowed)
 			}
 		} else {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"Status":"success"}`))
+			_, _ = w.Write([]byte(`{"Status":"success"}`))
 		}
 	}
 }
@@ -439,7 +440,7 @@ func buildBucketTagsResponse(tags map[string]string) string {
 	builder := strings.Builder{}
 	builder.WriteString(`<Tagging><TagSet>`)
 	for k, v := range tags {
-		builder.WriteString(fmt.Sprintf("<Tag><Key>%s</Key><Value>%s</Value></Tag>", k, v))
+		_, _ = fmt.Fprintf(&builder, "<Tag><Key>%s</Key><Value>%s</Value></Tag>", k, v)
 	}
 	builder.WriteString(`</TagSet></Tagging>`)
 	return builder.String()
@@ -483,10 +484,10 @@ func createMinIOConfig() (Config, *httptest.Server) {
 
 		if hreq.URL.Path == "/minio/admin/v3/info-canned-policy" {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"PolicyName": "testpolicy", "Policy": {"Version": "version","Statement": [{"Resource": ["res"]}]}}`))
+			_, _ = rw.Write([]byte(`{"PolicyName": "testpolicy", "Policy": {"Version": "version","Statement": [{"Resource": ["res"]}]}}`))
 		} else {
 			rw.WriteHeader(http.StatusOK)
-			rw.Write([]byte(`{"Status": "success"}`))
+			_, _ = rw.Write([]byte(`{"Status": "success"}`))
 		}
 	}))
 
@@ -1077,7 +1078,7 @@ func TestGetDataUsageInfo_NilClientPanics(t *testing.T) {
 			t.Error("expected panic when calling GetDataUsageInfo on nil client")
 		}
 	}()
-	client.GetDataUsageInfo()
+	_, _ = client.GetDataUsageInfo()
 }
 
 func TestEnrichBucketQuotaAndUsage_NilClientPanics(t *testing.T) {
@@ -1087,7 +1088,7 @@ func TestEnrichBucketQuotaAndUsage_NilClientPanics(t *testing.T) {
 			t.Error("expected panic when calling EnrichBucketQuotaAndUsage on nil client")
 		}
 	}()
-	client.EnrichBucketQuotaAndUsage(&MinIOBucket{}, madmin.DataUsageInfo{})
+	_ = client.EnrichBucketQuotaAndUsage(&MinIOBucket{}, madmin.DataUsageInfo{})
 }
 
 func TestCreateAddPolicy_NilClientPanics(t *testing.T) {
@@ -1097,7 +1098,7 @@ func TestCreateAddPolicy_NilClientPanics(t *testing.T) {
 			t.Error("expected panic when calling CreateAddPolicy on nil client")
 		}
 	}()
-	client.CreateAddPolicy("bucket", "policy", nil, false)
+	_ = client.CreateAddPolicy("bucket", "policy", nil, false)
 }
 
 func TestRemoveResource_NilClientPanics(t *testing.T) {
@@ -1107,7 +1108,7 @@ func TestRemoveResource_NilClientPanics(t *testing.T) {
 			t.Error("expected panic when calling RemoveResource on nil client")
 		}
 	}()
-	client.RemoveResource("bucket", "policy", false)
+	_ = client.RemoveResource("bucket", "policy", false)
 }
 
 func TestRemoveGroupPolicy_NilClientPanics(t *testing.T) {
@@ -1117,7 +1118,7 @@ func TestRemoveGroupPolicy_NilClientPanics(t *testing.T) {
 			t.Error("expected panic when calling RemoveGroupPolicy on nil client")
 		}
 	}()
-	client.RemoveGroupPolicy("policy")
+	_ = client.RemoveGroupPolicy("policy")
 }
 
 func TestDeleteBucketRemovesResources(t *testing.T) {
@@ -1131,5 +1132,95 @@ func TestDeleteBucketRemovesResources(t *testing.T) {
 
 	if _, ok := fake.buckets["bucket"]; ok {
 		t.Fatalf("expected bucket to be deleted")
+	}
+}
+
+func newMinIOQuotaClient(t *testing.T, handler http.HandlerFunc) (*MinIOAdminClient, *httptest.Server) {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut && r.URL.Path == "/minio/admin/v3/set-bucket-quota" {
+			handler(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"Status":"success"}`))
+	}))
+	cfg := Config{
+		MinIOProvider: &MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+	client, err := MakeMinIOAdminClient(&cfg)
+	if err != nil {
+		t.Fatalf("unexpected client error: %v", err)
+	}
+	return client, server
+}
+
+func TestSetBucketStorageQuotaRetriesTransientMinIOErrors(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	var attempts atomic.Int32
+	client, server := newMinIOQuotaClient(t, func(w http.ResponseWriter, r *http.Request) {
+		attempts.Add(1)
+		if attempts.Load() <= 2 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"code":"ServiceUnavailable","message":"service unavailable"}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"Status":"success"}`))
+	})
+	defer server.Close()
+
+	if err := client.SetBucketStorageQuota("bucket", "100Mi"); err != nil {
+		t.Fatalf("expected transient MinIO errors to be retried until success, got %v after %d attempts", err, attempts.Load())
+	}
+	if attempts.Load() != 3 {
+		t.Fatalf("expected 3 attempts for a transient failure, got %d", attempts.Load())
+	}
+}
+
+func TestSetBucketStorageQuotaGivesUpAfterMaxRetries(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	var attempts atomic.Int32
+	client, server := newMinIOQuotaClient(t, func(w http.ResponseWriter, r *http.Request) {
+		attempts.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"code":"ServiceUnavailable","message":"service unavailable"}`))
+	})
+	defer server.Close()
+
+	err := client.SetBucketStorageQuota("bucket", "100Mi")
+	if err == nil {
+		t.Fatalf("expected an error after exhausting the retry budget")
+	}
+	if attempts.Load() != 3 {
+		t.Fatalf("expected exactly 3 attempts before giving up, got %d", attempts.Load())
+	}
+}
+
+func TestSetBucketStorageQuotaDoesNotRetryPermanentErrors(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	var attempts atomic.Int32
+	client, server := newMinIOQuotaClient(t, func(w http.ResponseWriter, r *http.Request) {
+		attempts.Add(1)
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"code":"InvalidArgument","message":"invalid argument"}`))
+	})
+	defer server.Close()
+
+	err := client.SetBucketStorageQuota("bucket", "100Mi")
+	if err == nil {
+		t.Fatalf("expected an error for a non-retriable MinIO response")
+	}
+	if attempts.Load() != 1 {
+		t.Fatalf("expected exactly 1 attempt for a permanent failure, got %d", attempts.Load())
 	}
 }

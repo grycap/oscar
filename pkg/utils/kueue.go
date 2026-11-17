@@ -18,7 +18,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	kueuev1 "sigs.k8s.io/kueue/apis/kueue/v1beta2"
 	kueueclientset "sigs.k8s.io/kueue/client-go/clientset/versioned"
@@ -35,7 +34,7 @@ var (
 	defaultCpuRequest    = resource.MustParse("0.2")
 	defaultMemoryRequest = resource.MustParse("256Mi")
 	newKueueClient       = func() (kueueclientset.Interface, error) {
-		restCfg, err := rest.InClusterConfig()
+		restCfg, err := types.KubernetesConfig()
 		if err != nil {
 			return nil, err
 		}
@@ -52,12 +51,7 @@ func EnsureKueueUserQueues(ctx context.Context, cfg *types.Config, serviceNamesp
 		return nil
 	}
 
-	restCfg, err := rest.InClusterConfig()
-	if err != nil {
-		return fmt.Errorf("unable to build in-cluster config for kueue: %w", err)
-	}
-
-	kueueClient, err := kueueclientset.NewForConfig(restCfg)
+	kueueClient, err := newKueueClient()
 	if err != nil {
 		return fmt.Errorf("unable to create kueue client: %w", err)
 	}
@@ -88,14 +82,9 @@ func CreateKueueUserQueuesIfDontExist(cfg *types.Config, user string) error {
 	// Set empty Context
 	ctx := context.TODO()
 
-	restCfg, err := rest.InClusterConfig()
+	kueueClient, err := newKueueClient()
 	if err != nil {
-		return fmt.Errorf("unable to build in-cluster config for kueue: %v", err)
-	}
-
-	kueueClient, err := kueueclientset.NewForConfig(restCfg)
-	if err != nil {
-		return fmt.Errorf("unable to create kueue client: %v", err)
+		return fmt.Errorf("unable to create kueue client: %w", err)
 	}
 	// Check if the ClusterQueue for the user already exists, if not create it
 	clusterQueueName := buildClusterQueueName(user)
@@ -113,7 +102,7 @@ func CreateKueueUserQueuesIfDontExist(cfg *types.Config, user string) error {
 	return nil
 }
 
-func ensureResourceFlavor(ctx context.Context, kueueClient *kueueclientset.Clientset, flavorName string) error {
+func ensureResourceFlavor(ctx context.Context, kueueClient kueueclientset.Interface, flavorName string) error {
 	_, err := kueueClient.KueueV1beta2().ResourceFlavors().Get(ctx, flavorName, metav1.GetOptions{})
 	if err == nil {
 		return nil
@@ -138,7 +127,7 @@ func ensureResourceFlavor(ctx context.Context, kueueClient *kueueclientset.Clien
 	return err
 }
 
-func ensureClusterQueue(ctx context.Context, kueueClient *kueueclientset.Clientset, cfg *types.Config, cqName, flavorName, owner string) error {
+func ensureClusterQueue(ctx context.Context, kueueClient kueueclientset.Interface, cfg *types.Config, cqName, flavorName, owner string) error {
 	cpuQuota, err := resource.ParseQuantity(cfg.KueueDefaultCPU)
 	if err != nil {
 		return fmt.Errorf("invalid Kueue default CPU quota %q: %w", cfg.KueueDefaultCPU, err)
@@ -227,7 +216,7 @@ func ensureClusterQueue(ctx context.Context, kueueClient *kueueclientset.Clients
 	return err
 }
 
-func ensureLocalQueue(ctx context.Context, kueueClient *kueueclientset.Clientset, namespace, serviceName, clusterQueueName, owner string) error {
+func ensureLocalQueue(ctx context.Context, kueueClient kueueclientset.Interface, namespace, serviceName, clusterQueueName, owner string) error {
 	lqName := BuildLocalQueueName(serviceName)
 	lq, err := kueueClient.KueueV1beta2().LocalQueues(namespace).Get(ctx, lqName, metav1.GetOptions{})
 	if err == nil {
@@ -267,12 +256,7 @@ func DeleteKueueLocalQueue(ctx context.Context, cfg *types.Config, namespace, se
 		return nil
 	}
 
-	restCfg, err := rest.InClusterConfig()
-	if err != nil {
-		return fmt.Errorf("unable to build in-cluster config for kueue: %w", err)
-	}
-
-	kueueClient, err := kueueclientset.NewForConfig(restCfg)
+	kueueClient, err := newKueueClient()
 	if err != nil {
 		return fmt.Errorf("unable to create kueue client: %w", err)
 	}
@@ -338,16 +322,14 @@ func CreateWorkload(service types.Service, namespace string, cfg *types.Config, 
 	// TO DO
 	workloadSpec := getWorkloadSpec(service, namespace, cfg, templateFunction)
 
-	restCfg, err := rest.InClusterConfig()
+	kueueClient, err := newKueueClient()
 	if err != nil {
-		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
+		KueueLogger.Printf("error building kueue clientset: %v", err)
 		return false
 	}
-	kueueClient, err := kueueclientset.NewForConfig(restCfg)
-
-	_, err2 := kueueClient.KueueV1beta2().Workloads(namespace).Create(context.TODO(), workloadSpec, metav1.CreateOptions{})
-	if err2 != nil {
-		KueueLogger.Printf("error creating workload for exposed service '%s': %v", service.Name, err2)
+	_, err = kueueClient.KueueV1beta2().Workloads(namespace).Create(context.TODO(), workloadSpec, metav1.CreateOptions{})
+	if err != nil {
+		KueueLogger.Printf("error creating workload for exposed service '%s': %v", service.Name, err)
 		return false
 	}
 	return true
@@ -359,16 +341,14 @@ func UpdateWorkload(service types.Service, namespace string, cfg *types.Config, 
 }
 
 func DeleteWorkload(name string, namespace string, cfg *types.Config) bool {
-	restCfg, err := rest.InClusterConfig()
+	kueueClient, err := newKueueClient()
 	if err != nil {
-		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
+		KueueLogger.Printf("error building kueue clientset: %v", err)
 		return false
 	}
-	kueueClient, err := kueueclientset.NewForConfig(restCfg)
-
-	err2 := kueueClient.KueueV1beta2().Workloads(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
-	if err2 != nil {
-		KueueLogger.Printf("error deleting workload for exposed service '%s': %v", name, err2)
+	err = kueueClient.KueueV1beta2().Workloads(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err != nil {
+		KueueLogger.Printf("error deleting workload for exposed service '%s': %v", name, err)
 		return false
 	}
 
@@ -418,24 +398,25 @@ func getWorkloadSpec(service types.Service, namespace string, cfg *types.Config,
 	return workload
 }
 
-func getResourceOnlyWorkloadSpec(service *types.Service, cfg *types.Config, namespace, workloadName, localQueueName string) (*kueuev1.Workload, error) {
-
+// getResourceOnlyWorkloadSpec creates a Kueue Workload spec that only includes resource requests and replicas,
+// without any container images or commands. This is used for validating resource requests against the
+// ClusterQueue without actually deploying a workload.
+func getResourceOnlyWorkloadSpec(service *types.Service, namespace, workloadName, localQueueName string) (*kueuev1.Workload, error) {
 	podSets := []kueuev1.PodSet{}
-	if service.Image != "" {
-		serviceRequests, serviceReplicas, err := getServiceResourceRequests(service, cfg)
+	// If you have other ModelServingbackend that is not KServe
+	// Add anither method for if else
+	if service.IsModelServing() {
+		modelServeingRequests, modelServeingReplicas, err := service.ModelServing.GetKueueResourceList(service)
 		if err != nil {
 			return nil, err
 		}
-
+		podSets = append(podSets, buildResourceCheckPodSet("model-serving-service", modelServeingReplicas, modelServeingRequests))
+	} else if service.Image != "" {
+		serviceRequests, serviceReplicas, err := getServiceResourceRequests(service)
+		if err != nil {
+			return nil, err
+		}
 		podSets = append(podSets, buildResourceCheckPodSet("oscar-service", serviceReplicas, serviceRequests))
-	}
-
-	if service.IsKserve() {
-		kserveRequests, kserveReplicas, err := getKserveResourceRequests(service, cfg)
-		if err != nil {
-			return nil, err
-		}
-		podSets = append(podSets, buildResourceCheckPodSet("kserve-service", kserveReplicas, kserveRequests))
 	}
 
 	boolActive := true
@@ -474,10 +455,10 @@ func buildResourceCheckPodSet(name string, replicas int32, requests v1.ResourceL
 	}
 }
 
-func getServiceResourceRequests(service *types.Service, cfg *types.Config) (v1.ResourceList, int32, error) {
+func getServiceResourceRequests(service *types.Service) (v1.ResourceList, int32, error) {
 	requests := v1.ResourceList{}
-	var cpuQty resource.Quantity = defaultCpuRequest
-	var memoryQty resource.Quantity = defaultMemoryRequest
+	var cpuQty = defaultCpuRequest
+	var memoryQty = defaultMemoryRequest
 
 	if len(service.CPU) > 0 {
 		parsedCPU, err := resource.ParseQuantity(service.CPU)
@@ -539,53 +520,8 @@ func getServiceResourceRequests(service *types.Service, cfg *types.Config) (v1.R
 	return requests, serviceReplicas, nil
 }
 
-func getKserveResourceRequests(service *types.Service, cfg *types.Config) (v1.ResourceList, int32, error) {
-
-	if !service.IsKserve() || !IsKserveSupported(cfg) {
-		return nil, 0, fmt.Errorf("KServe is not supported in the current configuration")
-	}
-
-	requests := v1.ResourceList{}
-	cpuQty := defaultKserveCpuRequest
-	memoryQty := defaultKserveMemoryRequest
-
-	if len(service.Kserve.CPU) > 0 {
-		parsedCPU, err := resource.ParseQuantity(service.Kserve.CPU)
-		if err != nil {
-			return nil, 0, fmt.Errorf("invalid KServe service CPU %q: %w", service.Kserve.CPU, err)
-		}
-		cpuQty = parsedCPU
-	}
-	if len(service.Kserve.Memory) > 0 {
-		parsedMemory, err := resource.ParseQuantity(service.Kserve.Memory)
-		if err != nil {
-			return nil, 0, fmt.Errorf("invalid KServe service memory %q: %w", service.Kserve.Memory, err)
-		}
-		memoryQty = parsedMemory
-	}
-
-	requests[v1.ResourceCPU] = cpuQty
-	requests[v1.ResourceMemory] = memoryQty
-
-	if service.Kserve.EnableGPU {
-		gpu, err := resource.ParseQuantity("1")
-		if err != nil {
-			return nil, 0, fmt.Errorf("invalid KServe service GPU quantity: %w", err)
-		}
-		requests["nvidia.com/gpu"] = gpu
-	}
-
-	var kserveMinScale int32 = 1
-	if service.Kserve.MinScale > 1 {
-		kserveMinScale = service.Kserve.MinScale
-	}
-
-	// resoures, replicas, hasKservePodSet, err
-	return requests, kserveMinScale, nil
-}
-
 // checkQueueReferences validates that the specified LocalQueue and ClusterQueue exist and are correctly linked.
-func checkQueueReferences(ctx context.Context, kueueClient *kueueclientset.Clientset, namespace, localQueueName, clusterQueueName string) error {
+func checkQueueReferences(ctx context.Context, kueueClient kueueclientset.Interface, namespace, localQueueName, clusterQueueName string) error {
 	if strings.TrimSpace(localQueueName) == "" || strings.TrimSpace(clusterQueueName) == "" {
 		return fmt.Errorf("localQueueName and clusterQueueName are required")
 	}
@@ -686,13 +622,7 @@ func VerifyWorkloadByResources(service types.Service, cfg *types.Config) bool {
 	clusterQueueName := BuildClusterQueueName(service.Owner)
 	namespace := service.Namespace
 
-	restCfg, err := rest.InClusterConfig()
-	if err != nil {
-		KueueLogger.Printf("error building in-cluster config for kueue: %v", err)
-		return false
-	}
-
-	kueueClient, err := kueueclientset.NewForConfig(restCfg)
+	kueueClient, err := newKueueClient()
 	if err != nil {
 		KueueLogger.Printf("error building kueue clientset: %v", err)
 		return false
@@ -704,7 +634,7 @@ func VerifyWorkloadByResources(service types.Service, cfg *types.Config) bool {
 	}
 
 	workloadName := buildVerificationWorkloadName(service.Name)
-	workloadSpec, err := getResourceOnlyWorkloadSpec(&service, cfg, namespace, workloadName, localQueueName)
+	workloadSpec, err := getResourceOnlyWorkloadSpec(&service, namespace, workloadName, localQueueName)
 	if err != nil {
 		KueueLogger.Printf("error building resource-only workload for service '%s': %v", service.Name, err)
 		return false

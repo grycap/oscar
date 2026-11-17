@@ -1,6 +1,3 @@
 [submodule "dashboard"]
 	path = dashboard
 	url = https://github.com/grycap/oscar-dashboard.git
-[submodule "oscar-dashboard"]
-	path = dashboard
-	url = https://github.com/grycap/oscar-dashboard

@@ -99,7 +99,7 @@ type MinIOQuotaUpdate struct {
 	StoragePerBucket string `json:"storage_per_bucket,omitempty"`
 }
 
-func CreateQuotaBackend(kubeConfig *rest.Config, kubeClientset *kubernetes.Clientset) *QuotaBackend {
+func CreateQuotaBackend(kubeConfig *rest.Config, kubeClientset kubernetes.Interface) *QuotaBackend {
 	client, err := kueueclientset.NewForConfig(kubeConfig)
 	if err != nil {
 		return nil

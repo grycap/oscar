@@ -148,7 +148,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				}
 			} else {
 				if len(cfg.OIDCGroups) != 0 {
-					var notFound bool = true
+					var notFound = true
 					for _, vo := range cfg.OIDCGroups {
 						service.VO = vo
 						err := checkIdentity(&service, authHeader)
@@ -282,7 +282,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			service.Labels["kueue.x-k8s.io/queue-name"] = utils.BuildLocalQueueName(service.Name)
 			// At the moment check only for KServe service
-			if service.IsKserve() && !utils.VerifyWorkloadByResources(service, cfg) {
+			if service.IsModelServing() && !utils.VerifyWorkloadByResources(service, cfg) {
 				if err := utils.DeleteKueueLocalQueue(context.TODO(), cfg, service.Namespace, service.Name); err != nil {
 					createLogger.Printf("Error deleting Kueue local queue: %v", err)
 				}
@@ -308,8 +308,19 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating MinIO admin client: %v", objectStorageIAMErr))
 					return
 				}
-				if err := ValidateMinIOBucketCountQuota(cfg, objectStorageIAM.GetClient(c.Request.Context()), minIOQuota, uid, collectMinIOBucketCandidates(&service)); err != nil {
-					c.String(http.StatusForbidden, err.Error())
+				// Hold the per-user bucket quota lock from the validation until
+				// the service (and its buckets) have been created so concurrent
+				// creations cannot all pass the count check and overtake the limit.
+				// The lock is distributed (Kubernetes Lease) so it also serializes
+				// across manager replicas.
+				var lock *MinIOBucketQuotaLock
+				defer func() {
+					if releaseErr := ReleaseMinIOBucketQuota(c.Request.Context(), back.GetKubeClientset(), lock); releaseErr != nil {
+						createLogger.Printf("Error releasing MinIO bucket quota lock for user %s: %v", uid, releaseErr)
+					}
+				}()
+				lock, ok := AcquireMinIOBucketQuotaLockForRequest(c, back.GetKubeClientset(), cfg, uid, objectStorageIAM.GetClient(c.Request.Context()), minIOQuota, collectMinIOBucketCandidates(&service))
+				if !ok {
 					return
 				}
 			}
@@ -324,13 +335,6 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 
-		// Set the KSERVE_HOST environment variable for KServe servicescd
-		if service.IsKserve() {
-			if service.Environment.Vars == nil {
-				service.Environment.Vars = make(map[string]string)
-			}
-			service.Environment.Vars["KSERVE_HOST"] = fmt.Sprintf("%s.%s.svc.cluster.local", utils.GetKserveSvcName(service.Name, service.Kserve.Type), service.Namespace)
-		}
 		// Create service
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
@@ -372,17 +376,11 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 		}
 
 		buckets := []types.MinIOBucket{}
-		if !(service.Annotations != nil &&
-			strings.EqualFold(strings.TrimSpace(service.Annotations[types.FederationWorkerAnnotation]), "true") &&
-			service.Federation != nil &&
-			strings.EqualFold(strings.TrimSpace(service.Federation.Topology), "mesh")) {
+		if service.Annotations == nil || !strings.EqualFold(strings.TrimSpace(service.Annotations[types.FederationWorkerAnnotation]), "true") ||
+			service.Federation == nil || !strings.EqualFold(strings.TrimSpace(service.Federation.Topology), "mesh") {
 			if buckets, err = createBuckets(&service, cfg, objectStorageIAM.GetClient(c.Request.Context()), false, isAdminUser); err != nil {
 				createLogger.Printf("Error creating buckets for service '%s': %v", service.Name, err)
-				if err == errInput {
-					c.String(http.StatusBadRequest, err.Error())
-				} else {
-					c.String(http.StatusInternalServerError, err.Error())
-				}
+				c.String(bucketCreationErrorStatus(err), err.Error())
 				derr := back.DeleteService(service)
 				if derr != nil {
 					log.Printf("Error deleting service: %v\n", derr)
@@ -421,7 +419,7 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				oldTags, _ := objectStorageIAM.GetClient(c.Request.Context()).GetTaggedMetadata(b.BucketName)
 				// Bucket metadata for filtering
 				// If bucket dont have already the tags, set them.
-				if oldTags == nil || len(oldTags) == 0 {
+				if len(oldTags) == 0 {
 					/*storageQuota := ""
 					if minIOQuota != nil {
 						storageQuota = minIOQuota.StoragePerBucket
@@ -497,18 +495,6 @@ func checkValues(service *types.Service, cfg *types.Config) {
 		service.CPU = defaultCPU
 	}
 
-	if service.IsKserve() && utils.IsKserveSupported(cfg) {
-		if service.Kserve.CPU == "" {
-			service.Kserve.CPU = defaultCPU
-		}
-		if service.Kserve.Memory == "" {
-			service.Kserve.Memory = defaultMemory
-		}
-		if service.Labels == nil {
-			service.Labels = make(map[string]string)
-		}
-		service.Labels["kserve"] = "true"
-	}
 	// Check if visibility has been set. If not set default private.
 	if service.Visibility == "" {
 		service.Visibility = types.PRIVATE
@@ -646,6 +632,17 @@ func cloneStorageIOConfigs(items []types.StorageIOConfig) []types.StorageIOConfi
 	return append([]types.StorageIOConfig(nil), items...)
 }
 
+func bucketCreationErrorStatus(err error) int {
+	switch {
+	case errors.Is(err, types.ErrBucketAlreadyExists):
+		return http.StatusConflict
+	case errors.Is(err, types.ErrBucketCreation), err == errInput:
+		return http.StatusBadRequest
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
 func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *types.MinIOAdminClient, isUpdate, isAdminUser bool) ([]types.MinIOBucket, error) {
 	var s3Client *s3.S3
 	var cdmiClient *cdmi.Client
@@ -686,7 +683,7 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		splitPath := strings.SplitN(path, "/", 2)
 		folderKey := ""
 		if len(splitPath) > 1 && strings.TrimSpace(splitPath[1]) != "" {
-			folderKey = fmt.Sprintf("%s", splitPath[1])
+			folderKey = splitPath[1]
 		}
 
 		err := minIOAdminClient.CreateS3PathWithWebhook(s3Client, splitPath, service.GetObjectStorageWebhookARN(cfg.ObjectStorageType), false)
@@ -814,8 +811,8 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	}
 
 	if service.Mount.Provider != "" {
-		if resources.ValidateMountOpts(service.Mount.Options) == "" && service.Mount.Options != "" {
-			return nil, fmt.Errorf("mount options contain invalid characters")
+		if _, err := resources.ParseMountOptions(service.Mount.Options); err != nil {
+			return nil, err
 		}
 		provID, provName = getProviderInfo(service.Mount.Provider)
 		if provName == types.MinIOName {
@@ -1060,8 +1057,31 @@ func validateServiceCreation(service *types.Service, cfg *types.Config) error {
 	if err := service.Validate(); err != nil {
 		return err
 	}
-	if service.IsKserve() && !utils.IsKserveSupported(cfg) {
-		return fmt.Errorf("KServe is not supported in this OSCAR deployment")
+
+	if err := validateServiceMountOptions(service); err != nil {
+		return err
 	}
+
+	// Check if any Model Serving backends is supported in this OSCAR deployment
+	// If not supported, return an error
+	// If supported, add a label to the service indicating that it is a KServe service
+	if service.IsModelServing() {
+		if !service.ModelServing.IsTypeSupportedByOSCAR(cfg) {
+			return fmt.Errorf("model serving is not supported in this OSCAR deployment")
+		}
+		if service.Labels == nil {
+			service.Labels = make(map[string]string)
+		}
+		service.Labels["kserve"] = "true"
+	}
+
 	return nil
+}
+
+func validateServiceMountOptions(service *types.Service) error {
+	if service.Mount.Provider == "" && service.Mount.Options != "" {
+		return fmt.Errorf("mount options require a mount storage provider")
+	}
+	_, err := resources.ParseMountOptions(service.Mount.Options)
+	return err
 }

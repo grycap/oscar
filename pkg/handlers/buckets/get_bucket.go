@@ -102,11 +102,7 @@ func MakeGetHandler(cfg *types.Config) gin.HandlerFunc {
 			}
 		}
 
-		if !isAdmin && utils.IsRustFSConfig(cfg) && !utils.UserAllowedByTags(requester, metadata) {
-			c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", requester))
-			return
-		}
-		if !isAdmin && visibility == "" {
+		if !isAdmin && !auth.UserAllowedForVisibility(requester, visibility, ownerCandidate, allowedUsers) {
 			c.String(http.StatusForbidden, fmt.Sprintf("User '%s' is not authorised", requester))
 			return
 		}

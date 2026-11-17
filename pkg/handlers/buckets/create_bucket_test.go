@@ -1,8 +1,11 @@
 package buckets
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -333,6 +336,10 @@ func TestMakeCreateBucketHandlerEnforcesMinIOQuota(t *testing.T) {
 			w.Header().Set("Content-Type", "application/xml")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`<Tagging xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><TagSet><Tag><Key>owner</Key><Value>` + user + `</Value></Tag></TagSet></Tagging>`))
+		case r.Method == http.MethodGet && strings.Contains(r.URL.RawQuery, "location"):
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
 		default:
 			w.WriteHeader(http.StatusOK)
 		}
@@ -373,6 +380,21 @@ func TestMakeCreateBucketHandlerEnforcesMinIOQuota(t *testing.T) {
 
 	if res.Code != http.StatusForbidden {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusForbidden, res.Code, res.Body.String())
+	}
+	var quotaResp struct {
+		Status  string         `json:"status"`
+		Code    string         `json:"code"`
+		Error   string         `json:"error"`
+		Details map[string]any `json:"details"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &quotaResp); err != nil {
+		t.Fatalf("expected machine-readable JSON quota response, got %q: %v", res.Body.String(), err)
+	}
+	if quotaResp.Status != "error" || quotaResp.Code != "QuotaExceeded" {
+		t.Fatalf("unexpected quota rejection body: status=%q code=%q", quotaResp.Status, quotaResp.Code)
+	}
+	if got, ok := quotaResp.Details["limit"].(float64); !ok || got != 1 {
+		t.Errorf("expected quota limit 1 in details, got %v", quotaResp.Details["limit"])
 	}
 	for _, call := range recorder.snapshot() {
 		if strings.HasPrefix(call, "PUT /new-bucket") {
@@ -586,5 +608,131 @@ func TestMakeCreateBucketHandlerReturnsErrorWhenStorageQuotaApplyFails(t *testin
 	}
 	if !strings.Contains(res.Body.String(), "Error setting bucket quota") {
 		t.Fatalf("expected quota error response, got %s", res.Body.String())
+	}
+}
+
+// TestMakeCreateBucketHandlerSerializesConcurrentCreatesAgainstQuota simulates
+// several buckets being created in parallel for the same user with a limit below
+// the number of requests. The per-user quota lock must serialize the
+// check-and-create flow so that exactly `limit` buckets are created and the
+// rest are rejected with the machine-readable 403 body, even though all
+// requests would pass a check based on a stale bucket list.
+func TestMakeCreateBucketHandlerSerializesConcurrentCreatesAgainstQuota(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	testsupport.SkipIfCannotListen(t)
+
+	const (
+		user      = "alice@example.org"
+		requested = 2
+		limit     = 2
+	)
+
+	createdBuckets := struct {
+		sync.Mutex
+		items map[string]struct{}
+	}{items: map[string]struct{}{}}
+	addBucket := func(name string) {
+		createdBuckets.Lock()
+		defer createdBuckets.Unlock()
+		createdBuckets.items[strings.TrimPrefix(name, "/")] = struct{}{}
+	}
+	bucketListXML := func() string {
+		createdBuckets.Lock()
+		defer createdBuckets.Unlock()
+		parts := make([]string, 0, len(createdBuckets.items))
+		for name := range createdBuckets.items {
+			parts = append(parts, "<Bucket><Name>"+name+"</Name></Bucket>")
+		}
+		sort.Strings(parts)
+		return `<ListAllMyBucketsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Buckets>` + strings.Join(parts, "") + `</Buckets></ListAllMyBucketsResult>`
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPut && !strings.HasPrefix(r.URL.Path, "/minio/admin/") && !strings.Contains(r.URL.RawQuery, "tagging") && !strings.Contains(r.URL.RawQuery, "policy"):
+			addBucket(r.URL.Path)
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/":
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(bucketListXML()))
+		case strings.Contains(r.URL.RawQuery, "tagging"):
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<Tagging xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><TagSet><Tag><Key>owner</Key><Value>` + user + `</Value></Tag></TagSet></Tagging>`))
+		case strings.Contains(r.URL.RawQuery, "location"):
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>`))
+		case strings.HasPrefix(r.URL.Path, "/minio/admin/v3/info-canned-policy"):
+			w.WriteHeader(http.StatusNotFound)
+		default:
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"Status":"success"}`))
+		}
+	}))
+	defer server.Close()
+
+	cfg := &types.Config{
+		Name:              "oscar",
+		Namespace:         "oscar",
+		ServicesNamespace: "oscar-svc",
+		MinIOQuotaEnabled: true,
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  strings.Replace(server.URL, "127.0.0.1", "localhost", 1),
+			Region:    "us-east-1",
+			AccessKey: "minioadmin",
+			SecretKey: "minioadmin",
+			Verify:    false,
+		},
+	}
+	namespace := utils.BuildUserNamespace(cfg, user)
+	client := fake.NewSimpleClientset(&corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "oscar-minio-quota", Namespace: namespace},
+		Data:       map[string]string{"buckets": fmt.Sprint(limit)},
+	})
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", user)
+		c.Set("userName", "Alice")
+	})
+	router.POST("/system/buckets", MakeCreateHandler(cfg, client))
+
+	results := make([]int, requested)
+	var wg sync.WaitGroup
+	for i := 0; i < requested; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodPost, "/system/buckets", strings.NewReader(fmt.Sprintf(`{"bucket_name":"concurrent-%d"}`, i)))
+			req.Header.Set("Authorization", "Bearer token")
+			req.Header.Set("Content-Type", "application/json")
+			res := httptest.NewRecorder()
+			router.ServeHTTP(res, req)
+			results[i] = res.Code
+		}(i)
+	}
+	wg.Wait()
+
+	created, rejected := 0, 0
+	for i, code := range results {
+		switch code {
+		case http.StatusCreated:
+			created++
+		case http.StatusForbidden:
+			rejected++
+		default:
+			t.Fatalf("unexpected status %d for request %d in concurrent creates: %v", code, i, results)
+		}
+	}
+	if created != limit {
+		t.Fatalf("expected %d buckets to be created concurrently, got %d (results: %v)", limit, created, results)
+	}
+	if rejected != requested-limit {
+		t.Fatalf("expected %d creations rejected by the quota, got %d (results: %v)", requested-limit, rejected, results)
+	}
+	if len(createdBuckets.items) != limit {
+		t.Fatalf("expected %d buckets in MinIO, got %d: %v", limit, len(createdBuckets.items), createdBuckets.items)
 	}
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
@@ -26,13 +27,13 @@ import (
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 const (
 	tokenLength            = 64
-	errServiceNotFound     = "Service Not Found"
-	errMultipleServiceAuth = "More than one service authorize, use the owner query to select the service"
+	errServiceNotFound     = "service not found"
+	errMultipleServiceAuth = "more than one service authorize, use the owner query to select the service"
 )
 
 // MakeRunHandler godoc
@@ -56,7 +57,7 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 		serviceList, err := back.ListServicesByName(c.Param("serviceName"), "")
 		if err != nil {
 			// Check if error is caused because the service is not found
-			if errors.IsNotFound(err) || errors.IsGone(err) {
+			if k8serrors.IsNotFound(err) || k8serrors.IsGone(err) {
 				c.Status(http.StatusNotFound)
 			} else {
 				c.String(http.StatusInternalServerError, err.Error())
@@ -96,8 +97,16 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 			}
 
 			ui, err := oidcManager.GetUserInfo(rawToken)
+			if err != nil {
+				c.String(http.StatusBadGateway, "unable to retrieve OIDC user info")
+				return
+			}
+			if ui == nil {
+				c.String(http.StatusBadGateway, "OIDC provider returned no user info")
+				return
+			}
 
-			if !oidcManager.IsAuthorised(rawToken) {
+			if !oidcManager.IsAuthorisedWithUserInfo(rawToken, ui) {
 				c.Status(http.StatusNotFound)
 				return
 			}
@@ -145,12 +154,12 @@ func MakeRunHandler(cfg *types.Config, back types.SyncBackend) gin.HandlerFunc {
 func selectService(c *gin.Context, serviceList []*types.Service) (*types.Service, error) {
 	// If no services found, return not found
 	if len(serviceList) == 0 {
-		return nil, fmt.Errorf(errServiceNotFound)
+		return nil, errors.New(errServiceNotFound)
 	} else if len(serviceList) == 1 { // Found 1 service
 		if authorizeRequest(c, serviceList[0]) { // Found 1 service and is authorize
 			return serviceList[0], nil
 		} else {
-			return nil, fmt.Errorf(errServiceNotFound)
+			return nil, errors.New(errServiceNotFound)
 		}
 	} else { // Found more than one service with same name
 		authTime := 0
@@ -164,11 +173,11 @@ func selectService(c *gin.Context, serviceList []*types.Service) (*types.Service
 		if authTime == 1 { // More than 1 service found, but 1 service authorize
 			return service, nil
 		} else if authTime == 0 { // More than 1 service found, but no service authorize
-			return nil, fmt.Errorf(errServiceNotFound)
+			return nil, errors.New(errServiceNotFound)
 		} else if authTime > 1 { // More than 1 service found, and more than one service authorize -> user query owner
 			owner := strings.TrimSpace(c.Query("owner"))
 			if owner == "" {
-				return nil, fmt.Errorf(errMultipleServiceAuth)
+				return nil, errors.New(errMultipleServiceAuth)
 			}
 			for _, serviceIter := range serviceList {
 				if authorizeRequest(c, serviceIter) && serviceIter.Owner == owner {
@@ -176,8 +185,8 @@ func selectService(c *gin.Context, serviceList []*types.Service) (*types.Service
 					return service, nil
 				}
 			}
-			return nil, fmt.Errorf(errServiceNotFound)
+			return nil, errors.New(errServiceNotFound)
 		}
-		return nil, fmt.Errorf(errServiceNotFound)
+		return nil, errors.New(errServiceNotFound)
 	}
 }

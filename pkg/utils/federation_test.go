@@ -17,11 +17,54 @@ limitations under the License.
 package utils
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/grycap/oscar/v4/pkg/types"
 )
+
+func TestExpandFederationUsesDestinationNamespace(t *testing.T) {
+	for _, method := range []string{http.MethodPost, http.MethodPut} {
+		t.Run(method, func(t *testing.T) {
+			target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != method || r.URL.Path != "/system/services" {
+					t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				var worker types.Service
+				if err := json.NewDecoder(r.Body).Decode(&worker); err != nil {
+					t.Errorf("decode worker: %v", err)
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				if worker.Namespace != "" {
+					t.Errorf("worker inherited origin namespace %q", worker.Namespace)
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				w.WriteHeader(http.StatusCreated)
+			}))
+			defer target.Close()
+			origin := &types.Service{
+				Name: "origin", Namespace: "oscar-user-origin", ClusterID: "origin",
+				Federation: &types.Federation{Topology: "star", Members: types.ReplicaList{
+					{Type: "oscar", ClusterID: "target", ServiceName: "worker"},
+				}},
+				Clusters: map[string]types.Cluster{"target": {Endpoint: target.URL}},
+			}
+			if errs := ExpandFederation(origin, "Bearer test", method, ""); len(errs) != 0 {
+				t.Fatalf("federation failed: %v", errs)
+			}
+			if origin.Namespace != "oscar-user-origin" {
+				t.Fatalf("origin namespace changed: %q", origin.Namespace)
+			}
+		})
+	}
+}
 
 func TestExpandFederation(t *testing.T) {
 	t.Run("nil service", func(t *testing.T) {

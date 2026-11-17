@@ -111,7 +111,7 @@ func TestServerlessBackendInterface(t *testing.T) {
 	// Test GetInfo
 	info := backend.GetInfo()
 	if info == nil {
-		t.Error("Expected GetInfo to return non-nil info")
+		t.Fatal("Expected GetInfo to return non-nil info")
 	}
 
 	if info.Name != "MockBackend" {
@@ -292,7 +292,7 @@ func TestSyncBackendInterface(t *testing.T) {
 	// Test that SyncBackend inherits ServerlessBackend methods
 	info := backend.GetInfo()
 	if info == nil {
-		t.Error("Expected GetInfo to return non-nil info")
+		t.Fatal("Expected GetInfo to return non-nil info")
 	}
 
 	// Test GetProxyDirector
