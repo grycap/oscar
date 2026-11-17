@@ -2445,7 +2445,7 @@ layout. See the <a href="../rustfs-usage/">RustFS storage provider</a> for detai
 <p>To enable the KServe module in the deployed OSCAR, add:</p>
 <pre><code class="language-sh">bash oscar/deploy/kind-deploy.sh --kserve
 </code></pre>
-<p>This option deploys KServe InferenceService and LLMInferenceService controllers and is required in order to use <a href="../fdl/#kservesettings">KServe settings</a> in the FDL.</p>
+<p>This option installs the KServe components needed to create <code>InferenceService</code> and <code>LLMInferenceService</code> resources. It is required to use <a href="../fdl/#modelservingsettings">Model Serving settings</a> in the FDL. Other backends may be supported in the future.</p>
 <p><em>Note that in order to enable KServe, you must use Traefik as the Gateway API provider (the script uses it by default).</em></p>
 <p>To deploy the metrics stack (Prometheus, Loki and Alloy) in the local cluster, add:</p>
 <pre><code class="language-sh">bash oscar/deploy/kind-deploy.sh --metrics
@@ -2685,9 +2685,9 @@ flag to disable verification of the self-signed certificates:</p>
 <h2 id="testing-the-oscar-cluster">Testing the OSCAR cluster</h2>
 <p>We suggest you follow the instructions for the <a href="https://github.com/grycap/oscar/tree/master/examples/simple-test">simple-test</a> example.</p>
 <h2 id="limitations">Limitations</h2>
-<p>Please note that the local deployment has several limitations in terms of functionality, which includes:</p>
+<p>Please note that the local deployment has several functional limitations, including:</p>
 <ul>
-<li>Inaccurate information obtained via <code>/status</code></li>
+<li>Inaccurate information from the <code>/status</code> endpoint.</li>
 </ul>
 
 

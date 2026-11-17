@@ -2179,7 +2179,30 @@
   path: /notebook
   options: &quot;--buffer-size 128M --vfs-read-chunk-size 64M&quot;
 </code></pre>
-<p>These options are appended after the default mount flags, so they can override any built-in setting.</p>
+<p>OSCAR accepts only the following additional flags (as <code>--flag value</code> or <code>--flag=value</code> for flags with values):</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--buffer-size</code>, <code>--vfs-read-chunk-size</code>, <code>--vfs-cache-max-size</code></td>
+<td>Nonnegative integer, optionally followed by <code>K</code>, <code>M</code>, <code>G</code>, or <code>T</code> (case-insensitive), e.g. <code>128M</code></td>
+</tr>
+<tr>
+<td><code>--dir-cache-time</code>, <code>--timeout</code></td>
+<td>Nonnegative integer followed by <code>ms</code>, <code>s</code>, <code>m</code>, or <code>h</code>, e.g. <code>30s</code></td>
+</tr>
+<tr>
+<td><code>--read-only</code>, <code>--no-checksum</code></td>
+<td>No value</td>
+</tr>
+</tbody>
+</table>
+<p>Flags and values must be separated by ordinary spaces; quoting, tabs, shell syntax, unknown flags, network/control flags (including <code>--rc</code>), and configuration or provider overrides (including <code>--config</code>) are rejected. The flags above are appended after OSCAR's built-in mount settings. Existing service definitions using any other custom options must remove or replace them before an update; on PodSpec generation, OSCAR drops <strong>all</strong> custom options from a stored definition if any one is invalid. The default mount settings and mounts without custom options remain unchanged.</p>
 <p><strong>Note</strong>: You can find the files of this example on <a href="https://github.com/grycap/oscar/tree/master/examples/expose_services/jupyter">OSCAR's repository examples</a></p>
 <p>As OSCAR has the credentials of the default MinIO instance internally, if you want to use a different one or a different storage provider, you need to set these credentials on the service <a href="../fdl/">FDL</a>. Currently, the storage providers supported on this functionality are:</p>
 <ul>

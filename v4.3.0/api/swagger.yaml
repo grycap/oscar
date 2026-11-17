@@ -178,10 +178,18 @@ definitions:
         items:
           type: string
         type: array
+      pod_cidr:
+        description: 'Kubernetes Pod CIDR excluded from user namespace network policy
+          (default: 10.244.0.0/16)'
+        type: string
       serverless_backend:
         description: |-
           Serverless framework used to deploy services (Openfaas | Knative)
           If not defined only async invocations allowed (Using KubeBackend)
+        type: string
+      service_cidr:
+        description: 'Kubernetes Service CIDR excluded from user namespace network
+          policy (default: 10.96.0.0/12)'
         type: string
       services_namespace:
         description: 'Kubernetes namespace for services and jobs (default: oscar-svc)'
@@ -355,116 +363,6 @@ definitions:
         type: string
       remaining_jobs:
         type: integer
-    type: object
-  types.Kserve:
-    properties:
-      args:
-        description: |-
-          Args command-line arguments to be passed to the container
-          Optional
-        items:
-          type: string
-        type: array
-      cpu:
-        default: "0.2"
-        description: |-
-          CPU cpu limit for the service following the kubernetes format
-          https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
-          Optional. (default: 0.2)
-        type: string
-      enable_gpu:
-        default: false
-        description: |-
-          EnableGPU parameter to request gpu usage in KServe InferenceService
-          Optional. (default: false)
-        type: boolean
-      env:
-        additionalProperties:
-          type: string
-        description: |-
-          Environment variables to be passed to the container
-          Optional
-        type: object
-      inference:
-        allOf:
-        - $ref: '#/definitions/types.KserveInference'
-        description: |-
-          Inference configuration for KServe InferenceService.
-          It is required when Type is set to "inference"
-      llm_inference:
-        allOf:
-        - $ref: '#/definitions/types.KserveLLMInference'
-        description: |-
-          LLMInference configuration for KServe LLMInferenceService.
-          It is required when Type is set to "llm_inference"
-      max_scale:
-        default: 1
-        description: |-
-          MaxScale maximum number of active replicas (pods) for the service
-          Optional. (default: 1)
-        type: integer
-      memory:
-        default: 256Mi
-        description: |-
-          Memory memory limit for the service following the kubernetes format
-          https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
-          Optional. (default: 256Mi)
-        type: string
-      min_scale:
-        default: 1
-        description: |-
-          MinScale minimum number of active replicas (pods) for the service
-          Optional. (default: 1)
-        type: integer
-      set_auth:
-        default: true
-        description: |-
-          SetAuth parameter to set the authentication for the KServe InferenceService
-          Optional. (default: true)
-        type: boolean
-      storage_uri:
-        description: |-
-          StorageUri the URI of the model storage for KServe
-          Required. It should follow the format expected by KServe, for example:
-        type: string
-      type:
-        default: inference
-        description: |-
-          Type the type of KServe service to deploy
-          Required. Set the type of KServe service, either "inference" for a standard InferenceService
-          or "llm_inference" for an LLMInferenceService
-        type: string
-    type: object
-  types.KserveInference:
-    properties:
-      api_version:
-        default: v1
-        description: |-
-          Can be used to specify the protocol version for KServe (e.g., "v1", "v2").
-          Optional. (default: "v1")
-        type: string
-      model_format:
-        description: |-
-          ModelFormat the model format to use for KServe InferenceService.
-          Every model format has its own runtime and the available runtimes may vary depending on the cluster configuration.
-          ("onnx", "sklearn", "xgboost", "pytorch", "tensorflow", "triton", "huggingface").
-        type: string
-      runtime_image:
-        description: |-
-          RuntimeImage the KServe runtime to use. Its a custom runtime if
-          the available runtimes in the model format are not enough
-          Ref: https://kserve.github.io/website/docs/concepts/resources/servingruntime
-          Optional.
-        type: string
-    type: object
-  types.KserveLLMInference:
-    properties:
-      runtime_image:
-        description: |-
-          At the moment only supported for LLMInferenceService,
-          the runtime image to use for KServe when IsLLM is true
-          Optional. (default: a custom image based on vLLM for CPU and another one with GPU support)
-        type: string
     type: object
   types.ManagedVolume:
     properties:
@@ -706,6 +604,8 @@ definitions:
         type: integer
       total_objects:
         type: integer
+    type: object
+  types.ModelServing:
     type: object
   types.NodeConditionSimple:
     properties:
@@ -1047,10 +947,6 @@ definitions:
         description: IsolationLevel level of isolation for the buckets of the service
           (default:service)
         type: string
-      kserve:
-        allOf:
-        - $ref: '#/definitions/types.Kserve'
-        description: Kserve configuration to deploy the service using KServe CRD
       labels:
         additionalProperties:
           type: string
@@ -1070,6 +966,11 @@ definitions:
           https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
           Optional. (default: 256Mi)
         type: string
+      model_serving:
+        allOf:
+        - $ref: '#/definitions/types.ModelServing'
+        description: ModelServing configuration to deploy the service using KServe
+          CRD
       mount:
         allOf:
         - $ref: '#/definitions/types.StorageIOConfig'
@@ -2035,7 +1936,8 @@ paths:
   /system/logs/{serviceName}:
     delete:
       description: Delete jobs created by the provided service. If `all` is true pending,
-        running and failed jobs are also removed.
+        running and failed jobs are also removed. Bearer users other than the service
+        owner or an admin user may only delete the jobs they themselves created.
       parameters:
       - description: Service name
         in: path
@@ -2053,6 +1955,10 @@ paths:
             type: string
         "401":
           description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
           schema:
             type: string
         "404":
@@ -2108,7 +2014,8 @@ paths:
       - logs
   /system/logs/{serviceName}/{jobName}:
     delete:
-      description: Delete a specific job and its pod.
+      description: Delete a specific job and its pod. Bearer users other than the
+        service owner or an admin user may only delete the jobs they themselves created.
       parameters:
       - description: Service name
         in: path
@@ -2127,6 +2034,10 @@ paths:
             type: string
         "401":
           description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
           schema:
             type: string
         "404":

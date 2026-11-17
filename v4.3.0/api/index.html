@@ -2153,6 +2153,21 @@ through an Ingress Controller or a Gateway API HTTPRoute. This API has been desc
 quota information when those subsystems are enabled. Administrators can update
 per-user MinIO bucket limits through <code>/system/quotas/user/{userId}</code> by setting
 the <code>minio.buckets</code> and <code>minio.storage_per_bucket</code> fields.</p>
+<p>When a request would push a user over their MinIO bucket quota, the service
+and bucket creation endpoints (<code>/system/services</code> and <code>/system/buckets</code>)
+respond with <code>403 Forbidden</code> and a machine-readable JSON body:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;error&quot;,
+  &quot;code&quot;: &quot;QuotaExceeded&quot;,
+  &quot;error&quot;: &quot;MinIO bucket quota exceeded for user &lt;userId&gt;: limit &lt;limit&gt;, current &lt;current&gt;, requested new buckets &lt;requested&gt;&quot;,
+  &quot;details&quot;: {
+    &quot;owner&quot;: &quot;&lt;userId&gt;&quot;,
+    &quot;limit&quot;: &lt;limit&gt;,
+    &quot;current&quot;: &lt;current&gt;,
+    &quot;requested&quot;: &lt;requested&gt;
+  }
+}
+</code></pre>
 <p><link type="text/css" rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css"></p>
 <div id="swagger-ui-1">
 </div>

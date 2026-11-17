@@ -743,10 +743,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#kservesettings" class="md-nav__link">
+  <a href="#modelservingsettings" class="md-nav__link">
     <span class="md-ellipsis">
       
-        KServeSettings
+        ModelServingSettings
       
     </span>
   </a>
@@ -754,10 +754,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#kserveinferencesettings" class="md-nav__link">
+  <a href="#inferencesettings" class="md-nav__link">
     <span class="md-ellipsis">
       
-        KServeInferenceSettings
+        InferenceSettings
       
     </span>
   </a>
@@ -765,10 +765,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#kservellminferencesettings" class="md-nav__link">
+  <a href="#llminferencesettings" class="md-nav__link">
     <span class="md-ellipsis">
       
-        KServeLLMInferenceSettings
+        LLMInferenceSettings
       
     </span>
   </a>
@@ -2462,28 +2462,19 @@
         path: result-example-workflow
       - storage_provider: webdav.dcache
         path: example-workflow/res
-  - oscar-kserve:
-      name: inference
-      memory: 200Mi
-      cpu: '0.5'
-      image: grycap/procces
+  - oscar-model-serving:
+      name: llminference
+      memory: 6Gi
+      cpu: '2.0'
       script: script.sh
-      kserve:
-        type: inference
-        inference:
-          model_format: onnx
-        storage_uri: &quot;oci://ghcr.io/grycap/kserve-yolo8n-onnx&quot;
-        min_scale: 1
-        api_version: &quot;v2&quot;
-        cpu: '1.0'
-        memory: 2Gi
-      log_level: CRITICAL
-      input:
-      - storage_provider: minio
-        path: kserve-isvc-yolo8n-onnx/input
-      output:
-      - storage_provider: minio
-        path: kserve-isvc-yolo8n-onnx/output
+      model_serving:
+        llm_inference:
+          source: &quot;oci://ghcr.io/grycap/kserve-qwen2-5-05b-instruct:latest&quot;
+          args:
+            - --dtype=auto
+            - --enforce-eager
+            - --enable-auto-tool-choice
+            - --tool-call-parser=hermes
 
 storage_providers:
   onedata:
@@ -2679,8 +2670,8 @@ storage_providers:
 <td>Configuration for an OSCAR-managed persistent volume attached to the service. Optional.</td>
 </tr>
 <tr>
-<td><code>kserve</code> </br> <em><a href="#kservesettings">KServeSettings</a></em></td>
-<td>Configuration to deploy the service using KServe (<code>InferenceService</code> or <code>LLMInferenceService</code>). Optional. Depends on cluster configuration.</td>
+<td><code>model_serving</code> </br> <em><a href="#modelservingsettings">ModelServingSettings</a></em></td>
+<td>Configuration for deploying an AI model using one of the available options (<a href="#inferencesettings"><code>inference</code></a> or <a href="#llminferencesettings"><code>llm_inference</code></a>; other options may be added in the future). Optional. Depends on the cluster configuration.</td>
 </tr>
 </tbody>
 </table>
@@ -2789,7 +2780,7 @@ storage_providers:
 </tr>
 </tbody>
 </table>
-<h2 id="kservesettings">KServeSettings</h2>
+<h2 id="modelservingsettings">ModelServingSettings</h2>
 <table>
 <thead>
 <tr>
@@ -2799,56 +2790,16 @@ storage_providers:
 </thead>
 <tbody>
 <tr>
-<td><code>type</code> </br> <em>string</em></td>
-<td>KServe service type. Allowed values: <code>inference</code> and <code>llm_inference</code>. Required.</td>
+<td><code>inference</code> </br> <em><a href="#inferencesettings">InferenceSettings</a></em></td>
+<td>Configuration for predictive models, deployed with KServe. Configure either <code>inference</code> or <code>llm_inference</code>, but not both.</td>
 </tr>
 <tr>
-<td><code>storage_uri</code> </br> <em>string</em></td>
-<td>Model storage URI consumed by KServe (for example <code>hf://...</code>, <code>oci://...</code>, or other KServe-compatible URIs). Required.</td>
-</tr>
-<tr>
-<td><code>inference</code> </br> <em><a href="#kserveinferencesettings">KServeInferenceSettings</a></em></td>
-<td>Inference-specific configuration. Required when <code>type</code> is <code>inference</code>. It must be omitted when <code>type</code> is <code>llm_inference</code>.</td>
-</tr>
-<tr>
-<td><code>llm_inference</code> </br> <em><a href="#kservellminferencesettings">KServeLLMInferenceSettings</a></em></td>
-<td>LLM inference configuration used with <code>llm_inference</code> services. Optional.</td>
-</tr>
-<tr>
-<td><code>min_scale</code> </br> <em>integer</em></td>
-<td>Minimum number of predictor replicas. Set to <code>0</code> to allow scale-to-zero (only available for <code>inference</code> type and dependent on cluster configuration). Optional. (default: <code>1</code>; for <code>llm_inference</code>, OSCAR enforces at least <code>1</code>)</td>
-</tr>
-<tr>
-<td><code>max_scale</code> </br> <em>integer</em></td>
-<td>Maximum number of predictor replicas. Optional. (default: <code>1</code>). If <code>min_scale</code> is greater than <code>max_scale</code>, OSCAR sets <code>max_scale</code> equal to <code>min_scale</code>.</td>
-</tr>
-<tr>
-<td><code>cpu</code> </br> <em>string</em></td>
-<td>CPU resources for the KServe workload in Kubernetes quantity format. Optional. (default: <code>0.2</code>)</td>
-</tr>
-<tr>
-<td><code>memory</code> </br> <em>string</em></td>
-<td>Memory resources for the KServe workload in Kubernetes quantity format. Optional. (default: <code>256Mi</code>)</td>
-</tr>
-<tr>
-<td><code>args</code> </br> <em>string array</em></td>
-<td>Command-line arguments passed to the KServe model container. Optional.</td>
-</tr>
-<tr>
-<td><code>env</code> </br> <em>map[string]string</em></td>
-<td>Environment variables passed to the KServe model container. Optional.</td>
-</tr>
-<tr>
-<td><code>enable_gpu</code> </br> <em>bool</em></td>
-<td>Requests one GPU for the KServe workload (<code>nvidia.com/gpu: 1</code>). Optional. (default: false)</td>
-</tr>
-<tr>
-<td><code>set_auth</code> </br> <em>bool</em></td>
-<td>Enables authentication middleware for the exposed KServe route. Optional. (default: true)</td>
+<td><code>llm_inference</code> </br> <em><a href="#llminferencesettings">LLMInferenceSettings</a></em></td>
+<td>Configuration for large language models using a vLLM-compatible runtime, deployed with KServe. Configure either <code>llm_inference</code> or <code>inference</code>, but not both.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="kserveinferencesettings">KServeInferenceSettings</h2>
+<h2 id="inferencesettings">InferenceSettings</h2>
 <table>
 <thead>
 <tr>
@@ -2859,7 +2810,7 @@ storage_providers:
 <tbody>
 <tr>
 <td><code>model_format</code> </br> <em>string</em></td>
-<td>Model format expected by KServe for <code>inference</code> services. Required when <code>type</code> is <code>inference</code>. Typical values include: <code>onnx</code>, <code>sklearn</code>, <code>xgboost</code>, <code>pytorch</code>, <code>tensorflow</code>, <code>triton</code>, <code>huggingface</code>. Every model format has its own runtime and the available runtimes may vary depending on the cluster configuration</td>
+<td>Model format expected by KServe. Required for <code>inference</code> configuration. Typical values include <code>onnx</code>, <code>sklearn</code>, <code>xgboost</code>, <code>pytorch</code>, <code>tensorflow</code>, <code>triton</code>, and <code>huggingface</code>. Each format has its own runtime, and available runtimes may vary depending on the cluster configuration.</td>
 </tr>
 <tr>
 <td><code>runtime_image</code> </br> <em>string</em></td>
@@ -2869,9 +2820,29 @@ storage_providers:
 <td><code>api_version</code> </br> <em>string</em></td>
 <td>Protocol version used by KServe predictors. Allowed values: <code>v1</code>, <code>v2</code>. Optional. (default: <code>v1</code>)</td>
 </tr>
+<tr>
+<td><code>source</code> </br> <em>string</em></td>
+<td>Model storage URI consumed by KServe (for example <code>hf://...</code>, <code>oci://...</code>, or other KServe-compatible URIs). Required.</td>
+</tr>
+<tr>
+<td><code>min_scale</code> </br> <em>integer</em></td>
+<td>Minimum number of replicas. Set to <code>0</code> to allow scale-to-zero, depending on the cluster configuration. Optional. (default: <code>1</code>)</td>
+</tr>
+<tr>
+<td><code>max_scale</code> </br> <em>integer</em></td>
+<td>Maximum number of predictor replicas. Optional. (default: <code>1</code>). If <code>min_scale</code> is greater than <code>max_scale</code>, OSCAR sets <code>max_scale</code> equal to <code>min_scale</code>.</td>
+</tr>
+<tr>
+<td><code>args</code> </br> <em>string array</em></td>
+<td>Command-line arguments passed to the KServe model container. Optional.</td>
+</tr>
+<tr>
+<td><code>set_auth</code> </br> <em>bool</em></td>
+<td>Enables authentication for the Model Serving route through Traefik ForwardAuth. Requires a Traefik Gateway API setup. Optional. (default: <code>true</code>)</td>
+</tr>
 </tbody>
 </table>
-<h2 id="kservellminferencesettings">KServeLLMInferenceSettings</h2>
+<h2 id="llminferencesettings">LLMInferenceSettings</h2>
 <table>
 <thead>
 <tr>
@@ -2882,7 +2853,27 @@ storage_providers:
 <tbody>
 <tr>
 <td><code>runtime_image</code> </br> <em>string</em></td>
-<td>Runtime image for <code>llm_inference</code> services. Optional. If omitted, OSCAR uses the default vLLM-based runtime image.</td>
+<td>Runtime image for <code>llm_inference</code> services. Optional. If omitted, OSCAR selects its default vLLM-based runtime image based.</td>
+</tr>
+<tr>
+<td><code>source</code> </br> <em>string</em></td>
+<td>Model storage URI consumed by KServe (for example <code>hf://...</code>, <code>oci://...</code>, or other KServe-compatible URIs). Required.</td>
+</tr>
+<tr>
+<td><code>min_scale</code> </br> <em>integer</em></td>
+<td>Minimum number of replicas. Must be at least <code>1</code>. Optional. (default: <code>1</code>)</td>
+</tr>
+<tr>
+<td><code>max_scale</code> </br> <em>integer</em></td>
+<td>Maximum number of predictor replicas. Optional. (default: <code>1</code>). If <code>min_scale</code> is greater than <code>max_scale</code>, OSCAR sets <code>max_scale</code> equal to <code>min_scale</code>.</td>
+</tr>
+<tr>
+<td><code>args</code> </br> <em>string array</em></td>
+<td>Command-line arguments passed to the KServe model container. Optional.</td>
+</tr>
+<tr>
+<td><code>set_auth</code> </br> <em>bool</em></td>
+<td>Enables authentication for the Model Serving route. Only uses <code>forward</code> authentication type that delegates checks to OSCAR service authorization. Requires a Traefik Gateway API setup. Optional. (default: <code>true</code>)</td>
 </tr>
 </tbody>
 </table>

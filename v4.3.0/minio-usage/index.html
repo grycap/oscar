@@ -2267,6 +2267,10 @@ API. The MinIO quota block includes:</p>
 <li><code>storage_total</code>: aggregate storage usage reported for buckets attributed to
   the user.</li>
 </ul>
+<p>For users without an explicit quota, the OSCAR manager seeds the user's
+quota from the deployment defaults: <code>MINIO_QUOTA_BUCKETS</code> (default <code>100</code>)
+for the bucket count and <code>MINIO_QUOTA_STORAGE</code> (default <code>5Gi</code>) for the
+storage limit applied to each bucket.</p>
 <p>Example admin update:</p>
 <pre><code class="language-bash">curl -k -u oscar:&lt;OSCAR_PASSWORD&gt; \
   -X PUT https://&lt;OSCAR_ENDPOINT&gt;/system/quotas/user/&lt;USER_ID&gt; \
