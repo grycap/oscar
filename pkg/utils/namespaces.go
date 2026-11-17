@@ -355,7 +355,7 @@ func ensureControllerRole(ctx context.Context, kubeClientset kubernetes.Interfac
 			},
 			{
 				APIGroups: []string{"networking.k8s.io"},
-				Resources: []string{"ingresses"},
+				Resources: []string{"ingresses", "networkpolicies"},
 				Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
 			},
 			{

@@ -674,6 +674,7 @@ func TestEnsureControllerRoleIncludesVolumeQuotaPermissionsOnCreate(t *testing.T
 	foundResourceQuotas := false
 	foundLimitRanges := false
 	foundIngresses := false
+	foundNetworkPolicies := false
 	for _, rule := range role.Rules {
 		if containsString(rule.APIGroups, "") && containsString(rule.Resources, "pods") {
 			foundPodsRule = true
@@ -695,9 +696,7 @@ func TestEnsureControllerRoleIncludesVolumeQuotaPermissionsOnCreate(t *testing.T
 		}
 		if containsString(rule.APIGroups, "networking.k8s.io") {
 			foundIngresses = containsString(rule.Resources, "ingresses")
-			if containsString(rule.Resources, "networkpolicies") {
-				t.Fatalf("Expected created Role to not include networkpolicies resource: %v", rule.Resources)
-			}
+			foundNetworkPolicies = containsString(rule.Resources, "networkpolicies")
 		}
 	}
 
@@ -712,6 +711,9 @@ func TestEnsureControllerRoleIncludesVolumeQuotaPermissionsOnCreate(t *testing.T
 	}
 	if !foundIngresses {
 		t.Fatal("Expected a networking.k8s.io rule with ingresses resource")
+	}
+	if !foundNetworkPolicies {
+		t.Fatal("Expected a networking.k8s.io rule with networkpolicies resource")
 	}
 }
 
