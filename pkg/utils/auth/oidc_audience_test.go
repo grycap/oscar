@@ -26,13 +26,13 @@ func TestOIDCSignedAudienceAllowlist(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
-			fmt.Fprintf(w, `{"issuer":%q,"jwks_uri":%q,"userinfo_endpoint":%q}`, issuer, issuer+"/keys", issuer+"/userinfo")
+			_, _ = fmt.Fprintf(w, `{"issuer":%q,"jwks_uri":%q,"userinfo_endpoint":%q}`, issuer, issuer+"/keys", issuer+"/userinfo")
 		case "/keys":
-			n := base64.RawURLEncoding.EncodeToString(key.PublicKey.N.Bytes())
-			e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(key.PublicKey.E)).Bytes())
-			fmt.Fprintf(w, `{"keys":[{"kty":"RSA","kid":"test-key","use":"sig","alg":"RS256","n":%q,"e":%q}]}`, n, e)
+			n := base64.RawURLEncoding.EncodeToString(key.N.Bytes())
+			e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(key.E)).Bytes())
+			_, _ = fmt.Fprintf(w, `{"keys":[{"kty":"RSA","kid":"test-key","use":"sig","alg":"RS256","n":%q,"e":%q}]}`, n, e)
 		case "/userinfo":
-			fmt.Fprint(w, `{"sub":"test-user","group_membership":["allowed-group"]}`)
+			_, _ = fmt.Fprint(w, `{"sub":"test-user","group_membership":["allowed-group"]}`)
 		default:
 			http.NotFound(w, r)
 		}
