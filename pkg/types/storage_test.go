@@ -22,6 +22,71 @@ import (
 	"testing"
 )
 
+func TestStorageIOConfigValidate(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      StorageIOConfig
+		wantErrText string
+	}{
+		{
+			name: "valid delete policy",
+			config: StorageIOConfig{
+				Provider:        "minio.default",
+				Path:            "bucket/path",
+				LifecyclePolicy: VolumeLifecycleDelete,
+			},
+		},
+		{
+			name: "valid retain policy",
+			config: StorageIOConfig{
+				Provider:        "s3.external",
+				Path:            "bucket/path",
+				LifecyclePolicy: VolumeLifecycleRetain,
+			},
+		},
+		{
+			name: "missing provider",
+			config: StorageIOConfig{
+				Path:            "bucket/path",
+				LifecyclePolicy: VolumeLifecycleDelete,
+			},
+			wantErrText: "storage provider is required",
+		},
+		{
+			name: "missing path",
+			config: StorageIOConfig{
+				Provider:        "minio.default",
+				LifecyclePolicy: VolumeLifecycleDelete,
+			},
+			wantErrText: "storage path is required",
+		},
+		{
+			name: "invalid lifecycle policy",
+			config: StorageIOConfig{
+				Provider:        "minio.default",
+				Path:            "bucket/path",
+				LifecyclePolicy: "invalid",
+			},
+			wantErrText: "service I/O bucket lifecycle policy must be delete or retain",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if tt.wantErrText == "" {
+				if err != nil {
+					t.Fatalf("Validate() error = %v, want nil", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != tt.wantErrText {
+				t.Fatalf("Validate() error = %v, want %q", err, tt.wantErrText)
+			}
+		})
+	}
+}
+
 func TestGetMinIOClient(t *testing.T) {
 	scenarios := []struct {
 		name          string
