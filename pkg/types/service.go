@@ -445,6 +445,22 @@ func (s Service) Validate() error {
 		}
 	}
 
+	if len(s.Input) > 0 {
+		for _, input := range s.Input {
+			if err := input.Validate(); err != nil {
+				return fmt.Errorf("invalid input configuration: %v", err)
+			}
+		}
+	}
+
+	if len(s.Output) > 0 {
+		for _, output := range s.Output {
+			if err := output.Validate(); err != nil {
+				return fmt.Errorf("invalid output configuration: %v", err)
+			}
+		}
+	}
+
 	return nil
 }
 
