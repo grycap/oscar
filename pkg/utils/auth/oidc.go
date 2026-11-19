@@ -387,13 +387,14 @@ func (om *oidcManager) IsAuthorised(rawToken string) bool {
 }
 
 // IsAuthorisedWithUserInfo checks a token using UserInfo already retrieved by the caller.
-// The token is still verified before its groups are trusted.
+// The token is still fully verified (issuer, signature, expiry and the per-issuer audience
+// allowlist) before its groups are trusted.
 func (om *oidcManager) IsAuthorisedWithUserInfo(rawToken string, ui *userInfo) bool {
 	if ui == nil {
 		return false
 	}
 	// Check if the token is valid
-	_, err := om.provider.Verifier(om.config).Verify(context.TODO(), rawToken)
+	err := om.verifyToken(rawToken)
 	if err != nil {
 		return false
 	}
