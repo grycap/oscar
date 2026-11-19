@@ -125,13 +125,15 @@ func getOIDCMiddleware(kubeClientset kubernetes.Interface, objectStorageIAM obje
 			continue
 		}
 		issuerManager, err := NewOIDCManager(iss, cfg.OIDCSubject, cfg.OIDCGroups, allowed...)
-		if err == nil {
-			if oidcConfig != nil {
-				// Retain the test-only signature override, never an audience bypass.
-				issuerManager.config.InsecureSkipSignatureCheck = oidcConfig.InsecureSkipSignatureCheck
-			}
-			ClusterOidcManagers[iss] = issuerManager
+		if err != nil {
+			oidcLogger.Printf("Failed to create OIDC provider for issuer %q: %v", iss, err)
+			continue
 		}
+		if oidcConfig != nil {
+			// Retain the test-only signature override, never an audience bypass.
+			issuerManager.config.InsecureSkipSignatureCheck = oidcConfig.InsecureSkipSignatureCheck
+		}
+		ClusterOidcManagers[iss] = issuerManager
 	}
 
 	mc := NewMultitenancyConfig(kubeClientset, cfg.OIDCSubject)
