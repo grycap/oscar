@@ -60,11 +60,24 @@ If you want to use ingress with subpaths and ingress, use:
 bash oscar/deploy/kind-deploy.sh --devel --ingress --wildcards="false" --host="localhost"  
 ```
 
-To enable OIDC authentication support in the deployed OSCAR (disabled by default), add:
+To enable OIDC authentication support in the deployed OSCAR (disabled by default),
+set `OIDC_AUDIENCES` to a JSON map from each configured issuer URL to its
+explicitly allowed token audience(s), then add `--oidc` (or select OIDC in the
+interactive wizard). There is no default audience: obtain the intended `aud`
+values from your IdP/client configuration; do not guess a client ID. For example:
 
 ```sh
-bash oscar/deploy/kind-deploy.sh --oidc
+OIDC_AUDIENCES='{"https://keycloak.grycap.net/realms/grycap":["<your-client-id>","<intentionally-shared-api-audience>"]}' \
+  bash oscar/deploy/kind-deploy.sh --oidc
 ```
+
+Replace the placeholders with the actual audiences of tokens intended for OSCAR;
+omit the shared audience if it is not deliberately accepted. The installer
+requires this setting when OIDC is enabled and passes it to OSCAR. For an
+existing OIDC-enabled installation, configure `OIDC_AUDIENCES` on the OSCAR
+deployment for **every** `OIDC_ISSUERS` entry before upgrading the image;
+otherwise those issuers cannot authenticate. OSCAR also rejects malformed or
+empty audience lists. Keep the issuer URLs identical to `OIDC_ISSUERS`.
 
 To enable Kueue support for CPU and memory quotas in the deployed OSCAR
 (disabled by default), add:
