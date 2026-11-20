@@ -52,6 +52,9 @@ const (
 
 	// ProviderSeparator separator character used to split provider's name and identifier
 	ProviderSeparator = "."
+
+	StorageIOLifecycleDelete = "delete"
+	StorageIOLifecycleRetain = "retain"
 )
 
 // StorageIOConfig provides the storage input/output configuration for services
@@ -73,7 +76,7 @@ type StorageIOConfig struct {
 func (s *StorageIOConfig) UnmarshalJSON(data []byte) error {
 	type Alias StorageIOConfig
 	aux := Alias{
-		LifecyclePolicy: "delete", // default value
+		LifecyclePolicy: StorageIOLifecycleDelete, // default value
 	}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -81,7 +84,7 @@ func (s *StorageIOConfig) UnmarshalJSON(data []byte) error {
 	}
 
 	if strings.TrimSpace(aux.LifecyclePolicy) == "" {
-		aux.LifecyclePolicy = "delete"
+		aux.LifecyclePolicy = StorageIOLifecycleDelete
 	}
 
 	*s = StorageIOConfig(aux)
@@ -97,16 +100,16 @@ func (s StorageIOConfig) Validate() error {
 	}
 
 	switch s.LifecyclePolicy {
-	case "delete", "retain":
+	case StorageIOLifecycleDelete, StorageIOLifecycleRetain:
 	default:
-		return fmt.Errorf("service I/O bucket lifecycle policy must be delete or retain")
+		return fmt.Errorf("service I/O bucket lifecycle policy must be %s or %s", StorageIOLifecycleDelete, StorageIOLifecycleRetain)
 	}
 
 	return nil
 }
 
 func (s StorageIOConfig) IsRetainPolicy() bool {
-	return s.LifecyclePolicy == "retain"
+	return s.LifecyclePolicy == StorageIOLifecycleRetain
 }
 
 // StorageProviders stores the credentials of all supported storage providers
