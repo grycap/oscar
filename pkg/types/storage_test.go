@@ -22,6 +22,15 @@ import (
 	"testing"
 )
 
+func TestStorageIOConstants(t *testing.T) {
+	if StorageIOLifecycleDelete != "delete" {
+		t.Errorf("Expected StorageIOLifecycleDelete = delete, got %s", StorageIOLifecycleDelete)
+	}
+	if StorageIOLifecycleRetain != "retain" {
+		t.Errorf("Expected StorageIOLifecycleRetain = retain, got %s", StorageIOLifecycleRetain)
+	}
+}
+
 func TestStorageIOConfigValidate(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -33,7 +42,7 @@ func TestStorageIOConfigValidate(t *testing.T) {
 			config: StorageIOConfig{
 				Provider:        "minio.default",
 				Path:            "bucket/path",
-				LifecyclePolicy: VolumeLifecycleDelete,
+				LifecyclePolicy: StorageIOLifecycleDelete,
 			},
 		},
 		{
@@ -41,14 +50,14 @@ func TestStorageIOConfigValidate(t *testing.T) {
 			config: StorageIOConfig{
 				Provider:        "s3.external",
 				Path:            "bucket/path",
-				LifecyclePolicy: VolumeLifecycleRetain,
+				LifecyclePolicy: StorageIOLifecycleRetain,
 			},
 		},
 		{
 			name: "missing provider",
 			config: StorageIOConfig{
 				Path:            "bucket/path",
-				LifecyclePolicy: VolumeLifecycleDelete,
+				LifecyclePolicy: StorageIOLifecycleDelete,
 			},
 			wantErrText: "storage provider is required",
 		},
@@ -56,7 +65,7 @@ func TestStorageIOConfigValidate(t *testing.T) {
 			name: "missing path",
 			config: StorageIOConfig{
 				Provider:        "minio.default",
-				LifecyclePolicy: VolumeLifecycleDelete,
+				LifecyclePolicy: StorageIOLifecycleDelete,
 			},
 			wantErrText: "storage path is required",
 		},
