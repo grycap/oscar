@@ -243,6 +243,9 @@ storage_providers:
 | `path` </br> *string*             | Path in the storage provider. In MinIO and S3 the first directory of the specified path is translated into the bucket's name (e.g. "bucket/folder/subfolder")                                                                                    |
 | `suffix` </br> *string array*     | Array of suffixes for filtering the files to be uploaded. Only used in the `output` field. Optional                                                                                                                                              |
 | `prefix` </br> *string array*     | Array of prefixes for filtering the files to be uploaded. Only used in the `output` field. Optional                                                                                                                                              |
+| `lifecycle_policy` </br> *string* | Controls whether an input/output bucket created for the service is deleted when the service is deleted. Allowed values are `delete` (default) and `retain`. Optional. These policies only apply to the cluster's default MinIO provider. |
+
+If multiple `input` or `output` entries refer to the same bucket with conflicting lifecycle policies, OSCAR applies the most restrictive policy. In this case, `delete` takes precedence over `retain`, so the shared bucket is deleted when the service is deleted.
 
 ## EnvVarsMap
 

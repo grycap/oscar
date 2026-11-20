@@ -445,6 +445,22 @@ func (s Service) Validate() error {
 		}
 	}
 
+	if len(s.Input) > 0 {
+		for _, input := range s.Input {
+			if err := input.Validate(); err != nil {
+				return fmt.Errorf("invalid input configuration: %v", err)
+			}
+		}
+	}
+
+	if len(s.Output) > 0 {
+		for _, output := range s.Output {
+			if err := output.Validate(); err != nil {
+				return fmt.Errorf("invalid output configuration: %v", err)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -491,7 +507,7 @@ func (svcVol *ServiceVolumeConfig) UnmarshalJSON(data []byte) error {
 
 	// Conditionally set the default lifecycle policy to "delete" if a size is specified but no policy is provided.
 	if strings.TrimSpace(aux.Size) != "" && strings.TrimSpace(aux.LifecyclePolicy) == "" {
-		aux.LifecyclePolicy = "delete"
+		aux.LifecyclePolicy = VolumeLifecycleDelete
 	}
 
 	*svcVol = ServiceVolumeConfig(aux)
@@ -502,9 +518,9 @@ func (svcVol *ServiceVolumeConfig) Validate() error {
 	if strings.TrimSpace(svcVol.Size) != "" {
 		lifecyclePolicy := strings.TrimSpace(svcVol.LifecyclePolicy)
 		switch lifecyclePolicy {
-		case "delete", "retain":
+		case VolumeLifecycleDelete, VolumeLifecycleRetain:
 		default:
-			return fmt.Errorf("service volume lifecycle_policy must be delete or retain")
+			return fmt.Errorf("service volume lifecycle_policy must be %s or %s", VolumeLifecycleDelete, VolumeLifecycleRetain)
 		}
 	}
 	return nil
