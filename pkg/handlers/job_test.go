@@ -53,6 +53,30 @@ func TestRewriteRustFSEventSourceLeavesOtherInputsUnchanged(t *testing.T) {
 	}
 }
 
+func TestStorageEventMatchesInputFilters(t *testing.T) {
+	tests := []struct {
+		name string
+		key string
+		input []types.StorageIOConfig
+		want bool
+	}{
+		{"prefix and suffix match", "images/train/a.jpg", []types.StorageIOConfig{{Prefix: []string{"images/", "validation/"}, Suffix: []string{".png", ".jpg"}}}, true},
+		{"prefix list OR", "validation/a.jpg", []types.StorageIOConfig{{Prefix: []string{"images/", "validation/"}, Suffix: []string{".jpg"}}}, true},
+		{"suffix mismatch", "images/a.tmp", []types.StorageIOConfig{{Prefix: []string{"images/"}, Suffix: []string{".jpg"}}}, false},
+		{"prefix mismatch", "other/a.jpg", []types.StorageIOConfig{{Prefix: []string{"images/"}, Suffix: []string{".jpg"}}}, false},
+		{"empty filters allow all", "anything.tmp", []types.StorageIOConfig{{}}, true},
+		{"no inputs allow all", "anything.tmp", nil, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			event := []byte(`{"Records":[{"eventSource":"minio:s3","s3":{"object":{"key":"` + strings.ReplaceAll(tc.key, "/", "%2F") + `"}}}]}`)
+			got, err := storageEventMatchesInputFilters(event, tc.input)
+			if err != nil { t.Fatalf("unexpected error: %v", err) }
+			if got != tc.want { t.Fatalf("got %v, want %v", got, tc.want) }
+		})
+	}
+}
+
 func TestMakeJobHandler(t *testing.T) {
 	back := backends.MakeFakeBackend()
 	back.Services = []*types.Service{{
