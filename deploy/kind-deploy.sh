@@ -731,7 +731,7 @@ installCalico(){
         exit 1
     fi
     rm -f "$calico_manifest"
-    if ! kubectl -n kube-system rollout status daemonset/calico-node --timeout=180s; then
+    if ! kubectl -n kube-system rollout status daemonset/calico-node --timeout=0s; then
         echo -e "$RED[!]$END_COLOR Calico did not become ready"
         exit 1
     fi
