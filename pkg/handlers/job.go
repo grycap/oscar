@@ -485,8 +485,8 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 }
 
 // storageEventMatchesInputFilters applies service input key filters to S3 events.
-// Prefixes are ORed, suffixes are ORed, and the two groups are ANDed.
-// An empty filter group imposes no restriction; multiple input configs are alternatives.
+// Prefixes are ORed against the object's basename; suffixes are ORed against the full key.
+// The two groups are ANDed. Empty groups impose no restriction; input configs are alternatives.
 func storageEventMatchesInputFilters(eventBytes []byte, inputs []types.StorageIOConfig) (bool, error) {
 	if len(inputs) == 0 {
 		return true, nil
@@ -512,10 +512,11 @@ func storageEventMatchesInputFilters(eventBytes []byte, inputs []types.StorageIO
 		if err != nil {
 			return false, fmt.Errorf("decode object key: %w", err)
 		}
+		baseName := path.Base(key)
 		for _, input := range inputs {
 			prefixMatch := len(input.Prefix) == 0
 			for _, prefix := range input.Prefix {
-				if strings.HasPrefix(key, prefix) {
+				if strings.HasPrefix(baseName, prefix) {
 					prefixMatch = true
 					break
 				}

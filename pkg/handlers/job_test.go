@@ -60,10 +60,13 @@ func TestStorageEventMatchesInputFilters(t *testing.T) {
 		input []types.StorageIOConfig
 		want bool
 	}{
-		{"prefix and suffix match", "images/train/a.jpg", []types.StorageIOConfig{{Prefix: []string{"images/", "validation/"}, Suffix: []string{".png", ".jpg"}}}, true},
-		{"prefix list OR", "validation/a.jpg", []types.StorageIOConfig{{Prefix: []string{"images/", "validation/"}, Suffix: []string{".jpg"}}}, true},
-		{"suffix mismatch", "images/a.tmp", []types.StorageIOConfig{{Prefix: []string{"images/"}, Suffix: []string{".jpg"}}}, false},
-		{"prefix mismatch", "other/a.jpg", []types.StorageIOConfig{{Prefix: []string{"images/"}, Suffix: []string{".jpg"}}}, false},
+		{"prefix and suffix match", "images/train/a.jpg", []types.StorageIOConfig{{Prefix: []string{"a", "train/"}, Suffix: []string{".png", ".jpg"}}}, true},
+		{"prefix list OR against basename", "validation/a.jpg", []types.StorageIOConfig{{Prefix: []string{"x", "a"}, Suffix: []string{".jpg"}}}, true},
+		{"prefix basename and suffix full key match", "fish/input/test.json", []types.StorageIOConfig{{Prefix: []string{"test"}, Suffix: []string{".json"}}}, true},
+		{"prefix basename rejects notest", "fish/input/notest.json", []types.StorageIOConfig{{Prefix: []string{"test"}, Suffix: []string{".json"}}}, false},
+		{"suffix rejects txt despite basename prefix", "fish/input/test.txt", []types.StorageIOConfig{{Prefix: []string{"test"}, Suffix: []string{".json"}}}, false},
+		{"suffix mismatch", "images/a.tmp", []types.StorageIOConfig{{Prefix: []string{"a"}, Suffix: []string{".jpg"}}}, false},
+		{"prefix mismatch", "other/a.jpg", []types.StorageIOConfig{{Prefix: []string{"images"}, Suffix: []string{".jpg"}}}, false},
 		{"empty filters allow all", "anything.tmp", []types.StorageIOConfig{{}}, true},
 		{"no inputs allow all", "anything.tmp", nil, true},
 	}
