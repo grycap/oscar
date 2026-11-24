@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -203,6 +204,208 @@ func TestMakeDeleteHandlerPassesVolumeLifecycleService(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDeleteBucketsRespectsIsolatedBucketLifecycle(t *testing.T) {
+	tests := []struct {
+		name            string
+		direction       string
+		lifecyclePolicy string
+		wantDeleted     bool
+	}{
+		{
+			name:            "retain input bucket",
+			direction:       "input",
+			lifecyclePolicy: types.VolumeLifecycleRetain,
+			wantDeleted:     false,
+		},
+		{
+			name:            "delete input bucket",
+			direction:       "input",
+			lifecyclePolicy: types.VolumeLifecycleDelete,
+			wantDeleted:     true,
+		},
+		{
+			name:            "retain output bucket",
+			direction:       "output",
+			lifecyclePolicy: types.VolumeLifecycleRetain,
+			wantDeleted:     false,
+		},
+		{
+			name:            "delete output bucket",
+			direction:       "output",
+			lifecyclePolicy: types.VolumeLifecycleDelete,
+			wantDeleted:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isolatedBucket := tt.direction + "-user1234567"
+			var isolatedBucketDeleted atomic.Bool
+			server := newBucketLifecycleTestServer(t, isolatedBucket, &isolatedBucketDeleted)
+			defer server.Close()
+
+			storage := types.StorageIOConfig{
+				Provider:        "minio.default",
+				Path:            tt.direction + "/data",
+				LifecyclePolicy: tt.lifecyclePolicy,
+			}
+			service := &types.Service{
+				Name:           "svc",
+				Owner:          types.DefaultOwner,
+				IsolationLevel: types.IsolationLevelUser,
+				BucketList:     []string{isolatedBucket},
+				StorageProviders: &types.StorageProviders{
+					MinIO: map[string]*types.MinIOProvider{
+						types.DefaultProvider: {
+							Endpoint:  server.URL,
+							Region:    "us-east-1",
+							AccessKey: "ak",
+							SecretKey: "sk",
+						},
+					},
+				},
+			}
+			if tt.direction == "input" {
+				service.Input = []types.StorageIOConfig{storage}
+			} else {
+				service.Output = []types.StorageIOConfig{storage}
+			}
+			cfg := &types.Config{
+				MinIOProvider: &types.MinIOProvider{
+					Endpoint:  server.URL,
+					Region:    "us-east-1",
+					AccessKey: "ak",
+					SecretKey: "sk",
+				},
+			}
+
+			if err := deleteBuckets(service, cfg, &types.MinIOAdminClient{}); err != nil {
+				t.Fatalf("deleteBuckets() error = %v", err)
+			}
+			if got := isolatedBucketDeleted.Load(); got != tt.wantDeleted {
+				t.Fatalf("isolated bucket deleted = %v, want %v", got, tt.wantDeleted)
+			}
+		})
+	}
+}
+
+func TestDeleteBucketsRespectsNonIsolatedBucketLifecycle(t *testing.T) {
+	tests := []struct {
+		name            string
+		direction       string
+		lifecyclePolicy string
+		wantDeleted     bool
+	}{
+		{
+			name:            "retain input bucket",
+			direction:       "input",
+			lifecyclePolicy: types.VolumeLifecycleRetain,
+			wantDeleted:     false,
+		},
+		{
+			name:            "delete input bucket",
+			direction:       "input",
+			lifecyclePolicy: types.VolumeLifecycleDelete,
+			wantDeleted:     true,
+		},
+		{
+			name:            "retain output bucket",
+			direction:       "output",
+			lifecyclePolicy: types.VolumeLifecycleRetain,
+			wantDeleted:     false,
+		},
+		{
+			name:            "delete output bucket",
+			direction:       "output",
+			lifecyclePolicy: types.VolumeLifecycleDelete,
+			wantDeleted:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			const bucket = "data"
+			var bucketDeleted atomic.Bool
+			server := newBucketLifecycleTestServer(t, bucket, &bucketDeleted)
+			defer server.Close()
+
+			storage := types.StorageIOConfig{
+				Provider:        "minio.default",
+				Path:            "data/files",
+				LifecyclePolicy: tt.lifecyclePolicy,
+			}
+			service := &types.Service{
+				Name:  "svc",
+				Owner: types.DefaultOwner,
+				StorageProviders: &types.StorageProviders{
+					MinIO: map[string]*types.MinIOProvider{
+						types.DefaultProvider: {
+							Endpoint:  server.URL,
+							Region:    "us-east-1",
+							AccessKey: "ak",
+							SecretKey: "sk",
+						},
+					},
+				},
+			}
+			if tt.direction == "input" {
+				service.Input = []types.StorageIOConfig{storage}
+			} else {
+				service.Output = []types.StorageIOConfig{storage}
+			}
+			cfg := &types.Config{
+				MinIOProvider: &types.MinIOProvider{
+					Endpoint:  server.URL,
+					Region:    "us-east-1",
+					AccessKey: "ak",
+					SecretKey: "sk",
+				},
+			}
+
+			if err := deleteBuckets(service, cfg, &types.MinIOAdminClient{}); err != nil {
+				t.Fatalf("deleteBuckets() error = %v", err)
+			}
+			if got := bucketDeleted.Load(); got != tt.wantDeleted {
+				t.Fatalf("bucket deleted = %v, want %v", got, tt.wantDeleted)
+			}
+		})
+	}
+}
+
+func newBucketLifecycleTestServer(t *testing.T, isolatedBucket string, isolatedBucketDeleted *atomic.Bool) *httptest.Server {
+	t.Helper()
+
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodDelete && r.URL.Path == "/"+isolatedBucket:
+			isolatedBucketDeleted.Store(true)
+			w.WriteHeader(http.StatusNoContent)
+		case r.URL.Path == "/minio/admin/v3/info-canned-policy":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"PolicyName":"policy",
+				"Policy":{
+					"Version":"2012-10-17",
+					"Statement":[{
+						"Effect":"Allow",
+						"Action":["s3:GetObject"],
+						"Resource":["arn:aws:s3:::existing/*"]
+					}]
+				}
+			}`))
+		case r.Method == http.MethodGet && r.URL.Query().Has("notification"):
+			w.Header().Set("Content-Type", "application/xml")
+			_, _ = w.Write([]byte(`<NotificationConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>`))
+		case r.Method == http.MethodGet && !strings.HasPrefix(r.URL.Path, "/minio/admin/"):
+			w.Header().Set("Content-Type", "application/xml")
+			_, _ = w.Write([]byte(`<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><IsTruncated>false</IsTruncated></ListBucketResult>`))
+		default:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"success"}`))
+		}
+	}))
 }
 
 func TestMakeDeleteHandlerForbidsVisibleServicesForNonOwners(t *testing.T) {

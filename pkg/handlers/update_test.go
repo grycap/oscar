@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -194,6 +195,68 @@ func TestMakeUpdateHandler(t *testing.T) {
 	}
 	if strings.Contains(back.UpdatedService.Script, "\r") {
 		t.Fatalf("expected script without CR characters, got %q", back.UpdatedService.Script)
+	}
+}
+
+func TestMakeUpdateHandlerDeletesRemovedUserBucketDespiteRetainPolicy(t *testing.T) {
+	const isolatedBucket = "input-user1234567"
+	var isolatedBucketDeleted atomic.Bool
+	server := newBucketLifecycleTestServer(t, isolatedBucket, &isolatedBucketDeleted)
+	defer server.Close()
+
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name:           "svc",
+		Image:          "img",
+		Script:         "echo test",
+		Owner:          types.DefaultOwner,
+		IsolationLevel: types.IsolationLevelUser,
+		BucketList:     []string{isolatedBucket},
+		Input: []types.StorageIOConfig{{
+			Provider:        "minio.default",
+			Path:            "input/data",
+			LifecyclePolicy: types.VolumeLifecycleRetain,
+		}},
+		StorageProviders: &types.StorageProviders{
+			MinIO: map[string]*types.MinIOProvider{
+				types.DefaultProvider: {
+					Endpoint:  server.URL,
+					Region:    "us-east-1",
+					AccessKey: "ak",
+					SecretKey: "sk",
+				},
+			},
+		},
+	}
+	cfg := &types.Config{
+		MinIOProvider: &types.MinIOProvider{
+			Endpoint:  server.URL,
+			Region:    "us-east-1",
+			AccessKey: "ak",
+			SecretKey: "sk",
+		},
+	}
+
+	router := gin.New()
+	router.PUT("/system/services", MakeUpdateHandler(cfg, back))
+	body := `{
+		"name":"svc",
+		"image":"img",
+		"script":"echo test",
+		"isolation_level":"USER",
+		"allowed_users":[]
+	}`
+	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Basic admin")
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d: %s", resp.Code, http.StatusNoContent, resp.Body.String())
+	}
+	if !isolatedBucketDeleted.Load() {
+		t.Fatal("expected removed user's isolated bucket to be deleted despite retain policy")
 	}
 }
 

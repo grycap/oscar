@@ -210,6 +210,10 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 		if err := disableInputNotifications(s3Client, service.GetObjectStorageWebhookARN(cfg.ObjectStorageType), bucketName); err != nil {
 			log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 		}
+		// If any storage path using this bucket has a retain policy, preserve it.
+		if in.IsRetainPolicy() {
+			continue
+		}
 		// Check if the bucket is in the mount path
 		if !sameStorage(in, service.Mount) {
 			err := deleteObjectStorageBuckets(s3Client, minIOAdminClient, types.MinIOBucket{
@@ -272,6 +276,11 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 				if err := disableInputNotifications(s3Client, service.GetObjectStorageWebhookARN(cfg.ObjectStorageType), outBucket); err != nil {
 					log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
 				}
+				// If the output bucket has a retain policy, skip deletion
+				if out.IsRetainPolicy() {
+					continue
+				}
+
 				if !sameStorage(out, service.Mount) {
 					err := deleteObjectStorageBuckets(s3Client, minIOAdminClient, types.MinIOBucket{
 						BucketName:   outBucket,
@@ -306,6 +315,10 @@ func deleteBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 			// Disable input notifications for service bucket
 			if err := disableInputNotifications(s3Client, service.GetObjectStorageWebhookARN(cfg.ObjectStorageType), bucket); err != nil {
 				log.Printf("Error disabling MinIO input notifications for service \"%s\": %v\n", service.Name, err)
+			}
+
+			if isIsolatedBucketRetained(service, bucket) {
+				continue
 			}
 
 			err := deleteObjectStorageBuckets(s3Client, minIOAdminClient, types.MinIOBucket{
@@ -428,4 +441,20 @@ func getBucketNameFromPath(mountPath string) string {
 	mountPath = strings.Trim(mountPath, " /")
 	splitPath := strings.SplitN(mountPath, "/", 2)
 	return splitPath[0]
+}
+
+func isIsolatedBucketRetained(service *types.Service, bucketName string) bool {
+	for i := range service.Input {
+		baseBucket := getBucketNameFromPath(service.Input[i].Path)
+		if strings.HasPrefix(bucketName, baseBucket+"-") && service.Input[i].IsRetainPolicy() {
+			return true
+		}
+	}
+	for i := range service.Output {
+		baseBucket := getBucketNameFromPath(service.Output[i].Path)
+		if strings.HasPrefix(bucketName, baseBucket+"-") && service.Output[i].IsRetainPolicy() {
+			return true
+		}
+	}
+	return false
 }

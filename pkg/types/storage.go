@@ -18,6 +18,7 @@ package types
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -51,6 +52,9 @@ const (
 
 	// ProviderSeparator separator character used to split provider's name and identifier
 	ProviderSeparator = "."
+
+	StorageIOLifecycleDelete = "delete"
+	StorageIOLifecycleRetain = "retain"
 )
 
 // StorageIOConfig provides the storage input/output configuration for services
@@ -64,6 +68,48 @@ type StorageIOConfig struct {
 	// Options defines additional flags for the rclone mount command.
 	// Optional.
 	Options string `json:"options,omitempty"`
+	// LifecyclePolicy controls whether a service-created input/output bucket is deleted with the creator service.
+	// Optional. Default value is "delete". Valid values are "delete" and "retain".
+	LifecyclePolicy string `json:"lifecycle_policy,omitempty"`
+}
+
+func (s *StorageIOConfig) UnmarshalJSON(data []byte) error {
+	type Alias StorageIOConfig
+	aux := Alias{
+		LifecyclePolicy: StorageIOLifecycleDelete, // default value
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if strings.TrimSpace(aux.LifecyclePolicy) == "" {
+		aux.LifecyclePolicy = StorageIOLifecycleDelete
+	}
+
+	*s = StorageIOConfig(aux)
+	return nil
+}
+
+func (s StorageIOConfig) Validate() error {
+	if s.Provider == "" {
+		return fmt.Errorf("storage provider is required")
+	}
+	if s.Path == "" {
+		return fmt.Errorf("storage path is required")
+	}
+
+	switch s.LifecyclePolicy {
+	case StorageIOLifecycleDelete, StorageIOLifecycleRetain:
+	default:
+		return fmt.Errorf("service I/O bucket lifecycle policy must be %s or %s", StorageIOLifecycleDelete, StorageIOLifecycleRetain)
+	}
+
+	return nil
+}
+
+func (s StorageIOConfig) IsRetainPolicy() bool {
+	return s.LifecyclePolicy == StorageIOLifecycleRetain
 }
 
 // StorageProviders stores the credentials of all supported storage providers

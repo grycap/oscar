@@ -280,6 +280,75 @@ func TestServiceValidateUpdate(t *testing.T) {
 	}
 }
 
+func TestServiceValidateStorageIO(t *testing.T) {
+	validService := func() Service {
+		return Service{
+			CPU:            DefaultServiceCPU,
+			Visibility:     PRIVATE,
+			IsolationLevel: IsolationLevelService,
+			Image:          "example/image",
+		}
+	}
+
+	validStorage := StorageIOConfig{
+		Provider:        "minio.default",
+		Path:            "bucket/path",
+		LifecyclePolicy: VolumeLifecycleDelete,
+	}
+
+	tests := []struct {
+		name        string
+		configure   func(*Service)
+		wantErrText string
+	}{
+		{
+			name: "valid input and output",
+			configure: func(service *Service) {
+				service.Input = []StorageIOConfig{validStorage}
+				service.Output = []StorageIOConfig{validStorage}
+			},
+		},
+		{
+			name: "invalid input",
+			configure: func(service *Service) {
+				service.Input = []StorageIOConfig{{
+					Path:            "bucket/path",
+					LifecyclePolicy: VolumeLifecycleDelete,
+				}}
+			},
+			wantErrText: "invalid input configuration: storage provider is required",
+		},
+		{
+			name: "invalid output",
+			configure: func(service *Service) {
+				service.Output = []StorageIOConfig{{
+					Provider:        "minio.default",
+					LifecyclePolicy: VolumeLifecycleDelete,
+				}}
+			},
+			wantErrText: "invalid output configuration: storage path is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := validService()
+			tt.configure(&service)
+
+			err := service.Validate()
+			if tt.wantErrText == "" {
+				if err != nil {
+					t.Fatalf("Validate() error = %v, want nil", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != tt.wantErrText {
+				t.Fatalf("Validate() error = %v, want %q", err, tt.wantErrText)
+			}
+		})
+	}
+}
+
 func TestGetSupervisorPath(t *testing.T) {
 	// Deep copy the testService
 	copy, err := deepcopy.Anything(testService)
