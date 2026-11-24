@@ -52,6 +52,7 @@ type PodListResult struct {
 // @Produce json
 // @Param serviceName path string true "Service name"
 // @Param page query string false "Continuation token"
+// @Param file query string false "SHA-256 hash of the invoked file name"
 // @Success 200 {object} types.JobsResponse
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 404 {string} string "Not Found"
@@ -82,6 +83,9 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.
 			}
 			labelSelector = fmt.Sprintf("%s=%s,%s=%s", types.ServiceLabel, serviceName, types.JobOwnerExecutionAnnotation, uidParsed)
 		}
+		if fileHash := c.Query("file"); fileHash != "" {
+			labelSelector = fmt.Sprintf("%s,%s=%s", labelSelector, types.JobFileNameLabel, fileHash)
+		}
 		listOpts := metav1.ListOptions{
 			LabelSelector: labelSelector,
 			Limit:         int64(cfg.JobListingLimit),
@@ -91,19 +95,20 @@ func MakeJobsInfoHandler(back types.ServerlessBackend, kubeClientset kubernetes.
 		var wg sync.WaitGroup
 		channelPod := make(chan PodListResult)
 
-		for i := range jobs.Items {
+		for _, job := range jobs.Items {
 			wg.Add(1)
 			go func(job batchv1.Job) {
 				defer wg.Done()
 				getPod(
 					kubeClientset,
 					serviceNamespace,
-					jobs.Items[i].Name,
+					job.Name,
+					job.Labels[types.JobFileNameLabel],
 					listOpts,
 					c,
 					channelPod,
 				)
-			}(jobs.Items[i])
+			}(job)
 		}
 
 		go func() {
@@ -138,7 +143,7 @@ func getJobs(kubeClientset kubernetes.Interface, serviceNamespace string, listOp
 	return jobs
 }
 
-func getPod(kubeClientset kubernetes.Interface, serviceNamespace string, jobName string, listOpts metav1.ListOptions, c *gin.Context, ch chan PodListResult) {
+func getPod(kubeClientset kubernetes.Interface, serviceNamespace string, jobName string, fileHash string, listOpts metav1.ListOptions, c *gin.Context, ch chan PodListResult) {
 	if listOpts.LabelSelector != "" {
 		listOpts.LabelSelector += "," // separar con coma
 	}
@@ -155,9 +160,11 @@ func getPod(kubeClientset kubernetes.Interface, serviceNamespace string, jobName
 	}
 
 	if len(pods.Items) < 1 {
-		ch <- PodListResult{Pods: &types.JobInfo{
-			Status: string("Suspended"),
-		}, Identity: jobName}
+		jobInfo := &types.JobInfo{Status: string("Suspended")}
+		if fileHash != "" {
+			jobInfo.File = &types.JobFileInfo{NameHash: fileHash, Algorithm: "sha224"}
+		}
+		ch <- PodListResult{Pods: jobInfo, Identity: jobName}
 		return
 
 	}
@@ -165,6 +172,9 @@ func getPod(kubeClientset kubernetes.Interface, serviceNamespace string, jobName
 	jobInfo := &types.JobInfo{
 		Status:       string(podObject.Status.Phase),
 		CreationTime: podObject.Status.StartTime,
+	}
+	if fileHash != "" {
+		jobInfo.File = &types.JobFileInfo{NameHash: fileHash, Algorithm: "sha224"}
 	}
 	for _, contStatus := range podObject.Status.ContainerStatuses {
 		if contStatus.Name == types.ContainerName {
@@ -262,6 +272,7 @@ func MakeDeleteJobsHandler(back types.ServerlessBackend, kubeClientset kubernete
 // @Param serviceName path string true "Service name"
 // @Param jobName path string true "Job name"
 // @Param timestamps query bool false "Include timestamps"
+// @Param file query string false "SHA-256 hash of the invoked file name"
 // @Success 200 {string} string "Logs"
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 404 {string} string "Not Found"
@@ -286,8 +297,12 @@ func MakeGetLogsHandler(back types.ServerlessBackend, kubeClientset kubernetes.I
 		}
 
 		// Get job's pod (assuming there's only one pod per job)
+		labelSelector := fmt.Sprintf("%s=%s,job-name=%s", types.ServiceLabel, serviceName, jobName)
+		if fileHash := c.Query("file"); fileHash != "" {
+			labelSelector = fmt.Sprintf("%s,%s=%s", labelSelector, types.JobFileNameLabel, fileHash)
+		}
 		listOpts := metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s,job-name=%s", types.ServiceLabel, serviceName, jobName),
+			LabelSelector: labelSelector,
 		}
 		pods, err := kubeClientset.CoreV1().Pods(serviceNamespace).List(context.TODO(), listOpts)
 		if err != nil || len(pods.Items) < 1 {

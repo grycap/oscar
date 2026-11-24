@@ -38,6 +38,7 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 				Labels: map[string]string{
 					types.ServiceLabel:       "test",
 					"oscar.grycap/job-owner": "user",
+					types.JobFileNameLabel:   "abc123",
 				},
 			},
 		},
@@ -64,6 +65,7 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 						Labels: map[string]string{
 							"oscar_service":          "test",
 							"oscar.grycap/job-owner": "user",
+							types.JobFileNameLabel:   "abc123",
 							"job-name":               "job"},
 					},
 				},
@@ -81,7 +83,7 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	serviceName := "test"
-	req, _ := http.NewRequest("GET", "/system/logs/"+serviceName, nil)
+	req, _ := http.NewRequest("GET", "/system/logs/"+serviceName+"?file=abc123", nil)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -100,6 +102,10 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 				"status":        "Running",
 				"creation_time": now.UTC().Format(time.RFC3339),
 				"start_time":    now.UTC().Format(time.RFC3339),
+				"file": map[string]interface{}{
+					"hash": "abc123",
+					"alg":  "sha256",
+				},
 			},
 		},
 	}
@@ -116,6 +122,13 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 
 	if actions[0].GetVerb() != "list" || actions[0].GetResource().Resource != "jobs" {
 		t.Errorf("expecting list jobs, got %s %s", actions[0].GetVerb(), actions[0].GetResource().Resource)
+	}
+	listJobsAction, ok := actions[0].(k8stesting.ListAction)
+	if !ok {
+		t.Fatalf("expected list jobs action, got %T", actions[0])
+	}
+	if got := listJobsAction.GetListRestrictions().Labels.String(); got != "oscar.grycap/job-file-name=abc123,oscar.grycap/job-owner=user,oscar_service=test" {
+		t.Errorf("unexpected job label selector: %s", got)
 	}
 	if actions[1].GetVerb() != "list" || actions[1].GetResource().Resource != "pods" {
 		t.Errorf("expecting list pods, got %s %s", actions[1].GetVerb(), actions[1].GetResource().Resource)

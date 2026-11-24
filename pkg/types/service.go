@@ -150,6 +150,7 @@ const (
 	DefaultOwner = "cluster_admin"
 
 	JobOwnerExecutionAnnotation = "oscar.grycap/job-owner"
+	JobFileNameLabel            = "oscar.grycap/job-file-name"
 
 	OriginClusterAnnotation    = "oscar.grycap/origin-cluster"
 	OriginServiceAnnotation    = "oscar.grycap/origin-service"

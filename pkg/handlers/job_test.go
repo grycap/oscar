@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -53,12 +55,37 @@ func TestRewriteRustFSEventSourceLeavesOtherInputsUnchanged(t *testing.T) {
 	}
 }
 
+func TestInvokedFileName(t *testing.T) {
+	sha256ImageName := sha256.Sum224([]byte("image.jpg"))
+	tests := []struct {
+		name      string
+		event     string
+		wantName  string
+		wantFound bool
+	}{
+		{"object key basename", `{"Records":[{"eventSource":"minio:s3","s3":{"object":{"key":"input%2Fimage.jpg"}}}]}`, hex.EncodeToString(sha256ImageName[:]), true},
+		{"spaces are hashed", `{"Records":[{"eventSource":"minio:s3","s3":{"object":{"key":"input%2Fsome image.jpg"}}}]}`, func() string {
+			hash := sha256.Sum224([]byte("some image.jpg"))
+			return hex.EncodeToString(hash[:])
+		}(), true},
+		{"synchronous input", `{"message":"hello"}`, "", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotName, gotFound := invokedFileName([]byte(tc.event))
+			if gotFound != tc.wantFound || gotName != tc.wantName {
+				t.Fatalf("got (%q, %v), want (%q, %v)", gotName, gotFound, tc.wantName, tc.wantFound)
+			}
+		})
+	}
+}
+
 func TestStorageEventMatchesInputFilters(t *testing.T) {
 	tests := []struct {
-		name string
-		key string
+		name  string
+		key   string
 		input []types.StorageIOConfig
-		want bool
+		want  bool
 	}{
 		{"prefix and suffix match", "images/train/a.jpg", []types.StorageIOConfig{{Prefix: []string{"a", "train/"}, Suffix: []string{".png", ".jpg"}}}, true},
 		{"prefix list OR against basename", "validation/a.jpg", []types.StorageIOConfig{{Prefix: []string{"x", "a"}, Suffix: []string{".jpg"}}}, true},
@@ -74,8 +101,12 @@ func TestStorageEventMatchesInputFilters(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			event := []byte(`{"Records":[{"eventSource":"minio:s3","s3":{"object":{"key":"` + strings.ReplaceAll(tc.key, "/", "%2F") + `"}}}]}`)
 			got, err := storageEventMatchesInputFilters(event, tc.input)
-			if err != nil { t.Fatalf("unexpected error: %v", err) }
-			if got != tc.want { t.Fatalf("got %v, want %v", got, tc.want) }
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
 		})
 	}
 }
@@ -96,7 +127,7 @@ func TestMakeJobHandler(t *testing.T) {
 	r.POST("/job/:serviceName", MakeJobHandler(&cfg, *qb, back, nil))
 
 	w := httptest.NewRecorder()
-	body := strings.NewReader(`{"Records": [{"requestParameters": {"principalId": "uid", "sourceIPAddress": "ip"}}]}`)
+	body := strings.NewReader(`{"Records": [{"eventSource": "minio:s3", "requestParameters": {"principalId": "uid", "sourceIPAddress": "ip"}, "s3": {"object": {"key": "input%2Fimage.jpg"}}}]}`)
 	serviceName := "testName"
 	req, _ := http.NewRequest("POST", "/job/"+serviceName, body)
 	req.Header.Set("Authorization", "Bearer 11e387cf727630d899925d57fceb4578f478c44be6cde0ae3fe886d8be513acf")
@@ -131,6 +162,11 @@ func TestMakeJobHandler(t *testing.T) {
 	}
 	if *job.Spec.Template.Spec.EnableServiceLinks {
 		t.Fatal("expected job pod spec to disable service links")
+	}
+	hash := sha256.Sum224([]byte("image.jpg"))
+	wantFileNameLabel := hex.EncodeToString(hash[:])
+	if got := job.Labels[types.JobFileNameLabel]; got != wantFileNameLabel {
+		t.Fatalf("expected file name label %q, got %q", wantFileNameLabel, got)
 	}
 }
 

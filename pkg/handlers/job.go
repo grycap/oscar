@@ -280,6 +280,13 @@ func MakeJobHandler(cfg *types.Config, backendQuota types.QuotaBackend, back typ
 			minIOSecretKey = requestUserUID
 		}
 
+		if fileName, ok := invokedFileName(eventBytes); ok {
+			if service.Labels == nil {
+				service.Labels = make(map[string]string)
+			}
+			service.Labels[types.JobFileNameLabel] = fileName
+		}
+
 		if minIOSecretKey == "" {
 			minIOSecretKey = service.Owner
 		}
@@ -580,6 +587,39 @@ func rewriteRustFSEventSource(eventBytes []byte) []byte {
 		return eventBytes
 	}
 	return rewritten
+}
+
+func invokedFileName(eventBytes []byte) (string, bool) {
+	var event struct {
+		Records []struct {
+			EventSource string `json:"eventSource"`
+			S3          struct {
+				Object struct {
+					Key string `json:"key"`
+				} `json:"object"`
+			} `json:"s3"`
+		} `json:"Records"`
+	}
+	if err := json.Unmarshal(eventBytes, &event); err != nil {
+		return "", false
+	}
+	for _, record := range event.Records {
+		if !strings.EqualFold(strings.TrimSpace(record.EventSource), "minio:s3") {
+			continue
+		}
+		key, err := url.QueryUnescape(record.S3.Object.Key)
+		if err != nil {
+			return "", false
+		}
+		fileName := path.Base(strings.TrimSpace(key))
+		if fileName == "" || fileName == "." {
+			return "", false
+		}
+		//hash := sha1.Sum([]byte(fileName))
+		hash := sha256.Sum224([]byte(fileName))
+		return hex.EncodeToString(hash[:]), true
+	}
+	return "", false
 }
 
 type configForUser struct {
