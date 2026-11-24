@@ -103,8 +103,8 @@ func TestMakeJobsInfoHandler(t *testing.T) {
 				"creation_time": now.UTC().Format(time.RFC3339),
 				"start_time":    now.UTC().Format(time.RFC3339),
 				"file": map[string]interface{}{
-					"hash": "abc123",
-					"alg":  "sha256",
+					"name_hash": "abc123",
+					"alg":       "sha224",
 				},
 			},
 		},
