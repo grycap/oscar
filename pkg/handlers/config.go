@@ -135,6 +135,10 @@ func MakeConfigUpdateHandler(cfg *types.Config, back kubernetes.Interface) gin.H
 			c.String(http.StatusBadRequest, fmt.Sprintf("The configuration specification is not valid: %v", err))
 			return
 		}
+		if invalid := backends.ValidateAllowedImageRepositories(configInput.AllowedImageRepositories); len(invalid) > 0 {
+			c.String(http.StatusBadRequest, strings.Join(invalid, "; "))
+			return
+		}
 		_, err := backends.GetOSCARCMConfiguration(back, cfg.AdditionalConfigPath, cfg.Namespace)
 
 		if err != nil && !apierrors.IsNotFound(err) {
