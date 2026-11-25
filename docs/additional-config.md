@@ -2,7 +2,7 @@
 
 To configure trusted image origins, OSCAR reads the `allowed_image_repositories` JSON array from an additional ConfigMap. Each entry must be a fully qualified registry and repository path (for example, `ghcr.io/grycap`). OSCAR compares the registry and complete repository path components, not substrings: `ghcr.io/grycap` permits `ghcr.io/grycap/imagemagick` (including tags and digests) but **not** `ghcr.io/grycap-other/image` or `other.example/ghcr.io/grycap/image`. A more specific entry such as `ghcr.io/grycap/imagemagick` permits that image and its subpaths, but not `ghcr.io/grycap/imagemagick-other`.
 
-If the ConfigMap is absent or the array is empty (`[]`), images are unrestricted. If the ConfigMap exists but its policy cannot be read or parsed, service creation and updates fail instead of silently disabling the restriction.
+If the ConfigMap is absent or the array is empty (`[]`), images are unrestricted. If the ConfigMap exists but its policy cannot be read or parsed, service creation and updates fail instead of silently disabling the restriction. Malformed entries in an existing ConfigMap are skipped with a warning, so a single invalid entry does not block services that match other valid entries. If the policy does not contain any valid entry, service creation is not blocked and the restriction is effectively disabled (a warning is logged).
 
 ```yaml
 apiVersion: v1
@@ -14,7 +14,7 @@ data:
   allowed_image_repositories: '["ghcr.io/grycap"]'
 ```
 
-The administrator can also update the policy using `PUT /system/config` with Basic authentication. This example allows images from the `ghcr.io/grycap` owner only:
+The administrator can also update the policy using `PUT /system/config` with Basic authentication. The endpoint validates that every entry is a fully qualified registry and repository path and rejects the request with a `400` listing the malformed entries (for example, `test` or `test/test` fail because strict validation requires the registry to be explicitly defined). This example allows images from the `ghcr.io/grycap` owner only:
 
 ```sh
 curl -X PUT -u '<admin-user>:<admin-password>' \

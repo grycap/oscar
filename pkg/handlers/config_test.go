@@ -209,3 +209,166 @@ func TestMakeConfigUpdateHandlerRejectsBearerWithoutMutation(t *testing.T) {
 		t.Fatalf("expected config map not to be created, got err=%v", err)
 	}
 }
+
+func TestMakeConfigUpdateHandlerAllowedImageRepositories(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	validEntries := []string{"ghcr.io/grycap", "registry.example.org/team"}
+
+	t.Run("Accepts valid entries and creates the ConfigMap", func(t *testing.T) {
+		cfg := &types.Config{
+			Namespace:            "oscar",
+			AdditionalConfigPath: "oscar-config",
+			MinIOProvider:        &types.MinIOProvider{},
+		}
+		kubeClientset := testclient.NewSimpleClientset()
+
+		body := `{"allowed_image_repositories":["ghcr.io/grycap","registry.example.org/team"]}`
+		req := httptest.NewRequest(http.MethodPut, "/config", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		router := gin.New()
+		router.PUT("/config", MakeConfigUpdateHandler(cfg, kubeClientset))
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status code 200, got %d: %s", w.Code, w.Body.String())
+		}
+		resp := newAIRResponse(t, w)
+		assertAIRsEqual(t, resp, validEntries)
+
+		cm, err := kubeClientset.CoreV1().ConfigMaps(cfg.Namespace).Get(
+			req.Context(), cfg.AdditionalConfigPath, metav1.GetOptions{},
+		)
+		if err != nil {
+			t.Fatalf("expected config map to exist: %v", err)
+		}
+		var stored []string
+		if err := json.Unmarshal([]byte(cm.Data[types.AIR]), &stored); err != nil {
+			t.Fatalf("cannot parse stored policy %q: %v", cm.Data[types.AIR], err)
+		}
+		assertAIRsEqual(t, stored, validEntries)
+	})
+
+	t.Run("Accepts an empty list", func(t *testing.T) {
+		cfg := &types.Config{
+			Namespace:            "oscar",
+			AdditionalConfigPath: "oscar-config",
+			MinIOProvider:        &types.MinIOProvider{},
+		}
+		kubeClientset := testclient.NewSimpleClientset()
+
+		body := `{"allowed_image_repositories":[]}`
+		req := httptest.NewRequest(http.MethodPut, "/config", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		router := gin.New()
+		router.PUT("/config", MakeConfigUpdateHandler(cfg, kubeClientset))
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status code 200, got %d: %s", w.Code, w.Body.String())
+		}
+		resp := newAIRResponse(t, w)
+		if len(resp) != 0 {
+			t.Fatalf("expected an empty list, got %v", resp)
+		}
+	})
+
+	t.Run("Rejects malformed entries with 400", func(t *testing.T) {
+		cfg := &types.Config{
+			Namespace:            "oscar",
+			AdditionalConfigPath: "oscar-config",
+			MinIOProvider:        &types.MinIOProvider{},
+		}
+		kubeClientset := testclient.NewSimpleClientset()
+
+		body := `{"allowed_image_repositories":["ghcr.io/grycap","test/test","test"]}`
+		req := httptest.NewRequest(http.MethodPut, "/config", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		router := gin.New()
+		router.PUT("/config", MakeConfigUpdateHandler(cfg, kubeClientset))
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected status code 400, got %d: %s", w.Code, w.Body.String())
+		}
+		resp := w.Body.String()
+		for _, expected := range []string{
+			`invalid allowed image repository "test/test": strict validation requires the registry to be explicitly defined`,
+			`invalid allowed image repository "test": strict validation requires the registry to be explicitly defined`,
+		} {
+			if !strings.Contains(resp, expected) {
+				t.Fatalf("response %q does not mention %q", resp, expected)
+			}
+		}
+
+		_, err := kubeClientset.CoreV1().ConfigMaps(cfg.Namespace).Get(
+			req.Context(), cfg.AdditionalConfigPath, metav1.GetOptions{},
+		)
+		if !apierrors.IsNotFound(err) {
+			t.Fatalf("expected config map not to be created, got err=%v", err)
+		}
+	})
+
+	t.Run("Updates an existing ConfigMap", func(t *testing.T) {
+		cfg := &types.Config{
+			Namespace:            "oscar",
+			AdditionalConfigPath: "oscar-config",
+			MinIOProvider:        &types.MinIOProvider{},
+		}
+		existing := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            cfg.AdditionalConfigPath,
+				Namespace:       cfg.Namespace,
+				ResourceVersion: "1",
+			},
+			Data: map[string]string{types.AIR: `["old.example/old"]`},
+		}
+		kubeClientset := testclient.NewSimpleClientset(existing)
+
+		body := `{"allowed_image_repositories":["ghcr.io/grycap"]}`
+		req := httptest.NewRequest(http.MethodPut, "/config", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		router := gin.New()
+		router.PUT("/config", MakeConfigUpdateHandler(cfg, kubeClientset))
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status code 200, got %d: %s", w.Code, w.Body.String())
+		}
+		cm, err := kubeClientset.CoreV1().ConfigMaps(cfg.Namespace).Get(
+			req.Context(), cfg.AdditionalConfigPath, metav1.GetOptions{},
+		)
+		if err != nil {
+			t.Fatalf("expected config map to exist: %v", err)
+		}
+		var stored []string
+		if err := json.Unmarshal([]byte(cm.Data[types.AIR]), &stored); err != nil {
+			t.Fatalf("cannot parse stored policy %q: %v", cm.Data[types.AIR], err)
+		}
+		assertAIRsEqual(t, stored, []string{"ghcr.io/grycap"})
+	})
+}
+
+func newAIRResponse(t *testing.T, w *httptest.ResponseRecorder) []string {
+	t.Helper()
+	var resp []string
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("cannot parse response body %q: %v", w.Body.String(), err)
+	}
+	return resp
+}
+
+func assertAIRsEqual(t *testing.T, got, want []string) {
+	t.Helper()
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
