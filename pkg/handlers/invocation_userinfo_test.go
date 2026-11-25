@@ -51,14 +51,14 @@ func invocationOIDCFixture(t *testing.T) (string, func() bool, *atomic.Int32, *a
 		}
 	}))
 	t.Cleanup(server.Close)
-	manager, err := auth.NewOIDCManager(server.URL, "test-user", []string{"test-group"})
+	manager, err := auth.NewOIDCManager(server.URL, "test-user", []string{"test-group"}, "oscar-client")
 	if err != nil {
 		t.Fatal(err)
 	}
 	auth.ClusterOidcManagers[server.URL] = manager
 	t.Cleanup(func() { delete(auth.ClusterOidcManagers, server.URL) })
 	token, err := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
-		"iss": server.URL, "sub": "test-user", "exp": time.Now().Add(time.Hour).Unix(),
+		"iss": server.URL, "sub": "test-user", "aud": "oscar-client", "exp": time.Now().Add(time.Hour).Unix(),
 	}).SignedString(key)
 	if err != nil {
 		t.Fatal(err)
