@@ -18,12 +18,18 @@ package types
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+type JobFileInfo struct {
+	NameHash  string `json:"name_hash"`
+	Algorithm string `json:"alg"`
+}
+
 // JobInfo details the current status of a service's job
 type JobInfo struct {
 	Status       string       `json:"status"`
 	CreationTime *metav1.Time `json:"creation_time,omitempty"`
 	StartTime    *metav1.Time `json:"start_time,omitempty"`
 	FinishTime   *metav1.Time `json:"finish_time,omitempty"`
+	File         *JobFileInfo `json:"file,omitempty"`
 }
 
 type JobsResponse struct {
