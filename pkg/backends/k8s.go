@@ -427,14 +427,11 @@ func checkAdditionalConfig(configName string, configNamespace string, service ty
 		return nil // An empty allowlist explicitly disables the restriction.
 	}
 
-	repositories := make([]name.Repository, 0, len(allowed))
-	for _, entry := range allowed {
-		// Require a fully qualified registry/repository, not an implicit Docker Hub name.
-		allowedRepo, err := name.NewRepository(entry, name.StrictValidation)
-		if err != nil {
-			return fmt.Errorf("invalid allowed image repository %q: %w", entry, err)
-		}
-		repositories = append(repositories, allowedRepo)
+	repositories := parseAllowedRepositories(allowed, cfg.AdditionalConfigPath)
+	if len(repositories) == 0 {
+		// The allowlist has no valid entry; do not block service creation.
+		log.Printf("WARNING: image repository policy in %q has no valid entries; image restriction disabled", cfg.AdditionalConfigPath)
+		return nil
 	}
 
 	image, err := name.ParseReference(service.Image)
