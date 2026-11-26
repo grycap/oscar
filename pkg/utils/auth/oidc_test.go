@@ -533,6 +533,146 @@ func TestGetUID(t *testing.T) {
 	}
 }
 
+func TestGetGroupsAI4EOSCEntitlements(t *testing.T) {
+	urns := []string{
+		"urn%3Ageant%3Aeosc-portal.eu:group:Platform%20Access:vo.fluid.ai4eosc.eu:role=Access-AP-U",
+		"urn:geant:eosc-portal.eu:group:Platform Access:vo.ai4eosc.eu:role=Access-AP-D",
+		"urn%3Ageant%3Aeosc-portal.eu:group:Platform%20Access:vo.ai4eosc.eu:role=Access-AP-A1",
+		"urn:mace:egi.eu:group:vo.example.eu:role=member",
+		"urn%3Ageant%3Aeosc-portal.eu:group:Platform%20Access:vo.ai4eosc.eu",
+		"not-a-valid%Zpercent-encoding",
+	}
+
+	expected := []string{
+		"vo.fluid.ai4eosc.eu", "ap-u",
+		"vo.ai4eosc.eu", "ap-d",
+	}
+
+	groups := getGroupsAI4EOSCEntitlements(urns)
+	if !reflect.DeepEqual(groups, expected) {
+		t.Errorf("expected groups to be %v, got %v", expected, groups)
+	}
+}
+
+func TestAI4EOSCEntitlementsAuthorisation(t *testing.T) {
+	testsupport.SkipIfCannotListen(t)
+
+	scenarios := []struct {
+		name     string
+		userinfo string
+		gates    []string
+		wantAuth bool
+		expectVO string
+	}{
+		{
+			name: "entitlement-ap-u-authorized",
+			userinfo: `{"sub":"uid-1","eduperson_entitlement":[
+				"urn%3Ageant%3Aeosc-portal.eu:group:Platform%20Access:vo.fluid.ai4eosc.eu:role=Access-AP-U"]}`,
+			gates:    []string{"ap-u"},
+			wantAuth: true,
+		},
+		{
+			name: "entitlement-ap-d-authorized",
+			userinfo: `{"sub":"uid-1","eduperson_entitlement":[
+				"urn%3Ageant%3Aeosc-portal.eu:group:Platform%20Access:vo.ai4eosc.eu:role=Access-AP-D"]}`,
+			gates:    []string{"ap-d"},
+			wantAuth: true,
+		},
+		{
+			name: "entitlement-ap-a1-ignored",
+			userinfo: `{"sub":"uid-1","eduperson_entitlement":[
+				"urn%3Ageant%3Aeosc-portal.eu:group:Platform%20Access:vo.ai4eosc.eu:role=Access-AP-A1",
+				"urn%3Ageant%3Aeosc-portal.eu:group:Platform%20Access:vo.ai4eosc.eu:role=Access-AP-A"]}`,
+			gates:    []string{"ap-u", "ap-d"},
+			wantAuth: false,
+		},
+		{
+			name: "legacy-realm-roles-fallback",
+			userinfo: `{"sub":"uid-1","realm_access":{
+				"roles":["platform-access:vo.ai4eosc.eu"]}}`,
+			gates:    []string{"platform-access:vo.ai4eosc.eu"},
+			wantAuth: true,
+		},
+		{
+			name: "legacy-roles-and-entitlements-union",
+			userinfo: `{"sub":"uid-1","realm_access":{
+				"roles":["access:vo.ai4eosc.eu:ap-a1"]},
+				"eduperson_entitlement":[
+				"urn%3Ageant%3Aeosc-portal.eu:group:Platform%20Access:vo.ai4eosc.eu:role=Access-AP-U"]}`,
+			gates:    []string{"ap-u"},
+			wantAuth: true,
+		},
+		{
+			name: "entitlement-vo-gating",
+			userinfo: `{"sub":"uid-1","eduperson_entitlement":[
+				"urn%3Ageant%3Aeosc-portal.eu:group:Platform%20Access:vo.fluid.ai4eosc.eu:role=Access-AP-U"]}`,
+			gates:    []string{"ap-u", "vo.fluid.ai4eosc.eu"},
+			wantAuth: true,
+			expectVO: "vo.fluid.ai4eosc.eu",
+		},
+	}
+
+	for _, s := range scenarios {
+		t.Run(s.name, func(t *testing.T) {
+			var server *httptest.Server
+			server = httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, hreq *http.Request) {
+				rw.Header().Set("Content-Type", "application/json")
+				switch hreq.URL.Path {
+				case "/realms/ai4eosc/.well-known/openid-configuration":
+					_, _ = fmt.Fprintf(rw, `{"issuer":%q,"authorization_endpoint":%q,"userinfo_endpoint":%q}`,
+						server.URL+"/realms/ai4eosc",
+						server.URL+"/realms/ai4eosc/auth",
+						server.URL+"/realms/ai4eosc/userinfo")
+				case "/realms/ai4eosc/userinfo":
+					_, _ = rw.Write([]byte(s.userinfo))
+				default:
+					rw.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			defer server.Close()
+			issuer := server.URL + "/realms/ai4eosc"
+
+			oidcManager, err := NewOIDCManager(issuer, "uid-1", s.gates)
+			if err != nil {
+				t.Fatalf("unexpected error creating manager: %v", err)
+			}
+			oidcManager.config.InsecureSkipSignatureCheck = true
+
+			claims := jwt.MapClaims{
+				"iss": issuer,
+				"sub": "uid-1",
+				"exp": time.Now().Add(1 * time.Hour).Unix(),
+				"iat": time.Now().Unix(),
+			}
+			token := GetToken(claims)
+
+			if got := oidcManager.IsAuthorised(token); got != s.wantAuth {
+				t.Errorf("expected token to be %v authorised, got %v", s.wantAuth, got)
+			}
+
+			if s.expectVO != "" {
+				ui, err := oidcManager.GetUserInfo(token)
+				if err != nil {
+					t.Fatalf("unexpected error getting user info: %v", err)
+				}
+				if !oidcManager.UserHasVO(ui, s.expectVO) {
+					t.Errorf("expected user to have VO %v in groups %v", s.expectVO, ui.Groups)
+				}
+				if oidcManager.UserHasVO(ui, "vo.other.eu") {
+					t.Errorf("expected user to not have VO vo.other.eu in groups %v", ui.Groups)
+				}
+				cfg := &types.Config{OIDCGroups: s.gates}
+				if !oidcManager.UserInOneGroup(ui, cfg) {
+					t.Errorf("expected user to be in one of groups %v with groups %v", s.gates, ui.Groups)
+				}
+				if oidcManager.UserInOneGroup(ui, &types.Config{OIDCGroups: []string{"vo.other.eu"}}) {
+					t.Errorf("expected user to not be in any of groups [vo.other.eu] with groups %v", ui.Groups)
+				}
+			}
+		})
+	}
+}
+
 func GetToken(claims jwt.MapClaims) string {
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 1024)

@@ -32,3 +32,29 @@ Managed volumes do not require extra entries in this additional configuration fi
 MinIO bucket quotas also do not require entries in this additional
 configuration file. Per-user MinIO quota settings are managed through
 `/system/quotas/user/{userId}` and stored by OSCAR in each user's namespace.
+
+## OIDC authorization groups (`OIDC_GROUPS`)
+
+The `OIDC_GROUPS` list (inside `config.yaml`) contains the strings that a user's
+token groups are matched against to grant access to OSCAR. A user is authorized
+if any of their groups matches any entry in this list exactly. During the
+transition to the new Keycloak entitlements of AI4EOSC, the following entry types
+are supported at the same time:
+
+- `vo.<name>`: the VO name. It matches the `group_membership` /
+  `entitlements` VOs issued by EGI and the VOs derived from the new
+  `eduperson_entitlement` URNs.
+- `platform-access:<vo>`: legacy Keycloak realm role (for example
+  `platform-access:vo.ai4eosc.eu`). It is kept as a fallback while Keycloak
+  still issues realm roles alongside the new entitlements; it is scheduled for
+  removal.
+- `/group/name`: legacy ImGui group path.
+- `ap-u` / `ap-d`: normalized AI4EOSC access levels derived from the new
+  `eduperson_entitlement` claims, for example
+  `urn:geant:eosc-portal.eu:group:Platform Access:vo.ai4eosc.eu:role=Access-AP-U`
+  (which may arrive URL-encoded, e.g.
+  `urn%3Ageant%3Aeosc-portal.eu:group:Platform%20Access:vo.ai4eosc.eu:role=Access-AP-U`).
+  Only the `Access-AP-U` (`ap-u`) and `Access-AP-D` (`ap-d`) levels grant access
+  to resource-consuming services such as OSCAR. Each admitted entitlement also
+  contributes its VO, so the exact-match VO check on service creation keeps
+  working without any change.

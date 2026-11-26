@@ -23,6 +23,7 @@ import (
 	"os"
 
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -40,6 +41,16 @@ const (
 	EGIGroupsURNPrefix = "urn:mace:egi.eu:group"
 	EGIIssuer          = "/realms/egi"
 	AI4EOSCIssuer      = "/realms/ai4eosc"
+
+	// AI4EOSCEntitlementURNPrefix prefix to identify the new AI4EOSC
+	// "eduperson_entitlement" URNs, e.g.
+	// "urn:geant:eosc-portal.eu:group:Platform Access:vo.ai4eosc.eu:role=Access-AP-U"
+	AI4EOSCEntitlementURNPrefix = "urn:geant:eosc-portal.eu:group:"
+
+	// Access levels issued through AI4EOSC entitlements that grant access to
+	// resource-consuming services such as OSCAR
+	ai4EOSCAccessLevelAPU = "ap-u"
+	ai4EOSCAccessLevelAPD = "ap-d"
 
 	SecretKeyLength = 10
 )
@@ -72,8 +83,9 @@ type EGIClaims struct {
 }
 
 type GroupAI4EOSC struct {
-	Sub            string `json:"sub"`
-	ResourceAccess struct {
+	Sub                  string   `json:"sub"`
+	EduPersonEntitlement []string `json:"eduperson_entitlement"`
+	ResourceAccess       struct {
 		Account struct {
 			Roles []string `json:"roles"`
 		} `json:"account"`
@@ -292,9 +304,54 @@ func getGroupsKeycloak(ui *oidc.UserInfo) []string {
 	if cerr != nil {
 		return []string{}
 	}
-	memberships := claims.RealmAccess.Roles
-	return memberships
+	groups := []string{}
+	// "realm_access.roles" (e.g. "platform-access:vo.ai4eosc.eu" or
+	// "access:vo.ai4eosc.eu:ap-u") are kept as a fallback while Keycloak
+	// still issues them alongside the new entitlements.
+	groups = append(groups, claims.RealmAccess.Roles...)
+	// New "eduperson_entitlement" URNs (e.g.
+	// "urn:geant:eosc-portal.eu:group:Platform Access:vo.ai4eosc.eu:role=Access-AP-U")
+	groups = append(groups, getGroupsAI4EOSCEntitlements(claims.EduPersonEntitlement)...)
+	return groups
+}
 
+// getGroupsAI4EOSCEntitlements derives group strings from the AI4EOSC
+// "eduperson_entitlement" URNs, which arrive URL-encoded. Once decoded an
+// entitlement has 7 fields separated by ':':
+//
+//	urn : geant : eosc-portal.eu : group : Platform Access : <VO> : role=Access-AP-<level>
+//
+// For the "ap-u" (project member) and "ap-d" (developer) levels, the only
+// levels OSCAR admits for resource-consuming services, it returns both the VO
+// (e.g. "vo.fluid.ai4eosc.eu") and the normalised level ("ap-u" or "ap-d").
+// The VO keeps the exact-match VO gating (UserHasVO/checkIdentity) working,
+// while the level can be matched against the normalised "ap-u"/"ap-d" entries
+// of the OIDC_GROUPS list. Entitlements with any other level are ignored.
+func getGroupsAI4EOSCEntitlements(urns []string) []string {
+	groups := []string{}
+
+	for _, v := range urns {
+		urn, err := url.PathUnescape(strings.TrimSpace(v))
+		if err != nil {
+			continue
+		}
+		if !strings.HasPrefix(urn, AI4EOSCEntitlementURNPrefix) {
+			continue
+		}
+		urnFields := strings.Split(urn, ":")
+		if len(urnFields) < 7 {
+			continue
+		}
+		vo := urnFields[5]
+		// "Access-AP-U" -> "AP-U" -> "ap-u"
+		level := strings.ToLower(strings.TrimPrefix(strings.TrimPrefix(urnFields[6], "role="), "Access-"))
+		if (level != ai4EOSCAccessLevelAPU && level != ai4EOSCAccessLevelAPD) ||
+			!strings.HasPrefix(vo, "vo.") {
+			continue
+		}
+		groups = append(groups, vo, level)
+	}
+	return groups
 }
 
 func GetIssuerFromToken(rawToken string) (string, error) {
