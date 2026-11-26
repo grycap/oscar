@@ -61,7 +61,7 @@ func TestFederationPostUpdatesServiceWithoutFederation(t *testing.T) {
 	}, metav1.CreateOptions{})
 
 	r := gin.New()
-	r.POST("/system/federation/:serviceName", MakeFederationPostHandler(back))
+	r.POST("/system/federation/:serviceName", MakeFederationPostHandler(back, nil))
 
 	body := `{"members":[{"type":"oscar","cluster_id":"cluster-a","service_name":"svc-a"}]}`
 	req := httptest.NewRequest(http.MethodPost, "/system/federation/svc", strings.NewReader(body))
@@ -168,7 +168,7 @@ func TestMakeFederationPutHandler(t *testing.T) {
 	}, metav1.CreateOptions{})
 
 	r := gin.New()
-	r.PUT("/system/federation/:serviceName", MakeFederationPutHandler(back))
+	r.PUT("/system/federation/:serviceName", MakeFederationPutHandler(back, nil))
 
 	body := `{"members":[{"type":"oscar","cluster_id":"cluster-a","service_name":"svc-a"}],"update":[{"type":"oscar","cluster_id":"cluster-a","service_name":"svc-a-updated"}]}`
 	req := httptest.NewRequest(http.MethodPut, "/system/federation/svc", strings.NewReader(body))
@@ -187,6 +187,70 @@ func TestMakeFederationPutHandler(t *testing.T) {
 	}
 	if back.UpdatedService.Federation.Members[0].ServiceName != "svc-a-updated" {
 		t.Errorf("expected updated service name 'svc-a-updated', got %q", back.UpdatedService.Federation.Members[0].ServiceName)
+	}
+}
+
+func TestMakeFederationPutHandlerRejectsDisallowedEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name:      "svc",
+		Namespace: "oscar-svc-test",
+		Federation: &types.Federation{
+			Members: types.ReplicaList{},
+		},
+	}
+
+	r := gin.New()
+	r.PUT("/system/federation/:serviceName", MakeFederationPutHandler(back, nil))
+
+	body := `{"clusters":{"newcluster":{"endpoint":"http://10.0.0.7:8080"}}}`
+	req := httptest.NewRequest(http.MethodPut, "/system/federation/svc", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "10.0.0.7:8080") || !strings.Contains(w.Body.String(), "is not allowed") {
+		t.Errorf("expected the response to name the rejected endpoint, got: %s", w.Body.String())
+	}
+	if back.UpdatedService != nil {
+		t.Fatal("rejected request mutated the stored service")
+	}
+}
+
+func TestMakeFederationPutHandlerMergesAllowedCluster(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	back := backends.MakeFakeBackend()
+	back.Service = &types.Service{
+		Name:      "svc",
+		Namespace: "oscar-svc-test",
+		Federation: &types.Federation{
+			Members: types.ReplicaList{},
+		},
+	}
+
+	r := gin.New()
+	r.PUT("/system/federation/:serviceName", MakeFederationPutHandler(back, nil))
+
+	body := `{"clusters":{"newcluster":{"endpoint":"http://93.184.216.34/"}}}`
+	req := httptest.NewRequest(http.MethodPut, "/system/federation/svc", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if back.UpdatedService == nil {
+		t.Fatalf("expected service update via backend")
+	}
+	if cluster, ok := back.UpdatedService.Clusters["newcluster"]; !ok || cluster.Endpoint != "http://93.184.216.34/" {
+		t.Errorf("expected merged cluster endpoint 'http://93.184.216.34/', got %#v", back.UpdatedService.Clusters)
 	}
 }
 
@@ -220,7 +284,7 @@ func TestMakeFederationDeleteHandler(t *testing.T) {
 	}, metav1.CreateOptions{})
 
 	r := gin.New()
-	r.DELETE("/system/federation/:serviceName", MakeFederationDeleteHandler(back))
+	r.DELETE("/system/federation/:serviceName", MakeFederationDeleteHandler(back, nil))
 
 	body := `{"members":[{"type":"oscar","cluster_id":"cluster-a","service_name":"svc-a"}],"delete":true}`
 	req := httptest.NewRequest(http.MethodDelete, "/system/federation/svc", strings.NewReader(body))
@@ -257,7 +321,7 @@ func TestMakeFederationDeleteHandlerRejectsNonMember(t *testing.T) {
 		},
 	}
 	r := gin.New()
-	r.DELETE("/system/federation/:serviceName", MakeFederationDeleteHandler(back))
+	r.DELETE("/system/federation/:serviceName", MakeFederationDeleteHandler(back, nil))
 	body := `{"members":[{"type":"oscar","cluster_id":"cluster-b","service_name":"unrelated"}],"delete":true}`
 	req := httptest.NewRequest(http.MethodDelete, "/system/federation/svc", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -285,7 +349,7 @@ func TestMakeFederationDeleteHandlerPropagatesDeleteError(t *testing.T) {
 	}
 	back.AddError("DeleteService", errors.New("backend unavailable"))
 	r := gin.New()
-	r.DELETE("/system/federation/:serviceName", MakeFederationDeleteHandler(back))
+	r.DELETE("/system/federation/:serviceName", MakeFederationDeleteHandler(back, nil))
 	body := `{"members":[{"type":"oscar","cluster_id":"cluster-a","service_name":"svc-a"}],"delete":true}`
 	req := httptest.NewRequest(http.MethodDelete, "/system/federation/svc", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -306,9 +370,11 @@ func TestFederationHandlersRequireServiceOwner(t *testing.T) {
 	methods := []struct {
 		name    string
 		method  string
-		handler func(types.ServerlessBackend) gin.HandlerFunc
+		handler func(types.ServerlessBackend, *utils.FederationAllowlist) gin.HandlerFunc
 	}{
-		{"get", http.MethodGet, MakeFederationGetHandler},
+		{"get", http.MethodGet, func(back types.ServerlessBackend, _ *utils.FederationAllowlist) gin.HandlerFunc {
+			return MakeFederationGetHandler(back)
+		}},
 		{"post", http.MethodPost, MakeFederationPostHandler},
 		{"put", http.MethodPut, MakeFederationPutHandler},
 		{"delete", http.MethodDelete, MakeFederationDeleteHandler},
@@ -340,7 +406,7 @@ func TestFederationHandlersRequireServiceOwner(t *testing.T) {
 					}
 					c.Next()
 				})
-				r.Handle(method.method, "/system/federation/:serviceName", method.handler(back))
+				r.Handle(method.method, "/system/federation/:serviceName", method.handler(back, nil))
 
 				payload := `{"members":[]}`
 				if identity.wantStatus != http.StatusOK {

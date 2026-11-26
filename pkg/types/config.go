@@ -51,6 +51,7 @@ const (
 	serverlessBackendType = "serverlessBackend"
 	routeKindType         = "routeKind"
 	AIR                   = "allowed_image_repositories"
+	AFE                   = "allowed_federation_endpoints"
 	Ingress               = "ingress"
 	HTTPROUTE             = "httproute"
 
@@ -322,9 +323,10 @@ type Config struct {
 }
 
 type ConfigForUser struct {
-	Cfg                      *Config        `json:"config"`
-	MinIOProvider            *MinIOProvider `json:"minio_provider"`
-	AllowedImageRepositories []string       `json:"allowed_image_repositories"`
+	Cfg                        *Config        `json:"config"`
+	MinIOProvider              *MinIOProvider `json:"minio_provider"`
+	AllowedImageRepositories   []string       `json:"allowed_image_repositories"`
+	AllowedFederationEndpoints []string       `json:"allowed_federation_endpoints"`
 }
 
 var configVars = []configVar{

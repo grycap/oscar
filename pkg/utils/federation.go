@@ -23,15 +23,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"path"
 	"strings"
 
 	"github.com/grycap/oscar/v4/pkg/types"
 )
 
 // ExpandFederation propagates service definitions to federation members.
-func ExpandFederation(service *types.Service, authHeader string, method string, refreshToken string) []error {
+// Every member endpoint is validated against the (optional) allowlist before
+// any traffic leaves the cluster, and the shared federation client applies
+// the timeout, TLS and redirect rules plus the credential forwarding rule to
+// each request.
+func ExpandFederation(service *types.Service, authHeader string, method string, refreshToken string, allowlist *FederationAllowlist) []error {
 	if service == nil || service.Federation == nil || len(service.Federation.Members) == 0 {
 		return nil
 	}
@@ -52,15 +54,17 @@ func ExpandFederation(service *types.Service, authHeader string, method string, 
 			continue
 		}
 
-		if err := sendFederatedService(worker, cluster, authHeader, method); err != nil {
+		if err := sendFederatedService(worker, cluster, authHeader, method, allowlist); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	return errs
 }
 
-// VerifyFederationAuth checks that credentials are accepted by target clusters.
-func VerifyFederationAuth(service *types.Service, authHeader string) []error {
+// VerifyFederationAuth checks that credentials are accepted by target
+// clusters. Non-oscar members are skipped; oscar member endpoints are
+// validated against the allowlist before any request is sent.
+func VerifyFederationAuth(service *types.Service, authHeader string, allowlist *FederationAllowlist) []error {
 	if service == nil || service.Federation == nil || len(service.Federation.Members) == 0 {
 		return nil
 	}
@@ -75,15 +79,17 @@ func VerifyFederationAuth(service *types.Service, authHeader string) []error {
 			errs = append(errs, fmt.Errorf("cluster \"%s\" not defined", member.ClusterID))
 			continue
 		}
-		if err := checkFederatedAuth(member.ServiceName, cluster, authHeader); err != nil {
+		if err := checkFederatedAuth(member.ServiceName, cluster, authHeader, allowlist); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	return errs
 }
 
-// RollbackFederationCreate removes federated replicas created during initial deployment.
-func RollbackFederationCreate(service *types.Service, authHeader string) []error {
+// RollbackFederationCreate removes federated replicas created during initial
+// deployment. Non-oscar members are skipped; oscar member endpoints are
+// validated against the allowlist before any request is sent.
+func RollbackFederationCreate(service *types.Service, authHeader string, allowlist *FederationAllowlist) []error {
 	if service == nil || service.Federation == nil || len(service.Federation.Members) == 0 {
 		return nil
 	}
@@ -98,7 +104,7 @@ func RollbackFederationCreate(service *types.Service, authHeader string) []error
 			errs = append(errs, fmt.Errorf("cluster \"%s\" not defined", member.ClusterID))
 			continue
 		}
-		if err := sendFederatedDeleteService(member.ServiceName, cluster, authHeader); err != nil {
+		if err := sendFederatedDeleteService(member.ServiceName, cluster, authHeader, allowlist); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -196,43 +202,40 @@ func stripClusterCredentials(clusters map[string]types.Cluster) map[string]types
 	return clean
 }
 
-func sendFederatedService(service *types.Service, cluster types.Cluster, authHeader string, method string) error {
-	endpoint := strings.TrimSpace(cluster.Endpoint)
-	if endpoint == "" {
-		return fmt.Errorf("empty cluster endpoint")
+// setCallerFederationAuth carries the caller's Authorization header on the
+// outbound request. The federation target applies the credential forwarding
+// rule (see setFederationAuth) before sending: Bearer/Basic caller tokens are
+// only reached by allowlisted destinations, every other destination either
+// receives the cluster's own Basic authentication or none at all.
+func setCallerFederationAuth(req *http.Request, authHeader string) {
+	if strings.HasPrefix(authHeader, "Bearer ") || strings.HasPrefix(authHeader, "Basic ") {
+		req.Header.Set("Authorization", authHeader)
 	}
-	targetURL, err := url.Parse(endpoint)
+}
+
+// sendFederatedService sends the (stripped) service definition to the
+// federation collection endpoint of cluster with the given method (POST or
+// PUT). The endpoint is validated against the allowlist before the request is
+// built.
+func sendFederatedService(service *types.Service, cluster types.Cluster, authHeader string, method string, allowlist *FederationAllowlist) error {
+	target, err := NewFederationTarget(cluster.Endpoint, cluster, allowlist, federationRequestTimeout)
 	if err != nil {
-		return fmt.Errorf("invalid cluster endpoint \"%s\": %v", endpoint, err)
+		return err
 	}
-	targetURL.Path = path.Join(targetURL.Path, "system", "services")
 
 	body, err := json.Marshal(service)
 	if err != nil {
 		return fmt.Errorf("failed to encode service payload: %v", err)
 	}
 
-	req, err := http.NewRequest(method, targetURL.String(), bytes.NewBuffer(body))
+	req, err := http.NewRequest(method, target.url(), bytes.NewBuffer(body))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	setCallerFederationAuth(req, authHeader)
 
-	if strings.HasPrefix(authHeader, "Bearer ") {
-		req.Header.Set("Authorization", authHeader)
-	} else if strings.HasPrefix(authHeader, "Basic ") {
-		req.Header.Set("Authorization", authHeader)
-	} else if cluster.AuthUser != "" || cluster.AuthPassword != "" {
-		req.SetBasicAuth(cluster.AuthUser, cluster.AuthPassword)
-	}
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: buildTLSConfig(cluster.SSLVerify),
-		},
-	}
-
-	resp, err := client.Do(req)
+	resp, err := target.do(req)
 	if err != nil {
 		return fmt.Errorf("request failed: %v", err)
 	}
@@ -249,34 +252,23 @@ func sendFederatedService(service *types.Service, cluster types.Cluster, authHea
 	return nil
 }
 
-func checkFederatedAuth(serviceName string, cluster types.Cluster, authHeader string) error {
-	endpoint := strings.TrimSpace(cluster.Endpoint)
-	if endpoint == "" {
-		return fmt.Errorf("empty cluster endpoint")
-	}
-	targetURL, err := url.Parse(endpoint)
+// checkFederatedAuth performs the pre-creation authorization check against an
+// oscar member endpoint: a read of the member service definition. Only
+// non-authorized (401/403) and server errors fail the check; the endpoint is
+// validated against the allowlist before the request is built.
+func checkFederatedAuth(serviceName string, cluster types.Cluster, authHeader string, allowlist *FederationAllowlist) error {
+	target, err := NewFederationTarget(cluster.Endpoint, cluster, allowlist, federationAuthCheckTimeout)
 	if err != nil {
-		return fmt.Errorf("invalid cluster endpoint \"%s\": %v", endpoint, err)
+		return err
 	}
-	targetURL.Path = path.Join(targetURL.Path, "system", "services", serviceName)
 
-	req, err := http.NewRequest(http.MethodGet, targetURL.String(), nil)
+	req, err := http.NewRequest(http.MethodGet, target.url(serviceName), nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %v", err)
 	}
-	if strings.HasPrefix(authHeader, "Bearer ") || strings.HasPrefix(authHeader, "Basic ") {
-		req.Header.Set("Authorization", authHeader)
-	} else if cluster.AuthUser != "" || cluster.AuthPassword != "" {
-		req.SetBasicAuth(cluster.AuthUser, cluster.AuthPassword)
-	}
+	setCallerFederationAuth(req, authHeader)
 
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: buildTLSConfig(cluster.SSLVerify),
-		},
-	}
-
-	resp, err := client.Do(req)
+	resp, err := target.do(req)
 	if err != nil {
 		return fmt.Errorf("auth check failed for cluster \"%s\": %v", cluster.Endpoint, err)
 	}
@@ -291,34 +283,23 @@ func checkFederatedAuth(serviceName string, cluster types.Cluster, authHeader st
 	return nil
 }
 
-func sendFederatedDeleteService(serviceName string, cluster types.Cluster, authHeader string) error {
-	endpoint := strings.TrimSpace(cluster.Endpoint)
-	if endpoint == "" {
-		return fmt.Errorf("empty cluster endpoint")
-	}
-	targetURL, err := url.Parse(endpoint)
+// sendFederatedDeleteService deletes the member service definition on an
+// oscar member endpoint during create rollback; a 404 is considered
+// success (nothing to roll back). The endpoint is validated against the
+// allowlist before the request is built.
+func sendFederatedDeleteService(serviceName string, cluster types.Cluster, authHeader string, allowlist *FederationAllowlist) error {
+	target, err := NewFederationTarget(cluster.Endpoint, cluster, allowlist, federationRequestTimeout)
 	if err != nil {
-		return fmt.Errorf("invalid cluster endpoint \"%s\": %v", endpoint, err)
+		return err
 	}
-	targetURL.Path = path.Join(targetURL.Path, "system", "services", serviceName)
 
-	req, err := http.NewRequest(http.MethodDelete, targetURL.String(), nil)
+	req, err := http.NewRequest(http.MethodDelete, target.url(serviceName), nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %v", err)
 	}
-	if strings.HasPrefix(authHeader, "Bearer ") || strings.HasPrefix(authHeader, "Basic ") {
-		req.Header.Set("Authorization", authHeader)
-	} else if cluster.AuthUser != "" || cluster.AuthPassword != "" {
-		req.SetBasicAuth(cluster.AuthUser, cluster.AuthPassword)
-	}
+	setCallerFederationAuth(req, authHeader)
 
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: buildTLSConfig(cluster.SSLVerify),
-		},
-	}
-
-	resp, err := client.Do(req)
+	resp, err := target.do(req)
 	if err != nil {
 		return fmt.Errorf("rollback delete failed for cluster \"%s\": %v", cluster.Endpoint, err)
 	}

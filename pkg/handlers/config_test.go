@@ -60,6 +60,7 @@ func createExpectedBody(access_key string, secret_key string, cfg *types.Config)
 			"region":     cfg.MinIOProvider.Region,
 		},
 		"allowed_image_repositories": []interface{}{},
+		"allowed_federation_endpoints": []interface{}{},
 	}
 }
 

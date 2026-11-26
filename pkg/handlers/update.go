@@ -47,7 +47,7 @@ import (
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/services [put]
-func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
+func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend, allowlist *utils.FederationAllowlist) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var provName string
 		var newService types.Service
@@ -93,6 +93,22 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				c.String(http.StatusInternalServerError, fmt.Sprintf("Error updating the service: %v", err))
 			}
 			return
+		}
+
+		// Only the federation endpoints newly introduced by this request are
+		// validated and can be rejected with a 400; the diff runs against the
+		// previous service definition so updates that do not change endpoints
+		// keep working, and an external verifier is not invited before any
+		// traffic is sent.
+		for clusterID, cluster := range newService.Clusters {
+			oldCluster, known := oldService.Clusters[clusterID]
+			if known && oldCluster.Endpoint == cluster.Endpoint {
+				continue
+			}
+			if verr := utils.ValidateFederationEndpoint(cluster.Endpoint, allowlist); verr != nil {
+				c.String(http.StatusBadRequest, fmt.Sprintf("federation endpoint %q (cluster %q) is not allowed: %v", cluster.Endpoint, clusterID, verr))
+				return
+			}
 		}
 
 		if err := validateServiceUpdate(oldService, &newService, cfg); err != nil {
@@ -438,7 +454,7 @@ func MakeUpdateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			federated := newService
 			federated.Input = rawInput
 			federated.Output = rawOutput
-			if errs := utils.ExpandFederation(&federated, authHeader, http.MethodPut, federationRefreshToken); len(errs) > 0 {
+			if errs := utils.ExpandFederation(&federated, authHeader, http.MethodPut, federationRefreshToken, allowlist); len(errs) > 0 {
 				c.String(http.StatusOK, fmt.Sprintf("Updated with federation warnings: %v", errs))
 				return
 			}

@@ -25,6 +25,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/oscar/v4/pkg/backends"
 	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -54,6 +55,7 @@ func MakeConfigHandler(cfg *types.Config, back kubernetes.Interface) gin.Handler
 		var conf types.ConfigForUser
 		minIOProvider := cfg.MinIOProvider
 		var air []string
+		var afe []string
 		cm, err := backends.GetOSCARCMConfiguration(back, cfg.AdditionalConfigPath, cfg.Namespace)
 		if err != nil && !apierrors.IsNotFound(err) {
 			c.String(http.StatusInternalServerError, fmt.Sprintln(err))
@@ -61,19 +63,32 @@ func MakeConfigHandler(cfg *types.Config, back kubernetes.Interface) gin.Handler
 		}
 		if apierrors.IsNotFound(err) {
 			air = []string{}
+			afe = []string{}
 		} else {
-			err := json.Unmarshal([]byte(cm.Data[types.AIR]), &air)
-			if err != nil {
-				c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+			if data, ok := cm.Data[types.AIR]; ok {
+				err = json.Unmarshal([]byte(data), &air)
+				if err != nil {
+					c.String(http.StatusInternalServerError, fmt.Sprintln(err))
 
+				}
+			}
+			// The key may be absent in ConfigMaps created before the
+			// allowed_federation_endpoints option existed.
+			if data, ok := cm.Data[types.AFE]; ok {
+				err = json.Unmarshal([]byte(data), &afe)
+				if err != nil {
+					c.String(http.StatusInternalServerError, fmt.Sprintln(err))
+
+				}
 			}
 		}
 		authHeader := c.GetHeader("Authorization")
 		if len(strings.Split(authHeader, "Bearer")) == 1 {
 			conf = types.ConfigForUser{
-				Cfg:                      cfg,
-				MinIOProvider:            minIOProvider,
-				AllowedImageRepositories: air,
+				Cfg:                        cfg,
+				MinIOProvider:              minIOProvider,
+				AllowedImageRepositories:   air,
+				AllowedFederationEndpoints: afe,
 			}
 		} else {
 
@@ -103,9 +118,10 @@ func MakeConfigHandler(cfg *types.Config, back kubernetes.Interface) gin.Handler
 			}
 
 			conf = types.ConfigForUser{
-				Cfg:                      cfg,
-				MinIOProvider:            userMinIOProvider,
-				AllowedImageRepositories: air,
+				Cfg:                        cfg,
+				MinIOProvider:              userMinIOProvider,
+				AllowedImageRepositories:   air,
+				AllowedFederationEndpoints: afe,
 			}
 		}
 
@@ -139,6 +155,10 @@ func MakeConfigUpdateHandler(cfg *types.Config, back kubernetes.Interface) gin.H
 			c.String(http.StatusBadRequest, strings.Join(invalid, "; "))
 			return
 		}
+		if invalid := utils.ValidateFederationAllowlistEntries(configInput.AllowedFederationEndpoints); len(invalid) > 0 {
+			c.String(http.StatusBadRequest, strings.Join(invalid, "; "))
+			return
+		}
 		_, err := backends.GetOSCARCMConfiguration(back, cfg.AdditionalConfigPath, cfg.Namespace)
 
 		if err != nil && !apierrors.IsNotFound(err) {
@@ -159,7 +179,7 @@ func MakeConfigUpdateHandler(cfg *types.Config, back kubernetes.Interface) gin.H
 				return
 
 			} else {
-				cm, err := getOSCARCMConfigurationCustomDefinition(cfg.AdditionalConfigPath, configInput.AllowedImageRepositories)
+				cm, err := getOSCARCMConfigurationCustomDefinition(cfg.AdditionalConfigPath, configInput.AllowedImageRepositories, configInput.AllowedFederationEndpoints)
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, err)
 					return
@@ -174,7 +194,7 @@ func MakeConfigUpdateHandler(cfg *types.Config, back kubernetes.Interface) gin.H
 				return
 			}
 		}
-		newConfigMap, err := getOSCARCMConfigurationCustomDefinition(cfg.AdditionalConfigPath, configInput.AllowedImageRepositories)
+		newConfigMap, err := getOSCARCMConfigurationCustomDefinition(cfg.AdditionalConfigPath, configInput.AllowedImageRepositories, configInput.AllowedFederationEndpoints)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, err)
 			return
@@ -191,28 +211,38 @@ func MakeConfigUpdateHandler(cfg *types.Config, back kubernetes.Interface) gin.H
 }
 
 func getOSCARCMConfigurationDefaultDefinition(name string) *v1.ConfigMap {
+	// Both keys are always written so that a later update (PUT /system/config)
+	// does not drop any of them from the ConfigMap.
 	return &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Data: map[string]string{
 			types.AIR: "[]",
+			types.AFE: "[]",
 		},
 	}
 }
 
-func getOSCARCMConfigurationCustomDefinition(name string, air []string) (*v1.ConfigMap, error) {
-	data, err := json.Marshal(air)
+// getOSCARCMConfigurationCustomDefinition builds the additional configuration
+// ConfigMap with both the allowed_image_repositories and the
+// allowed_federation_endpoints keys, so updating one never wipes the other.
+func getOSCARCMConfigurationCustomDefinition(name string, air, afe []string) (*v1.ConfigMap, error) {
+	airData, err := json.Marshal(air)
 	if err != nil {
 		return nil, err
 	}
-	dataString := string(data)
+	afeData, err := json.Marshal(afe)
+	if err != nil {
+		return nil, err
+	}
 	return &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Data: map[string]string{
-			types.AIR: dataString,
+			types.AIR: string(airData),
+			types.AFE: string(afeData),
 		},
 	}, nil
 }

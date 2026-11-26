@@ -30,10 +30,10 @@ func TestCreateAndUpdateRejectUnsafeMountBeforeMutation(t *testing.T) {
 				r := gin.New()
 				cfg := &types.Config{MinIOProvider: &types.MinIOProvider{}}
 				if method == http.MethodPost {
-					r.POST("/system/services", MakeCreateHandler(cfg, back))
+					r.POST("/system/services", MakeCreateHandler(cfg, back, nil))
 				} else {
 					back.Service = &types.Service{Name: "svc"}
-					r.PUT("/system/services", MakeUpdateHandler(cfg, back))
+					r.PUT("/system/services", MakeUpdateHandler(cfg, back, nil))
 				}
 				body := fmt.Sprintf(`{"name":"svc","image":"img","script":"echo test","mount":{"storage_provider":"minio.default","path":"notebook","options":%q}}`, options)
 				resp := httptest.NewRecorder()
@@ -78,7 +78,7 @@ func TestMakeUpdateHandlerRejectsForgedOwnerBeforeSecretCopy(t *testing.T) {
 		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(client, "owner"))
 		c.Next()
 	})
-	r.PUT("/system/services", MakeUpdateHandler(&types.Config{MinIOProvider: &types.MinIOProvider{}}, back))
+	r.PUT("/system/services", MakeUpdateHandler(&types.Config{MinIOProvider: &types.MinIOProvider{}}, back, nil))
 	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(`{"name":"svc","owner":"victim","image":"img","script":"echo"}`))
 	req.Header.Set("Authorization", "Bearer token")
 	resp := httptest.NewRecorder()
@@ -145,7 +145,7 @@ func TestMakeUpdateHandler(t *testing.T) {
 		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "somelonguid@egi.eu"))
 		c.Next()
 	})
-	r.PUT("/system/services", MakeUpdateHandler(&cfg, back))
+	r.PUT("/system/services", MakeUpdateHandler(&cfg, back, nil))
 
 	w := httptest.NewRecorder()
 	body := strings.NewReader(`
@@ -238,7 +238,7 @@ func TestMakeUpdateHandlerDeletesRemovedUserBucketDespiteRetainPolicy(t *testing
 	}
 
 	router := gin.New()
-	router.PUT("/system/services", MakeUpdateHandler(cfg, back))
+	router.PUT("/system/services", MakeUpdateHandler(cfg, back, nil))
 	body := `{
 		"name":"svc",
 		"image":"img",
@@ -326,7 +326,7 @@ func TestMakeUpdateHandlerVOTransitions(t *testing.T) {
 				c.Set("multitenancyConfig", auth.NewMultitenancyConfig(client, "owner"))
 				c.Next()
 			})
-			r.PUT("/system/services", MakeUpdateHandler(cfg, back))
+			r.PUT("/system/services", MakeUpdateHandler(cfg, back, nil))
 			body := fmt.Sprintf(`{"name":"svc","vo":%q,"image":"img","script":"echo","environment":{"secrets":{"PASSWORD":"value"}}}`, tc.vo)
 			req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
 			req.Header.Set("Authorization", tc.authorization)
@@ -376,7 +376,7 @@ func TestMakeUpdateHandlerForbiddenOwner(t *testing.T) {
 		c.Set("uidOrigin", "other")
 		c.Next()
 	})
-	r.PUT("/system/services", MakeUpdateHandler(cfg, back))
+	r.PUT("/system/services", MakeUpdateHandler(cfg, back, nil))
 
 	body := `{"name":"svc","image":"img","script":"echo","token":"t","visibility":"private"}`
 	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
@@ -413,7 +413,7 @@ func TestMakeUpdateHandlerRejectsVolumeMutation(t *testing.T) {
 		c.Set("uidOrigin", "owner")
 		c.Next()
 	})
-	r.PUT("/system/services", MakeUpdateHandler(cfg, back))
+	r.PUT("/system/services", MakeUpdateHandler(cfg, back, nil))
 
 	body := `{"name":"svc","image":"img","script":"echo","volume":{"size":"2Gi","mount_path":"/data"}}`
 	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
@@ -476,7 +476,7 @@ func TestMakeUpdateHandlerLegacyServiceWithoutVolume(t *testing.T) {
 		c.Set("multitenancyConfig", auth.NewMultitenancyConfig(kubeClientset, "owner@example.com"))
 		c.Next()
 	})
-	r.PUT("/system/services", MakeUpdateHandler(cfg, back))
+	r.PUT("/system/services", MakeUpdateHandler(cfg, back, nil))
 
 	body := `{"name":"svc","cluster_id":"oscar","memory":"1Gi","cpu":"1.0","log_level":"CRITICAL","image":"ghcr.io/grycap/cowsay","script":"echo hi","allowed_users":[]}`
 	req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(body))
@@ -602,7 +602,7 @@ func TestMakeUpdateHandlerValidatesModelServingUpdates(t *testing.T) {
 			back := backends.MakeFakeBackend()
 			back.Service = tt.oldService
 			router := gin.New()
-			router.PUT("/system/services", MakeUpdateHandler(tt.cfg, back))
+			router.PUT("/system/services", MakeUpdateHandler(tt.cfg, back, nil))
 
 			req := httptest.NewRequest(http.MethodPut, "/system/services", strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
