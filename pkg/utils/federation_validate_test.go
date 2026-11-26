@@ -255,7 +255,7 @@ func TestFederationTargetEnforcesValidation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("followed redirect chain: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected status 200, got %d", resp.StatusCode)
 		}
@@ -303,7 +303,7 @@ func TestFederationTargetEnforcesValidation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("request to allowlisted destination failed: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected status 200, got %d", resp.StatusCode)
 		}
