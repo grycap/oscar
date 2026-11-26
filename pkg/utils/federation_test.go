@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -56,7 +57,12 @@ func TestExpandFederationUsesDestinationNamespace(t *testing.T) {
 				}},
 				Clusters: map[string]types.Cluster{"target": {Endpoint: target.URL}},
 			}
-			if errs := ExpandFederation(origin, "Bearer test", method, ""); len(errs) != 0 {
+			targetURL, err := url.Parse(target.URL)
+			if err != nil {
+				t.Fatalf("parse target URL: %v", err)
+			}
+			allowlist := NewFederationAllowlist([]string{targetURL.Host})
+			if errs := ExpandFederation(origin, "Bearer test", method, "", allowlist); len(errs) != 0 {
 				t.Fatalf("federation failed: %v", errs)
 			}
 			if origin.Namespace != "oscar-user-origin" {
@@ -68,14 +74,14 @@ func TestExpandFederationUsesDestinationNamespace(t *testing.T) {
 
 func TestExpandFederation(t *testing.T) {
 	t.Run("nil service", func(t *testing.T) {
-		if errs := ExpandFederation(nil, "", "", ""); errs != nil {
+		if errs := ExpandFederation(nil, "", "", "", nil); errs != nil {
 			t.Errorf("expected nil, got %v", errs)
 		}
 	})
 
 	t.Run("nil Federation", func(t *testing.T) {
 		svc := &types.Service{Name: "test"}
-		if errs := ExpandFederation(svc, "", "", ""); errs != nil {
+		if errs := ExpandFederation(svc, "", "", "", nil); errs != nil {
 			t.Errorf("expected nil, got %v", errs)
 		}
 	})
@@ -85,7 +91,7 @@ func TestExpandFederation(t *testing.T) {
 			Name:       "test",
 			Federation: &types.Federation{},
 		}
-		if errs := ExpandFederation(svc, "", "", ""); errs != nil {
+		if errs := ExpandFederation(svc, "", "", "", nil); errs != nil {
 			t.Errorf("expected nil, got %v", errs)
 		}
 	})
@@ -100,7 +106,7 @@ func TestExpandFederation(t *testing.T) {
 			},
 			Clusters: map[string]types.Cluster{},
 		}
-		errs := ExpandFederation(svc, "", "", "")
+		errs := ExpandFederation(svc, "", "", "", nil)
 		if len(errs) != 1 {
 			t.Fatalf("expected 1 error, got %d", len(errs))
 		}
@@ -112,14 +118,14 @@ func TestExpandFederation(t *testing.T) {
 
 func TestVerifyFederationAuth(t *testing.T) {
 	t.Run("nil service", func(t *testing.T) {
-		if errs := VerifyFederationAuth(nil, ""); errs != nil {
+		if errs := VerifyFederationAuth(nil, "", nil); errs != nil {
 			t.Errorf("expected nil, got %v", errs)
 		}
 	})
 
 	t.Run("nil Federation", func(t *testing.T) {
 		svc := &types.Service{Name: "test"}
-		if errs := VerifyFederationAuth(svc, ""); errs != nil {
+		if errs := VerifyFederationAuth(svc, "", nil); errs != nil {
 			t.Errorf("expected nil, got %v", errs)
 		}
 	})
@@ -129,7 +135,7 @@ func TestVerifyFederationAuth(t *testing.T) {
 			Name:       "test",
 			Federation: &types.Federation{},
 		}
-		if errs := VerifyFederationAuth(svc, ""); errs != nil {
+		if errs := VerifyFederationAuth(svc, "", nil); errs != nil {
 			t.Errorf("expected nil, got %v", errs)
 		}
 	})
@@ -143,7 +149,7 @@ func TestVerifyFederationAuth(t *testing.T) {
 				},
 			},
 		}
-		if errs := VerifyFederationAuth(svc, ""); errs != nil {
+		if errs := VerifyFederationAuth(svc, "", nil); errs != nil {
 			t.Errorf("expected nil, got %v", errs)
 		}
 	})
@@ -158,7 +164,7 @@ func TestVerifyFederationAuth(t *testing.T) {
 			},
 			Clusters: map[string]types.Cluster{},
 		}
-		errs := VerifyFederationAuth(svc, "")
+		errs := VerifyFederationAuth(svc, "", nil)
 		if len(errs) != 1 {
 			t.Fatalf("expected 1 error, got %d", len(errs))
 		}
@@ -170,14 +176,14 @@ func TestVerifyFederationAuth(t *testing.T) {
 
 func TestRollbackFederationCreate(t *testing.T) {
 	t.Run("nil service", func(t *testing.T) {
-		if errs := RollbackFederationCreate(nil, ""); errs != nil {
+		if errs := RollbackFederationCreate(nil, "", nil); errs != nil {
 			t.Errorf("expected nil, got %v", errs)
 		}
 	})
 
 	t.Run("nil Federation", func(t *testing.T) {
 		svc := &types.Service{Name: "test"}
-		if errs := RollbackFederationCreate(svc, ""); errs != nil {
+		if errs := RollbackFederationCreate(svc, "", nil); errs != nil {
 			t.Errorf("expected nil, got %v", errs)
 		}
 	})
@@ -187,7 +193,7 @@ func TestRollbackFederationCreate(t *testing.T) {
 			Name:       "test",
 			Federation: &types.Federation{},
 		}
-		if errs := RollbackFederationCreate(svc, ""); errs != nil {
+		if errs := RollbackFederationCreate(svc, "", nil); errs != nil {
 			t.Errorf("expected nil, got %v", errs)
 		}
 	})
@@ -201,7 +207,7 @@ func TestRollbackFederationCreate(t *testing.T) {
 				},
 			},
 		}
-		if errs := RollbackFederationCreate(svc, ""); errs != nil {
+		if errs := RollbackFederationCreate(svc, "", nil); errs != nil {
 			t.Errorf("expected nil, got %v", errs)
 		}
 	})
@@ -216,7 +222,7 @@ func TestRollbackFederationCreate(t *testing.T) {
 			},
 			Clusters: map[string]types.Cluster{},
 		}
-		errs := RollbackFederationCreate(svc, "")
+		errs := RollbackFederationCreate(svc, "", nil)
 		if len(errs) != 1 {
 			t.Fatalf("expected 1 error, got %d", len(errs))
 		}

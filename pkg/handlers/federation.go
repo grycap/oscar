@@ -80,9 +80,9 @@ func MakeFederationGetHandler(back types.ServerlessBackend) gin.HandlerFunc {
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/federation/{serviceName} [post]
-func MakeFederationPostHandler(back types.ServerlessBackend) gin.HandlerFunc {
+func MakeFederationPostHandler(back types.ServerlessBackend, allowlist *utils.FederationAllowlist) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		updated, ok := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) error {
+		updated, ok := updateFederationFromRequest(c, back, allowlist, func(service *types.Service, req *types.FederationRequest) error {
 			if service.Federation == nil {
 				service.Federation = &types.Federation{}
 			}
@@ -113,9 +113,9 @@ func MakeFederationPostHandler(back types.ServerlessBackend) gin.HandlerFunc {
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/federation/{serviceName} [put]
-func MakeFederationPutHandler(back types.ServerlessBackend) gin.HandlerFunc {
+func MakeFederationPutHandler(back types.ServerlessBackend, allowlist *utils.FederationAllowlist) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		updated, ok := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) error {
+		updated, ok := updateFederationFromRequest(c, back, allowlist, func(service *types.Service, req *types.FederationRequest) error {
 			if service.Federation == nil {
 				service.Federation = &types.Federation{}
 			}
@@ -152,9 +152,9 @@ func MakeFederationPutHandler(back types.ServerlessBackend) gin.HandlerFunc {
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/federation/{serviceName} [delete]
-func MakeFederationDeleteHandler(back types.ServerlessBackend) gin.HandlerFunc {
+func MakeFederationDeleteHandler(back types.ServerlessBackend, allowlist *utils.FederationAllowlist) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		updated, ok := updateFederationFromRequest(c, back, func(service *types.Service, req *types.FederationRequest) error {
+		updated, ok := updateFederationFromRequest(c, back, allowlist, func(service *types.Service, req *types.FederationRequest) error {
 			if service.Federation == nil {
 				service.Federation = &types.Federation{}
 			}
@@ -185,7 +185,7 @@ func MakeFederationDeleteHandler(back types.ServerlessBackend) gin.HandlerFunc {
 	}
 }
 
-func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, mutator func(service *types.Service, req *types.FederationRequest) error) (*types.FederationResponse, bool) {
+func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, allowlist *utils.FederationAllowlist, mutator func(service *types.Service, req *types.FederationRequest) error) (*types.FederationResponse, bool) {
 	var req types.FederationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.String(http.StatusBadRequest, fmt.Sprintf("Invalid payload: %v", err))
@@ -195,6 +195,23 @@ func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, m
 	service, ok := getAuthorizedServiceOwner(c, back, c.Param("serviceName"))
 	if !ok {
 		return nil, false
+	}
+
+	// Federation cluster entries can only be added or changed through this
+	// API, so only new or changed endpoints are validated (and can be
+	// rejected with 400). This happens before the merge, so a rejected
+	// endpoint never mutates the stored service, and requests without new
+	// or changed clusters (for example an empty payload) continue to work.
+	preRequestClusters := service.Clusters
+	for clusterID, cluster := range req.Clusters {
+		oldCluster, known := preRequestClusters[clusterID]
+		if known && oldCluster.Endpoint == cluster.Endpoint {
+			continue
+		}
+		if err := utils.ValidateFederationEndpoint(cluster.Endpoint, allowlist); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("federation endpoint %q (cluster %q) is not allowed: %v", cluster.Endpoint, clusterID, err))
+			return nil, false
+		}
 	}
 
 	if req.Clusters != nil {
@@ -229,7 +246,7 @@ func updateFederationFromRequest(c *gin.Context, back types.ServerlessBackend, m
 			c.String(http.StatusInternalServerError, "error reading refresh-token secret: %v", err)
 			return nil, false
 		}
-		if errs := utils.ExpandFederation(service, authHeader, http.MethodPut, refreshToken); len(errs) > 0 {
+		if errs := utils.ExpandFederation(service, authHeader, http.MethodPut, refreshToken, allowlist); len(errs) > 0 {
 			c.String(http.StatusOK, fmt.Sprintf("Updated with federation warnings: %v", errs))
 			return nil, false
 		}

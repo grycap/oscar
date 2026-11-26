@@ -32,6 +32,7 @@ limitations under the License.
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -43,7 +44,9 @@ import (
 	"github.com/grycap/oscar/v4/pkg/metrics"
 	"github.com/grycap/oscar/v4/pkg/resourcemanager"
 	"github.com/grycap/oscar/v4/pkg/types"
+	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	versioned "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
@@ -74,6 +77,26 @@ func main() {
 
 	// Create the ServerlessBackend
 	back := backends.MakeServerlessBackend(kubeClientset, kubeConfig, cfg)
+
+	// Read the federation allowlist from the additional-config ConfigMap.
+	// Fail-closed: on read or parse errors the allowlist stays nil, so every
+	// federation endpoint is subject to the IP range checks and no caller
+	// credentials are forwarded anywhere. A ConfigMap that does not exist
+	// yet simply means the allowlist is empty.
+	var federationAllowlist *utils.FederationAllowlist
+	cm, cmErr := backends.GetOSCARCMConfiguration(kubeClientset, cfg.AdditionalConfigPath, cfg.Namespace)
+	if cmErr != nil {
+		if !apierrors.IsNotFound(cmErr) {
+			log.Printf("could not read the additional-config ConfigMap, the federation allowlist is empty: %v", cmErr)
+		}
+	} else if raw, ok := cm.Data[types.AFE]; ok {
+		var endpoints []string
+		if jsonErr := json.Unmarshal([]byte(raw), &endpoints); jsonErr != nil {
+			log.Printf("could not parse %s in the additional-config ConfigMap, the federation allowlist is empty: %v", types.AFE, jsonErr)
+		} else {
+			federationAllowlist = utils.NewFederationAllowlist(endpoints)
+		}
+	}
 
 	// Start OpenFaaS Scaler
 	/*if cfg.ServerlessBackend == "openfaas" && cfg.OpenfaasScalerEnable {
@@ -119,7 +142,7 @@ func main() {
 	system.PUT("/config", handlers.MakeConfigUpdateHandler(cfg, kubeClientset))
 
 	// CRUD Services
-	system.POST("/services", handlers.MakeCreateHandler(cfg, back))
+	system.POST("/services", handlers.MakeCreateHandler(cfg, back, federationAllowlist))
 	system.GET("/services", handlers.MakeListHandler(back, kubeClientset, cfg))
 	system.GET("/services/:serviceName", handlers.MakeReadHandler(back, kubeClientset, cfg))
 	system.GET("/services/:serviceName/deployment", handlers.MakeGetDeploymentStatusHandler(back, kubeClientset, cfg))
@@ -127,14 +150,14 @@ func main() {
 	system.POST("/services/:serviceName/stop", handlers.MakeStopExposedServiceHandler(back, kubeClientset, cfg))
 	system.POST("/services/:serviceName/start", handlers.MakeStartExposedServiceHandler(back, kubeClientset, cfg))
 	system.POST("/services/:serviceName/restart", handlers.MakeRestartExposedServiceHandler(back, kubeClientset, cfg))
-	system.PUT("/services", handlers.MakeUpdateHandler(cfg, back))
+	system.PUT("/services", handlers.MakeUpdateHandler(cfg, back, federationAllowlist))
 	system.DELETE("/services/:serviceName", handlers.MakeDeleteHandler(cfg, back))
 
 	// CRUD Replicas (federation)
 	system.GET("/federation/:serviceName", handlers.MakeFederationGetHandler(back))
-	system.POST("/federation/:serviceName", handlers.MakeFederationPostHandler(back))
-	system.PUT("/federation/:serviceName", handlers.MakeFederationPutHandler(back))
-	system.DELETE("/federation/:serviceName", handlers.MakeFederationDeleteHandler(back))
+	system.POST("/federation/:serviceName", handlers.MakeFederationPostHandler(back, federationAllowlist))
+	system.PUT("/federation/:serviceName", handlers.MakeFederationPutHandler(back, federationAllowlist))
+	system.DELETE("/federation/:serviceName", handlers.MakeFederationDeleteHandler(back, federationAllowlist))
 
 	// CRUD Volumes
 	if cfg.VolumeEnable {

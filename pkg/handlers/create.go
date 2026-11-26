@@ -63,7 +63,7 @@ var createLogger = log.New(os.Stdout, "[CREATE-HANDLER] ", log.Flags())
 // @Security BasicAuth
 // @Security BearerAuth
 // @Router /system/services [post]
-func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.HandlerFunc {
+func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend, allowlist *utils.FederationAllowlist) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var service types.Service
 		isAdminUser := false
@@ -244,7 +244,15 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			return
 		}
 		if service.HasFederationMembers() {
-			authErrors := utils.VerifyFederationAuth(&service, authHeader)
+			// In a new service every cluster endpoint is new, so every one of
+			// them is validated before any federation traffic is sent.
+			for clusterID, cluster := range service.Clusters {
+				if err := utils.ValidateFederationEndpoint(cluster.Endpoint, allowlist); err != nil {
+					c.String(http.StatusBadRequest, fmt.Sprintf("federation endpoint %q (cluster %q) is not allowed: %v", cluster.Endpoint, clusterID, err))
+					return
+				}
+			}
+			authErrors := utils.VerifyFederationAuth(&service, authHeader, allowlist)
 			if len(authErrors) > 0 {
 				c.String(http.StatusUnauthorized, fmt.Sprintf("federation auth failed: %v", authErrors))
 				return
@@ -463,12 +471,12 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 			federated.Input = rawInput
 			federated.Output = rawOutput
-			federationErrors = utils.ExpandFederation(&federated, authHeader, http.MethodPost, refreshToken)
+			federationErrors = utils.ExpandFederation(&federated, authHeader, http.MethodPost, refreshToken, allowlist)
 		}
 	skipFederationExpansion:
 
 		if len(federationErrors) > 0 {
-			rollbackErrors := utils.RollbackFederationCreate(&federated, authHeader)
+			rollbackErrors := utils.RollbackFederationCreate(&federated, authHeader, allowlist)
 			if err := back.DeleteService(service); err != nil {
 				rollbackErrors = append(rollbackErrors, fmt.Errorf("local rollback failed: %v", err))
 			}
