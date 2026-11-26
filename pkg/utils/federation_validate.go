@@ -362,7 +362,7 @@ func NewFederationTarget(endpoint string, cluster types.Cluster, allowlist *Fede
 				return fmt.Errorf("federation request to %s exceeded %d redirects", via[0].URL, maxFederationRedirects)
 			}
 			if err := validateFederationEndpoint(req.URL.String(), allowlist); err != nil {
-				log.Printf("federation request aborted: redirect to %s is not allowed: %v", req.URL, err)
+				log.Printf("federation request aborted: redirect to %s is not allowed: %v", req.URL, err) // #nosec G706 -- req.URL is a parsed *url.URL logged on purpose to audit rejected redirects
 				return fmt.Errorf("redirect to %s is not allowed: %v", req.URL, err)
 			}
 			return nil
